@@ -12,7 +12,7 @@ func Query(l Logger, d trace.Detailer, opts ...Option) (t trace.Query) {
 	return internalQuery(wrapLogger(l, opts...), d)
 }
 
-//nolint:gocyclo
+//nolint:gocyclo,funlen
 func internalQuery(
 	l *wrapper, //nolint:interfacer
 	d trace.Detailer,
@@ -261,6 +261,58 @@ func internalQuery(
 				}
 			}
 		},
+		OnReadRow: func(info trace.QueryReadRowStartInfo) func(trace.QueryReadRowDoneInfo) {
+			if d.Details()&trace.QueryEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "read", "row")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryReadRowDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := ERROR
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnReadResultSet: func(info trace.QueryReadResultSetStartInfo) func(trace.QueryReadResultSetDoneInfo) {
+			if d.Details()&trace.QueryEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "read", "result", "set")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryReadResultSetDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := ERROR
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
 		OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(info trace.QuerySessionCreateDoneInfo) {
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil
@@ -474,6 +526,7 @@ func internalQuery(
 			return func(info trace.QueryResultNextPartDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
+						Stringer("stats", info.Stats),
 						latencyField(start),
 					)
 				} else {

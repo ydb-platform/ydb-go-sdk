@@ -21,7 +21,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestScripting(t *testing.T) {
+func TestScripting(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	ctx := xtest.Context(t)
 
 	db, err := ydb.Open(ctx,

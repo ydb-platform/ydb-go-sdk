@@ -60,6 +60,7 @@ func (c *Client) Execute(
 	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 
 	return r, xerrors.WithStackTrace(err)
@@ -139,6 +140,7 @@ func (c *Client) Explain(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 
 	return e, xerrors.WithStackTrace(err)
@@ -213,11 +215,13 @@ func (c *Client) StreamExecute(
 	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 
 	return r, xerrors.WithStackTrace(err)
 }
 
+//nolint:funlen
 func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,

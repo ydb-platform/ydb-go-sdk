@@ -2,10 +2,12 @@ package query
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -20,23 +22,74 @@ import (
 
 //go:generate mockgen -destination grpc_client_mock_test.go -package query -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1 QueryServiceClient,QueryService_AttachSessionClient,QueryService_ExecuteQueryClient
 
-type nodeChecker interface {
-	HasNode(id uint32) bool
+var (
+	_ query.Client = (*Client)(nil)
+	_ sessionPool  = (*poolStub)(nil)
+	_ sessionPool  = (*pool.Pool[*Session, Session])(nil)
+)
+
+type (
+	sessionPool interface {
+		closer.Closer
+
+		Stats() stats.Stats
+		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
+	}
+	poolStub struct {
+		createSession func(ctx context.Context) (*Session, error)
+		InUse         atomic.Int32
+	}
+	Client struct {
+		config *config.Config
+		client Ydb_Query_V1.QueryServiceClient
+		pool   sessionPool
+
+		done chan struct{}
+	}
+)
+
+func (pool *poolStub) Close(ctx context.Context) error {
+	return nil
 }
 
-type balancer interface {
-	grpc.ClientConnInterface
-	nodeChecker
+func (pool *poolStub) Stats() stats.Stats {
+	return stats.Stats{
+		Limit: -1,
+		Index: 0,
+		Idle:  0,
+		InUse: int(pool.InUse.Load()),
+	}
 }
 
-var _ query.Client = (*Client)(nil)
+func (pool *poolStub) With(
+	ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option,
+) error {
+	pool.InUse.Add(1)
+	defer func() {
+		pool.InUse.Add(-1)
+	}()
 
-type Client struct {
-	config     *config.Config
-	grpcClient Ydb_Query_V1.QueryServiceClient
-	pool       *pool.Pool[*Session, Session]
+	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
+		s, err := pool.createSession(ctx)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		defer func() {
+			_ = s.Close(ctx)
+		}()
 
-	done chan struct{}
+		err = f(ctx, s)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	}, opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (c *Client) Stats() *stats.Stats {
@@ -48,8 +101,7 @@ func (c *Client) Stats() *stats.Stats {
 func (c *Client) Close(ctx context.Context) error {
 	close(c.done)
 
-	err := c.pool.Close(ctx)
-	if err != nil {
+	if err := c.pool.Close(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -58,67 +110,62 @@ func (c *Client) Close(ctx context.Context) error {
 
 func do(
 	ctx context.Context,
-	pool *pool.Pool[*Session, Session],
+	pool sessionPool,
 	op query.Operation,
-	t *trace.Query,
-	opts ...options.DoOption,
-) (attempts int, finalErr error) {
-	doOpts := options.ParseDoOpts(t, opts...)
-
+	opts ...retry.Option,
+) (finalErr error) {
 	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
 		s.setStatus(statusInUse)
 
 		err := op(ctx, s)
 		if err != nil {
-			if !xerrors.IsRetryObjectValid(err) {
-				s.setStatus(statusError)
-			}
-
 			return xerrors.WithStackTrace(err)
 		}
 
 		s.setStatus(statusIdle)
 
 		return nil
-	}, append(doOpts.RetryOpts(), retry.WithTrace(&trace.Retry{
-		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-			return func(info trace.RetryLoopDoneInfo) {
-				attempts = info.Attempts
-			}
-		},
-	}))...)
+	}, opts...)
 	if err != nil {
-		return attempts, xerrors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
-	return attempts, nil
+	return nil
 }
 
-func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
-	select {
-	case <-c.done:
-		return xerrors.WithStackTrace(errClosedClient)
-	default:
-		onDone := trace.QueryOnDo(c.config.Trace(), &ctx,
+func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
+	var (
+		onDone = trace.QueryOnDo(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
 		)
-		attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
-		onDone(attempts, err)
+		attempts = 0
+	)
+	defer func() {
+		onDone(attempts, finalErr)
+	}()
 
-		return err
-	}
+	err := do(ctx, c.pool, func(ctx context.Context, s query.Session) error {
+		attempts++
+
+		return op(ctx, s)
+	}, options.ParseDoOpts(c.config.Trace(), opts...).RetryOpts()...)
+
+	return err
 }
 
 func doTx(
 	ctx context.Context,
-	pool *pool.Pool[*Session, Session],
+	pool sessionPool,
 	op query.TxOperation,
 	t *trace.Query,
 	opts ...options.DoTxOption,
-) (attempts int, err error) {
+) (finalErr error) {
 	doTxOpts := options.ParseDoTxOpts(t, opts...)
 
-	attempts, err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
+	err := do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
 		tx, err := s.Begin(ctx, doTxOpts.TxSettings())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -143,47 +190,180 @@ func doTx(
 		}
 
 		return nil
-	}, t, doTxOpts.DoOpts()...)
+	}, doTxOpts.RetryOpts()...)
 	if err != nil {
-		return attempts, xerrors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
-	return attempts, nil
+	return nil
 }
 
-func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (err error) {
-	select {
-	case <-c.done:
-		return xerrors.WithStackTrace(errClosedClient)
-	default:
-		onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx,
+// ReadRow is a helper which read only one row from first result set in result
+func (c *Client) ReadRow(ctx context.Context, q string, opts ...options.ExecuteOption) (row query.Row, err error) {
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
+	onDone := trace.QueryOnReadRow(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).ReadRow"),
+		q,
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	err = do(ctx, c.pool, func(ctx context.Context, s query.Session) (err error) {
+		row, err = s.ReadRow(ctx, q, opts...)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
+}
+
+func clientExecute(ctx context.Context,
+	pool sessionPool,
+	q string, opts ...options.ExecuteOption,
+) (r query.Result, err error) {
+	err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
+		_, streamResult, err := s.Execute(ctx, q, opts...)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		defer func() {
+			_ = streamResult.Close(ctx)
+		}()
+
+		r, err = resultToMaterializedResult(ctx, streamResult)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		if err = r.Err(); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
+}
+
+func (c *Client) Execute(ctx context.Context, q string, opts ...options.ExecuteOption) (_ query.Result, err error) {
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
+	onDone := trace.QueryOnExecute(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Execute"),
+		q,
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	r, err := clientExecute(ctx, c.pool, q, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
+}
+
+// ReadResultSet is a helper which read all rows from first result set in result
+func (c *Client) ReadResultSet(
+	ctx context.Context, q string, opts ...options.ExecuteOption,
+) (rs query.ResultSet, err error) {
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
+	onDone := trace.QueryOnReadResultSet(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).ReadResultSet"),
+		q,
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	err = do(ctx, c.pool, func(ctx context.Context, s query.Session) (err error) {
+		rs, err = s.ReadResultSet(ctx, q, opts...)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rs, nil
+}
+
+func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (finalErr error) {
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
+	var (
+		onDone = trace.QueryOnDoTx(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
 		)
-		attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
-		onDone(attempts, err)
+		attempts = 0
+	)
+	defer func() {
+		onDone(attempts, finalErr)
+	}()
 
-		return err
+	err := doTx(ctx, c.pool, func(ctx context.Context, tx query.TxActor) error {
+		attempts++
+
+		return op(ctx, tx)
+	}, c.config.Trace(), opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+func newPool(
+	ctx context.Context, cfg *config.Config, createSession func(ctx context.Context) (*Session, error),
+) sessionPool {
+	if cfg.UseSessionPool() {
+		return pool.New(ctx,
+			pool.WithLimit[*Session, Session](cfg.PoolLimit()),
+			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
+			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
+			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
+			pool.WithCreateFunc(createSession),
+		)
+	}
+
+	return &poolStub{
+		createSession: createSession,
 	}
 }
 
-func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
+func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.New"),
 	)
 	defer onDone()
 
-	client := &Client{
-		config:     cfg,
-		grpcClient: Ydb_Query_V1.NewQueryServiceClient(balancer),
-		done:       make(chan struct{}),
-	}
+	grpcClient := Ydb_Query_V1.NewQueryServiceClient(balancer)
 
-	client.pool = pool.New(ctx,
-		pool.WithLimit[*Session, Session](cfg.PoolLimit()),
-		pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
-		pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
-		pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
-		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
+	client := &Client{
+		config: cfg,
+		client: grpcClient,
+		done:   make(chan struct{}),
+		pool: newPool(ctx, cfg, func(ctx context.Context) (_ *Session, err error) {
 			var (
 				createCtx    context.Context
 				cancelCreate context.CancelFunc
@@ -195,18 +375,14 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 			}
 			defer cancelCreate()
 
-			s, err := createSession(createCtx, client.grpcClient, cfg,
-				withSessionCheck(func(s *Session) bool {
-					return balancer.HasNode(uint32(s.nodeID))
-				}),
-			)
+			s, err := createSession(createCtx, grpcClient, cfg)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
 
 			return s, nil
 		}),
-	)
+	}
 
 	return client
 }

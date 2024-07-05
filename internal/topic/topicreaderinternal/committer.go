@@ -52,16 +52,20 @@ type committer struct {
 	commits CommitRanges
 }
 
-func newCommitter(tracer *trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer { //nolint:lll,revive
+func newCommitterStopped(
+	tracer *trace.Topic,
+	lifeContext context.Context, //nolint:revive
+	mode PublicCommitMode,
+	send sendMessageToServerFunc,
+) *committer {
 	res := &committer{
 		mode:             mode,
 		clock:            clockwork.NewRealClock(),
 		send:             send,
-		backgroundWorker: *background.NewWorker(lifeContext),
+		backgroundWorker: *background.NewWorker(lifeContext, "ydb-topic-reader-committer"),
 		tracer:           tracer,
 	}
 	res.initChannels()
-	res.start()
 
 	return res
 }
@@ -70,7 +74,7 @@ func (c *committer) initChannels() {
 	c.commitLoopSignal = make(empty.Chan, 1)
 }
 
-func (c *committer) start() {
+func (c *committer) Start() {
 	c.backgroundWorker.Start("commit pusher", c.pushCommitsLoop)
 }
 
@@ -126,7 +130,7 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 		var commits CommitRanges
 		c.m.WithLock(func() {
 			commits = c.commits
-			c.commits = NewCommitRangesWithCapacity(commits.len() * 2)
+			c.commits = NewCommitRangesWithCapacity(commits.len() * 2) //nolint:gomnd
 		})
 
 		if commits.len() == 0 && c.backgroundWorker.Context().Err() != nil {
@@ -166,7 +170,10 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 		return
 	}
 
-	finish := c.clock.After(c.BufferTimeLagTrigger)
+	bufferTimeLagTriggerTimer := c.clock.NewTimer(c.BufferTimeLagTrigger)
+	defer bufferTimeLagTriggerTimer.Stop()
+
+	finish := bufferTimeLagTriggerTimer.Chan()
 	if c.BufferCountTrigger == 0 {
 		select {
 		case <-ctxDone:

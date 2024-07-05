@@ -9,10 +9,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
@@ -36,8 +36,7 @@ type streamResult struct {
 
 // Err returns error caused Scanner to be broken.
 func (r *streamResult) Err() error {
-	err := r.valueScanner.Err()
-	if err != nil {
+	if err := r.valueScanner.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -53,8 +52,7 @@ type unaryResult struct {
 
 // Err returns error caused Scanner to be broken.
 func (r *unaryResult) Err() error {
-	err := r.valueScanner.Err()
-	if err != nil {
+	if err := r.valueScanner.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -170,7 +168,7 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 
 func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) (err error) {
 	// skipping second recv because first call of recv is from New Stream(), second call is from user
-	if r.nextResultSetCounter.Add(1) == 2 {
+	if r.nextResultSetCounter.Add(1) == 2 { //nolint:gomnd
 		r.setColumnIndexes(columns)
 
 		return ctx.Err()
@@ -223,16 +221,10 @@ func (r *baseResult) CurrentResultSet() result.Set {
 
 // Stats returns query execution queryStats.
 func (r *baseResult) Stats() stats.QueryStats {
-	var s queryStats
-	r.statsMtx.WithRLock(func() {
-		s.stats = r.stats
-	})
+	r.statsMtx.RLock()
+	defer r.statsMtx.RUnlock()
 
-	if s.stats == nil {
-		return nil
-	}
-
-	return &s
+	return stats.FromQueryStats(r.stats)
 }
 
 // Close closes the result, preventing further iteration.

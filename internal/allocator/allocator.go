@@ -1,6 +1,7 @@
 package allocator
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -67,6 +68,7 @@ func New() (v *Allocator) {
 	return allocatorPool.Get()
 }
 
+//nolint:funlen
 func (a *Allocator) Free() {
 	a.valueAllocator.free()
 	a.typeAllocator.free()
@@ -395,7 +397,7 @@ type structAllocator struct {
 func (a *structAllocator) Struct() (v *Ydb.StructType) {
 	v = structPool.Get()
 	if cap(v.GetMembers()) <= 0 {
-		v.Members = make([]*Ydb.StructMember, 0, 10)
+		v.Members = make([]*Ydb.StructMember, 0, 10) //nolint:gomnd
 	}
 	a.allocations = append(a.allocations, v)
 
@@ -1107,7 +1109,12 @@ func (p *Pool[T]) Get() *T {
 		v = &zero
 	}
 
-	return v.(*T)
+	val, ok := v.(*T)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *T", val))
+	}
+
+	return val
 }
 
 func (p *Pool[T]) Put(t *T) {

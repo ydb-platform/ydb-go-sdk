@@ -34,8 +34,9 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), opts).Return(batch, nil)
 
 		reader := &readerReconnector{
-			streamVal: baseReader,
-			tracer:    &trace.Topic{},
+			streamVal:           baseReader,
+			streamContextCancel: func(cause error) {},
+			tracer:              &trace.Topic{},
 		}
 		reader.initChannelsAndClock()
 		res, err := reader.ReadMessageBatch(context.Background(), opts)
@@ -163,7 +164,11 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
 		})
-		reconnector := &readerReconnector{streamVal: stream, tracer: &trace.Topic{}}
+		reconnector := &readerReconnector{
+			streamVal:           stream,
+			streamContextCancel: func(cause error) {},
+			tracer:              &trace.Topic{},
+		}
 		reconnector.initChannelsAndClock()
 		require.NoError(t, reconnector.Commit(ctx, expectedCommitRange))
 	})
@@ -174,7 +179,11 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
 		}).Return(testErr)
-		reconnector := &readerReconnector{streamVal: stream, tracer: &trace.Topic{}}
+		reconnector := &readerReconnector{
+			streamVal:           stream,
+			streamContextCancel: func(cause error) {},
+			tracer:              &trace.Topic{},
+		}
 		reconnector.initChannelsAndClock()
 		require.ErrorIs(t, reconnector.Commit(ctx, expectedCommitRange), testErr)
 	})
@@ -211,7 +220,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 
 		reconnector := &readerReconnector{
 			connectTimeout: value.InfiniteDuration,
-			background:     *background.NewWorker(ctx),
+			background:     *background.NewWorker(ctx, "test-worker, "+t.Name()),
 			tracer:         &trace.Topic{},
 		}
 		reconnector.initChannelsAndClock()

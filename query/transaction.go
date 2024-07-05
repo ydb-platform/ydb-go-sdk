@@ -8,11 +8,8 @@ import (
 )
 
 type (
-	TxIdentifier interface {
-		ID() string
-	}
 	TxActor interface {
-		TxIdentifier
+		tx.Identifier
 
 		// Execute executes query.
 		//
@@ -20,6 +17,20 @@ type (
 		// - DefaultTxControl
 		// - flag WithKeepInCache(true) if params is not empty.
 		Execute(ctx context.Context, query string, opts ...options.TxExecuteOption) (r Result, err error)
+
+		// ReadRow is a helper which read only one row from first result set in result
+		//
+		// ReadRow returns error if result contains more than one result set or more than one row
+		//
+		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+		ReadRow(ctx context.Context, query string, opts ...options.TxExecuteOption) (Row, error)
+
+		// ReadResultSet is a helper which read all rows from first result set in result
+		//
+		// ReadRow returns error if result contains more than one result set
+		//
+		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+		ReadResultSet(ctx context.Context, query string, opts ...options.TxExecuteOption) (ResultSet, error)
 	}
 	Transaction interface {
 		TxActor
@@ -29,10 +40,11 @@ type (
 	}
 	TransactionControl  = tx.Control
 	TransactionSettings = tx.Settings
+	TransactionOption   = tx.Option
 )
 
 // BeginTx returns selector transaction control option
-func BeginTx(opts ...tx.Option) tx.ControlOption {
+func BeginTx(opts ...TransactionOption) tx.ControlOption {
 	return tx.BeginTx(opts...)
 }
 
@@ -58,12 +70,9 @@ func NoTx() *TransactionControl {
 	return nil
 }
 
-// DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
+// DefaultTxControl returns default transaction control for use default tx control on server-side
 func DefaultTxControl() *TransactionControl {
-	return TxControl(
-		BeginTx(WithSerializableReadWrite()),
-		CommitTx(),
-	)
+	return NoTx()
 }
 
 // SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode
@@ -100,19 +109,19 @@ func TxSettings(opts ...tx.Option) TransactionSettings {
 	return opts
 }
 
-func WithDefaultTxMode() tx.Option {
+func WithDefaultTxMode() TransactionOption {
 	return tx.WithDefaultTxMode()
 }
 
-func WithSerializableReadWrite() tx.Option {
+func WithSerializableReadWrite() TransactionOption {
 	return tx.WithSerializableReadWrite()
 }
 
-func WithSnapshotReadOnly() tx.Option {
+func WithSnapshotReadOnly() TransactionOption {
 	return tx.WithSnapshotReadOnly()
 }
 
-func WithStaleReadOnly() tx.Option {
+func WithStaleReadOnly() TransactionOption {
 	return tx.WithStaleReadOnly()
 }
 
@@ -120,6 +129,6 @@ func WithInconsistentReads() tx.OnlineReadOnlyOption {
 	return tx.WithInconsistentReads()
 }
 
-func WithOnlineReadOnly(opts ...tx.OnlineReadOnlyOption) tx.Option {
+func WithOnlineReadOnly(opts ...tx.OnlineReadOnlyOption) TransactionOption {
 	return tx.WithOnlineReadOnly(opts...)
 }

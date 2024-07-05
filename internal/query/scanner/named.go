@@ -12,13 +12,25 @@ type (
 	NamedScanner struct {
 		data *data
 	}
-	NamedDestination struct {
+	namedDestination struct {
 		name string
 		ref  interface{}
 	}
+	NamedDestination interface {
+		Name() string
+		Ref() interface{}
+	}
 )
 
-func NamedRef(columnName string, destinationValueReference interface{}) (dst NamedDestination) {
+func (dst namedDestination) Name() string {
+	return dst.name
+}
+
+func (dst namedDestination) Ref() interface{} {
+	return dst.ref
+}
+
+func NamedRef(columnName string, destinationValueReference interface{}) (dst namedDestination) {
 	if columnName == "" {
 		panic("columnName must be not empty")
 	}
@@ -40,12 +52,12 @@ func Named(data *data) NamedScanner {
 
 func (s NamedScanner) ScanNamed(dst ...NamedDestination) (err error) {
 	for i := range dst {
-		v, err := s.data.seekByName(dst[i].name)
+		v, err := s.data.seekByName(dst[i].Name())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		if err = value.CastTo(v, dst[i].ref); err != nil {
-			return xerrors.WithStackTrace(err)
+		if err = value.CastTo(v, dst[i].Ref()); err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("scan error on column name '%s': %w", dst[i].Name(), err))
 		}
 	}
 

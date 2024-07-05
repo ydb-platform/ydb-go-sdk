@@ -411,7 +411,7 @@ func TestNamed(t *testing.T) {
 				{func(v uint64) *uint64 { return &v }(100500)},
 				{func(v int64) *int64 { return &v }(100500)},
 				{func(v int32) *int32 { return &v }(100500)},
-				{func(v time.Time) *time.Time { return &v }(time.Unix(8683200000, 0))},
+				{func(v time.Time) *time.Time { return &v }(time.Unix(8683200000, 0).UTC())},
 			},
 		},
 		{
@@ -547,7 +547,7 @@ func TestScannerNamedNotFoundByName(t *testing.T) {
 	))
 	var s string
 	err := scanner.ScanNamed(NamedRef("b", &s))
-	require.ErrorIs(t, err, errColumnsNotFoundInRow)
+	require.ErrorIs(t, err, ErrColumnsNotFoundInRow)
 }
 
 func TestScannerNamedOrdering(t *testing.T) {
@@ -618,25 +618,25 @@ func TestNamedRef(t *testing.T) {
 		{
 			name:  "",
 			ref:   nil,
-			dst:   NamedDestination{},
+			dst:   namedDestination{},
 			panic: true,
 		},
 		{
 			name:  "nil_ref",
 			ref:   nil,
-			dst:   NamedDestination{},
+			dst:   namedDestination{},
 			panic: true,
 		},
 		{
 			name:  "not_ref",
 			ref:   123,
-			dst:   NamedDestination{},
+			dst:   namedDestination{},
 			panic: true,
 		},
 		{
 			name: "int_ptr",
 			ref:  func(v int) *int { return &v }(123),
-			dst: NamedDestination{
+			dst: namedDestination{
 				name: "int_ptr",
 				ref:  func(v int) *int { return &v }(123),
 			},
@@ -649,7 +649,7 @@ func TestNamedRef(t *testing.T) {
 
 				return &vv
 			}(123),
-			dst: NamedDestination{
+			dst: namedDestination{
 				name: "int_dbl_ptr",
 				ref: func(v int) **int {
 					vv := &v
@@ -698,4 +698,29 @@ func TestNamedCastFailed(t *testing.T) {
 	var A uint64
 	err := scanner.ScanNamed(NamedRef("a", &A))
 	require.ErrorIs(t, err, value.ErrCannotCast)
+}
+
+func TestNamedCastFailedErrMsg(t *testing.T) {
+	scanner := Named(Data(
+		[]*Ydb.Column{
+			{
+				Name: "a",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var A uint64
+	err := scanner.ScanNamed(NamedRef("a", &A))
+	require.ErrorContains(t, err, "scan error on column name 'a': cast failed")
 }

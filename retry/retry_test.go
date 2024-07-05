@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func TestRetryModes(t *testing.T) {
@@ -186,4 +188,118 @@ func TestRetryTransportCancelled(t *testing.T) {
 			require.Equal(t, cancelCounterValue, counter)
 		})
 	}
+}
+
+type noQuota struct{}
+
+var errNoQuota = errors.New("no quota")
+
+func (noQuota) Acquire(ctx context.Context) error {
+	return errNoQuota
+}
+
+func TestRetryWithBudget(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		quota := noQuota{}
+		ctx, cancel := context.WithCancel(xtest.Context(t))
+		defer cancel()
+		err := Retry(ctx, func(ctx context.Context) (err error) {
+			return RetryableError(errors.New("custom error"))
+		}, WithBudget(quota))
+		require.ErrorIs(t, err, errNoQuota)
+	})
+}
+
+type MockPanicCallback struct {
+	called   bool
+	received interface{}
+}
+
+func (m *MockPanicCallback) Call(e interface{}) {
+	m.called = true
+	m.received = e
+}
+
+func TestOpWithRecover_NoPanic(t *testing.T) {
+	ctx := context.Background()
+	options := &retryOptions{
+		panicCallback: nil,
+	}
+	op := func(ctx context.Context) (*struct{}, error) {
+		return nil, nil //nolint:nilnil
+	}
+
+	_, err := opWithRecover(ctx, options, op)
+
+	require.NoError(t, err)
+}
+
+func TestOpWithRecover_WithPanic(t *testing.T) {
+	ctx := context.Background()
+	mockCallback := new(MockPanicCallback)
+	options := &retryOptions{
+		panicCallback: mockCallback.Call,
+	}
+	op := func(ctx context.Context) (*struct{}, error) {
+		panic("test panic")
+	}
+
+	_, err := opWithRecover(ctx, options, op)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "panic recovered: test panic")
+	require.True(t, mockCallback.called)
+	require.Equal(t, "test panic", mockCallback.received)
+}
+
+func TestRetryWithResult(t *testing.T) {
+	ctx := xtest.Context(t)
+	t.Run("HappyWay", func(t *testing.T) {
+		v, err := RetryWithResult(ctx, func(ctx context.Context) (*int, error) {
+			v := 123
+
+			return &v, nil
+		})
+		require.NoError(t, err)
+		require.NotNil(t, v)
+		require.EqualValues(t, 123, *v)
+	})
+	t.Run("RetryableError", func(t *testing.T) {
+		var counter int
+		v, err := RetryWithResult(ctx, func(ctx context.Context) (*int, error) {
+			counter++
+			if counter < 10 {
+				return nil, RetryableError(errors.New("test"))
+			}
+			v := counter * 123
+
+			return &v, nil
+		})
+		require.NoError(t, err)
+		require.NotNil(t, v)
+		require.EqualValues(t, 1230, *v)
+		require.EqualValues(t, 10, counter)
+	})
+	t.Run("Context", func(t *testing.T) {
+		t.Run("Cancelled", func(t *testing.T) {
+			childCtx, cancel := context.WithCancel(ctx)
+			v, err := RetryWithResult(childCtx, func(ctx context.Context) (*int, error) {
+				cancel()
+
+				return nil, ctx.Err()
+			})
+			require.ErrorIs(t, err, context.Canceled)
+			require.Nil(t, v)
+		})
+		t.Run("DeadlineExceeded", func(t *testing.T) {
+			childCtx, cancel := context.WithTimeout(ctx, 0)
+			v, err := RetryWithResult(childCtx, func(ctx context.Context) (*int, error) {
+				cancel()
+
+				return nil, ctx.Err()
+			})
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			require.Nil(t, v)
+		})
+	})
 }

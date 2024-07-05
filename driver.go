@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 
@@ -37,7 +38,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -51,7 +51,6 @@ var _ Connection = (*Driver)(nil)
 
 // Driver type provide access to YDB service clients
 type Driver struct {
-	ctx       context.Context // cancel while Driver.Close called.
 	ctxCancel context.CancelFunc
 
 	userInfo *dsn.UserInfo
@@ -191,10 +190,8 @@ func (d *Driver) Table() table.Client {
 
 // Query returns query client
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (d *Driver) Query() query.Client {
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (d *Driver) Query() *internalQuery.Client {
 	return d.query.Get()
 }
 
@@ -237,13 +234,20 @@ func (d *Driver) Topic() topic.Client {
 // See sugar.DSN helper for make dsn from endpoint and database
 //
 //nolint:nonamedreturns
-func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, err error) {
-	d, err := newConnectionFromOptions(ctx, append(
-		[]Option{
-			WithConnectionString(dsn),
-		},
-		opts...,
-	)...)
+func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) {
+	opts = append(append(make([]Option, 0, len(opts)+1), WithConnectionString(dsn)), opts...)
+
+	for parserIdx := range dsnParsers {
+		if parser := dsnParsers[parserIdx]; parser != nil {
+			optsFromParser, err := parser(dsn)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(fmt.Errorf("data source name '%s' wrong: %w", dsn, err))
+			}
+			opts = append(opts, optsFromParser...)
+		}
+	}
+
+	d, err := newConnectionFromOptions(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -275,10 +279,12 @@ func MustOpen(ctx context.Context, dsn string, opts ...Option) *Driver {
 
 // New connects to database and return driver runtime holder
 //
-// Deprecated: use Open with required param connectionString instead
-//
-//nolint:nonamedreturns
-func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
+// Deprecated: use ydb.Open instead.
+// New func have no required arguments, such as connection string.
+// Thats why we recognize that New have wrong signature.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:nonamedreturns
 	d, err := newConnectionFromOptions(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -300,7 +306,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	return d, nil
 }
 
-//nolint:cyclop, nonamedreturns
+//nolint:cyclop, nonamedreturns, funlen
 func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
@@ -311,7 +317,6 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 
 	d := &Driver{
 		children:  make(map[uint64]*Driver),
-		ctx:       ctx,
 		ctxCancel: driverCtxCancel,
 	}
 

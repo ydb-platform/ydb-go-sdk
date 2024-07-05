@@ -3,6 +3,8 @@ package topicwriterinternal
 import (
 	"time"
 
+	"github.com/jonboulle/clockwork"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -51,9 +53,7 @@ func WithTokenUpdateInterval(interval time.Duration) PublicWriterOption {
 
 // WithCommonConfig
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithCommonConfig(common config.Common) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.Common = common
@@ -152,5 +152,12 @@ func WithTrace(tracer *trace.Topic) PublicWriterOption {
 func WithTopic(topic string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.topic = topic
+	}
+}
+
+// WithClock is private option for tests
+func WithClock(clock clockwork.Clock) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.clock = clock
 	}
 }

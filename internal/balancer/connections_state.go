@@ -5,6 +5,7 @@ import (
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
@@ -73,8 +74,8 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 }
 
 func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
-	if e, hasPreferEndpoint := ContextEndpoint(ctx); hasPreferEndpoint {
-		c := s.connByNodeID[e.NodeID()]
+	if nodeID, hasPreferEndpoint := endpoint.ContextNodeID(ctx); hasPreferEndpoint {
+		c := s.connByNodeID[nodeID]
 		if c != nil && isOkConnection(c, true) {
 			return c
 		}

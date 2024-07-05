@@ -1,17 +1,16 @@
-package main
+package internal
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"slo/internal/config"
@@ -19,9 +18,14 @@ import (
 )
 
 type Storage struct {
-	db        *ydb.Driver
-	cfg       *config.Config
-	tablePath string
+	db          *ydb.Driver
+	cfg         *config.Config
+	tablePath   string
+	retryBudget interface {
+		budget.Budget
+
+		Stop()
+	}
 }
 
 const writeQuery = `
@@ -65,14 +69,16 @@ const dropTableQuery = `
 DROP TABLE %s
 `
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label string) (*Storage, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
+
+	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:gomnd
 
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
 		ydb.WithSessionPoolSizeLimit(poolSize),
-		ydb.WithLogger(log.Default(os.Stderr, log.WithMinLevel(log.ERROR)), trace.DetailsAll),
+		ydb.WithRetryBudget(retryBudget),
 	)
 	if err != nil {
 		return nil, err
@@ -81,9 +87,10 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	prefix := path.Join(db.Name(), label)
 
 	s := &Storage{
-		db:        db,
-		cfg:       cfg,
-		tablePath: "`" + path.Join(prefix, cfg.Table) + "`",
+		db:          db,
+		cfg:         cfg,
+		tablePath:   "`" + path.Join(prefix, cfg.Table) + "`",
+		retryBudget: retryBudget,
 	}
 
 	return s, nil
@@ -212,7 +219,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 	return attempts, err
 }
 
-func (s *Storage) createTable(ctx context.Context) error {
+func (s *Storage) CreateTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
@@ -230,7 +237,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	)
 }
 
-func (s *Storage) dropTable(ctx context.Context) error {
+func (s *Storage) DropTable(ctx context.Context) error {
 	err := ctx.Err()
 	if err != nil {
 		return err
@@ -253,7 +260,9 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	)
 }
 
-func (s *Storage) close(ctx context.Context) error {
+func (s *Storage) Close(ctx context.Context) error {
+	s.retryBudget.Stop()
+
 	var (
 		shutdownCtx    context.Context
 		shutdownCancel context.CancelFunc

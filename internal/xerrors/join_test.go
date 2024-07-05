@@ -10,7 +10,7 @@ import (
 
 func TestJoin(t *testing.T) {
 	for _, tt := range []struct {
-		err joinError
+		err *joinError
 		iss []error
 		ass []interface{}
 		s   string

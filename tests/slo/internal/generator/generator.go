@@ -49,8 +49,7 @@ func (g *Generator) genPayloadString() (*string, error) {
 
 	sl := make([]byte, l)
 
-	_, err := crypto.Read(sl)
-	if err != nil {
+	if _, err := crypto.Read(sl); err != nil {
 		return nil, err
 	}
 

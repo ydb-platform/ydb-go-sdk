@@ -9,21 +9,103 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var _ query.ResultSet = (*resultSet)(nil)
+var (
+	_ query.ResultSet = (*resultSet)(nil)
+	_ query.ResultSet = (*materializedResultSet)(nil)
+)
 
-type resultSet struct {
-	index       int64
-	recv        func() (*Ydb_Query.ExecuteQueryResponsePart, error)
-	columns     []*Ydb.Column
-	currentPart *Ydb_Query.ExecuteQueryResponsePart
-	rowIndex    int
-	trace       *trace.Query
-	done        chan struct{}
+type (
+	materializedResultSet struct {
+		index       int
+		columnNames []string
+		columnTypes []types.Type
+		rows        []query.Row
+		rowIndex    int
+	}
+	resultSet struct {
+		index       int64
+		recv        func() (*Ydb_Query.ExecuteQueryResponsePart, error)
+		columns     []*Ydb.Column
+		currentPart *Ydb_Query.ExecuteQueryResponsePart
+		rowIndex    int
+		trace       *trace.Query
+		done        chan struct{}
+	}
+)
+
+func (rs *materializedResultSet) Range(ctx context.Context) xiter.Seq2[query.Row, error] {
+	return rangeRows(ctx, rs)
+}
+
+func (rs *resultSet) Range(ctx context.Context) xiter.Seq2[query.Row, error] {
+	return rangeRows(ctx, rs)
+}
+
+func (rs *materializedResultSet) Columns() (columnNames []string) {
+	return rs.columnNames
+}
+
+func (rs *materializedResultSet) ColumnTypes() []types.Type {
+	return rs.columnTypes
+}
+
+func (rs *resultSet) ColumnTypes() (columnTypes []types.Type) {
+	columnTypes = make([]types.Type, len(rs.columns))
+	for i := range rs.columns {
+		columnTypes[i] = types.TypeFromYDB(rs.columns[i].GetType())
+	}
+
+	return columnTypes
+}
+
+func (rs *resultSet) Columns() (columnNames []string) {
+	columnNames = make([]string, len(rs.columns))
+	for i := range rs.columns {
+		columnNames[i] = rs.columns[i].GetName()
+	}
+
+	return columnNames
+}
+
+func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error) {
+	if rs.rowIndex == len(rs.rows) {
+		return nil, xerrors.WithStackTrace(io.EOF)
+	}
+
+	defer func() {
+		rs.rowIndex++
+	}()
+
+	return rs.rows[rs.rowIndex], nil
+}
+
+func (rs *materializedResultSet) Index() int {
+	if rs == nil {
+		return -1
+	}
+
+	return rs.index
+}
+
+func NewMaterializedResultSet(
+	index int,
+	columnNames []string,
+	columnTypes []types.Type,
+	rows []query.Row,
+) *materializedResultSet {
+	return &materializedResultSet{
+		index:       index,
+		columnNames: columnNames,
+		columnTypes: columnTypes,
+		rows:        rows,
+	}
 }
 
 func newResultSet(
@@ -48,39 +130,43 @@ func newResultSet(
 
 func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 	rs.rowIndex++
-	select {
-	case <-rs.done:
-		return nil, io.EOF
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
-	default:
-		if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
-			part, err := rs.recv()
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					close(rs.done)
-				}
+	for {
+		select {
+		case <-rs.done:
+			return nil, io.EOF
+		case <-ctx.Done():
+			return nil, xerrors.WithStackTrace(ctx.Err())
+		default:
+			if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
+				part, err := rs.recv()
+				if err != nil {
+					if xerrors.Is(err, io.EOF) {
+						close(rs.done)
+					}
 
-				return nil, xerrors.WithStackTrace(err)
+					return nil, xerrors.WithStackTrace(err)
+				}
+				rs.rowIndex = 0
+				rs.currentPart = part
+				if part == nil {
+					close(rs.done)
+
+					return nil, xerrors.WithStackTrace(io.EOF)
+				}
 			}
-			rs.rowIndex = 0
-			rs.currentPart = part
-			if part == nil {
+			if rs.currentPart.GetResultSet() != nil && rs.index != rs.currentPart.GetResultSetIndex() {
 				close(rs.done)
 
-				return nil, xerrors.WithStackTrace(io.EOF)
+				return nil, xerrors.WithStackTrace(fmt.Errorf(
+					"received part with result set index = %d, current result set index = %d: %w",
+					rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
+				))
+			}
+
+			if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
+				return NewRow(ctx, rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex], rs.trace)
 			}
 		}
-		if rs.index != rs.currentPart.GetResultSetIndex() {
-			close(rs.done)
-
-			return nil, xerrors.WithStackTrace(fmt.Errorf(
-				"received part with result set index = %d, current result set index = %d: %w",
-				rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
-			))
-		}
-
-		return newRow(ctx, rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex], rs.trace)
 	}
 }
 
@@ -93,4 +179,12 @@ func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
 	}()
 
 	return rs.nextRow(ctx)
+}
+
+func (rs *resultSet) Index() int {
+	if rs == nil {
+		return -1
+	}
+
+	return int(rs.index)
 }

@@ -6,10 +6,13 @@ import (
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-// Deprecated: RoundRobin is RandomChoice now
+// Deprecated: RoundRobin is an alias to RandomChoice now
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func RoundRobin() *balancerConfig.Config {
 	return &balancerConfig.Config{}
 }
@@ -89,6 +92,10 @@ func PreferLocations(balancer *balancerConfig.Config, locations ...string) *bala
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
+
+	// Prevent modify source locations
+	locations = xslices.Clone(locations)
+
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
@@ -115,6 +122,8 @@ type Endpoint interface {
 
 	// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
 	// It work good only if connection url always point to local dc.
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	LocalDC() bool
 }
 

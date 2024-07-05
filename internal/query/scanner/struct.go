@@ -61,7 +61,7 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 			missingColumns = append(missingColumns, name)
 		} else {
 			if err = value.CastTo(v, ptr.Elem().Field(i).Addr().Interface()); err != nil {
-				return xerrors.WithStackTrace(err)
+				return xerrors.WithStackTrace(fmt.Errorf("scan error on struct field name '%s': %w", name, err))
 			}
 			existingFields[name] = struct{}{}
 		}
@@ -69,7 +69,7 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 
 	if !settings.AllowMissingColumnsFromSelect && len(missingColumns) > 0 {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("%w: '%v'", errColumnsNotFoundInRow, strings.Join(missingColumns, "','")),
+			fmt.Errorf("%w: '%v'", ErrColumnsNotFoundInRow, strings.Join(missingColumns, "','")),
 		)
 	}
 
@@ -82,7 +82,7 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 		}
 		if len(missingFields) > 0 {
 			return xerrors.WithStackTrace(
-				fmt.Errorf("%w: '%v'", errFieldsNotFoundInStruct, strings.Join(missingFields, "','")),
+				fmt.Errorf("%w: '%v'", ErrFieldsNotFoundInStruct, strings.Join(missingFields, "','")),
 			)
 		}
 	}

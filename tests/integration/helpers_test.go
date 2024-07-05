@@ -17,9 +17,12 @@ import (
 
 	"github.com/rekby/fixenv"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -35,21 +38,22 @@ type scopeT struct {
 	Ctx context.Context
 	fixenv.Env
 	Require *require.Assertions
-	t       testing.TB
+	t       *xtest.SyncedTest
 }
 
 func newScope(t *testing.T) *scopeT {
-	at := require.New(t)
-	fEnv := fixenv.NewEnv(t)
+	st := xtest.MakeSyncedTest(t)
+	at := require.New(st)
+	fEnv := fixenv.New(st)
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	t.Cleanup(func() {
+	st.Cleanup(func() {
 		ctxCancel()
 	})
 	res := &scopeT{
 		Ctx:     ctx,
 		Env:     fEnv,
 		Require: at,
-		t:       t,
+		t:       st,
 	}
 	return res
 }
@@ -79,9 +83,21 @@ func (scope *scopeT) AuthToken() string {
 }
 
 func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
+	return scope.driverNamed("default", opts...)
+}
+
+func (scope *scopeT) DriverWithGRPCLogging() *ydb.Driver {
+	return scope.driverNamed("grpc-logged", ydb.With(config.WithGrpcOptions(
+		grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(scope.t).UnaryClientInterceptor),
+		grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(scope.t).StreamClientInterceptor),
+	)),
+	)
+}
+
+func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 	f := func() (*fixenv.GenericResult[*ydb.Driver], error) {
 		connectionString := scope.ConnectionString()
-		scope.Logf("Connect with connection string: %v", connectionString)
+		scope.Logf("Connect with connection string, driver name %q: %v", name, connectionString)
 
 		token := scope.AuthToken()
 		if token == "" {
@@ -103,13 +119,15 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 			)...,
 		)
 		clean := func() {
-			scope.Require.NoError(driver.Close(scope.Ctx))
+			if driver != nil {
+				scope.Require.NoError(driver.Close(scope.Ctx))
+			}
 		}
 
 		return fixenv.NewGenericResultWithCleanup(driver, clean), err
 	}
 
-	return fixenv.CacheResult(scope.Env, f)
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
 }
 
 func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
@@ -317,7 +335,7 @@ func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 
 // logger for tests
 type testLogger struct {
-	test     testing.TB
+	test     *xtest.SyncedTest
 	testName string
 	minLevel log.Level
 
@@ -326,11 +344,11 @@ type testLogger struct {
 	messages []string
 }
 
-func newLogger(t testing.TB) *testLogger {
+func newLogger(t *xtest.SyncedTest) *testLogger {
 	return newLoggerWithMinLevel(t, 0)
 }
 
-func newLoggerWithMinLevel(t testing.TB, level log.Level) *testLogger {
+func newLoggerWithMinLevel(t *xtest.SyncedTest, level log.Level) *testLogger {
 	logger := &testLogger{
 		test:     t,
 		testName: t.Name(),
@@ -367,6 +385,7 @@ func (t *testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
 
 func (t *testLogger) flush() {
 	t.m.WithLock(func() {
+		t.test.Helper()
 		t.closed = true
 		message := "\n" + strings.Join(t.messages, "\n")
 		t.test.Log(message)

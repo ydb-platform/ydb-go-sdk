@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"reflect"
 	"strconv"
@@ -584,7 +585,10 @@ func (s *rawConverter) IsDecimal() bool {
 }
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
-	w := t.(*types.Decimal)
+	w, ok := t.(*types.Decimal)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *types.Decimal", w))
+	}
 
 	return d.GetPrecision() == w.Precision() && d.GetScale() == w.Scale()
 }
@@ -681,9 +685,8 @@ func (s *rawConverter) boundsCheck(n, i int) bool {
 }
 
 func (s *valueScanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
-	x := typ.GetType()
-	if t, _ = x.(*Ydb.Type_OptionalType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.GetType().(*Ydb.Type_OptionalType); t == nil {
+		s.typeError(typ.GetType(), t)
 	}
 
 	return
@@ -745,54 +748,48 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 }
 
 func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.Type_ListType) {
-	x := typ.GetType()
-	if t, _ = x.(*Ydb.Type_ListType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.GetType().(*Ydb.Type_ListType); t == nil {
+		s.typeError(typ.GetType(), t)
 	}
 
 	return
 }
 
 func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
-	x := typ.GetType()
-	if t, _ = x.(*Ydb.Type_TupleType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.GetType().(*Ydb.Type_TupleType); t == nil {
+		s.typeError(typ.GetType(), t)
 	}
 
 	return
 }
 
 func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) {
-	x := typ.GetType()
-	if t, _ = x.(*Ydb.Type_StructType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.GetType().(*Ydb.Type_StructType); t == nil {
+		s.typeError(typ.GetType(), t)
 	}
 
 	return
 }
 
 func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
-	x := typ.GetType()
-	if t, _ = x.(*Ydb.Type_DictType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.GetType().(*Ydb.Type_DictType); t == nil {
+		s.typeError(typ.GetType(), t)
 	}
 
 	return
 }
 
 func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	x := typ.GetType()
-	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.GetType().(*Ydb.Type_DecimalType); t == nil {
+		s.typeError(typ.GetType(), t)
 	}
 
 	return
 }
 
 func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType) {
-	x := typ.GetType()
-	if t, _ = x.(*Ydb.Type_VariantType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.GetType().(*Ydb.Type_VariantType); t == nil {
+		s.typeError(typ.GetType(), t)
 	}
 
 	return

@@ -639,7 +639,7 @@ func (mock *copyTablesMock) CopyTables(
 	return nil, fmt.Errorf("%w: %s, exp: %s", errUnexpectedRequest, in, mock.String())
 }
 
-func Test_copyTables(t *testing.T) {
+func TestCopyTables(t *testing.T) {
 	ctx := xtest.Context(t)
 	for _, tt := range []struct {
 		sessionID            string
@@ -750,6 +750,140 @@ func Test_copyTables(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			err := copyTables(ctx, tt.sessionID, tt.operationTimeout, tt.operationCancelAfter, tt.service, tt.opts...)
+			if tt.err != nil {
+				require.ErrorIs(t, err, tt.err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+type renameTablesMock struct {
+	*Ydb_Table.RenameTablesRequest
+}
+
+func (mock *renameTablesMock) RenameTables(
+	_ context.Context, in *Ydb_Table.RenameTablesRequest, opts ...grpc.CallOption,
+) (*Ydb_Table.RenameTablesResponse, error) {
+	if in.String() == mock.String() {
+		return &Ydb_Table.RenameTablesResponse{}, nil
+	}
+
+	return nil, fmt.Errorf("%w: %s, exp: %s", errUnexpectedRequest, in, mock.String())
+}
+
+func TestRenameTables(t *testing.T) {
+	ctx := xtest.Context(t)
+	for _, tt := range []struct {
+		sessionID            string
+		operationTimeout     time.Duration
+		operationCancelAfter time.Duration
+		service              *renameTablesMock
+		opts                 []options.RenameTablesOption
+		err                  error
+	}{
+		{
+			sessionID:            "1",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service: &renameTablesMock{
+				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+					SessionId: "1",
+					Tables: []*Ydb_Table.RenameTableItem{
+						{
+							SourcePath:         "from",
+							DestinationPath:    "to",
+							ReplaceDestination: true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(time.Second),
+						CancelAfter:      durationpb.New(time.Second),
+					},
+				},
+			},
+			opts: []options.RenameTablesOption{
+				options.RenameTablesItem("from", "to", true),
+			},
+			err: nil,
+		},
+		{
+			sessionID:            "2",
+			operationTimeout:     2 * time.Second,
+			operationCancelAfter: 2 * time.Second,
+			service: &renameTablesMock{
+				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+					SessionId: "2",
+					Tables: []*Ydb_Table.RenameTableItem{
+						{
+							SourcePath:         "from1",
+							DestinationPath:    "to1",
+							ReplaceDestination: true,
+						},
+						{
+							SourcePath:         "from2",
+							DestinationPath:    "to2",
+							ReplaceDestination: false,
+						},
+						{
+							SourcePath:         "from3",
+							DestinationPath:    "to3",
+							ReplaceDestination: true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(2 * time.Second),
+						CancelAfter:      durationpb.New(2 * time.Second),
+					},
+				},
+			},
+			opts: []options.RenameTablesOption{
+				options.RenameTablesItem("from1", "to1", true),
+				options.RenameTablesItem("from2", "to2", false),
+				options.RenameTablesItem("from3", "to3", true),
+			},
+			err: nil,
+		},
+		{
+			sessionID:            "3",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service: &renameTablesMock{
+				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+					SessionId: "1",
+					Tables: []*Ydb_Table.RenameTableItem{
+						{
+							SourcePath:         "from",
+							DestinationPath:    "to",
+							ReplaceDestination: true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(time.Second),
+						CancelAfter:      durationpb.New(time.Second),
+					},
+				},
+			},
+			opts: []options.RenameTablesOption{
+				options.RenameTablesItem("from1", "to1", true),
+			},
+			err: errUnexpectedRequest,
+		},
+		{
+			sessionID:            "4",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service:              &renameTablesMock{},
+			opts:                 nil,
+			err:                  errParamsRequired,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			err := renameTables(ctx, tt.sessionID, tt.operationTimeout, tt.operationCancelAfter, tt.service, tt.opts...)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {

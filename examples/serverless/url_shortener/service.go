@@ -41,8 +41,7 @@ var (
 
 func hash(s string) (string, error) {
 	hasher := fnv.New32a()
-	_, err := hasher.Write([]byte(s))
-	if err != nil {
+	if _, err := hasher.Write([]byte(s)); err != nil {
 		return "", err
 	}
 
@@ -59,8 +58,7 @@ func isLongCorrect(link string) bool {
 
 func render(t *template.Template, data interface{}) string {
 	var buf bytes.Buffer
-	err := t.Execute(&buf, data)
-	if err != nil {
+	if err := t.Execute(&buf, data); err != nil {
 		panic(err)
 	}
 
@@ -449,7 +447,7 @@ func Serverless(w http.ResponseWriter, r *http.Request) {
 	s, err := getService(
 		r.Context(),
 		os.Getenv("YDB"),
-		environ.WithEnvironCredentials(r.Context()),
+		environ.WithEnvironCredentials(),
 	)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())

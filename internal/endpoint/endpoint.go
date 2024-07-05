@@ -6,34 +6,43 @@ import (
 	"time"
 )
 
-type Info interface {
-	NodeID() uint32
-	Address() string
-	LocalDC() bool
-	Location() string
-	LastUpdated() time.Time
-	LoadFactor() float32
-}
+type (
+	NodeID interface {
+		NodeID() uint32
+	}
+	Info interface {
+		NodeID
+		Address() string
+		Location() string
+		LastUpdated() time.Time
+		LoadFactor() float32
 
-type Endpoint interface {
-	Info
+		// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+		// It work good only if connection url always point to local dc.
+		// Will be removed after Oct 2024.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		LocalDC() bool
+	}
+	Endpoint interface {
+		Info
 
-	String() string
-	Copy() Endpoint
-	Touch(opts ...Option)
-}
+		String() string
+		Copy() Endpoint
+		Touch(opts ...Option)
+	}
+)
 
-type endpoint struct {
+type endpoint struct { //nolint:maligned
 	mu       sync.RWMutex
 	id       uint32
 	address  string
 	location string
 	services []string
 
-	loadFactor float32
-	local      bool
-
+	loadFactor  float32
 	lastUpdated time.Time
+
+	local bool
 }
 
 func (e *endpoint) Copy() Endpoint {
@@ -86,6 +95,10 @@ func (e *endpoint) Location() string {
 	return e.location
 }
 
+// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+// It work good only if connection url always point to local dc.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (e *endpoint) LocalDC() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -110,7 +123,7 @@ func (e *endpoint) LastUpdated() time.Time {
 func (e *endpoint) Touch(opts ...Option) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	for _, opt := range append([]Option{withLastUpdated(time.Now())}, opts...) {
+	for _, opt := range append([]Option{WithLastUpdated(time.Now())}, opts...) {
 		if opt != nil {
 			opt(e)
 		}
@@ -149,7 +162,7 @@ func WithServices(services []string) Option {
 	}
 }
 
-func withLastUpdated(ts time.Time) Option {
+func WithLastUpdated(ts time.Time) Option {
 	return func(e *endpoint) {
 		e.lastUpdated = ts
 	}

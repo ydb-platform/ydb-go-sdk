@@ -35,6 +35,7 @@ type Config struct {
 	ShutdownTime int
 }
 
+//nolint:gomnd
 func New() (*Config, error) {
 	cfg := &Config{}
 
@@ -114,8 +115,7 @@ func New() (*Config, error) {
 
 	fs.IntVar(&cfg.WriteTimeout, "write-timeout", 10000, "write timeout milliseconds")
 
-	err := fs.Parse(os.Args[4:])
-	if err != nil {
+	if err := fs.Parse(os.Args[4:]); err != nil {
 		return nil, err
 	}
 

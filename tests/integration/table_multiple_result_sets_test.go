@@ -28,7 +28,8 @@ type scopeTableStreamExecuteScanQuery struct {
 	sum uint64
 }
 
-func TestTableMultipleResultSets(t *testing.T) {
+func TestTableMultipleResultSets(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	var (
 		scope = &scopeTableStreamExecuteScanQuery{
 			folder:          t.Name(),
@@ -40,8 +41,7 @@ func TestTableMultipleResultSets(t *testing.T) {
 	)
 
 	db, err := ydb.Open(ctx,
-		"", // corner case for check replacement of endpoint+database+secure
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithLogger(
 			newLogger(t),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
@@ -152,7 +152,7 @@ func TestTableMultipleResultSets(t *testing.T) {
 							checkSum += uint64(*val)
 						}
 						if stats := res.Stats(); stats != nil {
-							t.Logf(" --- query stats: compilation: %v, process CPU time: %v, affected shards: %v\n",
+							t.Logf(" --- query poolStats: compilation: %v, process CPU time: %v, affected shards: %v\n",
 								stats.Compilation(),
 								stats.ProcessCPUTime(),
 								func() (count uint64) {

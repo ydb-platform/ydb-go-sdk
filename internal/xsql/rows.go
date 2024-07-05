@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -128,7 +129,12 @@ func (r *rows) Next(dst []driver.Value) error {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	for i := range values {
-		dst[i] = values[i].(*valuer).Value()
+		val, ok := values[i].(*valuer)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *valuer", val))
+		}
+
+		dst[i] = val.Value()
 	}
 	if err = r.result.Err(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))

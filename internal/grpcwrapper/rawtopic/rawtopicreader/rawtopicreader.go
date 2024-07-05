@@ -29,6 +29,7 @@ func (s StreamReader) CloseSend() error {
 	return s.Stream.CloseSend()
 }
 
+//nolint:funlen
 func (s StreamReader) Recv() (ServerMessage, error) {
 	grpcMess, err := s.Stream.Recv()
 	if xerrors.Is(err, io.EOF) {

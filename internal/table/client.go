@@ -25,16 +25,7 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*session, error)
 
-type nodeChecker interface {
-	HasNode(id uint32) bool
-}
-
-type balancer interface {
-	grpc.ClientConnInterface
-	nodeChecker
-}
-
-func New(ctx context.Context, balancer balancer, config *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.New"),
 	)
@@ -42,27 +33,26 @@ func New(ctx context.Context, balancer balancer, config *config.Config) *Client 
 		onDone(config.SizeLimit())
 	}()
 
-	return newClient(ctx, balancer, func(ctx context.Context) (s *session, err error) {
-		return newSession(ctx, balancer, config)
+	return newClient(ctx, cc, func(ctx context.Context) (s *session, err error) {
+		return newSession(ctx, cc, config)
 	}, config)
 }
 
 func newClient(
 	ctx context.Context,
-	balancer balancer,
+	cc grpc.ClientConnInterface,
 	builder sessionBuilder,
 	config *config.Config,
 ) *Client {
 	c := &Client{
-		clock:       config.Clock(),
-		config:      config,
-		cc:          balancer,
-		nodeChecker: balancer,
-		build:       builder,
-		index:       make(map[*session]sessionInfo),
-		idle:        list.New(),
-		waitQ:       list.New(),
-		limit:       config.SizeLimit(),
+		clock:  config.Clock(),
+		config: config,
+		cc:     cc,
+		build:  builder,
+		index:  make(map[*session]sessionInfo),
+		idle:   list.New(),
+		waitQ:  list.New(),
+		limit:  config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *session)
@@ -84,11 +74,10 @@ func newClient(
 // A Client is safe for use by multiple goroutines simultaneously.
 type Client struct {
 	// read-only fields
-	config      *config.Config
-	build       sessionBuilder
-	cc          grpc.ClientConnInterface
-	nodeChecker nodeChecker
-	clock       clockwork.Clock
+	config *config.Config
+	build  sessionBuilder
+	cc     grpc.ClientConnInterface
+	clock  clockwork.Clock
 
 	// read-write fields
 	mu                xsync.Mutex
@@ -108,6 +97,11 @@ type createSessionOptions struct {
 	onClose  []func(s *session)
 }
 
+type sessionResult struct {
+	s   *session
+	err error
+}
+
 type createSessionOption func(o *createSessionOptions)
 
 func withCreateSessionOnCreate(onCreate func(s *session)) createSessionOption {
@@ -123,6 +117,23 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 }
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
+	options := gatherOptions(opts)
+
+	defer func() {
+		if s != nil {
+			applyOptions(s, options)
+		}
+	}()
+
+	resultCh := make(chan sessionResult)
+	if err := c.initiateSessionCreation(ctx, resultCh); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return c.waitForSessionCreation(ctx, resultCh)
+}
+
+func gatherOptions(opts []createSessionOption) createSessionOptions {
 	options := createSessionOptions{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -130,29 +141,23 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		}
 	}
 
-	defer func() {
-		if s == nil {
-			return
-		}
-		for _, onCreate := range options.onCreate {
-			onCreate(s)
-		}
-		s.onClose = append(s.onClose, options.onClose...)
-	}()
+	return options
+}
 
-	type result struct {
-		s   *session
-		err error
+func applyOptions(s *session, options createSessionOptions) {
+	for _, onCreate := range options.onCreate {
+		onCreate(s)
 	}
+	s.onClose = append(s.onClose, options.onClose...)
+}
 
-	ch := make(chan result)
-
+func (c *Client) initiateSessionCreation(ctx context.Context, resultCh chan<- sessionResult) error {
 	select {
 	case <-c.done:
-		return nil, xerrors.WithStackTrace(errClosedClient)
+		return errClosedClient
 
 	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
+		return ctx.Err()
 
 	default:
 		c.mu.WithLock(func() {
@@ -160,56 +165,50 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 				return
 			}
 			c.wg.Add(1)
-			go func() {
-				defer c.wg.Done()
-
-				var (
-					s   *session
-					err error
-				)
-
-				createSessionCtx := xcontext.ValueOnly(ctx)
-
-				if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-					var cancel context.CancelFunc
-					createSessionCtx, cancel = xcontext.WithTimeout(createSessionCtx, timeout)
-					defer cancel()
-				}
-
-				closeSession := func(s *session) {
-					if s == nil {
-						return
-					}
-
-					closeSessionCtx := xcontext.ValueOnly(ctx)
-
-					if timeout := c.config.DeleteTimeout(); timeout > 0 {
-						var cancel context.CancelFunc
-						createSessionCtx, cancel = xcontext.WithTimeout(closeSessionCtx, timeout)
-						defer cancel()
-					}
-
-					_ = s.Close(closeSessionCtx)
-				}
-
-				s, err = c.build(createSessionCtx)
-
-				select {
-				case ch <- result{
-					s:   s,
-					err: err,
-				}: // nop
-
-				case <-c.done:
-					closeSession(s)
-
-				case <-ctx.Done():
-					closeSession(s)
-				}
-			}()
+			go c.createSessionWorker(ctx, resultCh)
 		})
+
+		return nil
+	}
+}
+
+func (c *Client) createSessionWorker(ctx context.Context, resultCh chan<- sessionResult) {
+	defer c.wg.Done()
+
+	createSessionCtx := xcontext.ValueOnly(ctx)
+	if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
+		var cancel context.CancelFunc
+		createSessionCtx, cancel = xcontext.WithTimeout(createSessionCtx, timeout)
+		defer cancel()
 	}
 
+	s, err := c.build(createSessionCtx)
+
+	select {
+	case resultCh <- sessionResult{s: s, err: err}:
+	case <-c.done:
+		c.closeSession(ctx, s)
+	case <-ctx.Done():
+		c.closeSession(ctx, s)
+	}
+}
+
+func (c *Client) closeSession(ctx context.Context, s *session) {
+	if s == nil {
+		return
+	}
+
+	closeSessionCtx := xcontext.ValueOnly(ctx)
+	if timeout := c.config.DeleteTimeout(); timeout > 0 {
+		var cancel context.CancelFunc
+		closeSessionCtx, cancel = xcontext.WithTimeout(closeSessionCtx, timeout)
+		defer cancel()
+	}
+
+	_ = s.Close(closeSessionCtx)
+}
+
+func (c *Client) waitForSessionCreation(ctx context.Context, resultCh <-chan sessionResult) (*session, error) {
 	select {
 	case <-c.done:
 		return nil, xerrors.WithStackTrace(errClosedClient)
@@ -217,7 +216,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 
-	case r := <-ch:
+	case r := <-resultCh:
 		if r.err != nil {
 			return nil, xerrors.WithStackTrace(r.err)
 		}
@@ -370,6 +369,8 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
 
+	const maxAttempts = 100
+
 	var (
 		start = time.Now()
 		i     = 0
@@ -388,17 +389,12 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		onDone(s, i, err)
 	}()
 
-	const maxAttempts = 100
 	for s == nil && err == nil && i < maxAttempts && !c.isClosed() {
 		i++
-		// First, we try to internalPoolGet session from idle
-		c.mu.WithLock(func() {
-			s = c.internalPoolRemoveFirstIdle()
-		})
-
+		s = tryGetIdleSession(c)
 		if s != nil {
-			if c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()) {
-				_ = s.Close(ctx)
+			if !s.isReady() {
+				closeInvalidSession(ctx, s)
 				s = nil
 
 				continue
@@ -407,30 +403,46 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			return s, nil
 		}
 
-		// Second, we try to create new session
-		s, err = c.internalPoolCreateSession(ctx)
-		if s == nil && err == nil {
-			if err = ctx.Err(); err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			panic("both of session and err are nil")
-		}
-		// got session or err is not recoverable
+		s, err = tryCreateNewSession(ctx, c)
 		if s != nil || !isCreateSessionErrorRetriable(err) {
 			return s, xerrors.WithStackTrace(err)
 		}
 
-		// Third, we try to wait for a touched session - Client is full.
-		//
-		// This should be done only if number of currently waiting goroutines
-		// are less than maximum amount of touched session. That is, we want to
-		// be fair here and not to lock more goroutines than we could ship
-		// session to.
 		s, err = c.internalPoolWaitFromCh(ctx, o.t)
 		if err != nil {
 			err = xerrors.WithStackTrace(err)
 		}
 	}
+
+	return handleNoProgress(s, err, start, c, i)
+}
+
+func tryGetIdleSession(c *Client) *session {
+	var s *session
+	c.mu.WithLock(func() {
+		s = c.internalPoolRemoveFirstIdle()
+	})
+
+	return s
+}
+
+func closeInvalidSession(ctx context.Context, s *session) {
+	_ = s.Close(ctx)
+}
+
+func tryCreateNewSession(ctx context.Context, c *Client) (*session, error) {
+	s, err := c.internalPoolCreateSession(ctx)
+	if s == nil && err == nil {
+		if err = ctx.Err(); err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		panic("both session and err are nil")
+	}
+
+	return s, err
+}
+
+func handleNoProgress(s *session, err error, start time.Time, c *Client, attempts int) (*session, error) {
 	if s == nil && err == nil {
 		if c.isClosed() {
 			err = xerrors.WithStackTrace(errClosedClient)
@@ -438,6 +450,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			err = xerrors.WithStackTrace(errNoProgress)
 		}
 	}
+
 	if err != nil {
 		var (
 			index            int
@@ -450,15 +463,15 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			createInProgress = c.createInProgress
 		})
 
-		return s, xerrors.WithStackTrace(
+		err = xerrors.WithStackTrace(
 			fmt.Errorf("failed to get session from pool ("+
-				"attempts: %d, latency: %v, pool have %d sessions (%d busy, %d idle, %d create_in_progress): %w",
-				i, time.Since(start), index, index-idle, idle, createInProgress, err,
+				"attempts: %d, latency: %v, pool has %d sessions (%d busy, %d idle, %d create_in_progress): %w",
+				attempts, time.Since(start), index, index-idle, idle, createInProgress, err,
 			),
 		)
 	}
 
-	return s, nil
+	return s, err
 }
 
 // Get returns first idle session from the Client and removes it from
@@ -467,6 +480,7 @@ func (c *Client) Get(ctx context.Context) (s *session, err error) {
 	return c.internalPoolGet(ctx)
 }
 
+//nolint:funlen
 func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s *session, err error) {
 	var (
 		ch *chan *session
@@ -489,7 +503,10 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 
 	var createSessionTimeoutCh <-chan time.Time
 	if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-		createSessionTimeoutCh = c.clock.After(timeout)
+		createSessionTimeoutChTimer := c.clock.NewTimer(timeout)
+		defer createSessionTimeoutChTimer.Stop()
+
+		createSessionTimeoutCh = createSessionTimeoutChTimer.Chan()
 	}
 
 	select {
@@ -566,9 +583,6 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 	case s.isClosed():
 		return xerrors.WithStackTrace(errSessionClosed)
 
-	case c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()):
-		return xerrors.WithStackTrace(errNodeIsNotObservable)
-
 	default:
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -612,12 +626,18 @@ func (c *Client) Close(ctx context.Context) (err error) {
 			c.limit = 0
 
 			for el := c.waitQ.Front(); el != nil; el = el.Next() {
-				ch := el.Value.(*chan *session)
+				ch, ok := el.Value.(*chan *session)
+				if !ok {
+					panic(fmt.Sprintf("unsupported type conversion from %T to *chan *session", ch))
+				}
 				close(*ch)
 			}
 
 			for e := c.idle.Front(); e != nil; e = e.Next() {
-				s := e.Value.(*session)
+				s, ok := e.Value.(*session)
+				if !ok {
+					panic(fmt.Sprintf("unsupported type conversion from %T to *session", s))
+				}
 				s.SetStatus(table.SessionClosing)
 				c.wg.Add(1)
 				go func() {
@@ -686,54 +706,57 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		onDone(attempts, finalErr)
 	}()
 
-	return retryBackoff(ctx, c,
-		func(ctx context.Context, s table.Session) (err error) {
-			attempts++
+	return retryBackoff(ctx, c, func(ctx context.Context, s table.Session) (err error) {
+		attempts++
 
-			tx, err := s.BeginTransaction(ctx, config.TxSettings)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
+		tx, err := s.BeginTransaction(ctx, config.TxSettings)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		defer func() {
+			err = handleTransactionError(ctx, tx, err)
+		}()
+
+		if err = executeTxOperation(ctx, c, op, tx); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		_, err = tx.CommitTx(ctx, config.TxCommitOptions...)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	}, config.RetryOptions...)
+}
+
+func handleTransactionError(ctx context.Context, tx table.Transaction, err error) error {
+	if err != nil {
+		errRollback := tx.Rollback(ctx)
+		if errRollback != nil {
+			return xerrors.NewWithIssues("",
+				xerrors.WithStackTrace(err),
+				xerrors.WithStackTrace(errRollback),
+			)
+		}
+
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx table.Transaction) (err error) {
+	if panicCallback := c.config.PanicCallback(); panicCallback != nil {
+		defer func() {
+			if e := recover(); e != nil {
+				panicCallback(e)
 			}
+		}()
+	}
 
-			defer func() {
-				if err != nil {
-					errRollback := tx.Rollback(ctx)
-					if errRollback != nil {
-						err = xerrors.NewWithIssues("",
-							xerrors.WithStackTrace(err),
-							xerrors.WithStackTrace(errRollback),
-						)
-					} else {
-						err = xerrors.WithStackTrace(err)
-					}
-				}
-			}()
-
-			err = func() error {
-				if panicCallback := c.config.PanicCallback(); panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							panicCallback(e)
-						}
-					}()
-				}
-
-				return op(xcontext.MarkRetryCall(ctx), tx)
-			}()
-
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			_, err = tx.CommitTx(ctx, config.TxCommitOptions...)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			return nil
-		},
-		config.RetryOptions...,
-	)
+	return op(xcontext.MarkRetryCall(ctx), tx)
 }
 
 func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Duration) {
@@ -742,7 +765,10 @@ func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Dura
 			return
 		}
 		for e := c.idle.Front(); e != nil; e = e.Next() {
-			s := e.Value.(*session)
+			s, ok := e.Value.(*session)
+			if !ok {
+				panic(fmt.Sprintf("unsupported type conversion from %T to *session", s))
+			}
 			info, has := c.index[s]
 			if !has {
 				panic("session not found in pool")
@@ -778,7 +804,7 @@ func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration
 
 		case <-timer.Chan():
 			c.internalPoolGCTick(ctx, idleThreshold)
-			timer.Reset(idleThreshold / 2)
+			timer.Reset(idleThreshold / 2) //nolint:gomnd
 		}
 	}
 }
@@ -815,7 +841,10 @@ func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) {
 	if el == nil {
 		return
 	}
-	s = el.Value.(*session)
+	s, ok := el.Value.(*session)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *session", s))
+	}
 	info, has := c.index[s]
 	if !has || el != info.idle {
 		panic("inconsistent session client index")
@@ -854,7 +883,10 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 		// missed something and may want to retry (especially for case (3)).
 		//
 		// After that we taking a next waiter and repeat the same.
-		ch := c.waitQ.Remove(el).(*chan *session)
+		ch, ok := c.waitQ.Remove(el).(*chan *session)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *chan *session", ch))
+		}
 		select {
 		case *ch <- s:
 			// Case (1).

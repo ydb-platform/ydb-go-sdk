@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:funlen
 func table(config Config) (t trace.Table) {
 	config = config.WithSystem("table")
 	alive := config.GaugeVec("sessions", "node_id")
@@ -72,7 +73,11 @@ func table(config Config) (t trace.Table) {
 			if !ok {
 				panic(fmt.Sprintf("unknown session '%s'", info.Session.ID()))
 			}
-			inflightLatency.With(nil).Record(time.Since(start.(time.Time)))
+			val, ok := start.(time.Time)
+			if !ok {
+				panic(fmt.Sprintf("unsupported type conversion from %T to time.Time", val))
+			}
+			inflightLatency.With(nil).Record(time.Since(val))
 		}
 
 		return nil

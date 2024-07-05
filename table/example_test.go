@@ -62,6 +62,43 @@ func Example_select() {
 	}
 }
 
+func Example_explainQuery() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		plan string
+		ast  string
+	)
+	err = db.Table().Do( // Do retry operation on errors with best effort
+		ctx, // context manage exiting from Do
+		func(ctx context.Context, s table.Session) (err error) { // retry operation
+			explanation, err := s.Explain(ctx, `
+				DECLARE $id AS Optional<Uint64>;
+				DECLARE $myStr AS Optional<Text>;
+				SELECT $id AS id, $myStr AS myStr;
+			`)
+			if err != nil {
+				return err // for auto-retry with driver
+			}
+
+			plan, ast = explanation.Plan, explanation.AST
+
+			return nil
+		},
+		table.WithIdempotent(),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Plan: %s\n", plan)
+	fmt.Printf("AST: %s\n", ast)
+}
+
 func Example_createTable() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")

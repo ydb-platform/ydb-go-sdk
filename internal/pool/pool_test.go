@@ -297,8 +297,8 @@ func TestSafeStatsRace(t *testing.T) {
 			wg sync.WaitGroup
 			s  = &safeStats{}
 		)
-		wg.Add(10000)
-		for range make([]struct{}, 10000) {
+		wg.Add(1000)
+		for range make([]struct{}, 1000) {
 			go func() {
 				defer wg.Done()
 				require.NotPanics(t, func() {

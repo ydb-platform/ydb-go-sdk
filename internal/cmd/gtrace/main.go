@@ -20,7 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-//nolint:gocyclo
+//nolint:gocyclo,funlen
 func main() {
 	var (
 		// Reports whether we were called from go:generate.
@@ -67,7 +67,7 @@ func main() {
 			f, err = os.OpenFile(
 				filepath.Join(workDir, filepath.Clean(name)),
 				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
-				0o600,
+				0o600, //nolint:gomnd
 			)
 			if err != nil {
 				log.Fatal(err)

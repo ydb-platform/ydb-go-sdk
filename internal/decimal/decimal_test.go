@@ -11,31 +11,43 @@ func TestFromBytes(t *testing.T) {
 		bts       []byte
 		precision uint32
 		scale     uint32
+		format    string
 	}{
 		{
 			bts:       uint128(0xffffffffffffffff, 0xffffffffffffffff),
 			precision: 22,
 			scale:     9,
+			format:    "-0.000000001",
 		},
 		{
 			bts:       uint128(0xffffffffffffffff, 0),
 			precision: 22,
 			scale:     9,
+			format:    "-18446744073.709551616",
 		},
 		{
 			bts:       uint128(0x4000000000000000, 0),
 			precision: 22,
 			scale:     9,
+			format:    "inf",
 		},
 		{
 			bts:       uint128(0x8000000000000000, 0),
 			precision: 22,
 			scale:     9,
+			format:    "-inf",
 		},
 		{
 			bts:       uint128s(1000000000),
 			precision: 22,
 			scale:     9,
+			format:    "1.000000000",
+		},
+		{
+			bts:       []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 250, 240, 128},
+			precision: 22,
+			scale:     9,
+			format:    "0.050000000",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -47,6 +59,10 @@ func TestFromBytes(t *testing.T) {
 					"parsed bytes serialized to different value: %v; want %v",
 					x, y,
 				)
+			}
+			formatted := Format(x, test.precision, test.scale)
+			if test.format != formatted {
+				t.Errorf("unexpected decimal format. Expected: %s, actual %s", test.format, formatted)
 			}
 			t.Logf(
 				"%s %s",

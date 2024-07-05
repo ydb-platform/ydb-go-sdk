@@ -477,7 +477,7 @@ func TestStruct(t *testing.T) {
 		Int8Int32:     123,
 		Int8Int16:     123,
 		BoolBool:      true,
-		DateTime:      time.Unix(8683200000, 0),
+		DateTime:      time.Unix(8683200000, 0).UTC(),
 		DatetimeTime:  time.Unix(100500, 0),
 		TimestampTime: time.Unix(12345678987, 654321000),
 	}, dst)
@@ -563,6 +563,33 @@ func TestStructCastFailed(t *testing.T) {
 	require.ErrorIs(t, err, value.ErrCannotCast)
 }
 
+func TestStructCastFailedErrMsg(t *testing.T) {
+	scanner := Struct(Data(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var row struct {
+		A uint64
+	}
+	err := scanner.ScanStruct(&row)
+	require.ErrorContains(t, err, "scan error on struct field name 'A': cast failed")
+}
+
 func TestStructNotFoundColumns(t *testing.T) {
 	scanner := Struct(Data(
 		[]*Ydb.Column{
@@ -588,7 +615,7 @@ func TestStructNotFoundColumns(t *testing.T) {
 		C string
 	}
 	err := scanner.ScanStruct(&row)
-	require.ErrorIs(t, err, errColumnsNotFoundInRow)
+	require.ErrorIs(t, err, ErrColumnsNotFoundInRow)
 }
 
 func TestStructWithAllowMissingColumnsFromSelect(t *testing.T) {
@@ -675,7 +702,7 @@ func TestStructNotFoundFields(t *testing.T) {
 		A string
 	}
 	err := scanner.ScanStruct(&row)
-	require.ErrorIs(t, err, errFieldsNotFoundInStruct)
+	require.ErrorIs(t, err, ErrFieldsNotFoundInStruct)
 }
 
 func TestStructWithAllowMissingFieldsInStruct(t *testing.T) {

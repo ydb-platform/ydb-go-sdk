@@ -104,6 +104,22 @@ func TestParseConnectionString(t *testing.T) {
 			"",
 			"",
 		},
+		{
+			"localhost:3049/Root",
+			true,
+			"localhost:3049",
+			"/Root",
+			"",
+			"",
+		},
+		{
+			"grpc://localhost:3049/Root",
+			false,
+			"localhost:3049",
+			"/Root",
+			"",
+			"",
+		},
 	} {
 		t.Run(test.connectionString, func(t *testing.T) {
 			info, err := Parse(test.connectionString)
@@ -123,4 +139,16 @@ func TestParseConnectionString(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseConnectionStringEmptyDatabase(t *testing.T) {
+	info, err := Parse("grpc://ydb-ru.yandex.net:2135")
+	if err != nil {
+		t.Fatalf("Received unexpected error:\n%+v", err)
+	}
+	c := config.New(config.WithDatabase("mydb"))
+	c = c.With(info.Options...)
+	require.False(t, c.Secure())
+	require.Equal(t, "ydb-ru.yandex.net:2135", c.Endpoint())
+	require.Equal(t, "mydb", c.Database())
 }

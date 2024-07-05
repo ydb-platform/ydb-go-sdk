@@ -3,17 +3,16 @@ package options
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
-	_ DoOption = idempotentOption{}
-	_ DoOption = labelOption("")
-	_ DoOption = traceOption{}
+	_ DoOption = RetryOptionsOption(nil)
+	_ DoOption = TraceOption{}
 
-	_ DoTxOption = idempotentOption{}
-	_ DoTxOption = labelOption("")
-	_ DoTxOption = traceOption{}
+	_ DoTxOption = RetryOptionsOption(nil)
+	_ DoTxOption = TraceOption{}
 	_ DoTxOption = doTxSettingsOption{}
 )
 
@@ -32,13 +31,12 @@ type (
 	}
 
 	doTxSettings struct {
-		doOpts     []DoOption
+		doSettings
 		txSettings tx.Settings
 	}
 
-	idempotentOption struct{}
-	labelOption      string
-	traceOption      struct {
+	RetryOptionsOption []retry.Option
+	TraceOption        struct {
 		t *trace.Query
 	}
 	doTxSettingsOption struct {
@@ -54,36 +52,24 @@ func (s *doSettings) RetryOpts() []retry.Option {
 	return s.retryOpts
 }
 
-func (s *doTxSettings) DoOpts() []DoOption {
-	return s.doOpts
-}
-
 func (s *doTxSettings) TxSettings() tx.Settings {
 	return s.txSettings
 }
 
-func (opt idempotentOption) applyDoTxOption(s *doTxSettings) {
-	s.doOpts = append(s.doOpts, opt)
-}
-
-func (idempotentOption) applyDoOption(s *doSettings) {
-	s.retryOpts = append(s.retryOpts, retry.WithIdempotent(true))
-}
-
-func (opt traceOption) applyDoOption(s *doSettings) {
+func (opt TraceOption) applyDoOption(s *doSettings) {
 	s.trace = s.trace.Compose(opt.t)
 }
 
-func (opt traceOption) applyDoTxOption(s *doTxSettings) {
-	s.doOpts = append(s.doOpts, opt)
+func (opt TraceOption) applyDoTxOption(s *doTxSettings) {
+	opt.applyDoOption(&s.doSettings)
 }
 
-func (opt labelOption) applyDoOption(s *doSettings) {
-	s.retryOpts = append(s.retryOpts, retry.WithLabel(string(opt)))
+func (opts RetryOptionsOption) applyDoOption(s *doSettings) {
+	s.retryOpts = append(s.retryOpts, opts...)
 }
 
-func (opt labelOption) applyDoTxOption(s *doTxSettings) {
-	s.doOpts = append(s.doOpts, opt)
+func (opts RetryOptionsOption) applyDoTxOption(s *doTxSettings) {
+	opts.applyDoOption(&s.doSettings)
 }
 
 func (opt doTxSettingsOption) applyDoTxOption(opts *doTxSettings) {
@@ -94,16 +80,20 @@ func WithTxSettings(txSettings tx.Settings) doTxSettingsOption {
 	return doTxSettingsOption{txSettings: txSettings}
 }
 
-func WithIdempotent() idempotentOption {
-	return idempotentOption{}
+func WithIdempotent() RetryOptionsOption {
+	return []retry.Option{retry.WithIdempotent(true)}
 }
 
-func WithLabel(lbl string) labelOption {
-	return labelOption(lbl)
+func WithLabel(lbl string) RetryOptionsOption {
+	return []retry.Option{retry.WithLabel(lbl)}
 }
 
-func WithTrace(t *trace.Query) traceOption {
-	return traceOption{t: t}
+func WithTrace(t *trace.Query) TraceOption {
+	return TraceOption{t: t}
+}
+
+func WithRetryBudget(b budget.Budget) RetryOptionsOption {
+	return []retry.Option{retry.WithBudget(b)}
 }
 
 func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
@@ -123,8 +113,8 @@ func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 func ParseDoTxOpts(t *trace.Query, opts ...DoTxOption) (s *doTxSettings) {
 	s = &doTxSettings{
 		txSettings: tx.NewSettings(tx.WithDefaultTxMode()),
-		doOpts: []DoOption{
-			WithTrace(t),
+		doSettings: doSettings{
+			trace: t,
 		},
 	}
 

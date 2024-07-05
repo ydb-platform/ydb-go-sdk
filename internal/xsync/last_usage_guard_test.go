@@ -1,4 +1,4 @@
-package conn
+package xsync
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_lastUsage_Lock(t *testing.T) {
+func TestLastUsageGuardLock(t *testing.T) {
 	t.Run("NowFromLocked", func(t *testing.T) {
 		start := time.Unix(0, 0)
 		clock := clockwork.NewFakeClockAt(start)

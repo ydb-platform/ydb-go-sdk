@@ -86,7 +86,10 @@ func (w *Writer) init() {
 }
 
 func (w *Writer) mustDeclare(name string) {
-	s := w.scope.Back().Value.(*scope)
+	s, ok := w.scope.Back().Value.(*scope)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *scope", s))
+	}
 	if !s.set(name) {
 		where := s.where(name)
 		panic(fmt.Sprintf(
@@ -100,7 +103,10 @@ func (w *Writer) declare(name string) string {
 	if isPredeclared(name) {
 		name = firstChar(name)
 	}
-	s := w.scope.Back().Value.(*scope)
+	s, ok := w.scope.Back().Value.(*scope)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *scope", s))
+	}
 	for i := 0; ; i++ {
 		v := name
 		if i > 0 {
@@ -127,7 +133,10 @@ func (w *Writer) isGlobalScope() bool {
 }
 
 func (w *Writer) capture(vars ...string) {
-	s := w.scope.Back().Value.(*scope)
+	s, ok := w.scope.Back().Value.(*scope)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *scope", s))
+	}
 	for _, v := range vars {
 		if !s.set(v) {
 			panic(fmt.Sprintf("can't capture variable %q", v))
@@ -324,6 +333,7 @@ func (w *Writer) compose(trace *Trace) {
 		w.line(`// Compose returns a new `, trace.Name, ` which has functional fields composed both from `,
 			t, ` and `, x, `.`,
 		)
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.code(`func (`, t, ` *`, trace.Name, `) Compose(`, x, ` *`, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
 		w.line(`*`, trace.Name, ` {`)
 		w.block(func() {
@@ -362,6 +372,7 @@ func (w *Writer) composeHook(hook Hook, t1, t2, dst string) {
 	w.line(`}`)
 }
 
+//nolint:funlen
 func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 	w.newScope(func() {
 		w.capture(h1, h2)
@@ -405,9 +416,9 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 				w.line("if " + h + " != nil {")
 				w.block(func() {
 					if fn.HasResult() {
-						w.code(rs[i], ` = `)
+						w.code(rs[i], ` = `) //nolint:scopelint
 					}
-					w.code(h)
+					w.code(h) //nolint:scopelint
 					w.call(args)
 				})
 				w.line("}")
@@ -440,11 +451,13 @@ func (w *Writer) options(trace *Trace) {
 	})
 	w.newScope(func() {
 		w.line(fmt.Sprintf(`// %sOption specified %s compose option`, trace.Name, trace.Name))
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.line(fmt.Sprintf(`type %sComposeOption func(o *%sComposeOptions)`, trace.Name, unexported(trace.Name)))
 		_ = w.bw.WriteByte('\n')
 	})
 	w.newScope(func() {
 		w.line(fmt.Sprintf(`// With%sPanicCallback specified behavior on panic`, trace.Name))
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.line(fmt.Sprintf(`func With%sPanicCallback(cb func(e interface{})) %sComposeOption {`, trace.Name, trace.Name))
 		w.block(func() {
 			w.line(fmt.Sprintf(`return func(o *%sComposeOptions) {`, unexported(trace.Name)))
@@ -641,6 +654,7 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 
 	w.newScope(func() {
 		t := w.declare("t")
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.code(`func `, name)
 		w.code(`(`)
 		var ctx string
@@ -1028,7 +1042,7 @@ func (s *scope) set(v string) bool {
 	if _, has := s.vars[v]; has {
 		return false
 	}
-	_, file, line, _ := runtime.Caller(2)
+	_, file, line, _ := runtime.Caller(2) //nolint:gomnd
 	s.vars[v] = decl{
 		where: fmt.Sprintf("%s:%d", file, line),
 	}

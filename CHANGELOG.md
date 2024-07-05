@@ -1,8 +1,130 @@
 * Fixed topic reader and writer WaitInit hunging on unretriable connection error
+* Added `query.Client.Stats()` method
+* Added `query.Result.Stats()` method
+* Added `query.ResultSet.Index()` method
+* Support loading OAuth 2.0 token exchange credentials provider from config file
+* Added options for JWT tokens for loading EC private keys and HMAC secrets
+
+## v3.74.5
+* Fixed bug with reading empty result set parts.
+* Fixed nil pointer dereference when closing result set
+
+## v3.74.4
+* Fixed bug with fail cast of grpc response to `operation.{Response,Status}`
+
+## v3.74.3
+* Removed check the node is available for query and table service sessions 
+* Refactored the `balancers.PreferLocations()` function - it is a clean/pure function
+* Added experimental `balancers.WithNodeID()` context modifier for define per request the YDB endpoint by NodeID
+* Reverted the allowing the casts from signed YDB types to unsigned destination types if source value is not negative
+* Replaced internal query session pool by default to stub for exclude impact from internal/pool 
+
+## v3.74.2
+* Added description to scan errors with use query service client scanner
+
+## v3.74.1
+* Allowed the use of DSN without specifying the protocol/scheme
+* Allowed casts from signed YDB types to unsigned destination types if source value is not negative
+* Removed public `query.TxIdentifier` interface for exclude any external implementations for use with YDB
+
+## v3.74.0
+* Added experimental range functions to the `query.Result` and `query.ResultSet` types, available as for-range loops starting with Go version 1.22. These features can be enabled by setting the environment variable `GOEXPERIMENT=rangefunc`.
+* Added public types for `tx.Option`, `options.DoOption` and `options.DoTxOption`
+
+## v3.73.1
+* Changed `query.DefaultTxControl()` from `query.SerializableReadWrite()` with commit to `query.NoTx()`
+
+## v3.73.0
+* Added experimental `retry.DoWithResult` and `retry.DoTxWithResult` helpers for retry lambda and return value from lambda
+
+## v3.72.0
+* Excluded `Query()` method from interface `ydb.Connection`. Method `Query()` remains accessible from `ydb.Driver`
+
+## v3.71.0
+* Added `query/ResultSet.{Columns,ColumnTypes}` methods for get column names and types from query result set
+* Added experimental `retry.RetryWithResult` helper for retry lambda and return value from lambda
+
+## v3.70.0
+* Fixed `config.WithDatabase` behaviour with empty database in DSN string
+* Added experimental method `query/Client.Execute` for execute query and read materialized result
+
+## v3.69.0
+* Added experimental method for execute query and read only one row from result:
+  * `query/Client.ReadRow`
+  * `query/Session.ReadRow`
+  * `query/Transaction.ReadRow`
+* Added experimental method for execute query and read only one result set from result:
+  * `query/Client.ReadResultSet`
+  * `query/Session.ReadResultSet`
+  * `query/Transaction.ReadResultSet`
+* Added experimental `sugar.UnmarshallRow[T]` and `sugar.UnmarshallResultSet[T]` helpers for converts YDB rows to typed objects
+
+## v3.68.1
+* Downgraded minimal version of Go to 1.20
+* Refactored internal packages by `ifshort` linter issues
+
+## v3.68.0
+* Added experimental `ydb.{Register,Unregister}DsnParser` global funcs for register/unregister external custom DSN parser for `ydb.Open` and `sql.Open` driver constructor
+* Simple implement option WithReaderWithoutConsumer
+* Fixed bug: topic didn't send specified partition number to a server 
+
+## v3.67.2
+* Fixed incorrect formatting of decimal. Implementation of decimal has been reverted to latest working version
+
+## v3.67.1 (retracted)
+* Fixed race of stop internal processes on close topic writer
+* Fixed goroutines leak within topic reader on network problems
+
+## v3.67.0
+* Added `ydb.WithNodeAddressMutator` experimental option for mutate node addresses from `discovery.ListEndpoints` response
+* Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
+
+## v3.66.3
+* Fixed the OAuth2 test
+
+## v3.66.2
+* Added `trace.DriverConnStreamEvents` details bit
+* Added `trace.Driver.OnConnStreamFinish` event
+
+## v3.66.1
+* Added flush messages from buffer before close topic writer
+* Added Flush method for topic writer
+
+## v3.66.0
+* Added experimental package `retry/budget` for limit second and subsequent retry attempts 
+* Refactored internals for enabling `containedctx` linter
+* Fixed the hanging semaphore issue on coordination session reconnect
+
+## v3.65.3
+* Fixed data race in `internal/conn.grpcClientStream` 
+
+## v3.65.2
+* Fixed data race using `log.WithNames`
+
+## v3.65.1
+* Updated dependency `ydb-go-genproto`
+* Added processing of `Ydb.StatusIds_EXTERNAL_ERROR` in `retry.Retry`
+
+## v3.65.0
+* Supported OAuth 2.0 Token Exchange credentials provider
+
+## v3.64.0
+* Supported `table.Session.RenameTables` method
+* Fixed out of range panic if next query result set part is empty
+* Updated the indirect dependencies `golang.org/x/net` to `v0.17.0` and `golang.org/x/sys` to `v0.13.0` due to vulnerability issue
+
+## v3.63.0
+* Added versioning policy
+
+## v3.62.0
+* Restored `WithSessionPoolKeepAliveMinSize` and `WithSessionPoolKeepAliveTimeout` for backward compatibility.
+* Fixed leak timers
+* Changed default StartTime (time of retries for connect to server) for topic writer from 1 minute to infinite (can be overrided by WithWriterStartTimeout topic option)
 * Added `Struct` support for `Variant` in `ydb.ParamsBuilder()`
+* Added `go` with anonymous function case in `gstack`
 
 ## v3.61.2
-* Changed default transaction control to `NoTx` for execute query through query service client 
+* Changed default transaction control to `NoTx` for execute query through query service client
 
 ## v3.61.1
 * Renamed `db.Coordination().CreateSession()` to `db.Coordination().Session()` for compatibility with protos
@@ -85,7 +207,7 @@
 * Fixed sometime panic on topic writer closing
 * Added experimental query parameters builder `ydb.ParamsBuilder()`
 * Changed types of `table/table.{QueryParameters,ParameterOption}` to aliases on `internal/params.{Parameters,NamedValue}`
-* Fixed bug with optional decimal serialization 
+* Fixed bug with optional decimal serialization
 
 ## v3.56.2
 * Fixed return private error for commit to stopped partition in topic reader.

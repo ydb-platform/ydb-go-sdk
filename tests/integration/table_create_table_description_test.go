@@ -22,7 +22,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestCreateTableDescription(t *testing.T) {
+func TestCreateTableDescription(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	ctx := xtest.Context(t)
 
 	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),

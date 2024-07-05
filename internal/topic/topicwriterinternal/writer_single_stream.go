@@ -66,12 +66,13 @@ func NewSingleStreamWriter(
 	cfg SingleStreamWriterConfig, //nolint:gocritic
 ) (*SingleStreamWriter, error) {
 	res := newSingleStreamWriterStopped(ctxForPProfLabelsOnly, cfg)
-	err := res.initStream()
-	if err != nil {
+
+	if err := res.initStream(); err != nil {
 		_ = res.close(context.Background(), err)
 
 		return nil, err
 	}
+
 	res.start()
 
 	return res, nil
@@ -82,8 +83,11 @@ func newSingleStreamWriterStopped(
 	cfg SingleStreamWriterConfig, //nolint:gocritic
 ) *SingleStreamWriter {
 	return &SingleStreamWriter{
-		cfg:            cfg,
-		background:     *background.NewWorker(xcontext.ValueOnly(ctxForPProfLabelsOnly)),
+		cfg: cfg,
+		background: *background.NewWorker(
+			xcontext.ValueOnly(ctxForPProfLabelsOnly),
+			"ydb-topic-stream-writer-background",
+		),
 		closeCompleted: make(empty.Chan),
 	}
 }

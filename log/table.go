@@ -14,7 +14,7 @@ func Table(l Logger, d trace.Detailer, opts ...Option) (t trace.Table) {
 	return internalTable(wrapLogger(l, opts...), d)
 }
 
-//nolint:gocyclo
+//nolint:gocyclo,funlen
 func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 	t.OnDo = func(
 		info trace.TableDoStartInfo,

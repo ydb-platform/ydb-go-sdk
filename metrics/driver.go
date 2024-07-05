@@ -9,9 +9,11 @@ import (
 )
 
 // driver makes driver with New publishing
+//
+//nolint:funlen
 func driver(config Config) (t trace.Driver) {
 	config = config.WithSystem("driver")
-	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "local_dc", "az")
+	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "az")
 	balancersDiscoveries := config.WithSystem("balancer").CounterVec("discoveries", "status", "cause")
 	balancerUpdates := config.WithSystem("balancer").CounterVec("updates", "cause")
 	conns := config.GaugeVec("conns", "endpoint", "node_id")
@@ -20,8 +22,7 @@ func driver(config Config) (t trace.Driver) {
 	tli := config.CounterVec("transaction_locks_invalidated")
 
 	type endpointKey struct {
-		localDC bool
-		az      string
+		az string
 	}
 	knownEndpoints := make(map[endpointKey]struct{})
 
@@ -56,7 +57,7 @@ func driver(config Config) (t trace.Driver) {
 		)
 
 		return func(info trace.DriverConnNewStreamDoneInfo) {
-			if config.Details()&trace.DriverConnEvents != 0 {
+			if config.Details()&trace.DriverConnStreamEvents != 0 {
 				requests.With(map[string]string{
 					"status":   errorBrief(info.Error),
 					"method":   string(method),
@@ -100,8 +101,7 @@ func driver(config Config) (t trace.Driver) {
 				newEndpoints := make(map[endpointKey]int, len(info.Endpoints))
 				for _, e := range info.Endpoints {
 					e := endpointKey{
-						localDC: e.LocalDC(),
-						az:      e.Location(),
+						az: e.Location(),
 					}
 					newEndpoints[e]++
 				}
@@ -109,16 +109,14 @@ func driver(config Config) (t trace.Driver) {
 					if _, has := newEndpoints[e]; !has {
 						delete(knownEndpoints, e)
 						endpoints.With(map[string]string{
-							"local_dc": strconv.FormatBool(e.localDC),
-							"az":       e.az,
+							"az": e.az,
 						}).Set(0)
 					}
 				}
 				for e, count := range newEndpoints {
 					knownEndpoints[e] = struct{}{}
 					endpoints.With(map[string]string{
-						"local_dc": strconv.FormatBool(e.localDC),
-						"az":       e.az,
+						"az": e.az,
 					}).Set(float64(count))
 				}
 			}

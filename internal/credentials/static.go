@@ -19,6 +19,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
+const TokenRefreshDivisor = 10
+
 var (
 	_ Credentials             = (*Static)(nil)
 	_ fmt.Stringer            = (*Static)(nil)
@@ -73,6 +75,7 @@ type Static struct {
 	sourceInfo string
 }
 
+//nolint:funlen
 func (c *Static) Token(ctx context.Context) (token string, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -85,9 +88,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 			fmt.Errorf("dial failed: %w", err),
 		)
 	}
-	defer func() {
-		_ = cc.Close()
-	}()
+	defer cc.Close()
 
 	client := Ydb_Auth_V1.NewAuthServiceClient(cc)
 
@@ -133,7 +134,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 		return "", xerrors.WithStackTrace(err)
 	}
 
-	c.requestAt = time.Now().Add(time.Until(expiresAt) / 10)
+	c.requestAt = time.Now().Add(time.Until(expiresAt) / TokenRefreshDivisor)
 	c.token = result.GetToken()
 
 	return c.token, nil

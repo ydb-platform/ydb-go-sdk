@@ -31,6 +31,7 @@ func (d Details) String() string {
 const (
 	DriverNetEvents Details = 1 << iota // for bitmask: 1, 2, 4, 8, 16, 32, ...
 	DriverConnEvents
+	DriverConnStreamEvents
 	DriverBalancerEvents
 	DriverResolverEvents
 	DriverRepeaterEvents
@@ -79,6 +80,7 @@ const (
 	CoordinationEvents
 
 	DriverEvents = DriverConnEvents |
+		DriverConnStreamEvents |
 		DriverBalancerEvents |
 		DriverResolverEvents |
 		DriverRepeaterEvents |
@@ -128,6 +130,7 @@ var (
 		DriverResolverEvents:    "ydb.driver.resolver",
 		DriverRepeaterEvents:    "ydb.driver.repeater",
 		DriverConnEvents:        "ydb.driver.conn",
+		DriverConnStreamEvents:  "ydb.driver.conn.stream",
 		DriverCredentialsEvents: "ydb.driver.credentials",
 
 		DiscoveryEvents: "ydb.discovery",

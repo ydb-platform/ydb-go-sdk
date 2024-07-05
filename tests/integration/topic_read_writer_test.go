@@ -162,22 +162,22 @@ func TestMessageMetadata(t *testing.T) {
 	})
 }
 
-func TestManyConcurentReadersWriters(t *testing.T) {
+func TestManyConcurentReadersWriters(sourceTest *testing.T) {
 	const partitionCount = 3
 	const writersCount = 5
 	const readersCount = 10
 	const sendMessageCount = 100
 	const totalMessageCount = sendMessageCount * writersCount
 
-	tb := xtest.MakeSyncedTest(t)
-	ctx := xtest.Context(tb)
-	db := connect(tb, ydb.WithLogger(
+	t := xtest.MakeSyncedTest(sourceTest)
+	ctx := xtest.Context(t)
+	db := connect(t, ydb.WithLogger(
 		newLogger(t),
 		trace.DetailsAll,
 	))
 
 	// create topic
-	topicName := tb.Name()
+	topicName := t.Name()
 	_ = db.Topic().Drop(ctx, topicName)
 	err := db.Topic().Create(
 		ctx,
@@ -185,21 +185,21 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		topicoptions.CreateWithSupportedCodecs(topictypes.CodecRaw),
 		topicoptions.CreateWithMinActivePartitions(partitionCount),
 	)
-	require.NoError(tb, err)
+	require.NoError(t, err)
 
 	// senders
 	writer := func(producerID string) {
 		pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
 			w, errWriter := db.Topic().StartWriter(topicName, topicoptions.WithProducerID(producerID))
-			require.NoError(tb, errWriter)
+			require.NoError(t, errWriter)
 
 			for i := 0; i < sendMessageCount; i++ {
 				buf := &bytes.Buffer{}
 				errWriter = binary.Write(buf, binary.BigEndian, int64(i))
-				require.NoError(tb, errWriter)
+				require.NoError(t, errWriter)
 				mess := topicwriter.Message{Data: buf}
 				errWriter = w.Write(ctx, mess)
-				require.NoError(tb, errWriter)
+				require.NoError(t, errWriter)
 			}
 		})
 	}
@@ -223,25 +223,25 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 				topicoptions.ReadTopic(topicName),
 				topicoptions.WithCommitTimeLagTrigger(0),
 			)
-			require.NoError(tb, errReader)
+			require.NoError(t, errReader)
 
 			for {
 				mess, errReader := r.ReadMessage(readerCtx)
 				if readerCtx.Err() != nil {
 					return
 				}
-				require.NoError(tb, errReader)
+				require.NoError(t, errReader)
 
 				var val int64
 				errReader = binary.Read(mess, binary.BigEndian, &val)
-				require.NoError(tb, errReader)
+				require.NoError(t, errReader)
 				receivedMessage <- receivedMessT{
 					ctx:     mess.Context(),
 					writer:  mess.ProducerID,
 					content: val,
 				}
 				errReader = r.Commit(ctx, mess)
-				require.NoError(tb, errReader)
+				require.NoError(t, errReader)
 			}
 		})
 	}
@@ -251,7 +251,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 			Name: commonConsumerName,
 		},
 	))
-	require.NoError(tb, err)
+	require.NoError(t, err)
 
 	var wg sync.WaitGroup
 	wg.Add(readersCount)
@@ -279,20 +279,20 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 			continue
 		}
 		cnt++
-		require.Equal(tb, stored+1, mess.content)
+		require.Equal(t, stored+1, mess.content)
 		received[mess.writer] = mess.content
 	}
 
 	// check about no more messages
 	select {
 	case mess := <-receivedMessage:
-		tb.Fatal(mess)
+		t.Fatal(mess)
 	default:
 	}
 
 	readerCancel()
 	wg.Wait()
-	tb.Log(doubles)
+	t.Log(doubles)
 }
 
 func TestCommitUnexpectedRange(t *testing.T) {
@@ -349,25 +349,26 @@ func TestCommitUnexpectedRange(t *testing.T) {
 }
 
 func TestUpdateToken(t *testing.T) {
-	ctx := context.Background()
-	db := connect(t)
-	dbLogging := connectWithGrpcLogging(t)
-	topicPath := createTopic(ctx, t, db)
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	dbLogging := scope.DriverWithGRPCLogging()
+	topicPath := scope.TopicPath()
 
 	tokenInterval := time.Second
 	reader, err := dbLogging.Topic().StartReader(
-		consumerName,
+		scope.TopicConsumerName(),
 		topicoptions.ReadTopic(topicPath),
 		topicoptions.WithReaderUpdateTokenInterval(tokenInterval),
 	)
-	require.NoError(t, err)
+	scope.Require.NoError(err)
 
 	writer, err := db.Topic().StartWriter(
 		topicPath,
-		topicoptions.WithProducerID("producer-id"),
+		topicoptions.WithWriterProducerID("producer-id"),
 		topicoptions.WithWriterUpdateTokenInterval(tokenInterval),
 	)
-	require.NoError(t, err)
+	scope.Require.NoError(err)
 
 	var wg sync.WaitGroup
 
@@ -383,7 +384,7 @@ func TestUpdateToken(t *testing.T) {
 
 			msgContent := []byte(strconv.Itoa(i))
 			err = writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(msgContent)})
-			require.NoError(t, err)
+			scope.Require.NoError(err)
 		}
 	}()
 
@@ -399,8 +400,8 @@ func TestUpdateToken(t *testing.T) {
 			}
 
 			msg, err := reader.ReadMessage(ctx)
-			require.NoError(t, err)
-			require.NoError(t, reader.Commit(ctx, msg))
+			scope.Require.NoError(err)
+			scope.Require.NoError(reader.Commit(ctx, msg))
 			hasMessages.Store(true)
 		}
 	}()
@@ -436,6 +437,32 @@ func TestTopicWriterWithManualPartitionSelect(t *testing.T) {
 	require.NoError(t, err)
 	err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("asd")})
 	require.NoError(t, err)
+}
+
+func TestWriterFlushMessagesBeforeClose(t *testing.T) {
+	s := newScope(t)
+	ctx := s.Ctx
+	writer, err := s.Driver().Topic().StartWriter(s.TopicPath(), topicoptions.WithWriterWaitServerAck(false))
+	require.NoError(t, err)
+
+	count := 1000
+	for i := 0; i < count; i++ {
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(strconv.Itoa(i))}))
+	}
+	require.NoError(t, writer.Close(ctx))
+
+	for i := 0; i < count; i++ {
+		readCtx, cancel := context.WithTimeout(ctx, time.Second)
+		mess, err := s.TopicReader().ReadMessage(readCtx)
+		cancel()
+		require.NoError(t, err)
+
+		messBody, err := io.ReadAll(mess)
+		require.NoError(t, err)
+		messBodyString := string(messBody)
+		require.Equal(t, strconv.Itoa(i), messBodyString)
+		cancel()
+	}
 }
 
 var topicCounter int

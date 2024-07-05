@@ -7,15 +7,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-const wordSize = bits.UintSize / 8
+const (
+	wordSize   = bits.UintSize / 8
+	bufferSize = 40
+	negMask    = 0x80
+)
 
 var (
-	ten  = big.NewInt(10)
+	ten  = big.NewInt(10) //nolint:gomnd
 	zero = big.NewInt(0)
 	one  = big.NewInt(1)
 	inf  = big.NewInt(0).Mul(
-		big.NewInt(100000000000000000),
-		big.NewInt(1000000000000000000),
+		big.NewInt(100000000000000000),  //nolint:gomnd
+		big.NewInt(1000000000000000000), //nolint:gomnd
 	)
 	nan    = big.NewInt(0).Add(inf, one)
 	err    = big.NewInt(0).Add(nan, one)
@@ -57,8 +61,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 	}
 
 	v.SetBytes(bts)
-
-	neg := bts[0]&0x80 != 0
+	neg := bts[0]&negMask != 0 //nolint:ifshort
 	if neg {
 		// Given bytes contains negative value.
 		// Interpret is as two's complement.
@@ -85,6 +88,8 @@ func FromInt128(p [16]byte, precision, scale uint32) *big.Int {
 
 // Parse interprets a string s with the given precision and scale and returns
 // the corresponding big integer.
+//
+//nolint:funlen
 func Parse(s string, precision, scale uint32) (*big.Int, error) {
 	if scale > precision {
 		return nil, precisionError(s, precision, scale)
@@ -95,7 +100,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		return v, nil
 	}
 
-	neg := s[0] == '-'
+	neg := s[0] == '-' //nolint:ifshort
 	if neg || s[0] == '+' {
 		s = s[1:]
 	}
@@ -187,6 +192,8 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 
 // Format returns the string representation of x with the given precision and
 // scale.
+//
+//nolint:funlen
 func Format(x *big.Int, precision, scale uint32) string {
 	switch {
 	case x.CmpAbs(inf) == 0:
@@ -208,7 +215,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	}
 
 	v := big.NewInt(0).Set(x)
-	neg := x.Sign() < 0
+	neg := x.Sign() < 0 //nolint:ifshort
 	if neg {
 		// Convert negative to positive.
 		v.Neg(x)
@@ -216,7 +223,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 
 	// log_{10}(2^120) ~= 36.12, 37 decimal places
 	// plus dot, zero before dot, sign.
-	bts := make([]byte, 40)
+	bts := make([]byte, bufferSize)
 	pos := len(bts)
 
 	var digit big.Int
@@ -284,7 +291,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 }
 
 func put(x *big.Int, p []byte) {
-	neg := x.Sign() < 0
+	neg := x.Sign() < 0 //nolint:ifshort
 	if neg {
 		x = complement(x)
 	}

@@ -84,8 +84,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
-		MaxMessageSize:     50 * 1024 * 1024,
-		MaxQueueLen:        1000,
+		MaxMessageSize:     50 * 1024 * 1024, //nolint:gomnd
+		MaxQueueLen:        1000,             //nolint:gomnd
 		RetrySettings: topic.RetrySettings{
 			StartTimeout: topic.DefaultStartTimeout,
 		},
@@ -118,7 +118,6 @@ type WriterReconnector struct {
 	queue                          messageQueue
 	background                     background.Worker
 	retrySettings                  topic.RetrySettings
-	clock                          clockwork.Clock
 	writerInstanceID               string
 	sessionID                      string
 	semaphore                      *semaphore.Weighted
@@ -149,7 +148,6 @@ func newWriterReconnectorStopped(
 		cfg:                            cfg,
 		semaphore:                      semaphore.NewWeighted(int64(cfg.MaxQueueLen)),
 		queue:                          newMessageQueue(),
-		clock:                          clockwork.NewRealClock(),
 		lastSeqNo:                      -1,
 		firstInitResponseProcessedChan: make(empty.Chan),
 		encodersMap:                    NewEncoderMap(),
@@ -189,7 +187,7 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 		if w.cfg.AutoSetCreatedTime {
 			if msg.CreatedAt.IsZero() {
 				if now.IsZero() {
-					now = w.clock.Now()
+					now = w.cfg.clock.Now()
 				}
 				msg.CreatedAt = now
 			} else {
@@ -251,7 +249,26 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		return err
 	}
 
-	var waiter MessageQueueAckWaiter
+	waiter, err := w.processMessagesWithLock(messagesSlice, &semaphoreWeight)
+	if err != nil {
+		return err
+	}
+
+	if !w.cfg.WaitServerAck {
+		return nil
+	}
+
+	return w.queue.Wait(ctx, waiter)
+}
+
+func (w *WriterReconnector) processMessagesWithLock(
+	messagesSlice []messageWithDataContent,
+	semaphoreWeight *int64,
+) (MessageQueueAckWaiter, error) {
+	var (
+		waiter MessageQueueAckWaiter
+		err    error
+	)
 	w.m.WithLock(func() {
 		// need set numbers and add to queue atomically
 		err = w.fillFields(messagesSlice)
@@ -266,18 +283,11 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		}
 		if err == nil {
 			// move semaphore weight to queue
-			semaphoreWeight = 0
+			*semaphoreWeight = 0
 		}
 	})
-	if err != nil {
-		return err
-	}
 
-	if !w.cfg.WaitServerAck {
-		return nil
-	}
-
-	return w.queue.Wait(ctx, waiter)
+	return waiter, err
 }
 
 func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) error {
@@ -325,8 +335,22 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	return res, nil
 }
 
+func (w *WriterReconnector) Flush(ctx context.Context) error {
+	return w.queue.WaitLastWritten(ctx)
+}
+
 func (w *WriterReconnector) Close(ctx context.Context) error {
-	return w.close(ctx, xerrors.WithStackTrace(errStopWriterReconnector))
+	reason := xerrors.WithStackTrace(errStopWriterReconnector)
+	w.queue.StopAddNewMessages(reason)
+
+	flushErr := w.Flush(ctx) //nolint:ifshort
+	closeErr := w.close(ctx, reason)
+
+	if flushErr != nil {
+		return flushErr
+	}
+
+	return closeErr
 }
 
 func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
@@ -335,17 +359,21 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 		onDone(resErr)
 	}()
 
-	resErr = w.queue.Close(reason)
+	// stop background work and single stream writer
 	bgErr := w.background.Close(ctx, reason)
-	if resErr == nil {
+	if resErr == nil && bgErr != nil {
 		resErr = bgErr
+	}
+
+	closeErr := w.queue.Close(reason)
+	if resErr == nil && closeErr != nil {
+		resErr = closeErr
 	}
 
 	return resErr
 }
 
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
-	doneCtx := ctx.Done()
 	attempt := 0
 
 	createStreamContext := func() (context.Context, context.CancelFunc) {
@@ -373,24 +401,14 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		now := time.Now()
 		if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
-			startOfRetries = w.clock.Now()
+			startOfRetries = w.cfg.clock.Now()
 		} else {
 			attempt++
 		}
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, w.clock.Since(startOfRetries)); retry {
-				delay := backoff.Delay(attempt)
-				select {
-				case <-doneCtx:
-					return
-				case <-w.clock.After(delay):
-					// pass
-				}
-			} else {
-				_ = w.close(ctx, reconnectReason)
-
+			if w.handleReconnectRetry(ctx, reconnectReason, attempt, startOfRetries) {
 				return
 			}
 		}
@@ -404,6 +422,34 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			reconnectReason = err
 		}
 	}
+}
+
+func (w *WriterReconnector) handleReconnectRetry(
+	ctx context.Context,
+	reconnectReason error,
+	attempt int,
+	startOfRetries time.Time,
+) bool {
+	retryDuration := w.cfg.clock.Since(startOfRetries)
+	if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, retryDuration); retry {
+		delay := backoff.Delay(attempt)
+		delayTimer := w.cfg.clock.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			delayTimer.Stop()
+
+			return true
+		case <-delayTimer.Chan():
+			delayTimer.Stop() // no really need, stop for common style only
+			// pass
+		}
+	} else {
+		_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", reconnectReason, retryDuration))
+
+		return true
+	}
+
+	return false
 }
 
 func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, attempt int) (
