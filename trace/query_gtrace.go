@@ -4,6 +4,8 @@ package trace
 
 import (
 	"context"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 )
 
 // queryComposeOptions is a holder of options
@@ -1676,13 +1678,14 @@ func QueryOnResultNew(t *Query, c *context.Context, call call) func(error) {
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnResultNextPart(t *Query, c *context.Context, call call) func(error) {
+func QueryOnResultNextPart(t *Query, c *context.Context, call call) func(stats *Ydb_TableStats.QueryStats, _ error) {
 	var p QueryResultNextPartStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onResultNextPart(p)
-	return func(e error) {
+	return func(stats *Ydb_TableStats.QueryStats, e error) {
 		var p QueryResultNextPartDoneInfo
+		p.Stats = stats
 		p.Error = e
 		res(p)
 	}

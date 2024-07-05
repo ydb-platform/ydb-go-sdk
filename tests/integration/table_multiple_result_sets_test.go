@@ -152,7 +152,7 @@ func TestTableMultipleResultSets(sourceTest *testing.T) {
 							checkSum += uint64(*val)
 						}
 						if stats := res.Stats(); stats != nil {
-							t.Logf(" --- query stats: compilation: %v, process CPU time: %v, affected shards: %v\n",
+							t.Logf(" --- query poolStats: compilation: %v, process CPU time: %v, affected shards: %v\n",
 								stats.Compilation(),
 								stats.ProcessCPUTime(),
 								func() (count uint64) {
