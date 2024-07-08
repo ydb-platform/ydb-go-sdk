@@ -126,7 +126,7 @@ func (s *grpcClientStream) finish(err error) {
 	)
 }
 
-func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
+func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
@@ -146,14 +146,16 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	err = s.stream.RecvMsg(m)
 
 	if err != nil { //nolint:nestif
+		if xerrors.Is(err, io.EOF) {
+			return io.EOF
+		}
+
 		if xerrors.IsContextError(err) {
 			return xerrors.WithStackTrace(err)
 		}
 
 		defer func() {
-			if !xerrors.Is(err, io.EOF) {
-				s.parentConn.onTransportError(ctx, err)
-			}
+			s.parentConn.onTransportError(ctx, err)
 		}()
 
 		if s.wrapping {
