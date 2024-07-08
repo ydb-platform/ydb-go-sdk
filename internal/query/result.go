@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -296,12 +297,24 @@ func exactlyOneRowFromResult(ctx context.Context, r query.Result) (row query.Row
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if _, err = rs.NextRow(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+	_, err = rs.NextRow(ctx)
+	switch {
+	case err == nil:
 		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
+	case errors.Is(err, io.EOF):
+		// pass
+	default:
+		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if _, err = r.NextResultSet(ctx); err == nil || !xerrors.Is(err, io.EOF) {
-		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	_, err = r.NextResultSet(ctx)
+	switch {
+	case err == nil:
+		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
+	case errors.Is(err, io.EOF):
+		// pass
+	default:
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if err = r.Err(); err != nil {
@@ -336,8 +349,14 @@ func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs quer
 		rows = append(rows, row)
 	}
 
-	if _, err = r.NextResultSet(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+	_, err = r.NextResultSet(ctx)
+	switch {
+	case err == nil:
 		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	case errors.Is(err, io.EOF):
+		// pass
+	default:
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if err = r.Err(); err != nil {

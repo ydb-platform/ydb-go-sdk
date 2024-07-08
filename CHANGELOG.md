@@ -1,3 +1,4 @@
+* Fixed return more than one row error if real error raised on try read next row 
 * Fixed goroutine leak on close reader
 * Fixed topic reader and writer WaitInit hunging on unretriable connection error
 * Added `query.Client.Stats()` method
