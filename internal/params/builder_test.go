@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -401,6 +402,21 @@ func TestBuilder(t *testing.T) {
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
 						TextValue: "1973-11-29T21:33:09.000000Z",
+					},
+				},
+			},
+		},
+		{
+			method: "Any",
+			args:   []any{value.TextValue("test")},
+
+			expected: expected{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_TextValue{
+						TextValue: "test",
 					},
 				},
 			},
