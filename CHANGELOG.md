@@ -1,7 +1,7 @@
 * Added method `ydb.ParamsBuilder().Param(name).Any(value)` to add custom `types.Value`
 * Upgraded dependencies:
   * `google.golang.org/grpc` - from `v1.57.1` to `v1.62.1`
-  * `github.com/google/uuid` - from `v1.3.0` to `v1.3.0`
+  * `github.com/google/uuid` - from `v1.3.0` to `v1.6.0`
   * `golang.org/x/sync` - from `v0.3.0` to `v0.6.0`
 * Fixed goroutine leak on close reader
 * Fixed topic reader and writer WaitInit hunging on unretriable connection error
