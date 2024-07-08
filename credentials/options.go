@@ -55,6 +55,11 @@ func WithRequestTimeout(timeout time.Duration) Oauth2TokenExchangeCredentialsOpt
 	return credentials.WithRequestTimeout(timeout)
 }
 
+// SyncExchangeTimeout
+func WithSyncExchangeTimeout(timeout time.Duration) Oauth2TokenExchangeCredentialsOption {
+	return credentials.WithSyncExchangeTimeout(timeout)
+}
+
 // SubjectTokenSource
 func WithSubjectToken(subjectToken credentials.TokenSource) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithSubjectToken(subjectToken)
