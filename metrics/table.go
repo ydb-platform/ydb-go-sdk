@@ -12,6 +12,7 @@ import (
 func table(config Config) (t trace.Table) {
 	config = config.WithSystem("table")
 	alive := config.GaugeVec("sessions", "node_id")
+	session := config.WithSystem("session")
 	config = config.WithSystem("pool")
 	limit := config.GaugeVec("limit")
 	size := config.GaugeVec("size")
@@ -81,6 +82,42 @@ func table(config Config) (t trace.Table) {
 		}
 
 		return nil
+	}
+	{
+		queryLatency := session.WithSystem("query").TimerVec("latency")
+		queryError := session.WithSystem("query").CounterVec("errs", "status")
+		queryAttempts := session.WithSystem("query").HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10})
+		t.OnDo = func(info trace.TableDoStartInfo) func(trace.TableDoDoneInfo) {
+			start := time.Now()
+
+			return func(doneInfo trace.TableDoDoneInfo) {
+				if config.Details()&trace.TableSessionQueryEvents != 0 {
+					queryLatency.With(nil).Record(time.Since(start))
+					queryError.With(map[string]string{
+						"status": errorBrief(doneInfo.Error),
+					})
+					queryAttempts.With(nil).Record(float64(doneInfo.Attempts))
+				}
+			}
+		}
+	}
+	{
+		queryLatency := session.WithSystem("tx").TimerVec("latency")
+		queryError := session.WithSystem("tx").CounterVec("errs", "status")
+		queryAttempts := session.WithSystem("tx").HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10})
+		t.OnDoTx = func(info trace.TableDoTxStartInfo) func(trace.TableDoTxDoneInfo) {
+			start := time.Now()
+
+			return func(doneInfo trace.TableDoTxDoneInfo) {
+				if config.Details()&trace.TableSessionQueryEvents != 0 {
+					queryLatency.With(nil).Record(time.Since(start))
+					queryError.With(map[string]string{
+						"status": errorBrief(doneInfo.Error),
+					})
+					queryAttempts.With(nil).Record(float64(doneInfo.Attempts))
+				}
+			}
+		}
 	}
 
 	return t
