@@ -1,6 +1,9 @@
+// Package xlist is a copy of standard container/list but uses generics
+// for strict checks on compile time
+
 package xlist
 
-// Element[T] is an element of a linked list.
+// Element is an element of a linked list.
 type Element[T any] struct {
 	// Next and previous pointers in the doubly-linked list of elements.
 	// To simplify the implementation, internally a list l is implemented
@@ -32,8 +35,8 @@ func (e *Element[T]) Prev() *Element[T] {
 	return nil
 }
 
-// List[T] represents a doubly linked list.
-// The zero value for List[T] is an empty list ready to use.
+// List represents a doubly linked list.
+// The zero value for List is an empty list ready to use.
 type List[T any] struct {
 	root Element[T] // sentinel list element, only &root, root.prev, and root.next are used
 	len  int        // current list length excluding (this) sentinel element
@@ -70,7 +73,7 @@ func (l *List[T]) Back() *Element[T] {
 	return l.root.prev
 }
 
-// lazyInit lazily initializes a zero List[T] value.
+// lazyInit lazily initializes a zero List value.
 func (l *List[T]) lazyInit() {
 	if l.root.next == nil {
 		l.Init()
@@ -88,7 +91,7 @@ func (l *List[T]) insert(e, at *Element[T]) *Element[T] {
 	return e
 }
 
-// insertValue is a convenience wrapper for insert(&Element[T]{Value: v}, at).
+// insertValue is a convenience wrapper for insert(&Element{Value: v}, at).
 func (l *List[T]) insertValue(v T, at *Element[T]) *Element[T] {
 	return l.insert(&Element[T]{Value: v}, at)
 }
@@ -123,7 +126,7 @@ func (l *List[T]) move(e, at *Element[T]) {
 func (l *List[T]) Remove(e *Element[T]) T {
 	if e.list == l {
 		// if e.list == l, l must have been initialized when e was inserted
-		// in l or l == nil (e is a zero Element[T]) and l.remove will crash
+		// in l or l == nil (e is a zero Element) and l.remove will crash
 		l.remove(e)
 	}
 	return e.Value
@@ -148,7 +151,7 @@ func (l *List[T]) InsertBefore(v T, mark *Element[T]) *Element[T] {
 	if mark.list != l {
 		return nil
 	}
-	// see comment in List[T].Remove about initialization of l
+	// see comment in List.Remove about initialization of l
 	return l.insertValue(v, mark.prev)
 }
 
@@ -159,7 +162,7 @@ func (l *List[T]) InsertAfter(v T, mark *Element[T]) *Element[T] {
 	if mark.list != l {
 		return nil
 	}
-	// see comment in List[T].Remove about initialization of l
+	// see comment in List.Remove about initialization of l
 	return l.insertValue(v, mark)
 }
 
@@ -170,7 +173,7 @@ func (l *List[T]) MoveToFront(e *Element[T]) {
 	if e.list != l || l.root.next == e {
 		return
 	}
-	// see comment in List[T].Remove about initialization of l
+	// see comment in List.Remove about initialization of l
 	l.move(e, &l.root)
 }
 
@@ -181,7 +184,7 @@ func (l *List[T]) MoveToBack(e *Element[T]) {
 	if e.list != l || l.root.prev == e {
 		return
 	}
-	// see comment in List[T].Remove about initialization of l
+	// see comment in List.Remove about initialization of l
 	l.move(e, l.root.prev)
 }
 
@@ -205,7 +208,7 @@ func (l *List[T]) MoveAfter(e, mark *Element[T]) {
 	l.move(e, mark)
 }
 
-// PushBackList[T] inserts a copy of another list at the back of list l.
+// PushBackList inserts a copy of another list at the back of list l.
 // The lists l and other may be the same. They must not be nil.
 func (l *List[T]) PushBackList(other *List[T]) {
 	l.lazyInit()
@@ -214,7 +217,7 @@ func (l *List[T]) PushBackList(other *List[T]) {
 	}
 }
 
-// PushFrontList[T] inserts a copy of another list at the front of list l.
+// PushFrontList inserts a copy of another list at the front of list l.
 // The lists l and other may be the same. They must not be nil.
 func (l *List[T]) PushFrontList(other *List[T]) {
 	l.lazyInit()
