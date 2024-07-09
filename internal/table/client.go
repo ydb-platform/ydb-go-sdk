@@ -1,7 +1,6 @@
 package table
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -50,8 +50,8 @@ func newClient(
 		cc:     cc,
 		build:  builder,
 		index:  make(map[*session]sessionInfo),
-		idle:   list.New(),
-		waitQ:  list.New(),
+		idle:   xlist.New[*session](),
+		waitQ:  xlist.New[*chan *session](),
 		limit:  config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
@@ -82,10 +82,10 @@ type Client struct {
 	// read-write fields
 	mu                xsync.Mutex
 	index             map[*session]sessionInfo
-	createInProgress  int        // KIKIMR-9163: in-create-process counter
-	limit             int        // Upper bound for Client size.
-	idle              *list.List // list<*session>
-	waitQ             *list.List // list<*chan *session>
+	createInProgress  int // KIKIMR-9163: in-create-process counter
+	limit             int // Upper bound for Client size.
+	idle              *xlist.List[*session]
+	waitQ             *xlist.List[*chan *session]
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
 	wg                sync.WaitGroup
@@ -484,7 +484,7 @@ func (c *Client) Get(ctx context.Context) (s *session, err error) {
 func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s *session, err error) {
 	var (
 		ch *chan *session
-		el *list.Element // Element in the wait queue.
+		el *xlist.Element[*chan *session] // Element in the wait queue.
 		ok bool
 	)
 
@@ -626,18 +626,11 @@ func (c *Client) Close(ctx context.Context) (err error) {
 			c.limit = 0
 
 			for el := c.waitQ.Front(); el != nil; el = el.Next() {
-				ch, ok := el.Value.(*chan *session)
-				if !ok {
-					panic(fmt.Sprintf("unsupported type conversion from %T to *chan *session", ch))
-				}
-				close(*ch)
+				close(*el.Value)
 			}
 
 			for e := c.idle.Front(); e != nil; e = e.Next() {
-				s, ok := e.Value.(*session)
-				if !ok {
-					panic(fmt.Sprintf("unsupported type conversion from %T to *session", s))
-				}
+				s := e.Value
 				s.SetStatus(table.SessionClosing)
 				c.wg.Add(1)
 				go func() {
@@ -765,10 +758,7 @@ func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Dura
 			return
 		}
 		for e := c.idle.Front(); e != nil; e = e.Next() {
-			s, ok := e.Value.(*session)
-			if !ok {
-				panic(fmt.Sprintf("unsupported type conversion from %T to *session", s))
-			}
+			s := e.Value
 			info, has := c.index[s]
 			if !has {
 				panic("session not found in pool")
@@ -841,10 +831,7 @@ func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) {
 	if el == nil {
 		return
 	}
-	s, ok := el.Value.(*session)
-	if !ok {
-		panic(fmt.Sprintf("unsupported type conversion from %T to *session", s))
-	}
+	s = el.Value
 	info, has := c.index[s]
 	if !has || el != info.idle {
 		panic("inconsistent session client index")
@@ -883,10 +870,7 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 		// missed something and may want to retry (especially for case (3)).
 		//
 		// After that we taking a next waiter and repeat the same.
-		ch, ok := c.waitQ.Remove(el).(*chan *session)
-		if !ok {
-			panic(fmt.Sprintf("unsupported type conversion from %T to *chan *session", ch))
-		}
+		ch := c.waitQ.Remove(el)
 		select {
 		case *ch <- s:
 			// Case (1).
@@ -933,7 +917,7 @@ func (c *Client) internalPoolPushIdle(s *session, now time.Time) {
 }
 
 // c.mu must be held.
-func (c *Client) internalPoolHandlePushIdle(s *session, now time.Time, el *list.Element) {
+func (c *Client) internalPoolHandlePushIdle(s *session, now time.Time, el *xlist.Element[*session]) {
 	info, has := c.index[s]
 	if !has {
 		panic("trying to store session created outside of the client")
@@ -948,6 +932,6 @@ func (c *Client) internalPoolHandlePushIdle(s *session, now time.Time, el *list.
 }
 
 type sessionInfo struct {
-	idle    *list.Element
+	idle    *xlist.Element[*session]
 	touched time.Time
 }
