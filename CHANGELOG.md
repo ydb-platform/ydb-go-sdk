@@ -1,3 +1,4 @@
+* Added metrics over `table.Do()` and `table.DoTx()`
 * Added method `ydb.ParamsBuilder().Param(name).Any(value)` to add custom `types.Value`
 * Upgraded dependencies:
   * `google.golang.org/grpc` - from `v1.57.1` to `v1.62.1`
