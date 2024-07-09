@@ -21,16 +21,50 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 const (
-	defaultRequestTimeout = time.Second * 10
-	defaultJWTTokenTTL    = 3600 * time.Second
-	updateTimeDivider     = 2
+	defaultRequestTimeout      = time.Second * 10
+	defaultSyncExchangeTimeout = time.Second * 20
+	defaultJWTTokenTTL         = 3600 * time.Second
+	updateTimeDivider          = 2
+	retryJitterLimit           = 0.5
+	syncRetryFastSlot          = time.Millisecond * 100
+	syncRetrySlowSlot          = time.Millisecond * 300
+	syncRetryCeiling           = 1
+	backgroundRetryFastSlot    = time.Millisecond * 10
+	backgroundRetrySlowSlot    = time.Millisecond * 300
+	backgroundRetryFastCeiling = 12
+	backgroundRetrySlowCeiling = 7
+)
+
+var (
+	syncRetryFastBackoff = backoff.New(
+		backoff.WithSlotDuration(syncRetryFastSlot),
+		backoff.WithCeiling(syncRetryCeiling),
+		backoff.WithJitterLimit(retryJitterLimit),
+	)
+	syncRetrySlowBackoff = backoff.New(
+		backoff.WithSlotDuration(syncRetrySlowSlot),
+		backoff.WithCeiling(syncRetryCeiling),
+		backoff.WithJitterLimit(retryJitterLimit),
+	)
+	backgroundRetryFastBackoff = backoff.New(
+		backoff.WithSlotDuration(backgroundRetryFastSlot),
+		backoff.WithCeiling(backgroundRetryFastCeiling),
+		backoff.WithJitterLimit(retryJitterLimit),
+	)
+	backgroundRetrySlowBackoff = backoff.New(
+		backoff.WithSlotDuration(backgroundRetrySlowSlot),
+		backoff.WithCeiling(backgroundRetrySlowCeiling),
+		backoff.WithJitterLimit(retryJitterLimit),
+	)
 )
 
 var (
@@ -42,6 +76,7 @@ var (
 	errUnsupportedTokenType       = errors.New("OAuth2 token exchange: unsupported token type")
 	errIncorrectExpirationTime    = errors.New("OAuth2 token exchange: incorrect expiration time")
 	errDifferentScope             = errors.New("OAuth2 token exchange: got different scope")
+	errEmptyAccessToken           = errors.New("OAuth2 token exchange: got empty access token")
 	errCouldNotMakeHTTPRequest    = errors.New("OAuth2 token exchange: could not make http request")
 	errCouldNotApplyOption        = errors.New("OAuth2 token exchange: could not apply option")
 	errCouldNotCreateTokenSource  = errors.New("OAuth2 token exchange: could not create TokenSource")
@@ -172,6 +207,19 @@ func WithRequestTimeout(timeout time.Duration) requestTimeoutOption {
 	return requestTimeoutOption(timeout)
 }
 
+// SyncExchangeTimeout
+type syncExchangeTimeoutOption time.Duration
+
+func (timeout syncExchangeTimeoutOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
+	c.syncExchangeTimeout = time.Duration(timeout)
+
+	return nil
+}
+
+func WithSyncExchangeTimeout(timeout time.Duration) syncExchangeTimeoutOption {
+	return syncExchangeTimeoutOption(timeout)
+}
+
 const (
 	SubjectTokenSourceType = 1
 	ActorTokenSourceType   = 2
@@ -277,6 +325,11 @@ type oauth2TokenExchange struct {
 	// 10 by default
 	requestTimeout time.Duration
 
+	// Timeout when performing synchronous token exchange
+	// It is used when getting token for the first time
+	// or when it is already expired
+	syncExchangeTimeout time.Duration
+
 	// Received data
 	receivedToken           string
 	updateTokenTime         time.Time
@@ -292,10 +345,11 @@ func NewOauth2TokenExchangeCredentials(
 	opts ...Oauth2TokenExchangeCredentialsOption,
 ) (*oauth2TokenExchange, error) {
 	c := &oauth2TokenExchange{
-		grantType:          "urn:ietf:params:oauth:grant-type:token-exchange",
-		requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
-		requestTimeout:     defaultRequestTimeout,
-		sourceInfo:         stack.Record(1),
+		grantType:           "urn:ietf:params:oauth:grant-type:token-exchange",
+		requestedTokenType:  "urn:ietf:params:oauth:token-type:access_token",
+		requestTimeout:      defaultRequestTimeout,
+		syncExchangeTimeout: defaultSyncExchangeTimeout,
+		sourceInfo:          stack.Record(1),
 	}
 
 	var err error
@@ -697,35 +751,42 @@ func (provider *oauth2TokenExchange) getRequestParams() (string, error) {
 	return params.Encode(), nil
 }
 
-func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.Response, now time.Time) error {
+func (provider *oauth2TokenExchange) processTokenExchangeResponse(
+	result *http.Response,
+	now time.Time,
+	retryAllErrors bool,
+) (*tokenResponse, error) {
 	data, err := readResponseBody(result)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if result.StatusCode != http.StatusOK {
-		return provider.handleErrorResponse(result.Status, data)
+		return nil, provider.handleErrorResponse(result, data, retryAllErrors)
 	}
 
-	parsedResponse, err := parseTokenResponse(data)
+	parsedResponse, err := parseTokenResponse(data, retryAllErrors)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := validateTokenResponse(parsedResponse, provider); err != nil {
-		return err
+		return nil, err
 	}
 
-	provider.updateToken(parsedResponse, now)
+	parsedResponse.Now = now
 
-	return nil
+	return parsedResponse, nil
 }
 
 func readResponseBody(result *http.Response) ([]byte, error) {
 	if result.Body != nil {
 		data, err := io.ReadAll(result.Body)
 		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
+			return nil, xerrors.Retryable(
+				xerrors.WithStackTrace(err),
+				xerrors.WithBackoff(retry.TypeFastBackoff),
+			)
 		}
 
 		return data, nil
@@ -734,8 +795,36 @@ func readResponseBody(result *http.Response) ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
-func (provider *oauth2TokenExchange) handleErrorResponse(status string, data []byte) error {
-	description := status
+func makeError(result *http.Response, err error, retryAllErrors bool) error {
+	if result != nil {
+		if result.StatusCode == http.StatusRequestTimeout ||
+			result.StatusCode == http.StatusGatewayTimeout ||
+			result.StatusCode == http.StatusTooManyRequests ||
+			result.StatusCode == http.StatusInternalServerError ||
+			result.StatusCode == http.StatusBadGateway ||
+			result.StatusCode == http.StatusServiceUnavailable {
+			return xerrors.Retryable(
+				xerrors.WithStackTrace(err),
+				xerrors.WithBackoff(retry.TypeSlowBackoff),
+			)
+		}
+	}
+	if retryAllErrors {
+		return xerrors.Retryable(
+			xerrors.WithStackTrace(err),
+			xerrors.WithBackoff(retry.TypeFastBackoff),
+		)
+	}
+
+	return err
+}
+
+func (provider *oauth2TokenExchange) handleErrorResponse(
+	result *http.Response,
+	data []byte,
+	retryAllErrors bool,
+) error {
+	description := result.Status
 
 	//nolint:tagliatelle
 	type errorResponse struct {
@@ -747,7 +836,10 @@ func (provider *oauth2TokenExchange) handleErrorResponse(status string, data []b
 	if err := json.Unmarshal(data, &parsedErrorResponse); err != nil {
 		description += ", could not parse response: " + err.Error()
 
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
+		return makeError(
+			result,
+			xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description)),
+			retryAllErrors)
 	}
 
 	if parsedErrorResponse.ErrorName != "" {
@@ -760,21 +852,28 @@ func (provider *oauth2TokenExchange) handleErrorResponse(status string, data []b
 		description += ", error_uri: " + parsedErrorResponse.ErrorURI
 	}
 
-	return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
+	return makeError(
+		result,
+		xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description)),
+		retryAllErrors)
 }
 
 //nolint:tagliatelle
 type tokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int64  `json:"expires_in"`
-	Scope       string `json:"scope"`
+	AccessToken string    `json:"access_token"`
+	TokenType   string    `json:"token_type"`
+	ExpiresIn   int64     `json:"expires_in"`
+	Scope       string    `json:"scope"`
+	Now         time.Time `json:"-"`
 }
 
-func parseTokenResponse(data []byte) (*tokenResponse, error) {
+func parseTokenResponse(data []byte, retryAllErrors bool) (*tokenResponse, error) {
 	var parsedResponse tokenResponse
 	if err := json.Unmarshal(data, &parsedResponse); err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseResponse, err))
+		return nil, makeError(
+			nil,
+			xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseResponse, err)),
+			retryAllErrors)
 	}
 
 	return &parsedResponse, nil
@@ -799,28 +898,36 @@ func validateTokenResponse(parsedResponse *tokenResponse, provider *oauth2TokenE
 		}
 	}
 
+	if parsedResponse.AccessToken == "" {
+		return xerrors.WithStackTrace(errEmptyAccessToken)
+	}
+
 	return nil
 }
 
-func (provider *oauth2TokenExchange) updateToken(parsedResponse *tokenResponse, now time.Time) {
+func (provider *oauth2TokenExchange) updateToken(parsedResponse *tokenResponse) {
 	provider.receivedToken = "Bearer " + parsedResponse.AccessToken
 
 	expireDelta := time.Duration(parsedResponse.ExpiresIn) * time.Second
-	provider.receivedTokenExpireTime = now.Add(expireDelta)
+	provider.receivedTokenExpireTime = parsedResponse.Now.Add(expireDelta)
 
 	updateDelta := time.Duration(parsedResponse.ExpiresIn/updateTimeDivider) * time.Second
-	provider.updateTokenTime = now.Add(updateDelta)
+	provider.updateTokenTime = parsedResponse.Now.Add(updateDelta)
 }
 
-func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time.Time) error {
+// performExchangeTokenRequest is a read only func that performs request. Can be used without lock
+func (provider *oauth2TokenExchange) performExchangeTokenRequest(
+	ctx context.Context,
+	retryAllErrors bool,
+) (*tokenResponse, error) {
 	body, err := provider.getRequestParams()
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.tokenEndpoint, strings.NewReader(body))
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
@@ -831,29 +938,67 @@ func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time
 		Timeout:   provider.requestTimeout,
 	}
 
+	now := time.Now()
 	result, err := client.Do(req)
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotExchangeToken, err))
+		return nil, xerrors.Retryable(
+			xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotExchangeToken, err)),
+			xerrors.WithBackoff(retry.TypeFastBackoff),
+		)
 	}
 
 	defer result.Body.Close()
 
-	return provider.processTokenExchangeResponse(result, now)
+	return provider.processTokenExchangeResponse(result, now, retryAllErrors)
+}
+
+// exchangeTokenSync exchanges token synchronously, must be called under lock
+func (provider *oauth2TokenExchange) exchangeTokenSync(ctx context.Context) error {
+	retryAllErrors := provider.receivedToken != "" // already received token => all params are correct, can retry
+
+	ctx, cancelFunc := context.WithTimeout(ctx, provider.syncExchangeTimeout)
+	defer cancelFunc()
+
+	response, err := retry.RetryWithResult[*tokenResponse](
+		ctx,
+		func(ctx context.Context) (*tokenResponse, error) {
+			return provider.performExchangeTokenRequest(ctx, retryAllErrors)
+		},
+		retry.WithFastBackoff(syncRetryFastBackoff),
+		retry.WithSlowBackoff(syncRetrySlowBackoff),
+	)
+	if err != nil {
+		return err
+	}
+
+	provider.updateToken(response)
+
+	return nil
 }
 
 func (provider *oauth2TokenExchange) exchangeTokenInBackground() {
-	provider.mutex.Lock()
-	defer provider.mutex.Unlock()
+	defer provider.updating.Store(false)
 
-	now := time.Now()
-	if !provider.needUpdate(now) {
+	provider.mutex.RLock()
+	ctx, cancelFunc := context.WithDeadline(context.Background(), provider.receivedTokenExpireTime)
+	provider.mutex.RUnlock()
+	defer cancelFunc()
+
+	response, err := retry.RetryWithResult[*tokenResponse](
+		ctx,
+		func(ctx context.Context) (*tokenResponse, error) {
+			return provider.performExchangeTokenRequest(ctx, true)
+		},
+		retry.WithFastBackoff(backgroundRetryFastBackoff),
+		retry.WithSlowBackoff(backgroundRetrySlowBackoff),
+	)
+	if err != nil {
 		return
 	}
 
-	ctx := context.Background()
-	_ = provider.exchangeToken(ctx, now)
-
-	provider.updating.Store(false)
+	provider.mutex.Lock()
+	defer provider.mutex.Unlock()
+	provider.updateToken(response)
 }
 
 func (provider *oauth2TokenExchange) checkBackgroundUpdate(now time.Time) {
@@ -896,11 +1041,11 @@ func (provider *oauth2TokenExchange) Token(ctx context.Context) (string, error) 
 	provider.mutex.Lock()
 	defer provider.mutex.Unlock()
 
-	if !provider.expired(now) {
+	if !provider.expired(now) { // for the case of concurrent call
 		return provider.receivedToken, nil
 	}
 
-	if err := provider.exchangeToken(ctx, now); err != nil {
+	if err := provider.exchangeTokenSync(ctx); err != nil {
 		return "", err
 	}
 
