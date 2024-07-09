@@ -1,3 +1,4 @@
+* Improve config validation before start topic reader
 * Fixed goroutine leak on close reader
 * Fixed topic reader and writer WaitInit hunging on unretriable connection error
 * Added `query.Client.Stats()` method
