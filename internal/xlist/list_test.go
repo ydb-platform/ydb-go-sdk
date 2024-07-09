@@ -1,16 +1,14 @@
-// Copyright 2009 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package xlist
 
 import "testing"
 
-func checkListLen[T comparable](t *testing.T, l *List[T], len int) bool {
-	if n := l.Len(); n != len {
-		t.Errorf("l.Len() = %d, want %d", n, len)
+func checkListLen[T comparable](t *testing.T, l *List[T], expectedLen int) bool {
+	if n := l.Len(); n != expectedLen {
+		t.Errorf("l.Len() = %d, want %d", n, expectedLen)
+
 		return false
 	}
+
 	return true
 }
 
@@ -26,6 +24,7 @@ func checkListPointers[T comparable](t *testing.T, l *List[T], es []*Element[T])
 		if l.root.next != nil && l.root.next != root || l.root.prev != nil && l.root.prev != root {
 			t.Errorf("l.root.next = %p, l.root.prev = %p; both should both be nil or %p", l.root.next, l.root.prev, root)
 		}
+
 		return
 	}
 	// len(es) > 0
@@ -292,21 +291,29 @@ func TestMove(t *testing.T) {
 
 // Test PushFront, PushBack, PushFrontList, PushBackList with uninitialized List[T]
 func TestZeroList(t *testing.T) {
-	var l1 = new(List[int])
-	l1.PushFront(1)
-	checkList(t, l1, []any{1})
+	t.Run("PushFront", func(t *testing.T) {
+		l1 := new(List[int])
+		l1.PushFront(1)
+		checkList(t, l1, []any{1})
 
-	var l2 = new(List[int])
-	l2.PushBack(1)
-	checkList(t, l2, []any{1})
+		t.Run("PushFrontList", func(t *testing.T) {
+			l3 := new(List[int])
+			l3.PushFrontList(l1)
+			checkList(t, l3, []any{1})
+		})
+	})
 
-	var l3 = new(List[int])
-	l3.PushFrontList(l1)
-	checkList(t, l3, []any{1})
+	t.Run("PushBack", func(t *testing.T) {
+		l2 := new(List[int])
+		l2.PushBack(1)
+		checkList(t, l2, []any{1})
 
-	var l4 = new(List[int])
-	l4.PushBackList(l2)
-	checkList(t, l4, []any{1})
+		t.Run("PushBackList", func(t *testing.T) {
+			l4 := new(List[int])
+			l4.PushBackList(l2)
+			checkList(t, l4, []any{1})
+		})
+	})
 }
 
 // Test that a list l is not modified when calling InsertBefore with a mark that is not an element of l.

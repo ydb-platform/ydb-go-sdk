@@ -1,6 +1,5 @@
 // Package xlist is a copy of standard container/list but uses generics
 // for strict checks on compile time
-
 package xlist
 
 // Element is an element of a linked list.
@@ -24,6 +23,7 @@ func (e *Element[T]) Next() *Element[T] {
 	if p := e.next; e.list != nil && p != &e.list.root {
 		return p
 	}
+
 	return nil
 }
 
@@ -32,6 +32,7 @@ func (e *Element[T]) Prev() *Element[T] {
 	if p := e.prev; e.list != nil && p != &e.list.root {
 		return p
 	}
+
 	return nil
 }
 
@@ -47,6 +48,7 @@ func (l *List[T]) Init() *List[T] {
 	l.root.next = &l.root
 	l.root.prev = &l.root
 	l.len = 0
+
 	return l
 }
 
@@ -62,6 +64,7 @@ func (l *List[T]) Front() *Element[T] {
 	if l.len == 0 {
 		return nil
 	}
+
 	return l.root.next
 }
 
@@ -70,6 +73,7 @@ func (l *List[T]) Back() *Element[T] {
 	if l.len == 0 {
 		return nil
 	}
+
 	return l.root.prev
 }
 
@@ -88,6 +92,7 @@ func (l *List[T]) insert(e, at *Element[T]) *Element[T] {
 	e.next.prev = e
 	e.list = l
 	l.len++
+
 	return e
 }
 
@@ -129,18 +134,21 @@ func (l *List[T]) Remove(e *Element[T]) T {
 		// in l or l == nil (e is a zero Element) and l.remove will crash
 		l.remove(e)
 	}
+
 	return e.Value
 }
 
 // PushFront inserts a new element e with value v at the front of list l and returns e.
 func (l *List[T]) PushFront(v T) *Element[T] {
 	l.lazyInit()
+
 	return l.insertValue(v, &l.root)
 }
 
 // PushBack inserts a new element e with value v at the back of list l and returns e.
 func (l *List[T]) PushBack(v T) *Element[T] {
 	l.lazyInit()
+
 	return l.insertValue(v, l.root.prev)
 }
 
@@ -151,6 +159,7 @@ func (l *List[T]) InsertBefore(v T, mark *Element[T]) *Element[T] {
 	if mark.list != l {
 		return nil
 	}
+
 	// see comment in List.Remove about initialization of l
 	return l.insertValue(v, mark.prev)
 }
@@ -162,6 +171,7 @@ func (l *List[T]) InsertAfter(v T, mark *Element[T]) *Element[T] {
 	if mark.list != l {
 		return nil
 	}
+
 	// see comment in List.Remove about initialization of l
 	return l.insertValue(v, mark)
 }
