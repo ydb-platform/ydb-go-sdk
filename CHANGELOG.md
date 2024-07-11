@@ -1,3 +1,4 @@
+## v3.75.0
 * Improve config validation before start topic reader
 * Added metrics over `db.Table().Do()` and `db.Table().DoTx()`
 * Added method `ydb.ParamsBuilder().Param(name).Any(value)` to add custom `types.Value`
