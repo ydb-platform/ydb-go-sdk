@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -1016,6 +1017,58 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		require.ErrorIs(t, err, errMoreThanOneRow)
 		require.Nil(t, row)
 	})
+	t.Run("MoreThanOneRowErrorOnNextRow", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		testErr := errors.New("test-err")
+		stream.EXPECT().Recv().Return(nil, testErr)
+		r, _, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+
+		row, err := exactlyOneRowFromResult(ctx, r)
+		require.ErrorIs(t, err, testErr)
+		require.Nil(t, row)
+	})
 	t.Run("MoreThanOneResultSet", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -1102,8 +1155,60 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		r, _, err := newResult(ctx, stream, nil, nil)
 		require.NoError(t, err)
 
-		row, err := exactlyOneRowFromResult(ctx, r)
+		row, err := exactlyOneResultSetFromResult(ctx, r)
 		require.ErrorIs(t, err, errMoreThanOneResultSet)
+		require.Nil(t, row)
+	})
+	t.Run("MoreThanOneResultSetErrorOnNextResultSet", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		testErr := errors.New("test-err")
+		stream.EXPECT().Recv().Return(nil, testErr)
+		r, _, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+
+		row, err := exactlyOneRowFromResult(ctx, r)
+		require.ErrorIs(t, err, testErr)
 		require.Nil(t, row)
 	})
 }
@@ -1280,6 +1385,58 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 
 		rs, err := exactlyOneResultSetFromResult(ctx, r)
 		require.ErrorIs(t, err, errMoreThanOneResultSet)
+		require.Nil(t, rs)
+	})
+	t.Run("MoreThanOneResultSetErrorOnNextResultSet", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		testErr := errors.New("test-err")
+		stream.EXPECT().Recv().Return(nil, testErr)
+		r, _, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+
+		rs, err := exactlyOneResultSetFromResult(ctx, r)
+		require.ErrorIs(t, err, testErr)
 		require.Nil(t, rs)
 	})
 }

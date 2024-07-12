@@ -1,3 +1,5 @@
+* Fixed return more than one row error if real error raised on try read next row
+
 ## v3.75.0
 * Improve config validation before start topic reader
 * Added metrics over `db.Table().Do()` and `db.Table().DoTx()`
