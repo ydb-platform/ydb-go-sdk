@@ -2,13 +2,16 @@ package query
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
@@ -26,17 +29,23 @@ type (
 	materializedResult struct {
 		resultSets []query.ResultSet
 		idx        int
+		stats      stats.QueryStats
 	}
 	result struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		closeOnce      func(ctx context.Context) error
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
+		stats          *Ydb_TableStats.QueryStats
 		resultSetIndex int64
 		errs           []error
 		closed         chan struct{}
 		trace          *trace.Query
 	}
 )
+
+func (r *materializedResult) Stats() stats.QueryStats {
+	return r.stats
+}
 
 func (r *materializedResult) Range(ctx context.Context) xiter.Seq2[query.ResultSet, error] {
 	return rangeResultSets(ctx, r)
@@ -66,9 +75,10 @@ func (r *materializedResult) Err() error {
 	return nil
 }
 
-func newMaterializedResult(resultSets []query.ResultSet) *materializedResult {
+func newMaterializedResult(resultSets []query.ResultSet, stats stats.QueryStats) *materializedResult {
 	return &materializedResult{
 		resultSets: resultSets,
+		stats:      stats,
 	}
 }
 
@@ -115,6 +125,7 @@ func newResult(
 			stream:         stream,
 			resultSetIndex: -1,
 			lastPart:       part,
+			stats:          part.GetExecStats(),
 			closed:         closed,
 			closeOnce:      closeOnce,
 			trace:          t,
@@ -122,11 +133,15 @@ func newResult(
 	}
 }
 
+func (r *result) Stats() stats.QueryStats {
+	return stats.FromQueryStats(r.stats)
+}
+
 func nextPart(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	t *trace.Query,
-) (_ *Ydb_Query.ExecuteQueryResponsePart, finalErr error) {
+) (part *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	if t == nil {
 		t = &trace.Query{}
 	}
@@ -135,10 +150,10 @@ func nextPart(
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.nextPart"),
 	)
 	defer func() {
-		onDone(finalErr)
+		onDone(part.GetExecStats(), err)
 	}()
 
-	part, err := stream.Recv()
+	part, err = stream.Recv()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -189,9 +204,12 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 
 				return nil, xerrors.WithStackTrace(err)
 			}
+			if stats := part.GetExecStats(); stats != nil {
+				r.stats = stats
+			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"next result set index %d less than last result set index %d: %w",
+					"next result set rowIndex %d less than last result set index %d: %w",
 					part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
 				))
 			}
@@ -229,6 +247,9 @@ func (r *result) getNextResultSetPart(
 				return nil, xerrors.WithStackTrace(err)
 			}
 			r.lastPart = part
+			if stats := part.GetExecStats(); stats != nil {
+				r.stats = stats
+			}
 			if part.GetResultSetIndex() > nextResultSetIndex {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"result set (index=%d) receive part (index=%d) for next result set: %w",
@@ -276,12 +297,24 @@ func exactlyOneRowFromResult(ctx context.Context, r query.Result) (row query.Row
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if _, err = rs.NextRow(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+	_, err = rs.NextRow(ctx)
+	switch {
+	case err == nil:
 		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
+	case errors.Is(err, io.EOF):
+		// pass
+	default:
+		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if _, err = r.NextResultSet(ctx); err == nil || !xerrors.Is(err, io.EOF) {
-		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	_, err = r.NextResultSet(ctx)
+	switch {
+	case err == nil:
+		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
+	case errors.Is(err, io.EOF):
+		// pass
+	default:
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if err = r.Err(); err != nil {
@@ -316,15 +349,21 @@ func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs quer
 		rows = append(rows, row)
 	}
 
-	if _, err = r.NextResultSet(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+	_, err = r.NextResultSet(ctx)
+	switch {
+	case err == nil:
 		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	case errors.Is(err, io.EOF):
+		// pass
+	default:
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if err = r.Err(); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return NewMaterializedResultSet(rs.Columns(), rs.ColumnTypes(), rows), nil
+	return NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
 func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Result, error) {
@@ -354,8 +393,8 @@ func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Resu
 			rows = append(rows, row)
 		}
 
-		resultSets = append(resultSets, NewMaterializedResultSet(rs.Columns(), rs.ColumnTypes(), rows))
+		resultSets = append(resultSets, NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
 	}
 
-	return newMaterializedResult(resultSets), nil
+	return newMaterializedResult(resultSets, r.Stats()), nil
 }

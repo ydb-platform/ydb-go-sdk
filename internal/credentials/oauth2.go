@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,36 +21,96 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 const (
-	defaultRequestTimeout = time.Second * 10
-	defaultJWTTokenTTL    = 3600 * time.Second
-	updateTimeDivider     = 2
+	defaultRequestTimeout      = time.Second * 10
+	defaultSyncExchangeTimeout = time.Second * 20
+	defaultJWTTokenTTL         = 3600 * time.Second
+	updateTimeDivider          = 2
+	retryJitterLimit           = 0.5
+	syncRetryFastSlot          = time.Millisecond * 100
+	syncRetrySlowSlot          = time.Millisecond * 300
+	syncRetryCeiling           = 1
+	backgroundRetryFastSlot    = time.Millisecond * 10
+	backgroundRetrySlowSlot    = time.Millisecond * 300
+	backgroundRetryFastCeiling = 12
+	backgroundRetrySlowCeiling = 7
 )
 
 var (
+	syncRetryFastBackoff = backoff.New(
+		backoff.WithSlotDuration(syncRetryFastSlot),
+		backoff.WithCeiling(syncRetryCeiling),
+		backoff.WithJitterLimit(retryJitterLimit),
+	)
+	syncRetrySlowBackoff = backoff.New(
+		backoff.WithSlotDuration(syncRetrySlowSlot),
+		backoff.WithCeiling(syncRetryCeiling),
+		backoff.WithJitterLimit(retryJitterLimit),
+	)
+	backgroundRetryFastBackoff = backoff.New(
+		backoff.WithSlotDuration(backgroundRetryFastSlot),
+		backoff.WithCeiling(backgroundRetryFastCeiling),
+		backoff.WithJitterLimit(retryJitterLimit),
+	)
+	backgroundRetrySlowBackoff = backoff.New(
+		backoff.WithSlotDuration(backgroundRetrySlowSlot),
+		backoff.WithCeiling(backgroundRetrySlowCeiling),
+		backoff.WithJitterLimit(retryJitterLimit),
+	)
+)
+
+var (
+	errCouldNotReadFile           = errors.New("could not read file")
+	errCouldNotParseHomeDir       = errors.New("could not parse home dir")
 	errEmptyTokenEndpointError    = errors.New("OAuth2 token exchange: empty token endpoint")
 	errCouldNotParseResponse      = errors.New("OAuth2 token exchange: could not parse response")
 	errCouldNotExchangeToken      = errors.New("OAuth2 token exchange: could not exchange token")
 	errUnsupportedTokenType       = errors.New("OAuth2 token exchange: unsupported token type")
 	errIncorrectExpirationTime    = errors.New("OAuth2 token exchange: incorrect expiration time")
 	errDifferentScope             = errors.New("OAuth2 token exchange: got different scope")
+	errEmptyAccessToken           = errors.New("OAuth2 token exchange: got empty access token")
 	errCouldNotMakeHTTPRequest    = errors.New("OAuth2 token exchange: could not make http request")
 	errCouldNotApplyOption        = errors.New("OAuth2 token exchange: could not apply option")
-	errCouldNotCreateTokenSource  = errors.New("OAuth2 token exchange: could not createTokenSource")
+	errCouldNotCreateTokenSource  = errors.New("OAuth2 token exchange: could not create TokenSource")
 	errNoSigningMethodError       = errors.New("JWT token source: no signing method")
 	errNoPrivateKeyError          = errors.New("JWT token source: no private key")
 	errCouldNotSignJWTToken       = errors.New("JWT token source: could not sign jwt token")
 	errCouldNotApplyJWTOption     = errors.New("JWT token source: could not apply option")
-	errCouldNotparseRSAPrivateKey = errors.New("JWT token source: could not parse RSA private key from PEM")
-	errCouldNotParseHomeDir       = errors.New("JWT token source: could not parse home dir for private key")
+	errCouldNotparsePrivateKey    = errors.New("JWT token source: could not parse private key from PEM")
 	errCouldNotReadPrivateKeyFile = errors.New("JWT token source: could not read from private key file")
+	errCouldNotParseBase64Secret  = errors.New("JWT token source: could not parse base64 secret")
+	errCouldNotReadConfigFile     = errors.New("OAuth2 token exchange file: could not read from config file")
+	errCouldNotUnmarshalJSON      = errors.New("OAuth2 token exchange file: could not unmarshal json config file")
+	errUnknownTokenSourceType     = errors.New("OAuth2 token exchange file: incorrect \"type\" parameter: only \"JWT\" and \"FIXED\" are supported") //nolint:lll
+	errTokenAndTokenTypeRequired  = errors.New("OAuth2 token exchange file: \"token\" and \"token-type\" are required")
+	errAlgAndKeyRequired          = errors.New("OAuth2 token exchange file: \"alg\" and \"private-key\" are required")
+	errUnsupportedSigningMethod   = errors.New("OAuth2 token exchange file: signing method not supported")
+	errTTLMustBePositive          = errors.New("OAuth2 token exchange file: \"ttl\" must be positive value")
 )
+
+func readFileContent(filePath string) ([]byte, error) {
+	if len(filePath) > 0 && filePath[0] == '~' {
+		usr, err := user.Current()
+		if err != nil {
+			return []byte{}, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseHomeDir, err))
+		}
+		filePath = filepath.Join(usr.HomeDir, filePath[1:])
+	}
+	bytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return []byte{}, xerrors.WithStackTrace(fmt.Errorf("%w %s: %w", errCouldNotReadFile, filePath, err))
+	}
+
+	return bytes, nil
+}
 
 type Oauth2TokenExchangeCredentialsOption interface {
 	ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error
@@ -143,6 +205,19 @@ func (timeout requestTimeoutOption) ApplyOauth2CredentialsOption(c *oauth2TokenE
 
 func WithRequestTimeout(timeout time.Duration) requestTimeoutOption {
 	return requestTimeoutOption(timeout)
+}
+
+// SyncExchangeTimeout
+type syncExchangeTimeoutOption time.Duration
+
+func (timeout syncExchangeTimeoutOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
+	c.syncExchangeTimeout = time.Duration(timeout)
+
+	return nil
+}
+
+func WithSyncExchangeTimeout(timeout time.Duration) syncExchangeTimeoutOption {
+	return syncExchangeTimeoutOption(timeout)
 }
 
 const (
@@ -250,6 +325,11 @@ type oauth2TokenExchange struct {
 	// 10 by default
 	requestTimeout time.Duration
 
+	// Timeout when performing synchronous token exchange
+	// It is used when getting token for the first time
+	// or when it is already expired
+	syncExchangeTimeout time.Duration
+
 	// Received data
 	receivedToken           string
 	updateTokenTime         time.Time
@@ -265,10 +345,11 @@ func NewOauth2TokenExchangeCredentials(
 	opts ...Oauth2TokenExchangeCredentialsOption,
 ) (*oauth2TokenExchange, error) {
 	c := &oauth2TokenExchange{
-		grantType:          "urn:ietf:params:oauth:grant-type:token-exchange",
-		requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
-		requestTimeout:     defaultRequestTimeout,
-		sourceInfo:         stack.Record(1),
+		grantType:           "urn:ietf:params:oauth:grant-type:token-exchange",
+		requestedTokenType:  "urn:ietf:params:oauth:token-type:access_token",
+		requestTimeout:      defaultRequestTimeout,
+		syncExchangeTimeout: defaultSyncExchangeTimeout,
+		sourceInfo:          stack.Record(1),
 	}
 
 	var err error
@@ -286,6 +367,328 @@ func NewOauth2TokenExchangeCredentials(
 	}
 
 	return c, nil
+}
+
+type privateKeyLoadOptionFunc func(string) JWTTokenSourceOption
+
+type signingMethodDescription struct {
+	method        jwt.SigningMethod
+	keyLoadOption privateKeyLoadOptionFunc
+}
+
+func getHMACPrivateKeyOption(privateKey string) JWTTokenSourceOption {
+	return WithHMACSecretKeyBase64Content(privateKey)
+}
+
+func getRSAPrivateKeyOption(privateKey string) JWTTokenSourceOption {
+	return WithRSAPrivateKeyPEMContent([]byte(privateKey))
+}
+
+func getECPrivateKeyOption(privateKey string) JWTTokenSourceOption {
+	return WithECPrivateKeyPEMContent([]byte(privateKey))
+}
+
+var signingMethodsRegistry = map[string]signingMethodDescription{
+	"HS256": {
+		method:        jwt.SigningMethodHS256,
+		keyLoadOption: getHMACPrivateKeyOption,
+	},
+	"HS384": {
+		method:        jwt.SigningMethodHS384,
+		keyLoadOption: getHMACPrivateKeyOption,
+	},
+	"HS512": {
+		method:        jwt.SigningMethodHS512,
+		keyLoadOption: getHMACPrivateKeyOption,
+	},
+	"RS256": {
+		method:        jwt.SigningMethodRS256,
+		keyLoadOption: getRSAPrivateKeyOption,
+	},
+	"RS384": {
+		method:        jwt.SigningMethodRS384,
+		keyLoadOption: getRSAPrivateKeyOption,
+	},
+	"RS512": {
+		method:        jwt.SigningMethodRS512,
+		keyLoadOption: getRSAPrivateKeyOption,
+	},
+	"PS256": {
+		method:        jwt.SigningMethodPS256,
+		keyLoadOption: getRSAPrivateKeyOption,
+	},
+	"PS384": {
+		method:        jwt.SigningMethodPS384,
+		keyLoadOption: getRSAPrivateKeyOption,
+	},
+	"PS512": {
+		method:        jwt.SigningMethodPS512,
+		keyLoadOption: getRSAPrivateKeyOption,
+	},
+	"ES256": {
+		method:        jwt.SigningMethodES256,
+		keyLoadOption: getECPrivateKeyOption,
+	},
+	"ES384": {
+		method:        jwt.SigningMethodES384,
+		keyLoadOption: getECPrivateKeyOption,
+	},
+	"ES512": {
+		method:        jwt.SigningMethodES512,
+		keyLoadOption: getECPrivateKeyOption,
+	},
+}
+
+func GetSupportedOauth2TokenExchangeJwtAlgorithms() []string {
+	algs := make([]string, len(signingMethodsRegistry))
+	i := 0
+	for alg := range signingMethodsRegistry {
+		algs[i] = alg
+		i++
+	}
+	sort.Strings(algs)
+
+	return algs
+}
+
+//nolint:musttag
+type stringOrArrayConfig struct {
+	Values []string
+}
+
+func (a *stringOrArrayConfig) UnmarshalJSON(data []byte) error {
+	// Case 1: string
+	var s string
+	err := json.Unmarshal(data, &s)
+	if err == nil {
+		a.Values = []string{s}
+
+		return nil
+	}
+
+	var arr []string
+	err = json.Unmarshal(data, &arr)
+	if err != nil {
+		return err
+	}
+	a.Values = arr
+
+	return nil
+}
+
+type prettyTTL struct {
+	Value time.Duration
+}
+
+func (d *prettyTTL) UnmarshalJSON(data []byte) error {
+	var s string
+	err := json.Unmarshal(data, &s)
+	if err != nil {
+		return err
+	}
+	d.Value, err = time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	if d.Value <= 0 {
+		return xerrors.WithStackTrace(fmt.Errorf("%w, but got: %q", errTTLMustBePositive, s))
+	}
+
+	return err
+}
+
+//nolint:tagliatelle
+type oauth2TokenSourceConfig struct {
+	Type string `json:"type"`
+
+	// Fixed
+	Token     string `json:"token"`
+	TokenType string `json:"token-type"`
+
+	// JWT
+	Algorithm  string               `json:"alg"`
+	PrivateKey string               `json:"private-key"`
+	KeyID      string               `json:"kid"`
+	Issuer     string               `json:"iss"`
+	Subject    string               `json:"sub"`
+	Audience   *stringOrArrayConfig `json:"aud"`
+	ID         string               `json:"jti"`
+	TTL        *prettyTTL           `json:"ttl"`
+}
+
+func signingMethodNotSupportedError(method string) error {
+	var supported string
+	for i, alg := range GetSupportedOauth2TokenExchangeJwtAlgorithms() {
+		if i != 0 {
+			supported += ", "
+		}
+		supported += "\""
+		supported += alg
+		supported += "\""
+	}
+
+	return fmt.Errorf("%w: %q. Supported signing methods are %s", errUnsupportedSigningMethod, method, supported)
+}
+
+func (cfg *oauth2TokenSourceConfig) applyConfigFixed(tokenSrcType int) (*tokenSourceOption, error) {
+	if cfg.Token == "" || cfg.TokenType == "" {
+		return nil, xerrors.WithStackTrace(errTokenAndTokenTypeRequired)
+	}
+
+	return &tokenSourceOption{
+		createFunc: func() (TokenSource, error) {
+			return NewFixedTokenSource(cfg.Token, cfg.TokenType), nil
+		},
+		tokenSourceType: tokenSrcType,
+	}, nil
+}
+
+func (cfg *oauth2TokenSourceConfig) applyConfigFixedJWT(tokenSrcType int) (*tokenSourceOption, error) {
+	var opts []JWTTokenSourceOption
+
+	if cfg.Algorithm == "" || cfg.PrivateKey == "" {
+		return nil, xerrors.WithStackTrace(errAlgAndKeyRequired)
+	}
+
+	signingMethodDesc, signingMethodFound := signingMethodsRegistry[strings.ToUpper(cfg.Algorithm)]
+	if !signingMethodFound {
+		return nil, xerrors.WithStackTrace(signingMethodNotSupportedError(cfg.Algorithm))
+	}
+
+	opts = append(opts,
+		WithSigningMethod(signingMethodDesc.method),
+		signingMethodDesc.keyLoadOption(cfg.PrivateKey),
+	)
+
+	if cfg.KeyID != "" {
+		opts = append(opts, WithKeyID(cfg.KeyID))
+	}
+
+	if cfg.Issuer != "" {
+		opts = append(opts, WithIssuer(cfg.Issuer))
+	}
+
+	if cfg.Subject != "" {
+		opts = append(opts, WithSubject(cfg.Subject))
+	}
+
+	if cfg.Audience != nil && len(cfg.Audience.Values) > 0 {
+		opts = append(opts, WithAudience(cfg.Audience.Values...))
+	}
+
+	if cfg.ID != "" {
+		opts = append(opts, WithID(cfg.ID))
+	}
+
+	if cfg.TTL != nil {
+		opts = append(opts, WithTokenTTL(cfg.TTL.Value))
+	}
+
+	return &tokenSourceOption{
+		createFunc: func() (TokenSource, error) {
+			return NewJWTTokenSource(opts...)
+		},
+		tokenSourceType: tokenSrcType,
+	}, nil
+}
+
+func (cfg *oauth2TokenSourceConfig) applyConfig(tokenSrcType int) (*tokenSourceOption, error) {
+	if strings.EqualFold(cfg.Type, "FIXED") {
+		return cfg.applyConfigFixed(tokenSrcType)
+	}
+
+	if strings.EqualFold(cfg.Type, "JWT") {
+		return cfg.applyConfigFixedJWT(tokenSrcType)
+	}
+
+	return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %q", errUnknownTokenSourceType, cfg.Type))
+}
+
+//nolint:tagliatelle
+type oauth2Config struct {
+	GrantType          string               `json:"grant-type"`
+	Resource           string               `json:"res"`
+	Audience           *stringOrArrayConfig `json:"aud"`
+	Scope              *stringOrArrayConfig `json:"scope"`
+	RequestedTokenType string               `json:"requested-token-type"`
+	TokenEndpoint      string               `json:"token-endpoint"`
+
+	SubjectCreds *oauth2TokenSourceConfig `json:"subject-credentials"`
+	ActorCreds   *oauth2TokenSourceConfig `json:"actor-credentials"`
+}
+
+func (cfg *oauth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOption) error {
+	if cfg.GrantType != "" {
+		*opts = append(*opts, WithGrantType(cfg.GrantType))
+	}
+
+	if cfg.Resource != "" {
+		*opts = append(*opts, WithResource(cfg.Resource))
+	}
+
+	if cfg.Audience != nil && len(cfg.Audience.Values) > 0 {
+		*opts = append(*opts, WithAudience(cfg.Audience.Values...))
+	}
+
+	if cfg.Scope != nil && len(cfg.Scope.Values) > 0 {
+		*opts = append(*opts, WithScope(cfg.Scope.Values...))
+	}
+
+	if cfg.RequestedTokenType != "" {
+		*opts = append(*opts, WithRequestedTokenType(cfg.RequestedTokenType))
+	}
+
+	if cfg.TokenEndpoint != "" {
+		*opts = append(*opts, WithTokenEndpoint(cfg.TokenEndpoint))
+	}
+
+	if cfg.SubjectCreds != nil {
+		opt, err := cfg.SubjectCreds.applyConfig(SubjectTokenSourceType)
+		if err != nil {
+			return err
+		}
+		*opts = append(*opts, opt)
+	}
+
+	if cfg.ActorCreds != nil {
+		opt, err := cfg.ActorCreds.applyConfig(ActorTokenSourceType)
+		if err != nil {
+			return err
+		}
+		*opts = append(*opts, opt)
+	}
+
+	return nil
+}
+
+func NewOauth2TokenExchangeCredentialsFile(
+	configFilePath string,
+	opts ...Oauth2TokenExchangeCredentialsOption,
+) (*oauth2TokenExchange, error) {
+	configFileData, err := readFileContent(configFilePath)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotReadConfigFile, err))
+	}
+
+	var cfg oauth2Config
+	if err = json.Unmarshal(configFileData, &cfg); err != nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotUnmarshalJSON, err))
+	}
+
+	var fullOptions []Oauth2TokenExchangeCredentialsOption
+	err = cfg.applyConfig(&fullOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add additional options
+	for _, opt := range opts {
+		if opt != nil {
+			fullOptions = append(fullOptions, opt)
+		}
+	}
+
+	return NewOauth2TokenExchangeCredentials(fullOptions...)
 }
 
 func (provider *oauth2TokenExchange) getScopeParam() string {
@@ -348,35 +751,42 @@ func (provider *oauth2TokenExchange) getRequestParams() (string, error) {
 	return params.Encode(), nil
 }
 
-func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.Response, now time.Time) error {
+func (provider *oauth2TokenExchange) processTokenExchangeResponse(
+	result *http.Response,
+	now time.Time,
+	retryAllErrors bool,
+) (*tokenResponse, error) {
 	data, err := readResponseBody(result)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if result.StatusCode != http.StatusOK {
-		return provider.handleErrorResponse(result.Status, data)
+		return nil, provider.handleErrorResponse(result, data, retryAllErrors)
 	}
 
-	parsedResponse, err := parseTokenResponse(data)
+	parsedResponse, err := parseTokenResponse(data, retryAllErrors)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := validateTokenResponse(parsedResponse, provider); err != nil {
-		return err
+		return nil, err
 	}
 
-	provider.updateToken(parsedResponse, now)
+	parsedResponse.Now = now
 
-	return nil
+	return parsedResponse, nil
 }
 
 func readResponseBody(result *http.Response) ([]byte, error) {
 	if result.Body != nil {
 		data, err := io.ReadAll(result.Body)
 		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
+			return nil, xerrors.Retryable(
+				xerrors.WithStackTrace(err),
+				xerrors.WithBackoff(retry.TypeFastBackoff),
+			)
 		}
 
 		return data, nil
@@ -385,8 +795,36 @@ func readResponseBody(result *http.Response) ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
-func (provider *oauth2TokenExchange) handleErrorResponse(status string, data []byte) error {
-	description := status
+func makeError(result *http.Response, err error, retryAllErrors bool) error {
+	if result != nil {
+		if result.StatusCode == http.StatusRequestTimeout ||
+			result.StatusCode == http.StatusGatewayTimeout ||
+			result.StatusCode == http.StatusTooManyRequests ||
+			result.StatusCode == http.StatusInternalServerError ||
+			result.StatusCode == http.StatusBadGateway ||
+			result.StatusCode == http.StatusServiceUnavailable {
+			return xerrors.Retryable(
+				xerrors.WithStackTrace(err),
+				xerrors.WithBackoff(retry.TypeSlowBackoff),
+			)
+		}
+	}
+	if retryAllErrors {
+		return xerrors.Retryable(
+			xerrors.WithStackTrace(err),
+			xerrors.WithBackoff(retry.TypeFastBackoff),
+		)
+	}
+
+	return err
+}
+
+func (provider *oauth2TokenExchange) handleErrorResponse(
+	result *http.Response,
+	data []byte,
+	retryAllErrors bool,
+) error {
+	description := result.Status
 
 	//nolint:tagliatelle
 	type errorResponse struct {
@@ -398,7 +836,10 @@ func (provider *oauth2TokenExchange) handleErrorResponse(status string, data []b
 	if err := json.Unmarshal(data, &parsedErrorResponse); err != nil {
 		description += ", could not parse response: " + err.Error()
 
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
+		return makeError(
+			result,
+			xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description)),
+			retryAllErrors)
 	}
 
 	if parsedErrorResponse.ErrorName != "" {
@@ -411,21 +852,28 @@ func (provider *oauth2TokenExchange) handleErrorResponse(status string, data []b
 		description += ", error_uri: " + parsedErrorResponse.ErrorURI
 	}
 
-	return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
+	return makeError(
+		result,
+		xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description)),
+		retryAllErrors)
 }
 
 //nolint:tagliatelle
 type tokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int64  `json:"expires_in"`
-	Scope       string `json:"scope"`
+	AccessToken string    `json:"access_token"`
+	TokenType   string    `json:"token_type"`
+	ExpiresIn   int64     `json:"expires_in"`
+	Scope       string    `json:"scope"`
+	Now         time.Time `json:"-"`
 }
 
-func parseTokenResponse(data []byte) (*tokenResponse, error) {
+func parseTokenResponse(data []byte, retryAllErrors bool) (*tokenResponse, error) {
 	var parsedResponse tokenResponse
 	if err := json.Unmarshal(data, &parsedResponse); err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseResponse, err))
+		return nil, makeError(
+			nil,
+			xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseResponse, err)),
+			retryAllErrors)
 	}
 
 	return &parsedResponse, nil
@@ -450,28 +898,36 @@ func validateTokenResponse(parsedResponse *tokenResponse, provider *oauth2TokenE
 		}
 	}
 
+	if parsedResponse.AccessToken == "" {
+		return xerrors.WithStackTrace(errEmptyAccessToken)
+	}
+
 	return nil
 }
 
-func (provider *oauth2TokenExchange) updateToken(parsedResponse *tokenResponse, now time.Time) {
+func (provider *oauth2TokenExchange) updateToken(parsedResponse *tokenResponse) {
 	provider.receivedToken = "Bearer " + parsedResponse.AccessToken
 
 	expireDelta := time.Duration(parsedResponse.ExpiresIn) * time.Second
-	provider.receivedTokenExpireTime = now.Add(expireDelta)
+	provider.receivedTokenExpireTime = parsedResponse.Now.Add(expireDelta)
 
 	updateDelta := time.Duration(parsedResponse.ExpiresIn/updateTimeDivider) * time.Second
-	provider.updateTokenTime = now.Add(updateDelta)
+	provider.updateTokenTime = parsedResponse.Now.Add(updateDelta)
 }
 
-func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time.Time) error {
+// performExchangeTokenRequest is a read only func that performs request. Can be used without lock
+func (provider *oauth2TokenExchange) performExchangeTokenRequest(
+	ctx context.Context,
+	retryAllErrors bool,
+) (*tokenResponse, error) {
 	body, err := provider.getRequestParams()
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.tokenEndpoint, strings.NewReader(body))
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
@@ -482,29 +938,67 @@ func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time
 		Timeout:   provider.requestTimeout,
 	}
 
+	now := time.Now()
 	result, err := client.Do(req)
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotExchangeToken, err))
+		return nil, xerrors.Retryable(
+			xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotExchangeToken, err)),
+			xerrors.WithBackoff(retry.TypeFastBackoff),
+		)
 	}
 
 	defer result.Body.Close()
 
-	return provider.processTokenExchangeResponse(result, now)
+	return provider.processTokenExchangeResponse(result, now, retryAllErrors)
+}
+
+// exchangeTokenSync exchanges token synchronously, must be called under lock
+func (provider *oauth2TokenExchange) exchangeTokenSync(ctx context.Context) error {
+	retryAllErrors := provider.receivedToken != "" // already received token => all params are correct, can retry
+
+	ctx, cancelFunc := context.WithTimeout(ctx, provider.syncExchangeTimeout)
+	defer cancelFunc()
+
+	response, err := retry.RetryWithResult[*tokenResponse](
+		ctx,
+		func(ctx context.Context) (*tokenResponse, error) {
+			return provider.performExchangeTokenRequest(ctx, retryAllErrors)
+		},
+		retry.WithFastBackoff(syncRetryFastBackoff),
+		retry.WithSlowBackoff(syncRetrySlowBackoff),
+	)
+	if err != nil {
+		return err
+	}
+
+	provider.updateToken(response)
+
+	return nil
 }
 
 func (provider *oauth2TokenExchange) exchangeTokenInBackground() {
-	provider.mutex.Lock()
-	defer provider.mutex.Unlock()
+	defer provider.updating.Store(false)
 
-	now := time.Now()
-	if !provider.needUpdate(now) {
+	provider.mutex.RLock()
+	ctx, cancelFunc := context.WithDeadline(context.Background(), provider.receivedTokenExpireTime)
+	provider.mutex.RUnlock()
+	defer cancelFunc()
+
+	response, err := retry.RetryWithResult[*tokenResponse](
+		ctx,
+		func(ctx context.Context) (*tokenResponse, error) {
+			return provider.performExchangeTokenRequest(ctx, true)
+		},
+		retry.WithFastBackoff(backgroundRetryFastBackoff),
+		retry.WithSlowBackoff(backgroundRetrySlowBackoff),
+	)
+	if err != nil {
 		return
 	}
 
-	ctx := context.Background()
-	_ = provider.exchangeToken(ctx, now)
-
-	provider.updating.Store(false)
+	provider.mutex.Lock()
+	defer provider.mutex.Unlock()
+	provider.updateToken(response)
 }
 
 func (provider *oauth2TokenExchange) checkBackgroundUpdate(now time.Time) {
@@ -547,11 +1041,11 @@ func (provider *oauth2TokenExchange) Token(ctx context.Context) (string, error) 
 	provider.mutex.Lock()
 	defer provider.mutex.Unlock()
 
-	if !provider.expired(now) {
+	if !provider.expired(now) { // for the case of concurrent call
 		return provider.receivedToken, nil
 	}
 
-	if err := provider.exchangeToken(ctx, now); err != nil {
+	if err := provider.exchangeTokenSync(ctx); err != nil {
 		return "", err
 	}
 
@@ -706,6 +1200,26 @@ func WithSigningMethod(method jwt.SigningMethod) *signingMethodOption {
 	return &signingMethodOption{method}
 }
 
+// SigningMethodName
+type signingMethodNameOption struct {
+	method string
+}
+
+func (method *signingMethodNameOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	signingMethodDesc, signingMethodFound := signingMethodsRegistry[strings.ToUpper(method.method)]
+	if !signingMethodFound {
+		return xerrors.WithStackTrace(signingMethodNotSupportedError(method.method))
+	}
+
+	s.signingMethod = signingMethodDesc.method
+
+	return nil
+}
+
+func WithSigningMethodName(method string) *signingMethodNameOption {
+	return &signingMethodNameOption{method}
+}
+
 // KeyID
 type keyIDOption string
 
@@ -742,7 +1256,7 @@ type rsaPrivateKeyPemContentOption struct {
 func (key *rsaPrivateKeyPemContentOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(key.keyContent)
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotparseRSAPrivateKey, err))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotparsePrivateKey, err))
 	}
 	s.privateKey = privateKey
 
@@ -759,14 +1273,7 @@ type rsaPrivateKeyPemFileOption struct {
 }
 
 func (key *rsaPrivateKeyPemFileOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
-	if len(key.path) > 0 && key.path[0] == '~' {
-		usr, err := user.Current()
-		if err != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseHomeDir, err))
-		}
-		key.path = filepath.Join(usr.HomeDir, key.path[1:])
-	}
-	bytes, err := os.ReadFile(key.path)
+	bytes, err := readFileContent(key.path)
 	if err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotReadPrivateKeyFile, err))
 	}
@@ -778,6 +1285,119 @@ func (key *rsaPrivateKeyPemFileOption) ApplyJWTTokenSourceOption(s *jwtTokenSour
 
 func WithRSAPrivateKeyPEMFile(path string) *rsaPrivateKeyPemFileOption {
 	return &rsaPrivateKeyPemFileOption{path}
+}
+
+// PrivateKey
+type ecPrivateKeyPemContentOption struct {
+	keyContent []byte
+}
+
+func (key *ecPrivateKeyPemContentOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	privateKey, err := jwt.ParseECPrivateKeyFromPEM(key.keyContent)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotparsePrivateKey, err))
+	}
+	s.privateKey = privateKey
+
+	return nil
+}
+
+func WithECPrivateKeyPEMContent(key []byte) *ecPrivateKeyPemContentOption {
+	return &ecPrivateKeyPemContentOption{key}
+}
+
+// PrivateKey
+type ecPrivateKeyPemFileOption struct {
+	path string
+}
+
+func (key *ecPrivateKeyPemFileOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	bytes, err := readFileContent(key.path)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotReadPrivateKeyFile, err))
+	}
+
+	o := ecPrivateKeyPemContentOption{bytes}
+
+	return o.ApplyJWTTokenSourceOption(s)
+}
+
+func WithECPrivateKeyPEMFile(path string) *ecPrivateKeyPemFileOption {
+	return &ecPrivateKeyPemFileOption{path}
+}
+
+// Key
+type hmacSecretKeyContentOption struct {
+	keyContent []byte
+}
+
+func (key *hmacSecretKeyContentOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	s.privateKey = key.keyContent
+
+	return nil
+}
+
+func WithHMACSecretKey(key []byte) *hmacSecretKeyContentOption {
+	return &hmacSecretKeyContentOption{key}
+}
+
+// Key
+type hmacSecretKeyBase64ContentOption struct {
+	base64KeyContent string
+}
+
+func (key *hmacSecretKeyBase64ContentOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	keyData, err := base64.StdEncoding.DecodeString(key.base64KeyContent)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseBase64Secret, err))
+	}
+	s.privateKey = keyData
+
+	return nil
+}
+
+func WithHMACSecretKeyBase64Content(base64KeyContent string) *hmacSecretKeyBase64ContentOption {
+	return &hmacSecretKeyBase64ContentOption{base64KeyContent}
+}
+
+// Key
+type hmacSecretKeyFileOption struct {
+	path string
+}
+
+func (key *hmacSecretKeyFileOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	bytes, err := readFileContent(key.path)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotReadPrivateKeyFile, err))
+	}
+
+	s.privateKey = bytes
+
+	return nil
+}
+
+func WithHMACSecretKeyFile(path string) *hmacSecretKeyFileOption {
+	return &hmacSecretKeyFileOption{path}
+}
+
+// Key
+type hmacSecretKeyBase64FileOption struct {
+	path string
+}
+
+func (key *hmacSecretKeyBase64FileOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	bytes, err := readFileContent(key.path)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotReadPrivateKeyFile, err))
+	}
+
+	o := hmacSecretKeyBase64ContentOption{string(bytes)}
+
+	return o.ApplyJWTTokenSourceOption(s)
+}
+
+func WithHMACSecretKeyBase64File(path string) *hmacSecretKeyBase64FileOption {
+	return &hmacSecretKeyBase64FileOption{path}
 }
 
 func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*jwtTokenSource, error) {

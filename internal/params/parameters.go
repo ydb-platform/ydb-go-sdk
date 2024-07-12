@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type (
@@ -297,6 +298,13 @@ func (p *Parameter) YSON(v []byte) Builder {
 
 func (p *Parameter) UUID(v [16]byte) Builder {
 	p.value = value.UUIDValue(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) Any(v types.Value) Builder {
+	p.value = v
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent

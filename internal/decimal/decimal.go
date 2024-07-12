@@ -100,7 +100,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		return v, nil
 	}
 
-	neg := s[0] == '-' //nolint:ifshort
+	neg := s[0] == '-' //nolint:ifshort,nolintlint
 	if neg || s[0] == '+' {
 		s = s[1:]
 	}
@@ -215,7 +215,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	}
 
 	v := big.NewInt(0).Set(x)
-	neg := x.Sign() < 0 //nolint:ifshort
+	neg := x.Sign() < 0 //nolint:ifshort,nolintlint
 	if neg {
 		// Convert negative to positive.
 		v.Neg(x)

@@ -912,7 +912,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session *session, err 
 func (c *Client) debug() {
 	fmt.Print("head ")
 	for el := c.idle.Front(); el != nil; el = el.Next() {
-		s := el.Value.(*session)
+		s := el.Value
 		x := c.index[s]
 		fmt.Printf("<-> %s(%d) ", s.ID(), x.touched.Unix())
 	}

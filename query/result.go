@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 )
@@ -13,13 +14,19 @@ type (
 	Result interface {
 		closer.Closer
 
+		// NextResultSet returns next result set
 		NextResultSet(ctx context.Context) (ResultSet, error)
-		Err() error
 
 		// Range is experimental API for range iterators available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
 		Range(ctx context.Context) xiter.Seq2[ResultSet, error]
+
+		Stats() stats.QueryStats
+
+		// Err returns error (if happened) on result
+		Err() error
 	}
 	ResultSet interface {
+		Index() int
 		Columns() []string
 		ColumnTypes() []Type
 		NextRow(ctx context.Context) (Row, error)
