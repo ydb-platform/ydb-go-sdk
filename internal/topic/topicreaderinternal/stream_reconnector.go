@@ -234,7 +234,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			}
 		}
 
-		err := r.reconnect(ctx, request.oldReader)
+		err := r.reconnect(ctx, request.reason, request.oldReader)
 		onReconnectionDone(err)
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -64,6 +65,9 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 
 				return baseReader, nil
 			},
+			retrySettings: topic.RetrySettings{
+				StartTimeout: topic.DefaultStartTimeout,
+			},
 			streamErr: errUnconnected,
 			tracer:    &trace.Topic{},
 		}
@@ -107,6 +111,9 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 				connectCalled++
 
 				return readers[connectCalled-1], nil
+			},
+			retrySettings: topic.RetrySettings{
+				StartTimeout: topic.DefaultStartTimeout,
 			},
 			streamErr: errUnconnected,
 			tracer:    &trace.Topic{},
@@ -490,7 +497,7 @@ func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
 		tracer:    &trace.Topic{},
 	}
 	reconnector.initChannelsAndClock()
-	err := reconnector.reconnect(ctx, nil)
+	err := reconnector.reconnect(ctx, errors.New("test-reconnect"), nil)
 	require.ErrorIs(t, err, testErr)
 	require.ErrorIs(t, reconnector.streamErr, testErr)
 }
