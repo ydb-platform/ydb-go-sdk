@@ -1155,7 +1155,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		r, _, err := newResult(ctx, stream, nil, nil)
 		require.NoError(t, err)
 
-		row, err := exactlyOneRowFromResult(ctx, r)
+		row, err := exactlyOneResultSetFromResult(ctx, r)
 		require.ErrorIs(t, err, errMoreThanOneResultSet)
 		require.Nil(t, row)
 	})
