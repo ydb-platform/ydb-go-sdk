@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"slo/internal/config"
 	"slo/internal/generator"
@@ -23,7 +24,7 @@ type Workers struct {
 func New(cfg *config.Config, s ReadWriter, label, jobName string) (*Workers, error) {
 	m, err := metrics.New(cfg.PushGateway, label, jobName)
 	if err != nil {
-		fmt.Printf("create metrics failed: %v\n", err)
+		fmt.Printf("[%s] create metrics failed: %v\n", time.Now().Format(time.RFC3339), err)
 
 		return nil, err
 	}

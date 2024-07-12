@@ -12,6 +12,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,10 +44,19 @@ func WriteResponse(w http.ResponseWriter, code int, body string, bodyType string
 	_, _ = w.Write([]byte(body))
 }
 
-func runTokenExchangeServer(currentTestParams *Oauth2TokenExchangeTestParams) *httptest.Server {
+func runTokenExchangeServer(
+	currentTestParams *Oauth2TokenExchangeTestParams,
+	firstReplyIsError bool,
+	serverRequests *atomic.Int64,
+) *httptest.Server {
 	mux := http.NewServeMux()
+	returnedErr := !firstReplyIsError
+	returnedErrPtr := &returnedErr
 
 	mux.HandleFunc("/exchange", func(w http.ResponseWriter, r *http.Request) {
+		if serverRequests != nil {
+			serverRequests.Add(1)
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			WriteErr(w, err)
@@ -68,7 +78,12 @@ func runTokenExchangeServer(currentTestParams *Oauth2TokenExchangeTestParams) *h
 			WriteResponse(w, 555, fmt.Sprintf("Params are not as expected: \"%s\" != \"%s\"",
 				expectedParams.Encode(), body), "text/html") // error will be checked in test thread
 		} else {
-			WriteResponse(w, currentTestParams.Status, currentTestParams.Response, "application/json")
+			if !*returnedErrPtr {
+				WriteResponse(w, http.StatusInternalServerError, "test error", "text/html")
+				*returnedErrPtr = true
+			} else {
+				WriteResponse(w, currentTestParams.Status, currentTestParams.Response, "application/json")
+			}
 		}
 	})
 
@@ -123,7 +138,7 @@ func TestOauth2TokenExchange(t *testing.T) {
 			Status:            http.StatusInternalServerError,
 			ExpectedToken:     "",
 			ExpectedError:     errCouldNotExchangeToken,
-			ExpectedErrorPart: "500 Internal Server Error, error: unauthorized_client, description: \"something went bad\"", //nolint:lll
+			ExpectedErrorPart: "500 Internal Server Error, error: unauthorized_client, description: \\\"something went bad\\\"", //nolint:lll
 		},
 		{
 			Response:          `{"error_description":"something went bad","error_uri":"my_error_uri"}`,
@@ -157,11 +172,23 @@ func TestOauth2TokenExchange(t *testing.T) {
 			ExpectedError:     errDifferentScope,
 			ExpectedErrorPart: "Expected \"test_scope1 test_scope2\", but got \"s\"",
 		},
+		{
+			Response:      `{"access_token":"","token_type":"Bearer","expires_in":42}`,
+			Status:        http.StatusOK,
+			ExpectedToken: "",
+			ExpectedError: errEmptyAccessToken,
+		},
+		{
+			Response:      `{"token_type":"Bearer","expires_in":42}`,
+			Status:        http.StatusOK,
+			ExpectedToken: "",
+			ExpectedError: errEmptyAccessToken,
+		},
 	}
 
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		var currentTestParams Oauth2TokenExchangeTestParams
-		server := runTokenExchangeServer(&currentTestParams)
+		server := runTokenExchangeServer(&currentTestParams, true, nil)
 		defer server.Close()
 
 		for _, params := range testsParams {
@@ -172,6 +199,7 @@ func TestOauth2TokenExchange(t *testing.T) {
 				WithAudience("test_audience"),
 				WithScope("test_scope1", "test_scope2"),
 				WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
+				WithSyncExchangeTimeout(time.Second*3),
 			)
 			require.NoError(t, err)
 
@@ -197,7 +225,7 @@ func TestOauth2TokenUpdate(t *testing.T) {
 
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		var currentTestParams Oauth2TokenExchangeTestParams
-		server := runTokenExchangeServer(&currentTestParams)
+		server := runTokenExchangeServer(&currentTestParams, true, nil)
 		defer server.Close()
 
 		// First exchange
@@ -260,6 +288,63 @@ func TestOauth2TokenUpdate(t *testing.T) {
 			require.Equal(t, "Bearer test_token_2", token)
 		}
 	}, xtest.StopAfter(14*time.Second))
+}
+
+func TestReturnsOldTokenWhileUpdating(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+
+	var currentTestParams Oauth2TokenExchangeTestParams
+	var serverRequests atomic.Int64
+	server := runTokenExchangeServer(&currentTestParams, true, &serverRequests)
+	defer server.Close()
+
+	// First exchange
+	currentTestParams = Oauth2TokenExchangeTestParams{
+		Response: `{"access_token":"test_token_1", "token_type":"Bearer","expires_in":6}`,
+		Status:   http.StatusOK,
+	}
+
+	client, err := NewOauth2TokenExchangeCredentials(
+		WithTokenEndpoint(server.URL+"/exchange"),
+		WithAudience("test_audience"),
+		WithScope("test_scope1", "test_scope2"),
+		WithFixedSubjectToken("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt"),
+	)
+	require.NoError(t, err)
+
+	token, err := client.Token(ctx)
+	t1 := time.Now()
+	require.NoError(t, err)
+	require.Equal(t, "Bearer test_token_1", token)
+
+	// Second exchange
+	currentTestParams = Oauth2TokenExchangeTestParams{
+		Response: `{"error":"unauthorized_client","error_description":"something went bad"}`,
+		Status:   http.StatusInternalServerError,
+	}
+
+	token, err = client.Token(ctx)
+	t2 := time.Now()
+	require.NoError(t, err)
+	if t2.Sub(t1) <= time.Second*3 {
+		require.Equal(t, "Bearer test_token_1", token)
+		require.Equal(t, int64(2), serverRequests.Load())
+	}
+
+	time.Sleep(time.Second * 3) // wait half expire period
+	for i := 1; i <= 100; i++ {
+		token, err = client.Token(ctx)
+		t3 := time.Now()
+		if t3.Sub(t1) < 6*time.Second {
+			require.NoError(t, err)
+			require.Equal(t, "Bearer test_token_1", token)
+			time.Sleep(10 * time.Millisecond)
+		} else {
+			break
+		}
+	}
+	require.Greater(t, serverRequests.Load(), int64(3)) // at least one retry
 }
 
 func TestWrongParameters(t *testing.T) {
@@ -381,6 +466,7 @@ func TestErrorInHTTPRequest(t *testing.T) {
 		),
 		WithScope("1", "2", "3"),
 		WithSourceInfo("TestErrorInHTTPRequest"),
+		WithSyncExchangeTimeout(time.Second*3),
 	)
 	require.NoError(t, err)
 
