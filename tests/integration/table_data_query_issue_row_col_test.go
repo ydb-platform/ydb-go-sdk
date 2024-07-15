@@ -53,7 +53,7 @@ func TestDataQueryIssueRowCol(t *testing.T) {
 	require.Error(t, err)
 	err = ydb.OperationError(err)
 	require.Error(t, err)
-	re := regexp.MustCompile(", address = [a-zA-Z0-9.:-]+,")
+	re := regexp.MustCompile(", address = [a-zA-Z0-9.:-]+,( nodeID = \\d+,){0,1}")
 	errText := re.ReplaceAllStringFunc(err.Error(), func(s string) string {
 		return ","
 	})

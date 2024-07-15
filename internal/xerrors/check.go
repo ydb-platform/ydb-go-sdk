@@ -19,7 +19,7 @@ func Check(err error) (
 	}
 	var e Error
 	if As(err, &e) {
-		return int64(e.Code()), e.Type(), e.BackoffType(), e.IsRetryObjectValid()
+		return int64(e.Code()), e.Type(), e.BackoffType(), !e.IsRetryObjectValid()
 	}
 
 	return -1,
@@ -35,7 +35,7 @@ func IsRetryObjectValid(err error) bool {
 
 	var e Error
 	if As(err, &e) {
-		return !e.IsRetryObjectValid()
+		return e.IsRetryObjectValid()
 	}
 
 	return true

@@ -138,7 +138,7 @@ func TestOauth2TokenExchange(t *testing.T) {
 			Status:            http.StatusInternalServerError,
 			ExpectedToken:     "",
 			ExpectedError:     errCouldNotExchangeToken,
-			ExpectedErrorPart: "500 Internal Server Error, error: unauthorized_client, description: \\\"something went bad\\\"", //nolint:lll
+			ExpectedErrorPart: "500 Internal Server Error, error: unauthorized_client, description: \\\\\\\"something went bad\\\\\\\"", //nolint:lll
 		},
 		{
 			Response:          `{"error_description":"something went bad","error_uri":"my_error_uri"}`,
@@ -186,37 +186,39 @@ func TestOauth2TokenExchange(t *testing.T) {
 		},
 	}
 
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		var currentTestParams Oauth2TokenExchangeTestParams
-		server := runTokenExchangeServer(&currentTestParams, true, nil)
-		defer server.Close()
+	for _, params := range testsParams {
+		t.Run("", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				var currentTestParams Oauth2TokenExchangeTestParams
+				server := runTokenExchangeServer(&currentTestParams, true, nil)
+				defer server.Close()
 
-		for _, params := range testsParams {
-			currentTestParams = params
+				currentTestParams = params
 
-			client, err := NewOauth2TokenExchangeCredentials(
-				WithTokenEndpoint(server.URL+"/exchange"),
-				WithAudience("test_audience"),
-				WithScope("test_scope1", "test_scope2"),
-				WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
-				WithSyncExchangeTimeout(time.Second*3),
-			)
-			require.NoError(t, err)
-
-			token, err := client.Token(ctx)
-			if params.ExpectedErrorPart == "" && params.ExpectedError == nil {
+				client, err := NewOauth2TokenExchangeCredentials(
+					WithTokenEndpoint(server.URL+"/exchange"),
+					WithAudience("test_audience"),
+					WithScope("test_scope1", "test_scope2"),
+					WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
+					WithSyncExchangeTimeout(time.Second*3),
+				)
 				require.NoError(t, err)
-			} else {
-				if params.ExpectedErrorPart != "" {
-					require.ErrorContains(t, err, params.ExpectedErrorPart)
+
+				token, err := client.Token(ctx)
+				if params.ExpectedErrorPart == "" && params.ExpectedError == nil {
+					require.NoError(t, err)
+				} else {
+					if params.ExpectedErrorPart != "" {
+						require.ErrorContains(t, err, params.ExpectedErrorPart)
+					}
+					if params.ExpectedError != nil {
+						require.ErrorIs(t, err, params.ExpectedError)
+					}
 				}
-				if params.ExpectedError != nil {
-					require.ErrorIs(t, err, params.ExpectedError)
-				}
-			}
-			require.Equal(t, params.ExpectedToken, token)
-		}
-	})
+				require.Equal(t, params.ExpectedToken, token)
+			})
+		})
+	}
 }
 
 func TestOauth2TokenUpdate(t *testing.T) {
