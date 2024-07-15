@@ -58,13 +58,6 @@ func (c *Config) Meta() *meta.Meta {
 	return c.meta
 }
 
-// ConnectionTTL defines interval for parking grpc connections.
-//
-// If ConnectionTTL is zero - connections are not park.
-func (c *Config) ConnectionTTL() time.Duration {
-	return c.connectionTTL
-}
-
 // Secure is a flag for secure connection
 func (c *Config) Secure() bool {
 	return c.secure

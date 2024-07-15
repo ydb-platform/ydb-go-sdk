@@ -3,7 +3,6 @@ package pool
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 )
 
@@ -13,8 +12,6 @@ type (
 		OnClose  func(*CloseStartInfo) func(*CloseDoneInfo)
 		OnTry    func(*TryStartInfo) func(*TryDoneInfo)
 		OnWith   func(*WithStartInfo) func(*WithDoneInfo)
-		OnPut    func(*PutStartInfo) func(*PutDoneInfo)
-		OnGet    func(*GetStartInfo) func(*GetDoneInfo)
 		OnChange func(ChangeInfo)
 	}
 	NewStartInfo struct {
@@ -63,27 +60,5 @@ type (
 
 		Attempts int
 	}
-	PutStartInfo struct {
-		// Context make available context in trace stack.Callerback function.
-		// Pointer to context provide replacement of context in trace stack.Callerback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside stack.Callerback function
-		Context *context.Context
-		Call    stack.Caller
-	}
-	PutDoneInfo struct {
-		Error error
-	}
-	GetStartInfo struct {
-		// Context make available context in trace stack.Callerback function.
-		// Pointer to context provide replacement of context in trace stack.Callerback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside stack.Callerback function
-		Context *context.Context
-		Call    stack.Caller
-	}
-	GetDoneInfo struct {
-		Error error
-	}
-	ChangeInfo = stats.Stats
+	ChangeInfo = Stats
 )

@@ -118,7 +118,7 @@ func TestDiff(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			steady, added, dropped := Diff(tt.previous, tt.newest)
+			steady, added, dropped := Diff(tt.newest, tt.previous)
 			require.Equal(t, endpointsToAddresses(tt.added), endpointsToAddresses(added))
 			require.Equal(t, endpointsToAddresses(tt.dropped), endpointsToAddresses(dropped))
 			require.Equal(t, endpointsToAddresses(tt.steady), endpointsToAddresses(steady))

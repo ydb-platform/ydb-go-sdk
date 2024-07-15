@@ -55,14 +55,13 @@ func (m *Map[K, V]) LoadAndDelete(key K) (value V, ok bool) {
 
 func (m *Map[K, V]) Range(f func(key K, value V) bool) {
 	m.m.Range(func(k, v any) bool {
-		return f(k.(K), v.(V)) //nolint:forcetypeassert
+		return f(k.(K), v.(V))
 	})
 }
 
 func (m *Map[K, V]) Clear() {
 	m.m.Range(func(k, v any) bool {
 		m.m.Delete(k)
-
 		return true
 	})
 }

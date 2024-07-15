@@ -19,13 +19,5 @@ var defaultTrace = &Trace{
 		return func(info *WithDoneInfo) {
 		}
 	},
-	OnPut: func(info *PutStartInfo) func(info *PutDoneInfo) {
-		return func(info *PutDoneInfo) {
-		}
-	},
-	OnGet: func(info *GetStartInfo) func(info *GetDoneInfo) {
-		return func(info *GetDoneInfo) {
-		}
-	},
 	OnChange: func(info ChangeInfo) {},
 }

@@ -4,146 +4,183 @@ import (
 	"context"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 type connectionsState struct {
-	connByNodeID map[uint32]conn.Conn
+	index map[uint32]endpoint.Endpoint
 
-	prefer   []conn.Conn
-	fallback []conn.Conn
-	all      []conn.Conn
+	checkEndpoint func(endpoint.Endpoint) bool
+
+	prefer   []endpoint.Endpoint
+	fallback []endpoint.Endpoint
+	all      []endpoint.Endpoint
 
 	rand xrand.Rand
 }
 
 func newConnectionsState(
-	conns []conn.Conn,
+	endpoints []endpoint.Endpoint,
 	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
+	checkEndpoint func(endpoint.Endpoint) bool,
 ) *connectionsState {
-	res := &connectionsState{
-		connByNodeID: connsToNodeIDMap(conns),
-		rand:         xrand.New(xrand.WithLock()),
+	s := &connectionsState{
+		index:         endpointsToNodeIDMap(endpoints),
+		rand:          xrand.New(xrand.WithLock()),
+		checkEndpoint: checkEndpoint,
 	}
 
-	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)
+	s.prefer, s.fallback = sortPreferEndpoints(endpoints, filter, info, allowFallback)
 	if allowFallback {
-		res.all = conns
+		s.all = endpoints
 	} else {
-		res.all = res.prefer
+		s.all = s.prefer
 	}
 
-	return res
+	return s
 }
 
 func (s *connectionsState) PreferredCount() int {
 	return len(s.prefer)
 }
 
-func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
-	if err := ctx.Err(); err != nil {
-		return nil, 0
+func (s *connectionsState) All() []endpoint.Endpoint {
+	if s == nil {
+		return nil
 	}
 
-	if c := s.preferConnection(ctx); c != nil {
-		return c, 0
-	}
-
-	try := func(conns []conn.Conn) conn.Conn {
-		c, tryFailed := s.selectRandomConnection(conns, false)
-		failedCount += tryFailed
-
-		return c
-	}
-
-	if c := try(s.prefer); c != nil {
-		return c, failedCount
-	}
-
-	if c := try(s.fallback); c != nil {
-		return c, failedCount
-	}
-
-	c, _ := s.selectRandomConnection(s.all, true)
-
-	return c, failedCount
+	return s.all
 }
 
-func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
-	if nodeID, hasPreferEndpoint := endpoint.ContextNodeID(ctx); hasPreferEndpoint {
-		c := s.connByNodeID[nodeID]
-		if c != nil && isOkConnection(c, true) {
-			return c
+func (s *connectionsState) Next(ctx context.Context) endpoint.Endpoint {
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
+
+	if e := s.preferEndpoint(ctx); e != nil {
+		return e
+	}
+
+	if e := s.selectRandomEndpoint(s.prefer); e != nil {
+		return e
+	}
+
+	if e := s.selectRandomEndpoint(s.fallback); e != nil {
+		return e
+	}
+
+	return s.selectRandomEndpoint(s.all)
+}
+
+func (s *connectionsState) preferEndpoint(ctx context.Context) endpoint.Endpoint {
+	if nodeID, has := endpoint.ContextNodeID(ctx); has {
+		e := s.index[nodeID]
+		if e != nil && s.checkEndpoint(e) {
+			return e
 		}
 	}
 
 	return nil
 }
 
-func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned bool) (c conn.Conn, failedConns int) {
-	connCount := len(conns)
-	if connCount == 0 {
+func (s *connectionsState) selectRandomEndpoint(endpoints []endpoint.Endpoint) endpoint.Endpoint {
+	count := len(endpoints)
+	if count == 0 {
 		// return for empty list need for prevent panic in fast path
-		return nil, 0
+		return nil
 	}
 
 	// fast path
-	if c := conns[s.rand.Int(connCount)]; isOkConnection(c, allowBanned) {
-		return c, 0
+	if e := endpoints[s.rand.Int(count)]; s.checkEndpoint(e) {
+		return e
 	}
 
 	// shuffled indexes slices need for guarantee about every connection will check
-	indexes := make([]int, connCount)
+	indexes := make([]int, count)
 	for index := range indexes {
 		indexes[index] = index
 	}
-	s.rand.Shuffle(connCount, func(i, j int) {
+
+	s.rand.Shuffle(count, func(i, j int) {
 		indexes[i], indexes[j] = indexes[j], indexes[i]
 	})
 
 	for _, index := range indexes {
-		c := conns[index]
-		if isOkConnection(c, allowBanned) {
-			return c, 0
+		e := endpoints[index]
+		if s.checkEndpoint(e) {
+			return e
 		}
-		failedConns++
 	}
 
-	return nil, failedConns
+	return nil
 }
 
-func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
-	if len(conns) == 0 {
+func excludeS(in []endpoint.Endpoint, exclude endpoint.Endpoint) (out []endpoint.Endpoint) {
+	out = make([]endpoint.Endpoint, 0, len(in))
+
+	for i := range in {
+		if in[i].Address() != exclude.Address() {
+			out = append(out, in[i])
+		}
+	}
+
+	return out
+}
+
+func excludeM(in map[uint32]endpoint.Endpoint, exclude endpoint.Endpoint) (out map[uint32]endpoint.Endpoint) {
+	out = make(map[uint32]endpoint.Endpoint, len(in))
+
+	for i := range in {
+		if in[i].Address() != exclude.Address() {
+			out[in[i].NodeID()] = in[i]
+		}
+	}
+
+	return out
+}
+
+func (s *connectionsState) exclude(e endpoint.Endpoint) *connectionsState {
+	return &connectionsState{
+		index:         excludeM(s.index, e),
+		checkEndpoint: s.checkEndpoint,
+		prefer:        excludeS(s.prefer, e),
+		fallback:      excludeS(s.fallback, e),
+		all:           excludeS(s.all, e),
+		rand:          s.rand,
+	}
+}
+
+func endpointsToNodeIDMap(endpoints []endpoint.Endpoint) (index map[uint32]endpoint.Endpoint) {
+	if len(endpoints) == 0 {
 		return nil
 	}
-	nodes = make(map[uint32]conn.Conn, len(conns))
-	for _, c := range conns {
-		nodes[c.Endpoint().NodeID()] = c
+	index = make(map[uint32]endpoint.Endpoint, len(endpoints))
+	for _, c := range endpoints {
+		index[c.NodeID()] = c
 	}
 
-	return nodes
+	return index
 }
 
-func sortPreferConnections(
-	conns []conn.Conn,
+func sortPreferEndpoints(
+	endpoints []endpoint.Endpoint,
 	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
-) (prefer, fallback []conn.Conn) {
+) (prefer, fallback []endpoint.Endpoint) {
 	if filter == nil {
-		return conns, nil
+		return endpoints, nil
 	}
 
-	prefer = make([]conn.Conn, 0, len(conns))
+	prefer = make([]endpoint.Endpoint, 0, len(endpoints))
 	if allowFallback {
-		fallback = make([]conn.Conn, 0, len(conns))
+		fallback = make([]endpoint.Endpoint, 0, len(endpoints))
 	}
 
-	for _, c := range conns {
+	for _, c := range endpoints {
 		if filter.Allow(info, c) {
 			prefer = append(prefer, c)
 		} else if allowFallback {
@@ -152,15 +189,4 @@ func sortPreferConnections(
 	}
 
 	return prefer, fallback
-}
-
-func isOkConnection(c conn.Conn, bannedIsOk bool) bool {
-	switch c.GetState() {
-	case conn.Online, conn.Created, conn.Offline:
-		return true
-	case conn.Banned:
-		return bannedIsOk
-	default:
-		return false
-	}
 }

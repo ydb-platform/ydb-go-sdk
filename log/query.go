@@ -153,58 +153,6 @@ func internalQuery(
 				}
 			}
 		},
-		OnPoolPut: func(info trace.QueryPoolPutStartInfo) func(trace.QueryPoolPutDoneInfo) {
-			if d.Details()&trace.QueryPoolEvents == 0 {
-				return nil
-			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "put")
-			l.Log(ctx, "start")
-			start := time.Now()
-
-			return func(info trace.QueryPoolPutDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						latencyField(start),
-					)
-				} else {
-					lvl := WARN
-					if !xerrors.IsYdb(info.Error) {
-						lvl = DEBUG
-					}
-					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
-					)
-				}
-			}
-		},
-		OnPoolGet: func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
-			if d.Details()&trace.QueryPoolEvents == 0 {
-				return nil
-			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "get")
-			l.Log(ctx, "start")
-			start := time.Now()
-
-			return func(info trace.QueryPoolGetDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						latencyField(start),
-					)
-				} else {
-					lvl := WARN
-					if !xerrors.IsYdb(info.Error) {
-						lvl = DEBUG
-					}
-					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
-					)
-				}
-			}
-		},
 		OnDo: func(info trace.QueryDoStartInfo) func(trace.QueryDoDoneInfo) {
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil

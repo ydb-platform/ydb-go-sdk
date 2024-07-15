@@ -4,6 +4,8 @@ package trace
 
 import (
 	"context"
+
+	"google.golang.org/grpc/connectivity"
 )
 
 // driverComposeOptions is a holder of options
@@ -1340,49 +1342,49 @@ func DriverOnResolve(t *Driver, call call, target string, resolved []string) fun
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnConnStateChange(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+func DriverOnConnStateChange(t *Driver, c *context.Context, call call, endpoint EndpointInfo, s connectivity.State) func(connectivity.State) {
 	var p DriverConnStateChangeStartInfo
 	p.Context = c
 	p.Call = call
 	p.Endpoint = endpoint
-	p.State = state
+	p.State = s
 	res := t.onConnStateChange(p)
-	return func(state ConnState) {
+	return func(s connectivity.State) {
 		var p DriverConnStateChangeDoneInfo
-		p.State = state
+		p.State = s
 		res(p)
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnConnInvoke(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState, metadata map[string][]string) {
+func DriverOnConnInvoke(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, _ connectivity.State, metadata map[string][]string) {
 	var p DriverConnInvokeStartInfo
 	p.Context = c
 	p.Call = call
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnInvoke(p)
-	return func(e error, issues []Issue, opID string, state ConnState, metadata map[string][]string) {
+	return func(e error, issues []Issue, opID string, s connectivity.State, metadata map[string][]string) {
 		var p DriverConnInvokeDoneInfo
 		p.Error = e
 		p.Issues = issues
 		p.OpID = opID
-		p.State = state
+		p.State = s
 		p.Metadata = metadata
 		res(p)
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnConnNewStream(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(_ error, state ConnState) {
+func DriverOnConnNewStream(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(error, connectivity.State) {
 	var p DriverConnNewStreamStartInfo
 	p.Context = c
 	p.Call = call
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnNewStream(p)
-	return func(e error, state ConnState) {
+	return func(e error, s connectivity.State) {
 		var p DriverConnNewStreamDoneInfo
 		p.Error = e
-		p.State = state
+		p.State = s
 		res(p)
 	}
 }
@@ -1444,31 +1446,31 @@ func DriverOnConnDial(t *Driver, c *context.Context, call call, endpoint Endpoin
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnConnBan(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
+func DriverOnConnBan(t *Driver, c *context.Context, call call, endpoint EndpointInfo, s connectivity.State, cause error) func(connectivity.State) {
 	var p DriverConnBanStartInfo
 	p.Context = c
 	p.Call = call
 	p.Endpoint = endpoint
-	p.State = state
+	p.State = s
 	p.Cause = cause
 	res := t.onConnBan(p)
-	return func(state ConnState) {
+	return func(s connectivity.State) {
 		var p DriverConnBanDoneInfo
-		p.State = state
+		p.State = s
 		res(p)
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnConnAllow(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+func DriverOnConnAllow(t *Driver, c *context.Context, call call, endpoint EndpointInfo, s connectivity.State) func(connectivity.State) {
 	var p DriverConnAllowStartInfo
 	p.Context = c
 	p.Call = call
 	p.Endpoint = endpoint
-	p.State = state
+	p.State = s
 	res := t.onConnAllow(p)
-	return func(state ConnState) {
+	return func(s connectivity.State) {
 		var p DriverConnAllowDoneInfo
-		p.State = state
+		p.State = s
 		res(p)
 	}
 }

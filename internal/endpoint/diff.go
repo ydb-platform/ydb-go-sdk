@@ -6,7 +6,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xmath"
 )
 
-func Diff(previous, newest []Endpoint) (steady, added, dropped []Endpoint) {
+func Diff(newest []Endpoint, previous []Endpoint) (
+	steady []Endpoint,
+	added []Endpoint,
+	dropped []Endpoint,
+) {
 	steady = make([]Endpoint, 0, xmath.Min(len(newest), len(previous)))
 	added = make([]Endpoint, 0, len(newest))
 	dropped = make([]Endpoint, 0, len(previous))

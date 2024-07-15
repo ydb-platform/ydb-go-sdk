@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
@@ -759,10 +758,10 @@ func withOnClose(onClose func(c *Driver)) Option {
 	}
 }
 
-func withConnPool(pool *conn.Pool) Option {
-	return func(ctx context.Context, c *Driver) error {
-		c.pool = pool
-
-		return pool.Take(ctx)
-	}
-}
+//func withConnPool(pool *conn.Pool) Option {
+//	return func(ctx context.Context, c *Driver) error {
+//		c.pool = pool
+//
+//		return pool.Take(ctx)
+//	}
+//}
