@@ -9,7 +9,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -32,7 +31,7 @@ type (
 	sessionPool interface {
 		closer.Closer
 
-		Stats() stats.Stats
+		Stats() pool.Stats
 		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
 	}
 	poolStub struct {
@@ -48,29 +47,29 @@ type (
 	}
 )
 
-func (pool *poolStub) Close(ctx context.Context) error {
+func (p *poolStub) Close(ctx context.Context) error {
 	return nil
 }
 
-func (pool *poolStub) Stats() stats.Stats {
-	return stats.Stats{
+func (p *poolStub) Stats() pool.Stats {
+	return pool.Stats{
 		Limit: -1,
 		Index: 0,
 		Idle:  0,
-		InUse: int(pool.InUse.Load()),
+		InUse: int(p.InUse.Load()),
 	}
 }
 
-func (pool *poolStub) With(
+func (p *poolStub) With(
 	ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option,
 ) error {
-	pool.InUse.Add(1)
+	p.InUse.Add(1)
 	defer func() {
-		pool.InUse.Add(-1)
+		p.InUse.Add(-1)
 	}()
 
 	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
-		s, err := pool.createSession(ctx)
+		s, err := p.createSession(ctx)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -92,7 +91,7 @@ func (pool *poolStub) With(
 	return nil
 }
 
-func (c *Client) Stats() *stats.Stats {
+func (c *Client) Stats() *pool.Stats {
 	s := c.pool.Stats()
 
 	return &s

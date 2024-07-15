@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -25,7 +25,7 @@ type mockReadResultSetClient struct {
 	rs query.ResultSet
 }
 
-func (c *mockReadResultSetClient) Stats() *stats.Stats {
+func (c *mockReadResultSetClient) Stats() *pool.Stats {
 	return nil
 }
 
@@ -63,7 +63,7 @@ type mockReadRowClient struct {
 	row query.Row
 }
 
-func (c *mockReadRowClient) Stats() *stats.Stats {
+func (c *mockReadRowClient) Stats() *pool.Stats {
 	return nil
 }
 
