@@ -100,13 +100,13 @@ func readFileContent(filePath string) ([]byte, error) {
 	if len(filePath) > 0 && filePath[0] == '~' {
 		usr, err := user.Current()
 		if err != nil {
-			return []byte{}, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseHomeDir, err))
+			return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseHomeDir, err))
 		}
 		filePath = filepath.Join(usr.HomeDir, filePath[1:])
 	}
 	bytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return []byte{}, xerrors.WithStackTrace(fmt.Errorf("%w %s: %w", errCouldNotReadFile, filePath, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w %s: %w", errCouldNotReadFile, filePath, err))
 	}
 
 	return bytes, nil
@@ -469,7 +469,7 @@ func (a *stringOrArrayConfig) UnmarshalJSON(data []byte) error {
 	var arr []string
 	err = json.Unmarshal(data, &arr)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 	a.Values = arr
 
@@ -484,17 +484,17 @@ func (d *prettyTTL) UnmarshalJSON(data []byte) error {
 	var s string
 	err := json.Unmarshal(data, &s)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 	d.Value, err = time.ParseDuration(s)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 	if d.Value <= 0 {
 		return xerrors.WithStackTrace(fmt.Errorf("%w, but got: %q", errTTLMustBePositive, s))
 	}
 
-	return err
+	return xerrors.WithStackTrace(err)
 }
 
 //nolint:tagliatelle
@@ -645,7 +645,7 @@ func (cfg *oauth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOptio
 	if cfg.SubjectCreds != nil {
 		opt, err := cfg.SubjectCreds.applyConfig(SubjectTokenSourceType)
 		if err != nil {
-			return err
+			return xerrors.WithStackTrace(err)
 		}
 		*opts = append(*opts, opt)
 	}
@@ -653,7 +653,7 @@ func (cfg *oauth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOptio
 	if cfg.ActorCreds != nil {
 		opt, err := cfg.ActorCreds.applyConfig(ActorTokenSourceType)
 		if err != nil {
-			return err
+			return xerrors.WithStackTrace(err)
 		}
 		*opts = append(*opts, opt)
 	}
@@ -783,10 +783,9 @@ func readResponseBody(result *http.Response) ([]byte, error) {
 	if result.Body != nil {
 		data, err := io.ReadAll(result.Body)
 		if err != nil {
-			return nil, xerrors.Retryable(
-				xerrors.WithStackTrace(err),
+			return nil, xerrors.WithStackTrace(xerrors.Retryable(err,
 				xerrors.WithBackoff(retry.TypeFastBackoff),
-			)
+			))
 		}
 
 		return data, nil
@@ -803,20 +802,18 @@ func makeError(result *http.Response, err error, retryAllErrors bool) error {
 			result.StatusCode == http.StatusInternalServerError ||
 			result.StatusCode == http.StatusBadGateway ||
 			result.StatusCode == http.StatusServiceUnavailable {
-			return xerrors.Retryable(
-				xerrors.WithStackTrace(err),
+			return xerrors.WithStackTrace(xerrors.Retryable(err,
 				xerrors.WithBackoff(retry.TypeSlowBackoff),
-			)
+			))
 		}
 	}
 	if retryAllErrors {
-		return xerrors.Retryable(
-			xerrors.WithStackTrace(err),
+		return xerrors.WithStackTrace(xerrors.Retryable(err,
 			xerrors.WithBackoff(retry.TypeFastBackoff),
-		)
+		))
 	}
 
-	return err
+	return xerrors.WithStackTrace(err)
 }
 
 func (provider *oauth2TokenExchange) handleErrorResponse(
@@ -941,10 +938,10 @@ func (provider *oauth2TokenExchange) performExchangeTokenRequest(
 	now := time.Now()
 	result, err := client.Do(req)
 	if err != nil {
-		return nil, xerrors.Retryable(
-			xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotExchangeToken, err)),
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(
+			fmt.Errorf("%w: %w", errCouldNotExchangeToken, err),
 			xerrors.WithBackoff(retry.TypeFastBackoff),
-		)
+		))
 	}
 
 	defer result.Body.Close()
@@ -968,7 +965,7 @@ func (provider *oauth2TokenExchange) exchangeTokenSync(ctx context.Context) erro
 		retry.WithSlowBackoff(syncRetrySlowBackoff),
 	)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 
 	provider.updateToken(response)

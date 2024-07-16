@@ -1,4 +1,5 @@
 * Fixed return more than one row error if real error raised on try read next row
+* Fixed checking errors for session must be deleted
 
 ## v3.75.0
 * Improve config validation before start topic reader
