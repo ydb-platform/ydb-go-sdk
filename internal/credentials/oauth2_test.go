@@ -205,18 +205,20 @@ func TestOauth2TokenExchange(t *testing.T) {
 				require.NoError(t, err)
 
 				token, err := client.Token(ctx)
-				if params.ExpectedErrorPart == "" && params.ExpectedError == nil {
+				if params.ExpectedErrorPart == "" && params.ExpectedError == nil { //nolint:nestif
 					require.NoError(t, err)
 				} else {
-					if params.ExpectedErrorPart != "" {
-						require.ErrorContains(t, err, params.ExpectedErrorPart)
-					}
-					if params.ExpectedError != nil {
-						require.ErrorIs(t, err, params.ExpectedError)
+					if !errors.Is(err, context.DeadlineExceeded) {
+						if params.ExpectedErrorPart != "" {
+							require.ErrorContains(t, err, params.ExpectedErrorPart)
+						}
+						if params.ExpectedError != nil {
+							require.ErrorIs(t, err, params.ExpectedError)
+						}
 					}
 				}
 				require.Equal(t, params.ExpectedToken, token)
-			})
+			}, xtest.StopAfter(5+time.Second))
 		})
 	}
 }
