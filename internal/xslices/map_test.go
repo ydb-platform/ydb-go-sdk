@@ -1,9 +1,10 @@
 package xslices
 
 import (
-	"github.com/stretchr/testify/require"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMap(t *testing.T) {
