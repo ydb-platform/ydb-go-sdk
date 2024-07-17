@@ -3,7 +3,7 @@ package balancer
 import (
 	"context"
 	"fmt"
-	"sort"
+	"strings"
 
 	"google.golang.org/grpc"
 
@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -121,44 +122,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	return nil
 }
 
-func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Conn) (
-	nodes []trace.EndpointInfo,
-	added []trace.EndpointInfo,
-	dropped []trace.EndpointInfo,
-) {
-	nodes = make([]trace.EndpointInfo, 0, len(newestEndpoints))
-	added = make([]trace.EndpointInfo, 0, len(previousConns))
-	dropped = make([]trace.EndpointInfo, 0, len(previousConns))
-	var (
-		newestMap   = make(map[string]struct{}, len(newestEndpoints))
-		previousMap = make(map[string]struct{}, len(previousConns))
-	)
-	sort.Slice(newestEndpoints, func(i, j int) bool {
-		return newestEndpoints[i].Address() < newestEndpoints[j].Address()
-	})
-	sort.Slice(previousConns, func(i, j int) bool {
-		return previousConns[i].Endpoint().Address() < previousConns[j].Endpoint().Address()
-	})
-	for _, e := range previousConns {
-		previousMap[e.Endpoint().Address()] = struct{}{}
-	}
-	for _, e := range newestEndpoints {
-		nodes = append(nodes, e.Copy())
-		newestMap[e.Address()] = struct{}{}
-		if _, has := previousMap[e.Address()]; !has {
-			added = append(added, e.Copy())
-		}
-	}
-	for _, c := range previousConns {
-		if _, has := newestMap[c.Endpoint().Address()]; !has {
-			dropped = append(dropped, c.Endpoint().Copy())
-		}
-	}
-
-	return nodes, added, dropped
-}
-
-func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
+func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoint.Endpoint, localDC string) {
 	var (
 		onDone = trace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
@@ -166,14 +130,21 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 				"github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
 			b.config.DetectLocalDC,
 		)
-		previousConns []conn.Conn
+		previous = b.connections().All()
 	)
 	defer func() {
-		nodes, added, dropped := endpointsDiff(endpoints, previousConns)
-		onDone(nodes, added, dropped, localDC)
+		_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
+			return strings.Compare(lhs.Address(), rhs.Address())
+		})
+		onDone(
+			xslices.Transform(newest, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
+			xslices.Transform(added, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
+			xslices.Transform(dropped, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
+			localDC,
+		)
 	}()
 
-	connections := endpointsToConnections(b.pool, endpoints)
+	connections := endpointsToConnections(b.pool, newest)
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
 		c.Endpoint().Touch()
@@ -182,15 +153,12 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	info := balancerConfig.Info{SelfLocation: localDC}
 	state := newConnectionsState(connections, b.config.Filter, info, b.config.AllowFallback)
 
-	endpointsInfo := make([]endpoint.Info, len(endpoints))
-	for i, e := range endpoints {
+	endpointsInfo := make([]endpoint.Info, len(newest))
+	for i, e := range newest {
 		endpointsInfo[i] = e
 	}
 
 	b.mu.WithLock(func() {
-		if b.connectionsState != nil {
-			previousConns = b.connectionsState.all
-		}
 		b.connectionsState = state
 		for _, onApplyDiscoveredEndpoints := range b.onApplyDiscoveredEndpoints {
 			onApplyDiscoveredEndpoints(ctx, endpointsInfo)
@@ -243,15 +211,14 @@ func New(
 	}()
 
 	b = &Balancer{
-		driverConfig:    driverConfig,
-		pool:            pool,
-		localDCDetector: detectLocalDC,
+		driverConfig: driverConfig,
+		pool:         pool,
+		discoveryClient: internalDiscovery.New(ctx, pool.Get(
+			endpoint.New(driverConfig.Endpoint()),
+		), discoveryConfig),
+		connectionsState: &connectionsState{},
+		localDCDetector:  detectLocalDC,
 	}
-	d := internalDiscovery.New(ctx, pool.Get(
-		endpoint.New(driverConfig.Endpoint()),
-	), discoveryConfig)
-
-	b.discoveryClient = d
 
 	if config := driverConfig.Balancer(); config == nil {
 		b.config = balancerConfig.Config{}
