@@ -1,3 +1,4 @@
+## v3.75.2
 * Fixed build for go1.20
 
 ## v3.75.1
