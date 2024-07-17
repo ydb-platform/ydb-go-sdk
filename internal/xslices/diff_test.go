@@ -62,6 +62,59 @@ func TestDiff(t *testing.T) {
 			dropped: []int{},
 		},
 		{
+			name: "OnlyAddedWithDuplicatesInPrevious",
+			previous: []int{
+				1,
+				0,
+				1,
+				3,
+			},
+			newest: []int{
+				1,
+				3,
+				2,
+				0,
+			},
+			steady: []int{
+				0,
+				1,
+				3,
+			},
+			added: []int{
+				2,
+			},
+			dropped: []int{
+				1,
+			},
+		},
+		{
+			name: "OnlyAddedWithDuplicatesInNewest",
+			previous: []int{
+				1,
+				0,
+				3,
+			},
+			newest: []int{
+				1,
+				1,
+				3,
+				1,
+				2,
+				0,
+			},
+			steady: []int{
+				0,
+				1,
+				3,
+			},
+			added: []int{
+				1,
+				1,
+				2,
+			},
+			dropped: []int{},
+		},
+		{
 			name: "OnlyDropped",
 			previous: []int{
 				1,
@@ -129,6 +182,34 @@ func TestDiff(t *testing.T) {
 			dropped: []int{
 				0,
 				1,
+				3,
+			},
+		},
+		{
+			name: "AddedWithDuplicates",
+			previous: []int{
+				1,
+				3,
+				3,
+				0,
+			},
+			newest: []int{
+				4,
+				7,
+				7,
+				8,
+			},
+			steady: []int{},
+			added: []int{
+				4,
+				7,
+				7,
+				8,
+			},
+			dropped: []int{
+				0,
+				1,
+				3,
 				3,
 			},
 		},

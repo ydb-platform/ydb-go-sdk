@@ -1,3 +1,5 @@
+* Fixed build for go1.20
+
 ## v3.75.1
 * Fixed return more than one row error if real error raised on try read next row
 * Fixed checking errors for session must be deleted
