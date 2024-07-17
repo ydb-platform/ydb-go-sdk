@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 
@@ -41,9 +42,9 @@ type Balancer struct {
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
-	mu               xsync.RWMutex
-	connectionsState *connectionsState
+	connectionsState atomic.Pointer[connectionsState]
 
+	mu                         xsync.RWMutex
 	onApplyDiscoveredEndpoints []func(ctx context.Context, endpoints []endpoint.Info)
 }
 
@@ -158,8 +159,9 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		endpointsInfo[i] = e
 	}
 
+	b.connectionsState.Store(state)
+
 	b.mu.WithLock(func() {
-		b.connectionsState = state
 		for _, onApplyDiscoveredEndpoints := range b.onApplyDiscoveredEndpoints {
 			onApplyDiscoveredEndpoints(ctx, endpointsInfo)
 		}
@@ -216,8 +218,7 @@ func New(
 		discoveryClient: internalDiscovery.New(ctx, pool.Get(
 			endpoint.New(driverConfig.Endpoint()),
 		), discoveryConfig),
-		connectionsState: &connectionsState{},
-		localDCDetector:  detectLocalDC,
+		localDCDetector: detectLocalDC,
 	}
 
 	if config := driverConfig.Balancer(); config == nil {
@@ -319,10 +320,7 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 }
 
 func (b *Balancer) connections() *connectionsState {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
-	return b.connectionsState
+	return b.connectionsState.Load()
 }
 
 func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
