@@ -44,6 +44,19 @@ func (s *connectionsState) PreferredCount() int {
 	return len(s.prefer)
 }
 
+func (s *connectionsState) All() (all []endpoint.Endpoint) {
+	if s == nil {
+		return nil
+	}
+
+	all = make([]endpoint.Endpoint, len(s.all))
+	for i, c := range s.all {
+		all[i] = c.Endpoint()
+	}
+
+	return all
+}
+
 func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
 	if err := ctx.Err(); err != nil {
 		return nil, 0
