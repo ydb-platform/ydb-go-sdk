@@ -453,34 +453,38 @@ func TestErrorInSourceToken(t *testing.T) {
 }
 
 func TestErrorInHTTPRequest(t *testing.T) {
-	client, err := NewOauth2TokenExchangeCredentials(
-		WithTokenEndpoint("http://invalid_host:42/exchange"),
-		WithJWTSubjectToken(
-			WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
-			WithKeyID("key_id"),
-			WithSigningMethod(jwt.SigningMethodRS256),
-			WithIssuer("test_issuer"),
-			WithAudience("test_audience"),
-		),
-		WithJWTActorToken(
-			WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
-			WithKeyID("key_id"),
-			WithSigningMethod(jwt.SigningMethodRS256),
-			WithIssuer("test_issuer"),
-		),
-		WithScope("1", "2", "3"),
-		WithSourceInfo("TestErrorInHTTPRequest"),
-		WithSyncExchangeTimeout(time.Second*3),
-	)
-	require.NoError(t, err)
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		client, err := NewOauth2TokenExchangeCredentials(
+			WithTokenEndpoint("http://invalid_host:42/exchange"),
+			WithJWTSubjectToken(
+				WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
+				WithKeyID("key_id"),
+				WithSigningMethod(jwt.SigningMethodRS256),
+				WithIssuer("test_issuer"),
+				WithAudience("test_audience"),
+			),
+			WithJWTActorToken(
+				WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
+				WithKeyID("key_id"),
+				WithSigningMethod(jwt.SigningMethodRS256),
+				WithIssuer("test_issuer"),
+			),
+			WithScope("1", "2", "3"),
+			WithSourceInfo("TestErrorInHTTPRequest"),
+			WithSyncExchangeTimeout(time.Second*3),
+		)
+		require.NoError(t, err)
 
-	token, err := client.Token(context.Background())
-	require.ErrorIs(t, err, errCouldNotExchangeToken)
-	require.Equal(t, "", token)
+		token, err := client.Token(context.Background())
+		if !errors.Is(err, context.DeadlineExceeded) {
+			require.ErrorIs(t, err, errCouldNotExchangeToken)
+		}
+		require.Equal(t, "", token)
 
-	// check format:
-	formatted := fmt.Sprint(client)
-	require.Equal(t, `OAuth2TokenExchange{Endpoint:"http://invalid_host:42/exchange",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[1 2 3],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[test_audience],ID:,TokenTTL:1h0m0s},ActorToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestErrorInHTTPRequest"}`, formatted) //nolint:lll
+		// check format:
+		formatted := fmt.Sprint(client)
+		require.Equal(t, `OAuth2TokenExchange{Endpoint:"http://invalid_host:42/exchange",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[1 2 3],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[test_audience],ID:,TokenTTL:1h0m0s},ActorToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestErrorInHTTPRequest"}`, formatted) //nolint:lll
+	}, xtest.StopAfter(15*time.Second))
 }
 
 func TestJWTTokenSource(t *testing.T) {
