@@ -7,12 +7,18 @@ import (
 	"sort"
 )
 
-func Sort[T any](in []T, cmp func(lhs, rhs T) int) (out []T) {
+func SortCopy[T any](in []T, cmp func(lhs, rhs T) int) (out []T) {
 	out = Clone(in)
 
-	sort.Slice(out, func(i, j int) bool {
+	Sort(out, func(i, j int) bool {
 		return cmp(out[i], out[j]) < 0
 	})
 
 	return out
+}
+
+func Sort[T any](in []T, cmp func(lhs, rhs T) int) {
+	sort.Slice(in, func(i, j int) bool {
+		return cmp(in[i], in[j]) < 0
+	})
 }

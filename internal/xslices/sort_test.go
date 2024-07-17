@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSort(t *testing.T) {
+func TestSortCopy(t *testing.T) {
 	src := []int{3, 2, 1}
-	dst := Sort(src, func(lhs, rhs int) int {
+	dst := SortCopy(src, func(lhs, rhs int) int {
 		return lhs - rhs
 	})
 	require.Equal(t, len(src), len(dst))

@@ -9,8 +9,8 @@ func Diff[T any](from, to []T, cmp func(lhs, rhs T) int) (steady, added, dropped
 	added = make([]T, 0, len(to))
 	dropped = make([]T, 0, len(from))
 
-	to = Sort(to, cmp)
-	from = Sort(from, cmp)
+	to = SortCopy(to, cmp)
+	from = SortCopy(from, cmp)
 
 	for i, j := 0, 0; ; {
 		switch {
