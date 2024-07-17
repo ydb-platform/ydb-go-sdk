@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
 func TestFromConfig(t *testing.T) {
@@ -71,7 +71,7 @@ func TestFromConfig(t *testing.T) {
 			}`,
 			res: balancerConfig.Config{
 				DetectLocalDC: true,
-				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
+				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
 					return false
 				}),
@@ -95,7 +95,7 @@ func TestFromConfig(t *testing.T) {
 			res: balancerConfig.Config{
 				AllowFallback: true,
 				DetectLocalDC: true,
-				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
+				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
 					return false
 				}),
@@ -109,7 +109,7 @@ func TestFromConfig(t *testing.T) {
 				"locations": ["AAA", "BBB", "CCC"]
 			}`,
 			res: balancerConfig.Config{
-				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
+				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
 					return false
 				}),
@@ -125,7 +125,7 @@ func TestFromConfig(t *testing.T) {
 			}`,
 			res: balancerConfig.Config{
 				AllowFallback: true,
-				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
+				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
 					return false
 				}),

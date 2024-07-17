@@ -157,7 +157,7 @@ func sortPreferConnections(
 	}
 
 	for _, c := range conns {
-		if filter.Allow(info, c) {
+		if filter.Allow(info, c.Endpoint()) {
 			prefer = append(prefer, c)
 		} else if allowFallback {
 			fallback = append(fallback, c)
