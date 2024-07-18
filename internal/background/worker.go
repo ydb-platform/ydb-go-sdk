@@ -145,7 +145,7 @@ func (b *Worker) starterLoop(ctx context.Context) {
 		go func(task backgroundTask) {
 			defer b.workers.Done()
 
-			safeLabel := strings.Replace(task.name, `"`, `'`, -1)
+			safeLabel := strings.ReplaceAll(task.name, `"`, `'`)
 
 			pprof.Do(ctx, pprof.Labels("background", safeLabel), task.callback)
 		}(bgTask)
