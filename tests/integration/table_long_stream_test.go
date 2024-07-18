@@ -22,7 +22,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestLongStream(t *testing.T) {
+func TestLongStream(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	var (
 		folder            = t.Name()
 		tableName         = `long_stream_query`

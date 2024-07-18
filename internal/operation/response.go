@@ -1,4 +1,4 @@
-package response
+package operation
 
 import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 

@@ -35,7 +35,8 @@ import (
 )
 
 //nolint:gocyclo
-func TestConnectionWithCompression(t *testing.T) {
+func TestConnectionWithCompression(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	const sumColumn = "sum"
 	var (
 		userAgent     = "connection user agent"

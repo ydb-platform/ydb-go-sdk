@@ -28,6 +28,10 @@ var (
 	PublicErrCommitSessionToExpiredSession = xerrors.Wrap(errors.New("ydb: commit to expired session"))
 
 	errCommitWithNilPartitionSession = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
+	errUnexpectedEmptyConsumerName   = xerrors.Wrap(errors.New("ydb: create ydb reader with empty consumer name. Set one of: consumer name or option WithReaderWithoutConsumer")) //nolint:lll
+	errCantCommitWithoutConsumer     = xerrors.Wrap(errors.New("ydb: reader can't commit messages without consumer"))
+	errBufferSize                    = xerrors.Wrap(errors.New("ydb: buffer of topic reader must be greater than zero, see option topicoptions.WithReaderBufferSizeBytes")) //nolint:lll
+	errTopicSelectorsEmpty           = xerrors.Wrap(errors.New("ydb: topic selector for topic reader is empty, see arguments on topic starts"))                             //nolint:lll
 )
 
 type partitionSessionID = rawtopicreader.PartitionSessionID
@@ -84,6 +88,28 @@ func newTopicStreamReaderConfig() topicStreamReaderConfig {
 		Decoders:              newDecoderMap(),
 		Trace:                 &trace.Topic{},
 	}
+}
+
+func (cfg *topicStreamReaderConfig) Validate() []error {
+	var validateErrors []error
+
+	if cfg.Consumer != "" && cfg.ReadWithoutConsumer {
+		validateErrors = append(validateErrors, errSetConsumerAndNoConsumer)
+	}
+	if cfg.Consumer == "" && !cfg.ReadWithoutConsumer {
+		validateErrors = append(validateErrors, errUnexpectedEmptyConsumerName)
+	}
+	if cfg.ReadWithoutConsumer && cfg.CommitMode != CommitModeNone {
+		validateErrors = append(validateErrors, errCantCommitWithoutConsumer)
+	}
+	if cfg.BufferSizeProtoBytes <= 0 {
+		validateErrors = append(validateErrors, errBufferSize)
+	}
+	if len(cfg.ReadSelectors) == 0 {
+		validateErrors = append(validateErrors, errTopicSelectorsEmpty)
+	}
+
+	return validateErrors
 }
 
 func (cfg *topicStreamReaderConfig) initMessage() *rawtopicreader.InitRequest {

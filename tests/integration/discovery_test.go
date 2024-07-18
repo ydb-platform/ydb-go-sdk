@@ -22,7 +22,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestDiscovery(t *testing.T) {
+func TestDiscovery(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"

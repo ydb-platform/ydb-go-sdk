@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
@@ -19,6 +20,7 @@ type Config struct {
 
 	poolLimit int
 
+	useSessionPool       bool
 	sessionCreateTimeout time.Duration
 	sessionDeleteTimeout time.Duration
 
@@ -42,6 +44,7 @@ func defaults() *Config {
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
 		trace:                &trace.Query{},
+		useSessionPool:       os.Getenv("YDB_GO_SDK_QUERY_SERVICE_USE_SESSION_POOL") != "",
 	}
 }
 
@@ -67,4 +70,8 @@ func (c *Config) SessionCreateTimeout() time.Duration {
 // If SessionDeleteTimeout is less than or equal to zero then the DefaultSessionDeleteTimeout is used.
 func (c *Config) SessionDeleteTimeout() time.Duration {
 	return c.sessionDeleteTimeout
+}
+
+func (c *Config) UseSessionPool() bool {
+	return c.useSessionPool
 }

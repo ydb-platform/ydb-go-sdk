@@ -1,4 +1,4 @@
-package stats
+package pool
 
 type Stats struct {
 	Limit int

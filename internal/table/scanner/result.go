@@ -9,10 +9,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
@@ -221,16 +221,10 @@ func (r *baseResult) CurrentResultSet() result.Set {
 
 // Stats returns query execution queryStats.
 func (r *baseResult) Stats() stats.QueryStats {
-	var s queryStats
-	r.statsMtx.WithRLock(func() {
-		s.stats = r.stats
-	})
+	r.statsMtx.RLock()
+	defer r.statsMtx.RUnlock()
 
-	if s.stats == nil {
-		return nil
-	}
-
-	return &s
+	return stats.FromQueryStats(r.stats)
 }
 
 // Close closes the result, preventing further iteration.

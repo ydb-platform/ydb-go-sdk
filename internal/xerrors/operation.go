@@ -3,6 +3,7 @@ package xerrors
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
@@ -15,6 +16,7 @@ import (
 // operationError reports about operation fail.
 type operationError struct {
 	code    Ydb.StatusIds_StatusCode
+	nodeID  uint32
 	issues  issues
 	address string
 	traceID string
@@ -56,6 +58,10 @@ func WithStatusCode(code Ydb.StatusIds_StatusCode) statusCodeOption {
 
 func (address addressOption) applyToOperationError(oe *operationError) {
 	oe.address = string(address)
+}
+
+func (nodeID nodeIDOption) applyToOperationError(oe *operationError) {
+	oe.nodeID = uint32(nodeID)
 }
 
 type traceIDOption string
@@ -118,6 +124,10 @@ func (e *operationError) Error() string {
 	if len(e.address) > 0 {
 		b.WriteString(", address = ")
 		b.WriteString(e.address)
+	}
+	if e.nodeID > 0 {
+		b.WriteString(", nodeID = ")
+		b.WriteString(strconv.FormatUint(uint64(e.nodeID), 10))
 	}
 	if len(e.issues) > 0 {
 		b.WriteString(", issues = ")
@@ -198,9 +208,9 @@ func (e *operationError) IsRetryObjectValid() bool {
 		Ydb.StatusIds_BAD_SESSION,
 		Ydb.StatusIds_SESSION_EXPIRED,
 		Ydb.StatusIds_SESSION_BUSY:
-		return true
-	default:
 		return false
+	default:
+		return true
 	}
 }
 

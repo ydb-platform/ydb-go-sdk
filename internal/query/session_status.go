@@ -14,7 +14,6 @@ const (
 	statusInUse
 	statusClosing
 	statusClosed
-	statusError
 )
 
 func (s statusCode) String() string {
@@ -29,8 +28,6 @@ func (s statusCode) String() string {
 		return session.StatusClosing
 	case statusClosed:
 		return session.StatusClosed
-	case statusError:
-		return session.StatusError
 	default:
 		return fmt.Sprintf("Unknown%d", s)
 	}

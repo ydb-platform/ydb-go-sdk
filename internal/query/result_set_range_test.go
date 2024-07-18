@@ -681,7 +681,8 @@ func TestResultSetRange(t *testing.T) {
 			}
 			if resultSetIndex := part.GetResultSetIndex(); resultSetIndex != 0 {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"critical violation of the logic: wrong result set index: %d != %d",
+					"%w: %d != %d",
+					errWrongNextResultSetIndex,
 					resultSetIndex, 0,
 				))
 			}
@@ -771,7 +772,8 @@ func TestResultSetRange(t *testing.T) {
 			}
 			if resultSetIndex := part.GetResultSetIndex(); resultSetIndex != 0 {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"critical violation of the logic: wrong result set index: %d != %d",
+					"%w: %d != %d",
+					errWrongNextResultSetIndex,
 					resultSetIndex, 0,
 				))
 			}

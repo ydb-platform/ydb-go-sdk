@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -23,37 +24,13 @@ func TestRetryModes(t *testing.T) {
 		nonIdempotent,
 	} {
 		t.Run(idempotentType.String(), func(t *testing.T) {
-			for _, tt := range errsToCheck {
-				t.Run(tt.err.Error(), func(t *testing.T) {
+			for i, tt := range errsToCheck {
+				t.Run(strconv.Itoa(i)+"."+tt.err.Error(), func(t *testing.T) {
 					m := Check(tt.err)
-					if m.MustRetry(true) != tt.canRetry[idempotent] {
-						t.Errorf(
-							"unexpected must retry idempotent operation status: %v, want: %v",
-							m.MustRetry(true),
-							tt.canRetry[idempotent],
-						)
-					}
-					if m.MustRetry(false) != tt.canRetry[nonIdempotent] {
-						t.Errorf(
-							"unexpected must retry non-idempotent operation status: %v, want: %v",
-							m.MustRetry(false),
-							tt.canRetry[nonIdempotent],
-						)
-					}
-					if m.BackoffType() != tt.backoff {
-						t.Errorf(
-							"unexpected backoff status: %v, want: %v",
-							m.BackoffType(),
-							tt.backoff,
-						)
-					}
-					if m.IsRetryObjectValid() != tt.deleteSession {
-						t.Errorf(
-							"unexpected delete session status: %v, want: %v",
-							m.IsRetryObjectValid(),
-							tt.deleteSession,
-						)
-					}
+					require.Equal(t, tt.canRetry[idempotent], m.MustRetry(true))
+					require.Equal(t, tt.canRetry[nonIdempotent], m.MustRetry(false))
+					require.Equal(t, tt.backoff, m.BackoffType())
+					require.Equal(t, tt.deleteSession, m.MustDeleteSession())
 				})
 			}
 		})
@@ -174,6 +151,7 @@ func TestRetryTransportCancelled(t *testing.T) {
 		grpcCodes.Canceled,
 	} {
 		t.Run(code.String(), func(t *testing.T) {
+			t.Helper()
 			counter := 0
 			ctx, cancel := xcontext.WithCancel(context.Background())
 			err := Retry(ctx, func(ctx context.Context) error {

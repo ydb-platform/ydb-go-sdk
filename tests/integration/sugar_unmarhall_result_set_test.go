@@ -65,6 +65,7 @@ func TestSugarUnmarshallResultSet(t *testing.T) {
 			SELECT 43 as id, "myStr43" as myStr, 123 as unexpected_column
 			ORDER BY id
 		`)
+		require.NoError(t, err)
 
 		many, err := sugar.UnmarshallResultSet[myStruct](rows)
 		require.ErrorIs(t, err, scanner.ErrFieldsNotFoundInStruct)

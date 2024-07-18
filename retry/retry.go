@@ -416,12 +416,12 @@ func opWithRecover[T any](ctx context.Context,
 
 // Check returns retry mode for queryErr.
 func Check(err error) (m retryMode) {
-	code, errType, backoffType, deleteSession := xerrors.Check(err)
+	code, errType, backoffType, invalidObject := xerrors.Check(err)
 
 	return retryMode{
 		code:               code,
 		errType:            errType,
 		backoff:            backoffType,
-		isRetryObjectValid: deleteSession,
+		isRetryObjectValid: !invalidObject,
 	}
 }

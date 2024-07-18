@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawscheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -41,13 +42,13 @@ type DescribeTopicResult struct {
 	MeteringMode                      MeteringMode
 }
 
-func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopicResponse) error {
-	if err := res.Operation.FromProtoWithStatusCheck(protoResponse.GetOperation()); err != nil {
+func (res *DescribeTopicResult) FromProto(response operation.Response) error {
+	if err := res.Operation.FromProtoWithStatusCheck(response.GetOperation()); err != nil {
 		return err
 	}
 
 	protoResult := &Ydb_Topic.DescribeTopicResult{}
-	if err := protoResponse.GetOperation().GetResult().UnmarshalTo(protoResult); err != nil {
+	if err := response.GetOperation().GetResult().UnmarshalTo(protoResult); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: describe topic result failed on unmarshal grpc result: %w", err))
 	}
 

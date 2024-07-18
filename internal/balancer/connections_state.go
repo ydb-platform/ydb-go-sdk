@@ -44,6 +44,19 @@ func (s *connectionsState) PreferredCount() int {
 	return len(s.prefer)
 }
 
+func (s *connectionsState) All() (all []endpoint.Endpoint) {
+	if s == nil {
+		return nil
+	}
+
+	all = make([]endpoint.Endpoint, len(s.all))
+	for i, c := range s.all {
+		all[i] = c.Endpoint()
+	}
+
+	return all
+}
+
 func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
 	if err := ctx.Err(); err != nil {
 		return nil, 0
@@ -144,7 +157,7 @@ func sortPreferConnections(
 	}
 
 	for _, c := range conns {
-		if filter.Allow(info, c) {
+		if filter.Allow(info, c.Endpoint()) {
 			prefer = append(prefer, c)
 		} else if allowFallback {
 			fallback = append(fallback, c)
