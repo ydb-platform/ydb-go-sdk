@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime/pprof"
+	"strings"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -144,7 +145,9 @@ func (b *Worker) starterLoop(ctx context.Context) {
 		go func(task backgroundTask) {
 			defer b.workers.Done()
 
-			pprof.Do(ctx, pprof.Labels("background", task.name), task.callback)
+			safeLabel := strings.Replace(task.name, `"`, `'`, -1)
+
+			pprof.Do(ctx, pprof.Labels("background", safeLabel), task.callback)
 		}(bgTask)
 	}
 }
