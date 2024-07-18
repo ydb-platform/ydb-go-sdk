@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -74,6 +75,11 @@ func newReaderReconnector(
 	res.start()
 
 	return res
+}
+
+func (r *readerReconnector) PopBatchTx(ctx context.Context, tx query.Transaction) (*PublicBatch, error) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*PublicBatch, error) {

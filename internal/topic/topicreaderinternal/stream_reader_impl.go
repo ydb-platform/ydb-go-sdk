@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -199,6 +200,11 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	}
 
 	return nil
+}
+
+func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx query.Transaction) (*PublicBatch, error) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (r *topicStreamReaderImpl) ReadMessageBatch(

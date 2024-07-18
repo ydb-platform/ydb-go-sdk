@@ -10,6 +10,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	query "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -62,6 +63,21 @@ func (m *MockbatchedStreamReader) Commit(ctx context.Context, commitRange commit
 func (mr *MockbatchedStreamReaderMockRecorder) Commit(ctx, commitRange any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockbatchedStreamReader)(nil).Commit), ctx, commitRange)
+}
+
+// PopBatchTx mocks base method.
+func (m *MockbatchedStreamReader) PopBatchTx(ctx context.Context, tx query.Transaction) (*PublicBatch, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PopBatchTx", ctx, tx)
+	ret0, _ := ret[0].(*PublicBatch)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PopBatchTx indicates an expected call of PopBatchTx.
+func (mr *MockbatchedStreamReaderMockRecorder) PopBatchTx(ctx, tx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopBatchTx", reflect.TypeOf((*MockbatchedStreamReader)(nil).PopBatchTx), ctx, tx)
 }
 
 // ReadMessageBatch mocks base method.

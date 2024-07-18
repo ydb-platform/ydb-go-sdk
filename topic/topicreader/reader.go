@@ -2,10 +2,13 @@ package topicreader
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 
+	queryInternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 // Reader allow to read message from YDB topics.
@@ -71,30 +74,27 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 	return r.reader.Commit(ctx, obj)
 }
 
-type Transaction interface {
-	ID() string
-	// SessionID() string
-	// OnPrecommit(f func(ctx context.Context) error)
-	// OnComplete(f func(ctx context.Context, commitError error))
-}
-
-// CommitMessagesInTx attach the messages to the transaction. The messages will be committed on the server
-// only when the tx will be committed successfully.
-// If transaction will be failed - the reader will cancel all current messages.
-// The behaviour can be set by WithContinueOnFailedCommit option to start reader.
-func (r *Reader) CommitMessagesInTx(ctx context.Context, tx Transaction, obj CommitRangeGetter) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-// PopBatchTx read messages batch and commit them to the tx.
-// If tx failed - the batch will be readed again.
+// PopBatchTx read messages batch and commit them within tx.
+// If tx failed - the batch will be received again.
 //
 // Now it means reconnect to the server and re-read messages from the server to the readers buffer.
+// It is expensive operation and will be good to minimize transaction failures.
+//
 // The reconnect is implementation detail and may be changed in the future.
-func (r *Reader) PopBatchTx(ctx context.Context, tx Transaction) (*Batch, error) {
-	// TODO implement me
-	panic("implement me")
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (r *Reader) PopBatchTx(ctx context.Context, tx query.Transaction) (*Batch, error) {
+	if err := r.inCall(&r.readInFlyght); err != nil {
+		return nil, err
+	}
+	defer r.outCall(&r.readInFlyght)
+
+	internalTx, ok := tx.(queryInternal.Transaction)
+	if !ok {
+		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: mismatch types. Want query.Transaction, got: %T", tx)))
+	}
+
+	return r.reader.PopBatchTx(ctx, internalTx)
 }
 
 // CommitRangeGetter interface for get commit offsets

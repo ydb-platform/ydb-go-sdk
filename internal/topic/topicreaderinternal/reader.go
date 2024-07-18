@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -225,6 +226,10 @@ func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) e
 	}
 
 	return nil
+}
+
+func (r *Reader) PopBatchTx(ctx context.Context, tx query.Transaction) (*PublicBatch, error) {
+	return r.reader.PopBatchTx(ctx, tx)
 }
 
 type ReaderConfig struct {
