@@ -276,15 +276,27 @@ func BenchmarkNext4(b *testing.B) {
 }
 
 func BenchmarkNext16(b *testing.B) {
-	benchmarkNextParallel(b, 4)
+	benchmarkNextParallel(b, 16)
 }
 
 func BenchmarkNext32(b *testing.B) {
-	benchmarkNextParallel(b, 4)
+	benchmarkNextParallel(b, 32)
 }
 
 func BenchmarkNext64(b *testing.B) {
-	benchmarkNextParallel(b, 4)
+	benchmarkNextParallel(b, 64)
+}
+
+func BenchmarkNext128(b *testing.B) {
+	benchmarkNextParallel(b, 128)
+}
+
+func BenchmarkNext256(b *testing.B) {
+	benchmarkNextParallel(b, 256)
+}
+
+func BenchmarkNext512(b *testing.B) {
+	benchmarkNextParallel(b, 512)
 }
 
 func benchmarkNextParallel(b *testing.B, parallelism int) {
