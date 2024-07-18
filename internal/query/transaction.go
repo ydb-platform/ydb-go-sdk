@@ -21,6 +21,9 @@ type Transaction struct {
 	tx.Parent
 
 	s *Session
+
+	beforeCommit []BeforeCommitFunc
+	afterCommit  []AfterCommitFunc
 }
 
 func (tx Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
@@ -139,4 +142,26 @@ func (tx Transaction) Rollback(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+type BeforeCommitFunc func(ctx context.Context) error
+
+// OnBeforeCommit add callback f. The f will be called before sent commit message or tx_commit flag to the server.
+// If any of f return error != nil - commit execution will return false and transaction will be rolled back
+func OnBeforeCommit(tx *Transaction, f BeforeCommitFunc) {
+	if f == nil {
+		panic("ydb: callback must be not nil")
+	}
+	tx.beforeCommit = append(tx.beforeCommit, f)
+}
+
+type AfterCommitFunc func(ctx context.Context, commitError error)
+
+// OnAfterCommit add callback f to the tx. The f will be called after commit (successfully or failed) of the tx
+// will be completed.
+func OnAfterCommit(tx *Transaction, f AfterCommitFunc) {
+	if f == nil {
+		panic("ydb: callback must be not nil")
+	}
+	tx.afterCommit = append(tx.afterCommit, f)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -327,8 +328,8 @@ func TestBatcherConcurency(t *testing.T) {
 		go func() {
 			for i := 0; i < count; i++ {
 				_ = b.PushRawMessage(session, &rawtopicreader.StartPartitionSessionRequest{
-					CommittedOffset:  rawtopicreader.NewOffset(int64(i)),
-					PartitionOffsets: rawtopicreader.OffsetRange{},
+					CommittedOffset:  rawtopiccommon.NewOffset(int64(i)),
+					PartitionOffsets: rawtopiccommon.OffsetRange{},
 				})
 			}
 		}()
@@ -341,7 +342,7 @@ func TestBatcherConcurency(t *testing.T) {
 			require.NoError(tb, err)
 			require.Equal(
 				tb,
-				rawtopicreader.NewOffset(int64(i)),
+				rawtopiccommon.NewOffset(int64(i)),
 				res.RawMessage.(*rawtopicreader.StartPartitionSessionRequest).CommittedOffset,
 			)
 		}

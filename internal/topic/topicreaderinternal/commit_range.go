@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"sort"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -142,7 +143,7 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 
 	for i := range r.ranges {
 		commit := &r.ranges[i]
-		offsetsRange := rawtopicreader.OffsetRange{
+		offsetsRange := rawtopiccommon.OffsetRange{
 			Start: commit.commitOffsetStart,
 			End:   commit.commitOffsetEnd,
 		}
@@ -164,8 +165,8 @@ type PublicCommitRange struct {
 }
 
 type commitRange struct {
-	commitOffsetStart rawtopicreader.Offset
-	commitOffsetEnd   rawtopicreader.Offset
+	commitOffsetStart rawtopiccommon.Offset
+	commitOffsetEnd   rawtopiccommon.Offset
 	partitionSession  *partitionSession
 }
 

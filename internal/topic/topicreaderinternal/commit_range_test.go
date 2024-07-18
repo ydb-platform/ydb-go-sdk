@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 )
 
@@ -193,7 +194,7 @@ func TestCommitsToRawPartitionCommitOffset(t *testing.T) {
 			expected: []rawtopicreader.PartitionCommitOffset{
 				{
 					PartitionSessionID: 1,
-					Offsets: []rawtopicreader.OffsetRange{
+					Offsets: []rawtopiccommon.OffsetRange{
 						{Start: 1, End: 2},
 					},
 				},
@@ -209,7 +210,7 @@ func TestCommitsToRawPartitionCommitOffset(t *testing.T) {
 			expected: []rawtopicreader.PartitionCommitOffset{
 				{
 					PartitionSessionID: 1,
-					Offsets: []rawtopicreader.OffsetRange{
+					Offsets: []rawtopiccommon.OffsetRange{
 						{Start: 1, End: 2},
 						{Start: 10, End: 20},
 						{Start: 30, End: 40},
@@ -228,14 +229,14 @@ func TestCommitsToRawPartitionCommitOffset(t *testing.T) {
 			expected: []rawtopicreader.PartitionCommitOffset{
 				{
 					PartitionSessionID: 1,
-					Offsets: []rawtopicreader.OffsetRange{
+					Offsets: []rawtopiccommon.OffsetRange{
 						{Start: 1, End: 2},
 						{Start: 10, End: 20},
 					},
 				},
 				{
 					PartitionSessionID: 2,
-					Offsets: []rawtopicreader.OffsetRange{
+					Offsets: []rawtopiccommon.OffsetRange{
 						{Start: 1, End: 2},
 						{Start: 10, End: 20},
 					},
@@ -254,14 +255,14 @@ func TestCommitsToRawPartitionCommitOffset(t *testing.T) {
 			expected: []rawtopicreader.PartitionCommitOffset{
 				{
 					PartitionSessionID: 1,
-					Offsets: []rawtopicreader.OffsetRange{
+					Offsets: []rawtopiccommon.OffsetRange{
 						{Start: 1, End: 2},
 						{Start: 10, End: 20},
 					},
 				},
 				{
 					PartitionSessionID: 2,
-					Offsets: []rawtopicreader.OffsetRange{
+					Offsets: []rawtopiccommon.OffsetRange{
 						{Start: 1, End: 2},
 						{Start: 3, End: 4},
 						{Start: 5, End: 6},

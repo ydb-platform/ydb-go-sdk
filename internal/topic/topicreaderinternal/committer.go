@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -225,7 +226,7 @@ func (c *committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 	}
 }
 
-func (c *committer) OnCommitNotify(session *partitionSession, offset rawtopicreader.Offset) {
+func (c *committer) OnCommitNotify(session *partitionSession, offset rawtopiccommon.Offset) {
 	c.m.WithLock(func() {
 		for i := range c.waiters {
 			waiter := c.waiters[i]
@@ -258,17 +259,17 @@ func (c *committer) removeWaiterByIDNeedLock(id int64) {
 type commitWaiter struct {
 	ID        int64
 	Session   *partitionSession
-	EndOffset rawtopicreader.Offset
+	EndOffset rawtopiccommon.Offset
 	Committed empty.Chan
 }
 
-func (w *commitWaiter) checkCondition(session *partitionSession, offset rawtopicreader.Offset) (finished bool) {
+func (w *commitWaiter) checkCondition(session *partitionSession, offset rawtopiccommon.Offset) (finished bool) {
 	return session == w.Session && offset >= w.EndOffset
 }
 
 var commitWaiterLastID int64
 
-func newCommitWaiter(session *partitionSession, endOffset rawtopicreader.Offset) commitWaiter {
+func newCommitWaiter(session *partitionSession, endOffset rawtopiccommon.Offset) commitWaiter {
 	id := atomic.AddInt64(&commitWaiterLastID, 1)
 
 	return commitWaiter{

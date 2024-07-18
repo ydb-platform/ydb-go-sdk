@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -39,7 +40,7 @@ func newPartitionSession(
 	readerID int64,
 	connectionID string,
 	partitionSessionID rawtopicreader.PartitionSessionID,
-	committedOffset rawtopicreader.Offset,
+	committedOffset rawtopiccommon.Offset,
 ) *partitionSession {
 	partitionContext, cancel := xcontext.WithCancel(partitionContext)
 
@@ -66,29 +67,29 @@ func (s *partitionSession) Close() {
 	s.ctxCancel()
 }
 
-func (s *partitionSession) committedOffset() rawtopicreader.Offset {
+func (s *partitionSession) committedOffset() rawtopiccommon.Offset {
 	v := s.committedOffsetVal.Load()
 
-	var res rawtopicreader.Offset
+	var res rawtopiccommon.Offset
 	res.FromInt64(v)
 
 	return res
 }
 
-func (s *partitionSession) setCommittedOffset(v rawtopicreader.Offset) {
+func (s *partitionSession) setCommittedOffset(v rawtopiccommon.Offset) {
 	s.committedOffsetVal.Store(v.ToInt64())
 }
 
-func (s *partitionSession) lastReceivedMessageOffset() rawtopicreader.Offset {
+func (s *partitionSession) lastReceivedMessageOffset() rawtopiccommon.Offset {
 	v := s.lastReceivedOffsetEndVal.Load()
 
-	var res rawtopicreader.Offset
+	var res rawtopiccommon.Offset
 	res.FromInt64(v)
 
 	return res
 }
 
-func (s *partitionSession) setLastReceivedMessageOffset(v rawtopicreader.Offset) {
+func (s *partitionSession) setLastReceivedMessageOffset(v rawtopiccommon.Offset) {
 	s.lastReceivedOffsetEndVal.Store(v.ToInt64())
 }
 

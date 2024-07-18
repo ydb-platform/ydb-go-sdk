@@ -92,3 +92,8 @@ func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (*rawtopicwriter
 
 	return &rawtopicwriter.StreamWriter{Stream: protoResp}, nil
 }
+
+func (c *Client) UpdateOffsetsInTransaction(ctx context.Context, request UpdateOffsetsInTransactionRequest) error {
+	//TODO implement me
+	panic("implement me")
+}
