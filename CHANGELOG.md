@@ -1,3 +1,4 @@
+* Fixed `internal/xstrings.Buffer()` leak without call `buffer.Free()`
 * Removed double quotas from goroutine labels background workers for prevent problem with pprof
 
 ## v3.75.2
