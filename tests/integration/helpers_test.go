@@ -215,6 +215,10 @@ func (scope *scopeT) TopicPath() string {
 }
 
 func (scope *scopeT) TopicReader() *topicreader.Reader {
+	return scope.TopicReaderNamed("default-reader")
+}
+
+func (scope *scopeT) TopicReaderNamed(name string) *topicreader.Reader {
 	f := func() (*fixenv.GenericResult[*topicreader.Reader], error) {
 		reader, err := scope.Driver().Topic().StartReader(
 			scope.TopicConsumerName(),
@@ -228,7 +232,7 @@ func (scope *scopeT) TopicReader() *topicreader.Reader {
 		return fixenv.NewGenericResultWithCleanup(reader, cleanup), err
 	}
 
-	return fixenv.CacheResult(scope.Env, f)
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
 }
 
 func (scope *scopeT) TopicWriter() *topicwriter.Writer {
@@ -390,4 +394,11 @@ func (t *testLogger) flush() {
 		message := "\n" + strings.Join(t.messages, "\n")
 		t.test.Log(message)
 	})
+}
+
+func must[R any](res R, err error) R {
+	if err != nil {
+		panic(err)
+	}
+	return res
 }

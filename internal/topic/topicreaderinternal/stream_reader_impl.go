@@ -14,12 +14,16 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -42,6 +46,7 @@ type topicStreamReaderImpl struct {
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
 
+	topicClient         TopicClient
 	freeBytes           chan int
 	restBufferSizeBytes atomic.Int64
 	sessionController   partitionSessionStorage
@@ -137,6 +142,7 @@ func (cfg *topicStreamReaderConfig) initMessage() *rawtopicreader.InitRequest {
 }
 
 func newTopicStreamReader(
+	client TopicClient,
 	readerID int64,
 	stream RawTopicReaderStream,
 	cfg topicStreamReaderConfig, //nolint:gocritic
@@ -147,7 +153,7 @@ func newTopicStreamReader(
 		}
 	}()
 
-	reader := newTopicStreamReaderStopped(readerID, stream, cfg)
+	reader := newTopicStreamReaderStopped(client, readerID, stream, cfg)
 	if err = reader.initSession(); err != nil {
 		return nil, err
 	}
@@ -159,6 +165,7 @@ func newTopicStreamReader(
 }
 
 func newTopicStreamReaderStopped(
+	client TopicClient,
 	readerID int64,
 	stream RawTopicReaderStream,
 	cfg topicStreamReaderConfig, //nolint:gocritic
@@ -174,6 +181,7 @@ func newTopicStreamReaderStopped(
 	res := &topicStreamReaderImpl{
 		cfg:                   cfg,
 		ctx:                   stopPump,
+		topicClient:           client,
 		freeBytes:             make(chan int, 1),
 		stream:                &syncedStream{stream: stream},
 		cancel:                cancel,
@@ -202,9 +210,40 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	return nil
 }
 
-func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx query.Transaction) (*PublicBatch, error) {
-	// TODO implement me
-	panic("implement me")
+func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ReadMessageBatchOptions) (*PublicBatch, error) {
+	batch, err := r.ReadMessageBatch(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return r.topicClient.UpdateOffsetsInTransaction(ctx, rawtopic.UpdateOffsetsInTransactionRequest{
+			OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
+			Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+				ID:      tx.ID(),
+				Session: query.GetSessionID(tx),
+			},
+			Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
+				{
+					Path: batch.Topic(), // TODO: server response with error
+					Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
+						{
+							PartitionID: batch.PartitionID(),
+							PartitionOffsets: []rawtopiccommon.OffsetRange{
+								{
+									Start: batch.commitRange.commitOffsetStart,
+									End:   batch.commitRange.commitOffsetEnd,
+								},
+							},
+						},
+					},
+				},
+			},
+			Consumer: r.cfg.Consumer,
+		})
+	})
+
+	return batch, nil
 }
 
 func (r *topicStreamReaderImpl) ReadMessageBatch(

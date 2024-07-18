@@ -83,18 +83,18 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 // The reconnect is implementation detail and may be changed in the future.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (r *Reader) PopBatchTx(ctx context.Context, tx query.Transaction) (*Batch, error) {
+func (r *Reader) PopBatchTx(ctx context.Context, tx query.TxActor, opts ...ReadBatchOption) (*Batch, error) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err
 	}
 	defer r.outCall(&r.readInFlyght)
 
-	internalTx, ok := tx.(queryInternal.Transaction)
+	internalTx, ok := tx.(*queryInternal.Transaction)
 	if !ok {
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: mismatch types. Want query.Transaction, got: %T", tx)))
 	}
 
-	return r.reader.PopBatchTx(ctx, internalTx)
+	return r.reader.PopBatchTx(ctx, internalTx, opts...)
 }
 
 // CommitRangeGetter interface for get commit offsets

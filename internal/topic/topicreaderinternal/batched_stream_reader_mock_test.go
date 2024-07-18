@@ -66,7 +66,7 @@ func (mr *MockbatchedStreamReaderMockRecorder) Commit(ctx, commitRange any) *gom
 }
 
 // PopBatchTx mocks base method.
-func (m *MockbatchedStreamReader) PopBatchTx(ctx context.Context, tx query.Transaction) (*PublicBatch, error) {
+func (m *MockbatchedStreamReader) PopBatchTx(ctx context.Context, tx *query.Transaction) (*PublicBatch, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PopBatchTx", ctx, tx)
 	ret0, _ := ret[0].(*PublicBatch)

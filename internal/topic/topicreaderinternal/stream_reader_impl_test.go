@@ -334,7 +334,7 @@ func TestTopicStreamReaderImpl_Create(t *testing.T) {
 		}, nil)
 		stream.EXPECT().CloseSend().Return(nil)
 
-		reader, err := newTopicStreamReader(nextReaderID(), stream, newTopicStreamReaderConfig())
+		reader, err := newTopicStreamReader(nil, nextReaderID(), stream, newTopicStreamReaderConfig())
 		require.Error(t, err)
 		require.Nil(t, reader)
 	})
@@ -990,7 +990,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
 	cfg.CommitterBatchTimeLag = 0
 
-	reader := newTopicStreamReaderStopped(nextReaderID(), stream, cfg)
+	reader := newTopicStreamReaderStopped(nil, nextReaderID(), stream, cfg)
 	// reader.initSession() - skip stream level initialization
 
 	const testPartitionID = 5

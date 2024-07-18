@@ -80,6 +80,7 @@ func (count readExplicitMessagesCount) Apply(options ReadMessageBatchOptions) Re
 }
 
 func NewReader(
+	client TopicClient,
 	connector TopicSteamReaderConnect,
 	consumer string,
 	readSelectors []PublicReadSelector,
@@ -102,7 +103,7 @@ func NewReader(
 			return nil, err
 		}
 
-		return newTopicStreamReader(readerID, stream, cfg.topicStreamReaderConfig)
+		return newTopicStreamReader(client, readerID, stream, cfg.topicStreamReaderConfig)
 	}
 
 	res := Reader{
@@ -137,6 +138,12 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
 
+func (r *Reader) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ...PublicReadBatchOption) (*PublicBatch, error) {
+	batchOptions := r.getBatchOptions(opts)
+
+	return r.reader.PopBatchTx(ctx, tx, batchOptions)
+}
+
 // ReadMessage read exactly one message
 func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 	res, err := r.ReadMessageBatch(ctx, readExplicitMessagesCount(1))
@@ -150,20 +157,14 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 // ReadMessageBatch read batch of messages.
 // Batch is collection of messages, which can be atomically committed
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
-	readOptions := r.defaultBatchConfig.clone()
-
-	for _, opt := range opts {
-		if opt != nil {
-			readOptions = opt.Apply(readOptions)
-		}
-	}
+	batchOptions := r.getBatchOptions(opts)
 
 	for {
 		if err = ctx.Err(); err != nil {
 			return nil, err
 		}
 
-		batch, err = r.reader.ReadMessageBatch(ctx, readOptions)
+		batch, err = r.reader.ReadMessageBatch(ctx, batchOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -174,6 +175,17 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 			return batch, nil
 		}
 	}
+}
+
+func (r *Reader) getBatchOptions(opts []PublicReadBatchOption) ReadMessageBatchOptions {
+	readOptions := r.defaultBatchConfig.clone()
+
+	for _, opt := range opts {
+		if opt != nil {
+			readOptions = opt.Apply(readOptions)
+		}
+	}
+	return readOptions
 }
 
 func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
@@ -226,10 +238,6 @@ func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) e
 	}
 
 	return nil
-}
-
-func (r *Reader) PopBatchTx(ctx context.Context, tx query.Transaction) (*PublicBatch, error) {
-	return r.reader.PopBatchTx(ctx, tx)
 }
 
 type ReaderConfig struct {

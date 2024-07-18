@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -93,7 +94,12 @@ func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (*rawtopicwriter
 	return &rawtopicwriter.StreamWriter{Stream: protoResp}, nil
 }
 
-func (c *Client) UpdateOffsetsInTransaction(ctx context.Context, request UpdateOffsetsInTransactionRequest) error {
-	//TODO implement me
-	panic("implement me")
+func (c *Client) UpdateOffsetsInTransaction(ctx context.Context, req UpdateOffsetsInTransactionRequest) error {
+	protoResp, err := c.service.UpdateOffsetsInTransaction(ctx, req.ToProto())
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: update offsets in transaction failed: %w", err))
+	}
+
+	var operation rawydb.Operation
+	return operation.FromProtoWithStatusCheck(protoResp.GetOperation())
 }
