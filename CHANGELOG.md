@@ -1,3 +1,5 @@
+* Fixed `internal/xstrings.Buffer()` leak without call `buffer.Free()`
+
 ## v3.75.2
 * Fixed build for go1.20
 

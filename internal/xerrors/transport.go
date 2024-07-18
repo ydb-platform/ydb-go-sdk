@@ -61,6 +61,7 @@ func WithNodeID(nodeID uint32) nodeIDOption {
 
 func (e *transportError) Error() string {
 	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteString(e.Name())
 	fmt.Fprintf(b, " (code = %d, source error = %q", e.status.Code(), e.err.Error())
 	if len(e.address) > 0 {

@@ -77,6 +77,7 @@ func (e *withIssuesError) isYdbError() {}
 
 func (e *withIssuesError) Error() string {
 	b := xstring.Buffer()
+	defer b.Free()
 	if len(e.reason) > 0 {
 		b.WriteString(e.reason)
 		b.WriteString(", issues: [")
