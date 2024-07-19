@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -13,9 +14,6 @@ import (
 )
 
 var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read early"))
-
-// ErrPublicUnexpectedCodec return when try to read message content with unknown codec
-var ErrPublicUnexpectedCodec = errors.New("unexpected codec")
 
 // PublicMessage is representation of topic message
 type PublicMessage struct {
@@ -83,7 +81,7 @@ type PublicMessageContentUnmarshaler interface {
 	UnmarshalYDBTopicMessage(data []byte) error
 }
 
-func createReader(decoders decoderMap, codec rawtopiccommon.Codec, rawBytes []byte) oneTimeReader {
+func createReader(decoders topicreadercommon.DecoderMap, codec rawtopiccommon.Codec, rawBytes []byte) oneTimeReader {
 	reader, err := decoders.Decode(codec, bytes.NewReader(rawBytes))
 	if err != nil {
 		reader = errorReader{

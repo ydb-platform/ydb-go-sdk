@@ -1,6 +1,7 @@
 package topicoptions
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
@@ -11,7 +12,7 @@ import (
 )
 
 // ReadSelector set rules for reader: set of topic, partitions, start time filted, etc.
-type ReadSelector = topicreaderinternal.PublicReadSelector
+type ReadSelector = topicreadercommon.PublicReadSelector
 
 // ReadSelectors slice of rules for topic reader
 type ReadSelectors []ReadSelector
@@ -163,7 +164,7 @@ func WithReaderBufferSizeBytes(size int) ReaderOption {
 }
 
 // CreateDecoderFunc interface for fabric of message decoders
-type CreateDecoderFunc = topicreaderinternal.PublicCreateDecoderFunc
+type CreateDecoderFunc = topicreadercommon.PublicCreateDecoderFunc
 
 // WithAddDecoder add decoder for a codec.
 // It allows to set decoders fabric for custom codec and replace internal decoders.

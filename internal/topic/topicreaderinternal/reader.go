@@ -4,17 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-	"sync/atomic"
-	"time"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"sync"
+	"sync/atomic"
 )
 
 var (
@@ -81,7 +79,7 @@ func (count readExplicitMessagesCount) Apply(options ReadMessageBatchOptions) Re
 func NewReader(
 	connector TopicSteamReaderConnect,
 	consumer string,
-	readSelectors []PublicReadSelector,
+	readSelectors []topicreadercommon.PublicReadSelector,
 	opts ...PublicReaderOption,
 ) (Reader, error) {
 	cfg := convertNewParamsToStreamConfig(consumer, readSelectors, opts...)
@@ -254,14 +252,14 @@ func WithTrace(tracer *trace.Topic) PublicReaderOption {
 
 func convertNewParamsToStreamConfig(
 	consumer string,
-	readSelectors []PublicReadSelector,
+	readSelectors []topicreadercommon.PublicReadSelector,
 	opts ...PublicReaderOption,
 ) (cfg ReaderConfig) {
 	cfg.topicStreamReaderConfig = newTopicStreamReaderConfig()
 	cfg.Consumer = consumer
 
 	// make own copy, for prevent changing internal states if readSelectors will change outside
-	cfg.ReadSelectors = make([]*PublicReadSelector, len(readSelectors))
+	cfg.ReadSelectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
 		cfg.ReadSelectors[i] = readSelectors[i].Clone()
 	}
@@ -273,18 +271,4 @@ func convertNewParamsToStreamConfig(
 	}
 
 	return cfg
-}
-
-type PublicReadSelector struct {
-	Path       string
-	Partitions []int64
-	ReadFrom   time.Time     // zero value mean skip read from filter
-	MaxTimeLag time.Duration // 0 mean skip time lag filter
-}
-
-// Clone create deep clone of the selector
-func (s PublicReadSelector) Clone() *PublicReadSelector { //nolint:gocritic
-	s.Partitions = clone.Int64Slice(s.Partitions)
-
-	return &s
 }

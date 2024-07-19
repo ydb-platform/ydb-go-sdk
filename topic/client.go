@@ -2,7 +2,7 @@ package topic
 
 import (
 	"context"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -24,6 +24,15 @@ type Client interface {
 	// Drop topic
 	Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error
 
+	// StartListener starts read listen topic with the handler
+	// it is fast non block call, connection starts in background
+	StartListener(
+		consumer string,
+		handler topiclistener.EventHandler,
+		readSelectors topicoptions.ReadSelectors,
+		opts ...topicoptions.ReaderOption,
+	) (*topiclistener.TopicListener, error)
+
 	// StartReader start read messages from topic
 	// it is fast non block call, connection starts in background
 	StartReader(
@@ -31,14 +40,6 @@ type Client interface {
 		readSelectors topicoptions.ReadSelectors,
 		opts ...topicoptions.ReaderOption,
 	) (*topicreader.Reader, error)
-
-	// StartCallbackReader start read messages from topic, callback based interface
-	StartCallbackReader(
-		consumer string,
-		eventsHandler topicreader.EventHandler,
-		readSelectors topicoptions.ReadSelectors,
-		opts ...topicoptions.CallbackReaderOption,
-	) (*topicreader.CallbackReader, error)
 
 	// StartWriter start write session to topic
 	// it is fast non block call, connection starts in background

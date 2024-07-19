@@ -1,20 +1,24 @@
-package topicreader
+package topiclistener
 
-import "context"
+import (
+	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
+)
 
-type CallbackReader struct{}
+type TopicListener struct{}
 
-func (cr *CallbackReader) WaitInit() error {
+func (cr *TopicListener) WaitInit() error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (cr *CallbackReader) Commit(ctx context.Context, batch CommitRangeGetter) error {
+func (cr *TopicListener) Commit(ctx context.Context, batch topicreader.CommitRangeGetter) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (cr *CallbackReader) Close(ctx context.Context) error {
+func (cr *TopicListener) Close(ctx context.Context) error {
 	// TODO implement me
 	panic("implement me")
 }
@@ -31,7 +35,7 @@ type EventHandler interface {
 }
 
 type ReaderReady struct {
-	Reader *CallbackReader
+	Reader *TopicListener
 }
 
 type StartPartitionSessionRequest struct {
@@ -53,16 +57,14 @@ type StopPartitionSessionRequest struct {
 
 type StopPartitionSessionResponse struct{}
 
-type ReadMessages struct {
-	PartitionSessionID int64
-	Batch              *Batch
-}
+type ReadMessages = topiclistenerinternal.PublicReadMessages
 
 type BaseHandler struct{}
 
 func (b BaseHandler) topicReaderHandler() {}
 
 func (b BaseHandler) OnReaderCreated(ctx context.Context, req ReaderReady) error {
+	panic("not implemented yet")
 }
 
 func (b BaseHandler) OnStartPartitionSessionRequest(

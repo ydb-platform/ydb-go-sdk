@@ -2,6 +2,7 @@ package topicclientinternal
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
@@ -200,6 +201,17 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	}
 
 	return call(ctx)
+}
+
+// StartListener starts read listen topic with the handler
+// it is fast non block call, connection starts in background
+func (c *Client) StartListener(
+	consumer string,
+	handler topiclistener.EventHandler,
+	readSelectors topicoptions.ReadSelectors,
+	opts ...topicoptions.ReaderOption,
+) (*topiclistener.TopicListener, error) {
+	panic("not implemented yet")
 }
 
 // StartReader create new topic reader and start pull messages from server

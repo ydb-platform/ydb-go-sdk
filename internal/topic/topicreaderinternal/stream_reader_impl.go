@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"math"
 	"math/big"
 	"reflect"
@@ -43,7 +44,7 @@ type topicStreamReaderImpl struct {
 
 	freeBytes           chan int
 	restBufferSizeBytes atomic.Int64
-	sessionController   partitionSessionStorage
+	sessionController   PartitionSessionStorage
 	backgroundWorkers   background.Worker
 
 	rawMessagesFromBuffer chan rawtopicreader.ServerMessage
@@ -70,11 +71,11 @@ type topicStreamReaderConfig struct {
 	CredUpdateInterval              time.Duration
 	Consumer                        string
 	ReadWithoutConsumer             bool
-	ReadSelectors                   []*PublicReadSelector
+	ReadSelectors                   []*topicreadercommon.PublicReadSelector
 	Trace                           *trace.Topic
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
 	CommitMode                      PublicCommitMode
-	Decoders                        decoderMap
+	Decoders                        topicreadercommon.DecoderMap
 }
 
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
@@ -85,7 +86,7 @@ func newTopicStreamReaderConfig() topicStreamReaderConfig {
 		CredUpdateInterval:    time.Hour,
 		CommitMode:            CommitModeAsync,
 		CommitterBatchTimeLag: time.Second,
-		Decoders:              newDecoderMap(),
+		Decoders:              topicreadercommon.NewDecoderMap(),
 		Trace:                 &trace.Topic{},
 	}
 }
@@ -110,29 +111,6 @@ func (cfg *topicStreamReaderConfig) Validate() []error {
 	}
 
 	return validateErrors
-}
-
-func (cfg *topicStreamReaderConfig) initMessage() *rawtopicreader.InitRequest {
-	res := &rawtopicreader.InitRequest{
-		Consumer: cfg.Consumer,
-	}
-
-	res.TopicsReadSettings = make([]rawtopicreader.TopicReadSettings, len(cfg.ReadSelectors))
-	for i, selector := range cfg.ReadSelectors {
-		settings := &res.TopicsReadSettings[i]
-		settings.Path = selector.Path
-		settings.PartitionsID = selector.Partitions
-		if !selector.ReadFrom.IsZero() {
-			settings.ReadFrom.HasValue = true
-			settings.ReadFrom.Value = selector.ReadFrom
-		}
-		if selector.MaxTimeLag != 0 {
-			settings.MaxLag.HasValue = true
-			settings.MaxLag.Value = selector.MaxTimeLag
-		}
-	}
-
-	return res
 }
 
 func newTopicStreamReader(
@@ -471,7 +449,7 @@ func (r *topicStreamReaderImpl) setStarted() error {
 }
 
 func (r *topicStreamReaderImpl) initSession() (err error) {
-	initMessage := r.cfg.initMessage()
+	initMessage := topicreadercommon.CreateInitMessage(r.cfg.Consumer, r.cfg.ReadSelectors)
 
 	onDone := trace.TopicOnReaderInit(r.cfg.Trace, r.readConnectionID, initMessage)
 	defer func() {
@@ -488,6 +466,7 @@ func (r *topicStreamReaderImpl) initSession() (err error) {
 	}
 
 	if status := resp.StatusData(); !status.Status.IsSuccess() {
+		// TODO: better handler status error
 		return xerrors.WithStackTrace(fmt.Errorf("bad status on initial error: %v (%v)", status.Status, status.Issues))
 	}
 
@@ -656,32 +635,9 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		onDone(err)
 	}()
 
-	batchesCount := 0
-	for i := range msg.PartitionData {
-		batchesCount += len(msg.PartitionData[i].Batches)
-	}
-
-	var batches []*PublicBatch
-	for pIndex := range msg.PartitionData {
-		p := &msg.PartitionData[pIndex]
-
-		// normal way
-		session, err := r.sessionController.Get(p.PartitionSessionID)
-		if err != nil {
-			return err
-		}
-
-		for bIndex := range p.Batches {
-			if r.ctx.Err() != nil {
-				return r.ctx.Err()
-			}
-
-			batch, err := newBatchFromStream(r.cfg.Decoders, session, p.Batches[bIndex])
-			if err != nil {
-				return err
-			}
-			batches = append(batches, batch)
-		}
+	batches, err2 := ReadRawbatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
+	if err2 != nil {
+		return err2
 	}
 
 	if err := splitBytesByMessagesInBatches(batches, msg.BytesSize); err != nil {
@@ -695,6 +651,33 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	}
 
 	return nil
+}
+
+func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *PartitionSessionStorage, decoders topicreadercommon.DecoderMap) ([]*PublicBatch, error) {
+	batchesCount := 0
+	for i := range msg.PartitionData {
+		batchesCount += len(msg.PartitionData[i].Batches)
+	}
+
+	var batches []*PublicBatch
+	for pIndex := range msg.PartitionData {
+		p := &msg.PartitionData[pIndex]
+
+		// normal way
+		session, err := sessions.Get(p.PartitionSessionID)
+		if err != nil {
+			return nil, err
+		}
+
+		for bIndex := range p.Batches {
+			batch, err := NewBatchFromStream(decoders, session, p.Batches[bIndex])
+			if err != nil {
+				return nil, err
+			}
+			batches = append(batches, batch)
+		}
+	}
+	return batches, nil
 }
 
 func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error) (closeErr error) {

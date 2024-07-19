@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -58,8 +59,8 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 	}, nil
 }
 
-func newBatchFromStream(
-	decoders decoderMap,
+func NewBatchFromStream(
+	decoders topicreadercommon.DecoderMap,
 	session *partitionSession,
 	sb rawtopicreader.Batch, //nolint:gocritic
 ) (*PublicBatch, error) {
