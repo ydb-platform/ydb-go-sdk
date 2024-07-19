@@ -42,6 +42,12 @@ func (m *Map[K, V]) Store(key K, value V) {
 	m.m.Store(key, value)
 }
 
+func (m *Map[K, V]) Delete(key K) (ok bool) {
+	_, ok = m.LoadAndDelete(key)
+
+	return ok
+}
+
 func (m *Map[K, V]) LoadAndDelete(key K) (value V, ok bool) {
 	v, ok := m.m.LoadAndDelete(key)
 	if !ok {
