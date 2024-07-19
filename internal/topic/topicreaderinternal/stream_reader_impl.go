@@ -638,10 +638,6 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		return err2
 	}
 
-	if err := splitBytesByMessagesInBatches(batches, msg.BytesSize); err != nil {
-		return err
-	}
-
 	for i := range batches {
 		if err := r.batcher.PushBatches(batches[i]); err != nil {
 			return err
@@ -675,6 +671,11 @@ func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *t
 			batches = append(batches, batch)
 		}
 	}
+
+	if err := SplitBytesByMessagesInBatches(batches, msg.BytesSize); err != nil {
+		return nil, err
+	}
+
 	return batches, nil
 }
 

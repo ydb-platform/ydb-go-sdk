@@ -155,16 +155,16 @@ func TestSplitBytesByBatches(t *testing.T) {
 	}
 
 	t.Run("Empty", func(t *testing.T) {
-		require.NoError(t, splitBytesByMessagesInBatches(nil, 0))
+		require.NoError(t, SplitBytesByMessagesInBatches(nil, 0))
 	})
 	t.Run("BytesToNoMessages", func(t *testing.T) {
-		require.Error(t, splitBytesByMessagesInBatches(nil, 10))
+		require.Error(t, SplitBytesByMessagesInBatches(nil, 10))
 	})
 	t.Run("MetadataOnlyEqually", func(t *testing.T) {
 		totalBytes := 30
 		batch, err := newBatch(nil, []*PublicMessage{{}, {}, {}})
 		require.NoError(t, err)
-		require.NoError(t, splitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
+		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
 
 		for _, msg := range batch.Messages {
 			require.Equal(t, 10, msg.bufferBytesAccount)
@@ -175,7 +175,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 		totalBytes := 5
 		batch, err := newBatch(nil, []*PublicMessage{{}, {}, {}})
 		require.NoError(t, err)
-		require.NoError(t, splitBytesByMessagesInBatches([]*PublicBatch{batch}, 5))
+		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch}, 5))
 
 		require.Equal(t, 2, batch.Messages[0].bufferBytesAccount)
 		require.Equal(t, 2, batch.Messages[1].bufferBytesAccount)
@@ -190,7 +190,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 			batch.Messages[i].rawDataLen = 10
 		}
 
-		require.NoError(t, splitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
+		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
 		require.Equal(t, 10, batch.Messages[0].bufferBytesAccount)
 		require.Equal(t, 10, batch.Messages[1].bufferBytesAccount)
 		require.Equal(t, 10, batch.Messages[2].bufferBytesAccount)
@@ -204,7 +204,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 			batch.Messages[i].rawDataLen = 5
 		}
 
-		require.NoError(t, splitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
+		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
 		require.Equal(t, 10, batch.Messages[0].bufferBytesAccount)
 		require.Equal(t, 10, batch.Messages[1].bufferBytesAccount)
 		require.Equal(t, 10, batch.Messages[2].bufferBytesAccount)
@@ -220,7 +220,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 		require.NoError(t, err)
 		batch2.Messages[0].rawDataLen = 5
 
-		require.NoError(t, splitBytesByMessagesInBatches([]*PublicBatch{batch1, batch2}, totalBytes))
+		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch1, batch2}, totalBytes))
 		require.Equal(t, 10, batch1.Messages[0].bufferBytesAccount)
 		require.Equal(t, 10, batch1.Messages[1].bufferBytesAccount)
 		require.Equal(t, 10, batch2.Messages[0].bufferBytesAccount)
@@ -234,7 +234,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 			batch.Messages[i].rawDataLen = 5
 		}
 
-		require.NoError(t, splitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
+		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
 		require.Equal(t, 11, batch.Messages[0].bufferBytesAccount)
 		require.Equal(t, 11, batch.Messages[1].bufferBytesAccount)
 		require.Equal(t, 10, batch.Messages[2].bufferBytesAccount)
@@ -249,7 +249,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 			batch.Messages[i].rawDataLen = 5
 		}
 
-		require.NoError(t, splitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
+		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
 
 		summ := 0
 		for _, msg := range batch.Messages {

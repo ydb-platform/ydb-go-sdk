@@ -168,7 +168,7 @@ func (m *PublicBatch) isEmpty() bool {
 	return m == nil || len(m.Messages) == 0
 }
 
-func splitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) error {
+func SplitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) error {
 	restBytes := totalBytesCount
 
 	cutBytes := func(want int) int {
