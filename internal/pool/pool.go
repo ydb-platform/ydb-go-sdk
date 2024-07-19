@@ -6,7 +6,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -23,8 +22,8 @@ type (
 	}
 	safeStats struct {
 		mu       xsync.RWMutex
-		v        stats.Stats
-		onChange func(stats.Stats)
+		v        Stats
+		onChange func(Stats)
 	}
 	statsItemAddr struct {
 		v        *int
@@ -60,7 +59,7 @@ func (field statsItemAddr) Dec() {
 	})
 }
 
-func (s *safeStats) Get() stats.Stats {
+func (s *safeStats) Get() Stats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -175,7 +174,7 @@ func New[PT Item[T], T any](
 	p.idle = make([]PT, 0, p.limit)
 	p.index = make(map[PT]struct{}, p.limit)
 	p.stats = &safeStats{
-		v:        stats.Stats{Limit: p.limit},
+		v:        Stats{Limit: p.limit},
 		onChange: p.trace.OnChange,
 	}
 
@@ -276,7 +275,7 @@ func createItemWithContext[PT Item[T], T any](
 	}
 }
 
-func (p *Pool[PT, T]) Stats() stats.Stats {
+func (p *Pool[PT, T]) Stats() Stats {
 	return p.stats.Get()
 }
 

@@ -1,18 +1,14 @@
 package query
 
 import (
-	"fmt"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 )
 
-func Stats(client Client) (*stats.Stats, error) {
-	if c, has := client.(interface {
-		Stats() *stats.Stats
-	}); has {
-		return c.Stats(), nil
-	}
-
-	return nil, xerrors.WithStackTrace(fmt.Errorf("client %T not supported stats", client))
+// Stats returns stats of query client pool
+//
+// Deprecated: use client.Stats() method instead
+// Will be removed after Jan 2025.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func Stats(client Client) (*pool.Stats, error) {
+	return client.Stats(), nil
 }

@@ -3,7 +3,6 @@ package pool
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 )
 
@@ -85,5 +84,5 @@ type (
 	GetDoneInfo struct {
 		Error error
 	}
-	ChangeInfo = stats.Stats
+	ChangeInfo = Stats
 )

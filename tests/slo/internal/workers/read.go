@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 
 	"golang.org/x/time/rate"
 
@@ -32,7 +33,7 @@ func (w *Workers) read(ctx context.Context) (err error) {
 	defer func() {
 		m.Stop(err, attempts)
 		if err != nil {
-			fmt.Printf("get entry error: %v\n", err)
+			fmt.Printf("[%s] get entry error: %v\n", time.Now().Format(time.RFC3339), err)
 		}
 	}()
 

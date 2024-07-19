@@ -2,8 +2,10 @@ package xerrors
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type retryableError struct {
@@ -12,54 +14,86 @@ type retryableError struct {
 	backoffType        backoff.Type
 	isRetryObjectValid bool
 	code               int32
+	traceID            string
 }
 
-func (e *retryableError) Code() int32 {
-	return e.code
+func (re *retryableError) Code() int32 {
+	return re.code
 }
 
-func (e *retryableError) Name() string {
-	return "retryable/" + e.name
+func (re *retryableError) Name() string {
+	return "retryable/" + re.name
 }
 
-func (e *retryableError) Type() Type {
+func (re *retryableError) Type() Type {
 	return TypeRetryable
 }
 
-func (e *retryableError) BackoffType() backoff.Type {
-	return e.backoffType
+func (re *retryableError) BackoffType() backoff.Type {
+	return re.backoffType
 }
 
-func (e *retryableError) IsRetryObjectValid() bool {
-	return e.isRetryObjectValid
+func (re *retryableError) IsRetryObjectValid() bool {
+	return re.isRetryObjectValid
 }
 
-func (e *retryableError) Error() string {
-	return e.err.Error()
-}
-
-func (e *retryableError) Unwrap() error {
-	return e.err
-}
-
-type RetryableErrorOption func(e *retryableError)
-
-func WithBackoff(t backoff.Type) RetryableErrorOption {
-	return func(e *retryableError) {
-		e.backoffType = t
+func (re *retryableError) Error() string {
+	b := xstring.Buffer()
+	defer b.Free()
+	b.WriteString(re.Name())
+	fmt.Fprintf(b, " (code = %d, source error = %q", re.code, re.err.Error())
+	if len(re.traceID) > 0 {
+		fmt.Fprintf(b, ", traceID: %q", re.traceID)
 	}
+	b.WriteString(")")
+
+	return b.String()
 }
 
-func WithName(name string) RetryableErrorOption {
-	return func(e *retryableError) {
-		e.name = name
-	}
+func (re *retryableError) Unwrap() error {
+	return re.err
 }
 
-func InvalidObject() RetryableErrorOption {
-	return func(e *retryableError) {
-		e.isRetryObjectValid = true
-	}
+type RetryableErrorOption interface {
+	applyToRetryableError(re *retryableError)
+}
+
+var (
+	_ RetryableErrorOption = backoffOption{}
+	_ RetryableErrorOption = nameOption("")
+	_ RetryableErrorOption = invalidObjectOption{}
+)
+
+type backoffOption struct {
+	backoffType backoff.Type
+}
+
+func (t backoffOption) applyToRetryableError(re *retryableError) {
+	re.backoffType = t.backoffType
+}
+
+func WithBackoff(t backoff.Type) backoffOption {
+	return backoffOption{backoffType: t}
+}
+
+type nameOption string
+
+func (name nameOption) applyToRetryableError(re *retryableError) {
+	re.name = string(name)
+}
+
+func WithName(name string) nameOption {
+	return nameOption(name)
+}
+
+type invalidObjectOption struct{}
+
+func (invalidObjectOption) applyToRetryableError(re *retryableError) {
+	re.isRetryObjectValid = false
+}
+
+func InvalidObject() invalidObjectOption {
+	return invalidObjectOption{}
 }
 
 func Retryable(err error, opts ...RetryableErrorOption) error {
@@ -80,7 +114,7 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt(re)
+			opt.applyToRetryableError(re)
 		}
 	}
 

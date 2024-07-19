@@ -30,7 +30,7 @@ type connMock struct {
 }
 
 func (c connMock) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
-	_, _, err := invoke(ctx, method, args, reply, c.cc, nil, "", nil, opts...)
+	_, _, err := invoke(ctx, method, args, reply, c.cc, nil, "", 0, opts...)
 
 	return err
 }

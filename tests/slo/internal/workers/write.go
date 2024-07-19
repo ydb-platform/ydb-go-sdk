@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"golang.org/x/time/rate"
 
@@ -27,7 +28,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 	var row generator.Row
 	row, err = gen.Generate()
 	if err != nil {
-		fmt.Printf("generate error: %v\n", err)
+		fmt.Printf("[%s] generate error: %v\n", time.Now().Format(time.RFC3339), err)
 
 		return err
 	}
@@ -38,7 +39,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 	defer func() {
 		m.Stop(err, attempts)
 		if err != nil {
-			fmt.Printf("error when stop 'write' worker: %v\n", err)
+			fmt.Printf("[%s] error when stop 'write' worker: %v\n", time.Now().Format(time.RFC3339), err)
 		}
 	}()
 

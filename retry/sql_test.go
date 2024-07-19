@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -179,15 +182,14 @@ func (m *mockStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (
 	return m.conn.QueryContext(ctx, m.query, args)
 }
 
-//nolint:nestif
 func TestDoTx(t *testing.T) {
 	for _, idempotentType := range []idempotency{
 		idempotent,
 		nonIdempotent,
 	} {
 		t.Run(idempotentType.String(), func(t *testing.T) {
-			for _, tt := range errsToCheck {
-				t.Run(tt.err.Error(), func(t *testing.T) {
+			for i, tt := range errsToCheck {
+				t.Run(strconv.Itoa(i)+"."+tt.err.Error(), func(t *testing.T) {
 					m := &mockConnector{
 						t:        t,
 						queryErr: badconn.Map(tt.err),
@@ -216,23 +218,15 @@ func TestDoTx(t *testing.T) {
 						WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
 					)
 					if tt.canRetry[idempotentType] {
-						if err != nil {
-							t.Errorf("unexpected err after attempts=%d and driver conns=%d: %v)", attempts, m.conns, err)
-						}
-						if attempts <= 1 {
-							t.Errorf("must be attempts > 1 (actual=%d), driver conns=%d)", attempts, m.conns)
-						}
+						require.NoError(t, err)
+						require.NotEmpty(t, attempts)
 						if tt.deleteSession {
-							if m.conns <= 1 {
-								t.Errorf("must be retry on different conns (attempts=%d, driver conns=%d)", attempts, m.conns)
-							}
+							require.Greater(t, m.conns, uint32(1))
 						} else {
-							if m.conns > 1 {
-								t.Errorf("must be retry on single conn (attempts=%d, driver conns=%d)", attempts, m.conns)
-							}
+							require.Equal(t, uint32(1), m.conns)
 						}
-					} else if err == nil {
-						t.Errorf("unexpected nil err (attempts=%d, driver conns=%d)", attempts, m.conns)
+					} else {
+						require.Error(t, err)
 					}
 				})
 			}

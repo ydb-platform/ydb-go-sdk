@@ -1,7 +1,6 @@
 package xerrors
 
 import (
-	"bytes"
 	"errors"
 	"strconv"
 	"strings"
@@ -77,7 +76,8 @@ type withIssuesError struct {
 func (e *withIssuesError) isYdbError() {}
 
 func (e *withIssuesError) Error() string {
-	var b bytes.Buffer
+	b := xstring.Buffer()
+	defer b.Free()
 	if len(e.reason) > 0 {
 		b.WriteString(e.reason)
 		b.WriteString(", issues: [")
