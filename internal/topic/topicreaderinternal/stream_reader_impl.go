@@ -634,7 +634,7 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		onDone(err)
 	}()
 
-	batches, err2 := ReadRawbatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
+	batches, err2 := topicreadercommon.ReadRawbatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
 	if err2 != nil {
 		return err2
 	}
@@ -646,38 +646,6 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	}
 
 	return nil
-}
-
-func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *topicreadercommon.PartitionSessionStorage, decoders topicreadercommon.DecoderMap) ([]*topicreadercommon.PublicBatch, error) {
-	batchesCount := 0
-	for i := range msg.PartitionData {
-		batchesCount += len(msg.PartitionData[i].Batches)
-	}
-
-	var batches []*topicreadercommon.PublicBatch
-	for pIndex := range msg.PartitionData {
-		p := &msg.PartitionData[pIndex]
-
-		// normal way
-		session, err := sessions.Get(p.PartitionSessionID)
-		if err != nil {
-			return nil, err
-		}
-
-		for bIndex := range p.Batches {
-			batch, err := topicreadercommon.NewBatchFromStream(decoders, session, p.Batches[bIndex])
-			if err != nil {
-				return nil, err
-			}
-			batches = append(batches, batch)
-		}
-	}
-
-	if err := topicreadercommon.SplitBytesByMessagesInBatches(batches, msg.BytesSize); err != nil {
-		return nil, err
-	}
-
-	return batches, nil
 }
 
 func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error) (closeErr error) {

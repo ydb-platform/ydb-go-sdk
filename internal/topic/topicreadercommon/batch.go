@@ -124,7 +124,7 @@ func (m *PublicBatch) getCommitRange() PublicCommitRange {
 	return m.commitRange.getCommitRange()
 }
 
-func SplitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) error {
+func splitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) error {
 	restBytes := totalBytesCount
 
 	cutBytes := func(want int) int {

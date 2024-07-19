@@ -21,7 +21,8 @@ type streamListener struct {
 	consumer  string
 	sessionID string
 
-	background background.Worker
+	background   background.Worker
+	sendRequests chan rawtopicreader.ClientMessage
 }
 
 func newStreamListenerStopped(
@@ -32,7 +33,7 @@ func newStreamListenerStopped(
 	bufferSize int64,
 	decoders topicreadercommon.DecoderMap,
 ) *streamListener {
-	return &streamListener{
+	res := &streamListener{
 		stream:     stream,
 		handler:    eventListener,
 		consumer:   consumer,
@@ -40,6 +41,8 @@ func newStreamListenerStopped(
 		bufferSize: bufferSize,
 		decoders:   decoders,
 	}
+	res.initVars()
+	return res
 }
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
@@ -59,6 +62,9 @@ func (l *streamListener) start() error {
 
 }
 
+func (l *streamListener) initVars() {
+	l.sendRequests = make(chan rawtopicreader.ClientMessage, 100)
+}
 func (l *streamListener) init() error {
 	initMessage := topicreadercommon.CreateInitMessage(l.consumer, l.selectors)
 	err := l.stream.Send(initMessage)
