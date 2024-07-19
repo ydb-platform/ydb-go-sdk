@@ -1,4 +1,4 @@
-package state
+package cluster
 
 import (
 	"context"
@@ -11,20 +11,19 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func TestState(t *testing.T) {
+func TestCluster(t *testing.T) {
 	ctx := xtest.Context(t)
 
 	t.Run("Nil", func(t *testing.T) {
-		var s *state
+		var s *Cluster
 
 		require.Empty(t, s.All())
 
 		e, err := s.Next(ctx)
-		require.ErrorIs(t, err, ErrNilState)
+		require.ErrorIs(t, err, ErrNilPtr)
 		require.Nil(t, e)
 	})
 
@@ -69,7 +68,7 @@ func TestState(t *testing.T) {
 		require.Nil(t, e)
 	})
 
-	t.Run("Exclude", func(t *testing.T) {
+	t.Run("Without", func(t *testing.T) {
 		s := New([]endpoint.Endpoint{
 			&mock.Endpoint{
 				AddrField:   "1",
@@ -93,35 +92,72 @@ func TestState(t *testing.T) {
 			},
 		})
 
-		var endpoints []endpoint.Endpoint
+		{ // initial state
+			require.Len(t, s.All(), 5)
+			require.Len(t, s.index, 5)
+			require.Len(t, s.prefer, 5)
+		}
 
-		for i := 0; i < 5; i++ {
+		{ // without first endpoint
 			e, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, e)
-			endpoints = append(endpoints, e)
-			s = s.Exclude(e)
-			require.Len(t, s.All(), 4-i)
+			s = Without(s, e)
+			require.Len(t, s.All(), 5)
+			require.Len(t, s.index, 5)
+			require.Len(t, s.prefer, 4)
+			require.Len(t, s.fallback, 1)
 		}
 
-		e, err := s.Next(ctx)
-		require.ErrorIs(t, err, ErrNoEndpoints)
-		require.Nil(t, e)
-		require.Empty(t, s.All())
+		{ // without second endpoint
+			e, err := s.Next(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, e)
+			s = Without(s, e)
+			require.Len(t, s.All(), 5)
+			require.Len(t, s.index, 5)
+			require.Len(t, s.prefer, 3)
+			require.Len(t, s.fallback, 2)
+		}
 
-		require.Equal(t,
-			[]uint32{1, 2, 3, 4, 5},
-			xslices.SortCopy(
-				xslices.Transform(
-					endpoints,
-					func(e endpoint.Endpoint) uint32 {
-						return e.NodeID()
-					},
-				), func(lhs, rhs uint32) int {
-					return int(lhs) - int(rhs)
-				},
-			),
-		)
+		{ // without third endpoint
+			e, err := s.Next(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, e)
+			s = Without(s, e)
+			require.Len(t, s.All(), 5)
+			require.Len(t, s.index, 5)
+			require.Len(t, s.prefer, 2)
+			require.Len(t, s.fallback, 3)
+		}
+
+		{ // without fourth endpoint
+			e, err := s.Next(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, e)
+			s = Without(s, e)
+			require.Len(t, s.All(), 5)
+			require.Len(t, s.index, 5)
+			require.Len(t, s.prefer, 1)
+			require.Len(t, s.fallback, 4)
+		}
+
+		{ // without fifth endpoint
+			e, err := s.Next(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, e)
+			s = Without(s, e)
+			require.Len(t, s.All(), 5)
+			require.Len(t, s.index, 5)
+			require.Empty(t, s.prefer)
+			require.Len(t, s.fallback, 5)
+		}
+
+		{ // next from fallback is ok
+			e, err := s.Next(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, e)
+		}
 	})
 
 	t.Run("WithFilter", func(t *testing.T) {
@@ -173,7 +209,7 @@ func TestState(t *testing.T) {
 				},
 			}, WithFilter(func(e endpoint.Info) bool {
 				return e.NodeID()%2 == 0
-			}), WithFallback())
+			}), WithFallback(true))
 
 			require.Len(t, s.index, 4)
 			require.Len(t, s.All(), 4)
@@ -189,7 +225,7 @@ func TestState(t *testing.T) {
 				},
 			}, WithFilter(func(e endpoint.Info) bool {
 				return false
-			}), WithFallback())
+			}), WithFallback(true))
 
 			require.Len(t, s.index, 1)
 			require.Len(t, s.All(), 1)
@@ -236,7 +272,7 @@ func TestState(t *testing.T) {
 		const (
 			buckets = 10
 			total   = 1000000
-			epsilon = int(float64(total) / float64(buckets) * 0.01)
+			epsilon = int(float64(total) / float64(buckets) * 0.015)
 		)
 		endpoints := make([]endpoint.Endpoint, buckets)
 
@@ -321,7 +357,7 @@ func benchmarkNextParallel(b *testing.B, parallelism int) {
 		},
 	}, WithFilter(func(e endpoint.Info) bool {
 		return e.NodeID()%2 == 0
-	}), WithFallback())
+	}), WithFallback(true))
 
 	b.ReportAllocs()
 

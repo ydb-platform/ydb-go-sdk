@@ -1,4 +1,4 @@
-package state
+package cluster
 
 import (
 	"fmt"
@@ -8,5 +8,5 @@ import (
 
 var (
 	ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
-	ErrNilState    = xerrors.Wrap(fmt.Errorf("nil state"))
+	ErrNilPtr      = xerrors.Wrap(fmt.Errorf("nil pointer"))
 )
