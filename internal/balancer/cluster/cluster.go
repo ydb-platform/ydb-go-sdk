@@ -1,4 +1,4 @@
-package state
+package cluster
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 )
 
 type (
-	state struct {
+	Cluster struct {
 		filter        func(e endpoint.Info) bool
 		allowFallback bool
 
@@ -22,29 +22,23 @@ type (
 
 		rand xrand.Rand
 	}
-	option func(s *state)
+	option func(s *Cluster)
 )
 
 func WithFilter(filter func(e endpoint.Info) bool) option {
-	return func(s *state) {
+	return func(s *Cluster) {
 		s.filter = filter
 	}
 }
 
-func WithFallback() option {
-	return func(s *state) {
-		s.allowFallback = true
+func WithFallback(allowFallback bool) option {
+	return func(s *Cluster) {
+		s.allowFallback = allowFallback
 	}
 }
 
-func withRand(rand xrand.Rand) option {
-	return func(s *state) {
-		s.rand = rand
-	}
-}
-
-func New(endpoints []endpoint.Endpoint, opts ...option) *state {
-	s := &state{
+func New(endpoints []endpoint.Endpoint, opts ...option) *Cluster {
+	s := &Cluster{
 		filter: func(e endpoint.Info) bool {
 			return true
 		},
@@ -74,7 +68,7 @@ func New(endpoints []endpoint.Endpoint, opts ...option) *state {
 	return s
 }
 
-func (s *state) All() (all []endpoint.Endpoint) {
+func (s *Cluster) All() (all []endpoint.Endpoint) {
 	if s == nil {
 		return nil
 	}
@@ -82,15 +76,33 @@ func (s *state) All() (all []endpoint.Endpoint) {
 	return s.all
 }
 
-func (s *state) Exclude(e endpoint.Endpoint) *state {
-	return New(xslices.Filter(s.all, func(endpoint endpoint.Endpoint) bool {
-		return e.Address() != endpoint.Address()
-	}), withRand(s.rand))
+func Without(s *Cluster, endpoints ...endpoint.Endpoint) *Cluster {
+	prefer := make([]endpoint.Endpoint, 0, len(s.prefer))
+	fallback := s.fallback
+	for _, endpoint := range endpoints {
+		for i := range s.prefer {
+			if s.prefer[i].Address() != endpoint.Address() {
+				prefer = append(prefer, s.prefer[i])
+			} else {
+				fallback = append(fallback, s.prefer[i])
+			}
+		}
+	}
+
+	return &Cluster{
+		filter:        s.filter,
+		allowFallback: s.allowFallback,
+		index:         s.index,
+		prefer:        prefer,
+		fallback:      fallback,
+		all:           s.all,
+		rand:          s.rand,
+	}
 }
 
-func (s *state) Next(ctx context.Context) (endpoint.Endpoint, error) {
+func (s *Cluster) Next(ctx context.Context) (endpoint.Endpoint, error) {
 	if s == nil {
-		return nil, ErrNilState
+		return nil, ErrNilPtr
 	}
 
 	if err := ctx.Err(); err != nil {
