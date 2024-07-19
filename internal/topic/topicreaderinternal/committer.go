@@ -50,7 +50,7 @@ type committer struct {
 
 	m       xsync.Mutex
 	waiters []commitWaiter
-	commits CommitRanges
+	commits topicreadercommon.CommitRanges
 }
 
 func newCommitterStopped(
@@ -83,7 +83,7 @@ func (c *committer) Close(ctx context.Context, err error) error {
 	return c.backgroundWorker.Close(ctx, err)
 }
 
-func (c *committer) Commit(ctx context.Context, commitRange commitRange) error {
+func (c *committer) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
 	if !c.mode.commitsEnabled() {
 		return ErrCommitDisabled
 	}
@@ -100,9 +100,9 @@ func (c *committer) Commit(ctx context.Context, commitRange commitRange) error {
 	return c.waitCommitAck(ctx, waiter)
 }
 
-func (c *committer) pushCommit(commitRange commitRange) (commitWaiter, error) {
+func (c *committer) pushCommit(commitRange topicreadercommon.CommitRange) (commitWaiter, error) {
 	var resErr error
-	waiter := newCommitWaiter(commitRange.partitionSession, commitRange.commitOffsetEnd)
+	waiter := newCommitWaiter(commitRange.PartitionSession, commitRange.CommitOffsetEnd)
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
 			resErr = err
@@ -128,23 +128,23 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 	for {
 		c.waitSendTrigger(ctx)
 
-		var commits CommitRanges
+		var commits topicreadercommon.CommitRanges
 		c.m.WithLock(func() {
 			commits = c.commits
-			c.commits = NewCommitRangesWithCapacity(commits.len() * 2) //nolint:gomnd
+			c.commits = topicreadercommon.NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:gomnd
 		})
 
-		if commits.len() == 0 && c.backgroundWorker.Context().Err() != nil {
+		if commits.Len() == 0 && c.backgroundWorker.Context().Err() != nil {
 			// committer closed with empty buffer - target close state
 			return
 		}
 
 		// all ranges already committed of prev iteration
-		if commits.len() == 0 {
+		if commits.Len() == 0 {
 			continue
 		}
 
-		commits.optimize()
+		commits.Optimize()
 
 		onDone := trace.TopicOnReaderSendCommitMessage(
 			c.tracer,
@@ -187,7 +187,7 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 	for {
 		var commitsLen int
 		c.m.WithLock(func() {
-			commitsLen = c.commits.len()
+			commitsLen = c.commits.Len()
 		})
 		if commitsLen >= c.BufferCountTrigger {
 			return
@@ -280,9 +280,9 @@ func newCommitWaiter(session *topicreadercommon.PartitionSession, endOffset rawt
 	}
 }
 
-func sendCommitMessage(send sendMessageToServerFunc, batch CommitRanges) error {
+func sendCommitMessage(send sendMessageToServerFunc, batch topicreadercommon.CommitRanges) error {
 	req := &rawtopicreader.CommitOffsetRequest{
-		CommitOffsets: batch.toPartitionsOffsets(),
+		CommitOffsets: batch.ToPartitionsOffsets(),
 	}
 
 	return send(req)

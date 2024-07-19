@@ -181,7 +181,7 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 func (r *topicStreamReaderImpl) ReadMessageBatch(
 	ctx context.Context,
 	opts ReadMessageBatchOptions,
-) (batch *PublicBatch, err error) {
+) (batch *topicreadercommon.PublicBatch, err error) {
 	onDone := trace.TopicOnReaderReadMessages(
 		r.cfg.Trace,
 		&ctx,
@@ -193,13 +193,14 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 		if batch == nil {
 			onDone(0, "", -1, -1, -1, -1, r.getRestBufferBytes(), err)
 		} else {
+			commitRange := topicreadercommon.GetCommitRange(batch)
 			onDone(
 				len(batch.Messages),
 				batch.Topic(),
 				batch.PartitionID(),
-				batch.partitionSession().PartitionSessionID.ToInt64(),
-				batch.commitRange.commitOffsetStart.ToInt64(),
-				batch.commitRange.commitOffsetEnd.ToInt64(),
+				topicreadercommon.BatchGetPartitionSessionID(batch).ToInt64(),
+				commitRange.CommitOffsetStart.ToInt64(),
+				commitRange.CommitOffsetEnd.ToInt64(),
 				r.getRestBufferBytes(),
 				err,
 			)
@@ -222,7 +223,7 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 func (r *topicStreamReaderImpl) consumeMessagesUntilBatch(
 	ctx context.Context,
 	opts ReadMessageBatchOptions,
-) (*PublicBatch, error) {
+) (*topicreadercommon.PublicBatch, error) {
 	for {
 		item, err := r.batcher.Pop(ctx, opts.batcherGetOptions)
 		if err != nil {
@@ -350,26 +351,26 @@ func (r *topicStreamReaderImpl) onPartitionSessionStatusResponseFromBuffer(
 func (r *topicStreamReaderImpl) onUpdateTokenResponse(m *rawtopicreader.UpdateTokenResponse) {
 }
 
-func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRange) (err error) {
+func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) (err error) {
 	defer func() {
 		if errors.Is(err, PublicErrCommitSessionToExpiredSession) && r.cfg.CommitMode == CommitModeAsync {
 			err = nil
 		}
 	}()
 
-	if commitRange.partitionSession == nil {
+	if commitRange.PartitionSession == nil {
 		return xerrors.WithStackTrace(errCommitWithNilPartitionSession)
 	}
 
-	session := commitRange.partitionSession
+	session := commitRange.PartitionSession
 	onDone := trace.TopicOnReaderCommit(
 		r.cfg.Trace,
 		&ctx,
 		session.Topic,
 		session.PartitionID,
 		session.PartitionSessionID.ToInt64(),
-		commitRange.commitOffsetStart.ToInt64(),
-		commitRange.commitOffsetEnd.ToInt64(),
+		commitRange.CommitOffsetStart.ToInt64(),
+		commitRange.CommitOffsetEnd.ToInt64(),
 	)
 	defer func() {
 		onDone(err)
@@ -382,11 +383,11 @@ func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRa
 	return r.committer.Commit(ctx, commitRange)
 }
 
-func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error {
+func (r *topicStreamReaderImpl) checkCommitRange(commitRange topicreadercommon.CommitRange) error {
 	if r.cfg.CommitMode == CommitModeNone {
 		return ErrCommitDisabled
 	}
-	session := commitRange.partitionSession
+	session := commitRange.PartitionSession
 
 	if session == nil {
 		return xerrors.WithStackTrace(errCommitWithNilPartitionSession)
@@ -400,7 +401,7 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error 
 	if err != nil || session != ownSession {
 		return xerrors.WithStackTrace(PublicErrCommitSessionToExpiredSession)
 	}
-	if session.CommittedOffset() != commitRange.commitOffsetStart && r.cfg.CommitMode == CommitModeSync {
+	if session.CommittedOffset() != commitRange.CommitOffsetStart && r.cfg.CommitMode == CommitModeSync {
 		return ErrWrongCommitOrderInSyncMode
 	}
 
@@ -600,10 +601,10 @@ func (r *topicStreamReaderImpl) sendDataRequest(size int) error {
 	return r.send(&rawtopicreader.ReadRequest{BytesSize: size})
 }
 
-func (r *topicStreamReaderImpl) freeBufferFromMessages(batch *PublicBatch) {
+func (r *topicStreamReaderImpl) freeBufferFromMessages(batch *topicreadercommon.PublicBatch) {
 	size := 0
 	for messageIndex := range batch.Messages {
-		size += batch.Messages[messageIndex].bufferBytesAccount
+		size += topicreadercommon.MessageGetBufferBytesAccount(batch.Messages[messageIndex])
 	}
 	select {
 	case r.freeBytes <- size:
@@ -647,13 +648,13 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	return nil
 }
 
-func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *topicreadercommon.PartitionSessionStorage, decoders topicreadercommon.DecoderMap) ([]*PublicBatch, error) {
+func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *topicreadercommon.PartitionSessionStorage, decoders topicreadercommon.DecoderMap) ([]*topicreadercommon.PublicBatch, error) {
 	batchesCount := 0
 	for i := range msg.PartitionData {
 		batchesCount += len(msg.PartitionData[i].Batches)
 	}
 
-	var batches []*PublicBatch
+	var batches []*topicreadercommon.PublicBatch
 	for pIndex := range msg.PartitionData {
 		p := &msg.PartitionData[pIndex]
 
@@ -664,7 +665,7 @@ func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *t
 		}
 
 		for bIndex := range p.Batches {
-			batch, err := NewBatchFromStream(decoders, session, p.Batches[bIndex])
+			batch, err := topicreadercommon.NewBatchFromStream(decoders, session, p.Batches[bIndex])
 			if err != nil {
 				return nil, err
 			}
@@ -672,7 +673,7 @@ func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *t
 		}
 	}
 
-	if err := SplitBytesByMessagesInBatches(batches, msg.BytesSize); err != nil {
+	if err := topicreadercommon.SplitBytesByMessagesInBatches(batches, msg.BytesSize); err != nil {
 		return nil, err
 	}
 

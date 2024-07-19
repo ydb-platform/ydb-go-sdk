@@ -135,7 +135,7 @@ func (r *Reader) Close(ctx context.Context) error {
 }
 
 // ReadMessage read exactly one message
-func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
+func (r *Reader) ReadMessage(ctx context.Context) (*topicreadercommon.PublicMessage, error) {
 	res, err := r.ReadMessageBatch(ctx, readExplicitMessagesCount(1))
 	if err != nil {
 		return nil, err
@@ -146,7 +146,7 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 
 // ReadMessageBatch read batch of messages.
 // Batch is collection of messages, which can be atomically committed
-func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
+func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *topicreadercommon.PublicBatch, err error) {
 	readOptions := r.defaultBatchConfig.clone()
 
 	for _, opt := range opts {
@@ -173,43 +173,44 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 	}
 }
 
-func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
-	cr := offsets.getCommitRange().priv
-	if cr.partitionSession.ReaderID != r.readerID {
+func (r *Reader) Commit(ctx context.Context, offsets topicreadercommon.PublicCommitRangeGetter) (err error) {
+	cr := topicreadercommon.GetCommitRange(offsets)
+	if cr.PartitionSession.ReaderID != r.readerID {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: messages session reader id (%v) != current reader id (%v): %w",
-			cr.partitionSession.ReaderID, r.readerID, errCommitSessionFromOtherReader,
+			cr.PartitionSession.ReaderID, r.readerID, errCommitSessionFromOtherReader,
 		)))
 	}
 
 	return r.reader.Commit(ctx, cr)
 }
 
-func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) error {
+func (r *Reader) CommitRanges(ctx context.Context, ranges []topicreadercommon.PublicCommitRange) error {
 	for i := range ranges {
-		if ranges[i].priv.partitionSession.ReaderID != r.readerID {
+		commitRange := topicreadercommon.GetCommitRange(ranges[i])
+		if commitRange.PartitionSession.ReaderID != r.readerID {
 			return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 				"ydb: commit ranges (range item %v) "+
 					"messages session reader id (%v) != current reader id (%v): %w",
-				i, ranges[i].priv.partitionSession.ReaderID, r.readerID, errCommitSessionFromOtherReader,
+				i, commitRange.PartitionSession.ReaderID, r.readerID, errCommitSessionFromOtherReader,
 			)))
 		}
 	}
 
-	commitRanges := NewCommitRangesFromPublicCommits(ranges)
-	commitRanges.optimize()
+	commitRanges := topicreadercommon.NewCommitRangesFromPublicCommits(ranges)
+	commitRanges.Optimize()
 
-	commitErrors := make(chan error, commitRanges.len())
+	commitErrors := make(chan error, commitRanges.Len())
 
 	var wg sync.WaitGroup
 
-	commit := func(cr commitRange) {
+	commit := func(cr topicreadercommon.CommitRange) {
 		defer wg.Done()
 		commitErrors <- r.Commit(ctx, &cr)
 	}
 
-	wg.Add(commitRanges.len())
-	for _, cr := range commitRanges.ranges {
+	wg.Add(commitRanges.Len())
+	for _, cr := range commitRanges.Ranges {
 		go commit(cr)
 	}
 	wg.Wait()

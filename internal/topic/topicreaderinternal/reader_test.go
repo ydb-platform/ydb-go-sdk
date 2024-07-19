@@ -73,11 +73,10 @@ func TestReader_Close(t *testing.T) {
 		readerReadMessageBatchState := newCallState()
 
 		go func() {
-			readerCommitState.err = reader.Commit(context.Background(), &PublicMessage{
-				commitRange: commitRange{
-					partitionSession: &topicreadercommon.PartitionSession{},
-				},
-			})
+
+			readerCommitState.err = reader.Commit(context.Background(), topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{}, topicreadercommon.CommitRange{
+				PartitionSession: &topicreadercommon.PartitionSession{},
+			}))
 			close(readerCommitState.callCompleted)
 		}()
 
@@ -119,32 +118,35 @@ func TestReader_Commit(t *testing.T) {
 			readerID: readerID,
 		}
 
-		expectedRangeOk := commitRange{
-			commitOffsetStart: 1,
-			commitOffsetEnd:   10,
-			partitionSession:  newTestPartitionSessionReaderID(readerID, 10),
+		expectedRangeOk := topicreadercommon.CommitRange{
+			CommitOffsetStart: 1,
+			CommitOffsetEnd:   10,
+			PartitionSession:  newTestPartitionSessionReaderID(readerID, 10),
 		}
 		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeOk).Return(nil)
-		require.NoError(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeOk}))
+		require.NoError(t, reader.Commit(
+			context.Background(),
+			topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{}, expectedRangeOk),
+		))
 
-		expectedRangeErr := commitRange{
-			commitOffsetStart: 15,
-			commitOffsetEnd:   20,
-			partitionSession:  newTestPartitionSessionReaderID(readerID, 30),
+		expectedRangeErr := topicreadercommon.CommitRange{
+			CommitOffsetStart: 15,
+			CommitOffsetEnd:   20,
+			PartitionSession:  newTestPartitionSessionReaderID(readerID, 30),
 		}
 
 		testErr := errors.New("test err")
 		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeErr).Return(testErr)
-		require.ErrorIs(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeErr}), testErr)
+		require.ErrorIs(t, reader.Commit(context.Background(), topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{}, expectedRangeErr)), testErr)
 	})
 
 	t.Run("CommitFromOtherReader", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		reader := &Reader{readerID: 1}
-		forCommit := commitRange{
-			commitOffsetStart: 1,
-			commitOffsetEnd:   2,
-			partitionSession:  newTestPartitionSessionReaderID(2, 0),
+		forCommit := topicreadercommon.CommitRange{
+			CommitOffsetStart: 1,
+			CommitOffsetEnd:   2,
+			PartitionSession:  newTestPartitionSessionReaderID(2, 0),
 		}
 		err := reader.Commit(ctx, forCommit)
 		require.ErrorIs(t, err, errCommitSessionFromOtherReader)

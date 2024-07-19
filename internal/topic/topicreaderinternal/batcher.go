@@ -51,7 +51,7 @@ func (b *batcher) Close(err error) error {
 	return nil
 }
 
-func (b *batcher) PushBatches(batches ...*PublicBatch) error {
+func (b *batcher) PushBatches(batches ...*topicreadercommon.PublicBatch) error {
 	b.m.Lock()
 	defer b.m.Unlock()
 	if b.closed {
@@ -59,7 +59,7 @@ func (b *batcher) PushBatches(batches ...*PublicBatch) error {
 	}
 
 	for _, batch := range batches {
-		if err := b.addNeedLock(batch.commitRange.partitionSession, newBatcherItemBatch(batch)); err != nil {
+		if err := b.addNeedLock(topicreadercommon.GetCommitRange(batch).PartitionSession, newBatcherItemBatch(batch)); err != nil {
 			return err
 		}
 	}
@@ -135,8 +135,8 @@ func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
 	return items[0], items[1:], true
 }
 
-func (o batcherGetOptions) splitBatch(batch *PublicBatch) (head, rest *PublicBatch, ok bool) {
-	notFound := func() (*PublicBatch, *PublicBatch, bool) {
+func (o batcherGetOptions) splitBatch(batch *topicreadercommon.PublicBatch) (head, rest *topicreadercommon.PublicBatch, ok bool) {
+	notFound := func() (*topicreadercommon.PublicBatch, *topicreadercommon.PublicBatch, bool) {
 		return nil, nil, false
 	}
 
@@ -148,7 +148,7 @@ func (o batcherGetOptions) splitBatch(batch *PublicBatch) (head, rest *PublicBat
 		return batch, nil, true
 	}
 
-	head, rest = batch.cutMessages(o.MaxCount)
+	head, rest = topicreadercommon.BatchCutMessages(batch, o.MaxCount)
 
 	return head, rest, true
 }
@@ -311,7 +311,7 @@ func (items batcherMessageOrderItems) Append(item batcherMessageOrderItem) (batc
 
 	lastItem := &items[len(items)-1]
 	if item.IsBatch() && lastItem.IsBatch() {
-		if resBatch, err := lastItem.Batch.append(item.Batch); err == nil {
+		if resBatch, err := topicreadercommon.BatchAppend(lastItem.Batch, item.Batch); err == nil {
 			lastItem.Batch = resBatch
 		} else {
 			return nil, err
@@ -340,11 +340,11 @@ func (items batcherMessageOrderItems) ReplaceHeadItem(item batcherMessageOrderIt
 }
 
 type batcherMessageOrderItem struct {
-	Batch      *PublicBatch
+	Batch      *topicreadercommon.PublicBatch
 	RawMessage rawtopicreader.ServerMessage
 }
 
-func newBatcherItemBatch(b *PublicBatch) batcherMessageOrderItem {
+func newBatcherItemBatch(b *topicreadercommon.PublicBatch) batcherMessageOrderItem {
 	return batcherMessageOrderItem{Batch: b}
 }
 
@@ -353,7 +353,7 @@ func newBatcherItemRawMessage(b rawtopicreader.ServerMessage) batcherMessageOrde
 }
 
 func (item *batcherMessageOrderItem) IsBatch() bool {
-	return !item.Batch.isEmpty()
+	return !topicreadercommon.BatchIsEmpty(item.Batch)
 }
 
 func (item *batcherMessageOrderItem) IsRawMessage() bool {
@@ -361,5 +361,5 @@ func (item *batcherMessageOrderItem) IsRawMessage() bool {
 }
 
 func (item *batcherMessageOrderItem) IsEmpty() bool {
-	return item.RawMessage == nil && item.Batch.isEmpty()
+	return item.RawMessage == nil && topicreadercommon.BatchIsEmpty(item.Batch)
 }

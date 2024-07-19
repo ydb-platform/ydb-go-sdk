@@ -1,7 +1,6 @@
-package topicreaderinternal
+package topicreadercommon
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"testing"
 	"time"
 
@@ -10,19 +9,19 @@ import (
 
 func TestBatch_New(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
-		session := &topicreadercommon.PartitionSession{}
+		session := &PartitionSession{}
 		m1 := &PublicMessage{
-			commitRange: commitRange{commitOffsetStart: 1, commitOffsetEnd: 2, partitionSession: session},
+			commitRange: CommitRange{CommitOffsetStart: 1, CommitOffsetEnd: 2, PartitionSession: session},
 		}
 		m2 := &PublicMessage{
-			commitRange: commitRange{commitOffsetStart: 2, commitOffsetEnd: 3, partitionSession: session},
+			commitRange: CommitRange{CommitOffsetStart: 2, CommitOffsetEnd: 3, PartitionSession: session},
 		}
-		batch, err := newBatch(session, []*PublicMessage{m1, m2})
+		batch, err := NewBatch(session, []*PublicMessage{m1, m2})
 		require.NoError(t, err)
 
 		expected := &PublicBatch{
 			Messages:    []*PublicMessage{m1, m2},
-			commitRange: commitRange{commitOffsetStart: 1, commitOffsetEnd: 3, partitionSession: session},
+			commitRange: CommitRange{CommitOffsetStart: 1, CommitOffsetEnd: 3, PartitionSession: session},
 		}
 		require.Equal(t, expected, batch)
 	})
@@ -30,31 +29,31 @@ func TestBatch_New(t *testing.T) {
 
 func TestBatch_Cut(t *testing.T) {
 	t.Run("Full", func(t *testing.T) {
-		session := &topicreadercommon.PartitionSession{}
-		batch, _ := newBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		session := &PartitionSession{}
+		batch, _ := NewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
 
-		head, rest := batch.cutMessages(100)
+		head, rest := BatchCutMessages(batch, 100)
 
 		require.Equal(t, batch, head)
-		require.True(t, rest.isEmpty())
+		require.True(t, BatchIsEmpty(rest))
 	})
 	t.Run("Zero", func(t *testing.T) {
-		session := &topicreadercommon.PartitionSession{}
-		batch, _ := newBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		session := &PartitionSession{}
+		batch, _ := NewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
 
-		head, rest := batch.cutMessages(0)
+		head, rest := BatchCutMessages(batch, 0)
 
 		require.Equal(t, batch, rest)
-		require.True(t, head.isEmpty())
+		require.True(t, BatchIsEmpty(head))
 	})
 	t.Run("Middle", func(t *testing.T) {
-		session := &topicreadercommon.PartitionSession{}
-		batch, _ := newBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		session := &PartitionSession{}
+		batch, _ := NewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
 
-		head, rest := batch.cutMessages(1)
+		head, rest := BatchCutMessages(batch, 1)
 
-		expectedBatchHead, _ := newBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
-		expectedBatchRest, _ := newBatch(session, []*PublicMessage{{WrittenAt: testTime(2)}})
+		expectedBatchHead, _ := NewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
+		expectedBatchRest, _ := NewBatch(session, []*PublicMessage{{WrittenAt: testTime(2)}})
 		require.Equal(t, expectedBatchHead, head)
 		require.Equal(t, expectedBatchRest, rest)
 	})
@@ -62,14 +61,14 @@ func TestBatch_Cut(t *testing.T) {
 
 func TestBatch_Extend(t *testing.T) {
 	t.Run("Ok", func(t *testing.T) {
-		session := &topicreadercommon.PartitionSession{}
+		session := &PartitionSession{}
 		m1 := &PublicMessage{
 			WrittenAt:   time.Date(2022, 6, 17, 15, 15, 0, 1, time.UTC),
-			commitRange: commitRange{commitOffsetStart: 10, commitOffsetEnd: 11, partitionSession: session},
+			commitRange: CommitRange{CommitOffsetStart: 10, CommitOffsetEnd: 11, PartitionSession: session},
 		}
 		m2 := &PublicMessage{
 			WrittenAt:   time.Date(2022, 6, 17, 15, 15, 0, 2, time.UTC),
-			commitRange: commitRange{commitOffsetStart: 11, commitOffsetEnd: 12, partitionSession: session},
+			commitRange: CommitRange{CommitOffsetStart: 11, CommitOffsetEnd: 12, PartitionSession: session},
 		}
 
 		b1 := &PublicBatch{
@@ -81,23 +80,23 @@ func TestBatch_Extend(t *testing.T) {
 			Messages:    []*PublicMessage{m2},
 			commitRange: m2.commitRange,
 		}
-		res, err := b1.append(b2)
+		res, err := BatchAppend(b1, b2)
 		require.NoError(t, err)
 
 		expected := &PublicBatch{
 			Messages:    []*PublicMessage{m1, m2},
-			commitRange: commitRange{commitOffsetStart: 10, commitOffsetEnd: 12, partitionSession: session},
+			commitRange: CommitRange{CommitOffsetStart: 10, CommitOffsetEnd: 12, PartitionSession: session},
 		}
 		require.Equal(t, expected, res)
 	})
 	t.Run("BadInterval", func(t *testing.T) {
 		m1 := &PublicMessage{
 			WrittenAt:   time.Date(2022, 6, 17, 15, 15, 0, 1, time.UTC),
-			commitRange: commitRange{commitOffsetStart: 10, commitOffsetEnd: 11},
+			commitRange: CommitRange{CommitOffsetStart: 10, CommitOffsetEnd: 11},
 		}
 		m2 := &PublicMessage{
 			WrittenAt:   time.Date(2022, 6, 17, 15, 15, 0, 2, time.UTC),
-			commitRange: commitRange{commitOffsetStart: 20, commitOffsetEnd: 30},
+			commitRange: CommitRange{CommitOffsetStart: 20, CommitOffsetEnd: 30},
 		}
 
 		b1 := &PublicBatch{
@@ -109,22 +108,22 @@ func TestBatch_Extend(t *testing.T) {
 			Messages:    []*PublicMessage{m2},
 			commitRange: m2.commitRange,
 		}
-		res, err := b1.append(b2)
+		res, err := BatchAppend(b1, b2)
 		require.Error(t, err)
 
 		require.Nil(t, res)
 	})
 	t.Run("BadSession", func(t *testing.T) {
-		session1 := &topicreadercommon.PartitionSession{}
-		session2 := &topicreadercommon.PartitionSession{}
+		session1 := &PartitionSession{}
+		session2 := &PartitionSession{}
 
 		m1 := &PublicMessage{
 			WrittenAt:   time.Date(2022, 6, 17, 15, 15, 0, 1, time.UTC),
-			commitRange: commitRange{commitOffsetStart: 10, commitOffsetEnd: 11, partitionSession: session1},
+			commitRange: CommitRange{CommitOffsetStart: 10, CommitOffsetEnd: 11, PartitionSession: session1},
 		}
 		m2 := &PublicMessage{
 			WrittenAt:   time.Date(2022, 6, 17, 15, 15, 0, 2, time.UTC),
-			commitRange: commitRange{commitOffsetStart: 11, commitOffsetEnd: 12, partitionSession: session2},
+			commitRange: CommitRange{CommitOffsetStart: 11, CommitOffsetEnd: 12, PartitionSession: session2},
 		}
 
 		b1 := &PublicBatch{
@@ -136,7 +135,7 @@ func TestBatch_Extend(t *testing.T) {
 			Messages:    []*PublicMessage{m2},
 			commitRange: m2.commitRange,
 		}
-		res, err := b1.append(b2)
+		res, err := BatchAppend(b1, b2)
 		require.Error(t, err)
 		require.Nil(t, res)
 	})
@@ -162,7 +161,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 	})
 	t.Run("MetadataOnlyEqually", func(t *testing.T) {
 		totalBytes := 30
-		batch, err := newBatch(nil, []*PublicMessage{{}, {}, {}})
+		batch, err := NewBatch(nil, []*PublicMessage{{}, {}, {}})
 		require.NoError(t, err)
 		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch}, totalBytes))
 
@@ -173,7 +172,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 	})
 	t.Run("MetadataOnlyWithReminder", func(t *testing.T) {
 		totalBytes := 5
-		batch, err := newBatch(nil, []*PublicMessage{{}, {}, {}})
+		batch, err := NewBatch(nil, []*PublicMessage{{}, {}, {}})
 		require.NoError(t, err)
 		require.NoError(t, SplitBytesByMessagesInBatches([]*PublicBatch{batch}, 5))
 
@@ -184,7 +183,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 	})
 	t.Run("OnlyData", func(t *testing.T) {
 		totalBytes := 30
-		batch, err := newBatch(nil, []*PublicMessage{{}, {}, {}})
+		batch, err := NewBatch(nil, []*PublicMessage{{}, {}, {}})
 		require.NoError(t, err)
 		for i := range batch.Messages {
 			batch.Messages[i].rawDataLen = 10
@@ -198,7 +197,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 	})
 	t.Run("DataAndMetadataEqually", func(t *testing.T) {
 		totalBytes := 30
-		batch, err := newBatch(nil, []*PublicMessage{{}, {}, {}})
+		batch, err := NewBatch(nil, []*PublicMessage{{}, {}, {}})
 		require.NoError(t, err)
 		for i := range batch.Messages {
 			batch.Messages[i].rawDataLen = 5
@@ -212,11 +211,11 @@ func TestSplitBytesByBatches(t *testing.T) {
 	})
 	t.Run("DataAndMetadataEquallyTwoBatches", func(t *testing.T) {
 		totalBytes := 30
-		batch1, err := newBatch(nil, []*PublicMessage{{}, {}})
+		batch1, err := NewBatch(nil, []*PublicMessage{{}, {}})
 		require.NoError(t, err)
 		batch1.Messages[0].rawDataLen = 5
 		batch1.Messages[1].rawDataLen = 5
-		batch2, err := newBatch(nil, []*PublicMessage{{}})
+		batch2, err := NewBatch(nil, []*PublicMessage{{}})
 		require.NoError(t, err)
 		batch2.Messages[0].rawDataLen = 5
 
@@ -228,7 +227,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 	})
 	t.Run("DataAndMetadataWithReminder", func(t *testing.T) {
 		totalBytes := 32
-		batch, err := newBatch(nil, []*PublicMessage{{}, {}, {}})
+		batch, err := NewBatch(nil, []*PublicMessage{{}, {}, {}})
 		require.NoError(t, err)
 		for i := range batch.Messages {
 			batch.Messages[i].rawDataLen = 5
@@ -243,7 +242,7 @@ func TestSplitBytesByBatches(t *testing.T) {
 	t.Run("BytesSmallerThenCalcedData", func(t *testing.T) {
 		totalBytes := 2
 
-		batch, err := newBatch(nil, []*PublicMessage{{}, {}, {}})
+		batch, err := NewBatch(nil, []*PublicMessage{{}, {}, {}})
 		require.NoError(t, err)
 		for i := range batch.Messages {
 			batch.Messages[i].rawDataLen = 5

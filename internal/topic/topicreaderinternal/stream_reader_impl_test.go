@@ -183,7 +183,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		opts.MinCount = 2
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
 		require.NoError(t, err)
-		require.NoError(t, e.reader.Commit(e.ctx, batch.getCommitRange().priv))
+		require.NoError(t, e.reader.Commit(e.ctx, topicreadercommon.GetCommitRange(batch)))
 		xtest.WaitChannelClosed(t, commitReceived)
 		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
@@ -244,7 +244,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		opts.MinCount = 2
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
 		require.NoError(t, err)
-		require.ErrorIs(t, e.reader.Commit(e.ctx, batch.Messages[1].getCommitRange().priv), ErrWrongCommitOrderInSyncMode)
+		require.ErrorIs(t, e.reader.Commit(e.ctx, topicreadercommon.GetCommitRange(batch.Messages[1])), ErrWrongCommitOrderInSyncMode)
 		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
 
@@ -309,7 +309,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 
 		batch, err := e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
 		require.NoError(t, err)
-		err = e.reader.Commit(e.ctx, batch.commitRange)
+		err = e.reader.Commit(e.ctx, topicreadercommon.GetCommitRange(batch))
 		require.NoError(t, err)
 		_, err = e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
 		require.ErrorIs(t, err, context.Canceled)
@@ -693,112 +693,105 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 		)
 
 		expectedData := [][]byte{[]byte("123"), []byte("4567"), []byte("098"), []byte("0987"), []byte("test"), []byte("4567")}
-		expectedBatch := &PublicBatch{
-			commitRange: commitRange{
-				commitOffsetStart: prevOffset + 1,
-				commitOffsetEnd:   prevOffset + 32,
-				partitionSession:  e.partitionSession,
-			},
-			Messages: []*PublicMessage{
-				{
-					SeqNo:                1,
-					CreatedAt:            testTime(1),
-					MessageGroupID:       "1",
-					Offset:               prevOffset.ToInt64() + 1,
-					WrittenAt:            testTime(5),
-					WriteSessionMetadata: map[string]string{"a": "b", "c": "d"},
-					UncompressedSize:     3,
-					rawDataLen:           3,
-					commitRange: commitRange{
-						commitOffsetStart: prevOffset + 1,
-						commitOffsetEnd:   prevOffset + 2,
-						partitionSession:  e.partitionSession,
-					},
-				},
-				{
-					SeqNo:                2,
-					CreatedAt:            testTime(2),
-					MessageGroupID:       "1",
-					Offset:               prevOffset.ToInt64() + 2,
-					WrittenAt:            testTime(5),
-					WriteSessionMetadata: map[string]string{"a": "b", "c": "d"},
-					rawDataLen:           4,
-					UncompressedSize:     4,
-					commitRange: commitRange{
-						commitOffsetStart: prevOffset + 2,
-						commitOffsetEnd:   prevOffset + 3,
-						partitionSession:  e.partitionSession,
-					},
-				},
-				{
-					SeqNo:                3,
-					CreatedAt:            testTime(3),
-					MessageGroupID:       "2",
-					Offset:               prevOffset.ToInt64() + 10,
-					WrittenAt:            testTime(6),
-					WriteSessionMetadata: map[string]string{"e": "f", "g": "h"},
-					rawDataLen:           len(compress("098")),
-					UncompressedSize:     3,
-					commitRange: commitRange{
-						commitOffsetStart: prevOffset + 3,
-						commitOffsetEnd:   prevOffset + 11,
-						partitionSession:  e.partitionSession,
-					},
-				},
-				{
-					SeqNo:                4,
-					CreatedAt:            testTime(4),
-					MessageGroupID:       "2",
-					Offset:               prevOffset.ToInt64() + 20,
-					WrittenAt:            testTime(6),
-					WriteSessionMetadata: map[string]string{"e": "f", "g": "h"},
-					rawDataLen:           len(compress("0987")),
-					UncompressedSize:     4,
-					commitRange: commitRange{
-						commitOffsetStart: prevOffset + 11,
-						commitOffsetEnd:   prevOffset + 21,
-						partitionSession:  e.partitionSession,
-					},
-				},
-				{
-					SeqNo:          5,
-					CreatedAt:      testTime(5),
-					MessageGroupID: "1",
-					Metadata: map[string][]byte{
+		expectedBatch := topicreadercommon.BatchSetCommitRangeForTest(&topicreadercommon.PublicBatch{
+			Messages: []*topicreadercommon.PublicMessage{
+				topicreadercommon.NewPublicMessageBuilder().
+					Seqno(1).
+					CreatedAt(testTime(1)).
+					MessageGroupID("1").
+					Offset(prevOffset.ToInt64() + 1).
+					WrittenAt(testTime(5)).
+					WriteSessionMetadata(map[string]string{"a": "b", "c": "d"}).
+					UncompressedSize(3).
+					RawDataLen(3).
+					CommitRange(topicreadercommon.CommitRange{
+						CommitOffsetStart: prevOffset + 1,
+						CommitOffsetEnd:   prevOffset + 2,
+						PartitionSession:  e.partitionSession,
+					}).Build(),
+				topicreadercommon.NewPublicMessageBuilder().
+					Seqno(2).
+					CreatedAt(testTime(2)).
+					MessageGroupID("1").
+					Offset(prevOffset.ToInt64() + 2).
+					WrittenAt(testTime(5)).
+					WriteSessionMetadata(map[string]string{"a": "b", "c": "d"}).
+					UncompressedSize(4).
+					RawDataLen(4).
+					CommitRange(topicreadercommon.CommitRange{
+						CommitOffsetStart: prevOffset + 2,
+						CommitOffsetEnd:   prevOffset + 3,
+						PartitionSession:  e.partitionSession,
+					}).Build(),
+				topicreadercommon.NewPublicMessageBuilder().
+					Seqno(3).
+					CreatedAt(testTime(3)).
+					MessageGroupID("2").
+					Offset(prevOffset.ToInt64() + 10).
+					WrittenAt(testTime(6)).
+					WriteSessionMetadata(map[string]string{"e": "f", "g": "h"}).
+					UncompressedSize(3).
+					RawDataLen(len(compress("098"))).
+					CommitRange(topicreadercommon.CommitRange{
+						CommitOffsetStart: prevOffset + 3,
+						CommitOffsetEnd:   prevOffset + 11,
+						PartitionSession:  e.partitionSession,
+					}).Build(),
+				topicreadercommon.NewPublicMessageBuilder().
+					Seqno(4).
+					CreatedAt(testTime(4)).
+					MessageGroupID("2").
+					Offset(prevOffset.ToInt64() + 20).
+					WrittenAt(testTime(6)).
+					WriteSessionMetadata(map[string]string{"e": "f", "g": "h"}).
+					UncompressedSize(4).
+					RawDataLen(len(compress("0987"))).
+					CommitRange(topicreadercommon.CommitRange{
+						CommitOffsetStart: prevOffset + 11,
+						CommitOffsetEnd:   prevOffset + 21,
+						PartitionSession:  e.partitionSession,
+					}).Build(),
+				topicreadercommon.NewPublicMessageBuilder().
+					Seqno(5).
+					CreatedAt(testTime(5)).
+					MessageGroupID("1").
+					Metadata(map[string][]byte{
 						"first":  []byte("first-value"),
 						"second": []byte("second-value"),
-					},
-					Offset:               prevOffset.ToInt64() + 30,
-					WrittenAt:            testTime(7),
-					WriteSessionMetadata: map[string]string{"a": "b", "c": "d"},
-					UncompressedSize:     4,
-					rawDataLen:           4,
-					commitRange: commitRange{
-						commitOffsetStart: prevOffset + 21,
-						commitOffsetEnd:   prevOffset + 31,
-						partitionSession:  e.partitionSession,
-					},
-				},
-				{
-					SeqNo:          6,
-					CreatedAt:      testTime(5),
-					MessageGroupID: "1",
-					Metadata: map[string][]byte{
+					}).
+					Offset(prevOffset.ToInt64() + 30).
+					WrittenAt(testTime(7)).
+					WriteSessionMetadata(map[string]string{"a": "b", "c": "d"}).
+					UncompressedSize(4).
+					RawDataLen(4).
+					CommitRange(topicreadercommon.CommitRange{
+						CommitOffsetStart: prevOffset + 21,
+						CommitOffsetEnd:   prevOffset + 31,
+						PartitionSession:  e.partitionSession,
+					}).Build(),
+				topicreadercommon.NewPublicMessageBuilder().
+					Seqno(6).
+					CreatedAt(testTime(5)).
+					MessageGroupID("1").
+					Metadata(map[string][]byte{
 						"doubled-key": []byte("good"),
-					},
-					Offset:               prevOffset.ToInt64() + 31,
-					WrittenAt:            testTime(7),
-					WriteSessionMetadata: map[string]string{"a": "b", "c": "d"},
-					UncompressedSize:     4,
-					rawDataLen:           4,
-					commitRange: commitRange{
-						commitOffsetStart: prevOffset + 31,
-						commitOffsetEnd:   prevOffset + 32,
-						partitionSession:  e.partitionSession,
-					},
-				},
+					}).
+					Offset(prevOffset.ToInt64() + 31).
+					WrittenAt(testTime(7)).
+					WriteSessionMetadata(map[string]string{"a": "b", "c": "d"}).
+					UncompressedSize(4).
+					RawDataLen(4).
+					CommitRange(topicreadercommon.CommitRange{
+						CommitOffsetStart: prevOffset + 31,
+						CommitOffsetEnd:   prevOffset + 32,
+						PartitionSession:  e.partitionSession,
+					}).Build(),
 			},
-		}
+		}, topicreadercommon.CommitRange{
+			CommitOffsetStart: prevOffset + 1,
+			CommitOffsetEnd:   prevOffset + 32,
+			PartitionSession:  e.partitionSession,
+		})
 
 		opts := newReadMessageBatchOptions()
 		opts.MinCount = 6
@@ -807,11 +800,10 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 
 		data := make([][]byte, 0, len(batch.Messages))
 		for i := range batch.Messages {
-			content, err := io.ReadAll(&batch.Messages[i].data)
+			content, err := io.ReadAll(batch.Messages[i])
 			require.NoError(t, err)
 			data = append(data, content)
-			batch.Messages[i].data = newOneTimeReader(nil)
-			batch.Messages[i].bufferBytesAccount = 0
+			topicreadercommon.MessageSetNilDataForTest(batch.Messages[i])
 		}
 
 		require.Equal(t, expectedData, data)
@@ -884,7 +876,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 		e.Start()
 
 		readCompleted := make(empty.Chan)
-		var batch *PublicBatch
+		var batch *topicreadercommon.PublicBatch
 		var readErr error
 		go func() {
 			defer close(readCompleted)
@@ -924,8 +916,8 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 		e.reader.cfg.CommitMode = mode
 		e.Start()
 
-		cr := commitRange{
-			partitionSession: topicreadercommon.NewPartitionSession(
+		cr := topicreadercommon.CommitRange{
+			PartitionSession: topicreadercommon.NewPartitionSession(
 				context.Background(),
 				"asd",
 				123,

@@ -2,6 +2,7 @@ package topicreader
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
@@ -49,10 +50,10 @@ func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
 }
 
 // Message contains data and metadata, readed from the server
-type Message = topicreaderinternal.PublicMessage
+type Message = topicreadercommon.PublicMessage
 
 // MessageContentUnmarshaler is interface for unmarshal message content to own struct
-type MessageContentUnmarshaler = topicreaderinternal.PublicMessageContentUnmarshaler
+type MessageContentUnmarshaler = topicreadercommon.PublicMessageContentUnmarshaler
 
 // Commit receive Message, Batch of single offset
 // It can be fast (by default) or sync and waite response from server
@@ -72,7 +73,7 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 }
 
 // CommitRangeGetter interface for get commit offsets
-type CommitRangeGetter = topicreaderinternal.PublicCommitRangeGetter
+type CommitRangeGetter = topicreadercommon.PublicCommitRangeGetter
 
 // ReadMessageBatch
 //
@@ -103,7 +104,7 @@ func (r *Reader) ReadMessagesBatch(ctx context.Context, opts ...ReadBatchOption)
 }
 
 // Batch is ordered group of messages from one partition
-type Batch = topicreaderinternal.PublicBatch
+type Batch = topicreadercommon.PublicBatch
 
 // ReadBatchOption is type for options of read batch
 type ReadBatchOption = topicreaderinternal.PublicReadBatchOption

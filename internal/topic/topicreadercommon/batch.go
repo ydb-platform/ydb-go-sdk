@@ -1,10 +1,8 @@
-package topicreaderinternal
+package topicreadercommon
 
 import (
 	"context"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -21,17 +19,17 @@ type PublicBatch struct {
 
 	Messages []*PublicMessage
 
-	commitRange commitRange // от всех сообщений батча
+	commitRange CommitRange // от всех сообщений батча
 }
 
-func newBatch(session *topicreadercommon.PartitionSession, messages []*PublicMessage) (*PublicBatch, error) {
+func NewBatch(session *PartitionSession, messages []*PublicMessage) (*PublicBatch, error) {
 	for i := 0; i < len(messages); i++ {
 		msg := messages[i]
 
-		if msg.commitRange.partitionSession == nil {
-			msg.commitRange.partitionSession = session
+		if msg.commitRange.PartitionSession == nil {
+			msg.commitRange.PartitionSession = session
 		}
-		if session != msg.commitRange.partitionSession {
+		if session != msg.commitRange.PartitionSession {
 			return nil, xerrors.WithStackTrace(errBadSessionWhileMessageBatchCreate)
 		}
 
@@ -40,17 +38,17 @@ func newBatch(session *topicreadercommon.PartitionSession, messages []*PublicMes
 		}
 
 		prev := messages[i-1]
-		if prev.commitRange.commitOffsetEnd != msg.commitRange.commitOffsetStart {
+		if prev.commitRange.CommitOffsetEnd != msg.commitRange.CommitOffsetStart {
 			return nil, xerrors.WithStackTrace(errBadMessageOffsetWhileMessageBatchCreate)
 		}
 	}
 
-	offset := commitRange{
-		partitionSession: session,
+	offset := CommitRange{
+		PartitionSession: session,
 	}
 	if len(messages) > 0 {
-		offset.commitOffsetStart = messages[0].commitRange.commitOffsetStart
-		offset.commitOffsetEnd = messages[len(messages)-1].commitRange.commitOffsetEnd
+		offset.CommitOffsetStart = messages[0].commitRange.CommitOffsetStart
+		offset.CommitOffsetEnd = messages[len(messages)-1].commitRange.CommitOffsetEnd
 	}
 
 	return &PublicBatch{
@@ -60,8 +58,8 @@ func newBatch(session *topicreadercommon.PartitionSession, messages []*PublicMes
 }
 
 func NewBatchFromStream(
-	decoders topicreadercommon.DecoderMap,
-	session *topicreadercommon.PartitionSession,
+	decoders DecoderMap,
+	session *PartitionSession,
 	sb rawtopicreader.Batch, //nolint:gocritic
 ) (*PublicBatch, error) {
 	messages := make([]*PublicMessage, len(sb.MessageData))
@@ -83,9 +81,9 @@ func NewBatchFromStream(
 		dstMess.data = createReader(decoders, sb.Codec, sMess.Data)
 		dstMess.UncompressedSize = int(sMess.UncompressedSize)
 
-		dstMess.commitRange.partitionSession = session
-		dstMess.commitRange.commitOffsetStart = prevOffset + 1
-		dstMess.commitRange.commitOffsetEnd = sMess.Offset + 1
+		dstMess.commitRange.PartitionSession = session
+		dstMess.commitRange.CommitOffsetStart = prevOffset + 1
+		dstMess.commitRange.CommitOffsetEnd = sMess.Offset + 1
 
 		if len(sMess.MetadataItems) > 0 {
 			dstMess.Metadata = make(map[string][]byte, len(sMess.MetadataItems))
@@ -99,13 +97,13 @@ func NewBatchFromStream(
 
 	session.SetLastReceivedMessageOffset(prevOffset)
 
-	return newBatch(session, messages)
+	return NewBatch(session, messages)
 }
 
 // Context is cancelled when code should stop to process messages batch
 // for example - lost connection to server or receive stop partition signal without graceful flag
 func (m *PublicBatch) Context() context.Context {
-	return m.commitRange.partitionSession.Context()
+	return m.commitRange.PartitionSession.Context()
 }
 
 // Topic is path of source topic of the messages in the batch
@@ -118,54 +116,12 @@ func (m *PublicBatch) PartitionID() int64 {
 	return m.partitionSession().PartitionID
 }
 
-func (m *PublicBatch) partitionSession() *topicreadercommon.PartitionSession {
-	return m.commitRange.partitionSession
+func (m *PublicBatch) partitionSession() *PartitionSession {
+	return m.commitRange.PartitionSession
 }
 
 func (m *PublicBatch) getCommitRange() PublicCommitRange {
 	return m.commitRange.getCommitRange()
-}
-
-func (m *PublicBatch) append(b *PublicBatch) (*PublicBatch, error) {
-	var res *PublicBatch
-	if m == nil {
-		res = &PublicBatch{}
-	} else {
-		res = m
-	}
-
-	if res.commitRange.partitionSession != b.commitRange.partitionSession {
-		return nil, xerrors.WithStackTrace(errors.New("ydb: bad partition session for merge"))
-	}
-
-	if res.commitRange.commitOffsetEnd != b.commitRange.commitOffsetStart {
-		return nil, xerrors.WithStackTrace(errors.New("ydb: bad offset interval for merge"))
-	}
-
-	res.Messages = append(res.Messages, b.Messages...)
-	res.commitRange.commitOffsetEnd = b.commitRange.commitOffsetEnd
-
-	return res, nil
-}
-
-func (m *PublicBatch) cutMessages(count int) (head, rest *PublicBatch) {
-	switch {
-	case count == 0:
-		return nil, m
-	case count >= len(m.Messages):
-		return m, nil
-	default:
-		// slice[0:count:count] - limit slice capacity and prevent overwrite rest by append messages to head
-		// explicit 0 need for prevent typos, when type slice[count:count] instead of slice[:count:count]
-		head, _ = newBatch(m.commitRange.partitionSession, m.Messages[0:count:count])
-		rest, _ = newBatch(m.commitRange.partitionSession, m.Messages[count:])
-
-		return head, rest
-	}
-}
-
-func (m *PublicBatch) isEmpty() bool {
-	return m == nil || len(m.Messages) == 0
 }
 
 func SplitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) error {
@@ -219,4 +175,55 @@ func SplitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) 
 	}
 
 	return nil
+}
+
+func BatchAppend(original *PublicBatch, appended *PublicBatch) (*PublicBatch, error) {
+	var res *PublicBatch
+	if original == nil {
+		res = &PublicBatch{}
+	} else {
+		res = original
+	}
+
+	if res.commitRange.PartitionSession != appended.commitRange.PartitionSession {
+		return nil, xerrors.WithStackTrace(errors.New("ydb: bad partition session for merge"))
+	}
+
+	if res.commitRange.CommitOffsetEnd != appended.commitRange.CommitOffsetStart {
+		return nil, xerrors.WithStackTrace(errors.New("ydb: bad offset interval for merge"))
+	}
+
+	res.Messages = append(res.Messages, appended.Messages...)
+	res.commitRange.CommitOffsetEnd = appended.commitRange.CommitOffsetEnd
+
+	return res, nil
+}
+
+func BatchCutMessages(b *PublicBatch, count int) (head, rest *PublicBatch) {
+	switch {
+	case count == 0:
+		return nil, b
+	case count >= len(b.Messages):
+		return b, nil
+	default:
+		// slice[0:count:count] - limit slice capacity and prevent overwrite rest by append messages to head
+		// explicit 0 need for prevent typos, when type slice[count:count] instead of slice[:count:count]
+		head, _ = NewBatch(b.commitRange.PartitionSession, b.Messages[0:count:count])
+		rest, _ = NewBatch(b.commitRange.PartitionSession, b.Messages[count:])
+
+		return head, rest
+	}
+}
+
+func BatchIsEmpty(b *PublicBatch) bool {
+	return b == nil || len(b.Messages) == 0
+}
+
+func BatchGetPartitionSessionID(item *PublicBatch) rawtopicreader.PartitionSessionID {
+	return item.partitionSession().PartitionSessionID
+}
+
+func BatchSetCommitRangeForTest(b *PublicBatch, commitRange CommitRange) *PublicBatch {
+	b.commitRange = commitRange
+	return b
 }

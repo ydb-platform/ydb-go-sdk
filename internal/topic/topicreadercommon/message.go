@@ -1,11 +1,10 @@
-package topicreaderinternal
+package topicreadercommon
 
 import (
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -28,7 +27,7 @@ type PublicMessage struct {
 	ProducerID           string
 	Metadata             map[string][]byte // Metadata, nil if no metadata
 
-	commitRange        commitRange
+	commitRange        CommitRange
 	data               oneTimeReader
 	rawDataLen         int
 	bufferBytesAccount int
@@ -81,7 +80,7 @@ type PublicMessageContentUnmarshaler interface {
 	UnmarshalYDBTopicMessage(data []byte) error
 }
 
-func createReader(decoders topicreadercommon.DecoderMap, codec rawtopiccommon.Codec, rawBytes []byte) oneTimeReader {
+func createReader(decoders DecoderMap, codec rawtopiccommon.Codec, rawBytes []byte) oneTimeReader {
 	reader, err := decoders.Decode(codec, bytes.NewReader(rawBytes))
 	if err != nil {
 		reader = errorReader{
@@ -113,7 +112,7 @@ func NewPublicMessageBuilder() *PublicMessageBuilder {
 
 func (pmb *PublicMessageBuilder) initMessage() {
 	pmb.mess = &PublicMessage{
-		commitRange: commitRange{partitionSession: topicreadercommon.NewPartitionSession(
+		commitRange: CommitRange{PartitionSession: NewPartitionSession(
 			context.Background(),
 			"",
 			0,
@@ -195,6 +194,11 @@ func (pmb *PublicMessageBuilder) DataAndUncompressedSize(data []byte) *PublicMes
 	return pmb
 }
 
+func (pmb *PublicMessageBuilder) CommitRange(cr CommitRange) *PublicMessageBuilder {
+	pmb.mess.commitRange = cr
+	return pmb
+}
+
 // UncompressedSize set message UncompressedSize
 func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicMessageBuilder {
 	pmb.mess.UncompressedSize = uncompressedSize
@@ -204,17 +208,22 @@ func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicM
 
 // Context set message Context
 func (pmb *PublicMessageBuilder) Context(ctx context.Context) {
-	pmb.mess.commitRange.partitionSession.SetContext(ctx)
+	pmb.mess.commitRange.PartitionSession.SetContext(ctx)
 }
 
 // Topic set message Topic
 func (pmb *PublicMessageBuilder) Topic(topic string) {
-	pmb.mess.commitRange.partitionSession.Topic = topic
+	pmb.mess.commitRange.PartitionSession.Topic = topic
 }
 
 // PartitionID set message PartitionID
 func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) {
-	pmb.mess.commitRange.partitionSession.PartitionID = partitionID
+	pmb.mess.commitRange.PartitionSession.PartitionID = partitionID
+}
+
+func (pmb *PublicMessageBuilder) RawDataLen(val int) *PublicMessageBuilder {
+	pmb.mess.rawDataLen = val
+	return pmb
 }
 
 // Build return builded message and reset internal state for create new message
@@ -223,4 +232,19 @@ func (pmb *PublicMessageBuilder) Build() *PublicMessage {
 	pmb.initMessage()
 
 	return mess
+}
+
+func MessageGetBufferBytesAccount(m *PublicMessage) int {
+	return m.bufferBytesAccount
+}
+
+func MessageWithSetCommitRangeForTest(m *PublicMessage, commitRange CommitRange) *PublicMessage {
+	m.commitRange = commitRange
+	return m
+}
+
+func MessageSetNilDataForTest(m *PublicMessage) {
+	m.data = newOneTimeReader(nil)
+	m.bufferBytesAccount = 0
+	m.dataConsumed = false
 }

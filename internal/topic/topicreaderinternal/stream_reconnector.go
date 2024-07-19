@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"runtime"
 	"sync"
 	"time"
@@ -76,7 +77,7 @@ func newReaderReconnector(
 	return res
 }
 
-func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*PublicBatch, error) {
+func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -126,7 +127,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 	}
 }
 
-func (r *readerReconnector) Commit(ctx context.Context, commitRange commitRange) error {
+func (r *readerReconnector) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
 	stream, err := r.stream(ctx)
 	if err != nil {
 		return err
