@@ -3,6 +3,8 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"runtime"
 	"testing"
 
@@ -73,7 +75,7 @@ func TestReader_Close(t *testing.T) {
 		go func() {
 			readerCommitState.err = reader.Commit(context.Background(), &PublicMessage{
 				commitRange: commitRange{
-					partitionSession: &partitionSession{},
+					partitionSession: &topicreadercommon.PartitionSession{},
 				},
 			})
 			close(readerCommitState.callCompleted)
@@ -120,10 +122,7 @@ func TestReader_Commit(t *testing.T) {
 		expectedRangeOk := commitRange{
 			commitOffsetStart: 1,
 			commitOffsetEnd:   10,
-			partitionSession: &partitionSession{
-				readerID:           readerID,
-				partitionSessionID: 10,
-			},
+			partitionSession:  newTestPartitionSessionReaderID(readerID, 10),
 		}
 		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeOk).Return(nil)
 		require.NoError(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeOk}))
@@ -131,10 +130,7 @@ func TestReader_Commit(t *testing.T) {
 		expectedRangeErr := commitRange{
 			commitOffsetStart: 15,
 			commitOffsetEnd:   20,
-			partitionSession: &partitionSession{
-				readerID:           readerID,
-				partitionSessionID: 30,
-			},
+			partitionSession:  newTestPartitionSessionReaderID(readerID, 30),
 		}
 
 		testErr := errors.New("test err")
@@ -148,7 +144,7 @@ func TestReader_Commit(t *testing.T) {
 		forCommit := commitRange{
 			commitOffsetStart: 1,
 			commitOffsetEnd:   2,
-			partitionSession:  &partitionSession{readerID: 2},
+			partitionSession:  newTestPartitionSessionReaderID(2, 0),
 		}
 		err := reader.Commit(ctx, forCommit)
 		require.ErrorIs(t, err, errCommitSessionFromOtherReader)
@@ -169,4 +165,16 @@ func TestReader_WaitInit(t *testing.T) {
 	baseReader.EXPECT().WaitInit(gomock.Any())
 	err := reader.WaitInit(context.Background())
 	require.NoError(t, err)
+}
+
+func newTestPartitionSessionReaderID(readerID int64, partitionSessionID rawtopicreader.PartitionSessionID) *topicreadercommon.PartitionSession {
+	return topicreadercommon.NewPartitionSession(
+		context.Background(),
+		"",
+		0,
+		readerID,
+		"",
+		partitionSessionID,
+		0,
+	)
 }

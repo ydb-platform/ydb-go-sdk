@@ -1,14 +1,11 @@
 package topicreaderinternal
 
 import (
-	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -16,81 +13,6 @@ const (
 	compactionIntervalTime    = time.Hour
 	compactionIntervalRemoves = 10000
 )
-
-type partitionSession struct {
-	Topic       string
-	PartitionID int64
-
-	readerID     int64
-	connectionID string
-
-	ctx                context.Context //nolint:containedctx
-	ctxCancel          context.CancelFunc
-	partitionSessionID rawtopicreader.PartitionSessionID
-
-	lastReceivedOffsetEndVal atomic.Int64
-	committedOffsetVal       atomic.Int64
-}
-
-func newPartitionSession(
-	partitionContext context.Context,
-	topic string,
-	partitionID int64,
-	readerID int64,
-	connectionID string,
-	partitionSessionID rawtopicreader.PartitionSessionID,
-	committedOffset rawtopicreader.Offset,
-) *partitionSession {
-	partitionContext, cancel := xcontext.WithCancel(partitionContext)
-
-	res := &partitionSession{
-		Topic:              topic,
-		PartitionID:        partitionID,
-		readerID:           readerID,
-		connectionID:       connectionID,
-		ctx:                partitionContext,
-		ctxCancel:          cancel,
-		partitionSessionID: partitionSessionID,
-	}
-	res.committedOffsetVal.Store(committedOffset.ToInt64())
-	res.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
-
-	return res
-}
-
-func (s *partitionSession) Context() context.Context {
-	return s.ctx
-}
-
-func (s *partitionSession) Close() {
-	s.ctxCancel()
-}
-
-func (s *partitionSession) committedOffset() rawtopicreader.Offset {
-	v := s.committedOffsetVal.Load()
-
-	var res rawtopicreader.Offset
-	res.FromInt64(v)
-
-	return res
-}
-
-func (s *partitionSession) setCommittedOffset(v rawtopicreader.Offset) {
-	s.committedOffsetVal.Store(v.ToInt64())
-}
-
-func (s *partitionSession) lastReceivedMessageOffset() rawtopicreader.Offset {
-	v := s.lastReceivedOffsetEndVal.Load()
-
-	var res rawtopicreader.Offset
-	res.FromInt64(v)
-
-	return res
-}
-
-func (s *partitionSession) setLastReceivedMessageOffset(v rawtopicreader.Offset) {
-	s.lastReceivedOffsetEndVal.Store(v.ToInt64())
-}
 
 type PartitionSessionStorage struct {
 	m sync.RWMutex
@@ -107,19 +29,19 @@ func (c *PartitionSessionStorage) init() {
 	c.lastCompactedTime = time.Now()
 }
 
-func (c *PartitionSessionStorage) Add(session *partitionSession) error {
+func (c *PartitionSessionStorage) Add(session *topicreadercommon.PartitionSession) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	if _, ok := c.sessions[session.partitionSessionID]; ok {
-		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.partitionSessionID))
+	if _, ok := c.sessions[session.PartitionSessionID]; ok {
+		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.PartitionSessionID))
 	}
-	c.sessions[session.partitionSessionID] = &sessionInfo{Session: session}
+	c.sessions[session.PartitionSessionID] = &sessionInfo{Session: session}
 
 	return nil
 }
 
-func (c *PartitionSessionStorage) Get(id partitionSessionID) (*partitionSession, error) {
+func (c *PartitionSessionStorage) Get(id partitionSessionID) (*topicreadercommon.PartitionSession, error) {
 	c.m.RLock()
 	defer c.m.RUnlock()
 
@@ -131,7 +53,7 @@ func (c *PartitionSessionStorage) Get(id partitionSessionID) (*partitionSession,
 	return partitionInfo.Session, nil
 }
 
-func (c *PartitionSessionStorage) Remove(id partitionSessionID) (*partitionSession, error) {
+func (c *PartitionSessionStorage) Remove(id partitionSessionID) (*topicreadercommon.PartitionSession, error) {
 	now := time.Now()
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -174,7 +96,7 @@ func (c *PartitionSessionStorage) doCompactionNeedLock(now time.Time) {
 type sessionInfo struct {
 	RemoveTime   time.Time
 	RemovedIndex int
-	Session      *partitionSession
+	Session      *topicreadercommon.PartitionSession
 }
 
 func (si *sessionInfo) IsGarbage(removeIndexNow int, timeNow time.Time) bool {

@@ -12,10 +12,10 @@ import (
 )
 
 type streamListener struct {
-	stream  topicreaderinternal.RawTopicReaderStream
-	handler EventHandler
-
+	stream     topicreaderinternal.RawTopicReaderStream
+	handler    EventHandler
 	bufferSize int64
+	decoders   topicreadercommon.DecoderMap
 
 	selectors []*topicreadercommon.PublicReadSelector
 	consumer  string
@@ -30,6 +30,7 @@ func newStreamListenerStopped(
 	consumer string,
 	selectors []*topicreadercommon.PublicReadSelector,
 	bufferSize int64,
+	decoders topicreadercommon.DecoderMap,
 ) *streamListener {
 	return &streamListener{
 		stream:     stream,
@@ -37,6 +38,7 @@ func newStreamListenerStopped(
 		consumer:   consumer,
 		selectors:  selectors,
 		bufferSize: bufferSize,
+		decoders:   decoders,
 	}
 }
 

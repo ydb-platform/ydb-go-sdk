@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"io"
 	"testing"
 	"time"
@@ -107,7 +108,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		e := newTopicReaderTestEnv(t)
 		e.Start()
 
-		lastOffset := e.partitionSession.lastReceivedMessageOffset()
+		lastOffset := e.partitionSession.LastReceivedMessageOffset()
 		const dataSize = 4
 
 		// request new data portion
@@ -191,7 +192,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		e.reader.cfg.CommitMode = CommitModeSync
 		e.Start()
 
-		lastOffset := e.partitionSession.lastReceivedMessageOffset()
+		lastOffset := e.partitionSession.LastReceivedMessageOffset()
 		const dataSize = 4
 		// request new data portion
 		readRequestReceived := make(empty.Chan)
@@ -250,7 +251,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 
-		committed := e.partitionSession.committedOffset()
+		committed := e.partitionSession.CommittedOffset()
 		commitReceived := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.CommitOffsetRequest{CommitOffsets: []rawtopicreader.PartitionCommitOffset{
 			{
@@ -379,16 +380,16 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.reader.cfg.Trace.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
 			expected := trace.TopicReaderPartitionReadStopResponseStartInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
-				PartitionContext:   &e.partitionSession.ctx,
+				PartitionContext:   e.partitionSession.Context(),
 				Topic:              e.partitionSession.Topic,
 				PartitionID:        e.partitionSession.PartitionID,
-				PartitionSessionID: e.partitionSession.partitionSessionID.ToInt64(),
+				PartitionSessionID: e.partitionSession.PartitionSessionID.ToInt64(),
 				CommittedOffset:    committedOffset,
 				Graceful:           true,
 			}
 			require.Equal(t, expected, info)
 
-			require.NoError(t, (*info.PartitionContext).Err())
+			require.NoError(t, info.PartitionContext.Err())
 
 			readMessagesCtxCancel()
 
@@ -424,15 +425,15 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.reader.cfg.Trace.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
 			expected := trace.TopicReaderPartitionReadStopResponseStartInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
-				PartitionContext:   &e.partitionSession.ctx,
+				PartitionContext:   e.partitionSession.Context(),
 				Topic:              e.partitionSession.Topic,
 				PartitionID:        e.partitionSession.PartitionID,
-				PartitionSessionID: e.partitionSession.partitionSessionID.ToInt64(),
+				PartitionSessionID: e.partitionSession.PartitionSessionID.ToInt64(),
 				CommittedOffset:    committedOffset,
 				Graceful:           false,
 			}
 			require.Equal(t, expected, info)
-			require.Error(t, (*info.PartitionContext).Err())
+			require.Error(t, info.PartitionContext.Err())
 
 			readMessagesCtxCancel()
 
@@ -583,7 +584,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			return b.Bytes()
 		}
 
-		prevOffset := e.partitionSession.lastReceivedMessageOffset()
+		prevOffset := e.partitionSession.LastReceivedMessageOffset()
 
 		sendDataRequestCompleted := make(empty.Chan)
 		dataSize := 6
@@ -924,7 +925,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 		e.Start()
 
 		cr := commitRange{
-			partitionSession: newPartitionSession(
+			partitionSession: topicreadercommon.NewPartitionSession(
 				context.Background(),
 				"asd",
 				123,
@@ -961,7 +962,7 @@ type streamEnv struct {
 	stream                 *MockRawTopicReaderStream
 	partitionSessionID     partitionSessionID
 	mc                     *gomock.Controller
-	partitionSession       *partitionSession
+	partitionSession       *topicreadercommon.PartitionSession
 	initialBufferSizeBytes int64
 
 	m                          xsync.Mutex
@@ -997,7 +998,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	const testSessionID = 15
 	const testSessionComitted = 20
 
-	session := newPartitionSession(
+	session := topicreadercommon.NewPartitionSession(
 		ctx,
 		"/test",
 		testPartitionID,
@@ -1017,7 +1018,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		stream:                     stream,
 		messagesFromServerToClient: make(chan testStreamResult),
 		partitionSession:           session,
-		partitionSessionID:         session.partitionSessionID,
+		partitionSessionID:         session.PartitionSessionID,
 		mc:                         mc,
 	}
 

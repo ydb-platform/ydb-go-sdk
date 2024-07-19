@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -66,7 +67,7 @@ func (b *batcher) PushBatches(batches ...*PublicBatch) error {
 	return nil
 }
 
-func (b *batcher) PushRawMessage(session *partitionSession, m rawtopicreader.ServerMessage) error {
+func (b *batcher) PushRawMessage(session *topicreadercommon.PartitionSession, m rawtopicreader.ServerMessage) error {
 	b.m.Lock()
 	defer b.m.Unlock()
 
@@ -77,7 +78,7 @@ func (b *batcher) PushRawMessage(session *partitionSession, m rawtopicreader.Ser
 	return b.addNeedLock(session, newBatcherItemRawMessage(m))
 }
 
-func (b *batcher) addNeedLock(session *partitionSession, item batcherMessageOrderItem) error {
+func (b *batcher) addNeedLock(session *topicreadercommon.PartitionSession, item batcherMessageOrderItem) error {
 	var currentItems batcherMessageOrderItems
 	var ok bool
 	var err error
@@ -217,7 +218,7 @@ func (b *batcher) notifyAboutNewMessages() {
 }
 
 type batcherResultCandidate struct {
-	Key         *partitionSession
+	Key         *topicreadercommon.PartitionSession
 	Result      batcherMessageOrderItem
 	Rest        batcherMessageOrderItems
 	WaiterIndex int
@@ -225,7 +226,7 @@ type batcherResultCandidate struct {
 }
 
 func newBatcherResultCandidate(
-	key *partitionSession,
+	key *topicreadercommon.PartitionSession,
 	result batcherMessageOrderItem,
 	rest batcherMessageOrderItems,
 	ok bool,
@@ -299,7 +300,7 @@ func (b *batcher) IgnoreMinRestrictionsOnNextPop() {
 	b.notifyAboutNewMessages()
 }
 
-type batcherMessagesMap map[*partitionSession]batcherMessageOrderItems
+type batcherMessagesMap map[*topicreadercommon.PartitionSession]batcherMessageOrderItems
 
 type batcherMessageOrderItems []batcherMessageOrderItem
 

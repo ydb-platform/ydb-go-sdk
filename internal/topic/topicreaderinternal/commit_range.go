@@ -1,6 +1,7 @@
 package topicreaderinternal
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -27,7 +28,7 @@ func (r *CommitRanges) GetCommitsInfo() []trace.TopicReaderStreamCommitInfo {
 		res[i] = trace.TopicReaderStreamCommitInfo{
 			Topic:              r.ranges[i].partitionSession.Topic,
 			PartitionID:        r.ranges[i].partitionSession.PartitionID,
-			PartitionSessionID: r.ranges[i].partitionSession.partitionSessionID.ToInt64(),
+			PartitionSessionID: r.ranges[i].partitionSession.PartitionSessionID.ToInt64(),
 			StartOffset:        r.ranges[i].commitOffsetStart.ToInt64(),
 			EndOffset:          r.ranges[i].commitOffsetEnd.ToInt64(),
 		}
@@ -98,9 +99,9 @@ func (r *CommitRanges) optimize() {
 	sort.Slice(r.ranges, func(i, j int) bool {
 		cI, cJ := &r.ranges[i], &r.ranges[j]
 		switch {
-		case cI.partitionSession.partitionSessionID < cJ.partitionSession.partitionSessionID:
+		case cI.partitionSession.PartitionSessionID < cJ.partitionSession.PartitionSessionID:
 			return true
-		case cJ.partitionSession.partitionSessionID < cI.partitionSession.partitionSessionID:
+		case cJ.partitionSession.PartitionSessionID < cI.partitionSession.PartitionSessionID:
 			return false
 		case cI.commitOffsetStart < cJ.commitOffsetStart:
 			return true
@@ -113,7 +114,7 @@ func (r *CommitRanges) optimize() {
 	lastCommit := &newCommits[0]
 	for i := 1; i < len(r.ranges); i++ {
 		commit := &r.ranges[i]
-		if lastCommit.partitionSession.partitionSessionID == commit.partitionSession.partitionSessionID &&
+		if lastCommit.partitionSession.PartitionSessionID == commit.partitionSession.PartitionSessionID &&
 			lastCommit.commitOffsetEnd == commit.commitOffsetStart {
 			lastCommit.commitOffsetEnd = commit.commitOffsetEnd
 		} else {
@@ -137,7 +138,7 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 	}
 
 	partitionOffsets := make([]rawtopicreader.PartitionCommitOffset, 0, len(r.ranges))
-	partitionOffsets = append(partitionOffsets, newPartition(r.ranges[0].partitionSession.partitionSessionID))
+	partitionOffsets = append(partitionOffsets, newPartition(r.ranges[0].partitionSession.PartitionSessionID))
 	partition := &partitionOffsets[0]
 
 	for i := range r.ranges {
@@ -146,8 +147,8 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 			Start: commit.commitOffsetStart,
 			End:   commit.commitOffsetEnd,
 		}
-		if partition.PartitionSessionID != commit.partitionSession.partitionSessionID {
-			partitionOffsets = append(partitionOffsets, newPartition(commit.partitionSession.partitionSessionID))
+		if partition.PartitionSessionID != commit.partitionSession.PartitionSessionID {
+			partitionOffsets = append(partitionOffsets, newPartition(commit.partitionSession.PartitionSessionID))
 			partition = &partitionOffsets[len(partitionOffsets)-1]
 		}
 		partition.Offsets = append(partition.Offsets, offsetsRange)
@@ -166,13 +167,13 @@ type PublicCommitRange struct {
 type commitRange struct {
 	commitOffsetStart rawtopicreader.Offset
 	commitOffsetEnd   rawtopicreader.Offset
-	partitionSession  *partitionSession
+	partitionSession  *topicreadercommon.PartitionSession
 }
 
 func (c commitRange) getCommitRange() PublicCommitRange {
 	return PublicCommitRange{priv: c}
 }
 
-func (c *commitRange) session() *partitionSession {
+func (c *commitRange) session() *topicreadercommon.PartitionSession {
 	return c.partitionSession
 }

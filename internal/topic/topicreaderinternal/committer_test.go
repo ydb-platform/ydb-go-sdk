@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"testing"
 	"time"
 
@@ -45,10 +46,7 @@ func TestCommitterCommitDisabled(t *testing.T) {
 func TestCommitterCommitAsync(t *testing.T) {
 	t.Run("SendCommit", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		session := &partitionSession{
-			ctx:                context.Background(),
-			partitionSessionID: 1,
-		}
+		session := newTestPartitionSession(context.Background(), 1)
 
 		cRange := commitRange{
 			commitOffsetStart: 1,
@@ -77,10 +75,7 @@ func TestCommitterCommitAsync(t *testing.T) {
 func TestCommitterCommitSync(t *testing.T) {
 	t.Run("SendCommit", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		session := &partitionSession{
-			ctx:                context.Background(),
-			partitionSessionID: 1,
-		}
+		session := newTestPartitionSession(context.Background(), 1)
 
 		cRange := commitRange{
 			commitOffsetStart: 1,
@@ -108,10 +103,7 @@ func TestCommitterCommitSync(t *testing.T) {
 
 	xtest.TestManyTimesWithName(t, "SuccessCommitWithNotifyAfterCommit", func(t testing.TB) {
 		ctx := xtest.Context(t)
-		session := &partitionSession{
-			ctx:                context.Background(),
-			partitionSessionID: 1,
-		}
+		session := newTestPartitionSession(context.Background(), 1)
 
 		cRange := commitRange{
 			commitOffsetStart: 1,
@@ -147,11 +139,8 @@ func TestCommitterCommitSync(t *testing.T) {
 
 	t.Run("SuccessCommitPreviousCommitted", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		session := &partitionSession{
-			ctx:                ctx,
-			partitionSessionID: 1,
-		}
-		session.committedOffsetVal.Store(2)
+		session := newTestPartitionSession(context.Background(), 1)
+		session.SetCommittedOffset(2)
 
 		cRange := commitRange{
 			commitOffsetStart: 1,
@@ -168,11 +157,8 @@ func TestCommitterCommitSync(t *testing.T) {
 
 		sessionCtx, sessionCancel := xcontext.WithCancel(ctx)
 
-		session := &partitionSession{
-			ctx:                sessionCtx,
-			partitionSessionID: 1,
-		}
-		session.committedOffsetVal.Store(1)
+		session := newTestPartitionSession(sessionCtx, 1)
+		session.SetCommittedOffset(1)
 		cRange := commitRange{
 			commitOffsetStart: 1,
 			commitOffsetEnd:   2,
@@ -209,7 +195,9 @@ func TestCommitterBuffer(t *testing.T) {
 			return nil
 		}
 
-		_, err := c.pushCommit(commitRange{partitionSession: &partitionSession{partitionSessionID: 2}})
+		_, err := c.pushCommit(commitRange{partitionSession: newTestPartitionSession(
+			context.Background(), 2,
+		)})
 		require.NoError(t, err)
 		<-sendCalled
 	})
@@ -238,9 +226,13 @@ func TestCommitterBuffer(t *testing.T) {
 			return nil
 		}
 
-		_, err := c.pushCommit(commitRange{partitionSession: &partitionSession{partitionSessionID: 1}})
+		_, err := c.pushCommit(commitRange{partitionSession: newTestPartitionSession(
+			context.Background(), 1,
+		)})
 		require.NoError(t, err)
-		_, err = c.pushCommit(commitRange{partitionSession: &partitionSession{partitionSessionID: 2}})
+		_, err = c.pushCommit(commitRange{partitionSession: newTestPartitionSession(
+			context.Background(), 2,
+		)})
 		require.NoError(t, err)
 		require.False(t, isSended())
 
@@ -271,12 +263,20 @@ func TestCommitterBuffer(t *testing.T) {
 			return nil
 		}
 		c.commits.appendCommitRanges([]commitRange{
-			{partitionSession: &partitionSession{partitionSessionID: 1}},
-			{partitionSession: &partitionSession{partitionSessionID: 2}},
-			{partitionSession: &partitionSession{partitionSessionID: 3}},
+			{partitionSession: newTestPartitionSession(
+				context.Background(), 1,
+			)},
+			{partitionSession: newTestPartitionSession(
+				context.Background(), 2,
+			)},
+			{partitionSession: newTestPartitionSession(
+				context.Background(), 3,
+			)},
 		})
 
-		_, err := c.pushCommit(commitRange{partitionSession: &partitionSession{partitionSessionID: 4}})
+		_, err := c.pushCommit(commitRange{partitionSession: newTestPartitionSession(
+			context.Background(), 4,
+		)})
 		require.NoError(t, err)
 		<-sendCalled
 	})
@@ -309,9 +309,9 @@ func TestCommitterBuffer(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			_, err := c.pushCommit(
 				commitRange{
-					partitionSession: &partitionSession{
-						partitionSessionID: rawtopicreader.PartitionSessionID(i),
-					},
+					partitionSession: newTestPartitionSession(
+						context.Background(), rawtopicreader.PartitionSessionID(i),
+					),
 				},
 			)
 			require.NoError(t, err)
@@ -323,7 +323,9 @@ func TestCommitterBuffer(t *testing.T) {
 		})
 		require.False(t, isSended())
 
-		_, err := c.pushCommit(commitRange{partitionSession: &partitionSession{partitionSessionID: 3}})
+		_, err := c.pushCommit(commitRange{partitionSession: newTestPartitionSession(
+			context.Background(), 3,
+		)})
 		require.NoError(t, err)
 		<-sendCalled
 	})
@@ -341,7 +343,9 @@ func TestCommitterBuffer(t *testing.T) {
 
 			return nil
 		}
-		_, err := c.pushCommit(commitRange{partitionSession: &partitionSession{}})
+		_, err := c.pushCommit(commitRange{partitionSession: newTestPartitionSession(
+			context.Background(), 0,
+		)})
 		require.NoError(t, err)
 
 		clock.BlockUntil(1)
@@ -370,7 +374,9 @@ func TestCommitterBuffer(t *testing.T) {
 
 			return nil
 		}
-		c.commits.appendCommitRange(commitRange{partitionSession: &partitionSession{}})
+		c.commits.appendCommitRange(commitRange{partitionSession: newTestPartitionSession(
+			context.Background(), 0,
+		)})
 		require.NoError(t, c.Close(ctx, nil))
 		require.True(t, sendCalled)
 	})
@@ -388,4 +394,16 @@ func newTestCommitter(ctx context.Context, t testing.TB) *committer {
 	})
 
 	return res
+}
+
+func newTestPartitionSession(ctx context.Context, partitionSessionID rawtopicreader.PartitionSessionID) *topicreadercommon.PartitionSession {
+	return topicreadercommon.NewPartitionSession(
+		ctx,
+		"",
+		0,
+		-1,
+		"",
+		partitionSessionID,
+		0,
+	)
 }

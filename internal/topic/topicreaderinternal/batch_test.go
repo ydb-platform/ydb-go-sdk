@@ -1,6 +1,7 @@
 package topicreaderinternal
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"testing"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 
 func TestBatch_New(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		m1 := &PublicMessage{
 			commitRange: commitRange{commitOffsetStart: 1, commitOffsetEnd: 2, partitionSession: session},
 		}
@@ -29,7 +30,7 @@ func TestBatch_New(t *testing.T) {
 
 func TestBatch_Cut(t *testing.T) {
 	t.Run("Full", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		batch, _ := newBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
 
 		head, rest := batch.cutMessages(100)
@@ -38,7 +39,7 @@ func TestBatch_Cut(t *testing.T) {
 		require.True(t, rest.isEmpty())
 	})
 	t.Run("Zero", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		batch, _ := newBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
 
 		head, rest := batch.cutMessages(0)
@@ -47,7 +48,7 @@ func TestBatch_Cut(t *testing.T) {
 		require.True(t, head.isEmpty())
 	})
 	t.Run("Middle", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		batch, _ := newBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
 
 		head, rest := batch.cutMessages(1)
@@ -61,7 +62,7 @@ func TestBatch_Cut(t *testing.T) {
 
 func TestBatch_Extend(t *testing.T) {
 	t.Run("Ok", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		m1 := &PublicMessage{
 			WrittenAt:   time.Date(2022, 6, 17, 15, 15, 0, 1, time.UTC),
 			commitRange: commitRange{commitOffsetStart: 10, commitOffsetEnd: 11, partitionSession: session},
@@ -114,8 +115,8 @@ func TestBatch_Extend(t *testing.T) {
 		require.Nil(t, res)
 	})
 	t.Run("BadSession", func(t *testing.T) {
-		session1 := &partitionSession{}
-		session2 := &partitionSession{}
+		session1 := &topicreadercommon.PartitionSession{}
+		session2 := &topicreadercommon.PartitionSession{}
 
 		m1 := &PublicMessage{
 			WrittenAt:   time.Date(2022, 6, 17, 15, 15, 0, 1, time.UTC),

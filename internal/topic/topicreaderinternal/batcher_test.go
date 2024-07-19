@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,8 +17,8 @@ import (
 )
 
 func TestBatcher_PushBatch(t *testing.T) {
-	session1 := &partitionSession{}
-	session2 := &partitionSession{}
+	session1 := &topicreadercommon.PartitionSession{}
+	session2 := &topicreadercommon.PartitionSession{}
 
 	m11 := &PublicMessage{
 		WrittenAt:   testTime(1),
@@ -58,7 +59,7 @@ func TestBatcher_PushBatch(t *testing.T) {
 func TestBatcher_PushRawMessage(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		b := newBatcher()
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		m := &rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: 1,
 		}
@@ -69,7 +70,7 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 	})
 	t.Run("AddRawAfterBatch", func(t *testing.T) {
 		b := newBatcher()
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
 		m := &rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: 1,
@@ -87,7 +88,7 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 
 	t.Run("AddBatchRawBatchBatch", func(t *testing.T) {
 		b := newBatcher()
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		batch1 := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
 		batch2 := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(2)}})
 		batch3 := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(3)}})
@@ -124,8 +125,8 @@ func TestBatcher_Pop(t *testing.T) {
 
 	t.Run("SimpleOneOfTwo", func(t *testing.T) {
 		ctx := context.Background()
-		session1 := &partitionSession{}
-		session2 := &partitionSession{}
+		session1 := &topicreadercommon.PartitionSession{}
+		session2 := &topicreadercommon.PartitionSession{}
 		batch := mustNewBatch(
 			session1,
 			[]*PublicMessage{{WrittenAt: testTime(1), commitRange: commitRange{partitionSession: session1}}},
@@ -207,8 +208,8 @@ func TestBatcher_Pop(t *testing.T) {
 	})
 
 	t.Run("PreferFirstRawMessageFromDifferentSessions", func(t *testing.T) {
-		session1 := &partitionSession{}
-		session2 := &partitionSession{}
+		session1 := &topicreadercommon.PartitionSession{}
+		session2 := &topicreadercommon.PartitionSession{}
 
 		b := newBatcher()
 		m := &rawtopicreader.StopPartitionSessionRequest{PartitionSessionID: 1}
@@ -322,7 +323,7 @@ func TestBatcherConcurency(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "ManyRawMessages", func(tb testing.TB) {
 		const count = 10
 		b := newBatcher()
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 
 		go func() {
 			for i := 0; i < count; i++ {
@@ -355,7 +356,7 @@ func TestBatcher_Find(t *testing.T) {
 		require.False(t, findRes.Ok)
 	})
 	t.Run("FoundEmptyFilter", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
 
 		b := newBatcher()
@@ -374,7 +375,7 @@ func TestBatcher_Find(t *testing.T) {
 	})
 
 	t.Run("FoundPartialBatchFilter", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
 
 		b := newBatcher()
@@ -399,7 +400,7 @@ func TestBatcher_Find(t *testing.T) {
 
 func TestBatcher_Apply(t *testing.T) {
 	t.Run("New", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		b := newBatcher()
 
 		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
@@ -414,7 +415,7 @@ func TestBatcher_Apply(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		b := newBatcher()
 
 		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
@@ -497,7 +498,7 @@ func TestBatcher_Fire(t *testing.T) {
 	})
 }
 
-func mustNewBatch(session *partitionSession, messages []*PublicMessage) *PublicBatch {
+func mustNewBatch(session *topicreadercommon.PartitionSession, messages []*PublicMessage) *PublicBatch {
 	batch, err := newBatch(session, messages)
 	if err != nil {
 		panic(err)

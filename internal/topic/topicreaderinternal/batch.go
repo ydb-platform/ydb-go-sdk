@@ -24,7 +24,7 @@ type PublicBatch struct {
 	commitRange commitRange // от всех сообщений батча
 }
 
-func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatch, error) {
+func newBatch(session *topicreadercommon.PartitionSession, messages []*PublicMessage) (*PublicBatch, error) {
 	for i := 0; i < len(messages); i++ {
 		msg := messages[i]
 
@@ -61,11 +61,11 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 
 func NewBatchFromStream(
 	decoders topicreadercommon.DecoderMap,
-	session *partitionSession,
+	session *topicreadercommon.PartitionSession,
 	sb rawtopicreader.Batch, //nolint:gocritic
 ) (*PublicBatch, error) {
 	messages := make([]*PublicMessage, len(sb.MessageData))
-	prevOffset := session.lastReceivedMessageOffset()
+	prevOffset := session.LastReceivedMessageOffset()
 	for i := range sb.MessageData {
 		sMess := &sb.MessageData[i]
 
@@ -97,7 +97,7 @@ func NewBatchFromStream(
 		prevOffset = sMess.Offset
 	}
 
-	session.setLastReceivedMessageOffset(prevOffset)
+	session.SetLastReceivedMessageOffset(prevOffset)
 
 	return newBatch(session, messages)
 }
@@ -118,7 +118,7 @@ func (m *PublicBatch) PartitionID() int64 {
 	return m.partitionSession().PartitionID
 }
 
-func (m *PublicBatch) partitionSession() *partitionSession {
+func (m *PublicBatch) partitionSession() *topicreadercommon.PartitionSession {
 	return m.commitRange.partitionSession
 }
 

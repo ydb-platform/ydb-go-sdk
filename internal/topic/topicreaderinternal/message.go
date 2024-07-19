@@ -113,7 +113,7 @@ func NewPublicMessageBuilder() *PublicMessageBuilder {
 
 func (pmb *PublicMessageBuilder) initMessage() {
 	pmb.mess = &PublicMessage{
-		commitRange: commitRange{partitionSession: newPartitionSession(
+		commitRange: commitRange{partitionSession: topicreadercommon.NewPartitionSession(
 			context.Background(),
 			"",
 			0,
@@ -204,7 +204,7 @@ func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicM
 
 // Context set message Context
 func (pmb *PublicMessageBuilder) Context(ctx context.Context) {
-	pmb.mess.commitRange.partitionSession.ctx = ctx
+	pmb.mess.commitRange.partitionSession.SetContext(ctx)
 }
 
 // Topic set message Topic

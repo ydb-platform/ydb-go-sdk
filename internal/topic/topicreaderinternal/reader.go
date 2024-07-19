@@ -175,10 +175,10 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 
 func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
 	cr := offsets.getCommitRange().priv
-	if cr.partitionSession.readerID != r.readerID {
+	if cr.partitionSession.ReaderID != r.readerID {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: messages session reader id (%v) != current reader id (%v): %w",
-			cr.partitionSession.readerID, r.readerID, errCommitSessionFromOtherReader,
+			cr.partitionSession.ReaderID, r.readerID, errCommitSessionFromOtherReader,
 		)))
 	}
 
@@ -187,11 +187,11 @@ func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (e
 
 func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) error {
 	for i := range ranges {
-		if ranges[i].priv.partitionSession.readerID != r.readerID {
+		if ranges[i].priv.partitionSession.ReaderID != r.readerID {
 			return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 				"ydb: commit ranges (range item %v) "+
 					"messages session reader id (%v) != current reader id (%v): %w",
-				i, ranges[i].priv.partitionSession.readerID, r.readerID, errCommitSessionFromOtherReader,
+				i, ranges[i].priv.partitionSession.ReaderID, r.readerID, errCommitSessionFromOtherReader,
 			)))
 		}
 	}
