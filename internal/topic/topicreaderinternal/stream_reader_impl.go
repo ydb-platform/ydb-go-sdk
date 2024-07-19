@@ -44,7 +44,7 @@ type topicStreamReaderImpl struct {
 
 	freeBytes           chan int
 	restBufferSizeBytes atomic.Int64
-	sessionController   PartitionSessionStorage
+	sessionController   topicreadercommon.PartitionSessionStorage
 	backgroundWorkers   background.Worker
 
 	rawMessagesFromBuffer chan rawtopicreader.ServerMessage
@@ -651,7 +651,7 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	return nil
 }
 
-func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *PartitionSessionStorage, decoders topicreadercommon.DecoderMap) ([]*PublicBatch, error) {
+func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *topicreadercommon.PartitionSessionStorage, decoders topicreadercommon.DecoderMap) ([]*PublicBatch, error) {
 	batchesCount := 0
 	for i := range msg.PartitionData {
 		batchesCount += len(msg.PartitionData[i].Batches)

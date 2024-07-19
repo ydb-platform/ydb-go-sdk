@@ -1,12 +1,11 @@
-package topicreaderinternal
+package topicreadercommon
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"sync"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 const (
@@ -17,7 +16,7 @@ const (
 type PartitionSessionStorage struct {
 	m sync.RWMutex
 
-	sessions map[partitionSessionID]*sessionInfo
+	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
 
 	removeIndex              int
 	lastCompactedTime        time.Time
@@ -26,12 +25,12 @@ type PartitionSessionStorage struct {
 
 func (c *PartitionSessionStorage) initNeedLock() {
 	if c.sessions == nil {
-		c.sessions = make(map[partitionSessionID]*sessionInfo)
+		c.sessions = make(map[rawtopicreader.PartitionSessionID]*sessionInfo)
 		c.lastCompactedTime = time.Now()
 	}
 }
 
-func (c *PartitionSessionStorage) Add(session *topicreadercommon.PartitionSession) error {
+func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -45,7 +44,7 @@ func (c *PartitionSessionStorage) Add(session *topicreadercommon.PartitionSessio
 	return nil
 }
 
-func (c *PartitionSessionStorage) Get(id partitionSessionID) (*topicreadercommon.PartitionSession, error) {
+func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
 	c.m.RLock()
 	defer c.m.RUnlock()
 
@@ -59,7 +58,7 @@ func (c *PartitionSessionStorage) Get(id partitionSessionID) (*topicreadercommon
 	return partitionInfo.Session, nil
 }
 
-func (c *PartitionSessionStorage) Remove(id partitionSessionID) (*topicreadercommon.PartitionSession, error) {
+func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
 	now := time.Now()
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -91,7 +90,7 @@ func (c *PartitionSessionStorage) isNeedCompactionNeedLock(now time.Time) bool {
 }
 
 func (c *PartitionSessionStorage) doCompactionNeedLock(now time.Time) {
-	newSessions := make(map[partitionSessionID]*sessionInfo, len(c.sessions))
+	newSessions := make(map[rawtopicreader.PartitionSessionID]*sessionInfo, len(c.sessions))
 	for sessionID, info := range c.sessions {
 		if info.IsGarbage(c.removeIndex, now) {
 			continue
@@ -104,7 +103,7 @@ func (c *PartitionSessionStorage) doCompactionNeedLock(now time.Time) {
 type sessionInfo struct {
 	RemoveTime   time.Time
 	RemovedIndex int
-	Session      *topicreadercommon.PartitionSession
+	Session      *PartitionSession
 }
 
 func (si *sessionInfo) IsGarbage(removeIndexNow int, timeNow time.Time) bool {
