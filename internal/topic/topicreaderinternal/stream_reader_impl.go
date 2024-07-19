@@ -165,7 +165,6 @@ func newTopicStreamReaderStopped(
 	res.committer = newCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
 	res.committer.BufferTimeLagTrigger = cfg.CommitterBatchTimeLag
 	res.committer.BufferCountTrigger = cfg.CommitterBatchCounterTrigger
-	res.sessionController.init()
 	res.freeBytes <- cfg.BufferSizeProtoBytes
 
 	return res

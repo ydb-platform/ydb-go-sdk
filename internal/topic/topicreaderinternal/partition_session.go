@@ -24,14 +24,18 @@ type PartitionSessionStorage struct {
 	lastCompactedRemoveIndex int
 }
 
-func (c *PartitionSessionStorage) init() {
-	c.sessions = make(map[partitionSessionID]*sessionInfo)
-	c.lastCompactedTime = time.Now()
+func (c *PartitionSessionStorage) initNeedLock() {
+	if c.sessions == nil {
+		c.sessions = make(map[partitionSessionID]*sessionInfo)
+		c.lastCompactedTime = time.Now()
+	}
 }
 
 func (c *PartitionSessionStorage) Add(session *topicreadercommon.PartitionSession) error {
 	c.m.Lock()
 	defer c.m.Unlock()
+
+	c.initNeedLock()
 
 	if _, ok := c.sessions[session.PartitionSessionID]; ok {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.PartitionSessionID))
@@ -45,6 +49,8 @@ func (c *PartitionSessionStorage) Get(id partitionSessionID) (*topicreadercommon
 	c.m.RLock()
 	defer c.m.RUnlock()
 
+	c.initNeedLock()
+
 	partitionInfo, has := c.sessions[id]
 	if !has || partitionInfo.Session == nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition session with id: %v", id))
@@ -57,6 +63,8 @@ func (c *PartitionSessionStorage) Remove(id partitionSessionID) (*topicreadercom
 	now := time.Now()
 	c.m.Lock()
 	defer c.m.Unlock()
+
+	c.initNeedLock()
 
 	c.removeIndex++
 	if partitionInfo, ok := c.sessions[id]; ok {
