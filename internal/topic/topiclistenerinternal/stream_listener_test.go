@@ -2,6 +2,7 @@ package topiclistenerinternal
 
 import (
 	"context"
+	"errors"
 	"github.com/rekby/fixenv"
 	"github.com/rekby/fixenv/sf"
 	"github.com/stretchr/testify/require"
@@ -270,15 +271,13 @@ func TestStreamListener_CloseSessionsOnCloseListener(t *testing.T) {
 	e := fixenv.New(t)
 	EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(
 		PartitionSession(e).Context(),
-		&rawtopicreader.StopPartitionSessionRequest{
-			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
-				Status: rawydb.StatusSuccess,
-			},
-			PartitionSessionID: PartitionSession(e).PartitionSessionID,
+		PublicStopPartitionSessionRequest{
+			PartitionSessionID: PartitionSession(e).PartitionSessionID.ToInt64(),
 			Graceful:           false,
-			CommittedOffset:    PartitionSession(e).CommittedOffset(),
+			CommittedOffset:    PartitionSession(e).CommittedOffset().ToInt64(),
 		},
 	).Return(PublicStopPartitionSessionResponse{}, ErrUnimplementedPublic)
+	require.NoError(t, StreamListener(e).Close(sf.Context(e), errors.New("test")))
 }
 
 func newTestPartitionSession(ctx context.Context, partitionSessionID int) *topicreadercommon.PartitionSession {

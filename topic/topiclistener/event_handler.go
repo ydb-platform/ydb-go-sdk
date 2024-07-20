@@ -14,11 +14,11 @@ type EventHandler interface {
 
 	topiclistenerinternal.EventHandler
 
-	OnReaderCreated(ctx context.Context, req ReaderReady) error
+	OnReaderCreated(req ReaderReady) error
 }
 
 type ReaderReady struct {
-	Reader *TopicListener
+	Listener *TopicListener
 }
 
 type ReadMessages = topiclistenerinternal.PublicReadMessages
@@ -27,8 +27,8 @@ type BaseHandler struct{}
 
 func (b BaseHandler) topicReaderHandler() {}
 
-func (b BaseHandler) OnReaderCreated(ctx context.Context, req ReaderReady) error {
-	panic("not implemented yet")
+func (b BaseHandler) OnReaderCreated(req ReaderReady) error {
+	return ErrMethodUnimplemented
 }
 
 func (b BaseHandler) OnStartPartitionSessionRequest(

@@ -13,6 +13,9 @@ func StreamListener(e fixenv.Env) *streamListener {
 		l := &streamListener{}
 		l.initVars()
 		l.stream = StreamMock(e)
+		l.streamClose = func(cause error) {
+
+		}
 		l.handler = EventHandlerMock(e)
 		l.sessions = PartitionStorage(e)
 		return fixenv.NewGenericResult(l), nil

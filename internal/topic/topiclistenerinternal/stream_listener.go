@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"reflect"
@@ -59,7 +60,9 @@ func newStreamListener(
 func (l *streamListener) Close(ctx context.Context, reason error) error {
 	var resErrors []error
 
-	l.streamClose(reason)
+	if l.stream != nil {
+		l.streamClose(reason)
+	}
 
 	if err := l.background.Close(ctx, reason); err != nil {
 		resErrors = append(resErrors, err)
@@ -84,9 +87,7 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 }
 
 func (l *streamListener) closeWithTimeout(ctx context.Context, reason error) {
-	ctx, cancel := context.WithTimeoutCause(context.WithoutCancel(ctx), time.Second, xerrors.WithStackTrace(xerrors.Wrap(errors.New(
-		"ydb: stream listener close timeout",
-	))))
+	ctx, cancel := context.WithTimeout(xcontext.ValueOnly(ctx), time.Second)
 	l.streamClose(reason)
 	_ = l.background.Close(ctx, reason)
 

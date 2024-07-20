@@ -18,7 +18,14 @@ func NewTopicListener(client *rawtopic.Client, config topiclistenerinternal.Stre
 	if err != nil {
 		return nil, err
 	}
-	return &TopicListener{listenerReconnector: reconnector}, nil
+
+	res := &TopicListener{listenerReconnector: reconnector}
+	if err = handler.OnReaderCreated(ReaderReady{Listener: res}); err != nil {
+		_ = res.Close(context.Background())
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func (cr *TopicListener) WaitInit(ctx context.Context) error {

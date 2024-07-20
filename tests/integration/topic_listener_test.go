@@ -27,6 +27,7 @@ func TestTopicListener(t *testing.T) {
 		handler,
 		topicoptions.ReadTopic(scope.TopicPath()),
 	)
+	require.Same(t, listener, handler.listener)
 	require.NoError(t, err)
 	require.NoError(t, listener.WaitInit(scope.Ctx))
 
@@ -46,10 +47,16 @@ func TestTopicListener(t *testing.T) {
 type TestTopicListener_Handler struct {
 	topiclistener.BaseHandler
 
+	listener         *topiclistener.TopicListener
 	readMessages     *topiclistener.ReadMessages
 	onPartitionStart *topiclistener.StartPartitionSessionRequest
 	onPartitionStop  *topiclistener.StopPartitionSessionRequest
 	done             empty.Chan
+}
+
+func (h *TestTopicListener_Handler) OnReaderCreated(req topiclistener.ReaderReady) error {
+	h.listener = req.Listener
+	return nil
 }
 
 func (h *TestTopicListener_Handler) OnStartPartitionSessionRequest(
