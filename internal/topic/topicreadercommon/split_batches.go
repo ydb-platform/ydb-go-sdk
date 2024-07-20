@@ -2,7 +2,7 @@ package topicreadercommon
 
 import "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 
-func ReadRawbatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *PartitionSessionStorage, decoders DecoderMap) ([]*PublicBatch, error) {
+func ReadRawBatchesToPublicBatches(msg *rawtopicreader.ReadResponse, sessions *PartitionSessionStorage, decoders DecoderMap) ([]*PublicBatch, error) {
 	batchesCount := 0
 	for i := range msg.PartitionData {
 		batchesCount += len(msg.PartitionData[i].Batches)

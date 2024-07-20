@@ -30,7 +30,7 @@ type Client interface {
 		consumer string,
 		handler topiclistener.EventHandler,
 		readSelectors topicoptions.ReadSelectors,
-		opts ...topicoptions.ReaderOption,
+		opts ...topicoptions.ListenerOption,
 	) (*topiclistener.TopicListener, error)
 
 	// StartReader start read messages from topic

@@ -58,6 +58,17 @@ func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*Pa
 	return partitionInfo.Session, nil
 }
 
+func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	res := make([]*PartitionSession, 0, len(c.sessions))
+	for _, s := range c.sessions {
+		res = append(res, s.Session)
+	}
+	return res
+}
+
 func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
 	now := time.Now()
 	c.m.Lock()

@@ -111,7 +111,7 @@ func TestReader_Commit(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
 
-		readerID := nextReaderID()
+		readerID := topicreadercommon.NextReaderID()
 		baseReader := NewMockbatchedStreamReader(mc)
 		reader := &Reader{
 			reader:   baseReader,
@@ -157,7 +157,7 @@ func TestReader_WaitInit(t *testing.T) {
 	mc := gomock.NewController(t)
 	defer mc.Finish()
 
-	readerID := nextReaderID()
+	readerID := topicreadercommon.NextReaderID()
 	baseReader := NewMockbatchedStreamReader(mc)
 	reader := &Reader{
 		reader:   baseReader,

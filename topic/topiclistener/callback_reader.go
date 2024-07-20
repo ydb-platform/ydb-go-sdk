@@ -2,99 +2,34 @@ package topiclistener
 
 import (
 	"context"
+	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
-type TopicListener struct{}
-
-func (cr *TopicListener) WaitInit() error {
-	// TODO implement me
-	panic("implement me")
+type TopicListener struct {
+	listenerReconnector *topiclistenerinternal.TopicListenerReconnector
 }
 
-func (cr *TopicListener) Commit(ctx context.Context, batch topicreader.CommitRangeGetter) error {
+func NewTopicListener(client *rawtopic.Client, config topiclistenerinternal.StreamListenerConfig, handler EventHandler) (*TopicListener, error) {
+	reconnector, err := topiclistenerinternal.NewTopicListenerReconnector(client, config, handler)
+	if err != nil {
+		return nil, err
+	}
+	return &TopicListener{listenerReconnector: reconnector}, nil
+}
+
+func (cr *TopicListener) WaitInit(ctx context.Context) error {
+	return cr.listenerReconnector.WaitInit(ctx)
+}
+
+func (cr *TopicListener) commit(ctx context.Context, batch topicreader.CommitRangeGetter) error {
 	// TODO implement me
 	panic("implement me")
 }
 
 func (cr *TopicListener) Close(ctx context.Context) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-// EventHandler methods will be called sequentially by partition, but can be called in parallel for different partitions
-type EventHandler interface {
-	// topicReaderHandler needs for guarantee inherits from base struct with default implementations of new methods
-	topicReaderHandler()
-
-	OnReaderCreated(ctx context.Context, req ReaderReady) error
-	OnStartPartitionSessionRequest(ctx context.Context, req StartPartitionSessionRequest) (StartPartitionSessionResponse, error)
-	OnStopPartitionSessionRequest(ctx context.Context, req StopPartitionSessionRequest) (StopPartitionSessionResponse, error)
-	OnReadMessages(ctx context.Context, req ReadMessages) error
-}
-
-type ReaderReady struct {
-	Reader *TopicListener
-}
-
-type StartPartitionSessionRequest struct {
-	PartitionSession PartitionSession
-	CommittedOffset  int64
-	PartitionOffsets OffsetsRange
-}
-
-type StartPartitionSessionResponse struct {
-	ReadOffset   *int64
-	CommitOffset *int64
-}
-
-type StopPartitionSessionRequest struct {
-	PartitionSessionID int64
-	Graceful           bool
-	CommittedOffset    int64
-}
-
-type StopPartitionSessionResponse struct{}
-
-type ReadMessages = topiclistenerinternal.PublicReadMessages
-
-type BaseHandler struct{}
-
-func (b BaseHandler) topicReaderHandler() {}
-
-func (b BaseHandler) OnReaderCreated(ctx context.Context, req ReaderReady) error {
-	panic("not implemented yet")
-}
-
-func (b BaseHandler) OnStartPartitionSessionRequest(
-	ctx context.Context,
-	req StartPartitionSessionRequest,
-) (StartPartitionSessionResponse, error) {
-	return StartPartitionSessionResponse{}, nil
-}
-
-func (b BaseHandler) OnStopPartitionSessionRequest(
-	ctx context.Context,
-	req StopPartitionSessionRequest,
-) (StopPartitionSessionResponse, error) {
-	return StopPartitionSessionResponse{}, nil
-}
-
-func (b BaseHandler) OnReadMessages(
-	ctx context.Context,
-	req ReadMessages,
-) error {
-	return nil
-}
-
-type PartitionSession struct {
-	SessionID   int64
-	TopicPath   string
-	PartitionID int64
-}
-
-type OffsetsRange struct {
-	Start int64
-	End   int64
+	return cr.listenerReconnector.Close(ctx, xerrors.WithStackTrace(fmt.Errorf("ydb: topic listener closed")))
 }

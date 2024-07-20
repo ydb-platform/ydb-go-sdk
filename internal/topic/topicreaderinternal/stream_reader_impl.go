@@ -23,8 +23,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-const defaultBufferSize = 1024 * 1024
-
 var (
 	PublicErrCommitSessionToExpiredSession = xerrors.Wrap(errors.New("ydb: commit to expired session"))
 
@@ -81,7 +79,7 @@ type topicStreamReaderConfig struct {
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
 	return topicStreamReaderConfig{
 		BaseContext:           context.Background(),
-		BufferSizeProtoBytes:  defaultBufferSize,
+		BufferSizeProtoBytes:  topicreadercommon.DefaultBufferSize,
 		Cred:                  credentials.NewAnonymousCredentials(),
 		CredUpdateInterval:    time.Hour,
 		CommitMode:            CommitModeAsync,
@@ -634,7 +632,7 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		onDone(err)
 	}()
 
-	batches, err2 := topicreadercommon.ReadRawbatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
+	batches, err2 := topicreadercommon.ReadRawBatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
 	if err2 != nil {
 		return err2
 	}

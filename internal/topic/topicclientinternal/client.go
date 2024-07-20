@@ -2,6 +2,8 @@ package topicclientinternal
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
@@ -209,9 +211,30 @@ func (c *Client) StartListener(
 	consumer string,
 	handler topiclistener.EventHandler,
 	readSelectors topicoptions.ReadSelectors,
-	opts ...topicoptions.ReaderOption,
+	opts ...topicoptions.ListenerOption,
 ) (*topiclistener.TopicListener, error) {
-	panic("not implemented yet")
+	cfg := topiclistenerinternal.NewStreamListenerConfig()
+
+	cfg.Consumer = consumer
+
+	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
+	for i := range readSelectors {
+		cfg.Selectors[i] = readSelectors[i].Clone()
+	}
+
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
+		opt(&cfg)
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	return topiclistener.NewTopicListener(&c.rawClient, cfg, handler)
 }
 
 // StartReader create new topic reader and start pull messages from server

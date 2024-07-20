@@ -335,7 +335,7 @@ func TestTopicStreamReaderImpl_Create(t *testing.T) {
 		}, nil)
 		stream.EXPECT().CloseSend().Return(nil)
 
-		reader, err := newTopicStreamReader(nextReaderID(), stream, newTopicStreamReaderConfig())
+		reader, err := newTopicStreamReader(topicreadercommon.NextReaderID(), stream, newTopicStreamReaderConfig())
 		require.Error(t, err)
 		require.Nil(t, reader)
 	})
@@ -921,7 +921,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 				context.Background(),
 				"asd",
 				123,
-				nextReaderID(),
+				topicreadercommon.NextReaderID(),
 				"bad-connection-id",
 				222,
 				213,
@@ -983,7 +983,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
 	cfg.CommitterBatchTimeLag = 0
 
-	reader := newTopicStreamReaderStopped(nextReaderID(), stream, cfg)
+	reader := newTopicStreamReaderStopped(topicreadercommon.NextReaderID(), stream, cfg)
 	// reader.initSession() - skip stream level initialization
 
 	const testPartitionID = 5

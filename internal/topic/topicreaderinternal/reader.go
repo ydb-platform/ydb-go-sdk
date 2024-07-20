@@ -12,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
-	"sync/atomic"
 )
 
 var (
@@ -23,12 +22,6 @@ var (
 	errSetConsumerAndNoConsumer     = xerrors.Wrap(errors.New("ydb: reader has non empty consumer name and set option WithReaderWithoutConsumer. Only one of them must be set")) //nolint:lll
 	errCommitSessionFromOtherReader = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 )
-
-var globalReaderCounter int64
-
-func nextReaderID() int64 {
-	return atomic.AddInt64(&globalReaderCounter, 1)
-}
 
 //go:generate mockgen -destination raw_topic_reader_stream_mock_test.go -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
 
@@ -91,7 +84,7 @@ func NewReader(
 		))
 	}
 
-	readerID := nextReaderID()
+	readerID := topicreadercommon.NextReaderID()
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx)
