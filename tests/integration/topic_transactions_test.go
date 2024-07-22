@@ -42,5 +42,4 @@ func TestTopicReadInTransaction(t *testing.T) {
 		require.Equal(t, "bbb", content)
 		return nil
 	}))
-
 }
