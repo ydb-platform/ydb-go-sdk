@@ -106,22 +106,24 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 
 		EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
 			gomock.Any(),
-			PublicStartPartitionSessionRequest{
-				PartitionSession: PublicPartitionSession{
-					SessionID:   100,
-					TopicPath:   "asd",
-					PartitionID: 123,
-				},
-				CommittedOffset: 10,
-				PartitionOffsets: PublicOffsetsRange{
-					Start: 5,
-					End:   15,
-				},
-			},
-		).Return(PublicStartPartitionSessionResponse{
-			ReadOffset:   &respReadOffset,
-			CommitOffset: &respCommitOffset,
-		}, nil)
+			gomock.Any(),
+		).DoAndReturn(func(ctx context.Context, event PublicStartPartitionSessionEvent) error {
+			require.Equal(t, PublicPartitionSession{
+				SessionID:   100,
+				TopicPath:   "asd",
+				PartitionID: 123,
+			}, event.PartitionSession)
+			require.Equal(t, int64(10), event.CommittedOffset)
+			require.Equal(t, PublicOffsetsRange{
+				Start: 5,
+				End:   15,
+			}, event.PartitionOffsets)
+			event.Confirm(PublicStartPartitionSessionResponse{
+				ReadOffset:   &respReadOffset,
+				CommitOffset: &respCommitOffset,
+			}, nil)
+			return nil
+		})
 
 		StreamListener(e).onReceiveServerMessage(sf.Context(e), &rawtopicreader.StartPartitionSessionRequest{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
@@ -156,50 +158,6 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, session)
 	})
-	t.Run("onStartPartitionSessionUnimplemented", func(t *testing.T) {
-		e := fixenv.New(t)
-
-		EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
-			gomock.Any(),
-			PublicStartPartitionSessionRequest{
-				PartitionSession: PublicPartitionSession{
-					SessionID:   100,
-					TopicPath:   "asd",
-					PartitionID: 123,
-				},
-				CommittedOffset: 10,
-				PartitionOffsets: PublicOffsetsRange{
-					Start: 5,
-					End:   15,
-				},
-			},
-		).Return(PublicStartPartitionSessionResponse{}, ErrUnimplementedPublic)
-
-		StreamListener(e).onReceiveServerMessage(sf.Context(e), &rawtopicreader.StartPartitionSessionRequest{
-			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
-				Status: rawydb.StatusSuccess,
-			},
-			PartitionSession: rawtopicreader.PartitionSession{
-				PartitionSessionID: 100,
-				Path:               "asd",
-				PartitionID:        123,
-			},
-			CommittedOffset: 10,
-			PartitionOffsets: rawtopicreader.OffsetRange{
-				Start: 5,
-				End:   15,
-			},
-		})
-
-		req := StreamListener(e).messagesToSend[0]
-		require.Equal(t, &rawtopicreader.StartPartitionSessionResponse{
-			PartitionSessionID: 100,
-		}, req)
-
-		session, err := StreamListener(e).sessions.Get(100)
-		require.NoError(t, err)
-		require.NotNil(t, session)
-	})
 	t.Run("onStopPartitionRequest", func(t *testing.T) {
 		e := fixenv.New(t)
 		ctx := sf.Context(e)
@@ -208,45 +166,14 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 
 		EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(
 			PartitionSession(e).Context(),
-			PublicStopPartitionSessionRequest{
-				PartitionSessionID: PartitionSession(e).PartitionSessionID.ToInt64(),
-				Graceful:           true,
-				CommittedOffset:    5,
-			},
-		).Return(PublicStopPartitionSessionResponse{}, nil)
-
-		listener.onReceiveServerMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
-			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
-				Status: rawydb.StatusSuccess,
-			},
-			PartitionSessionID: PartitionSession(e).PartitionSessionID,
-			Graceful:           true,
-			CommittedOffset:    5,
+			gomock.Any(),
+		).DoAndReturn(func(ctx context.Context, event PublicStopPartitionSessionEvent) error {
+			require.Equal(t, PartitionSession(e).PartitionSessionID.ToInt64(), event.PartitionSessionID)
+			require.True(t, event.Graceful)
+			require.Equal(t, int64(5), event.CommittedOffset)
+			event.Confirm(PublicStopPartitionSessionResponse{}, nil)
+			return nil
 		})
-
-		req := listener.messagesToSend[0]
-		require.Equal(
-			t,
-			&rawtopicreader.StopPartitionSessionResponse{
-				PartitionSessionID: PartitionSession(e).PartitionSessionID,
-			},
-			req,
-		)
-	})
-	t.Run("onStopPartitionRequestUnimplemented", func(t *testing.T) {
-		e := fixenv.New(t)
-		ctx := sf.Context(e)
-
-		listener := StreamListener(e)
-
-		EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(
-			PartitionSession(e).Context(),
-			PublicStopPartitionSessionRequest{
-				PartitionSessionID: PartitionSession(e).PartitionSessionID.ToInt64(),
-				Graceful:           true,
-				CommittedOffset:    5,
-			},
-		).Return(PublicStopPartitionSessionResponse{}, ErrUnimplementedPublic)
 
 		listener.onReceiveServerMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
@@ -272,12 +199,14 @@ func TestStreamListener_CloseSessionsOnCloseListener(t *testing.T) {
 	e := fixenv.New(t)
 	EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(
 		PartitionSession(e).Context(),
-		PublicStopPartitionSessionRequest{
-			PartitionSessionID: PartitionSession(e).PartitionSessionID.ToInt64(),
-			Graceful:           false,
-			CommittedOffset:    PartitionSession(e).CommittedOffset().ToInt64(),
-		},
-	).Return(PublicStopPartitionSessionResponse{}, ErrUnimplementedPublic)
+		gomock.Any(),
+	).Do(func(ctx context.Context, event PublicStopPartitionSessionEvent) error {
+		require.Equal(t, PartitionSession(e).PartitionSessionID.ToInt64(), event.PartitionSessionID)
+		require.False(t, event.Graceful)
+		require.Equal(t, PartitionSession(e).CommittedOffset().ToInt64(), event.CommittedOffset)
+		event.Confirm(PublicStopPartitionSessionResponse{}, nil)
+		return nil
+	})
 	require.NoError(t, StreamListener(e).Close(sf.Context(e), errors.New("test")))
 }
 

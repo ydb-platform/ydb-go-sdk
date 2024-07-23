@@ -2,10 +2,11 @@ package topicreadercommon
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"sync"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 const (

@@ -5,14 +5,16 @@ package integration
 
 import (
 	"context"
+	"io"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
-	"io"
-	"strings"
-	"testing"
 )
 
 func TestTopicListener(t *testing.T) {
@@ -62,17 +64,19 @@ func (h *TestTopicListener_Handler) OnReaderCreated(req topiclistener.ReaderRead
 func (h *TestTopicListener_Handler) OnStartPartitionSessionRequest(
 	ctx context.Context,
 	req topiclistener.StartPartitionSessionRequest,
-) (topiclistener.StartPartitionSessionResponse, error) {
+) error {
 	h.onPartitionStart = &req
-	return topiclistener.StartPartitionSessionResponse{}, nil
+	req.Confirm(topiclistener.StartPartitionSessionResponse{}, nil)
+	return nil
 }
 
 func (h *TestTopicListener_Handler) OnStopPartitionSessionRequest(
 	ctx context.Context,
 	req topiclistener.StopPartitionSessionRequest,
-) (topiclistener.StopPartitionSessionResponse, error) {
+) error {
 	h.onPartitionStop = &req
-	return topiclistener.StopPartitionSessionResponse{}, nil
+	req.Confirm(topiclistener.StopPartitionSessionResponse{}, nil)
+	return nil
 }
 
 func (h *TestTopicListener_Handler) OnReadMessages(

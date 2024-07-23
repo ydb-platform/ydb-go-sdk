@@ -3,7 +3,6 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"testing"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"

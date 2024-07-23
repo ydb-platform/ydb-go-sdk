@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -11,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"sync"
 )
 
 var (

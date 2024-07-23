@@ -3,7 +3,6 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"sync/atomic"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"

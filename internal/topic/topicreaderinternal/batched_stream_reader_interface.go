@@ -2,6 +2,7 @@ package topicreaderinternal
 
 import (
 	"context"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 )
 

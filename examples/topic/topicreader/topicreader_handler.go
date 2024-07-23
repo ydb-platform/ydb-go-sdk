@@ -23,6 +23,8 @@ func startReader(ctx context.Context, db *ydb.Driver) (*topiclistener.TopicListe
 		return nil, err
 	}
 
+	err = reader.Close(ctx)
+
 	return reader, nil
 }
 

@@ -29,13 +29,13 @@ func WaitGroupWithTimeout(tb testing.TB, wg *sync.WaitGroup, timeout time.Durati
 	WaitChannelClosedWithTimeout(tb, groupFinished, timeout)
 }
 
-func WaitChannelClosed(t testing.TB, ch <-chan struct{}) {
+func WaitChannelClosed(t testing.TB, ch <-chan empty.Struct) {
 	t.Helper()
 
 	WaitChannelClosedWithTimeout(t, ch, commonWaitTimeout)
 }
 
-func WaitChannelClosedWithTimeout(t testing.TB, ch <-chan struct{}, timeout time.Duration) {
+func WaitChannelClosedWithTimeout(t testing.TB, ch <-chan empty.Struct, timeout time.Duration) {
 	t.Helper()
 
 	select {

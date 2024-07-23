@@ -4,9 +4,10 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"io"
 )
 
 type DecoderMap struct {

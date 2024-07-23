@@ -3,7 +3,7 @@ package empty
 import "sync"
 
 type (
-	Chan         chan struct{}
+	Chan         chan Struct
 	ChanReadonly <-chan struct{}
 	Struct       struct{}
 )

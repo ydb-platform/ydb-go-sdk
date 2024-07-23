@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"math"
 	"math/big"
 	"reflect"
@@ -17,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -299,17 +299,15 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 		return err
 	}
 
-	var (
-		onDone = trace.TopicOnReaderPartitionReadStopResponse(
-			r.cfg.Trace,
-			r.readConnectionID,
-			session.Context(),
-			session.Topic,
-			session.PartitionID,
-			session.PartitionSessionID.ToInt64(),
-			msg.CommittedOffset.ToInt64(),
-			msg.Graceful,
-		)
+	onDone := trace.TopicOnReaderPartitionReadStopResponse(
+		r.cfg.Trace,
+		r.readConnectionID,
+		session.Context(),
+		session.Topic,
+		session.PartitionID,
+		session.PartitionSessionID.ToInt64(),
+		msg.CommittedOffset.ToInt64(),
+		msg.Graceful,
 	)
 	defer func() {
 		onDone(err)

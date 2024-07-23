@@ -46,6 +46,6 @@ type OneTimeWaiter struct {
 	ch empty.Chan
 }
 
-func (w *OneTimeWaiter) Done() <-chan struct{} {
+func (w *OneTimeWaiter) Done() <-chan empty.Struct {
 	return w.ch
 }

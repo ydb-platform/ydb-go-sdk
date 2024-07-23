@@ -2,7 +2,6 @@ package topiclistener
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
@@ -33,11 +32,15 @@ func (cr *TopicListener) WaitInit(ctx context.Context) error {
 	return cr.listenerReconnector.WaitInit(ctx)
 }
 
+func (cr *TopicListener) WaitStop(ctx context.Context) error {
+	return cr.listenerReconnector.WaitStop(ctx)
+}
+
 func (cr *TopicListener) Commit(ctx context.Context, batch topicreader.CommitRangeGetter) error {
 	// TODO implement me
 	panic("implement me")
 }
 
 func (cr *TopicListener) Close(ctx context.Context) error {
-	return cr.listenerReconnector.Close(ctx, xerrors.WithStackTrace(fmt.Errorf("ydb: topic listener closed")))
+	return cr.listenerReconnector.Close(ctx, xerrors.WithStackTrace(topiclistenerinternal.ErrUserCloseTopic))
 }

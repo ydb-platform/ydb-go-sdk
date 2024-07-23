@@ -3,9 +3,12 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 )
+
+var ErrUserCloseTopic = errors.New("ydb: user closed topic listener")
 
 type TopicListenerReconnector struct {
 	streamConfig StreamListenerConfig
@@ -67,4 +70,17 @@ func (lr *TopicListenerReconnector) WaitInit(ctx context.Context) error {
 	}
 
 	return lr.connectionResult
+}
+
+func (lr *TopicListenerReconnector) WaitStop(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-lr.background.StopDone():
+		err := lr.background.CloseReason()
+		if errors.Is(err, ErrUserCloseTopic) {
+			return nil
+		}
+		return err
+	}
 }

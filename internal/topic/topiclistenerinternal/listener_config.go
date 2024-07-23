@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"errors"
 	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )

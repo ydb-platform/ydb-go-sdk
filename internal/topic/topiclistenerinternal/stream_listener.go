@@ -234,7 +234,7 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 		PartitionSessionID: m.PartitionSession.PartitionSessionID,
 	}
 
-	handlerResp, err := l.handler.OnStartPartitionSessionRequest(ctx, PublicStartPartitionSessionRequest{
+	event := PublicStartPartitionSessionEvent{
 		PartitionSession: PublicPartitionSession{
 			SessionID:   m.PartitionSession.PartitionSessionID.ToInt64(),
 			TopicPath:   m.PartitionSession.Path,
@@ -245,17 +245,25 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 			Start: m.PartitionOffsets.Start.ToInt64(),
 			End:   m.PartitionOffsets.End.ToInt64(),
 		},
-	})
-	if supressUnimplemented(err) != nil {
+		resp: make(chan WithError[PublicStartPartitionSessionResponse], 1),
+	}
+	err := l.handler.OnStartPartitionSessionRequest(ctx, event)
+	if err != nil {
 		return err
 	}
+
+	userResp := <-event.resp
+	if userResp.Error != nil {
+		return err
+	}
+
 	if err == nil {
-		if handlerResp.ReadOffset != nil {
-			resp.ReadOffset.Offset = rawtopicreader.NewOffset(*handlerResp.ReadOffset)
+		if userResp.Val.ReadOffset != nil {
+			resp.ReadOffset.Offset = rawtopicreader.NewOffset(*userResp.Val.ReadOffset)
 			resp.ReadOffset.HasValue = true
 		}
-		if handlerResp.CommitOffset != nil {
-			resp.CommitOffset.Offset = rawtopicreader.NewOffset(*handlerResp.CommitOffset)
+		if userResp.Val.CommitOffset != nil {
+			resp.CommitOffset.Offset = rawtopicreader.NewOffset(*userResp.Val.CommitOffset)
 			resp.CommitOffset.HasValue = true
 		}
 	}
@@ -282,12 +290,20 @@ func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopic
 		handlerCtx = session.Context()
 	}
 
-	if _, err := l.handler.OnStopPartitionSessionRequest(handlerCtx, PublicStopPartitionSessionRequest{
+	event := PublicStopPartitionSessionEvent{
 		PartitionSessionID: m.PartitionSessionID.ToInt64(),
 		Graceful:           m.Graceful,
 		CommittedOffset:    m.CommittedOffset.ToInt64(),
-	}); supressUnimplemented(err) != nil {
+		resp:               make(chan WithError[PublicStopPartitionSessionResponse], 1),
+	}
+
+	if err = l.handler.OnStopPartitionSessionRequest(handlerCtx, event); err != nil {
 		return err
+	}
+
+	userResp := <-event.resp
+	if userResp.Error != nil {
+		return userResp.Error
 	}
 
 	if m.Graceful {

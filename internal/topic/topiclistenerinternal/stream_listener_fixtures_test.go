@@ -3,9 +3,10 @@ package topiclistenerinternal
 import (
 	"github.com/rekby/fixenv"
 	"github.com/rekby/fixenv/sf"
+	"go.uber.org/mock/gomock"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
-	"go.uber.org/mock/gomock"
 )
 
 func StreamListener(e fixenv.Env) *streamListener {
@@ -14,7 +15,6 @@ func StreamListener(e fixenv.Env) *streamListener {
 		l.initVars()
 		l.stream = StreamMock(e)
 		l.streamClose = func(cause error) {
-
 		}
 		l.handler = EventHandlerMock(e)
 		l.sessions = PartitionStorage(e)

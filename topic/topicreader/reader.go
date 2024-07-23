@@ -143,30 +143,3 @@ func (r *Reader) outCall(inFlight *atomic.Bool) {
 
 	panic("ydb: topic reader out call without in call, must be never")
 }
-
-// Example only
-func (r *Reader) ReadEvent(ctx context.Context) (Event, error) {
-	// TODO implement me
-	panic("implement me")
-}
-
-type Event struct {
-	StartPartition *EventStartPartition
-	StopPartition  *EventStopPartition
-	ReadData       *EventReadData
-}
-
-type EventStartPartition struct {
-	PartitionSessionID int64
-	PartitionID        int64
-	Topic              string
-}
-
-type EventStopPartition struct {
-	PartitionSessionID int64
-	Graceful           bool
-}
-
-type EventReadData struct {
-	Batch *Batch
-}

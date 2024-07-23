@@ -2,8 +2,8 @@ package topicreader
 
 import (
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )

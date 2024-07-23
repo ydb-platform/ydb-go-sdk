@@ -2,9 +2,6 @@ package topicclientinternal
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
@@ -13,9 +10,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"

@@ -19,6 +19,7 @@ type EventHandler interface {
 
 type PublicReadMessages struct {
 	PartitionSessionID int64
+	PartitionID        int64
 	Batch              *topicreader.Batch
 }
 
@@ -26,16 +27,19 @@ type PublicStartPartitionSessionEvent struct {
 	PartitionSession PublicPartitionSession
 	CommittedOffset  int64
 	PartitionOffsets PublicOffsetsRange
+	resp             chan WithError[PublicStartPartitionSessionResponse]
 }
 
-func (e PublicStartPartitionSessionEvent) Confirm(resp *PublicStartPartitionSessionResponse, err error) {
-	// TODO implement me
-	panic("implement me")
+func (e PublicStartPartitionSessionEvent) Confirm(resp PublicStartPartitionSessionResponse, err error) {
+	e.resp <- WithError[PublicStartPartitionSessionResponse]{
+		Error: err,
+		Val:   resp,
+	}
 }
 
 type PublicStartPartitionSessionResponse struct {
 	ReadOffset   *int64
-	CommitOffset *int64
+	CommitOffset *int64 ``
 }
 
 type PublicPartitionSession struct {
@@ -53,11 +57,19 @@ type PublicStopPartitionSessionEvent struct {
 	PartitionSessionID int64
 	Graceful           bool
 	CommittedOffset    int64
+	resp               chan WithError[PublicStopPartitionSessionResponse]
 }
 
-func (e *PublicStopPartitionSessionEvent) Confirm(resp *PublicStopPartitionSessionResponse, err error) {
-	// TODO implement me
-	panic("implement me")
+func (e *PublicStopPartitionSessionEvent) Confirm(resp PublicStopPartitionSessionResponse, err error) {
+	e.resp <- WithError[PublicStopPartitionSessionResponse]{
+		Error: err,
+		Val:   resp,
+	}
 }
 
 type PublicStopPartitionSessionResponse struct{}
+
+type WithError[S any] struct {
+	Error error
+	Val   S
+}
