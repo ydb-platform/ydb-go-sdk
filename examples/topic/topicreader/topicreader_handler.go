@@ -41,42 +41,44 @@ func (h *TopicEventsHandler) OnReaderCreated(req topiclistener.ReaderReady) erro
 
 func (h *TopicEventsHandler) OnReadMessages(
 	ctx context.Context,
-	req topiclistener.ReadMessages,
+	event topiclistener.ReadMessages,
 ) error {
-	for _, mess := range req.Batch.Messages {
+	for _, mess := range event.Batch.Messages {
 		log.Println("Receive message: %v/%v/%v", mess.Topic(), mess.PartitionID(), mess.SeqNo)
 	}
-	_ = h.listener.Commit(ctx, req.Batch)
+	_ = h.listener.Commit(ctx, event.Batch)
 	return nil
 }
 
 func (h *TopicEventsHandler) OnStartPartitionSessionRequest(
 	ctx context.Context,
-	req topiclistener.StartPartitionSessionRequest,
-) (topiclistener.StartPartitionSessionResponse, error) {
-	lockID, offset, err := lockPartition(ctx, req.PartitionSession.TopicPath, req.PartitionSession.PartitionID)
+	event topiclistener.StartPartitionSessionRequest,
+) error {
+	lockID, offset, err := lockPartition(ctx, event.PartitionSession.TopicPath, event.PartitionSession.PartitionID)
 
 	h.m.Lock()
-	h.locks[req.PartitionSession.SessionID] = lockID
+	h.locks[event.PartitionSession.SessionID] = lockID
 	h.m.Unlock()
 
-	log.Printf("Started read partition %v/%v", req.PartitionSession.TopicPath, req.PartitionSession.PartitionID)
-	return topiclistener.StartPartitionSessionResponse{
+	log.Printf("Started read partition %v/%v", event.PartitionSession.TopicPath, event.PartitionSession.PartitionID)
+	event.Confirm(&topiclistener.StartPartitionSessionResponse{
 		ReadOffset: &offset,
-	}, err
+	}, err)
+	return err
 }
 
 func (h *TopicEventsHandler) OnStopPartitionSessionRequest(
 	ctx context.Context,
-	req topiclistener.StopPartitionSessionRequest,
-) (topiclistener.StopPartitionSessionResponse, error) {
+	event topiclistener.StopPartitionSessionRequest,
+) error {
 	h.m.Lock()
-	lockID := h.locks[req.PartitionSessionID]
-	delete(h.locks, req.PartitionSessionID)
+	lockID := h.locks[event.PartitionSessionID]
+	delete(h.locks, event.PartitionSessionID)
 	h.m.Unlock()
 
 	err := unlockPartition(ctx, lockID)
-	return topiclistener.StopPartitionSessionResponse{}, err
+	event.Confirm(nil, err)
+	return err
 }
 
 func lockPartition(ctx context.Context, topic string, partitionID int64) (lockID, offset int64, err error) {

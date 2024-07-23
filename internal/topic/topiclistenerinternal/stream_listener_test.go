@@ -3,16 +3,18 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"testing"
+	"time"
+
 	"github.com/rekby/fixenv"
 	"github.com/rekby/fixenv/sf"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
-	"go.uber.org/mock/gomock"
-	"testing"
-	"time"
 )
 
 func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
@@ -95,7 +97,6 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 
 		req := StreamListener(e).messagesToSend[0]
 		require.Equal(t, batchBytes, req.(*rawtopicreader.ReadRequest).BytesSize)
-
 	})
 	t.Run("onStartPartitionSession", func(t *testing.T) {
 		e := fixenv.New(t)

@@ -75,7 +75,7 @@ func (c *MockEventHandlerOnReadMessagesCall) DoAndReturn(f func(context.Context,
 }
 
 // OnStartPartitionSessionRequest mocks base method.
-func (m *MockEventHandler) OnStartPartitionSessionRequest(ctx context.Context, req PublicStartPartitionSessionRequest) (PublicStartPartitionSessionResponse, error) {
+func (m *MockEventHandler) OnStartPartitionSessionRequest(ctx context.Context, req PublicStartPartitionSessionEvent) (PublicStartPartitionSessionResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "OnStartPartitionSessionRequest", ctx, req)
 	ret0, _ := ret[0].(PublicStartPartitionSessionResponse)
@@ -102,19 +102,19 @@ func (c *MockEventHandlerOnStartPartitionSessionRequestCall) Return(arg0 PublicS
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockEventHandlerOnStartPartitionSessionRequestCall) Do(f func(context.Context, PublicStartPartitionSessionRequest) (PublicStartPartitionSessionResponse, error)) *MockEventHandlerOnStartPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStartPartitionSessionRequestCall) Do(f func(context.Context, PublicStartPartitionSessionEvent) (PublicStartPartitionSessionResponse, error)) *MockEventHandlerOnStartPartitionSessionRequestCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockEventHandlerOnStartPartitionSessionRequestCall) DoAndReturn(f func(context.Context, PublicStartPartitionSessionRequest) (PublicStartPartitionSessionResponse, error)) *MockEventHandlerOnStartPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStartPartitionSessionRequestCall) DoAndReturn(f func(context.Context, PublicStartPartitionSessionEvent) (PublicStartPartitionSessionResponse, error)) *MockEventHandlerOnStartPartitionSessionRequestCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // OnStopPartitionSessionRequest mocks base method.
-func (m *MockEventHandler) OnStopPartitionSessionRequest(ctx context.Context, req PublicStopPartitionSessionRequest) (PublicStopPartitionSessionResponse, error) {
+func (m *MockEventHandler) OnStopPartitionSessionRequest(ctx context.Context, req PublicStopPartitionSessionEvent) (PublicStopPartitionSessionResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "OnStopPartitionSessionRequest", ctx, req)
 	ret0, _ := ret[0].(PublicStopPartitionSessionResponse)
@@ -141,13 +141,13 @@ func (c *MockEventHandlerOnStopPartitionSessionRequestCall) Return(arg0 PublicSt
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockEventHandlerOnStopPartitionSessionRequestCall) Do(f func(context.Context, PublicStopPartitionSessionRequest) (PublicStopPartitionSessionResponse, error)) *MockEventHandlerOnStopPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStopPartitionSessionRequestCall) Do(f func(context.Context, PublicStopPartitionSessionEvent) (PublicStopPartitionSessionResponse, error)) *MockEventHandlerOnStopPartitionSessionRequestCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockEventHandlerOnStopPartitionSessionRequestCall) DoAndReturn(f func(context.Context, PublicStopPartitionSessionRequest) (PublicStopPartitionSessionResponse, error)) *MockEventHandlerOnStopPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStopPartitionSessionRequestCall) DoAndReturn(f func(context.Context, PublicStopPartitionSessionEvent) (PublicStopPartitionSessionResponse, error)) *MockEventHandlerOnStopPartitionSessionRequestCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

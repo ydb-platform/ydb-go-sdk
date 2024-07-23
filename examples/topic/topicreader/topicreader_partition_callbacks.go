@@ -9,7 +9,6 @@ import (
 )
 
 func OwnReadProgressStorageWithStop(ctx context.Context, db *ydb.Driver) {
-
 	workWithPartition := map[int64]*sync.Mutex{}
 
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),

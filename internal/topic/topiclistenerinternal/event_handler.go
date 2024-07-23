@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
@@ -11,9 +12,9 @@ var ErrUnimplementedPublic = errors.New("unimplemented event handler method")
 //go:generate mockgen -source event_handler.go -destination event_handler_mock_test.go -package topiclistenerinternal -write_package_comment=false --typed
 
 type EventHandler interface {
-	OnStartPartitionSessionRequest(ctx context.Context, req PublicStartPartitionSessionRequest) (PublicStartPartitionSessionResponse, error)
+	OnStartPartitionSessionRequest(ctx context.Context, event PublicStartPartitionSessionEvent) error
 	OnReadMessages(ctx context.Context, req PublicReadMessages) error
-	OnStopPartitionSessionRequest(ctx context.Context, req PublicStopPartitionSessionRequest) (PublicStopPartitionSessionResponse, error)
+	OnStopPartitionSessionRequest(ctx context.Context, event PublicStopPartitionSessionEvent) error
 }
 
 type PublicReadMessages struct {
@@ -21,10 +22,15 @@ type PublicReadMessages struct {
 	Batch              *topicreader.Batch
 }
 
-type PublicStartPartitionSessionRequest struct {
+type PublicStartPartitionSessionEvent struct {
 	PartitionSession PublicPartitionSession
 	CommittedOffset  int64
 	PartitionOffsets PublicOffsetsRange
+}
+
+func (e PublicStartPartitionSessionEvent) Confirm(resp *PublicStartPartitionSessionResponse, err error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 type PublicStartPartitionSessionResponse struct {
@@ -43,10 +49,15 @@ type PublicOffsetsRange struct {
 	End   int64
 }
 
-type PublicStopPartitionSessionRequest struct {
+type PublicStopPartitionSessionEvent struct {
 	PartitionSessionID int64
 	Graceful           bool
 	CommittedOffset    int64
+}
+
+func (e *PublicStopPartitionSessionEvent) Confirm(resp *PublicStopPartitionSessionResponse, err error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 type PublicStopPartitionSessionResponse struct{}

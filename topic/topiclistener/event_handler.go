@@ -34,9 +34,10 @@ func (b BaseHandler) OnReaderCreated(req ReaderReady) error {
 
 func (b BaseHandler) OnStartPartitionSessionRequest(
 	ctx context.Context,
-	req StartPartitionSessionRequest,
-) (StartPartitionSessionResponse, error) {
-	return StartPartitionSessionResponse{}, ErrMethodUnimplemented
+	event StartPartitionSessionRequest,
+) error {
+	event.Confirm(nil, nil)
+	return nil
 }
 
 // OnStopPartitionSessionRequest called when server want to stop send messages for the partition
@@ -46,22 +47,25 @@ func (b BaseHandler) OnStartPartitionSessionRequest(
 // not
 func (b BaseHandler) OnStopPartitionSessionRequest(
 	ctx context.Context,
-	req StopPartitionSessionRequest,
-) (StopPartitionSessionResponse, error) {
-	return StopPartitionSessionResponse{}, ErrMethodUnimplemented
+	event StopPartitionSessionRequest,
+) error {
+	event.Confirm(nil, nil)
+	return nil
 }
 
 func (b BaseHandler) OnReadMessages(
 	ctx context.Context,
 	req ReadMessages,
 ) error {
-	return ErrMethodUnimplemented
+	return nil
 }
 
-type StartPartitionSessionRequest = topiclistenerinternal.PublicStartPartitionSessionRequest
-type StartPartitionSessionResponse = topiclistenerinternal.PublicStartPartitionSessionResponse
-type StopPartitionSessionRequest = topiclistenerinternal.PublicStopPartitionSessionRequest
-type StopPartitionSessionResponse = topiclistenerinternal.PublicStopPartitionSessionResponse
+type (
+	StartPartitionSessionRequest  = topiclistenerinternal.PublicStartPartitionSessionEvent
+	StartPartitionSessionResponse = topiclistenerinternal.PublicStartPartitionSessionResponse
+	StopPartitionSessionRequest   = topiclistenerinternal.PublicStopPartitionSessionEvent
+	StopPartitionSessionResponse  = topiclistenerinternal.PublicStopPartitionSessionResponse
+)
 
 type PartitionSession = topiclistenerinternal.PublicPartitionSession
 

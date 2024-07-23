@@ -119,7 +119,7 @@ func (m *PublicBatch) PartitionID() int64 {
 
 // PartitionSessionID example only
 func (m *PublicBatch) PartitionSessionID() int64 {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 

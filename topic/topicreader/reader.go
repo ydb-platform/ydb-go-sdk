@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -147,7 +146,7 @@ func (r *Reader) outCall(inFlight *atomic.Bool) {
 
 // Example only
 func (r *Reader) ReadEvent(ctx context.Context) (Event, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
