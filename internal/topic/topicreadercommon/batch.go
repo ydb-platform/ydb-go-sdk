@@ -3,6 +3,7 @@ package topicreadercommon
 import (
 	"context"
 	"errors"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -114,6 +115,12 @@ func (m *PublicBatch) Topic() string {
 // PartitionID of messages in the batch
 func (m *PublicBatch) PartitionID() int64 {
 	return m.partitionSession().PartitionID
+}
+
+// PartitionSessionID example only
+func (m *PublicBatch) PartitionSessionID() int64 {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m *PublicBatch) partitionSession() *PartitionSession {

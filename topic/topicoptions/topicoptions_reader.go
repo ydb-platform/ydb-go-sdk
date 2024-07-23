@@ -1,8 +1,11 @@
 package topicoptions
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"context"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -244,6 +247,21 @@ func WithReaderGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOpti
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.GetPartitionStartOffsetCallback = f
 	}
+}
+
+type (
+	// ExampleOnly
+	StopPartitionSession struct {
+		reader             *topicreader.Reader
+		PartitionSessionID int64
+		Graceful           bool
+	}
+	OnStopPartitionFunction func(ctx context.Context, req StopPartitionSession)
+)
+
+func WithReaderOnStopPartition(f OnStopPartitionFunction) ReaderOption {
+	//TODO implement me
+	panic("implement me")
 }
 
 // WithReaderTrace set tracer for the topic reader

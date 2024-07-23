@@ -3,6 +3,7 @@ package topiclistener
 import (
 	"context"
 	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -32,7 +33,7 @@ func (cr *TopicListener) WaitInit(ctx context.Context) error {
 	return cr.listenerReconnector.WaitInit(ctx)
 }
 
-func (cr *TopicListener) commit(ctx context.Context, batch topicreader.CommitRangeGetter) error {
+func (cr *TopicListener) Commit(ctx context.Context, batch topicreader.CommitRangeGetter) error {
 	// TODO implement me
 	panic("implement me")
 }

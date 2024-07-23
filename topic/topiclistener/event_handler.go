@@ -2,6 +2,7 @@ package topiclistener
 
 import (
 	"context"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 )
 
@@ -28,7 +29,7 @@ type BaseHandler struct{}
 func (b BaseHandler) topicReaderHandler() {}
 
 func (b BaseHandler) OnReaderCreated(req ReaderReady) error {
-	return ErrMethodUnimplemented
+	return nil
 }
 
 func (b BaseHandler) OnStartPartitionSessionRequest(
