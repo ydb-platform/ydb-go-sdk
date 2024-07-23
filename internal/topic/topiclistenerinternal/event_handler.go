@@ -29,7 +29,7 @@ type PublicStartPartitionSessionEvent struct {
 }
 
 func (e PublicStartPartitionSessionEvent) Confirm(resp *PublicStartPartitionSessionResponse, err error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -56,7 +56,7 @@ type PublicStopPartitionSessionEvent struct {
 }
 
 func (e *PublicStopPartitionSessionEvent) Confirm(resp *PublicStopPartitionSessionResponse, err error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
