@@ -66,7 +66,7 @@ func (h *TestTopicListener_Handler) OnStartPartitionSessionRequest(
 	req topiclistener.StartPartitionSessionRequest,
 ) error {
 	h.onPartitionStart = &req
-	req.Confirm(topiclistener.StartPartitionSessionResponse{}, nil)
+	req.Confirm(topiclistener.StartPartitionSessionResponse{})
 	return nil
 }
 
@@ -75,7 +75,7 @@ func (h *TestTopicListener_Handler) OnStopPartitionSessionRequest(
 	req topiclistener.StopPartitionSessionRequest,
 ) error {
 	h.onPartitionStop = &req
-	req.Confirm(topiclistener.StopPartitionSessionResponse{}, nil)
+	req.Confirm(topiclistener.StopPartitionSessionResponse{})
 	return nil
 }
 

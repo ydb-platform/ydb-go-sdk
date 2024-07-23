@@ -27,14 +27,11 @@ type PublicStartPartitionSessionEvent struct {
 	PartitionSession PublicPartitionSession
 	CommittedOffset  int64
 	PartitionOffsets PublicOffsetsRange
-	resp             chan WithError[PublicStartPartitionSessionResponse]
+	resp             chan PublicStartPartitionSessionResponse
 }
 
-func (e PublicStartPartitionSessionEvent) Confirm(resp PublicStartPartitionSessionResponse, err error) {
-	e.resp <- WithError[PublicStartPartitionSessionResponse]{
-		Error: err,
-		Val:   resp,
-	}
+func (e PublicStartPartitionSessionEvent) Confirm(resp PublicStartPartitionSessionResponse) {
+	e.resp <- resp
 }
 
 type PublicStartPartitionSessionResponse struct {
@@ -57,19 +54,11 @@ type PublicStopPartitionSessionEvent struct {
 	PartitionSessionID int64
 	Graceful           bool
 	CommittedOffset    int64
-	resp               chan WithError[PublicStopPartitionSessionResponse]
+	resp               chan PublicStopPartitionSessionResponse
 }
 
-func (e *PublicStopPartitionSessionEvent) Confirm(resp PublicStopPartitionSessionResponse, err error) {
-	e.resp <- WithError[PublicStopPartitionSessionResponse]{
-		Error: err,
-		Val:   resp,
-	}
+func (e *PublicStopPartitionSessionEvent) Confirm(resp PublicStopPartitionSessionResponse) {
+	e.resp <- resp
 }
 
 type PublicStopPartitionSessionResponse struct{}
-
-type WithError[S any] struct {
-	Error error
-	Val   S
-}

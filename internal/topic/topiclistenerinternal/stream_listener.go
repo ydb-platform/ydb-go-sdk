@@ -245,27 +245,28 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 			Start: m.PartitionOffsets.Start.ToInt64(),
 			End:   m.PartitionOffsets.End.ToInt64(),
 		},
-		resp: make(chan WithError[PublicStartPartitionSessionResponse], 1),
+		resp: make(chan PublicStartPartitionSessionResponse, 1),
 	}
 	err := l.handler.OnStartPartitionSessionRequest(ctx, event)
 	if err != nil {
 		return err
 	}
 
-	userResp := <-event.resp
-	if userResp.Error != nil {
-		return err
+	var userResp PublicStartPartitionSessionResponse
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case userResp = <-event.resp:
+		// pass
 	}
 
-	if err == nil {
-		if userResp.Val.ReadOffset != nil {
-			resp.ReadOffset.Offset = rawtopicreader.NewOffset(*userResp.Val.ReadOffset)
-			resp.ReadOffset.HasValue = true
-		}
-		if userResp.Val.CommitOffset != nil {
-			resp.CommitOffset.Offset = rawtopicreader.NewOffset(*userResp.Val.CommitOffset)
-			resp.CommitOffset.HasValue = true
-		}
+	if userResp.ReadOffset != nil {
+		resp.ReadOffset.Offset = rawtopicreader.NewOffset(*userResp.ReadOffset)
+		resp.ReadOffset.HasValue = true
+	}
+	if userResp.CommitOffset != nil {
+		resp.CommitOffset.Offset = rawtopicreader.NewOffset(*userResp.CommitOffset)
+		resp.CommitOffset.HasValue = true
 	}
 
 	l.sendMessage(resp)
@@ -294,16 +295,18 @@ func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopic
 		PartitionSessionID: m.PartitionSessionID.ToInt64(),
 		Graceful:           m.Graceful,
 		CommittedOffset:    m.CommittedOffset.ToInt64(),
-		resp:               make(chan WithError[PublicStopPartitionSessionResponse], 1),
+		resp:               make(chan PublicStopPartitionSessionResponse, 1),
 	}
 
 	if err = l.handler.OnStopPartitionSessionRequest(handlerCtx, event); err != nil {
 		return err
 	}
 
-	userResp := <-event.resp
-	if userResp.Error != nil {
-		return userResp.Error
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-event.resp:
+		// pass
 	}
 
 	if m.Graceful {

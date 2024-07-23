@@ -171,7 +171,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 			require.Equal(t, PartitionSession(e).PartitionSessionID.ToInt64(), event.PartitionSessionID)
 			require.True(t, event.Graceful)
 			require.Equal(t, int64(5), event.CommittedOffset)
-			event.Confirm(PublicStopPartitionSessionResponse{}, nil)
+			event.Confirm(PublicStopPartitionSessionResponse{})
 			return nil
 		})
 

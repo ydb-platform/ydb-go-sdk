@@ -36,7 +36,7 @@ func (b BaseHandler) OnStartPartitionSessionRequest(
 	ctx context.Context,
 	event StartPartitionSessionRequest,
 ) error {
-	event.Confirm(StartPartitionSessionResponse{}, nil)
+	event.Confirm(StartPartitionSessionResponse{})
 	return nil
 }
 
@@ -49,7 +49,7 @@ func (b BaseHandler) OnStopPartitionSessionRequest(
 	ctx context.Context,
 	event StopPartitionSessionRequest,
 ) error {
-	event.Confirm(StopPartitionSessionResponse{}, nil)
+	event.Confirm(StopPartitionSessionResponse{})
 	return nil
 }
 
