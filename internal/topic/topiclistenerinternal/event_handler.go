@@ -27,11 +27,22 @@ type PublicStartPartitionSessionEvent struct {
 	PartitionSession PublicPartitionSession
 	CommittedOffset  int64
 	PartitionOffsets PublicOffsetsRange
-	resp             chan PublicStartPartitionSessionResponse
+	resp             PublicStartPartitionSessionResponse
+	respChan         chan PublicStartPartitionSessionResponse
 }
 
-func (e PublicStartPartitionSessionEvent) Confirm(resp PublicStartPartitionSessionResponse) {
-	e.resp <- resp
+func (e *PublicStartPartitionSessionEvent) Confirm() {
+	e.respChan <- e.resp
+}
+
+func (e *PublicStartPartitionSessionEvent) SetReadOffset(offset int64) *PublicStartPartitionSessionEvent {
+	e.resp.ReadOffset = &offset
+	return e
+}
+
+func (e *PublicStartPartitionSessionEvent) SetCommitOffset(offset int64) *PublicStartPartitionSessionEvent {
+	e.resp.CommitOffset = &offset
+	return e
 }
 
 type PublicStartPartitionSessionResponse struct {
@@ -57,8 +68,8 @@ type PublicStopPartitionSessionEvent struct {
 	resp               chan PublicStopPartitionSessionResponse
 }
 
-func (e *PublicStopPartitionSessionEvent) Confirm(resp PublicStopPartitionSessionResponse) {
-	e.resp <- resp
+func (e *PublicStopPartitionSessionEvent) Confirm() {
+	e.resp <- PublicStopPartitionSessionResponse{}
 }
 
 type PublicStopPartitionSessionResponse struct{}

@@ -245,7 +245,7 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 			Start: m.PartitionOffsets.Start.ToInt64(),
 			End:   m.PartitionOffsets.End.ToInt64(),
 		},
-		resp: make(chan PublicStartPartitionSessionResponse, 1),
+		respChan: make(chan PublicStartPartitionSessionResponse, 1),
 	}
 	err := l.handler.OnStartPartitionSessionRequest(ctx, event)
 	if err != nil {
@@ -256,7 +256,7 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case userResp = <-event.resp:
+	case userResp = <-event.respChan:
 		// pass
 	}
 

@@ -46,7 +46,9 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 
 	if lr.streamListener != nil {
 		err = lr.streamListener.Close(ctx, reason)
-		closeErrors = append(closeErrors, err)
+		if !errors.Is(err, context.Canceled) {
+			closeErrors = append(closeErrors, err)
+		}
 	}
 
 	return errors.Join(closeErrors...)
