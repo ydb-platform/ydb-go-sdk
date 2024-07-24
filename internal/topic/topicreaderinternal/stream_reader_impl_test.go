@@ -244,7 +244,10 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		opts.MinCount = 2
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
 		require.NoError(t, err)
-		require.ErrorIs(t, e.reader.Commit(e.ctx, topicreadercommon.GetCommitRange(batch.Messages[1])), ErrWrongCommitOrderInSyncMode)
+		require.ErrorIs(t, e.reader.Commit(
+			e.ctx,
+			topicreadercommon.GetCommitRange(batch.Messages[1]),
+		), ErrWrongCommitOrderInSyncMode)
 		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
 

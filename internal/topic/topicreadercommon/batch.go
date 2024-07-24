@@ -226,5 +226,6 @@ func BatchGetPartitionSessionID(item *PublicBatch) rawtopicreader.PartitionSessi
 
 func BatchSetCommitRangeForTest(b *PublicBatch, commitRange CommitRange) *PublicBatch {
 	b.commitRange = commitRange
+
 	return b
 }

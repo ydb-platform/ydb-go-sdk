@@ -196,6 +196,7 @@ func (pmb *PublicMessageBuilder) DataAndUncompressedSize(data []byte) *PublicMes
 
 func (pmb *PublicMessageBuilder) CommitRange(cr CommitRange) *PublicMessageBuilder {
 	pmb.mess.commitRange = cr
+
 	return pmb
 }
 
@@ -223,6 +224,7 @@ func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) {
 
 func (pmb *PublicMessageBuilder) RawDataLen(val int) *PublicMessageBuilder {
 	pmb.mess.rawDataLen = val
+
 	return pmb
 }
 
@@ -240,6 +242,7 @@ func MessageGetBufferBytesAccount(m *PublicMessage) int {
 
 func MessageWithSetCommitRangeForTest(m *PublicMessage, commitRange CommitRange) *PublicMessage {
 	m.commitRange = commitRange
+
 	return m
 }
 

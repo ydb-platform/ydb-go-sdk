@@ -67,6 +67,7 @@ func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
 	for _, s := range c.sessions {
 		res = append(res, s.Session)
 	}
+
 	return res
 }
 

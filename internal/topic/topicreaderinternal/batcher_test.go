@@ -387,7 +387,10 @@ func TestBatcher_Find(t *testing.T) {
 
 	t.Run("FoundPartialBatchFilter", func(t *testing.T) {
 		session := &topicreadercommon.PartitionSession{}
-		batch := mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		batch := mustNewBatch(
+			session,
+			[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}},
+		)
 
 		b := newBatcher()
 
@@ -395,8 +398,14 @@ func TestBatcher_Find(t *testing.T) {
 
 		findRes := b.findNeedLock(batcherGetOptions{MaxCount: 1})
 
-		expectedResult := newBatcherItemBatch(mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}}))
-		expectedRestBatch := newBatcherItemBatch(mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(2)}}))
+		expectedResult := newBatcherItemBatch(mustNewBatch(
+			session,
+			[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}},
+		))
+		expectedRestBatch := newBatcherItemBatch(mustNewBatch(
+			session,
+			[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(2)}},
+		))
 
 		expectedCandidate := batcherResultCandidate{
 			Key:         session,
@@ -447,7 +456,11 @@ func TestBatcher_Apply(t *testing.T) {
 func TestBatcherGetOptions_Split(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		opts := batcherGetOptions{}
-		batch := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		batch := mustNewBatch(nil, []*topicreadercommon.PublicMessage{
+			{WrittenAt: testTime(1)},
+			{WrittenAt: testTime(2)},
+		},
+		)
 		head, rest, ok := opts.splitBatch(batch)
 
 		require.Equal(t, batch, head)
@@ -457,7 +470,11 @@ func TestBatcherGetOptions_Split(t *testing.T) {
 	t.Run("MinCount", func(t *testing.T) {
 		opts := batcherGetOptions{MinCount: 2}
 		batch1 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
-		batch2 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		batch2 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{
+			{WrittenAt: testTime(1)},
+			{WrittenAt: testTime(2)},
+		},
+		)
 
 		head, rest, ok := opts.splitBatch(batch1)
 		require.True(t, topicreadercommon.BatchIsEmpty(head))
@@ -472,7 +489,11 @@ func TestBatcherGetOptions_Split(t *testing.T) {
 	t.Run("MaxCount", func(t *testing.T) {
 		opts := batcherGetOptions{MaxCount: 2}
 		batch1 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
-		batch2 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		batch2 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{
+			{WrittenAt: testTime(1)},
+			{WrittenAt: testTime(2)},
+		},
+		)
 		batch3 := mustNewBatch(
 			nil,
 			[]*topicreadercommon.PublicMessage{
@@ -494,8 +515,20 @@ func TestBatcherGetOptions_Split(t *testing.T) {
 		require.True(t, ok)
 
 		head, rest, ok = opts.splitBatch(batch3)
-		expectedHead := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(11)}, {WrittenAt: testTime(12)}})
-		expectedRest := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(13)}, {WrittenAt: testTime(14)}})
+		expectedHead := mustNewBatch(
+			nil,
+			[]*topicreadercommon.PublicMessage{
+				{WrittenAt: testTime(11)},
+				{WrittenAt: testTime(12)},
+			},
+		)
+		expectedRest := mustNewBatch(
+			nil,
+			[]*topicreadercommon.PublicMessage{
+				{WrittenAt: testTime(13)},
+				{WrittenAt: testTime(14)},
+			},
+		)
 		require.Equal(t, expectedHead, head)
 		require.Equal(t, expectedRest, rest)
 		require.True(t, ok)
@@ -509,7 +542,10 @@ func TestBatcher_Fire(t *testing.T) {
 	})
 }
 
-func mustNewBatch(session *topicreadercommon.PartitionSession, messages []*topicreadercommon.PublicMessage) *topicreadercommon.PublicBatch {
+func mustNewBatch(
+	session *topicreadercommon.PartitionSession,
+	messages []*topicreadercommon.PublicMessage,
+) *topicreadercommon.PublicBatch {
 	batch, err := topicreadercommon.NewBatch(session, messages)
 	if err != nil {
 		panic(err)

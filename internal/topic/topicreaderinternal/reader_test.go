@@ -73,9 +73,15 @@ func TestReader_Close(t *testing.T) {
 		readerReadMessageBatchState := newCallState()
 
 		go func() {
-			readerCommitState.err = reader.Commit(context.Background(), topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{}, topicreadercommon.CommitRange{
-				PartitionSession: &topicreadercommon.PartitionSession{},
-			}))
+			readerCommitState.err = reader.Commit(
+				context.Background(),
+				topicreadercommon.MessageWithSetCommitRangeForTest(
+					&topicreadercommon.PublicMessage{},
+					topicreadercommon.CommitRange{
+						PartitionSession: &topicreadercommon.PartitionSession{},
+					},
+				),
+			)
 			close(readerCommitState.callCompleted)
 		}()
 
@@ -136,7 +142,13 @@ func TestReader_Commit(t *testing.T) {
 
 		testErr := errors.New("test err")
 		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeErr).Return(testErr)
-		require.ErrorIs(t, reader.Commit(context.Background(), topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{}, expectedRangeErr)), testErr)
+		require.ErrorIs(t, reader.Commit(
+			context.Background(),
+			topicreadercommon.MessageWithSetCommitRangeForTest(
+				&topicreadercommon.PublicMessage{},
+				expectedRangeErr,
+			),
+		), testErr)
 	})
 
 	t.Run("CommitFromOtherReader", func(t *testing.T) {
@@ -168,7 +180,10 @@ func TestReader_WaitInit(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func newTestPartitionSessionReaderID(readerID int64, partitionSessionID rawtopicreader.PartitionSessionID) *topicreadercommon.PartitionSession {
+func newTestPartitionSessionReaderID(
+	readerID int64,
+	partitionSessionID rawtopicreader.PartitionSessionID,
+) *topicreadercommon.PartitionSession {
 	return topicreadercommon.NewPartitionSession(
 		context.Background(),
 		"",

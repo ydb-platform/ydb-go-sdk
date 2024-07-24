@@ -161,10 +161,14 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 		defer mc.Finish()
 
 		stream := NewMockbatchedStreamReader(mc)
-		stream.EXPECT().Commit(gomock.Any(), gomock.Any()).Do(func(ctx context.Context, offset topicreadercommon.CommitRange) {
+		stream.EXPECT().Commit(
+			gomock.Any(),
+			gomock.Any(),
+		).Do(func(ctx context.Context, offset topicreadercommon.CommitRange) {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
 		})
+
 		reconnector := &readerReconnector{
 			streamVal:           stream,
 			streamContextCancel: func(cause error) {},
@@ -176,10 +180,14 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 	t.Run("StreamOkCommitErr", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		stream := NewMockbatchedStreamReader(mc)
-		stream.EXPECT().Commit(gomock.Any(), gomock.Any()).Do(func(ctx context.Context, offset topicreadercommon.CommitRange) {
+		stream.EXPECT().Commit(
+			gomock.Any(),
+			gomock.Any(),
+		).Do(func(ctx context.Context, offset topicreadercommon.CommitRange) {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
 		}).Return(testErr)
+
 		reconnector := &readerReconnector{
 			streamVal:           stream,
 			streamContextCancel: func(cause error) {},
