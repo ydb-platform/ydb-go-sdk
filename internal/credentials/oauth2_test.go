@@ -1011,33 +1011,31 @@ func TestParseSettingsFromFile(t *testing.T) {
 			ExpectedError: errTokenAndTokenTypeRequired,
 		},
 	}
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		for _, params := range testsParams {
-			var fileName string
-			if params.Cfg != "" {
-				f, err := os.CreateTemp("", "cfg-")
-				require.NoError(t, err)
-				defer os.Remove(f.Name())
-				_, err = f.WriteString(params.Cfg)
-				require.NoError(t, err)
-				f.Close()
-				fileName = f.Name()
-			} else {
-				fileName = params.CfgFile
-			}
-
-			client, err := NewOauth2TokenExchangeCredentialsFile(
-				fileName,
-				WithSourceInfo("TestParseSettingsFromFile"),
-			)
-			fmt.Printf("Cfg:\n%s\n", params.Cfg)
-			if params.ExpectedError != nil {
-				require.ErrorIs(t, err, params.ExpectedError)
-			} else {
-				require.NoError(t, err)
-				formatted := fmt.Sprint(client)
-				require.Equal(t, params.ExpectedFormattedCredentials, formatted)
-			}
+	for _, params := range testsParams {
+		var fileName string
+		if params.Cfg != "" {
+			f, err := os.CreateTemp("", "cfg-")
+			require.NoError(t, err)
+			defer os.Remove(f.Name())
+			_, err = f.WriteString(params.Cfg)
+			require.NoError(t, err)
+			f.Close()
+			fileName = f.Name()
+		} else {
+			fileName = params.CfgFile
 		}
-	})
+
+		client, err := NewOauth2TokenExchangeCredentialsFile(
+			fileName,
+			WithSourceInfo("TestParseSettingsFromFile"),
+		)
+		t.Logf("Cfg:\n%s\n", params.Cfg)
+		if params.ExpectedError != nil {
+			require.ErrorIs(t, err, params.ExpectedError)
+		} else {
+			require.NoError(t, err)
+			formatted := fmt.Sprint(client)
+			require.Equal(t, params.ExpectedFormattedCredentials, formatted)
+		}
+	}
 }
