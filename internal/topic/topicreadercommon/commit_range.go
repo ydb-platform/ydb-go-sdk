@@ -27,7 +27,7 @@ func (r *CommitRanges) GetCommitsInfo() []trace.TopicReaderStreamCommitInfo {
 		res[i] = trace.TopicReaderStreamCommitInfo{
 			Topic:              r.Ranges[i].PartitionSession.Topic,
 			PartitionID:        r.Ranges[i].PartitionSession.PartitionID,
-			PartitionSessionID: r.Ranges[i].PartitionSession.PartitionSessionID.ToInt64(),
+			PartitionSessionID: r.Ranges[i].PartitionSession.StreamPartitionSessionID.ToInt64(),
 			StartOffset:        r.Ranges[i].CommitOffsetStart.ToInt64(),
 			EndOffset:          r.Ranges[i].CommitOffsetEnd.ToInt64(),
 		}
@@ -98,9 +98,9 @@ func (r *CommitRanges) Optimize() {
 	sort.Slice(r.Ranges, func(i, j int) bool {
 		cI, cJ := &r.Ranges[i], &r.Ranges[j]
 		switch {
-		case cI.PartitionSession.PartitionSessionID < cJ.PartitionSession.PartitionSessionID:
+		case cI.PartitionSession.StreamPartitionSessionID < cJ.PartitionSession.StreamPartitionSessionID:
 			return true
-		case cJ.PartitionSession.PartitionSessionID < cI.PartitionSession.PartitionSessionID:
+		case cJ.PartitionSession.StreamPartitionSessionID < cI.PartitionSession.StreamPartitionSessionID:
 			return false
 		case cI.CommitOffsetStart < cJ.CommitOffsetStart:
 			return true
@@ -113,7 +113,7 @@ func (r *CommitRanges) Optimize() {
 	lastCommit := &newCommits[0]
 	for i := 1; i < len(r.Ranges); i++ {
 		commit := &r.Ranges[i]
-		if lastCommit.PartitionSession.PartitionSessionID == commit.PartitionSession.PartitionSessionID &&
+		if lastCommit.PartitionSession.StreamPartitionSessionID == commit.PartitionSession.StreamPartitionSessionID &&
 			lastCommit.CommitOffsetEnd == commit.CommitOffsetStart {
 			lastCommit.CommitOffsetEnd = commit.CommitOffsetEnd
 		} else {
@@ -137,7 +137,7 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 	}
 
 	partitionOffsets := make([]rawtopicreader.PartitionCommitOffset, 0, len(r.Ranges))
-	partitionOffsets = append(partitionOffsets, newPartition(r.Ranges[0].PartitionSession.PartitionSessionID))
+	partitionOffsets = append(partitionOffsets, newPartition(r.Ranges[0].PartitionSession.StreamPartitionSessionID))
 	partition := &partitionOffsets[0]
 
 	for i := range r.Ranges {
@@ -146,8 +146,8 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 			Start: commit.CommitOffsetStart,
 			End:   commit.CommitOffsetEnd,
 		}
-		if partition.PartitionSessionID != commit.PartitionSession.PartitionSessionID {
-			partitionOffsets = append(partitionOffsets, newPartition(commit.PartitionSession.PartitionSessionID))
+		if partition.PartitionSessionID != commit.PartitionSession.StreamPartitionSessionID {
+			partitionOffsets = append(partitionOffsets, newPartition(commit.PartitionSession.StreamPartitionSessionID))
 			partition = &partitionOffsets[len(partitionOffsets)-1]
 		}
 		partition.Offsets = append(partition.Offsets, offsetsRange)

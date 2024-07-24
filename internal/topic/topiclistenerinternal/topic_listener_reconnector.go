@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -20,6 +21,7 @@ type TopicListenerReconnector struct {
 	streamListener      *streamListener
 	connectionResult    error
 	connectionCompleted empty.Chan
+	connectionIDCounter atomic.Int64
 }
 
 func NewTopicListenerReconnector(
@@ -55,7 +57,7 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 }
 
 func (lr *TopicListenerReconnector) connect(connectionCtx context.Context) {
-	lr.streamListener, lr.connectionResult = newStreamListener(connectionCtx, lr.client, lr.handler, lr.streamConfig)
+	lr.streamListener, lr.connectionResult = newStreamListener(connectionCtx, lr.client, lr.handler, lr.streamConfig, &lr.connectionIDCounter)
 	close(lr.connectionCompleted)
 }
 

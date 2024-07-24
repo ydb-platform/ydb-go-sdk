@@ -1,6 +1,8 @@
 package topiclistenerinternal
 
 import (
+	"sync/atomic"
+
 	"github.com/rekby/fixenv"
 	"github.com/rekby/fixenv/sf"
 	"go.uber.org/mock/gomock"
@@ -12,7 +14,7 @@ import (
 func StreamListener(e fixenv.Env) *streamListener {
 	f := func() (*fixenv.GenericResult[*streamListener], error) {
 		l := &streamListener{}
-		l.initVars()
+		l.initVars(&atomic.Int64{})
 		l.stream = StreamMock(e)
 		l.streamClose = func(cause error) {
 		}
@@ -43,6 +45,7 @@ func PartitionSession(e fixenv.Env) *topicreadercommon.PartitionSession {
 			0,
 			"",
 			2,
+			0,
 			0,
 		)), nil
 	}

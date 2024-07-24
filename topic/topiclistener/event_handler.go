@@ -4,17 +4,25 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 )
 
-var ErrMethodUnimplemented = topiclistenerinternal.ErrUnimplementedPublic
-
 // EventHandler methods will be called sequentially by partition, but can be called in parallel for different partitions
+// You should include topiclistener.BaseHandler into your struct for the interface implementation
+// It allows to extend the interface in the future without broke compatibility.
+// Method of the handler will be called from one goroutine per partition. But can be run in parallel for different partitions.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type EventHandler interface {
 	// topicReaderHandler needs for guarantee inherits from base struct with default implementations of new methods
 	topicReaderHandler()
 
 	topiclistenerinternal.EventHandler
 
+	// OnReaderCreated called once at the reader complete internal initialization
+	// It not mean that reader is connected to a server.
+	// Allow easy initialize your handler with the reader without sync with return of topic.Client StartListener method
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	OnReaderCreated(req ReaderReady) error
 }
 
@@ -24,6 +32,11 @@ type ReaderReady struct {
 
 type ReadMessages = topiclistenerinternal.PublicReadMessages
 
+// BaseHandler implements default behavior for EventHandler interface
+// you must embed the structure to your own implementation of the interface.
+// It allows to extend the interface in the future without broke compatibility
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type BaseHandler struct{}
 
 func (b BaseHandler) topicReaderHandler() {}
@@ -67,6 +80,6 @@ type (
 	StopPartitionSessionConfirm  = topiclistenerinternal.PublicStopPartitionSessionConfirm
 )
 
-type PartitionSession = topiclistenerinternal.PublicPartitionSession
+type PartitionSession = topicreadercommon.PublicPartitionSession
 
 type OffsetsRange = topiclistenerinternal.PublicOffsetsRange

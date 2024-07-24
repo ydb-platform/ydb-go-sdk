@@ -27,6 +27,8 @@ type Client interface {
 
 	// StartListener starts read listen topic with the handler
 	// it is fast non block call, connection starts in background
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	StartListener(
 		consumer string,
 		handler topiclistener.EventHandler,

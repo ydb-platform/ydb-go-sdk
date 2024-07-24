@@ -120,6 +120,7 @@ func (pmb *PublicMessageBuilder) initMessage() {
 			"",
 			0,
 			0,
+			0,
 		)},
 	}
 }

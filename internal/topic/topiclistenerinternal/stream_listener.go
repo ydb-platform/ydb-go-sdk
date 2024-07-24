@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
@@ -26,8 +27,9 @@ type streamListener struct {
 	handler     EventHandler
 	sessionID   string
 
-	background background.Worker
-	sessions   *topicreadercommon.PartitionSessionStorage
+	background       background.Worker
+	sessions         *topicreadercommon.PartitionSessionStorage
+	sessionIDCounter *atomic.Int64
 
 	hasNewMessagesToSend empty.Chan
 
@@ -40,13 +42,15 @@ func newStreamListener(
 	client TopicClient,
 	eventListener EventHandler,
 	config StreamListenerConfig,
+	sessionIDCounter *atomic.Int64,
 ) (*streamListener, error) {
 	res := &streamListener{
-		cfg:        config,
-		handler:    eventListener,
-		background: *background.NewWorker(context.WithoutCancel(connectionCtx), "topic reader stream listener"),
+		cfg:              config,
+		handler:          eventListener,
+		background:       *background.NewWorker(context.WithoutCancel(connectionCtx), "topic reader stream listener"),
+		sessionIDCounter: sessionIDCounter,
 	}
-	res.initVars()
+	res.initVars(sessionIDCounter)
 
 	if err := res.initStream(connectionCtx, client); err != nil {
 		res.closeWithTimeout(connectionCtx, err)
@@ -75,7 +79,7 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
 				Status: rawydb.StatusSuccess,
 			},
-			PartitionSessionID: session.PartitionSessionID,
+			PartitionSessionID: session.StreamPartitionSessionID,
 			Graceful:           false,
 			CommittedOffset:    session.CommittedOffset(),
 		})
@@ -102,9 +106,10 @@ func (l *streamListener) startBackground() {
 	l.background.Start("stream listener receiver", l.receiveMessagesLoop)
 }
 
-func (l *streamListener) initVars() {
+func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.hasNewMessagesToSend = make(empty.Chan, 1)
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
+	l.sessionIDCounter = sessionIDCounter
 }
 
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
@@ -226,6 +231,7 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 		l.cfg.readerID,
 		l.sessionID,
 		m.PartitionSession.PartitionSessionID,
+		l.sessionIDCounter.Add(1),
 		m.CommittedOffset,
 	)
 	if err := l.sessions.Add(session); err != nil {
@@ -237,12 +243,8 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 	}
 
 	event := PublicStartPartitionSessionEvent{
-		PartitionSession: PublicPartitionSession{
-			SessionID:   m.PartitionSession.PartitionSessionID.ToInt64(),
-			TopicPath:   m.PartitionSession.Path,
-			PartitionID: m.PartitionSession.PartitionID,
-		},
-		CommittedOffset: m.CommittedOffset.ToInt64(),
+		PartitionSession: session.ToPublic(),
+		CommittedOffset:  m.CommittedOffset.ToInt64(),
 		PartitionOffsets: PublicOffsetsRange{
 			Start: m.PartitionOffsets.Start.ToInt64(),
 			End:   m.PartitionOffsets.End.ToInt64(),
@@ -276,9 +278,13 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 }
 
 func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopicreader.StopPartitionSessionRequest) error {
-	session, err := l.sessions.Remove(m.PartitionSessionID)
-	if m.Graceful && err != nil {
+	session, err := l.sessions.Get(m.PartitionSessionID)
+	if !m.Graceful && session == nil {
 		// stop partition may be received twice: graceful and force
+		// the sdk we can forget about the session after graceful stop
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 
@@ -294,15 +300,24 @@ func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopic
 	}
 
 	event := PublicStopPartitionSessionEvent{
-		PartitionSessionID: m.PartitionSessionID.ToInt64(),
-		Graceful:           m.Graceful,
-		CommittedOffset:    m.CommittedOffset.ToInt64(),
-		resp:               make(chan PublicStopPartitionSessionConfirm, 1),
+		PartitionSession: session.ToPublic(),
+		Graceful:         m.Graceful,
+		CommittedOffset:  m.CommittedOffset.ToInt64(),
+		resp:             make(chan PublicStopPartitionSessionConfirm, 1),
 	}
 
 	if err = l.handler.OnStopPartitionSessionRequest(handlerCtx, event); err != nil {
 		return err
 	}
+
+	go func() {
+		// remove partition on the confirmation or on the listener closed
+		select {
+		case <-l.background.Done():
+		case <-event.resp:
+		}
+		_, _ = l.sessions.Remove(m.PartitionSessionID)
+	}()
 
 	select {
 	case <-ctx.Done():
@@ -312,7 +327,7 @@ func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopic
 	}
 
 	if m.Graceful {
-		l.sendMessage(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: session.PartitionSessionID})
+		l.sendMessage(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: session.StreamPartitionSessionID})
 	}
 	return nil
 }
@@ -325,9 +340,9 @@ func (l *streamListener) onReadResponse(ctx context.Context, m *rawtopicreader.R
 
 	for _, batch := range batches {
 		if err = l.handler.OnReadMessages(batch.Context(), PublicReadMessages{
-			PartitionSessionID: topicreadercommon.GetCommitRange(batch).PartitionSession.PartitionSessionID.ToInt64(),
-			Batch:              batch,
-		}); supressUnimplemented(err) != nil {
+			PartitionSession: topicreadercommon.BatchGetPartitionSession(batch).ToPublic(),
+			Batch:            batch,
+		}); err != nil {
 			return err
 		}
 	}
@@ -348,11 +363,4 @@ func (l *streamListener) sendMessage(m rawtopicreader.ClientMessage) {
 	case l.hasNewMessagesToSend <- empty.Struct{}:
 	default:
 	}
-}
-
-func supressUnimplemented(err error) error {
-	if errors.Is(err, ErrUnimplementedPublic) {
-		return nil
-	}
-	return err
 }

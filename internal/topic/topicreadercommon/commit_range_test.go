@@ -13,8 +13,8 @@ var _ PublicCommitRangeGetter = &PublicMessage{}
 var _ PublicCommitRangeGetter = &PublicBatch{}
 
 func TestCompressCommitsInplace(t *testing.T) {
-	session1 := &PartitionSession{PartitionSessionID: 1}
-	session2 := &PartitionSession{PartitionSessionID: 2}
+	session1 := &PartitionSession{StreamPartitionSessionID: 1}
+	session2 := &PartitionSession{StreamPartitionSessionID: 2}
 	table := []struct {
 		name     string
 		source   []CommitRange
@@ -172,8 +172,8 @@ func TestCompressCommitsInplace(t *testing.T) {
 }
 
 func TestCommitsToRawPartitionCommitOffset(t *testing.T) {
-	session1 := &PartitionSession{PartitionSessionID: 1}
-	session2 := &PartitionSession{PartitionSessionID: 2}
+	session1 := &PartitionSession{StreamPartitionSessionID: 1}
+	session2 := &PartitionSession{StreamPartitionSessionID: 2}
 
 	table := []struct {
 		name     string

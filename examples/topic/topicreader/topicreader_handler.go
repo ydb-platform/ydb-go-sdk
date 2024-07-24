@@ -59,7 +59,7 @@ func (h *TopicEventsHandler) OnStartPartitionSessionRequest(
 	lockID, offset, err := lockPartition(ctx, event.PartitionSession.TopicPath, event.PartitionSession.PartitionID)
 
 	h.m.Lock()
-	h.locks[event.PartitionSession.SessionID] = lockID
+	h.locks[event.PartitionSession.PartitionSessionID] = lockID
 	h.m.Unlock()
 
 	log.Printf("Started read partition %v/%v", event.PartitionSession.TopicPath, event.PartitionSession.PartitionID)

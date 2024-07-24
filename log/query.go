@@ -405,7 +405,7 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "execute")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
+				String("PartitionSessionID", info.Session.ID()),
 				String("SessionStatus", info.Session.Status()),
 				String("Query", info.Query),
 			)
@@ -435,7 +435,7 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "begin")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
+				String("PartitionSessionID", info.Session.ID()),
 				String("SessionStatus", info.Session.Status()),
 			)
 			start := time.Now()
@@ -465,7 +465,7 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "execute")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
+				String("PartitionSessionID", info.Session.ID()),
 				String("TransactionID", info.Tx.ID()),
 				String("SessionStatus", info.Session.Status()),
 			)

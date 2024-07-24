@@ -220,8 +220,8 @@ func BatchIsEmpty(b *PublicBatch) bool {
 	return b == nil || len(b.Messages) == 0
 }
 
-func BatchGetPartitionSessionID(item *PublicBatch) rawtopicreader.PartitionSessionID {
-	return item.partitionSession().PartitionSessionID
+func BatchGetPartitionSession(item *PublicBatch) *PartitionSession {
+	return item.partitionSession()
 }
 
 func BatchSetCommitRangeForTest(b *PublicBatch, commitRange CommitRange) *PublicBatch {

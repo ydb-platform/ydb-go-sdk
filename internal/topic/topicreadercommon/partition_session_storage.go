@@ -37,10 +37,10 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 
 	c.initNeedLock()
 
-	if _, ok := c.sessions[session.PartitionSessionID]; ok {
-		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.PartitionSessionID))
+	if _, ok := c.sessions[session.StreamPartitionSessionID]; ok {
+		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
-	c.sessions[session.PartitionSessionID] = &sessionInfo{Session: session}
+	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
 
 	return nil
 }

@@ -407,6 +407,7 @@ func newTestPartitionSession(
 		-1,
 		"",
 		partitionSessionID,
+		int64(partitionSessionID)+100,
 		0,
 	)
 }

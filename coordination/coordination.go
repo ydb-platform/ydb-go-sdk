@@ -194,6 +194,6 @@ func (d *SemaphoreDescription) String() string {
 }
 
 func (s *SemaphoreSession) String() string {
-	return fmt.Sprintf("{SessionID: %d Count: %d OrderID: %d Data: %q TimeoutMillis: %v}",
+	return fmt.Sprintf("{PartitionSessionID: %d Count: %d OrderID: %d Data: %q TimeoutMillis: %v}",
 		s.SessionID, s.Count, s.OrderID, s.Data, s.Timeout)
 }

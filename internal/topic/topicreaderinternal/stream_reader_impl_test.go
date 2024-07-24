@@ -386,7 +386,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 				PartitionContext:   e.partitionSession.Context(),
 				Topic:              e.partitionSession.Topic,
 				PartitionID:        e.partitionSession.PartitionID,
-				PartitionSessionID: e.partitionSession.PartitionSessionID.ToInt64(),
+				PartitionSessionID: e.partitionSession.StreamPartitionSessionID.ToInt64(),
 				CommittedOffset:    committedOffset,
 				Graceful:           true,
 			}
@@ -431,7 +431,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 				PartitionContext:   e.partitionSession.Context(),
 				Topic:              e.partitionSession.Topic,
 				PartitionID:        e.partitionSession.PartitionID,
-				PartitionSessionID: e.partitionSession.PartitionSessionID.ToInt64(),
+				PartitionSessionID: e.partitionSession.StreamPartitionSessionID.ToInt64(),
 				CommittedOffset:    committedOffset,
 				Graceful:           false,
 			}
@@ -927,6 +927,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 				topicreadercommon.NextReaderID(),
 				"bad-connection-id",
 				222,
+				322,
 				213,
 			),
 		}
@@ -991,6 +992,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 
 	const testPartitionID = 5
 	const testSessionID = 15
+	const testClientSessionID = 115
 	const testSessionComitted = 20
 
 	session := topicreadercommon.NewPartitionSession(
@@ -1000,6 +1002,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		reader.readerID,
 		reader.readConnectionID,
 		testSessionID,
+		testClientSessionID,
 		testSessionComitted,
 	)
 	require.NoError(t, reader.sessionController.Add(session))
@@ -1013,7 +1016,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		stream:                     stream,
 		messagesFromServerToClient: make(chan testStreamResult),
 		partitionSession:           session,
-		partitionSessionID:         session.PartitionSessionID,
+		partitionSessionID:         session.StreamPartitionSessionID,
 		mc:                         mc,
 	}
 
