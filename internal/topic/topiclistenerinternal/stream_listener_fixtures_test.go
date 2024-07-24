@@ -5,7 +5,7 @@ import (
 	"github.com/rekby/fixenv/sf"
 	"go.uber.org/mock/gomock"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreadermock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 )
 
@@ -57,9 +57,9 @@ func MockController(e fixenv.Env) *gomock.Controller {
 	return fixenv.CacheResult(e, f)
 }
 
-func StreamMock(e fixenv.Env) *rawtopicreader.MockTopicReaderStreamInterface {
-	f := func() (*fixenv.GenericResult[*rawtopicreader.MockTopicReaderStreamInterface], error) {
-		m := rawtopicreader.NewMockTopicReaderStreamInterface(MockController(e))
+func StreamMock(e fixenv.Env) *rawtopicreadermock.MockTopicReaderStreamInterface {
+	f := func() (*fixenv.GenericResult[*rawtopicreadermock.MockTopicReaderStreamInterface], error) {
+		m := rawtopicreadermock.NewMockTopicReaderStreamInterface(MockController(e))
 		return fixenv.NewGenericResult(m), nil
 	}
 	return fixenv.CacheResult(e, f)

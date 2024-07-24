@@ -118,10 +118,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 				Start: 5,
 				End:   15,
 			}, event.PartitionOffsets)
-			event.Confirm(PublicStartPartitionSessionResponse{
-				ReadOffset:   &respReadOffset,
-				CommitOffset: &respCommitOffset,
-			}, nil)
+			event.SetReadOffset(respReadOffset).SetCommitOffset(respCommitOffset).Confirm()
 			return nil
 		})
 
@@ -171,7 +168,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 			require.Equal(t, PartitionSession(e).PartitionSessionID.ToInt64(), event.PartitionSessionID)
 			require.True(t, event.Graceful)
 			require.Equal(t, int64(5), event.CommittedOffset)
-			event.Confirm(PublicStopPartitionSessionResponse{})
+			event.Confirm()
 			return nil
 		})
 
@@ -204,7 +201,7 @@ func TestStreamListener_CloseSessionsOnCloseListener(t *testing.T) {
 		require.Equal(t, PartitionSession(e).PartitionSessionID.ToInt64(), event.PartitionSessionID)
 		require.False(t, event.Graceful)
 		require.Equal(t, PartitionSession(e).CommittedOffset().ToInt64(), event.CommittedOffset)
-		event.Confirm(PublicStopPartitionSessionResponse{}, nil)
+		event.Confirm()
 		return nil
 	})
 	require.NoError(t, StreamListener(e).Close(sf.Context(e), errors.New("test")))

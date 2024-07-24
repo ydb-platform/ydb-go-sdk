@@ -1,6 +1,6 @@
 package rawtopicreader
 
-//go:generate mockgen -destination stream_reader_stream_interface_mock.go -package rawtopicreader -write_package_comment=false --typed . TopicReaderStreamInterface
+//go:generate mockgen -destination ../rawtopicreadermock/stream_reader_stream_interface_mock.go -package rawtopicreadermock -write_package_comment=false --typed . TopicReaderStreamInterface
 
 type TopicReaderStreamInterface interface {
 	Recv() (ServerMessage, error)
