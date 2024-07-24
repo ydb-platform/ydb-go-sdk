@@ -263,7 +263,10 @@ type commitWaiter struct {
 	Committed empty.Chan
 }
 
-func (w *commitWaiter) checkCondition(session *topicreadercommon.PartitionSession, offset rawtopicreader.Offset) (finished bool) {
+func (w *commitWaiter) checkCondition(
+	session *topicreadercommon.PartitionSession,
+	offset rawtopicreader.Offset,
+) (finished bool) {
 	return session == w.Session && offset >= w.EndOffset
 }
 

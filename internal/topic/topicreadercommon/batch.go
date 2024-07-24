@@ -178,7 +178,7 @@ func splitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) 
 	return nil
 }
 
-func BatchAppend(original *PublicBatch, appended *PublicBatch) (*PublicBatch, error) {
+func BatchAppend(original, appended *PublicBatch) (*PublicBatch, error) {
 	var res *PublicBatch
 	if original == nil {
 		res = &PublicBatch{}

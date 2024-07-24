@@ -103,7 +103,10 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 		expectedMap := batcherMessagesMap{session: batcherMessageOrderItems{
 			newBatcherItemBatch(batch1),
 			newBatcherItemRawMessage(m),
-			newBatcherItemBatch(mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(2)}, {WrittenAt: testTime(3)}})),
+			newBatcherItemBatch(mustNewBatch(
+				session,
+				[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(2)}, {WrittenAt: testTime(3)}},
+			)),
 		}}
 		require.Equal(t, expectedMap, b.messages)
 	})
@@ -219,7 +222,10 @@ func TestBatcher_Pop(t *testing.T) {
 		b := newBatcher()
 		m := &rawtopicreader.StopPartitionSessionRequest{PartitionSessionID: 1}
 
-		require.NoError(t, b.PushBatches(mustNewBatch(session1, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})))
+		require.NoError(t, b.PushBatches(mustNewBatch(
+			session1,
+			[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}},
+		)))
 		require.NoError(t, b.PushRawMessage(session2, m))
 
 		res, err := b.Pop(context.Background(), batcherGetOptions{})
