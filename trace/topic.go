@@ -119,7 +119,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStopResponseStartInfo struct {
 		ReaderConnectionID string
-		PartitionContext   *context.Context
+		PartitionContext   context.Context
 		Topic              string
 		PartitionID        int64
 		PartitionSessionID int64
