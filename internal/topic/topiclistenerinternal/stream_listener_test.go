@@ -118,7 +118,10 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 				Start: 5,
 				End:   15,
 			}, event.PartitionOffsets)
-			event.SetReadOffset(respReadOffset).SetCommitOffset(respCommitOffset).Confirm()
+			event.Confirm(PublicStartPartitionSessionConfirm{}.
+				WithReadOffet(respReadOffset).
+				WithCommitOffset(respCommitOffset),
+			)
 			return nil
 		})
 

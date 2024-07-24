@@ -80,7 +80,9 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 			CommittedOffset:    session.CommittedOffset(),
 		})
 		if err != nil {
-			resErrors = append(resErrors, err)
+			if !errors.Is(err, context.Canceled) {
+				resErrors = append(resErrors, err)
+			}
 		}
 	}
 
@@ -245,14 +247,14 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 			Start: m.PartitionOffsets.Start.ToInt64(),
 			End:   m.PartitionOffsets.End.ToInt64(),
 		},
-		respChan: make(chan PublicStartPartitionSessionResponse, 1),
+		respChan: make(chan PublicStartPartitionSessionConfirm, 1),
 	}
 	err := l.handler.OnStartPartitionSessionRequest(ctx, event)
 	if err != nil {
 		return err
 	}
 
-	var userResp PublicStartPartitionSessionResponse
+	var userResp PublicStartPartitionSessionConfirm
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -295,7 +297,7 @@ func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopic
 		PartitionSessionID: m.PartitionSessionID.ToInt64(),
 		Graceful:           m.Graceful,
 		CommittedOffset:    m.CommittedOffset.ToInt64(),
-		resp:               make(chan PublicStopPartitionSessionResponse, 1),
+		resp:               make(chan PublicStopPartitionSessionConfirm, 1),
 	}
 
 	if err = l.handler.OnStopPartitionSessionRequest(handlerCtx, event); err != nil {

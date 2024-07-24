@@ -63,9 +63,11 @@ func (h *TopicEventsHandler) OnStartPartitionSessionRequest(
 	h.m.Unlock()
 
 	log.Printf("Started read partition %v/%v", event.PartitionSession.TopicPath, event.PartitionSession.PartitionID)
-	event.Confirm(&topiclistener.StartPartitionSessionResponse{
-		ReadOffset: &offset,
-	}, err)
+	event.Confirm(
+		topiclistener.StartPartitionSessionConfirm{}.
+			WithReadOffet(offset).
+			WithCommitOffset(offset),
+	)
 	return err
 }
 
@@ -79,7 +81,7 @@ func (h *TopicEventsHandler) OnStopPartitionSessionRequest(
 	h.m.Unlock()
 
 	err := unlockPartition(ctx, lockID)
-	event.Confirm(nil, err)
+	event.Confirm()
 	return err
 }
 

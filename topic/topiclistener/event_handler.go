@@ -61,10 +61,10 @@ func (b BaseHandler) OnReadMessages(
 }
 
 type (
-	StartPartitionSessionRequest  = topiclistenerinternal.PublicStartPartitionSessionEvent
-	StartPartitionSessionResponse = topiclistenerinternal.PublicStartPartitionSessionResponse
-	StopPartitionSessionRequest   = topiclistenerinternal.PublicStopPartitionSessionEvent
-	StopPartitionSessionResponse  = topiclistenerinternal.PublicStopPartitionSessionResponse
+	StartPartitionSessionRequest = topiclistenerinternal.PublicStartPartitionSessionEvent
+	StartPartitionSessionConfirm = topiclistenerinternal.PublicStartPartitionSessionConfirm
+	StopPartitionSessionRequest  = topiclistenerinternal.PublicStopPartitionSessionEvent
+	StopPartitionSessionConfirm  = topiclistenerinternal.PublicStopPartitionSessionConfirm
 )
 
 type PartitionSession = topiclistenerinternal.PublicPartitionSession

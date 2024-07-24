@@ -27,27 +27,34 @@ type PublicStartPartitionSessionEvent struct {
 	PartitionSession PublicPartitionSession
 	CommittedOffset  int64
 	PartitionOffsets PublicOffsetsRange
-	resp             PublicStartPartitionSessionResponse
-	respChan         chan PublicStartPartitionSessionResponse
+	resp             PublicStartPartitionSessionConfirm
+	respChan         chan PublicStartPartitionSessionConfirm
 }
 
-func (e *PublicStartPartitionSessionEvent) Confirm() {
-	e.respChan <- e.resp
+func (e *PublicStartPartitionSessionEvent) Confirm(opts ...PublicStartPartitionSessionConfirm) {
+	switch len(opts) {
+	case 0:
+		e.respChan <- PublicStartPartitionSessionConfirm{}
+	case 1:
+		e.respChan <- opts[0]
+	default:
+		panic("Confirm accept only zero or one confirm parameters")
+	}
 }
 
-func (e *PublicStartPartitionSessionEvent) SetReadOffset(offset int64) *PublicStartPartitionSessionEvent {
-	e.resp.ReadOffset = &offset
-	return e
-}
-
-func (e *PublicStartPartitionSessionEvent) SetCommitOffset(offset int64) *PublicStartPartitionSessionEvent {
-	e.resp.CommitOffset = &offset
-	return e
-}
-
-type PublicStartPartitionSessionResponse struct {
+type PublicStartPartitionSessionConfirm struct {
 	ReadOffset   *int64
 	CommitOffset *int64 ``
+}
+
+func (c PublicStartPartitionSessionConfirm) WithReadOffet(val int64) PublicStartPartitionSessionConfirm {
+	c.ReadOffset = &val
+	return c
+}
+
+func (c PublicStartPartitionSessionConfirm) WithCommitOffset(val int64) PublicStartPartitionSessionConfirm {
+	c.CommitOffset = &val
+	return c
 }
 
 type PublicPartitionSession struct {
@@ -65,11 +72,19 @@ type PublicStopPartitionSessionEvent struct {
 	PartitionSessionID int64
 	Graceful           bool
 	CommittedOffset    int64
-	resp               chan PublicStopPartitionSessionResponse
+	resp               chan PublicStopPartitionSessionConfirm
 }
 
-func (e *PublicStopPartitionSessionEvent) Confirm() {
-	e.resp <- PublicStopPartitionSessionResponse{}
+func (e *PublicStopPartitionSessionEvent) Confirm(options ...PublicStopPartitionSessionConfirm) {
+	switch len(options) {
+	case 0:
+		e.resp <- PublicStopPartitionSessionConfirm{}
+	case 1:
+		e.resp <- options[0]
+	default:
+		panic("Confirm accept only zero or one confirm parameters")
+	}
+
 }
 
-type PublicStopPartitionSessionResponse struct{}
+type PublicStopPartitionSessionConfirm struct{}
