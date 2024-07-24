@@ -142,7 +142,6 @@ func (b *Worker) init() {
 
 func (b *Worker) starterLoop(ctx context.Context) {
 	defer close(b.tasksCompleted)
-	defer b.workers.Wait()
 
 	for bgTask := range b.tasks {
 		b.workers.Add(1)
