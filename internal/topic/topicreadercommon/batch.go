@@ -117,12 +117,6 @@ func (m *PublicBatch) PartitionID() int64 {
 	return m.partitionSession().PartitionID
 }
 
-// PartitionSessionID example only
-func (m *PublicBatch) PartitionSessionID() int64 {
-	// TODO implement me
-	panic("implement me")
-}
-
 func (m *PublicBatch) partitionSession() *PartitionSession {
 	return m.commitRange.PartitionSession
 }
