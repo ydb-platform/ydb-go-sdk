@@ -10,9 +10,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -200,6 +203,38 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	}
 
 	return call(ctx)
+}
+
+// StartListener starts read listen topic with the handler
+// it is fast non block call, connection starts in background
+func (c *Client) StartListener(
+	consumer string,
+	handler topiclistener.EventHandler,
+	readSelectors topicoptions.ReadSelectors,
+	opts ...topicoptions.ListenerOption,
+) (*topiclistener.TopicListener, error) {
+	cfg := topiclistenerinternal.NewStreamListenerConfig()
+
+	cfg.Consumer = consumer
+
+	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
+	for i := range readSelectors {
+		cfg.Selectors[i] = readSelectors[i].Clone()
+	}
+
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
+		opt(&cfg)
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	return topiclistener.NewTopicListener(&c.rawClient, &cfg, handler)
 }
 
 // StartReader create new topic reader and start pull messages from server

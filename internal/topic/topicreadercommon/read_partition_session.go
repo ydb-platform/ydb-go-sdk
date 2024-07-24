@@ -15,9 +15,10 @@ type PartitionSession struct {
 	ReaderID     int64
 	connectionID string
 
-	ctx                context.Context //nolint:containedctx
-	ctxCancel          context.CancelFunc
-	PartitionSessionID rawtopicreader.PartitionSessionID
+	ctx                      context.Context //nolint:containedctx
+	ctxCancel                context.CancelFunc
+	StreamPartitionSessionID rawtopicreader.PartitionSessionID
+	ClientPartitionSessionID int64
 
 	lastReceivedOffsetEndVal atomic.Int64
 	committedOffsetVal       atomic.Int64
@@ -30,18 +31,20 @@ func NewPartitionSession(
 	readerID int64,
 	connectionID string,
 	partitionSessionID rawtopicreader.PartitionSessionID,
+	clientPartitionSessionID int64,
 	committedOffset rawtopicreader.Offset,
 ) *PartitionSession {
 	partitionContext, cancel := xcontext.WithCancel(partitionContext)
 
 	res := &PartitionSession{
-		Topic:              topic,
-		PartitionID:        partitionID,
-		ReaderID:           readerID,
-		connectionID:       connectionID,
-		ctx:                partitionContext,
-		ctxCancel:          cancel,
-		PartitionSessionID: partitionSessionID,
+		Topic:                    topic,
+		PartitionID:              partitionID,
+		ReaderID:                 readerID,
+		connectionID:             connectionID,
+		ctx:                      partitionContext,
+		ctxCancel:                cancel,
+		StreamPartitionSessionID: partitionSessionID,
+		ClientPartitionSessionID: clientPartitionSessionID,
 	}
 	res.committedOffsetVal.Store(committedOffset.ToInt64())
 	res.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
@@ -85,4 +88,26 @@ func (s *PartitionSession) LastReceivedMessageOffset() rawtopicreader.Offset {
 
 func (s *PartitionSession) SetLastReceivedMessageOffset(v rawtopicreader.Offset) {
 	s.lastReceivedOffsetEndVal.Store(v.ToInt64())
+}
+
+func (s *PartitionSession) ToPublic() PublicPartitionSession {
+	return PublicPartitionSession{
+		PartitionSessionID: s.ClientPartitionSessionID,
+		TopicPath:          s.Topic,
+		PartitionID:        s.PartitionID,
+	}
+}
+
+// PublicPartitionSession contains information about partition session for the event
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+type PublicPartitionSession struct {
+	// PartitionSessionID is unique session ID per listener object
+	PartitionSessionID int64
+
+	// TopicPath contains path for the topic
+	TopicPath string
+
+	// PartitionID contains partition id. It can be repeated for one reader if the partition will stop/start few times.
+	PartitionID int64
 }
