@@ -20,7 +20,7 @@ import (
 )
 
 type streamListener struct {
-	cfg StreamListenerConfig
+	cfg *StreamListenerConfig
 
 	stream      rawtopicreader.TopicReaderStreamInterface
 	streamClose context.CancelCauseFunc
@@ -41,7 +41,7 @@ func newStreamListener(
 	connectionCtx context.Context,
 	client TopicClient,
 	eventListener EventHandler,
-	config StreamListenerConfig,
+	config *StreamListenerConfig,
 	sessionIDCounter *atomic.Int64,
 ) (*streamListener, error) {
 	res := &streamListener{

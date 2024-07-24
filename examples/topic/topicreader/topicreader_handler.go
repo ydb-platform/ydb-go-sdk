@@ -47,7 +47,8 @@ func (h *TopicEventsHandler) OnReadMessages(
 	for _, mess := range event.Batch.Messages {
 		log.Printf("Receive message: %v/%v/%v", mess.Topic(), mess.PartitionID(), mess.SeqNo)
 	}
-	_ = h.listener.Commit(ctx, event.Batch)
+
+	processBatch(ctx, event.Batch)
 
 	return nil
 }
