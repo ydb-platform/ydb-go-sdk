@@ -53,11 +53,13 @@ func newStreamListener(
 	res.initVars(sessionIDCounter)
 	if err := res.initStream(connectionCtx, client); err != nil {
 		res.closeWithTimeout(connectionCtx, err)
+
 		return nil, err
 	}
 
 	res.startBackground()
 	res.sendDataRequest(config.BufferSize)
+
 	return res, nil
 }
 
@@ -114,6 +116,7 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	}
 }
 
+//nolint:funlen
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
 	streamCtx, streamClose := context.WithCancelCause(xcontext.ValueOnly(ctx))
 	l.streamClose = streamClose
@@ -150,20 +153,33 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 
 	resp, err := l.stream.Recv()
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: failed to receive init response for read stream in the listener: %w", err))
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"ydb: failed to receive init response for read stream in the listener: %w",
+			err,
+		))
 	}
 
 	if status := resp.StatusData(); !status.Status.IsSuccess() {
-		// TODO: better handler status error
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: received bad status on init the topic stream listener: %v (%v)", status.Status, status.Issues))
+		// wrap initialization error as operation status error - for handle with retrier
+		// https://github.com/ydb-platform/ydb-go-sdk/issues/1361
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"ydb: received bad status on init the topic stream listener: %v (%v)",
+			status.Status,
+			status.Issues,
+		))
 	}
 
 	initResp, ok := resp.(*rawtopicreader.InitResponse)
 	if !ok {
-		return xerrors.WithStackTrace(fmt.Errorf("bad message type on session init: %v (%v)", resp, reflect.TypeOf(resp)))
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"bad message type on session init: %v (%v)",
+			resp,
+			reflect.TypeOf(resp),
+		))
 	}
 
 	l.sessionID = initResp.SessionID
+
 	return nil
 }
 
@@ -178,13 +194,17 @@ func (l *streamListener) sendMessagesLoop(ctx context.Context) {
 			l.m.WithLock(func() {
 				messages = l.messagesToSend
 				if len(messages) > 0 {
-					l.messagesToSend = make([]rawtopicreader.ClientMessage, 0, len(messages)*2)
+					l.messagesToSend = make([]rawtopicreader.ClientMessage, 0, cap(messages))
 				}
 			})
 
 			for _, m := range messages {
 				if err := l.stream.Send(m); err != nil {
-					l.closeWithTimeout(ctx, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed send message by grpc to topic reader stream from listener: %w", err))))
+					l.closeWithTimeout(ctx, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+						"ydb: failed send message by grpc to topic reader stream from listener: %w",
+						err,
+					))))
+
 					return
 				}
 			}
@@ -203,6 +223,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 			l.closeWithTimeout(ctx, xerrors.WithStackTrace(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
 			))
+
 			return
 		}
 
@@ -218,14 +239,17 @@ func (l *streamListener) onReceiveServerMessage(ctx context.Context, mess rawtop
 	case *rawtopicreader.StopPartitionSessionRequest:
 		err = l.onStopPartitionRequest(ctx, m)
 	case *rawtopicreader.ReadResponse:
-		err = l.onReadResponse(ctx, m)
+		err = l.onReadResponse(m)
 	}
 	if err != nil {
 		l.closeWithTimeout(ctx, err)
 	}
 }
 
-func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopicreader.StartPartitionSessionRequest) error {
+func (l *streamListener) onStartPartitionRequest(
+	ctx context.Context,
+	m *rawtopicreader.StartPartitionSessionRequest,
+) error {
 	session := topicreadercommon.NewPartitionSession(
 		ctx,
 		m.PartitionSession.Path,
@@ -276,10 +300,14 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 	}
 
 	l.sendMessage(resp)
+
 	return nil
 }
 
-func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopicreader.StopPartitionSessionRequest) error {
+func (l *streamListener) onStopPartitionRequest(
+	ctx context.Context,
+	m *rawtopicreader.StopPartitionSessionRequest,
+) error {
 	session, err := l.sessions.Get(m.PartitionSessionID)
 	if !m.Graceful && session == nil {
 		// stop partition may be received twice: graceful and force
@@ -331,10 +359,11 @@ func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopic
 	if m.Graceful {
 		l.sendMessage(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: session.StreamPartitionSessionID})
 	}
+
 	return nil
 }
 
-func (l *streamListener) onReadResponse(ctx context.Context, m *rawtopicreader.ReadResponse) error {
+func (l *streamListener) onReadResponse(m *rawtopicreader.ReadResponse) error {
 	batches, err := topicreadercommon.ReadRawBatchesToPublicBatches(m, l.sessions, l.cfg.Decoders)
 	if err != nil {
 		return err
@@ -349,6 +378,7 @@ func (l *streamListener) onReadResponse(ctx context.Context, m *rawtopicreader.R
 		}
 	}
 	l.sendDataRequest(m.BytesSize)
+
 	return nil
 }
 

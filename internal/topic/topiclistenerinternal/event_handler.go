@@ -23,8 +23,8 @@ type EventHandler interface {
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	OnReadMessages(ctx context.Context, event *PublicReadMessages) error
 
-	// OnStopPartitionSessionRequest called when the server send stop partition message. It means that no more OnReadMessages
-	// calls for the partition session.
+	// OnStopPartitionSessionRequest called when the server send stop partition message.
+	// It means that no more OnReadMessages calls for the partition session.
 	// You must call event.Confirm() for allow the server to stop the partition session (if event.Graceful=true).
 	// Confirm is optional for event.Graceful=false
 	// The method can be called twice: with event.Graceful=true, then event.Graceful=false.
@@ -49,7 +49,6 @@ type PublicStartPartitionSessionEvent struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
 	CommittedOffset  int64
 	PartitionOffsets PublicOffsetsRange
-	resp             PublicStartPartitionSessionConfirm
 	respChan         chan PublicStartPartitionSessionConfirm
 }
 
@@ -77,6 +76,7 @@ type PublicStartPartitionSessionConfirm struct {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c PublicStartPartitionSessionConfirm) WithReadOffet(val int64) PublicStartPartitionSessionConfirm {
 	c.readOffset = &val
+
 	return c
 }
 
@@ -85,6 +85,7 @@ func (c PublicStartPartitionSessionConfirm) WithReadOffet(val int64) PublicStart
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c PublicStartPartitionSessionConfirm) WithCommitOffset(val int64) PublicStartPartitionSessionConfirm {
 	c.CommitOffset = &val
+
 	return c
 }
 

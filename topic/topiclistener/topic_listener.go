@@ -12,7 +12,11 @@ type TopicListener struct {
 	listenerReconnector *topiclistenerinternal.TopicListenerReconnector
 }
 
-func NewTopicListener(client *rawtopic.Client, config *topiclistenerinternal.StreamListenerConfig, handler EventHandler) (*TopicListener, error) {
+func NewTopicListener(
+	client *rawtopic.Client, //nolint:interfacer
+	config *topiclistenerinternal.StreamListenerConfig,
+	handler EventHandler,
+) (*TopicListener, error) {
 	reconnector, err := topiclistenerinternal.NewTopicListenerReconnector(client, config, handler)
 	if err != nil {
 		return nil, err

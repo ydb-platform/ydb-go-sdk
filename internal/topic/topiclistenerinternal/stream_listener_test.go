@@ -34,7 +34,8 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 		EventHandlerMock(e).EXPECT().OnReadMessages(PartitionSession(e).Context(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, event *PublicReadMessages) error {
 				require.Equal(t, PartitionSession(e).ClientPartitionSessionID, event.PartitionSession.PartitionSessionID)
-				require.Equal(t, event.Batch.Messages[0].SeqNo, seqNo)
+				require.Equal(t, seqNo, event.Batch.Messages[0].SeqNo)
+
 				return nil
 			})
 
@@ -92,6 +93,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 				WithReadOffet(respReadOffset).
 				WithCommitOffset(respCommitOffset),
 			)
+
 			return nil
 		})
 
@@ -142,6 +144,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 			require.True(t, event.Graceful)
 			require.Equal(t, int64(5), event.CommittedOffset)
 			event.Confirm()
+
 			return nil
 		})
 
@@ -175,6 +178,7 @@ func TestStreamListener_CloseSessionsOnCloseListener(t *testing.T) {
 		require.False(t, event.Graceful)
 		require.Equal(t, PartitionSession(e).CommittedOffset().ToInt64(), event.CommittedOffset)
 		event.Confirm()
+
 		return nil
 	})
 	require.NoError(t, StreamListener(e).Close(sf.Context(e), errors.New("test")))

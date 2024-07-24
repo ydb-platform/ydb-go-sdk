@@ -57,7 +57,13 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 }
 
 func (lr *TopicListenerReconnector) connect(connectionCtx context.Context) {
-	lr.streamListener, lr.connectionResult = newStreamListener(connectionCtx, lr.client, lr.handler, lr.streamConfig, &lr.connectionIDCounter)
+	lr.streamListener, lr.connectionResult = newStreamListener(
+		connectionCtx,
+		lr.client,
+		lr.handler,
+		lr.streamConfig,
+		&lr.connectionIDCounter,
+	)
 	close(lr.connectionCompleted)
 }
 
@@ -85,6 +91,7 @@ func (lr *TopicListenerReconnector) WaitStop(ctx context.Context) error {
 		if errors.Is(err, ErrUserCloseTopic) {
 			return nil
 		}
+
 		return err
 	}
 }
