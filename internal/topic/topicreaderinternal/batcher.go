@@ -59,7 +59,10 @@ func (b *batcher) PushBatches(batches ...*topicreadercommon.PublicBatch) error {
 	}
 
 	for _, batch := range batches {
-		if err := b.addNeedLock(topicreadercommon.GetCommitRange(batch).PartitionSession, newBatcherItemBatch(batch)); err != nil {
+		if err := b.addNeedLock(
+			topicreadercommon.GetCommitRange(batch).PartitionSession,
+			newBatcherItemBatch(batch),
+		); err != nil {
 			return err
 		}
 	}
@@ -135,7 +138,10 @@ func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
 	return items[0], items[1:], true
 }
 
-func (o batcherGetOptions) splitBatch(batch *topicreadercommon.PublicBatch) (head, rest *topicreadercommon.PublicBatch, ok bool) {
+func (o batcherGetOptions) splitBatch(batch *topicreadercommon.PublicBatch) (
+	head, rest *topicreadercommon.PublicBatch,
+	ok bool,
+) {
 	notFound := func() (*topicreadercommon.PublicBatch, *topicreadercommon.PublicBatch, bool) {
 		return nil, nil, false
 	}

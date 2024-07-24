@@ -77,7 +77,13 @@ func newReaderReconnector(
 	return res
 }
 
-func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
+func (r *readerReconnector) ReadMessageBatch(
+	ctx context.Context,
+	opts ReadMessageBatchOptions,
+) (
+	*topicreadercommon.PublicBatch,
+	error,
+) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -127,7 +133,10 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 	}
 }
 
-func (r *readerReconnector) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
+func (r *readerReconnector) Commit(
+	ctx context.Context,
+	commitRange topicreadercommon.CommitRange,
+) error {
 	stream, err := r.stream(ctx)
 	if err != nil {
 		return err

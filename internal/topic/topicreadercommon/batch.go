@@ -117,12 +117,6 @@ func (m *PublicBatch) PartitionID() int64 {
 	return m.partitionSession().PartitionID
 }
 
-// PartitionSessionID example only
-func (m *PublicBatch) PartitionSessionID() int64 {
-	// TODO implement me
-	panic("implement me")
-}
-
 func (m *PublicBatch) partitionSession() *PartitionSession {
 	return m.commitRange.PartitionSession
 }
@@ -184,7 +178,7 @@ func splitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) 
 	return nil
 }
 
-func BatchAppend(original *PublicBatch, appended *PublicBatch) (*PublicBatch, error) {
+func BatchAppend(original, appended *PublicBatch) (*PublicBatch, error) {
 	var res *PublicBatch
 	if original == nil {
 		res = &PublicBatch{}
@@ -232,5 +226,6 @@ func BatchGetPartitionSessionID(item *PublicBatch) rawtopicreader.PartitionSessi
 
 func BatchSetCommitRangeForTest(b *PublicBatch, commitRange CommitRange) *PublicBatch {
 	b.commitRange = commitRange
+
 	return b
 }

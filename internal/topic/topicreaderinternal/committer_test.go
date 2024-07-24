@@ -396,7 +396,10 @@ func newTestCommitter(ctx context.Context, t testing.TB) *committer {
 	return res
 }
 
-func newTestPartitionSession(ctx context.Context, partitionSessionID rawtopicreader.PartitionSessionID) *topicreadercommon.PartitionSession {
+func newTestPartitionSession(
+	ctx context.Context,
+	partitionSessionID rawtopicreader.PartitionSessionID,
+) *topicreadercommon.PartitionSession {
 	return topicreadercommon.NewPartitionSession(
 		ctx,
 		"",

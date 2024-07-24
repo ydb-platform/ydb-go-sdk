@@ -461,7 +461,8 @@ func (r *topicStreamReaderImpl) initSession() (err error) {
 	}
 
 	if status := resp.StatusData(); !status.Status.IsSuccess() {
-		// TODO: better handler status error
+		// Need wrap status to common ydb operational error
+		// https://github.com/ydb-platform/ydb-go-sdk/issues/1361
 		return xerrors.WithStackTrace(fmt.Errorf("bad status on initial error: %v (%v)", status.Status, status.Issues))
 	}
 
