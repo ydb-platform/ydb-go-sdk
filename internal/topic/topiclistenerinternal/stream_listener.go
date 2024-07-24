@@ -109,6 +109,9 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.hasNewMessagesToSend = make(empty.Chan, 1)
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
+	if l.cfg == nil {
+		l.cfg = &StreamListenerConfig{}
+	}
 }
 
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
