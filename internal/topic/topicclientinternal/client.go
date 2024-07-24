@@ -234,7 +234,7 @@ func (c *Client) StartListener(
 		return nil, err
 	}
 
-	return topiclistener.NewTopicListener(&c.rawClient, cfg, handler)
+	return topiclistener.NewTopicListener(&c.rawClient, &cfg, handler)
 }
 
 // StartReader create new topic reader and start pull messages from server

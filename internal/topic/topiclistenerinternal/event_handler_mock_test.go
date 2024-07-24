@@ -37,45 +37,45 @@ func (m *MockEventHandler) EXPECT() *MockEventHandlerMockRecorder {
 }
 
 // OnReadMessages mocks base method.
-func (m *MockEventHandler) OnReadMessages(ctx context.Context, req PublicReadMessages) error {
+func (m *MockEventHandler) OnReadMessages(ctx context.Context, event *PublicReadMessages) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "OnReadMessages", ctx, req)
+	ret := m.ctrl.Call(m, "OnReadMessages", ctx, event)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // OnReadMessages indicates an expected call of OnReadMessages.
-func (mr *MockEventHandlerMockRecorder) OnReadMessages(ctx, req any) *EventHandlerOnReadMessagesCall {
+func (mr *MockEventHandlerMockRecorder) OnReadMessages(ctx, event any) *MockEventHandlerOnReadMessagesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnReadMessages", reflect.TypeOf((*MockEventHandler)(nil).OnReadMessages), ctx, req)
-	return &EventHandlerOnReadMessagesCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnReadMessages", reflect.TypeOf((*MockEventHandler)(nil).OnReadMessages), ctx, event)
+	return &MockEventHandlerOnReadMessagesCall{Call: call}
 }
 
-// EventHandlerOnReadMessagesCall wrap *gomock.Call
-type EventHandlerOnReadMessagesCall struct {
+// MockEventHandlerOnReadMessagesCall wrap *gomock.Call
+type MockEventHandlerOnReadMessagesCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *EventHandlerOnReadMessagesCall) Return(arg0 error) *EventHandlerOnReadMessagesCall {
+func (c *MockEventHandlerOnReadMessagesCall) Return(arg0 error) *MockEventHandlerOnReadMessagesCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *EventHandlerOnReadMessagesCall) Do(f func(context.Context, PublicReadMessages) error) *EventHandlerOnReadMessagesCall {
+func (c *MockEventHandlerOnReadMessagesCall) Do(f func(context.Context, *PublicReadMessages) error) *MockEventHandlerOnReadMessagesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *EventHandlerOnReadMessagesCall) DoAndReturn(f func(context.Context, PublicReadMessages) error) *EventHandlerOnReadMessagesCall {
+func (c *MockEventHandlerOnReadMessagesCall) DoAndReturn(f func(context.Context, *PublicReadMessages) error) *MockEventHandlerOnReadMessagesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // OnStartPartitionSessionRequest mocks base method.
-func (m *MockEventHandler) OnStartPartitionSessionRequest(ctx context.Context, event PublicStartPartitionSessionEvent) error {
+func (m *MockEventHandler) OnStartPartitionSessionRequest(ctx context.Context, event *PublicStartPartitionSessionEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "OnStartPartitionSessionRequest", ctx, event)
 	ret0, _ := ret[0].(error)
@@ -83,37 +83,37 @@ func (m *MockEventHandler) OnStartPartitionSessionRequest(ctx context.Context, e
 }
 
 // OnStartPartitionSessionRequest indicates an expected call of OnStartPartitionSessionRequest.
-func (mr *MockEventHandlerMockRecorder) OnStartPartitionSessionRequest(ctx, event any) *EventHandlerOnStartPartitionSessionRequestCall {
+func (mr *MockEventHandlerMockRecorder) OnStartPartitionSessionRequest(ctx, event any) *MockEventHandlerOnStartPartitionSessionRequestCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnStartPartitionSessionRequest", reflect.TypeOf((*MockEventHandler)(nil).OnStartPartitionSessionRequest), ctx, event)
-	return &EventHandlerOnStartPartitionSessionRequestCall{Call: call}
+	return &MockEventHandlerOnStartPartitionSessionRequestCall{Call: call}
 }
 
-// EventHandlerOnStartPartitionSessionRequestCall wrap *gomock.Call
-type EventHandlerOnStartPartitionSessionRequestCall struct {
+// MockEventHandlerOnStartPartitionSessionRequestCall wrap *gomock.Call
+type MockEventHandlerOnStartPartitionSessionRequestCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *EventHandlerOnStartPartitionSessionRequestCall) Return(arg0 error) *EventHandlerOnStartPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStartPartitionSessionRequestCall) Return(arg0 error) *MockEventHandlerOnStartPartitionSessionRequestCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *EventHandlerOnStartPartitionSessionRequestCall) Do(f func(context.Context, PublicStartPartitionSessionEvent) error) *EventHandlerOnStartPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStartPartitionSessionRequestCall) Do(f func(context.Context, *PublicStartPartitionSessionEvent) error) *MockEventHandlerOnStartPartitionSessionRequestCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *EventHandlerOnStartPartitionSessionRequestCall) DoAndReturn(f func(context.Context, PublicStartPartitionSessionEvent) error) *EventHandlerOnStartPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStartPartitionSessionRequestCall) DoAndReturn(f func(context.Context, *PublicStartPartitionSessionEvent) error) *MockEventHandlerOnStartPartitionSessionRequestCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // OnStopPartitionSessionRequest mocks base method.
-func (m *MockEventHandler) OnStopPartitionSessionRequest(ctx context.Context, event PublicStopPartitionSessionEvent) error {
+func (m *MockEventHandler) OnStopPartitionSessionRequest(ctx context.Context, event *PublicStopPartitionSessionEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "OnStopPartitionSessionRequest", ctx, event)
 	ret0, _ := ret[0].(error)
@@ -121,31 +121,31 @@ func (m *MockEventHandler) OnStopPartitionSessionRequest(ctx context.Context, ev
 }
 
 // OnStopPartitionSessionRequest indicates an expected call of OnStopPartitionSessionRequest.
-func (mr *MockEventHandlerMockRecorder) OnStopPartitionSessionRequest(ctx, event any) *EventHandlerOnStopPartitionSessionRequestCall {
+func (mr *MockEventHandlerMockRecorder) OnStopPartitionSessionRequest(ctx, event any) *MockEventHandlerOnStopPartitionSessionRequestCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnStopPartitionSessionRequest", reflect.TypeOf((*MockEventHandler)(nil).OnStopPartitionSessionRequest), ctx, event)
-	return &EventHandlerOnStopPartitionSessionRequestCall{Call: call}
+	return &MockEventHandlerOnStopPartitionSessionRequestCall{Call: call}
 }
 
-// EventHandlerOnStopPartitionSessionRequestCall wrap *gomock.Call
-type EventHandlerOnStopPartitionSessionRequestCall struct {
+// MockEventHandlerOnStopPartitionSessionRequestCall wrap *gomock.Call
+type MockEventHandlerOnStopPartitionSessionRequestCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *EventHandlerOnStopPartitionSessionRequestCall) Return(arg0 error) *EventHandlerOnStopPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStopPartitionSessionRequestCall) Return(arg0 error) *MockEventHandlerOnStopPartitionSessionRequestCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *EventHandlerOnStopPartitionSessionRequestCall) Do(f func(context.Context, PublicStopPartitionSessionEvent) error) *EventHandlerOnStopPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStopPartitionSessionRequestCall) Do(f func(context.Context, *PublicStopPartitionSessionEvent) error) *MockEventHandlerOnStopPartitionSessionRequestCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *EventHandlerOnStopPartitionSessionRequestCall) DoAndReturn(f func(context.Context, PublicStopPartitionSessionEvent) error) *EventHandlerOnStopPartitionSessionRequestCall {
+func (c *MockEventHandlerOnStopPartitionSessionRequestCall) DoAndReturn(f func(context.Context, *PublicStopPartitionSessionEvent) error) *MockEventHandlerOnStopPartitionSessionRequestCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

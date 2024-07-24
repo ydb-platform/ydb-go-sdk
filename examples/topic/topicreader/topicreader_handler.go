@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 )
 
-func startReader(ctx context.Context, db *ydb.Driver) (*topiclistener.TopicListener, error) {
+func StartReader(ctx context.Context, db *ydb.Driver) (*topiclistener.TopicListener, error) {
 	handler := &TopicEventsHandler{
 		locks: make(map[int64]int64),
 	}
@@ -23,8 +23,6 @@ func startReader(ctx context.Context, db *ydb.Driver) (*topiclistener.TopicListe
 		return nil, err
 	}
 
-	err = reader.Close(ctx)
-
 	return reader, nil
 }
 
@@ -36,25 +34,27 @@ type TopicEventsHandler struct {
 	locks map[int64]int64 // [partitionSessionID]lockID
 }
 
-func (h *TopicEventsHandler) OnReaderCreated(req topiclistener.ReaderReady) error {
+func (h *TopicEventsHandler) OnReaderCreated(req *topiclistener.ReaderReady) error {
 	h.listener = req.Listener
+
 	return nil
 }
 
 func (h *TopicEventsHandler) OnReadMessages(
 	ctx context.Context,
-	event topiclistener.ReadMessages,
+	event *topiclistener.ReadMessages,
 ) error {
 	for _, mess := range event.Batch.Messages {
-		log.Println("Receive message: %v/%v/%v", mess.Topic(), mess.PartitionID(), mess.SeqNo)
+		log.Printf("Receive message: %v/%v/%v", mess.Topic(), mess.PartitionID(), mess.SeqNo)
 	}
 	_ = h.listener.Commit(ctx, event.Batch)
+
 	return nil
 }
 
 func (h *TopicEventsHandler) OnStartPartitionSessionRequest(
 	ctx context.Context,
-	event topiclistener.StartPartitionSessionRequest,
+	event *topiclistener.StartPartitionSessionRequest,
 ) error {
 	lockID, offset, err := lockPartition(ctx, event.PartitionSession.TopicPath, event.PartitionSession.PartitionID)
 
@@ -68,12 +68,13 @@ func (h *TopicEventsHandler) OnStartPartitionSessionRequest(
 			WithReadOffet(offset).
 			WithCommitOffset(offset),
 	)
+
 	return err
 }
 
 func (h *TopicEventsHandler) OnStopPartitionSessionRequest(
 	ctx context.Context,
-	event topiclistener.StopPartitionSessionRequest,
+	event *topiclistener.StopPartitionSessionRequest,
 ) error {
 	h.m.Lock()
 	lockID := h.locks[event.PartitionSession.PartitionSessionID]
@@ -82,15 +83,14 @@ func (h *TopicEventsHandler) OnStopPartitionSessionRequest(
 
 	err := unlockPartition(ctx, lockID)
 	event.Confirm()
+
 	return err
 }
 
 func lockPartition(ctx context.Context, topic string, partitionID int64) (lockID, offset int64, err error) {
-	// TODO implement me
-	panic("implement me")
+	panic("not implemented in the example")
 }
 
 func unlockPartition(ctx context.Context, lockID int64) error {
-	// TODO implement me
-	panic("implement me")
+	panic("not implemented in the example")
 }

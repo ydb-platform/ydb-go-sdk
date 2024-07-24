@@ -7,10 +7,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 )
 
-// EventHandler methods will be called sequentially by partition, but can be called in parallel for different partitions
+// EventHandler methods will be called sequentially by partition,
+// but can be called in parallel for different partitions.
 // You should include topiclistener.BaseHandler into your struct for the interface implementation
 // It allows to extend the interface in the future without broke compatibility.
-// Method of the handler will be called from one goroutine per partition. But can be run in parallel for different partitions.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type EventHandler interface {
@@ -23,7 +23,7 @@ type EventHandler interface {
 	// It not mean that reader is connected to a server.
 	// Allow easy initialize your handler with the reader without sync with return of topic.Client StartListener method
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	OnReaderCreated(req ReaderReady) error
+	OnReaderCreated(event *ReaderReady) error
 }
 
 type ReaderReady struct {
@@ -41,15 +41,16 @@ type BaseHandler struct{}
 
 func (b BaseHandler) topicReaderHandler() {}
 
-func (b BaseHandler) OnReaderCreated(req ReaderReady) error {
+func (b BaseHandler) OnReaderCreated(event *ReaderReady) error {
 	return nil
 }
 
 func (b BaseHandler) OnStartPartitionSessionRequest(
 	ctx context.Context,
-	event StartPartitionSessionRequest,
+	event *StartPartitionSessionRequest,
 ) error {
 	event.Confirm()
+
 	return nil
 }
 
@@ -60,15 +61,16 @@ func (b BaseHandler) OnStartPartitionSessionRequest(
 // not
 func (b BaseHandler) OnStopPartitionSessionRequest(
 	ctx context.Context,
-	event StopPartitionSessionRequest,
+	event *StopPartitionSessionRequest,
 ) error {
 	event.Confirm()
+
 	return nil
 }
 
 func (b BaseHandler) OnReadMessages(
 	ctx context.Context,
-	req ReadMessages,
+	event *ReadMessages,
 ) error {
 	return nil
 }

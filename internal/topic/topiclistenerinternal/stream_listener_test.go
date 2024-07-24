@@ -32,9 +32,9 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 		}()
 
 		EventHandlerMock(e).EXPECT().OnReadMessages(PartitionSession(e).Context(), gomock.Any()).
-			DoAndReturn(func(ctx context.Context, req PublicReadMessages) error {
-				require.Equal(t, PartitionSession(e).ClientPartitionSessionID, req.PartitionSession.PartitionSessionID)
-				require.Equal(t, req.Batch.Messages[0].SeqNo, seqNo)
+			DoAndReturn(func(ctx context.Context, event *PublicReadMessages) error {
+				require.Equal(t, PartitionSession(e).ClientPartitionSessionID, event.PartitionSession.PartitionSessionID)
+				require.Equal(t, event.Batch.Messages[0].SeqNo, seqNo)
 				return nil
 			})
 
@@ -77,7 +77,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 		EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
 			gomock.Any(),
 			gomock.Any(),
-		).DoAndReturn(func(ctx context.Context, event PublicStartPartitionSessionEvent) error {
+		).DoAndReturn(func(ctx context.Context, event *PublicStartPartitionSessionEvent) error {
 			require.Equal(t, topicreadercommon.PublicPartitionSession{
 				PartitionSessionID: 1, // ClientPartitionSessionID
 				TopicPath:          "asd",
@@ -88,7 +88,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 				Start: 5,
 				End:   15,
 			}, event.PartitionOffsets)
-			event.Confirm(PublicStartPartitionSessionConfirm{}.
+			event.ConfirmWithParams(PublicStartPartitionSessionConfirm{}.
 				WithReadOffet(respReadOffset).
 				WithCommitOffset(respCommitOffset),
 			)
@@ -137,7 +137,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 		EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(
 			PartitionSession(e).Context(),
 			gomock.Any(),
-		).DoAndReturn(func(ctx context.Context, event PublicStopPartitionSessionEvent) error {
+		).DoAndReturn(func(ctx context.Context, event *PublicStopPartitionSessionEvent) error {
 			require.Equal(t, PartitionSession(e).ClientPartitionSessionID, event.PartitionSession.PartitionSessionID)
 			require.True(t, event.Graceful)
 			require.Equal(t, int64(5), event.CommittedOffset)
@@ -170,7 +170,7 @@ func TestStreamListener_CloseSessionsOnCloseListener(t *testing.T) {
 	EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(
 		PartitionSession(e).Context(),
 		gomock.Any(),
-	).Do(func(ctx context.Context, event PublicStopPartitionSessionEvent) error {
+	).Do(func(ctx context.Context, event *PublicStopPartitionSessionEvent) error {
 		require.Equal(t, PartitionSession(e).ClientPartitionSessionID, event.PartitionSession.PartitionSessionID)
 		require.False(t, event.Graceful)
 		require.Equal(t, PartitionSession(e).CommittedOffset().ToInt64(), event.CommittedOffset)

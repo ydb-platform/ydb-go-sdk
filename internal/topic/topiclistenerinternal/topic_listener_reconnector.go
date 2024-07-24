@@ -12,7 +12,7 @@ import (
 var ErrUserCloseTopic = errors.New("ydb: user closed topic listener")
 
 type TopicListenerReconnector struct {
-	streamConfig StreamListenerConfig
+	streamConfig *StreamListenerConfig
 	client       TopicClient
 	handler      EventHandler
 
@@ -26,7 +26,7 @@ type TopicListenerReconnector struct {
 
 func NewTopicListenerReconnector(
 	client TopicClient,
-	streamConfig StreamListenerConfig,
+	streamConfig *StreamListenerConfig,
 	handler EventHandler,
 ) (*TopicListenerReconnector, error) {
 	res := &TopicListenerReconnector{

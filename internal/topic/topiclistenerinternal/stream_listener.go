@@ -47,11 +47,10 @@ func newStreamListener(
 	res := &streamListener{
 		cfg:              config,
 		handler:          eventListener,
-		background:       *background.NewWorker(context.WithoutCancel(connectionCtx), "topic reader stream listener"),
+		background:       *background.NewWorker(xcontext.ValueOnly(connectionCtx), "topic reader stream listener"),
 		sessionIDCounter: sessionIDCounter,
 	}
 	res.initVars(sessionIDCounter)
-
 	if err := res.initStream(connectionCtx, client); err != nil {
 		res.closeWithTimeout(connectionCtx, err)
 		return nil, err
@@ -113,7 +112,7 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 }
 
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
-	streamCtx, streamClose := context.WithCancelCause(context.WithoutCancel(ctx))
+	streamCtx, streamClose := context.WithCancelCause(xcontext.ValueOnly(ctx))
 	l.streamClose = streamClose
 	initDone := make(empty.Chan)
 	defer close(initDone)
@@ -242,7 +241,7 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 		PartitionSessionID: m.PartitionSession.PartitionSessionID,
 	}
 
-	event := PublicStartPartitionSessionEvent{
+	event := &PublicStartPartitionSessionEvent{
 		PartitionSession: session.ToPublic(),
 		CommittedOffset:  m.CommittedOffset.ToInt64(),
 		PartitionOffsets: PublicOffsetsRange{
@@ -299,7 +298,7 @@ func (l *streamListener) onStopPartitionRequest(ctx context.Context, m *rawtopic
 		handlerCtx = session.Context()
 	}
 
-	event := PublicStopPartitionSessionEvent{
+	event := &PublicStopPartitionSessionEvent{
 		PartitionSession: session.ToPublic(),
 		Graceful:         m.Graceful,
 		CommittedOffset:  m.CommittedOffset.ToInt64(),
@@ -339,7 +338,7 @@ func (l *streamListener) onReadResponse(ctx context.Context, m *rawtopicreader.R
 	}
 
 	for _, batch := range batches {
-		if err = l.handler.OnReadMessages(batch.Context(), PublicReadMessages{
+		if err = l.handler.OnReadMessages(batch.Context(), &PublicReadMessages{
 			PartitionSession: topicreadercommon.BatchGetPartitionSession(batch).ToPublic(),
 			Batch:            batch,
 		}); err != nil {

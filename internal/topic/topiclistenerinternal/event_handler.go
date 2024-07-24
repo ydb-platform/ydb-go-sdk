@@ -16,12 +16,12 @@ type EventHandler interface {
 	// You can set topiclistener.StartPartitionSessionConfirm for change default settings.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	OnStartPartitionSessionRequest(ctx context.Context, event PublicStartPartitionSessionEvent) error
+	OnStartPartitionSessionRequest(ctx context.Context, event *PublicStartPartitionSessionEvent) error
 
 	// OnReadMessages called with batch of messages. Max count of messages limited by internal buffer size
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	OnReadMessages(ctx context.Context, req PublicReadMessages) error
+	OnReadMessages(ctx context.Context, event *PublicReadMessages) error
 
 	// OnStopPartitionSessionRequest called when the server send stop partition message. It means that no more OnReadMessages
 	// calls for the partition session.
@@ -31,7 +31,7 @@ type EventHandler interface {
 	// It is guaranteed about the method will be called least once.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	OnStopPartitionSessionRequest(ctx context.Context, event PublicStopPartitionSessionEvent) error
+	OnStopPartitionSessionRequest(ctx context.Context, event *PublicStopPartitionSessionEvent) error
 }
 
 // PublicReadMessages

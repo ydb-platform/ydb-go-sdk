@@ -56,34 +56,34 @@ type TestTopicListener_Handler struct {
 	done             empty.Chan
 }
 
-func (h *TestTopicListener_Handler) OnReaderCreated(req topiclistener.ReaderReady) error {
-	h.listener = req.Listener
+func (h *TestTopicListener_Handler) OnReaderCreated(event *topiclistener.ReaderReady) error {
+	h.listener = event.Listener
 	return nil
 }
 
 func (h *TestTopicListener_Handler) OnStartPartitionSessionRequest(
 	ctx context.Context,
-	req topiclistener.StartPartitionSessionRequest,
+	event *topiclistener.StartPartitionSessionRequest,
 ) error {
-	h.onPartitionStart = &req
-	req.Confirm()
+	h.onPartitionStart = event
+	event.Confirm()
 	return nil
 }
 
 func (h *TestTopicListener_Handler) OnStopPartitionSessionRequest(
 	ctx context.Context,
-	req topiclistener.StopPartitionSessionRequest,
+	event *topiclistener.StopPartitionSessionRequest,
 ) error {
-	h.onPartitionStop = &req
-	req.Confirm()
+	h.onPartitionStop = event
+	event.Confirm()
 	return nil
 }
 
 func (h *TestTopicListener_Handler) OnReadMessages(
 	ctx context.Context,
-	req topiclistener.ReadMessages,
+	event *topiclistener.ReadMessages,
 ) error {
-	h.readMessages = &req
+	h.readMessages = event
 	close(h.done)
 	return nil
 }
