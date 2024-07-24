@@ -76,8 +76,8 @@ func (h *TopicEventsHandler) OnStopPartitionSessionRequest(
 	event topiclistener.StopPartitionSessionRequest,
 ) error {
 	h.m.Lock()
-	lockID := h.locks[event.PartitionSessionID]
-	delete(h.locks, event.PartitionSessionID)
+	lockID := h.locks[event.PartitionSession.PartitionSessionID]
+	delete(h.locks, event.PartitionSession.PartitionSessionID)
 	h.m.Unlock()
 
 	err := unlockPartition(ctx, lockID)

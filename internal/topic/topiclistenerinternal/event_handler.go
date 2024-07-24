@@ -71,7 +71,7 @@ func (e *PublicStartPartitionSessionEvent) Confirm(opts ...PublicStartPartitionS
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type PublicStartPartitionSessionConfirm struct {
-	ReadOffset   *int64
+	readOffset   *int64
 	CommitOffset *int64 ``
 }
 
@@ -79,7 +79,7 @@ type PublicStartPartitionSessionConfirm struct {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c PublicStartPartitionSessionConfirm) WithReadOffet(val int64) PublicStartPartitionSessionConfirm {
-	c.ReadOffset = &val
+	c.readOffset = &val
 	return c
 }
 

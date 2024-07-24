@@ -264,8 +264,8 @@ func (l *streamListener) onStartPartitionRequest(ctx context.Context, m *rawtopi
 		// pass
 	}
 
-	if userResp.ReadOffset != nil {
-		resp.ReadOffset.Offset = rawtopicreader.NewOffset(*userResp.ReadOffset)
+	if userResp.readOffset != nil {
+		resp.ReadOffset.Offset = rawtopicreader.NewOffset(*userResp.readOffset)
 		resp.ReadOffset.HasValue = true
 	}
 	if userResp.CommitOffset != nil {
