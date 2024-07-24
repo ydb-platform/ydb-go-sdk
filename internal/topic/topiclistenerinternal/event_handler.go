@@ -56,15 +56,12 @@ type PublicStartPartitionSessionEvent struct {
 // Confirm
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (e *PublicStartPartitionSessionEvent) Confirm(opts ...PublicStartPartitionSessionConfirm) {
-	switch len(opts) {
-	case 0:
-		e.respChan <- PublicStartPartitionSessionConfirm{}
-	case 1:
-		e.respChan <- opts[0]
-	default:
-		panic("Confirm accept only zero or one confirm parameters")
-	}
+func (e *PublicStartPartitionSessionEvent) Confirm() {
+	e.ConfirmWithParams(PublicStartPartitionSessionConfirm{})
+}
+
+func (e *PublicStartPartitionSessionEvent) ConfirmWithParams(p PublicStartPartitionSessionConfirm) {
+	e.respChan <- p
 }
 
 // PublicStartPartitionSessionConfirm
@@ -117,15 +114,8 @@ type PublicStopPartitionSessionEvent struct {
 // Confirm
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (e *PublicStopPartitionSessionEvent) Confirm(options ...PublicStopPartitionSessionConfirm) {
-	switch len(options) {
-	case 0:
-		e.resp <- PublicStopPartitionSessionConfirm{}
-	case 1:
-		e.resp <- options[0]
-	default:
-		panic("Confirm accept only zero or one confirm parameters")
-	}
+func (e *PublicStopPartitionSessionEvent) Confirm() {
+	e.resp <- PublicStopPartitionSessionConfirm{}
 }
 
 // PublicStopPartitionSessionConfirm
