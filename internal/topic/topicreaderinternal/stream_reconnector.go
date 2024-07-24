@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -76,7 +77,13 @@ func newReaderReconnector(
 	return res
 }
 
-func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*PublicBatch, error) {
+func (r *readerReconnector) ReadMessageBatch(
+	ctx context.Context,
+	opts ReadMessageBatchOptions,
+) (
+	*topicreadercommon.PublicBatch,
+	error,
+) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -126,7 +133,10 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 	}
 }
 
-func (r *readerReconnector) Commit(ctx context.Context, commitRange commitRange) error {
+func (r *readerReconnector) Commit(
+	ctx context.Context,
+	commitRange topicreadercommon.CommitRange,
+) error {
 	stream, err := r.stream(ctx)
 	if err != nil {
 		return err

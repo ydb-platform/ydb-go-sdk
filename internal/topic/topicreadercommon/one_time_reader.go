@@ -1,4 +1,4 @@
-package topicreaderinternal
+package topicreadercommon
 
 import (
 	"io"

@@ -10,6 +10,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -71,11 +73,15 @@ func TestReader_Close(t *testing.T) {
 		readerReadMessageBatchState := newCallState()
 
 		go func() {
-			readerCommitState.err = reader.Commit(context.Background(), &PublicMessage{
-				commitRange: commitRange{
-					partitionSession: &partitionSession{},
-				},
-			})
+			readerCommitState.err = reader.Commit(
+				context.Background(),
+				topicreadercommon.MessageWithSetCommitRangeForTest(
+					&topicreadercommon.PublicMessage{},
+					topicreadercommon.CommitRange{
+						PartitionSession: &topicreadercommon.PartitionSession{},
+					},
+				),
+			)
 			close(readerCommitState.callCompleted)
 		}()
 
@@ -110,45 +116,48 @@ func TestReader_Commit(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
 
-		readerID := nextReaderID()
+		readerID := topicreadercommon.NextReaderID()
 		baseReader := NewMockbatchedStreamReader(mc)
 		reader := &Reader{
 			reader:   baseReader,
 			readerID: readerID,
 		}
 
-		expectedRangeOk := commitRange{
-			commitOffsetStart: 1,
-			commitOffsetEnd:   10,
-			partitionSession: &partitionSession{
-				readerID:           readerID,
-				partitionSessionID: 10,
-			},
+		expectedRangeOk := topicreadercommon.CommitRange{
+			CommitOffsetStart: 1,
+			CommitOffsetEnd:   10,
+			PartitionSession:  newTestPartitionSessionReaderID(readerID, 10),
 		}
 		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeOk).Return(nil)
-		require.NoError(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeOk}))
+		require.NoError(t, reader.Commit(
+			context.Background(),
+			topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{}, expectedRangeOk),
+		))
 
-		expectedRangeErr := commitRange{
-			commitOffsetStart: 15,
-			commitOffsetEnd:   20,
-			partitionSession: &partitionSession{
-				readerID:           readerID,
-				partitionSessionID: 30,
-			},
+		expectedRangeErr := topicreadercommon.CommitRange{
+			CommitOffsetStart: 15,
+			CommitOffsetEnd:   20,
+			PartitionSession:  newTestPartitionSessionReaderID(readerID, 30),
 		}
 
 		testErr := errors.New("test err")
 		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeErr).Return(testErr)
-		require.ErrorIs(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeErr}), testErr)
+		require.ErrorIs(t, reader.Commit(
+			context.Background(),
+			topicreadercommon.MessageWithSetCommitRangeForTest(
+				&topicreadercommon.PublicMessage{},
+				expectedRangeErr,
+			),
+		), testErr)
 	})
 
 	t.Run("CommitFromOtherReader", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		reader := &Reader{readerID: 1}
-		forCommit := commitRange{
-			commitOffsetStart: 1,
-			commitOffsetEnd:   2,
-			partitionSession:  &partitionSession{readerID: 2},
+		forCommit := topicreadercommon.CommitRange{
+			CommitOffsetStart: 1,
+			CommitOffsetEnd:   2,
+			PartitionSession:  newTestPartitionSessionReaderID(2, 0),
 		}
 		err := reader.Commit(ctx, forCommit)
 		require.ErrorIs(t, err, errCommitSessionFromOtherReader)
@@ -159,7 +168,7 @@ func TestReader_WaitInit(t *testing.T) {
 	mc := gomock.NewController(t)
 	defer mc.Finish()
 
-	readerID := nextReaderID()
+	readerID := topicreadercommon.NextReaderID()
 	baseReader := NewMockbatchedStreamReader(mc)
 	reader := &Reader{
 		reader:   baseReader,
@@ -169,4 +178,19 @@ func TestReader_WaitInit(t *testing.T) {
 	baseReader.EXPECT().WaitInit(gomock.Any())
 	err := reader.WaitInit(context.Background())
 	require.NoError(t, err)
+}
+
+func newTestPartitionSessionReaderID(
+	readerID int64,
+	partitionSessionID rawtopicreader.PartitionSessionID,
+) *topicreadercommon.PartitionSession {
+	return topicreadercommon.NewPartitionSession(
+		context.Background(),
+		"",
+		0,
+		readerID,
+		"",
+		partitionSessionID,
+		0,
+	)
 }
