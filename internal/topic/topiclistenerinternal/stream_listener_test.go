@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
@@ -22,7 +23,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 
 	const seqNo int64 = 4
 
-	t.Run("onReadResponse", func(t *testing.T) {
+	xtest.TestManyTimesWithName(t, "onReadResponse", func(t testing.TB) {
 		e := fixenv.New(t)
 		ctx := sf.Context(e)
 
@@ -69,7 +70,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 			},
 		})
 	})
-	t.Run("onStartPartitionSession", func(t *testing.T) {
+	xtest.TestManyTimesWithName(t, "onStartPartitionSession", func(t testing.TB) {
 		e := fixenv.New(t)
 
 		respReadOffset := int64(16)
@@ -130,7 +131,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, session)
 	})
-	t.Run("onStopPartitionRequest", func(t *testing.T) {
+	xtest.TestManyTimesWithName(t, "onStopPartitionRequest", func(t testing.TB) {
 		e := fixenv.New(t)
 		ctx := sf.Context(e)
 
