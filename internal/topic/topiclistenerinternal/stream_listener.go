@@ -287,7 +287,7 @@ func (l *streamListener) onStartPartitionRequest(
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-event.confirm.DoneChan:
+	case <-event.confirm.Done():
 		userResp, _ = event.confirm.Get()
 	}
 
@@ -344,7 +344,7 @@ func (l *streamListener) onStopPartitionRequest(
 		// remove partition on the confirmation or on the listener closed
 		select {
 		case <-l.background.Done():
-		case <-event.confirm.DoneChan:
+		case <-event.confirm.Done():
 		}
 		_, _ = l.sessions.Remove(m.PartitionSessionID)
 	}()
@@ -352,7 +352,7 @@ func (l *streamListener) onStopPartitionRequest(
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-event.confirm.DoneChan:
+	case <-event.confirm.Done():
 		// pass
 	}
 
@@ -398,27 +398,37 @@ func (l *streamListener) sendMessage(m rawtopicreader.ClientMessage) {
 }
 
 type confirmStorage[T any] struct {
-	DoneChan      empty.Chan
+	doneChan      empty.Chan
 	confirmed     atomic.Bool
 	val           T
 	confirmAction sync.Once
+	initAction    sync.Once
 }
 
-func newConfirmStorage[T any]() confirmStorage[T] {
-	return confirmStorage[T]{
-		DoneChan: make(empty.Chan),
-	}
-}
-
-func (c *confirmStorage[T]) Set(val T) {
-	c.confirmAction.Do(func() {
-		c.val = val
-		c.confirmed.Store(true)
-		close(c.DoneChan)
+func (c *confirmStorage[T]) init() {
+	c.initAction.Do(func() {
+		c.doneChan = make(empty.Chan)
 	})
 }
 
+func (c *confirmStorage[T]) Set(val T) {
+	c.init()
+	c.confirmAction.Do(func() {
+		c.val = val
+		c.confirmed.Store(true)
+		close(c.doneChan)
+	})
+}
+
+func (c *confirmStorage[T]) Done() empty.ChanReadonly {
+	c.init()
+
+	return c.doneChan
+}
+
 func (c *confirmStorage[T]) Get() (val T, ok bool) {
+	c.init()
+
 	if c.confirmed.Load() {
 		return c.val, true
 	}

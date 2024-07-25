@@ -62,7 +62,6 @@ func NewPublicStartPartitionSessionEvent(
 		PartitionSession: session,
 		CommittedOffset:  committedOffset,
 		PartitionOffsets: partitionOffsets,
-		confirm:          newConfirmStorage[PublicStartPartitionSessionConfirm](),
 	}
 }
 
@@ -126,12 +125,15 @@ type PublicStopPartitionSessionEvent struct {
 	confirm confirmStorage[empty.Struct]
 }
 
-func NewPublicStopPartitionSessionEvent(partitionSession topicreadercommon.PublicPartitionSession, graceful bool, committedOffset int64) *PublicStopPartitionSessionEvent {
+func NewPublicStopPartitionSessionEvent(
+	partitionSession topicreadercommon.PublicPartitionSession,
+	graceful bool,
+	committedOffset int64,
+) *PublicStopPartitionSessionEvent {
 	return &PublicStopPartitionSessionEvent{
 		PartitionSession: partitionSession,
 		Graceful:         graceful,
 		CommittedOffset:  committedOffset,
-		confirm:          newConfirmStorage[empty.Struct](),
 	}
 }
 

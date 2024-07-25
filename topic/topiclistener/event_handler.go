@@ -47,7 +47,7 @@ func (b BaseHandler) OnReaderCreated(event *ReaderReady) error {
 
 func (b BaseHandler) OnStartPartitionSessionRequest(
 	ctx context.Context,
-	event *StartPartitionSessionRequest,
+	event *StartPartitionSessionEvent,
 ) error {
 	event.Confirm()
 
@@ -61,7 +61,7 @@ func (b BaseHandler) OnStartPartitionSessionRequest(
 // not
 func (b BaseHandler) OnStopPartitionSessionRequest(
 	ctx context.Context,
-	event *StopPartitionSessionRequest,
+	event *StopPartitionSessionEvent,
 ) error {
 	event.Confirm()
 
@@ -76,10 +76,8 @@ func (b BaseHandler) OnReadMessages(
 }
 
 type (
-	StartPartitionSessionRequest = topiclistenerinternal.PublicStartPartitionSessionEvent
-	StartPartitionSessionConfirm = topiclistenerinternal.PublicStartPartitionSessionConfirm
-	StopPartitionSessionRequest  = topiclistenerinternal.PublicStopPartitionSessionEvent
-	StopPartitionSessionConfirm  = topiclistenerinternal.PublicStopPartitionSessionConfirm
+	StartPartitionSessionEvent = topiclistenerinternal.PublicStartPartitionSessionEvent
+	StopPartitionSessionEvent  = topiclistenerinternal.PublicStopPartitionSessionEvent
 )
 
 type PartitionSession = topicreadercommon.PublicPartitionSession

@@ -51,8 +51,8 @@ type TestTopicListener_Handler struct {
 
 	listener         *topiclistener.TopicListener
 	readMessages     *topiclistener.ReadMessages
-	onPartitionStart *topiclistener.StartPartitionSessionRequest
-	onPartitionStop  *topiclistener.StopPartitionSessionRequest
+	onPartitionStart *topiclistener.StartPartitionSessionEvent
+	onPartitionStop  *topiclistener.StopPartitionSessionEvent
 	done             empty.Chan
 }
 
@@ -63,7 +63,7 @@ func (h *TestTopicListener_Handler) OnReaderCreated(event *topiclistener.ReaderR
 
 func (h *TestTopicListener_Handler) OnStartPartitionSessionRequest(
 	ctx context.Context,
-	event *topiclistener.StartPartitionSessionRequest,
+	event *topiclistener.StartPartitionSessionEvent,
 ) error {
 	h.onPartitionStart = event
 	event.Confirm()
@@ -72,7 +72,7 @@ func (h *TestTopicListener_Handler) OnStartPartitionSessionRequest(
 
 func (h *TestTopicListener_Handler) OnStopPartitionSessionRequest(
 	ctx context.Context,
-	event *topiclistener.StopPartitionSessionRequest,
+	event *topiclistener.StopPartitionSessionEvent,
 ) error {
 	h.onPartitionStop = event
 	event.Confirm()
