@@ -167,13 +167,27 @@ func (s *commonExecuteSettings) Params() *params.Parameters {
 
 func TxExecuteSettings(id string, opts ...TxExecuteOption) (settings *txExecuteSettings) {
 	settings = &txExecuteSettings{
-		ExecuteSettings: ExecuteSettings(WithTxControl(tx.NewControl(tx.WithTxID(id)))),
+		ExecuteSettings: ExecuteSettings(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.applyTxExecuteOption(settings)
 		}
 	}
+
+	var txControlOptions []tx.ControlOption
+	if settings.commitTx {
+		txControlOptions = []tx.ControlOption{
+			tx.WithTxID(id),
+			tx.CommitTx(),
+		}
+	} else {
+		txControlOptions = []tx.ControlOption{
+			tx.WithTxID(id),
+		}
+	}
+
+	settings.ExecuteSettings.SetTxControl(tx.NewControl(txControlOptions...))
 
 	return settings
 }

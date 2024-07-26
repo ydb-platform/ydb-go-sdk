@@ -86,6 +86,21 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 	return scope.driverNamed("default", opts...)
 }
 
+func (scope *scopeT) DriverWithLogs(opts ...ydb.Option) *ydb.Driver {
+	return scope.driverNamed("logged",
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.INFO),
+				),
+				trace.QueryEvents,
+			),
+		),
+	)
+}
+
 func (scope *scopeT) DriverWithGRPCLogging() *ydb.Driver {
 	return scope.driverNamed("grpc-logged", ydb.With(config.WithGrpcOptions(
 		grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(scope.t).UnaryClientInterceptor),
