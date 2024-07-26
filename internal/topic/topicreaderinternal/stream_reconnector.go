@@ -78,19 +78,41 @@ func newReaderReconnector(
 	return res
 }
 
-func (r *readerReconnector) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ReadMessageBatchOptions) (*PublicBatch, error) {
-	return r.readWithReconnections(ctx, func(ctx context.Context, stream batchedStreamReader) (*PublicBatch, error) {
+func (r *readerReconnector) PopBatchTx(
+	ctx context.Context,
+	tx *query.Transaction,
+	opts ReadMessageBatchOptions,
+) (
+	*topicreadercommon.PublicBatch,
+	error,
+) {
+	return r.readWithReconnections(ctx, func(ctx context.Context, stream batchedStreamReader) (*topicreadercommon.PublicBatch, error) {
 		return stream.PopBatchTx(ctx, tx, opts)
 	})
 }
 
-func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*PublicBatch, error) {
-	return r.readWithReconnections(ctx, func(ctx context.Context, stream batchedStreamReader) (*PublicBatch, error) {
+func (r *readerReconnector) ReadMessageBatch(
+	ctx context.Context,
+	opts ReadMessageBatchOptions,
+) (
+	*topicreadercommon.PublicBatch,
+	error,
+) {
+	return r.readWithReconnections(ctx, func(ctx context.Context, stream batchedStreamReader) (*topicreadercommon.PublicBatch, error) {
 		return stream.ReadMessageBatch(ctx, opts)
 	})
 }
 
-func (r *readerReconnector) readWithReconnections(ctx context.Context, read func(ctx context.Context, stream batchedStreamReader) (*PublicBatch, error)) (*PublicBatch, error) {
+func (r *readerReconnector) readWithReconnections(
+	ctx context.Context,
+	read func(
+		ctx context.Context,
+		stream batchedStreamReader,
+	) (*topicreadercommon.PublicBatch, error),
+) (
+	*topicreadercommon.PublicBatch,
+	error,
+) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

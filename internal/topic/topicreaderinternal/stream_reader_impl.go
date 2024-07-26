@@ -187,12 +187,13 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	return nil
 }
 
-func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ReadMessageBatchOptions) (*PublicBatch, error) {
+func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 	batch, err := r.ReadMessageBatch(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 
+	commitRange := topicreadercommon.GetCommitRange(batch)
 	err = r.topicClient.UpdateOffsetsInTransaction(ctx, rawtopic.UpdateOffsetsInTransactionRequest{
 		OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
 		Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
@@ -207,8 +208,8 @@ func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx *query.Transa
 						PartitionID: batch.PartitionID(),
 						PartitionOffsets: []rawtopiccommon.OffsetRange{
 							{
-								Start: batch.commitRange.commitOffsetStart,
-								End:   batch.commitRange.commitOffsetEnd,
+								Start: commitRange.CommitOffsetStart,
+								End:   commitRange.CommitOffsetEnd,
 							},
 						},
 					},

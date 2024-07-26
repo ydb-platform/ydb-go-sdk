@@ -130,7 +130,7 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
 
-func (r *Reader) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ...PublicReadBatchOption) (*PublicBatch, error) {
+func (r *Reader) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ...PublicReadBatchOption) (*topicreadercommon.PublicBatch, error) {
 	batchOptions := r.getBatchOptions(opts)
 
 	return r.reader.PopBatchTx(ctx, tx, batchOptions)
@@ -155,13 +155,7 @@ func (r *Reader) ReadMessageBatch(
 	batch *topicreadercommon.PublicBatch,
 	err error,
 ) {
-	readOptions := r.defaultBatchConfig.clone()
-
-	for _, opt := range opts {
-		if opt != nil {
-			readOptions = opt.Apply(readOptions)
-		}
-	}
+	batchOptions := r.getBatchOptions(opts)
 
 	for {
 		if err = ctx.Err(); err != nil {
@@ -181,6 +175,16 @@ func (r *Reader) ReadMessageBatch(
 	}
 }
 
+func (r *Reader) getBatchOptions(opts []PublicReadBatchOption) ReadMessageBatchOptions {
+	readOptions := r.defaultBatchConfig.clone()
+
+	for _, opt := range opts {
+		if opt != nil {
+			readOptions = opt.Apply(readOptions)
+		}
+	}
+	return readOptions
+}
 func (r *Reader) Commit(ctx context.Context, offsets topicreadercommon.PublicCommitRangeGetter) (err error) {
 	cr := topicreadercommon.GetCommitRange(offsets)
 	if cr.PartitionSession.ReaderID != r.readerID {

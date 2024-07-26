@@ -291,11 +291,11 @@ func (l *streamListener) onStartPartitionRequest(
 	}
 
 	if userResp.readOffset != nil {
-		resp.ReadOffset.Offset = rawtopicreader.NewOffset(*userResp.readOffset)
+		resp.ReadOffset.Offset.FromInt64(*userResp.readOffset)
 		resp.ReadOffset.HasValue = true
 	}
 	if userResp.CommitOffset != nil {
-		resp.CommitOffset.Offset = rawtopicreader.NewOffset(*userResp.CommitOffset)
+		resp.CommitOffset.Offset.FromInt64(*userResp.CommitOffset)
 		resp.CommitOffset.HasValue = true
 	}
 
