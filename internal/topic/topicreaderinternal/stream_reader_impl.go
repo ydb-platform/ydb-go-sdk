@@ -241,9 +241,11 @@ func (r *topicStreamReaderImpl) commitWithTransaction(ctx context.Context, tx *T
 		})
 	} else {
 		log.Printf("failed to add offsets in tx: %v", updateOffesetInTransactionErr)
-		//TODO: Fail the transaction
+		_ = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			return tx.Rollback(ctx)
+		})
 
-		_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.RetryableError(
+		_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.Retryable(
 			fmt.Errorf("ydb: failed add topic offsets in transaction: %w", updateOffesetInTransactionErr),
 		)))
 

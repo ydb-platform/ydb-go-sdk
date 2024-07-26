@@ -83,7 +83,24 @@ func (tx Transaction) Execute(ctx context.Context, q string, opts ...options.TxE
 		onDone(finalErr)
 	}()
 
-	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings)
+	executeSettings := options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings
+
+	var res *result
+	if executeSettings.TxControl().IsTxCommit() {
+		defer func() {
+			if finalErr == nil {
+				go func() {
+					<-res.Done()
+					tx.notifyOnCompleted(res.Err())
+				}()
+			} else {
+				tx.notifyOnCompleted(finalErr)
+			}
+		}()
+	}
+
+	var err error
+	_, res, err = execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)
@@ -109,9 +126,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 
 func (tx Transaction) CommitTx(ctx context.Context) (err error) {
 	defer func() {
-		for _, f := range tx.onCompleted {
-			f(err)
-		}
+		tx.notifyOnCompleted(err)
 	}()
 
 	err = commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
@@ -139,9 +154,9 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx Transaction) Rollback(ctx context.Context) error {
-	for _, f := range tx.onCompleted {
-		f(xerrors.WithStackTrace(ErrTransactionRollingBack))
-	}
+	// ToDo save local marker for deny any additional requests to the transaction?
+
+	tx.notifyOnCompleted(xerrors.WithStackTrace(ErrTransactionRollingBack))
 
 	err := rollback(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
@@ -153,6 +168,12 @@ func (tx Transaction) Rollback(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (tx Transaction) notifyOnCompleted(err error) {
+	for _, f := range tx.onCompleted {
+		f(err)
+	}
 }
 
 func GetSessionID(tx *Transaction) string {

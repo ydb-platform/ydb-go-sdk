@@ -1,8 +1,13 @@
 package query
 
 import (
+	"context"
+	"errors"
+	"sync"
 	"testing"
 
+	"github.com/rekby/fixenv"
+	"github.com/rekby/fixenv/sf"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -56,6 +61,130 @@ func TestCommitTx(t *testing.T) {
 		err := commitTx(ctx, service, "123", "456")
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+	})
+}
+
+func TestTxOnCompleted(t *testing.T) {
+	t.Run("OnCommitTxSuccess", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		QueryGrpcMock(e).EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
+			&Ydb_Query.CommitTransactionResponse{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil,
+		)
+
+		tx := TransactionOverGrpcMock(e)
+
+		var completed []error
+		OnTransactionCompleted(tx, func(transactionResult error) {
+			completed = append(completed, transactionResult)
+		})
+		err := tx.CommitTx(sf.Context(e))
+		require.NoError(t, err)
+		require.Equal(t, []error{nil}, completed)
+	})
+	t.Run("OnCommitTxFailed", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		testError := errors.New("test-error")
+
+		QueryGrpcMock(e).EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(nil,
+			testError,
+		)
+
+		tx := TransactionOverGrpcMock(e)
+
+		var completed []error
+		OnTransactionCompleted(tx, func(transactionResult error) {
+			completed = append(completed, transactionResult)
+		})
+		err := tx.CommitTx(sf.Context(e))
+		require.ErrorIs(t, err, testError)
+		require.Len(t, completed, 1)
+		require.ErrorIs(t, completed[0], err)
+	})
+	t.Run("OnRollback", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		rollbackCalled := false
+		QueryGrpcMock(e).EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(
+				ctx context.Context,
+				request *Ydb_Query.RollbackTransactionRequest,
+				option ...grpc.CallOption,
+			) (
+				*Ydb_Query.RollbackTransactionResponse,
+				error,
+			) {
+				rollbackCalled = true
+				return &Ydb_Query.RollbackTransactionResponse{
+					Status: Ydb.StatusIds_SUCCESS,
+				}, nil
+			})
+
+		tx := TransactionOverGrpcMock(e)
+		var completed []error
+
+		OnTransactionCompleted(tx, func(transactionResult error) {
+			// notification before call to the server
+			require.False(t, rollbackCalled)
+			completed = append(completed, transactionResult)
+		})
+
+		_ = tx.Rollback(sf.Context(e))
+		require.Len(t, completed, 1)
+		require.ErrorIs(t, completed[0], ErrTransactionRollingBack)
+	})
+	t.Run("OnExecuteWithoutCommitTxSuccess", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+		responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+		}, nil)
+
+		QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+		tx := TransactionOverGrpcMock(e)
+		var completed []error
+
+		OnTransactionCompleted(tx, func(transactionResult error) {
+			completed = append(completed, transactionResult)
+		})
+
+		_, err := tx.Execute(sf.Context(e), "")
+		require.NoError(t, err)
+		require.Len(t, completed, 0)
+	})
+	t.Run("OnExecuteWithTxSuccess", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+		responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+		}, nil)
+
+		QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+		tx := TransactionOverGrpcMock(e)
+		var completedMutex sync.Mutex
+		var completed []error
+
+		OnTransactionCompleted(tx, func(transactionResult error) {
+			completedMutex.Lock()
+			completed = append(completed, transactionResult)
+			completedMutex.Unlock()
+		})
+
+		res, err := tx.Execute(sf.Context(e), "", options.WithCommit())
+		_ = res.Close(sf.Context(e))
+		require.NoError(t, err)
+		xtest.SpinWaitCondition(t, &completedMutex, func() bool {
+			return len(completed) != 0
+		})
+		require.Len(t, completed, 1)
+		require.ErrorIs(t, completed[0], ErrTransactionRollingBack)
 	})
 }
 

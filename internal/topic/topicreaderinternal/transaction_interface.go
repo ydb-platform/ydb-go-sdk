@@ -1,6 +1,10 @@
 package topicreaderinternal
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+import (
+	"context"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+)
 
 type TransactionWrapper struct {
 	queryTx *query.Transaction
@@ -25,6 +29,7 @@ type mockTransaction struct {
 	ID          string
 	SessionID   string
 	OnCompleted []query.OnTransactionCompletedFunc
+	RolledBack  bool
 }
 
 func (t *TransactionWrapper) ID() string {
@@ -57,5 +62,17 @@ func (t *TransactionWrapper) OnTxCompleted(f query.OnTransactionCompletedFunc) {
 		t.mockTx.OnCompleted = append(t.mockTx.OnCompleted, f)
 	default:
 		panic("ydb: unexpected transaction wrapper state for OnTxCompleted")
+	}
+}
+
+func (t *TransactionWrapper) Rollback(ctx context.Context) error {
+	switch {
+	case t.queryTx != nil:
+		return t.queryTx.Rollback(ctx)
+	case t.mockTx != nil:
+		t.mockTx.RolledBack = true
+		return nil
+	default:
+		panic("ydb: unexpected transaction wrapper state for Rollback")
 	}
 }
