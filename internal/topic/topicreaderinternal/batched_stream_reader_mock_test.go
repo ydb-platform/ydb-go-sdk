@@ -11,6 +11,7 @@ import (
 	reflect "reflect"
 
 	query "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	topicreadercommon "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -52,7 +53,7 @@ func (mr *MockbatchedStreamReaderMockRecorder) CloseWithError(ctx, err any) *gom
 }
 
 // Commit mocks base method.
-func (m *MockbatchedStreamReader) Commit(ctx context.Context, commitRange commitRange) error {
+func (m *MockbatchedStreamReader) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Commit", ctx, commitRange)
 	ret0, _ := ret[0].(error)
@@ -81,10 +82,10 @@ func (mr *MockbatchedStreamReaderMockRecorder) PopBatchTx(ctx, tx any) *gomock.C
 }
 
 // ReadMessageBatch mocks base method.
-func (m *MockbatchedStreamReader) ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*PublicBatch, error) {
+func (m *MockbatchedStreamReader) ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReadMessageBatch", ctx, opts)
-	ret0, _ := ret[0].(*PublicBatch)
+	ret0, _ := ret[0].(*topicreadercommon.PublicBatch)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

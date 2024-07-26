@@ -22,6 +22,9 @@ func (r *PublicGetPartitionStartOffsetResponse) StartFrom(offset int64) {
 type PublicGetPartitionStartOffsetRequest struct {
 	Topic       string
 	PartitionID int64
+
+	// ExampleOnly
+	PartitionSessionID int64
 }
 
 // PublicGetPartitionStartOffsetFunc callback function for optional manage read progress store at own side

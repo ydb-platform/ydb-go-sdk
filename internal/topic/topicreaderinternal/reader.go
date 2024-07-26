@@ -5,15 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -26,12 +24,6 @@ var (
 	errSetConsumerAndNoConsumer     = xerrors.Wrap(errors.New("ydb: reader has non empty consumer name and set option WithReaderWithoutConsumer. Only one of them must be set")) //nolint:lll
 	errCommitSessionFromOtherReader = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 )
-
-var globalReaderCounter int64
-
-func nextReaderID() int64 {
-	return atomic.AddInt64(&globalReaderCounter, 1)
-}
 
 //go:generate mockgen -destination raw_topic_reader_stream_mock_test.go -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
 
@@ -83,7 +75,7 @@ func NewReader(
 	client TopicClient,
 	connector TopicSteamReaderConnect,
 	consumer string,
-	readSelectors []PublicReadSelector,
+	readSelectors []topicreadercommon.PublicReadSelector,
 	opts ...PublicReaderOption,
 ) (Reader, error) {
 	cfg := convertNewParamsToStreamConfig(consumer, readSelectors, opts...)
@@ -95,7 +87,7 @@ func NewReader(
 		))
 	}
 
-	readerID := nextReaderID()
+	readerID := topicreadercommon.NextReaderID()
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx)
@@ -145,7 +137,7 @@ func (r *Reader) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ...
 }
 
 // ReadMessage read exactly one message
-func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
+func (r *Reader) ReadMessage(ctx context.Context) (*topicreadercommon.PublicMessage, error) {
 	res, err := r.ReadMessageBatch(ctx, readExplicitMessagesCount(1))
 	if err != nil {
 		return nil, err
@@ -156,8 +148,20 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 
 // ReadMessageBatch read batch of messages.
 // Batch is collection of messages, which can be atomically committed
-func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
-	batchOptions := r.getBatchOptions(opts)
+func (r *Reader) ReadMessageBatch(
+	ctx context.Context,
+	opts ...PublicReadBatchOption,
+) (
+	batch *topicreadercommon.PublicBatch,
+	err error,
+) {
+	readOptions := r.defaultBatchConfig.clone()
+
+	for _, opt := range opts {
+		if opt != nil {
+			readOptions = opt.Apply(readOptions)
+		}
+	}
 
 	for {
 		if err = ctx.Err(); err != nil {
@@ -177,54 +181,44 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 	}
 }
 
-func (r *Reader) getBatchOptions(opts []PublicReadBatchOption) ReadMessageBatchOptions {
-	readOptions := r.defaultBatchConfig.clone()
-
-	for _, opt := range opts {
-		if opt != nil {
-			readOptions = opt.Apply(readOptions)
-		}
-	}
-	return readOptions
-}
-
-func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
-	cr := offsets.getCommitRange().priv
-	if cr.partitionSession.readerID != r.readerID {
+func (r *Reader) Commit(ctx context.Context, offsets topicreadercommon.PublicCommitRangeGetter) (err error) {
+	cr := topicreadercommon.GetCommitRange(offsets)
+	if cr.PartitionSession.ReaderID != r.readerID {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: messages session reader id (%v) != current reader id (%v): %w",
-			cr.partitionSession.readerID, r.readerID, errCommitSessionFromOtherReader,
+			cr.PartitionSession.ReaderID, r.readerID, errCommitSessionFromOtherReader,
 		)))
 	}
 
 	return r.reader.Commit(ctx, cr)
 }
 
-func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) error {
+func (r *Reader) CommitRanges(ctx context.Context, ranges []topicreadercommon.PublicCommitRange) error {
 	for i := range ranges {
-		if ranges[i].priv.partitionSession.readerID != r.readerID {
+		commitRange := topicreadercommon.GetCommitRange(ranges[i])
+		if commitRange.PartitionSession.ReaderID != r.readerID {
 			return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 				"ydb: commit ranges (range item %v) "+
 					"messages session reader id (%v) != current reader id (%v): %w",
-				i, ranges[i].priv.partitionSession.readerID, r.readerID, errCommitSessionFromOtherReader,
+				i, commitRange.PartitionSession.ReaderID, r.readerID, errCommitSessionFromOtherReader,
 			)))
 		}
 	}
 
-	commitRanges := NewCommitRangesFromPublicCommits(ranges)
-	commitRanges.optimize()
+	commitRanges := topicreadercommon.NewCommitRangesFromPublicCommits(ranges)
+	commitRanges.Optimize()
 
-	commitErrors := make(chan error, commitRanges.len())
+	commitErrors := make(chan error, commitRanges.Len())
 
 	var wg sync.WaitGroup
 
-	commit := func(cr commitRange) {
+	commit := func(cr topicreadercommon.CommitRange) {
 		defer wg.Done()
 		commitErrors <- r.Commit(ctx, &cr)
 	}
 
-	wg.Add(commitRanges.len())
-	for _, cr := range commitRanges.ranges {
+	wg.Add(commitRanges.Len())
+	for _, cr := range commitRanges.Ranges {
 		go commit(cr)
 	}
 	wg.Wait()
@@ -267,14 +261,14 @@ func WithTrace(tracer *trace.Topic) PublicReaderOption {
 
 func convertNewParamsToStreamConfig(
 	consumer string,
-	readSelectors []PublicReadSelector,
+	readSelectors []topicreadercommon.PublicReadSelector,
 	opts ...PublicReaderOption,
 ) (cfg ReaderConfig) {
 	cfg.topicStreamReaderConfig = newTopicStreamReaderConfig()
 	cfg.Consumer = consumer
 
 	// make own copy, for prevent changing internal states if readSelectors will change outside
-	cfg.ReadSelectors = make([]*PublicReadSelector, len(readSelectors))
+	cfg.ReadSelectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
 		cfg.ReadSelectors[i] = readSelectors[i].Clone()
 	}
@@ -286,18 +280,4 @@ func convertNewParamsToStreamConfig(
 	}
 
 	return cfg
-}
-
-type PublicReadSelector struct {
-	Path       string
-	Partitions []int64
-	ReadFrom   time.Time     // zero value mean skip read from filter
-	MaxTimeLag time.Duration // 0 mean skip time lag filter
-}
-
-// Clone create deep clone of the selector
-func (s PublicReadSelector) Clone() *PublicReadSelector { //nolint:gocritic
-	s.Partitions = clone.Int64Slice(s.Partitions)
-
-	return &s
 }

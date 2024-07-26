@@ -12,42 +12,42 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func TestBatcher_PushBatch(t *testing.T) {
-	session1 := &partitionSession{}
-	session2 := &partitionSession{}
+	session1 := &topicreadercommon.PartitionSession{}
+	session2 := &topicreadercommon.PartitionSession{}
 
-	m11 := &PublicMessage{
-		WrittenAt:   testTime(1),
-		commitRange: commitRange{partitionSession: session1},
-	}
-	m12 := &PublicMessage{
-		WrittenAt:   testTime(2),
-		commitRange: commitRange{partitionSession: session1},
-	}
-	m21 := &PublicMessage{
-		WrittenAt:   testTime(3),
-		commitRange: commitRange{partitionSession: session2},
-	}
-	m22 := &PublicMessage{
-		WrittenAt:   testTime(4),
-		commitRange: commitRange{partitionSession: session2},
-	}
+	m11 := topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{
+		WrittenAt: testTime(1),
+	}, topicreadercommon.CommitRange{PartitionSession: session1})
 
-	batch1 := mustNewBatch(session1, []*PublicMessage{m11, m12})
-	batch2 := mustNewBatch(session2, []*PublicMessage{m21})
-	batch3 := mustNewBatch(session2, []*PublicMessage{m22})
+	m12 := topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{
+		WrittenAt: testTime(2),
+	}, topicreadercommon.CommitRange{PartitionSession: session1})
+
+	m21 := topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{
+		WrittenAt: testTime(3),
+	}, topicreadercommon.CommitRange{PartitionSession: session2})
+
+	m22 := topicreadercommon.MessageWithSetCommitRangeForTest(&topicreadercommon.PublicMessage{
+		WrittenAt: testTime(4),
+	}, topicreadercommon.CommitRange{PartitionSession: session2})
+
+	batch1 := mustNewBatch(session1, []*topicreadercommon.PublicMessage{m11, m12})
+	batch2 := mustNewBatch(session2, []*topicreadercommon.PublicMessage{m21})
+	batch3 := mustNewBatch(session2, []*topicreadercommon.PublicMessage{m22})
 
 	b := newBatcher()
 	require.NoError(t, b.PushBatches(batch1))
 	require.NoError(t, b.PushBatches(batch2))
 	require.NoError(t, b.PushBatches(batch3))
 
-	expectedSession1 := newBatcherItemBatch(mustNewBatch(session1, []*PublicMessage{m11, m12}))
-	expectedSession2 := newBatcherItemBatch(mustNewBatch(session2, []*PublicMessage{m21, m22}))
+	expectedSession1 := newBatcherItemBatch(mustNewBatch(session1, []*topicreadercommon.PublicMessage{m11, m12}))
+	expectedSession2 := newBatcherItemBatch(mustNewBatch(session2, []*topicreadercommon.PublicMessage{m21, m22}))
 
 	expected := batcherMessagesMap{
 		session1: batcherMessageOrderItems{expectedSession1},
@@ -59,7 +59,7 @@ func TestBatcher_PushBatch(t *testing.T) {
 func TestBatcher_PushRawMessage(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		b := newBatcher()
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		m := &rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: 1,
 		}
@@ -70,8 +70,8 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 	})
 	t.Run("AddRawAfterBatch", func(t *testing.T) {
 		b := newBatcher()
-		session := &partitionSession{}
-		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
+		session := &topicreadercommon.PartitionSession{}
+		batch := mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
 		m := &rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: 1,
 		}
@@ -88,10 +88,10 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 
 	t.Run("AddBatchRawBatchBatch", func(t *testing.T) {
 		b := newBatcher()
-		session := &partitionSession{}
-		batch1 := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
-		batch2 := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(2)}})
-		batch3 := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(3)}})
+		session := &topicreadercommon.PartitionSession{}
+		batch1 := mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
+		batch2 := mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(2)}})
+		batch3 := mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(3)}})
 		m := &rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: 1,
 		}
@@ -104,7 +104,10 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 		expectedMap := batcherMessagesMap{session: batcherMessageOrderItems{
 			newBatcherItemBatch(batch1),
 			newBatcherItemRawMessage(m),
-			newBatcherItemBatch(mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(2)}, {WrittenAt: testTime(3)}})),
+			newBatcherItemBatch(mustNewBatch(
+				session,
+				[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(2)}, {WrittenAt: testTime(3)}},
+			)),
 		}}
 		require.Equal(t, expectedMap, b.messages)
 	})
@@ -113,7 +116,7 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 func TestBatcher_Pop(t *testing.T) {
 	t.Run("SimpleGet", func(t *testing.T) {
 		ctx := context.Background()
-		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
+		batch := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
 
 		b := newBatcher()
 		require.NoError(t, b.PushBatches(batch))
@@ -125,15 +128,21 @@ func TestBatcher_Pop(t *testing.T) {
 
 	t.Run("SimpleOneOfTwo", func(t *testing.T) {
 		ctx := context.Background()
-		session1 := &partitionSession{}
-		session2 := &partitionSession{}
+		session1 := &topicreadercommon.PartitionSession{}
+		session2 := &topicreadercommon.PartitionSession{}
+
+		mess1 := &topicreadercommon.PublicMessage{WrittenAt: testTime(1)}
+		topicreadercommon.MessageWithSetCommitRangeForTest(mess1, topicreadercommon.CommitRange{PartitionSession: session1})
 		batch := mustNewBatch(
 			session1,
-			[]*PublicMessage{{WrittenAt: testTime(1), commitRange: commitRange{partitionSession: session1}}},
+			[]*topicreadercommon.PublicMessage{mess1},
 		)
+
+		mess2 := &topicreadercommon.PublicMessage{WrittenAt: testTime(2)}
+		topicreadercommon.MessageWithSetCommitRangeForTest(mess2, topicreadercommon.CommitRange{PartitionSession: session2})
 		batch2 := mustNewBatch(
 			session2,
-			[]*PublicMessage{{WrittenAt: testTime(2), commitRange: commitRange{partitionSession: session2}}},
+			[]*topicreadercommon.PublicMessage{mess2},
 		)
 
 		b := newBatcher()
@@ -156,7 +165,7 @@ func TestBatcher_Pop(t *testing.T) {
 
 	xtest.TestManyTimesWithName(t, "GetBeforePut", func(t testing.TB) {
 		ctx := context.Background()
-		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
+		batch := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
 
 		b := newBatcher()
 		b.notifyAboutNewMessages()
@@ -177,9 +186,9 @@ func TestBatcher_Pop(t *testing.T) {
 	t.Run("GetMaxOne", func(t *testing.T) {
 		ctx := context.Background()
 
-		m1 := &PublicMessage{WrittenAt: testTime(1)}
-		m2 := &PublicMessage{WrittenAt: testTime(2)}
-		batch := mustNewBatch(nil, []*PublicMessage{m1, m2})
+		m1 := &topicreadercommon.PublicMessage{WrittenAt: testTime(1)}
+		m2 := &topicreadercommon.PublicMessage{WrittenAt: testTime(2)}
+		batch := mustNewBatch(nil, []*topicreadercommon.PublicMessage{m1, m2})
 
 		b := newBatcher()
 		require.NoError(t, b.PushBatches(batch))
@@ -187,18 +196,18 @@ func TestBatcher_Pop(t *testing.T) {
 		res, err := b.Pop(ctx, batcherGetOptions{MaxCount: 1})
 		require.NoError(t, err)
 
-		expectedResult := newBatcherItemBatch(mustNewBatch(nil, []*PublicMessage{m1}))
+		expectedResult := newBatcherItemBatch(mustNewBatch(nil, []*topicreadercommon.PublicMessage{m1}))
 		require.Equal(t, expectedResult, res)
 
 		expectedMessages := batcherMessagesMap{
-			nil: batcherMessageOrderItems{newBatcherItemBatch(mustNewBatch(nil, []*PublicMessage{m2}))},
+			nil: batcherMessageOrderItems{newBatcherItemBatch(mustNewBatch(nil, []*topicreadercommon.PublicMessage{m2}))},
 		}
 		require.Equal(t, expectedMessages, b.messages)
 	})
 
 	t.Run("GetFirstMessageFromSameSession", func(t *testing.T) {
 		b := newBatcher()
-		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
+		batch := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
 		require.NoError(t, b.PushBatches(batch))
 		require.NoError(t, b.PushRawMessage(nil, &rawtopicreader.StopPartitionSessionRequest{PartitionSessionID: 1}))
 
@@ -208,13 +217,16 @@ func TestBatcher_Pop(t *testing.T) {
 	})
 
 	t.Run("PreferFirstRawMessageFromDifferentSessions", func(t *testing.T) {
-		session1 := &partitionSession{}
-		session2 := &partitionSession{}
+		session1 := &topicreadercommon.PartitionSession{}
+		session2 := &topicreadercommon.PartitionSession{}
 
 		b := newBatcher()
 		m := &rawtopicreader.StopPartitionSessionRequest{PartitionSessionID: 1}
 
-		require.NoError(t, b.PushBatches(mustNewBatch(session1, []*PublicMessage{{WrittenAt: testTime(1)}})))
+		require.NoError(t, b.PushBatches(mustNewBatch(
+			session1,
+			[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}},
+		)))
 		require.NoError(t, b.PushRawMessage(session2, m))
 
 		res, err := b.Pop(context.Background(), batcherGetOptions{})
@@ -258,7 +270,7 @@ func TestBatcher_Pop(t *testing.T) {
 func TestBatcher_PopMinIgnored(t *testing.T) {
 	t.Run("PopAfterForce", func(t *testing.T) {
 		b := newBatcher()
-		require.NoError(t, b.PushBatches(&PublicBatch{Messages: []*PublicMessage{
+		require.NoError(t, b.PushBatches(&topicreadercommon.PublicBatch{Messages: []*topicreadercommon.PublicMessage{
 			{
 				SeqNo: 1,
 			},
@@ -277,7 +289,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 	xtest.TestManyTimesWithName(t, "ForceAfterPop", func(t testing.TB) {
 		b := newBatcher()
-		require.NoError(t, b.PushBatches(&PublicBatch{Messages: []*PublicMessage{
+		require.NoError(t, b.PushBatches(&topicreadercommon.PublicBatch{Messages: []*topicreadercommon.PublicMessage{
 			{
 				SeqNo: 1,
 			},
@@ -309,7 +321,7 @@ func TestBatcherConcurency(t *testing.T) {
 		b := newBatcher()
 
 		go func() {
-			_ = b.PushBatches(&PublicBatch{Messages: []*PublicMessage{{SeqNo: 1}}})
+			_ = b.PushBatches(&topicreadercommon.PublicBatch{Messages: []*topicreadercommon.PublicMessage{{SeqNo: 1}}})
 		}()
 
 		ctx, cancel := xcontext.WithTimeout(context.Background(), time.Second)
@@ -323,7 +335,7 @@ func TestBatcherConcurency(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "ManyRawMessages", func(tb testing.TB) {
 		const count = 10
 		b := newBatcher()
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 
 		go func() {
 			for i := 0; i < count; i++ {
@@ -356,8 +368,8 @@ func TestBatcher_Find(t *testing.T) {
 		require.False(t, findRes.Ok)
 	})
 	t.Run("FoundEmptyFilter", func(t *testing.T) {
-		session := &partitionSession{}
-		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
+		session := &topicreadercommon.PartitionSession{}
+		batch := mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
 
 		b := newBatcher()
 
@@ -375,8 +387,11 @@ func TestBatcher_Find(t *testing.T) {
 	})
 
 	t.Run("FoundPartialBatchFilter", func(t *testing.T) {
-		session := &partitionSession{}
-		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		session := &topicreadercommon.PartitionSession{}
+		batch := mustNewBatch(
+			session,
+			[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}},
+		)
 
 		b := newBatcher()
 
@@ -384,8 +399,14 @@ func TestBatcher_Find(t *testing.T) {
 
 		findRes := b.findNeedLock(batcherGetOptions{MaxCount: 1})
 
-		expectedResult := newBatcherItemBatch(mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}}))
-		expectedRestBatch := newBatcherItemBatch(mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(2)}}))
+		expectedResult := newBatcherItemBatch(mustNewBatch(
+			session,
+			[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}},
+		))
+		expectedRestBatch := newBatcherItemBatch(mustNewBatch(
+			session,
+			[]*topicreadercommon.PublicMessage{{WrittenAt: testTime(2)}},
+		))
 
 		expectedCandidate := batcherResultCandidate{
 			Key:         session,
@@ -400,10 +421,10 @@ func TestBatcher_Find(t *testing.T) {
 
 func TestBatcher_Apply(t *testing.T) {
 	t.Run("New", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		b := newBatcher()
 
-		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
+		batch := mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
 		foundRes := batcherResultCandidate{
 			Key:  session,
 			Rest: batcherMessageOrderItems{newBatcherItemBatch(batch)},
@@ -415,10 +436,10 @@ func TestBatcher_Apply(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		session := &partitionSession{}
+		session := &topicreadercommon.PartitionSession{}
 		b := newBatcher()
 
-		batch := mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}})
+		batch := mustNewBatch(session, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
 
 		foundRes := batcherResultCandidate{
 			Key:  session,
@@ -436,35 +457,47 @@ func TestBatcher_Apply(t *testing.T) {
 func TestBatcherGetOptions_Split(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		opts := batcherGetOptions{}
-		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		batch := mustNewBatch(nil, []*topicreadercommon.PublicMessage{
+			{WrittenAt: testTime(1)},
+			{WrittenAt: testTime(2)},
+		},
+		)
 		head, rest, ok := opts.splitBatch(batch)
 
 		require.Equal(t, batch, head)
-		require.True(t, rest.isEmpty())
+		require.True(t, topicreadercommon.BatchIsEmpty(rest))
 		require.True(t, ok)
 	})
 	t.Run("MinCount", func(t *testing.T) {
 		opts := batcherGetOptions{MinCount: 2}
-		batch1 := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
-		batch2 := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		batch1 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
+		batch2 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{
+			{WrittenAt: testTime(1)},
+			{WrittenAt: testTime(2)},
+		},
+		)
 
 		head, rest, ok := opts.splitBatch(batch1)
-		require.True(t, head.isEmpty())
-		require.True(t, rest.isEmpty())
+		require.True(t, topicreadercommon.BatchIsEmpty(head))
+		require.True(t, topicreadercommon.BatchIsEmpty(rest))
 		require.False(t, ok)
 
 		head, rest, ok = opts.splitBatch(batch2)
 		require.Equal(t, batch2, head)
-		require.True(t, rest.isEmpty())
+		require.True(t, topicreadercommon.BatchIsEmpty(rest))
 		require.True(t, ok)
 	})
 	t.Run("MaxCount", func(t *testing.T) {
 		opts := batcherGetOptions{MaxCount: 2}
-		batch1 := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
-		batch2 := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}, {WrittenAt: testTime(2)}})
+		batch1 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{{WrittenAt: testTime(1)}})
+		batch2 := mustNewBatch(nil, []*topicreadercommon.PublicMessage{
+			{WrittenAt: testTime(1)},
+			{WrittenAt: testTime(2)},
+		},
+		)
 		batch3 := mustNewBatch(
 			nil,
-			[]*PublicMessage{
+			[]*topicreadercommon.PublicMessage{
 				{WrittenAt: testTime(11)},
 				{WrittenAt: testTime(12)},
 				{WrittenAt: testTime(13)},
@@ -474,17 +507,29 @@ func TestBatcherGetOptions_Split(t *testing.T) {
 
 		head, rest, ok := opts.splitBatch(batch1)
 		require.Equal(t, batch1, head)
-		require.True(t, rest.isEmpty())
+		require.True(t, topicreadercommon.BatchIsEmpty(rest))
 		require.True(t, ok)
 
 		head, rest, ok = opts.splitBatch(batch2)
 		require.Equal(t, batch2, head)
-		require.True(t, rest.isEmpty())
+		require.True(t, topicreadercommon.BatchIsEmpty(rest))
 		require.True(t, ok)
 
 		head, rest, ok = opts.splitBatch(batch3)
-		expectedHead := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(11)}, {WrittenAt: testTime(12)}})
-		expectedRest := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(13)}, {WrittenAt: testTime(14)}})
+		expectedHead := mustNewBatch(
+			nil,
+			[]*topicreadercommon.PublicMessage{
+				{WrittenAt: testTime(11)},
+				{WrittenAt: testTime(12)},
+			},
+		)
+		expectedRest := mustNewBatch(
+			nil,
+			[]*topicreadercommon.PublicMessage{
+				{WrittenAt: testTime(13)},
+				{WrittenAt: testTime(14)},
+			},
+		)
 		require.Equal(t, expectedHead, head)
 		require.Equal(t, expectedRest, rest)
 		require.True(t, ok)
@@ -498,11 +543,18 @@ func TestBatcher_Fire(t *testing.T) {
 	})
 }
 
-func mustNewBatch(session *partitionSession, messages []*PublicMessage) *PublicBatch {
-	batch, err := newBatch(session, messages)
+func mustNewBatch(
+	session *topicreadercommon.PartitionSession,
+	messages []*topicreadercommon.PublicMessage,
+) *topicreadercommon.PublicBatch {
+	batch, err := topicreadercommon.NewBatch(session, messages)
 	if err != nil {
 		panic(err)
 	}
 
 	return batch
+}
+
+func testTime(num int) time.Time {
+	return time.Date(2022, 6, 17, 0, 0, 0, num, time.UTC)
 }

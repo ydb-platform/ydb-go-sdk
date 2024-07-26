@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -139,7 +140,10 @@ func (r *readerReconnector) readWithReconnections(ctx context.Context, read func
 	}
 }
 
-func (r *readerReconnector) Commit(ctx context.Context, commitRange commitRange) error {
+func (r *readerReconnector) Commit(
+	ctx context.Context,
+	commitRange topicreadercommon.CommitRange,
+) error {
 	stream, err := r.stream(ctx)
 	if err != nil {
 		return err

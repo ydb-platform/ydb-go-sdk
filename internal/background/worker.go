@@ -122,6 +122,10 @@ func (b *Worker) CloseReason() error {
 	return b.closeReason
 }
 
+func (b *Worker) StopDone() <-chan empty.Struct {
+	return b.tasksCompleted
+}
+
 func (b *Worker) init() {
 	b.onceInit.Do(func() {
 		if b.ctx == nil {

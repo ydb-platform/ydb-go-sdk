@@ -3,6 +3,8 @@ package topicreaderinternal
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 )
 
@@ -10,8 +12,8 @@ import (
 
 type batchedStreamReader interface {
 	WaitInit(ctx context.Context) error
-	ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*PublicBatch, error)
-	Commit(ctx context.Context, commitRange commitRange) error
+	ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)
+	Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error
 	CloseWithError(ctx context.Context, err error) error
 	PopBatchTx(ctx context.Context, tx *query.Transaction, opts ReadMessageBatchOptions) (*PublicBatch, error)
 }

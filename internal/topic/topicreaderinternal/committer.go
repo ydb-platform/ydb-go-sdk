@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -50,7 +51,7 @@ type committer struct {
 
 	m       xsync.Mutex
 	waiters []commitWaiter
-	commits CommitRanges
+	commits topicreadercommon.CommitRanges
 }
 
 func newCommitterStopped(
@@ -83,7 +84,7 @@ func (c *committer) Close(ctx context.Context, err error) error {
 	return c.backgroundWorker.Close(ctx, err)
 }
 
-func (c *committer) Commit(ctx context.Context, commitRange commitRange) error {
+func (c *committer) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
 	if !c.mode.commitsEnabled() {
 		return ErrCommitDisabled
 	}
@@ -100,9 +101,9 @@ func (c *committer) Commit(ctx context.Context, commitRange commitRange) error {
 	return c.waitCommitAck(ctx, waiter)
 }
 
-func (c *committer) pushCommit(commitRange commitRange) (commitWaiter, error) {
+func (c *committer) pushCommit(commitRange topicreadercommon.CommitRange) (commitWaiter, error) {
 	var resErr error
-	waiter := newCommitWaiter(commitRange.partitionSession, commitRange.commitOffsetEnd)
+	waiter := newCommitWaiter(commitRange.PartitionSession, commitRange.CommitOffsetEnd)
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
 			resErr = err
@@ -128,23 +129,23 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 	for {
 		c.waitSendTrigger(ctx)
 
-		var commits CommitRanges
+		var commits topicreadercommon.CommitRanges
 		c.m.WithLock(func() {
 			commits = c.commits
-			c.commits = NewCommitRangesWithCapacity(commits.len() * 2) //nolint:gomnd
+			c.commits = topicreadercommon.NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:gomnd
 		})
 
-		if commits.len() == 0 && c.backgroundWorker.Context().Err() != nil {
+		if commits.Len() == 0 && c.backgroundWorker.Context().Err() != nil {
 			// committer closed with empty buffer - target close state
 			return
 		}
 
 		// all ranges already committed of prev iteration
-		if commits.len() == 0 {
+		if commits.Len() == 0 {
 			continue
 		}
 
-		commits.optimize()
+		commits.Optimize()
 
 		onDone := trace.TopicOnReaderSendCommitMessage(
 			c.tracer,
@@ -187,7 +188,7 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 	for {
 		var commitsLen int
 		c.m.WithLock(func() {
-			commitsLen = c.commits.len()
+			commitsLen = c.commits.Len()
 		})
 		if commitsLen >= c.BufferCountTrigger {
 			return
@@ -212,7 +213,7 @@ func (c *committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 	defer c.m.WithLock(func() {
 		c.removeWaiterByIDNeedLock(waiter.ID)
 	})
-	if waiter.checkCondition(waiter.Session, waiter.Session.committedOffset()) {
+	if waiter.checkCondition(waiter.Session, waiter.Session.CommittedOffset()) {
 		return nil
 	}
 
@@ -226,7 +227,7 @@ func (c *committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 	}
 }
 
-func (c *committer) OnCommitNotify(session *partitionSession, offset rawtopiccommon.Offset) {
+func (c *committer) OnCommitNotify(session *topicreadercommon.PartitionSession, offset rawtopicreader.Offset) {
 	c.m.WithLock(func() {
 		for i := range c.waiters {
 			waiter := c.waiters[i]
@@ -258,18 +259,21 @@ func (c *committer) removeWaiterByIDNeedLock(id int64) {
 
 type commitWaiter struct {
 	ID        int64
-	Session   *partitionSession
-	EndOffset rawtopiccommon.Offset
+	Session   *topicreadercommon.PartitionSession
+	EndOffset rawtopicreader.Offset
 	Committed empty.Chan
 }
 
-func (w *commitWaiter) checkCondition(session *partitionSession, offset rawtopiccommon.Offset) (finished bool) {
+func (w *commitWaiter) checkCondition(
+	session *topicreadercommon.PartitionSession,
+	offset rawtopicreader.Offset,
+) (finished bool) {
 	return session == w.Session && offset >= w.EndOffset
 }
 
 var commitWaiterLastID int64
 
-func newCommitWaiter(session *partitionSession, endOffset rawtopiccommon.Offset) commitWaiter {
+func newCommitWaiter(session *topicreadercommon.PartitionSession, endOffset rawtopicreader.Offset) commitWaiter {
 	id := atomic.AddInt64(&commitWaiterLastID, 1)
 
 	return commitWaiter{
@@ -280,9 +284,9 @@ func newCommitWaiter(session *partitionSession, endOffset rawtopiccommon.Offset)
 	}
 }
 
-func sendCommitMessage(send sendMessageToServerFunc, batch CommitRanges) error {
+func sendCommitMessage(send sendMessageToServerFunc, batch topicreadercommon.CommitRanges) error {
 	req := &rawtopicreader.CommitOffsetRequest{
-		CommitOffsets: batch.toPartitionsOffsets(),
+		CommitOffsets: batch.ToPartitionsOffsets(),
 	}
 
 	return send(req)

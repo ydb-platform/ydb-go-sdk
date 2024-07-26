@@ -39,6 +39,7 @@ func (re *retryableError) IsRetryObjectValid() bool {
 
 func (re *retryableError) Error() string {
 	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteString(re.Name())
 	fmt.Fprintf(b, " (code = %d, source error = %q", re.code, re.err.Error())
 	if len(re.traceID) > 0 {

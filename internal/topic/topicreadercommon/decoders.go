@@ -1,7 +1,8 @@
-package topicreaderinternal
+package topicreadercommon
 
 import (
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 
@@ -9,12 +10,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-type decoderMap struct {
+type DecoderMap struct {
 	m map[rawtopiccommon.Codec]PublicCreateDecoderFunc
 }
 
-func newDecoderMap() decoderMap {
-	return decoderMap{
+func NewDecoderMap() DecoderMap {
+	return DecoderMap{
 		m: map[rawtopiccommon.Codec]PublicCreateDecoderFunc{
 			rawtopiccommon.CodecRaw: func(input io.Reader) (io.Reader, error) {
 				return input, nil
@@ -26,11 +27,11 @@ func newDecoderMap() decoderMap {
 	}
 }
 
-func (m *decoderMap) AddDecoder(codec rawtopiccommon.Codec, createFunc PublicCreateDecoderFunc) {
+func (m *DecoderMap) AddDecoder(codec rawtopiccommon.Codec, createFunc PublicCreateDecoderFunc) {
 	m.m[codec] = createFunc
 }
 
-func (m *decoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Reader, error) {
+func (m *DecoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Reader, error) {
 	if f := m.m[codec]; f != nil {
 		return f(input)
 	}
@@ -41,3 +42,6 @@ func (m *decoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Rea
 }
 
 type PublicCreateDecoderFunc func(input io.Reader) (io.Reader, error)
+
+// ErrPublicUnexpectedCodec return when try to read message content with unknown codec
+var ErrPublicUnexpectedCodec = xerrors.Wrap(errors.New("ydb: unexpected codec"))
