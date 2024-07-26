@@ -1,3 +1,4 @@
+## v3.76.0
 * Added experimental topic listener implementation
 * Fixed `internal/xstrings.Buffer()` leak without call `buffer.Free()`
 * Removed double quotas from goroutine labels background workers for prevent problem with pprof
