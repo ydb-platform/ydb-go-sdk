@@ -2,7 +2,6 @@ package query
 
 import (
 	"fmt"
-	"testing"
 
 	"github.com/rekby/fixenv"
 	"go.uber.org/mock/gomock"
@@ -27,7 +26,7 @@ func QueryGrpcMock(e fixenv.Env) *MockQueryServiceClient {
 
 func MockController(e fixenv.Env) *gomock.Controller {
 	f := func() (*fixenv.GenericResult[*gomock.Controller], error) {
-		mc := gomock.NewController(e.T().(*testing.T))
+		mc := gomock.NewController(e.T().(gomock.TestReporter))
 		return fixenv.NewGenericResult(mc), nil
 	}
 	return fixenv.CacheResult(e, f)

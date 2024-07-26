@@ -86,18 +86,22 @@ func (tx Transaction) Execute(ctx context.Context, q string, opts ...options.TxE
 	executeSettings := options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings
 
 	var res *result
-	if executeSettings.TxControl().IsTxCommit() {
-		defer func() {
-			if finalErr == nil {
-				go func() {
-					<-res.Done()
-					tx.notifyOnCompleted(res.Err())
-				}()
-			} else {
-				tx.notifyOnCompleted(finalErr)
-			}
-		}()
-	}
+
+	// notification about complete transaction must be sended for any error or for successfully read all result if
+	// it was execution with commit flag
+	defer func() {
+		if finalErr == nil {
+			go func() {
+				<-res.Done()
+				resErr := res.Err()
+				if resErr != nil || executeSettings.TxControl().IsTxCommit() {
+					tx.notifyOnCompleted(resErr)
+				}
+			}()
+		} else {
+			tx.notifyOnCompleted(finalErr)
+		}
+	}()
 
 	var err error
 	_, res, err = execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings)
