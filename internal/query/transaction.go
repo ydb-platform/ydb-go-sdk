@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -17,10 +18,13 @@ import (
 
 var _ query.Transaction = (*Transaction)(nil)
 
+var ErrTransactionRollingBack = xerrors.Wrap(errors.New("ydb: the transaction is rolling back"))
+
 type Transaction struct {
 	tx.Parent
 
-	s *Session
+	s           *Session
+	onCompleted []OnTransactionCompletedFunc
 }
 
 func (tx Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
@@ -103,8 +107,14 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx Transaction) CommitTx(ctx context.Context) error {
-	err := commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
+func (tx Transaction) CommitTx(ctx context.Context) (err error) {
+	defer func() {
+		for _, f := range tx.onCompleted {
+			f(err)
+		}
+	}()
+
+	err = commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
 			tx.s.setStatus(statusClosed)
@@ -129,6 +139,10 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx Transaction) Rollback(ctx context.Context) error {
+	for _, f := range tx.onCompleted {
+		f(xerrors.WithStackTrace(ErrTransactionRollingBack))
+	}
+
 	err := rollback(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
@@ -144,3 +158,9 @@ func (tx Transaction) Rollback(ctx context.Context) error {
 func GetSessionID(tx *Transaction) string {
 	return tx.s.ID()
 }
+
+func OnTransactionCompleted(tx *Transaction, f OnTransactionCompletedFunc) {
+	tx.onCompleted = append(tx.onCompleted, f)
+}
+
+type OnTransactionCompletedFunc func(transactionResult error)

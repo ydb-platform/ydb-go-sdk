@@ -95,7 +95,7 @@ func (r *Reader) PopBatchTx(ctx context.Context, tx query.TxActor, opts ...ReadB
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: mismatch types. Want query.Transaction, got: %T", tx)))
 	}
 
-	return r.reader.PopBatchTx(ctx, internalTx, opts...)
+	return r.reader.PopBatchTx(ctx, topicreaderinternal.NewFromQueryTransaction(internalTx), opts...)
 }
 
 // CommitRangeGetter interface for get commit offsets

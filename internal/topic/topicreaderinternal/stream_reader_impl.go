@@ -20,11 +20,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -187,44 +187,70 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	return nil
 }
 
-func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx *query.Transaction, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
+func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx *TransactionWrapper, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 	batch, err := r.ReadMessageBatch(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 
+	if err = r.commitWithTransaction(ctx, tx, batch); err == nil {
+		return batch, nil
+	}
+	return nil, err
+}
+
+func (r *topicStreamReaderImpl) commitWithTransaction(ctx context.Context, tx *TransactionWrapper, batch *topicreadercommon.PublicBatch) error {
 	commitRange := topicreadercommon.GetCommitRange(batch)
-	err = r.topicClient.UpdateOffsetsInTransaction(ctx, rawtopic.UpdateOffsetsInTransactionRequest{
-		OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
-		Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
-			ID:      tx.ID(),
-			Session: query.GetSessionID(tx),
-		},
-		Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
-			{
-				Path: batch.Topic(), // TODO: server response with error
-				Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
-					{
-						PartitionID: batch.PartitionID(),
-						PartitionOffsets: []rawtopiccommon.OffsetRange{
-							{
-								Start: commitRange.CommitOffsetStart,
-								End:   commitRange.CommitOffsetEnd,
+	updateOffesetInTransactionErr := retry.Retry(ctx, func(ctx context.Context) (err error) {
+		err = r.topicClient.UpdateOffsetsInTransaction(ctx, rawtopic.UpdateOffsetsInTransactionRequest{
+			OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
+			Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+				ID:      tx.ID(),
+				Session: tx.SessionID(),
+			},
+			Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
+				{
+					Path: batch.Topic(),
+					Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
+						{
+							PartitionID: batch.PartitionID(),
+							PartitionOffsets: []rawtopiccommon.OffsetRange{
+								{
+									Start: commitRange.CommitOffsetStart,
+									End:   commitRange.CommitOffsetEnd,
+								},
 							},
 						},
 					},
 				},
 			},
-		},
-		Consumer: r.cfg.Consumer,
+			Consumer: r.cfg.Consumer,
+		})
+		return err
 	})
+	if updateOffesetInTransactionErr == nil {
+		tx.OnTxCompleted(func(transactionResult error) {
+			// TODO: trace
+			if transactionResult == nil {
+				topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+			} else {
+				_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.RetryableError(
+					fmt.Errorf("ydb: failed batch commit because transaction doesn't committed: %w", updateOffesetInTransactionErr),
+				)))
+			}
+		})
+	} else {
+		log.Printf("failed to add offsets in tx: %v", updateOffesetInTransactionErr)
+		//TODO: Fail the transaction
 
-	if err != nil {
-		log.Printf("failed to add offsets in tx: %v", err)
-		return nil, err
+		_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.RetryableError(
+			fmt.Errorf("ydb: failed add topic offsets in transaction: %w", updateOffesetInTransactionErr),
+		)))
+
+		return updateOffesetInTransactionErr
 	}
 
-	return batch, nil
+	return nil
 }
 
 func (r *topicStreamReaderImpl) ReadMessageBatch(
@@ -744,7 +770,7 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 		if err != nil {
 			return fmt.Errorf("ydb: can't found session on commit response: %w", err)
 		}
-		partition.SetCommittedOffset(commit.CommittedOffset)
+		partition.SetCommittedOffsetForward(commit.CommittedOffset)
 
 		trace.TopicOnReaderCommittedNotify(
 			r.cfg.Trace,

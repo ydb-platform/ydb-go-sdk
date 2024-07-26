@@ -141,7 +141,7 @@ func TestCommitterCommitSync(t *testing.T) {
 	t.Run("SuccessCommitPreviousCommitted", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		session := newTestPartitionSession(context.Background(), 1)
-		session.SetCommittedOffset(2)
+		session.SetCommittedOffsetForward(2)
 
 		cRange := topicreadercommon.CommitRange{
 			CommitOffsetStart: 1,
@@ -159,7 +159,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		sessionCtx, sessionCancel := xcontext.WithCancel(ctx)
 
 		session := newTestPartitionSession(sessionCtx, 1)
-		session.SetCommittedOffset(1)
+		session.SetCommittedOffsetForward(1)
 		cRange := topicreadercommon.CommitRange{
 			CommitOffsetStart: 1,
 			CommitOffsetEnd:   2,
