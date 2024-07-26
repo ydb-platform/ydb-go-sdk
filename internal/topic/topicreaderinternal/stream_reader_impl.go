@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"math/big"
 	"reflect"
@@ -23,7 +24,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -216,32 +216,35 @@ func (r *topicStreamReaderImpl) PopBatchTx(ctx context.Context, tx *query.Transa
 		return nil, err
 	}
 
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return r.topicClient.UpdateOffsetsInTransaction(ctx, rawtopic.UpdateOffsetsInTransactionRequest{
-			OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
-			Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
-				ID:      tx.ID(),
-				Session: query.GetSessionID(tx),
-			},
-			Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
-				{
-					Path: batch.Topic(), // TODO: server response with error
-					Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
-						{
-							PartitionID: batch.PartitionID(),
-							PartitionOffsets: []rawtopiccommon.OffsetRange{
-								{
-									Start: batch.commitRange.commitOffsetStart,
-									End:   batch.commitRange.commitOffsetEnd,
-								},
+	err = r.topicClient.UpdateOffsetsInTransaction(ctx, rawtopic.UpdateOffsetsInTransactionRequest{
+		OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
+		Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+			ID:      tx.ID(),
+			Session: query.GetSessionID(tx),
+		},
+		Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
+			{
+				Path: batch.Topic(), // TODO: server response with error
+				Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
+					{
+						PartitionID: batch.PartitionID(),
+						PartitionOffsets: []rawtopiccommon.OffsetRange{
+							{
+								Start: batch.commitRange.commitOffsetStart,
+								End:   batch.commitRange.commitOffsetEnd,
 							},
 						},
 					},
 				},
 			},
-			Consumer: r.cfg.Consumer,
-		})
+		},
+		Consumer: r.cfg.Consumer,
 	})
+
+	if err != nil {
+		log.Printf("failed to add offsets in tx: %v", err)
+		return nil, err
+	}
 
 	return batch, nil
 }

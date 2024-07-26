@@ -206,7 +206,7 @@ func (scope *scopeT) TopicPath() string {
 
 		scope.Logf("Drop topic if exists: %q", topicPath)
 		if err := client.Drop(scope.Ctx, topicPath); err != nil && !ydb.IsOperationErrorSchemeError(err) {
-			scope.t.Fatalf("failed drop previous topic %q: %v", topicPath, err)
+			scope.t.Logf("failed drop previous topic %q: %v", topicPath, err)
 		}
 
 		scope.Logf("Creating topic %q", topicPath)
@@ -229,7 +229,7 @@ func (scope *scopeT) TopicReader() *topicreader.Reader {
 
 func (scope *scopeT) TopicReaderNamed(name string) *topicreader.Reader {
 	f := func() (*fixenv.GenericResult[*topicreader.Reader], error) {
-		reader, err := scope.Driver().Topic().StartReader(
+		reader, err := scope.DriverWithGRPCLogging().Topic().StartReader(
 			scope.TopicConsumerName(),
 			topicoptions.ReadTopic(scope.TopicPath()),
 		)
