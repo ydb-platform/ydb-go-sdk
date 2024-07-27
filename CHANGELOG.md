@@ -1,3 +1,5 @@
+* OAuth 2.0 token exchange. Allow multiple resource parameters in according to https://www.rfc-editor.org/rfc/rfc8693
+
 ## v3.76.0
 * Added experimental topic listener implementation
 * Fixed `internal/xstrings.Buffer()` leak without call `buffer.Free()`

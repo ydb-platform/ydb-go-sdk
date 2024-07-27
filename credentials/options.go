@@ -36,8 +36,8 @@ func WithGrantType(grantType string) Oauth2TokenExchangeCredentialsOption {
 }
 
 // Resource
-func WithResource(resource string) Oauth2TokenExchangeCredentialsOption {
-	return credentials.WithResource(resource)
+func WithResource(resource ...string) Oauth2TokenExchangeCredentialsOption {
+	return credentials.WithResource(resource...)
 }
 
 // RequestedTokenType

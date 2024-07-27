@@ -51,7 +51,7 @@ Config file must be a valid json file
 Fields of json file
 
 	grant-type:           [string] Grant type option (default: "urn:ietf:params:oauth:grant-type:token-exchange")
-	res:                  [string] Resource option (optional)
+	res:                  [string | list of strings] Resource option (optional)
 	aud:                  [string | list of strings] Audience option for token exchange request (optional)
 	scope:                [string | list of strings] Scope option (optional)
 	requested-token-type: [string] Requested token type option (default: "urn:ietf:params:oauth:token-type:access_token")
