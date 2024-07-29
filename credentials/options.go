@@ -36,8 +36,8 @@ func WithGrantType(grantType string) Oauth2TokenExchangeCredentialsOption {
 }
 
 // Resource
-func WithResource(resource string) Oauth2TokenExchangeCredentialsOption {
-	return credentials.WithResource(resource)
+func WithResource(resource string, resources ...string) Oauth2TokenExchangeCredentialsOption {
+	return credentials.WithResource(resource, resources...)
 }
 
 // RequestedTokenType
@@ -46,8 +46,8 @@ func WithRequestedTokenType(requestedTokenType string) Oauth2TokenExchangeCreden
 }
 
 // Scope
-func WithScope(scope ...string) Oauth2TokenExchangeCredentialsOption {
-	return credentials.WithScope(scope...)
+func WithScope(scope string, scopes ...string) Oauth2TokenExchangeCredentialsOption {
+	return credentials.WithScope(scope, scopes...)
 }
 
 // RequestTimeout
@@ -96,8 +96,8 @@ type oauthCredentialsAndJWTCredentialsOption interface {
 	credentials.JWTTokenSourceOption
 }
 
-func WithAudience(audience ...string) oauthCredentialsAndJWTCredentialsOption {
-	return credentials.WithAudience(audience...)
+func WithAudience(audience string, audiences ...string) oauthCredentialsAndJWTCredentialsOption {
+	return credentials.WithAudience(audience, audiences...)
 }
 
 // Issuer
