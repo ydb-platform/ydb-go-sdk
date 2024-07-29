@@ -146,13 +146,13 @@ func WithGrantType(grantType string) grantTypeOption {
 type resourceOption []string
 
 func (resource resourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
-	c.resource = resource
+	c.resource = append(c.resource, resource...)
 
 	return nil
 }
 
-func WithResource(resource ...string) resourceOption {
-	return resource
+func WithResource(resource string, resources ...string) resourceOption {
+	return append([]string{resource}, resources...)
 }
 
 // RequestedTokenType
@@ -172,26 +172,26 @@ func WithRequestedTokenType(requestedTokenType string) requestedTokenTypeOption 
 type audienceOption []string
 
 func (audience audienceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
-	c.audience = audience
+	c.audience = append(c.audience, audience...)
 
 	return nil
 }
 
-func WithAudience(audience ...string) audienceOption {
-	return audience
+func WithAudience(audience string, audiences ...string) audienceOption {
+	return append([]string{audience}, audiences...)
 }
 
 // Scope
 type scopeOption []string
 
 func (scope scopeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
-	c.scope = scope
+	c.scope = append(c.scope, scope...)
 
 	return nil
 }
 
-func WithScope(scope ...string) scopeOption {
-	return scope
+func WithScope(scope string, scopes ...string) scopeOption {
+	return append([]string{scope}, scopes...)
 }
 
 // RequestTimeout
@@ -573,7 +573,7 @@ func (cfg *oauth2TokenSourceConfig) applyConfigFixedJWT(tokenSrcType int) (*toke
 	}
 
 	if cfg.Audience != nil && len(cfg.Audience.Values) > 0 {
-		opts = append(opts, WithAudience(cfg.Audience.Values...))
+		opts = append(opts, WithAudience(cfg.Audience.Values[0], cfg.Audience.Values[1:]...))
 	}
 
 	if cfg.ID != "" {
@@ -623,15 +623,15 @@ func (cfg *oauth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOptio
 	}
 
 	if cfg.Resource != nil && len(cfg.Resource.Values) > 0 {
-		*opts = append(*opts, WithResource(cfg.Resource.Values...))
+		*opts = append(*opts, WithResource(cfg.Resource.Values[0], cfg.Resource.Values[1:]...))
 	}
 
 	if cfg.Audience != nil && len(cfg.Audience.Values) > 0 {
-		*opts = append(*opts, WithAudience(cfg.Audience.Values...))
+		*opts = append(*opts, WithAudience(cfg.Audience.Values[0], cfg.Audience.Values[1:]...))
 	}
 
 	if cfg.Scope != nil && len(cfg.Scope.Values) > 0 {
-		*opts = append(*opts, WithScope(cfg.Scope.Values...))
+		*opts = append(*opts, WithScope(cfg.Scope.Values[0], cfg.Scope.Values[1:]...))
 	}
 
 	if cfg.RequestedTokenType != "" {
@@ -1153,7 +1153,7 @@ func WithSubject(subject string) subjectOption {
 
 // Audience
 func (audience audienceOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
-	s.audience = audience
+	s.audience = append(s.audience, audience...)
 
 	return nil
 }
