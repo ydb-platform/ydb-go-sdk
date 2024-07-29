@@ -1,3 +1,4 @@
+## v3.76.1
 * Fixed `query.WithCommit()` flag behaviour for `tx.Execute` in query service
 * OAuth 2.0 token exchange: allowed multiple resource parameters in according to https://www.rfc-editor.org/rfc/rfc8693
 
