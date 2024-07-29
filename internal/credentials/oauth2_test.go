@@ -423,7 +423,7 @@ func TestErrorInSourceToken(t *testing.T) {
 		WithTokenEndpoint("http:trololo"),
 		WithGrantType("grant_type"),
 		WithRequestTimeout(time.Second),
-		WithResource("res"),
+		WithResource("res", "res2"),
 		WithFixedSubjectToken("t", "tt"),
 		WithActorToken(&errorTokenSource{}),
 		WithSourceInfo("TestErrorInSourceToken"),
@@ -432,7 +432,7 @@ func TestErrorInSourceToken(t *testing.T) {
 
 	// Check that token prints well
 	formatted := fmt.Sprint(client)
-	require.Equal(t, `OAuth2TokenExchange{Endpoint:"http:trololo",GrantType:grant_type,Resource:res,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 856A5AA8)",Type:tt},ActorToken:&{},From:"TestErrorInSourceToken"}`, formatted) //nolint:lll
+	require.Equal(t, `OAuth2TokenExchange{Endpoint:"http:trololo",GrantType:grant_type,Resource:[res res2],Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 856A5AA8)",Type:tt},ActorToken:&{},From:"TestErrorInSourceToken"}`, formatted) //nolint:lll
 
 	token, err := client.Token(context.Background())
 	require.ErrorIs(t, err, errTokenSource)
@@ -442,7 +442,7 @@ func TestErrorInSourceToken(t *testing.T) {
 		WithTokenEndpoint("http:trololo"),
 		WithGrantType("grant_type"),
 		WithRequestTimeout(time.Second),
-		WithResource("res"),
+		WithResource("res", "res2"),
 		WithSubjectToken(&errorTokenSource{}),
 	)
 	require.NoError(t, err)
@@ -483,7 +483,7 @@ func TestErrorInHTTPRequest(t *testing.T) {
 
 		// check format:
 		formatted := fmt.Sprint(client)
-		require.Equal(t, `OAuth2TokenExchange{Endpoint:"http://invalid_host:42/exchange",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[1 2 3],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[test_audience],ID:,TokenTTL:1h0m0s},ActorToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestErrorInHTTPRequest"}`, formatted) //nolint:lll
+		require.Equal(t, `OAuth2TokenExchange{Endpoint:"http://invalid_host:42/exchange",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[],Audience:[],Scope:[1 2 3],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[test_audience],ID:,TokenTTL:1h0m0s},ActorToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestErrorInHTTPRequest"}`, formatted) //nolint:lll
 	}, xtest.StopAfter(15*time.Second))
 }
 
@@ -780,12 +780,16 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"token-type": "test-token-type"
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:grant,Resource:tEst,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:grant,Resource:[tEst],Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
 				"token-endpoint": "http://localhost:123",
 				"aud": "test-aud",
+				"res": [
+					"r1",
+					"r2"
+				],
 				"scope": [
 					"s1",
 					"s2"
@@ -797,7 +801,7 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"token-type": "test-token-type"
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[test-aud],Scope:[s1 s2],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,ActorToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[r1 r2],Audience:[test-aud],Scope:[s1 s2],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,ActorToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
@@ -816,7 +820,7 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"unknown_field": [123]
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:access_token,SubjectToken:JWTTokenSource{Method:PS256,KeyID:test_key_id,Issuer:"test_issuer",Subject:"test_subject",Audience:[a1 a2],ID:123,TokenTTL:24h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[],Audience:[],Scope:[],RequestedTokenType:access_token,SubjectToken:JWTTokenSource{Method:PS256,KeyID:test_key_id,Issuer:"test_issuer",Subject:"test_subject",Audience:[a1 a2],ID:123,TokenTTL:24h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
@@ -828,7 +832,7 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"ttl": "3m"
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:ES256,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:3m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[],Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:ES256,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:3m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
@@ -839,7 +843,7 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"private-key": "` + testHMACSecretKeyBase64Content + `"
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:HS512,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[],Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:HS512,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
