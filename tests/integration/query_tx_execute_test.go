@@ -5,16 +5,14 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestQueryTxExecute(t *testing.T) {
@@ -22,29 +20,13 @@ func TestQueryTxExecute(t *testing.T) {
 		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	scope := newScope(t)
 
-	db, err := ydb.Open(ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-		ydb.WithTraceQuery(
-			log.Query(
-				log.Default(os.Stdout,
-					log.WithLogQuery(),
-					log.WithColoring(),
-					log.WithMinLevel(log.INFO),
-				),
-				trace.QueryEvents,
-			),
-		),
-	)
-	require.NoError(t, err)
 	var (
 		columnNames []string
 		columnTypes []string
 	)
-	err = db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+	err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
 		res, err := tx.Execute(ctx, "SELECT 1 AS col1")
 		if err != nil {
 			return err
@@ -71,4 +53,42 @@ func TestQueryTxExecute(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"col1"}, columnNames)
 	require.Equal(t, []string{"Int32"}, columnTypes)
+}
+
+func TestQueryWithCommitTxFlag(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
+		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
+	}
+
+	scope := newScope(t)
+	var count uint64
+	err := scope.DriverWithLogs().Query().Do(scope.Ctx, func(ctx context.Context, s query.Session) error {
+		tableName := scope.TablePath()
+		tx, err := s.Begin(ctx, query.TxSettings(query.WithDefaultTxMode()))
+		if err != nil {
+			return fmt.Errorf("failed start transaction: %w", err)
+		}
+		q := fmt.Sprintf("UPSERT INTO `%v` (id, val) VALUES(1, \"2\")", tableName)
+		res, err := tx.Execute(ctx, q, query.WithCommit())
+		if err != nil {
+			return fmt.Errorf("failed execute insert: %w", err)
+		}
+		if err = res.Close(ctx); err != nil {
+			return err
+		}
+
+		// read row within other (implicit) transaction
+		q2 := fmt.Sprintf("SELECT COUNT(*) FROM `%v`", tableName)
+		row, err := s.ReadRow(ctx, q2)
+		if err != nil {
+			return fmt.Errorf("failed read row: %w", err)
+		}
+
+		if err = row.Scan(&count); err != nil {
+			return fmt.Errorf("failed scan row: %w", err)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), count)
 }

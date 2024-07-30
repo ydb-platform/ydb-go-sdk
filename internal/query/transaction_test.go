@@ -218,6 +218,19 @@ func TestTxExecuteSettings(t *testing.T) {
 				params:    params.Builder{}.Param("$a").Text("A").Build(),
 			},
 		},
+		{
+			name: "WithCommitTx",
+			txOpts: []options.TxExecuteOption{
+				options.WithCommit(),
+			},
+			settings: testExecuteSettings{
+				execMode:  options.ExecModeExecute,
+				statsMode: options.StatsModeNone,
+				txControl: query.TxControl(query.WithTxID(""), query.CommitTx()),
+				syntax:    options.SyntaxYQL,
+				params:    nil,
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
