@@ -37,62 +37,92 @@ func WithFallback(allowFallback bool) option {
 	}
 }
 
+func From(parent *Cluster) option {
+	if parent == nil {
+		return nil
+	}
+
+	return func(s *Cluster) {
+		s.rand = parent.rand
+		s.filter = parent.filter
+		s.allowFallback = parent.allowFallback
+	}
+}
+
 func New(endpoints []endpoint.Endpoint, opts ...option) *Cluster {
-	s := &Cluster{
+	c := &Cluster{
 		filter: func(e endpoint.Info) bool {
 			return true
 		},
 	}
 
 	for _, opt := range opts {
-		opt(s)
+		if opt != nil {
+			opt(c)
+		}
 	}
 
-	if s.rand == nil {
-		s.rand = xrand.New(xrand.WithLock())
+	if c.rand == nil {
+		c.rand = xrand.New(xrand.WithLock())
 	}
 
-	s.prefer, s.fallback = xslices.Split(endpoints, func(e endpoint.Endpoint) bool {
-		return s.filter(e)
+	c.prefer, c.fallback = xslices.Split(endpoints, func(e endpoint.Endpoint) bool {
+		return c.filter(e)
 	})
 
-	if s.allowFallback {
-		s.all = endpoints
-		s.index = xslices.Map(endpoints, func(e endpoint.Endpoint) uint32 { return e.NodeID() })
+	if c.allowFallback {
+		c.all = endpoints
+		c.index = xslices.Map(endpoints, func(e endpoint.Endpoint) uint32 { return e.NodeID() })
 	} else {
-		s.all = s.prefer
-		s.fallback = nil
-		s.index = xslices.Map(s.prefer, func(e endpoint.Endpoint) uint32 { return e.NodeID() })
+		c.all = c.prefer
+		c.fallback = nil
+		c.index = xslices.Map(c.prefer, func(e endpoint.Endpoint) uint32 { return e.NodeID() })
 	}
 
-	return s
+	return c
 }
 
-func (s *Cluster) All() (all []endpoint.Endpoint) {
-	if s == nil {
+func (c *Cluster) All() (all []endpoint.Endpoint) {
+	if c == nil {
 		return nil
 	}
 
-	return s.all
+	return c.all
 }
 
-func Without(s *Cluster, endpoints ...endpoint.Endpoint) *Cluster {
-	prefer := make([]endpoint.Endpoint, 0, len(s.prefer))
-	fallback := s.fallback
-	for _, endpoint := range endpoints {
+func (c *Cluster) Availability() (percent float64) {
+	return float64(len(c.prefer)+len(c.fallback)) / float64(len(c.all))
+}
+
+func Without(s *Cluster, required endpoint.Endpoint, other ...endpoint.Endpoint) *Cluster {
+	var (
+		prefer   = make([]endpoint.Endpoint, 0, len(s.prefer))
+		fallback = make([]endpoint.Endpoint, 0, len(s.fallback))
+	)
+
+	for _, endpoint := range append(other, required) {
 		for i := range s.prefer {
 			if s.prefer[i].Address() != endpoint.Address() {
 				prefer = append(prefer, s.prefer[i])
-			} else {
-				fallback = append(fallback, s.prefer[i])
+			}
+		}
+		for i := range s.fallback {
+			if s.fallback[i].Address() != endpoint.Address() {
+				fallback = append(fallback, s.fallback[i])
 			}
 		}
 	}
 
+	if len(prefer)+len(fallback) == len(s.prefer)+len(s.fallback) {
+		return s
+	}
+
+	all := append(append(make([]endpoint.Endpoint, 0, len(prefer)+len(fallback)), prefer...), fallback...)
+
 	return &Cluster{
 		filter:        s.filter,
 		allowFallback: s.allowFallback,
-		index:         s.index,
+		index:         xslices.Map(all, func(e endpoint.Endpoint) uint32 { return e.NodeID() }),
 		prefer:        prefer,
 		fallback:      fallback,
 		all:           s.all,
@@ -100,8 +130,8 @@ func Without(s *Cluster, endpoints ...endpoint.Endpoint) *Cluster {
 	}
 }
 
-func (s *Cluster) Next(ctx context.Context) (endpoint.Endpoint, error) {
-	if s == nil {
+func (c *Cluster) Next(ctx context.Context) (endpoint.Endpoint, error) {
+	if c == nil {
 		return nil, ErrNilPtr
 	}
 
@@ -110,18 +140,18 @@ func (s *Cluster) Next(ctx context.Context) (endpoint.Endpoint, error) {
 	}
 
 	if nodeID, wantEndpointByNodeID := endpoint.ContextNodeID(ctx); wantEndpointByNodeID {
-		e, has := s.index[nodeID]
+		e, has := c.index[nodeID]
 		if has {
 			return e, nil
 		}
 	}
 
-	if l := len(s.prefer); l > 0 {
-		return s.prefer[s.rand.Int(l)], nil
+	if l := len(c.prefer); l > 0 {
+		return c.prefer[c.rand.Int(l)], nil
 	}
 
-	if l := len(s.fallback); l > 0 {
-		return s.fallback[s.rand.Int(l)], nil
+	if l := len(c.fallback); l > 0 {
+		return c.fallback[c.rand.Int(l)], nil
 	}
 
 	return nil, xerrors.WithStackTrace(ErrNoEndpoints)

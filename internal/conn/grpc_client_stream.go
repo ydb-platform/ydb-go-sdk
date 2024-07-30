@@ -95,7 +95,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		}
 
 		defer func() {
-			s.parentConn.onTransportError(ctx, err)
+			s.parentConn.onTransportError(err)
 		}()
 
 		if !s.wrapping {
@@ -155,7 +155,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
 		}
 
 		defer func() {
-			s.parentConn.onTransportError(ctx, err)
+			s.parentConn.onTransportError(err)
 		}()
 
 		if !s.wrapping {
