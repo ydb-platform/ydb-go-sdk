@@ -1,3 +1,4 @@
+* Fixed test message builder, now all method return itself pointer
 * Fixed handle reconnection timeout error
 * Fixed experimental topic listener handle stop partition event
 
