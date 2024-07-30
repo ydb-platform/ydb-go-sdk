@@ -80,7 +80,7 @@ type Client struct {
 	clock  clockwork.Clock
 
 	// read-write fields
-	mu                xsync.Mutex
+	mu                xsync.RWMutex
 	index             map[*session]sessionInfo
 	createInProgress  int // KIKIMR-9163: in-create-process counter
 	limit             int // Upper bound for Client size.
@@ -352,45 +352,53 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 	return s, nil
 }
 
-type getOptions struct {
-	t *trace.Table
+type getSettings struct {
+	t           *trace.Table
+	maxAttempts int
 }
 
-type getOption func(o *getOptions)
+type getOption func(o *getSettings)
 
 func withTrace(t *trace.Table) getOption {
-	return func(o *getOptions) {
+	return func(o *getSettings) {
 		o.t = o.t.Compose(t)
 	}
 }
 
-func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *session, err error) {
+const maxAttempts = 100
+
+func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *session, finalErr error) { //nolint:funlen
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
 
-	const maxAttempts = 100
-
-	var (
-		start = time.Now()
-		i     = 0
-		o     = getOptions{t: c.config.Trace()}
-	)
+	settings := getSettings{t: c.config.Trace(), maxAttempts: maxAttempts}
 	for _, opt := range opts {
 		if opt != nil {
-			opt(&o)
+			opt(&settings)
 		}
 	}
 
-	onDone := trace.TableOnPoolGet(o.t, &ctx,
+	var (
+		start            = time.Now()
+		i                int
+		lastErr          error
+		createSessionErr error
+		waitFromChErr    error
+	)
+
+	onDone := trace.TableOnPoolGet(settings.t, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolGet"),
 	)
 	defer func() {
-		onDone(s, i, err)
+		onDone(s, i, finalErr)
 	}()
 
-	for s == nil && err == nil && i < maxAttempts && !c.isClosed() {
-		i++
+	for ; i < settings.maxAttempts; i++ {
+		if c.isClosed() {
+			return nil, xerrors.WithStackTrace(errClosedClient)
+		}
+
 		s = tryGetIdleSession(c)
 		if s != nil {
 			if !s.isReady() {
@@ -403,18 +411,36 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			return s, nil
 		}
 
-		s, err = tryCreateNewSession(ctx, c)
-		if s != nil || !isCreateSessionErrorRetriable(err) {
-			return s, xerrors.WithStackTrace(err)
+		s, createSessionErr = tryCreateNewSession(ctx, c)
+		if s != nil {
+			return s, nil
 		}
 
-		s, err = c.internalPoolWaitFromCh(ctx, o.t)
-		if err != nil {
-			err = xerrors.WithStackTrace(err)
+		if !isCreateSessionErrorRetriable(createSessionErr) {
+			return nil, xerrors.WithStackTrace(createSessionErr)
 		}
+
+		s, waitFromChErr = c.internalPoolWaitFromCh(ctx, settings.t)
+		if s != nil {
+			return s, nil
+		}
+
+		if waitFromChErr != nil && !isCreateSessionErrorRetriable(waitFromChErr) {
+			return nil, xerrors.WithStackTrace(waitFromChErr)
+		}
+
+		lastErr = xerrors.WithStackTrace(xerrors.Join(createSessionErr, waitFromChErr))
 	}
 
-	return handleNoProgress(s, err, start, c, i)
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return nil, xerrors.WithStackTrace(
+		fmt.Errorf("failed to get session from pool ("+
+			"attempts: %d, latency: %v, pool has %d sessions (%d busy, %d idle, %d create_in_progress): %w",
+			i, time.Since(start), len(c.index), len(c.index)-c.idle.Len(), c.idle.Len(), c.createInProgress, lastErr,
+		),
+	)
 }
 
 func tryGetIdleSession(c *Client) *session {
@@ -437,38 +463,6 @@ func tryCreateNewSession(ctx context.Context, c *Client) (*session, error) {
 			return nil, xerrors.WithStackTrace(err)
 		}
 		panic("both session and err are nil")
-	}
-
-	return s, err
-}
-
-func handleNoProgress(s *session, err error, start time.Time, c *Client, attempts int) (*session, error) {
-	if s == nil && err == nil {
-		if c.isClosed() {
-			err = xerrors.WithStackTrace(errClosedClient)
-		} else {
-			err = xerrors.WithStackTrace(errNoProgress)
-		}
-	}
-
-	if err != nil {
-		var (
-			index            int
-			idle             int
-			createInProgress int
-		)
-		c.mu.WithLock(func() {
-			index = len(c.index)
-			idle = c.idle.Len()
-			createInProgress = c.createInProgress
-		})
-
-		err = xerrors.WithStackTrace(
-			fmt.Errorf("failed to get session from pool ("+
-				"attempts: %d, latency: %v, pool has %d sessions (%d busy, %d idle, %d create_in_progress): %w",
-				attempts, time.Since(start), index, index-idle, idle, createInProgress, err,
-			),
-		)
 	}
 
 	return s, err
@@ -708,7 +702,9 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		}
 
 		defer func() {
-			err = handleTransactionError(ctx, tx, err)
+			if err != nil {
+				_ = tx.Rollback(ctx)
+			}
 		}()
 
 		if err = executeTxOperation(ctx, c, op, tx); err != nil {
@@ -722,22 +718,6 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 		return nil
 	}, config.RetryOptions...)
-}
-
-func handleTransactionError(ctx context.Context, tx table.Transaction, err error) error {
-	if err != nil {
-		errRollback := tx.Rollback(ctx)
-		if errRollback != nil {
-			return xerrors.NewWithIssues("",
-				xerrors.WithStackTrace(err),
-				xerrors.WithStackTrace(errRollback),
-			)
-		}
-
-		return xerrors.WithStackTrace(err)
-	}
-
-	return nil
 }
 
 func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx table.Transaction) (err error) {
