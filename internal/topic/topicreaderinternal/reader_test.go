@@ -24,20 +24,30 @@ func TestReader_Close(t *testing.T) {
 		testErr := errors.New("test error")
 		readerContext, readerCancel := xcontext.WithCancel(context.Background())
 		baseReader := NewMockbatchedStreamReader(mc)
-		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), ReadMessageBatchOptions{}).Do(func(_, _ interface{}) {
-			<-readerContext.Done()
-		}).Return(nil, testErr)
+		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), ReadMessageBatchOptions{}).
+			DoAndReturn(func(ctx context.Context, options ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
+				<-readerContext.Done()
+
+				return nil, testErr
+			})
 		baseReader.EXPECT().ReadMessageBatch(
 			gomock.Any(),
 			ReadMessageBatchOptions{batcherGetOptions: batcherGetOptions{MaxCount: 1, MinCount: 1}},
-		).Do(func(_, _ interface{}) {
+		).DoAndReturn(func(ctx context.Context, options ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 			<-readerContext.Done()
-		}).Return(nil, testErr)
-		baseReader.EXPECT().Commit(gomock.Any(), gomock.Any()).Do(func(_, _ interface{}) {
-			<-readerContext.Done()
-		}).Return(testErr)
-		baseReader.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Do(func(_, _ interface{}) {
+
+			return nil, testErr
+		})
+		baseReader.EXPECT().Commit(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
+				<-readerContext.Done()
+
+				return testErr
+			})
+		baseReader.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ error) error {
 			readerCancel()
+
+			return nil
 		})
 
 		reader := &Reader{

@@ -38,7 +38,8 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		mc := gomock.NewController(t)
 		p := NewMockPool(mc)
 		p.EXPECT().Get().Return(nil)
-		p.EXPECT().Put(gomock.Any()).Do(func(buf *bytes.Buffer) {
+		p.EXPECT().Put(gomock.Any()).Do(func(val any) {
+			buf := val.(*bytes.Buffer)
 			require.NotNil(t, buf)
 			require.Equal(t, 0, buf.Len())
 			require.Equal(t, minInitializeBufferSize, buf.Cap())
@@ -62,11 +63,13 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		p.EXPECT().Get().Return(nil).Times(2)
 
 		var targetCapacity int
-		p.EXPECT().Put(gomock.Any()).Do(func(buf *bytes.Buffer) {
+		p.EXPECT().Put(gomock.Any()).DoAndReturn(func(val any) {
+			buf := val.(*bytes.Buffer)
 			targetCapacity = buf.Cap()
 		})
 
-		p.EXPECT().Put(gomock.Any()).Do(func(buf *bytes.Buffer) {
+		p.EXPECT().Put(gomock.Any()).DoAndReturn(func(val any) {
+			buf := val.(*bytes.Buffer)
 			require.NotNil(t, buf)
 			require.Equal(t, 0, buf.Len())
 
@@ -96,7 +99,8 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		mc := gomock.NewController(t)
 		p := NewMockPool(mc)
 		p.EXPECT().Get().Return(nil)
-		p.EXPECT().Put(gomock.Any()).Do(func(buf *bytes.Buffer) {
+		p.EXPECT().Put(gomock.Any()).DoAndReturn(func(val any) {
+			buf := val.(*bytes.Buffer)
 			require.NotNil(t, buf)
 			require.Equal(t, 0, buf.Len())
 			require.Equal(t, maxInitialBufferSize, buf.Cap())
@@ -117,7 +121,7 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		mc := gomock.NewController(t)
 		p := NewMockPool(mc)
 		p.EXPECT().Get().Return(poolBuf)
-		p.EXPECT().Put(gomock.Any()).Do(func(buf *bytes.Buffer) {
+		p.EXPECT().Put(gomock.Any()).DoAndReturn(func(buf any) {
 			require.Same(t, poolBuf, buf)
 		})
 

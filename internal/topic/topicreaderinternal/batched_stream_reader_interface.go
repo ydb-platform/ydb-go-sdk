@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 )
 
-//go:generate mockgen -source batched_stream_reader_interface.go -destination batched_stream_reader_mock_test.go -package topicreaderinternal -write_package_comment=false
+//go:generate mockgen -source batched_stream_reader_interface.go --typed -destination batched_stream_reader_mock_test.go -package topicreaderinternal -write_package_comment=false
 
 type batchedStreamReader interface {
 	WaitInit(ctx context.Context) error

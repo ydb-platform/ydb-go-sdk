@@ -24,7 +24,7 @@ var (
 	errCommitSessionFromOtherReader = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 )
 
-//go:generate mockgen -destination raw_topic_reader_stream_mock_test.go -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
+//go:generate mockgen -destination raw_topic_reader_stream_mock_test.go --typed -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
 
 type RawTopicReaderStream interface {
 	Recv() (rawtopicreader.ServerMessage, error)

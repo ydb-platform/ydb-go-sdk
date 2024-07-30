@@ -115,8 +115,12 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 
 		// request new data portion
 		readRequestReceived := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
+		e.stream.EXPECT().Send(
+			&rawtopicreader.ReadRequest{BytesSize: dataSize * 2},
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(readRequestReceived)
+
+			return nil
 		})
 
 		commitReceived := make(empty.Chan)
@@ -135,8 +139,10 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 					},
 				},
 			},
-		).Do(func(req *rawtopicreader.CommitOffsetRequest) {
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(commitReceived)
+
+			return nil
 		})
 
 		// send message with stole offsets
@@ -198,8 +204,12 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		const dataSize = 4
 		// request new data portion
 		readRequestReceived := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
+		e.stream.EXPECT().Send(
+			&rawtopicreader.ReadRequest{BytesSize: dataSize * 2},
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(readRequestReceived)
+
+			return nil
 		})
 
 		e.SendFromServer(&rawtopicreader.ReadResponse{
@@ -268,15 +278,19 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 					},
 				},
 			},
-		}}).Do(func(_ interface{}) {
+		}}).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(commitReceived)
-		}).Return(nil)
+
+			return nil
+		})
 
 		stopPartitionResponseSent := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: e.partitionSessionID}).
-			Do(func(_ interface{}) {
+			DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 				close(stopPartitionResponseSent)
-			}).Return(nil)
+
+				return nil
+			})
 
 		e.Start()
 
@@ -406,8 +420,10 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		stopPartitionResponseSent := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: e.partitionSessionID,
-		}).Return(nil).Do(func(_ interface{}) {
+		}).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(stopPartitionResponseSent)
+
+			return nil
 		})
 
 		e.SendFromServer(&rawtopicreader.StopPartitionSessionRequest{
@@ -534,9 +550,13 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			e := newTopicReaderTestEnv(t)
 
 			dataRequested := make(empty.Chan)
-			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)}).
-				Do(func(_ interface{}) {
+			e.stream.EXPECT().Send(
+				&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)},
+			).
+				DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 					close(dataRequested)
+
+					return nil
 				})
 
 			e.Start()
@@ -593,8 +613,12 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 
 		sendDataRequestCompleted := make(empty.Chan)
 		dataSize := 6
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize}).Do(func(_ interface{}) {
+		e.stream.EXPECT().Send(
+			&rawtopicreader.ReadRequest{BytesSize: dataSize},
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(sendDataRequestCompleted)
+
+			return nil
 		})
 		e.SendFromServer(&rawtopicreader.ReadResponse{
 			BytesSize: dataSize,
@@ -820,8 +844,12 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *testing.T) {
 	sendMessageWithFullBuffer := func(e *streamEnv) empty.Chan {
 		nextDataRequested := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)}).Do(func(_ interface{}) {
+		e.stream.EXPECT().Send(
+			&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)},
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(nextDataRequested)
+
+			return nil
 		})
 
 		e.SendFromServer(
@@ -1035,9 +1063,11 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 0}).AnyTimes()
 
 	streamClosed := make(empty.Chan)
-	stream.EXPECT().CloseSend().Return(nil).Do(func() {
+	stream.EXPECT().CloseSend().Return(nil).DoAndReturn(func() error {
 		close(streamClosed)
 		env.closeStream()
+
+		return nil
 	})
 
 	t.Cleanup(func() {
@@ -1064,12 +1094,14 @@ func (e *streamEnv) Start() {
 }
 
 func (e *streamEnv) readerReceiveWaitClose(callback func()) {
-	e.stream.EXPECT().Recv().Do(func() {
+	e.stream.EXPECT().Recv().DoAndReturn(func() (rawtopicreader.ServerMessage, error) {
 		if callback != nil {
 			callback()
 		}
 		<-e.ctx.Done()
-	}).Return(nil, errors.New("test reader closed"))
+
+		return nil, errors.New("test reader closed")
+	})
 }
 
 func (e *streamEnv) SendFromServer(msg rawtopicreader.ServerMessage) {
