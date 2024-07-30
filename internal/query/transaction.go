@@ -18,7 +18,7 @@ import (
 var _ query.Transaction = (*transaction)(nil)
 
 type transaction struct {
-	tx.Parent
+	tx.Identifier
 
 	s *Session
 }
@@ -65,8 +65,8 @@ func (tx transaction) ReadResultSet(ctx context.Context, q string, opts ...optio
 
 func newTransaction(id string, s *Session) *transaction {
 	return &transaction{
-		Parent: tx.Parent(id),
-		s:      s,
+		Identifier: tx.ID(id),
+		s:          s,
 	}
 }
 
