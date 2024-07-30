@@ -7,11 +7,20 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-func Join(errs ...error) *joinError {
-	return &joinError{
-		errs: xslices.Filter(errs, func(err error) bool {
-			return err != nil
-		}),
+func Join(errs ...error) error {
+	errs = xslices.Filter(errs, func(err error) bool {
+		return err != nil
+	})
+
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	default:
+		return &joinError{
+			errs: errs,
+		}
 	}
 }
 
