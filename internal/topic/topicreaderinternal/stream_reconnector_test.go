@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -29,8 +30,8 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 		baseReader := NewMockbatchedStreamReader(mc)
 
 		opts := ReadMessageBatchOptions{batcherGetOptions: batcherGetOptions{MaxCount: 10}}
-		batch := &PublicBatch{
-			Messages: []*PublicMessage{{WrittenAt: time.Date(2022, 0o6, 15, 17, 56, 0, 0, time.UTC)}},
+		batch := &topicreadercommon.PublicBatch{
+			Messages: []*topicreadercommon.PublicMessage{{WrittenAt: time.Date(2022, 0o6, 15, 17, 56, 0, 0, time.UTC)}},
 		}
 		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), opts).Return(batch, nil)
 
@@ -50,8 +51,8 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 
 		baseReader := NewMockbatchedStreamReader(mc)
 		opts := ReadMessageBatchOptions{batcherGetOptions: batcherGetOptions{MaxCount: 10}}
-		batch := &PublicBatch{
-			Messages: []*PublicMessage{{WrittenAt: time.Date(2022, 0o6, 15, 17, 56, 0, 0, time.UTC)}},
+		batch := &topicreadercommon.PublicBatch{
+			Messages: []*topicreadercommon.PublicMessage{{WrittenAt: time.Date(2022, 0o6, 15, 17, 56, 0, 0, time.UTC)}},
 		}
 		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), opts).Return(batch, nil)
 
@@ -97,8 +98,8 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 		baseReader2.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil)
 
 		baseReader3 := NewMockbatchedStreamReader(mc)
-		batch := &PublicBatch{
-			Messages: []*PublicMessage{{WrittenAt: time.Date(2022, 0o6, 15, 17, 56, 0, 0, time.UTC)}},
+		batch := &topicreadercommon.PublicBatch{
+			Messages: []*topicreadercommon.PublicMessage{{WrittenAt: time.Date(2022, 0o6, 15, 17, 56, 0, 0, time.UTC)}},
 		}
 		baseReader3.EXPECT().ReadMessageBatch(gomock.Any(), opts).Return(batch, nil)
 
@@ -159,7 +160,7 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 func TestTopicReaderReconnectorCommit(t *testing.T) {
 	type k struct{}
 	ctx := context.WithValue(context.Background(), k{}, "v")
-	expectedCommitRange := commitRange{commitOffsetStart: 1, commitOffsetEnd: 2}
+	expectedCommitRange := topicreadercommon.CommitRange{CommitOffsetStart: 1, CommitOffsetEnd: 2}
 	testErr := errors.New("test")
 	testErr2 := errors.New("test2")
 	t.Run("AllOk", func(t *testing.T) {
@@ -167,10 +168,14 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 		defer mc.Finish()
 
 		stream := NewMockbatchedStreamReader(mc)
-		stream.EXPECT().Commit(gomock.Any(), gomock.Any()).Do(func(ctx context.Context, offset commitRange) {
+		stream.EXPECT().Commit(
+			gomock.Any(),
+			gomock.Any(),
+		).Do(func(ctx context.Context, offset topicreadercommon.CommitRange) {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
 		})
+
 		reconnector := &readerReconnector{
 			streamVal:           stream,
 			streamContextCancel: func(cause error) {},
@@ -182,10 +187,14 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 	t.Run("StreamOkCommitErr", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		stream := NewMockbatchedStreamReader(mc)
-		stream.EXPECT().Commit(gomock.Any(), gomock.Any()).Do(func(ctx context.Context, offset commitRange) {
+		stream.EXPECT().Commit(
+			gomock.Any(),
+			gomock.Any(),
+		).Do(func(ctx context.Context, offset topicreadercommon.CommitRange) {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
 		}).Return(testErr)
+
 		reconnector := &readerReconnector{
 			streamVal:           stream,
 			streamContextCancel: func(cause error) {},

@@ -3,9 +3,9 @@ package empty
 import "sync"
 
 type (
-	Chan         chan struct{}
-	ChanReadonly <-chan struct{}
-	Struct       struct{}
+	Chan         = chan struct{}
+	ChanReadonly = <-chan struct{}
+	Struct       = struct{}
 )
 
 // DoNotCopy can be embedded in a struct to help prevent shallow copies.

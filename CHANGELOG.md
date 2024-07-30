@@ -1,5 +1,21 @@
 * Fixed handle reconnection timeout error
+
+## v3.76.1
+* Fixed `query.WithCommit()` flag behaviour for `tx.Execute` in query service
+* OAuth 2.0 token exchange: allowed multiple resource parameters in according to https://www.rfc-editor.org/rfc/rfc8693
+
+## v3.76.0
+* Added experimental topic listener implementation
+* Fixed `internal/xstrings.Buffer()` leak without call `buffer.Free()`
+* Removed double quotas from goroutine labels background workers for prevent problem with pprof
+
+## v3.75.2
+* Fixed build for go1.20
+
+## v3.75.1
 * Fixed return more than one row error if real error raised on try read next row
+* Fixed checking errors for session must be deleted
+* Changed signature of filter func in balancers (replaced argument from `conn.Conn` type to `endpoint.Info`)
 
 ## v3.75.0
 * Improve config validation before start topic reader

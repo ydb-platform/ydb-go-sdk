@@ -100,13 +100,13 @@ func readFileContent(filePath string) ([]byte, error) {
 	if len(filePath) > 0 && filePath[0] == '~' {
 		usr, err := user.Current()
 		if err != nil {
-			return []byte{}, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseHomeDir, err))
+			return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseHomeDir, err))
 		}
 		filePath = filepath.Join(usr.HomeDir, filePath[1:])
 	}
 	bytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return []byte{}, xerrors.WithStackTrace(fmt.Errorf("%w %s: %w", errCouldNotReadFile, filePath, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w %s: %w", errCouldNotReadFile, filePath, err))
 	}
 
 	return bytes, nil
@@ -143,16 +143,16 @@ func WithGrantType(grantType string) grantTypeOption {
 }
 
 // Resource
-type resourceOption string
+type resourceOption []string
 
 func (resource resourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
-	c.resource = string(resource)
+	c.resource = append(c.resource, resource...)
 
 	return nil
 }
 
-func WithResource(resource string) resourceOption {
-	return resourceOption(resource)
+func WithResource(resource string, resources ...string) resourceOption {
+	return append([]string{resource}, resources...)
 }
 
 // RequestedTokenType
@@ -172,26 +172,26 @@ func WithRequestedTokenType(requestedTokenType string) requestedTokenTypeOption 
 type audienceOption []string
 
 func (audience audienceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
-	c.audience = audience
+	c.audience = append(c.audience, audience...)
 
 	return nil
 }
 
-func WithAudience(audience ...string) audienceOption {
-	return audience
+func WithAudience(audience string, audiences ...string) audienceOption {
+	return append([]string{audience}, audiences...)
 }
 
 // Scope
 type scopeOption []string
 
 func (scope scopeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
-	c.scope = scope
+	c.scope = append(c.scope, scope...)
 
 	return nil
 }
 
-func WithScope(scope ...string) scopeOption {
-	return scope
+func WithScope(scope string, scopes ...string) scopeOption {
+	return append([]string{scope}, scopes...)
 }
 
 // RequestTimeout
@@ -309,7 +309,7 @@ type oauth2TokenExchange struct {
 	// urn:ietf:params:oauth:grant-type:token-exchange by default
 	grantType string
 
-	resource string
+	resource []string
 	audience []string
 	scope    []string
 
@@ -469,7 +469,7 @@ func (a *stringOrArrayConfig) UnmarshalJSON(data []byte) error {
 	var arr []string
 	err = json.Unmarshal(data, &arr)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 	a.Values = arr
 
@@ -484,17 +484,17 @@ func (d *prettyTTL) UnmarshalJSON(data []byte) error {
 	var s string
 	err := json.Unmarshal(data, &s)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 	d.Value, err = time.ParseDuration(s)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 	if d.Value <= 0 {
 		return xerrors.WithStackTrace(fmt.Errorf("%w, but got: %q", errTTLMustBePositive, s))
 	}
 
-	return err
+	return xerrors.WithStackTrace(err)
 }
 
 //nolint:tagliatelle
@@ -573,7 +573,7 @@ func (cfg *oauth2TokenSourceConfig) applyConfigFixedJWT(tokenSrcType int) (*toke
 	}
 
 	if cfg.Audience != nil && len(cfg.Audience.Values) > 0 {
-		opts = append(opts, WithAudience(cfg.Audience.Values...))
+		opts = append(opts, WithAudience(cfg.Audience.Values[0], cfg.Audience.Values[1:]...))
 	}
 
 	if cfg.ID != "" {
@@ -607,7 +607,7 @@ func (cfg *oauth2TokenSourceConfig) applyConfig(tokenSrcType int) (*tokenSourceO
 //nolint:tagliatelle
 type oauth2Config struct {
 	GrantType          string               `json:"grant-type"`
-	Resource           string               `json:"res"`
+	Resource           *stringOrArrayConfig `json:"res"`
 	Audience           *stringOrArrayConfig `json:"aud"`
 	Scope              *stringOrArrayConfig `json:"scope"`
 	RequestedTokenType string               `json:"requested-token-type"`
@@ -622,16 +622,16 @@ func (cfg *oauth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOptio
 		*opts = append(*opts, WithGrantType(cfg.GrantType))
 	}
 
-	if cfg.Resource != "" {
-		*opts = append(*opts, WithResource(cfg.Resource))
+	if cfg.Resource != nil && len(cfg.Resource.Values) > 0 {
+		*opts = append(*opts, WithResource(cfg.Resource.Values[0], cfg.Resource.Values[1:]...))
 	}
 
 	if cfg.Audience != nil && len(cfg.Audience.Values) > 0 {
-		*opts = append(*opts, WithAudience(cfg.Audience.Values...))
+		*opts = append(*opts, WithAudience(cfg.Audience.Values[0], cfg.Audience.Values[1:]...))
 	}
 
 	if cfg.Scope != nil && len(cfg.Scope.Values) > 0 {
-		*opts = append(*opts, WithScope(cfg.Scope.Values...))
+		*opts = append(*opts, WithScope(cfg.Scope.Values[0], cfg.Scope.Values[1:]...))
 	}
 
 	if cfg.RequestedTokenType != "" {
@@ -645,7 +645,7 @@ func (cfg *oauth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOptio
 	if cfg.SubjectCreds != nil {
 		opt, err := cfg.SubjectCreds.applyConfig(SubjectTokenSourceType)
 		if err != nil {
-			return err
+			return xerrors.WithStackTrace(err)
 		}
 		*opts = append(*opts, opt)
 	}
@@ -653,7 +653,7 @@ func (cfg *oauth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOptio
 	if cfg.ActorCreds != nil {
 		opt, err := cfg.ActorCreds.applyConfig(ActorTokenSourceType)
 		if err != nil {
-			return err
+			return xerrors.WithStackTrace(err)
 		}
 		*opts = append(*opts, opt)
 	}
@@ -723,8 +723,10 @@ func (provider *oauth2TokenExchange) addTokenSrc(params *url.Values, src TokenSo
 func (provider *oauth2TokenExchange) getRequestParams() (string, error) {
 	params := url.Values{}
 	params.Set("grant_type", provider.grantType)
-	if provider.resource != "" {
-		params.Set("resource", provider.resource)
+	for _, res := range provider.resource {
+		if res != "" {
+			params.Add("resource", res)
+		}
 	}
 	for _, aud := range provider.audience {
 		if aud != "" {
@@ -783,10 +785,9 @@ func readResponseBody(result *http.Response) ([]byte, error) {
 	if result.Body != nil {
 		data, err := io.ReadAll(result.Body)
 		if err != nil {
-			return nil, xerrors.Retryable(
-				xerrors.WithStackTrace(err),
+			return nil, xerrors.WithStackTrace(xerrors.Retryable(err,
 				xerrors.WithBackoff(retry.TypeFastBackoff),
-			)
+			))
 		}
 
 		return data, nil
@@ -803,20 +804,18 @@ func makeError(result *http.Response, err error, retryAllErrors bool) error {
 			result.StatusCode == http.StatusInternalServerError ||
 			result.StatusCode == http.StatusBadGateway ||
 			result.StatusCode == http.StatusServiceUnavailable {
-			return xerrors.Retryable(
-				xerrors.WithStackTrace(err),
+			return xerrors.WithStackTrace(xerrors.Retryable(err,
 				xerrors.WithBackoff(retry.TypeSlowBackoff),
-			)
+			))
 		}
 	}
 	if retryAllErrors {
-		return xerrors.Retryable(
-			xerrors.WithStackTrace(err),
+		return xerrors.WithStackTrace(xerrors.Retryable(err,
 			xerrors.WithBackoff(retry.TypeFastBackoff),
-		)
+		))
 	}
 
-	return err
+	return xerrors.WithStackTrace(err)
 }
 
 func (provider *oauth2TokenExchange) handleErrorResponse(
@@ -941,10 +940,10 @@ func (provider *oauth2TokenExchange) performExchangeTokenRequest(
 	now := time.Now()
 	result, err := client.Do(req)
 	if err != nil {
-		return nil, xerrors.Retryable(
-			xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotExchangeToken, err)),
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(
+			fmt.Errorf("%w: %w", errCouldNotExchangeToken, err),
 			xerrors.WithBackoff(retry.TypeFastBackoff),
-		)
+		))
 	}
 
 	defer result.Body.Close()
@@ -968,7 +967,7 @@ func (provider *oauth2TokenExchange) exchangeTokenSync(ctx context.Context) erro
 		retry.WithSlowBackoff(syncRetrySlowBackoff),
 	)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 
 	provider.updateToken(response)
@@ -1057,7 +1056,7 @@ func (provider *oauth2TokenExchange) String() string {
 	defer buffer.Free()
 	fmt.Fprintf(
 		buffer,
-		"OAuth2TokenExchange{Endpoint:%q,GrantType:%s,Resource:%s,Audience:%v,Scope:%v,RequestedTokenType:%s",
+		"OAuth2TokenExchange{Endpoint:%q,GrantType:%s,Resource:%v,Audience:%v,Scope:%v,RequestedTokenType:%s",
 		provider.tokenEndpoint,
 		provider.grantType,
 		provider.resource,
@@ -1154,7 +1153,7 @@ func WithSubject(subject string) subjectOption {
 
 // Audience
 func (audience audienceOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
-	s.audience = audience
+	s.audience = append(s.audience, audience...)
 
 	return nil
 }

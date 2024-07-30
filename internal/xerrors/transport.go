@@ -1,21 +1,23 @@
 package xerrors
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type transportError struct {
 	status  *grpcStatus.Status
 	err     error
 	address string
+	nodeID  uint32
 	traceID string
 }
 
@@ -47,15 +49,30 @@ func WithAddress(address string) addressOption {
 	return addressOption(address)
 }
 
+type nodeIDOption uint32
+
+func (nodeID nodeIDOption) applyToTransportError(te *transportError) {
+	te.nodeID = uint32(nodeID)
+}
+
+func WithNodeID(nodeID uint32) nodeIDOption {
+	return nodeIDOption(nodeID)
+}
+
 func (e *transportError) Error() string {
-	var b bytes.Buffer
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteString(e.Name())
-	b.WriteString(fmt.Sprintf(" (code = %d, source error = %q", e.status.Code(), e.err.Error()))
+	fmt.Fprintf(b, " (code = %d, source error = %q", e.status.Code(), e.err.Error())
 	if len(e.address) > 0 {
-		b.WriteString(fmt.Sprintf(", address: %q", e.address))
+		fmt.Fprintf(b, ", address: %q", e.address)
+	}
+	if e.nodeID > 0 {
+		b.WriteString(", nodeID = ")
+		b.WriteString(strconv.FormatUint(uint64(e.nodeID), 10))
 	}
 	if len(e.traceID) > 0 {
-		b.WriteString(fmt.Sprintf(", traceID: %q", e.traceID))
+		fmt.Fprintf(b, ", traceID: %q", e.traceID)
 	}
 	b.WriteString(")")
 
@@ -103,9 +120,9 @@ func (e *transportError) IsRetryObjectValid() bool {
 	case
 		grpcCodes.ResourceExhausted,
 		grpcCodes.OutOfRange:
-		return false
-	default:
 		return true
+	default:
+		return false
 	}
 }
 

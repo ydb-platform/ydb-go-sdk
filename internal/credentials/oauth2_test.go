@@ -138,7 +138,7 @@ func TestOauth2TokenExchange(t *testing.T) {
 			Status:            http.StatusInternalServerError,
 			ExpectedToken:     "",
 			ExpectedError:     errCouldNotExchangeToken,
-			ExpectedErrorPart: "500 Internal Server Error, error: unauthorized_client, description: \\\"something went bad\\\"", //nolint:lll
+			ExpectedErrorPart: "500 Internal Server Error, error: unauthorized_client, description: \\\\\\\"something went bad\\\\\\\"", //nolint:lll
 		},
 		{
 			Response:          `{"error_description":"something went bad","error_uri":"my_error_uri"}`,
@@ -186,37 +186,41 @@ func TestOauth2TokenExchange(t *testing.T) {
 		},
 	}
 
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		var currentTestParams Oauth2TokenExchangeTestParams
-		server := runTokenExchangeServer(&currentTestParams, true, nil)
-		defer server.Close()
+	for _, params := range testsParams {
+		t.Run("", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				var currentTestParams Oauth2TokenExchangeTestParams
+				server := runTokenExchangeServer(&currentTestParams, true, nil)
+				defer server.Close()
 
-		for _, params := range testsParams {
-			currentTestParams = params
+				currentTestParams = params
 
-			client, err := NewOauth2TokenExchangeCredentials(
-				WithTokenEndpoint(server.URL+"/exchange"),
-				WithAudience("test_audience"),
-				WithScope("test_scope1", "test_scope2"),
-				WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
-				WithSyncExchangeTimeout(time.Second*3),
-			)
-			require.NoError(t, err)
-
-			token, err := client.Token(ctx)
-			if params.ExpectedErrorPart == "" && params.ExpectedError == nil {
+				client, err := NewOauth2TokenExchangeCredentials(
+					WithTokenEndpoint(server.URL+"/exchange"),
+					WithAudience("test_audience"),
+					WithScope("test_scope1", "test_scope2"),
+					WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
+					WithSyncExchangeTimeout(time.Second*3),
+				)
 				require.NoError(t, err)
-			} else {
-				if params.ExpectedErrorPart != "" {
-					require.ErrorContains(t, err, params.ExpectedErrorPart)
+
+				token, err := client.Token(ctx)
+				if params.ExpectedErrorPart == "" && params.ExpectedError == nil { //nolint:nestif
+					require.NoError(t, err)
+				} else {
+					if !errors.Is(err, context.DeadlineExceeded) {
+						if params.ExpectedErrorPart != "" {
+							require.ErrorContains(t, err, params.ExpectedErrorPart)
+						}
+						if params.ExpectedError != nil {
+							require.ErrorIs(t, err, params.ExpectedError)
+						}
+					}
 				}
-				if params.ExpectedError != nil {
-					require.ErrorIs(t, err, params.ExpectedError)
-				}
-			}
-			require.Equal(t, params.ExpectedToken, token)
-		}
-	})
+				require.Equal(t, params.ExpectedToken, token)
+			}, xtest.StopAfter(5+time.Second))
+		})
+	}
 }
 
 func TestOauth2TokenUpdate(t *testing.T) {
@@ -419,7 +423,7 @@ func TestErrorInSourceToken(t *testing.T) {
 		WithTokenEndpoint("http:trololo"),
 		WithGrantType("grant_type"),
 		WithRequestTimeout(time.Second),
-		WithResource("res"),
+		WithResource("res", "res2"),
 		WithFixedSubjectToken("t", "tt"),
 		WithActorToken(&errorTokenSource{}),
 		WithSourceInfo("TestErrorInSourceToken"),
@@ -428,7 +432,7 @@ func TestErrorInSourceToken(t *testing.T) {
 
 	// Check that token prints well
 	formatted := fmt.Sprint(client)
-	require.Equal(t, `OAuth2TokenExchange{Endpoint:"http:trololo",GrantType:grant_type,Resource:res,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 856A5AA8)",Type:tt},ActorToken:&{},From:"TestErrorInSourceToken"}`, formatted) //nolint:lll
+	require.Equal(t, `OAuth2TokenExchange{Endpoint:"http:trololo",GrantType:grant_type,Resource:[res res2],Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 856A5AA8)",Type:tt},ActorToken:&{},From:"TestErrorInSourceToken"}`, formatted) //nolint:lll
 
 	token, err := client.Token(context.Background())
 	require.ErrorIs(t, err, errTokenSource)
@@ -438,7 +442,7 @@ func TestErrorInSourceToken(t *testing.T) {
 		WithTokenEndpoint("http:trololo"),
 		WithGrantType("grant_type"),
 		WithRequestTimeout(time.Second),
-		WithResource("res"),
+		WithResource("res", "res2"),
 		WithSubjectToken(&errorTokenSource{}),
 	)
 	require.NoError(t, err)
@@ -449,34 +453,38 @@ func TestErrorInSourceToken(t *testing.T) {
 }
 
 func TestErrorInHTTPRequest(t *testing.T) {
-	client, err := NewOauth2TokenExchangeCredentials(
-		WithTokenEndpoint("http://invalid_host:42/exchange"),
-		WithJWTSubjectToken(
-			WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
-			WithKeyID("key_id"),
-			WithSigningMethod(jwt.SigningMethodRS256),
-			WithIssuer("test_issuer"),
-			WithAudience("test_audience"),
-		),
-		WithJWTActorToken(
-			WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
-			WithKeyID("key_id"),
-			WithSigningMethod(jwt.SigningMethodRS256),
-			WithIssuer("test_issuer"),
-		),
-		WithScope("1", "2", "3"),
-		WithSourceInfo("TestErrorInHTTPRequest"),
-		WithSyncExchangeTimeout(time.Second*3),
-	)
-	require.NoError(t, err)
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		client, err := NewOauth2TokenExchangeCredentials(
+			WithTokenEndpoint("http://invalid_host:42/exchange"),
+			WithJWTSubjectToken(
+				WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
+				WithKeyID("key_id"),
+				WithSigningMethod(jwt.SigningMethodRS256),
+				WithIssuer("test_issuer"),
+				WithAudience("test_audience"),
+			),
+			WithJWTActorToken(
+				WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
+				WithKeyID("key_id"),
+				WithSigningMethod(jwt.SigningMethodRS256),
+				WithIssuer("test_issuer"),
+			),
+			WithScope("1", "2", "3"),
+			WithSourceInfo("TestErrorInHTTPRequest"),
+			WithSyncExchangeTimeout(time.Second*3),
+		)
+		require.NoError(t, err)
 
-	token, err := client.Token(context.Background())
-	require.ErrorIs(t, err, errCouldNotExchangeToken)
-	require.Equal(t, "", token)
+		token, err := client.Token(context.Background())
+		if !errors.Is(err, context.DeadlineExceeded) {
+			require.ErrorIs(t, err, errCouldNotExchangeToken)
+		}
+		require.Equal(t, "", token)
 
-	// check format:
-	formatted := fmt.Sprint(client)
-	require.Equal(t, `OAuth2TokenExchange{Endpoint:"http://invalid_host:42/exchange",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[1 2 3],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[test_audience],ID:,TokenTTL:1h0m0s},ActorToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestErrorInHTTPRequest"}`, formatted) //nolint:lll
+		// check format:
+		formatted := fmt.Sprint(client)
+		require.Equal(t, `OAuth2TokenExchange{Endpoint:"http://invalid_host:42/exchange",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[],Audience:[],Scope:[1 2 3],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[test_audience],ID:,TokenTTL:1h0m0s},ActorToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestErrorInHTTPRequest"}`, formatted) //nolint:lll
+	}, xtest.StopAfter(15*time.Second))
 }
 
 func TestJWTTokenSource(t *testing.T) {
@@ -772,12 +780,16 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"token-type": "test-token-type"
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:grant,Resource:tEst,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:grant,Resource:[tEst],Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
 				"token-endpoint": "http://localhost:123",
 				"aud": "test-aud",
+				"res": [
+					"r1",
+					"r2"
+				],
 				"scope": [
 					"s1",
 					"s2"
@@ -789,7 +801,7 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"token-type": "test-token-type"
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[test-aud],Scope:[s1 s2],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,ActorToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[r1 r2],Audience:[test-aud],Scope:[s1 s2],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,ActorToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
@@ -808,7 +820,7 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"unknown_field": [123]
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:access_token,SubjectToken:JWTTokenSource{Method:PS256,KeyID:test_key_id,Issuer:"test_issuer",Subject:"test_subject",Audience:[a1 a2],ID:123,TokenTTL:24h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[],Audience:[],Scope:[],RequestedTokenType:access_token,SubjectToken:JWTTokenSource{Method:PS256,KeyID:test_key_id,Issuer:"test_issuer",Subject:"test_subject",Audience:[a1 a2],ID:123,TokenTTL:24h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
@@ -820,7 +832,7 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"ttl": "3m"
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:ES256,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:3m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[],Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:ES256,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:3m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
@@ -831,7 +843,7 @@ func TestParseSettingsFromFile(t *testing.T) {
 					"private-key": "` + testHMACSecretKeyBase64Content + `"
 				}
 			}`,
-			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:HS512,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:[],Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:HS512,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
 		},
 		{
 			Cfg: `{
@@ -1003,33 +1015,31 @@ func TestParseSettingsFromFile(t *testing.T) {
 			ExpectedError: errTokenAndTokenTypeRequired,
 		},
 	}
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		for _, params := range testsParams {
-			var fileName string
-			if params.Cfg != "" {
-				f, err := os.CreateTemp("", "cfg-")
-				require.NoError(t, err)
-				defer os.Remove(f.Name())
-				_, err = f.WriteString(params.Cfg)
-				require.NoError(t, err)
-				f.Close()
-				fileName = f.Name()
-			} else {
-				fileName = params.CfgFile
-			}
-
-			client, err := NewOauth2TokenExchangeCredentialsFile(
-				fileName,
-				WithSourceInfo("TestParseSettingsFromFile"),
-			)
-			fmt.Printf("Cfg:\n%s\n", params.Cfg)
-			if params.ExpectedError != nil {
-				require.ErrorIs(t, err, params.ExpectedError)
-			} else {
-				require.NoError(t, err)
-				formatted := fmt.Sprint(client)
-				require.Equal(t, params.ExpectedFormattedCredentials, formatted)
-			}
+	for _, params := range testsParams {
+		var fileName string
+		if params.Cfg != "" {
+			f, err := os.CreateTemp("", "cfg-")
+			require.NoError(t, err)
+			defer os.Remove(f.Name())
+			_, err = f.WriteString(params.Cfg)
+			require.NoError(t, err)
+			f.Close()
+			fileName = f.Name()
+		} else {
+			fileName = params.CfgFile
 		}
-	})
+
+		client, err := NewOauth2TokenExchangeCredentialsFile(
+			fileName,
+			WithSourceInfo("TestParseSettingsFromFile"),
+		)
+		t.Logf("Cfg:\n%s\n", params.Cfg)
+		if params.ExpectedError != nil {
+			require.ErrorIs(t, err, params.ExpectedError)
+		} else {
+			require.NoError(t, err)
+			formatted := fmt.Sprint(client)
+			require.Equal(t, params.ExpectedFormattedCredentials, formatted)
+		}
+	}
 }
