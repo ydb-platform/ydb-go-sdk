@@ -92,7 +92,6 @@ func (scope *scopeT) DriverWithLogs(opts ...ydb.Option) *ydb.Driver {
 			log.Query(
 				log.Default(os.Stdout,
 					log.WithLogQuery(),
-					log.WithColoring(),
 					log.WithMinLevel(log.INFO),
 				),
 				trace.QueryEvents,

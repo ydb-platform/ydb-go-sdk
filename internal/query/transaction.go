@@ -21,7 +21,7 @@ var _ query.Transaction = (*Transaction)(nil)
 var ErrTransactionRollingBack = xerrors.Wrap(errors.New("ydb: the transaction is rolling back"))
 
 type Transaction struct {
-	tx.Parent
+	tx.Identifier
 
 	s           *Session
 	onCompleted []OnTransactionCompletedFunc
@@ -69,7 +69,7 @@ func (tx Transaction) ReadResultSet(ctx context.Context, q string, opts ...optio
 
 func newTransaction(id string, s *Session) *Transaction {
 	return &Transaction{
-		Parent: tx.Parent(id),
+		Identifier: tx.Parent(id),
 		s:      s,
 	}
 }

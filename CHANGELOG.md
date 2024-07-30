@@ -1,4 +1,11 @@
-* Fixed respect to query.WithCommit() flag for tx.Execute in query service
+* Fixed handle reconnection timeout error
+* Fixed experimental topic listener handle stop partition event
+
+## v3.76.1
+* Fixed `query.WithCommit()` flag behaviour for `tx.Execute` in query service
+* OAuth 2.0 token exchange: allowed multiple resource parameters in according to https://www.rfc-editor.org/rfc/rfc8693
+
+## v3.76.0
 * Added experimental topic listener implementation
 * Fixed `internal/xstrings.Buffer()` leak without call `buffer.Free()`
 * Removed double quotas from goroutine labels background workers for prevent problem with pprof

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -268,15 +269,15 @@ func (l *streamListener) onStartPartitionRequest(
 		PartitionSessionID: m.PartitionSession.PartitionSessionID,
 	}
 
-	event := &PublicStartPartitionSessionEvent{
-		PartitionSession: session.ToPublic(),
-		CommittedOffset:  m.CommittedOffset.ToInt64(),
-		PartitionOffsets: PublicOffsetsRange{
+	event := NewPublicStartPartitionSessionEvent(
+		session.ToPublic(),
+		m.CommittedOffset.ToInt64(),
+		PublicOffsetsRange{
 			Start: m.PartitionOffsets.Start.ToInt64(),
 			End:   m.PartitionOffsets.End.ToInt64(),
 		},
-		respChan: make(chan PublicStartPartitionSessionConfirm, 1),
-	}
+	)
+
 	err := l.handler.OnStartPartitionSessionRequest(ctx, event)
 	if err != nil {
 		return err
@@ -286,8 +287,8 @@ func (l *streamListener) onStartPartitionRequest(
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case userResp = <-event.respChan:
-		// pass
+	case <-event.confirm.Done():
+		userResp, _ = event.confirm.Get()
 	}
 
 	if userResp.readOffset != nil {
@@ -329,12 +330,11 @@ func (l *streamListener) onStopPartitionRequest(
 		handlerCtx = session.Context()
 	}
 
-	event := &PublicStopPartitionSessionEvent{
-		PartitionSession: session.ToPublic(),
-		Graceful:         m.Graceful,
-		CommittedOffset:  m.CommittedOffset.ToInt64(),
-		resp:             make(chan PublicStopPartitionSessionConfirm, 1),
-	}
+	event := NewPublicStopPartitionSessionEvent(
+		session.ToPublic(),
+		m.Graceful,
+		m.CommittedOffset.ToInt64(),
+	)
 
 	if err = l.handler.OnStopPartitionSessionRequest(handlerCtx, event); err != nil {
 		return err
@@ -344,7 +344,7 @@ func (l *streamListener) onStopPartitionRequest(
 		// remove partition on the confirmation or on the listener closed
 		select {
 		case <-l.background.Done():
-		case <-event.resp:
+		case <-event.confirm.Done():
 		}
 		_, _ = l.sessions.Remove(m.PartitionSessionID)
 	}()
@@ -352,7 +352,7 @@ func (l *streamListener) onStopPartitionRequest(
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-event.resp:
+	case <-event.confirm.Done():
 		// pass
 	}
 
@@ -395,4 +395,43 @@ func (l *streamListener) sendMessage(m rawtopicreader.ClientMessage) {
 	case l.hasNewMessagesToSend <- empty.Struct{}:
 	default:
 	}
+}
+
+type confirmStorage[T any] struct {
+	doneChan      empty.Chan
+	confirmed     atomic.Bool
+	val           T
+	confirmAction sync.Once
+	initAction    sync.Once
+}
+
+func (c *confirmStorage[T]) init() {
+	c.initAction.Do(func() {
+		c.doneChan = make(empty.Chan)
+	})
+}
+
+func (c *confirmStorage[T]) Set(val T) {
+	c.init()
+	c.confirmAction.Do(func() {
+		c.val = val
+		c.confirmed.Store(true)
+		close(c.doneChan)
+	})
+}
+
+func (c *confirmStorage[T]) Done() empty.ChanReadonly {
+	c.init()
+
+	return c.doneChan
+}
+
+func (c *confirmStorage[T]) Get() (val T, ok bool) {
+	c.init()
+
+	if c.confirmed.Load() {
+		return c.val, true
+	}
+
+	return val, false
 }

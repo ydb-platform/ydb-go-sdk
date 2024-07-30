@@ -1,11 +1,11 @@
 package tx
 
-var _ Identifier = (*Parent)(nil)
+var _ Identifier = (*ID)(nil)
 
-type Parent string
+type ID string
 
-func (id Parent) ID() string {
+func (id ID) ID() string {
 	return string(id)
 }
 
-func (id Parent) isYdbTx() {}
+func (id ID) isYdbTx() {}

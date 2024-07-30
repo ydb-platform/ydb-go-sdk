@@ -17,6 +17,8 @@ const (
 	connectionEstablishedTimeout = time.Minute
 )
 
+var errNil = xerrors.Wrap(errors.New("nil error is not retrieable"))
+
 type RetrySettings struct {
 	StartTimeout time.Duration // Full retry timeout
 	CheckError   PublicCheckErrorRetryFunction
@@ -53,50 +55,58 @@ func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout ti
 	return now.Sub(lastTry) > connectionTimeout*resetAttemptEmpiricalCoefficient
 }
 
-func CheckRetryMode(err error, settings RetrySettings, retriesDuration time.Duration) (
+// RetryDecision check if err is retriable.
+// if return nil stopRetryReason - err can be retried
+// if return non nil stopRetryReason - err is not retriable and stopRetryReason contains reason,
+// which should be used instead of err
+func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.Duration) (
 	_ backoff.Backoff,
-	isRetriable bool,
+	stopRetryReason error,
 ) {
 	// nil is not error and doesn't need retry it.
-	if err == nil {
-		return nil, false
+	if checkErr == nil {
+		return nil, xerrors.WithStackTrace(errNil)
 	}
 
 	// eof is retriable for topic
-	if errors.Is(err, io.EOF) && xerrors.RetryableError(err) == nil {
-		err = xerrors.Retryable(err, xerrors.WithName("TopicEOF"))
+	if errors.Is(checkErr, io.EOF) && xerrors.RetryableError(checkErr) == nil {
+		checkErr = xerrors.Retryable(checkErr, xerrors.WithName("TopicEOF"))
 	}
 
 	if retriesDuration > settings.StartTimeout {
-		return nil, false
+		return nil, fmt.Errorf("ydb: topic reader reconnection timeout, last error: %w", xerrors.Unretryable(checkErr))
 	}
 
-	mode := retry.Check(err)
+	mode := retry.Check(checkErr)
 
 	decision := PublicRetryDecisionDefault
 	if settings.CheckError != nil {
-		decision = settings.CheckError(NewCheckRetryArgs(err))
+		decision = settings.CheckError(NewCheckRetryArgs(checkErr))
 	}
 
 	switch decision {
 	case PublicRetryDecisionDefault:
-		isRetriable = mode.MustRetry(true)
+		isRetriable := mode.MustRetry(true)
+		if !isRetriable {
+			return nil, fmt.Errorf("ydb: topic reader unretriable error: %w", xerrors.Unretryable(checkErr))
+		}
 	case PublicRetryDecisionRetry:
-		isRetriable = true
+		// pass
 	case PublicRetryDecisionStop:
-		isRetriable = false
+		return nil, fmt.Errorf(
+			"ydb: topic reader unretriable error by check error callback: %w",
+			xerrors.Unretryable(checkErr),
+		)
 	default:
 		panic(fmt.Errorf("unexpected retry decision: %v", decision))
 	}
 
-	if !isRetriable {
-		return nil, false
-	}
+	// checkErr is retryable error
 
 	switch mode.BackoffType() {
 	case backoff.TypeFast:
-		return backoff.Fast, true
+		return backoff.Fast, nil
 	default:
-		return backoff.Slow, true
+		return backoff.Slow, nil
 	}
 }
