@@ -3,12 +3,15 @@ package xerrors
 import (
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 func Join(errs ...error) *joinError {
 	return &joinError{
-		errs: errs,
+		errs: xslices.Filter(errs, func(err error) bool {
+			return err != nil
+		}),
 	}
 }
 
