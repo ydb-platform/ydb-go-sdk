@@ -1297,8 +1297,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	return nil
 }
 
-// BeginTransaction begins new transaction within given session with given
-// settings.
+// BeginTransaction begins new transaction within given session with given settings.
 func (s *session) BeginTransaction(
 	ctx context.Context,
 	txSettings *table.TransactionSettings,

@@ -15,12 +15,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
-func TestRetryerBackoffRetryCancelation(t *testing.T) {
+func TestDoBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
 		xerrors.Transport(
@@ -78,7 +79,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	}
 }
 
-func TestRetryerBadSession(t *testing.T) {
+func TestDoBadSession(t *testing.T) {
 	closed := make(map[table.Session]bool)
 	p := SessionProviderFunc{
 		OnGet: func(ctx context.Context) (*session, error) {
@@ -133,7 +134,36 @@ func TestRetryerBadSession(t *testing.T) {
 	}
 }
 
-func TestRetryerSessionClosing(t *testing.T) {
+func TestDoCreateSessionError(t *testing.T) {
+	p := SessionProviderFunc{
+		OnGet: func(ctx context.Context) (*session, error) {
+			return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
+		},
+		OnPut: func(ctx context.Context, s *session) error {
+			if s.isClosing() {
+				return s.Close(ctx)
+			}
+
+			return nil
+		},
+	}
+	ctx, cancel := xcontext.WithTimeout(xtest.Context(t), time.Second)
+	defer cancel()
+	err := do(ctx, p, config.New(),
+		func(ctx context.Context, s table.Session) error {
+			return nil
+		},
+		nil,
+	)
+	if !xerrors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestDoSessionClosing(t *testing.T) {
 	closed := make(map[table.Session]bool)
 	p := SessionProviderFunc{
 		OnGet: func(ctx context.Context) (*session, error) {
@@ -183,7 +213,7 @@ func TestRetryerSessionClosing(t *testing.T) {
 	}
 }
 
-func TestRetryerImmediateReturn(t *testing.T) {
+func TestDoImmediateReturn(t *testing.T) {
 	for _, testErr := range []error{
 		xerrors.Operation(
 			xerrors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
@@ -236,7 +266,7 @@ func TestRetryerImmediateReturn(t *testing.T) {
 
 // We are testing all suspentions of custom operation func against to all deadline
 // timeouts - all sub-tests must have latency less than timeouts (+tolerance)
-func TestRetryContextDeadline(t *testing.T) {
+func TestDoContextDeadline(t *testing.T) {
 	timeouts := []time.Duration{
 		50 * time.Millisecond,
 		100 * time.Millisecond,
@@ -372,7 +402,7 @@ func (e *CustomError) Unwrap() error {
 	return e.Err
 }
 
-func TestRetryWithCustomErrors(t *testing.T) {
+func TestDoWithCustomErrors(t *testing.T) {
 	var (
 		limit = 10
 		ctx   = context.Background()
