@@ -102,7 +102,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.22.x]
-        ydb-version: [24.1]
+        ydb-version: [nightly]
     services:
       ydb:
         image: ydbplatform/local-ydb:${{ matrix.ydb-version }}
