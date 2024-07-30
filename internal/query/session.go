@@ -235,7 +235,7 @@ func begin(
 	client Ydb_Query_V1.QueryServiceClient,
 	s *Session,
 	txSettings query.TransactionSettings,
-) (*transaction, error) {
+) (*Transaction, error) {
 	a := allocator.New()
 	defer a.Free()
 	response, err := client.BeginTransaction(ctx,
@@ -257,7 +257,7 @@ func (s *Session) Begin(
 ) (
 	_ query.Transaction, err error,
 ) {
-	var tx *transaction
+	var tx *Transaction
 
 	onDone := trace.QueryOnSessionBegin(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).Begin"), s)

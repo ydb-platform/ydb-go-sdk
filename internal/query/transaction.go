@@ -15,15 +15,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var _ query.Transaction = (*transaction)(nil)
+var _ query.Transaction = (*Transaction)(nil)
 
-type transaction struct {
+type Transaction struct {
 	tx.Identifier
 
 	s *Session
 }
 
-func (tx transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
+func (tx Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
 	r, err := tx.Execute(ctx, q, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -42,7 +42,7 @@ func (tx transaction) ReadRow(ctx context.Context, q string, opts ...options.TxE
 	return row, nil
 }
 
-func (tx transaction) ReadResultSet(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx Transaction) ReadResultSet(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	rs query.ResultSet, _ error,
 ) {
 	r, err := tx.Execute(ctx, q, opts...)
@@ -63,18 +63,18 @@ func (tx transaction) ReadResultSet(ctx context.Context, q string, opts ...optio
 	return rs, nil
 }
 
-func newTransaction(id string, s *Session) *transaction {
-	return &transaction{
+func newTransaction(id string, s *Session) *Transaction {
+	return &Transaction{
 		Identifier: tx.ID(id),
 		s:          s,
 	}
 }
 
-func (tx transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx Transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, finalErr error,
 ) {
 	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.transaction.Execute"), tx.s, tx, q)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.Transaction.Execute"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -103,7 +103,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx transaction) CommitTx(ctx context.Context) error {
+func (tx Transaction) CommitTx(ctx context.Context) error {
 	err := commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
@@ -128,7 +128,7 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx transaction) Rollback(ctx context.Context) error {
+func (tx Transaction) Rollback(ctx context.Context) error {
 	err := rollback(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
