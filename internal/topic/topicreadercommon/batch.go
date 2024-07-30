@@ -44,17 +44,17 @@ func NewBatch(session *PartitionSession, messages []*PublicMessage) (*PublicBatc
 		}
 	}
 
-	offset := CommitRange{
+	commitRange := CommitRange{
 		PartitionSession: session,
 	}
 	if len(messages) > 0 {
-		offset.CommitOffsetStart = messages[0].commitRange.CommitOffsetStart
-		offset.CommitOffsetEnd = messages[len(messages)-1].commitRange.CommitOffsetEnd
+		commitRange.CommitOffsetStart = messages[0].commitRange.CommitOffsetStart
+		commitRange.CommitOffsetEnd = messages[len(messages)-1].commitRange.CommitOffsetEnd
 	}
 
 	return &PublicBatch{
 		Messages:    messages,
-		commitRange: offset,
+		commitRange: commitRange,
 	}, nil
 }
 
