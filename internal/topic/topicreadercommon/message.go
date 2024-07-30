@@ -209,18 +209,24 @@ func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicM
 }
 
 // Context set message Context
-func (pmb *PublicMessageBuilder) Context(ctx context.Context) {
+func (pmb *PublicMessageBuilder) Context(ctx context.Context) *PublicMessageBuilder {
 	pmb.mess.commitRange.PartitionSession.SetContext(ctx)
+
+	return pmb
 }
 
 // Topic set message Topic
-func (pmb *PublicMessageBuilder) Topic(topic string) {
+func (pmb *PublicMessageBuilder) Topic(topic string) *PublicMessageBuilder {
 	pmb.mess.commitRange.PartitionSession.Topic = topic
+
+	return pmb
 }
 
 // PartitionID set message PartitionID
-func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) {
+func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) *PublicMessageBuilder {
 	pmb.mess.commitRange.PartitionSession.PartitionID = partitionID
+
+	return pmb
 }
 
 func (pmb *PublicMessageBuilder) RawDataLen(val int) *PublicMessageBuilder {
