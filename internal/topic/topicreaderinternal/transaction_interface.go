@@ -71,6 +71,7 @@ func (t *TransactionWrapper) Rollback(ctx context.Context) error {
 		return t.queryTx.Rollback(ctx)
 	case t.mockTx != nil:
 		t.mockTx.RolledBack = true
+
 		return nil
 	default:
 		panic("ydb: unexpected transaction wrapper state for Rollback")

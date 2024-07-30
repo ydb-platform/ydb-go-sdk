@@ -94,12 +94,16 @@ func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (*rawtopicwriter
 	return &rawtopicwriter.StreamWriter{Stream: protoResp}, nil
 }
 
-func (c *Client) UpdateOffsetsInTransaction(ctx context.Context, req UpdateOffsetsInTransactionRequest) error {
+func (c *Client) UpdateOffsetsInTransaction(
+	ctx context.Context,
+	req *UpdateOffsetsInTransactionRequest,
+) error {
 	protoResp, err := c.service.UpdateOffsetsInTransaction(ctx, req.ToProto())
 	if err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: update offsets in transaction failed: %w", err))
 	}
 
 	var operation rawydb.Operation
+
 	return operation.FromProtoWithStatusCheck(protoResp.GetOperation())
 }

@@ -85,9 +85,18 @@ func (r *readerReconnector) PopBatchTx(
 	*topicreadercommon.PublicBatch,
 	error,
 ) {
-	return r.readWithReconnections(ctx, func(ctx context.Context, stream batchedStreamReader) (*topicreadercommon.PublicBatch, error) {
-		return stream.PopBatchTx(ctx, tx, opts)
-	})
+	return r.readWithReconnections(
+		ctx,
+		func(
+			ctx context.Context,
+			stream batchedStreamReader,
+		) (
+			*topicreadercommon.PublicBatch,
+			error,
+		) {
+			return stream.PopBatchTx(ctx, tx, opts)
+		},
+	)
 }
 
 func (r *readerReconnector) ReadMessageBatch(
@@ -97,9 +106,18 @@ func (r *readerReconnector) ReadMessageBatch(
 	*topicreadercommon.PublicBatch,
 	error,
 ) {
-	return r.readWithReconnections(ctx, func(ctx context.Context, stream batchedStreamReader) (*topicreadercommon.PublicBatch, error) {
-		return stream.ReadMessageBatch(ctx, opts)
-	})
+	return r.readWithReconnections(
+		ctx,
+		func(
+			ctx context.Context,
+			stream batchedStreamReader,
+		) (
+			*topicreadercommon.PublicBatch,
+			error,
+		) {
+			return stream.ReadMessageBatch(ctx, opts)
+		},
+	)
 }
 
 func (r *readerReconnector) readWithReconnections(

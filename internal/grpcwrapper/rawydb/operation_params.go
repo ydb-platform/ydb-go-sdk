@@ -45,5 +45,6 @@ func NewRawOperationParamsFromProto(proto *Ydb_Operations.OperationParams) (res 
 		Value:    proto.GetOperationTimeout().AsDuration(),
 		HasValue: proto.GetOperationTimeout().AsDuration() > 0,
 	}
+
 	return res
 }

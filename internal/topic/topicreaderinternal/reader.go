@@ -129,7 +129,11 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
 
-func (r *Reader) PopBatchTx(ctx context.Context, tx *TransactionWrapper, opts ...PublicReadBatchOption) (*topicreadercommon.PublicBatch, error) {
+func (r *Reader) PopBatchTx(
+	ctx context.Context,
+	tx *TransactionWrapper,
+	opts ...PublicReadBatchOption,
+) (*topicreadercommon.PublicBatch, error) {
 	batchOptions := r.getBatchOptions(opts)
 
 	return r.reader.PopBatchTx(ctx, tx, batchOptions)
@@ -182,6 +186,7 @@ func (r *Reader) getBatchOptions(opts []PublicReadBatchOption) ReadMessageBatchO
 			readOptions = opt.Apply(readOptions)
 		}
 	}
+
 	return readOptions
 }
 

@@ -25,13 +25,18 @@ func (r *UpdateOffsetsInTransactionRequest) ToProto() *Ydb_Topic.UpdateOffsetsIn
 	}
 
 	req.Topics = make([]*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets, len(r.Topics))
-	for topicIndex, topic := range r.Topics {
+	for topicIndex := range r.Topics {
+		topic := &r.Topics[topicIndex]
 		offsets := &Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets{
 			Path: topic.Path,
 		}
 
-		offsets.Partitions = make([]*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets, len(topic.Partitions))
-		for partitionIndex, partition := range topic.Partitions {
+		offsets.Partitions = make(
+			[]*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets,
+			len(topic.Partitions),
+		)
+		for partitionIndex := range topic.Partitions {
+			partition := &topic.Partitions[partitionIndex]
 			protoPartition := &Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets{
 				PartitionId: partition.PartitionID,
 			}
@@ -51,17 +56,17 @@ func (r *UpdateOffsetsInTransactionRequest) ToProto() *Ydb_Topic.UpdateOffsetsIn
 	return req
 }
 
-type UpdateOffsetsInTransactionRequest_TransactionIdentity struct {
+type UpdateOffsetsInTransactionRequest_TransactionIdentity struct { //nolint:revive,stylecheck
 	ID      string
 	Session string
 }
 
-type UpdateOffsetsInTransactionRequest_TopicOffsets struct {
+type UpdateOffsetsInTransactionRequest_TopicOffsets struct { //nolint:revive,stylecheck
 	Path       string // Topic path
 	Partitions []UpdateOffsetsInTransactionRequest_PartitionOffsets
 }
 
-type UpdateOffsetsInTransactionRequest_PartitionOffsets struct {
+type UpdateOffsetsInTransactionRequest_PartitionOffsets struct { //nolint:revive,stylecheck
 	PartitionID      int64
 	PartitionOffsets []rawtopiccommon.OffsetRange
 }

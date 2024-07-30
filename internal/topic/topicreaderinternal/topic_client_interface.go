@@ -10,5 +10,5 @@ import (
 
 // TopicClient is part of rawtopic.Client
 type TopicClient interface {
-	UpdateOffsetsInTransaction(ctx context.Context, req rawtopic.UpdateOffsetsInTransactionRequest) error
+	UpdateOffsetsInTransaction(ctx context.Context, req *rawtopic.UpdateOffsetsInTransactionRequest) error
 }

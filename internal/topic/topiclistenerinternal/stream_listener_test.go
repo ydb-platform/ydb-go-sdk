@@ -108,7 +108,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 				PartitionID:        123,
 			},
 			CommittedOffset: 10,
-			PartitionOffsets: rawtopicreader.OffsetRange{
+			PartitionOffsets: rawtopiccommon.OffsetRange{
 				Start: 5,
 				End:   15,
 			},
@@ -118,11 +118,11 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 		require.Equal(t, &rawtopicreader.StartPartitionSessionResponse{
 			PartitionSessionID: 100,
 			ReadOffset: rawtopicreader.OptionalOffset{
-				Offset:   rawtopicreader.NewOffset(respReadOffset),
+				Offset:   rawtopiccommon.NewOffset(respReadOffset),
 				HasValue: true,
 			},
 			CommitOffset: rawtopicreader.OptionalOffset{
-				Offset:   rawtopicreader.NewOffset(respCommitOffset),
+				Offset:   rawtopiccommon.NewOffset(respCommitOffset),
 				HasValue: true,
 			},
 		}, req)

@@ -69,8 +69,8 @@ func (tx Transaction) ReadResultSet(ctx context.Context, q string, opts ...optio
 
 func newTransaction(id string, s *Session) *Transaction {
 	return &Transaction{
-		Identifier: tx.Parent(id),
-		s:      s,
+		Identifier: tx.ID(id),
+		s:          s,
 	}
 }
 
@@ -158,6 +158,7 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx Transaction) Rollback(ctx context.Context) error {
+	//nolint:godox
 	// ToDo save local marker for deny any additional requests to the transaction?
 
 	tx.notifyOnCompleted(xerrors.WithStackTrace(ErrTransactionRollingBack))

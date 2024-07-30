@@ -120,6 +120,7 @@ func TestTxOnCompleted(t *testing.T) {
 				error,
 			) {
 				rollbackCalled = true
+
 				return &Ydb_Query.RollbackTransactionResponse{
 					Status: Ydb.StatusIds_SUCCESS,
 				}, nil
@@ -157,7 +158,7 @@ func TestTxOnCompleted(t *testing.T) {
 
 		_, err := tx.Execute(sf.Context(e), "")
 		require.NoError(t, err)
-		require.Len(t, completed, 0)
+		require.Empty(t, completed)
 	})
 	t.Run("OnExecuteWithoutTxSuccess", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
@@ -184,7 +185,7 @@ func TestTxOnCompleted(t *testing.T) {
 			require.NoError(t, err)
 			_ = res.Close(sf.Context(e))
 			time.Sleep(time.Millisecond) // time for reaction for closing channel
-			require.Len(t, completed, 0)
+			require.Empty(t, completed)
 		})
 	})
 	t.Run("OnExecuteWithTxSuccess", func(t *testing.T) {
@@ -245,16 +246,17 @@ func TestTxOnCompleted(t *testing.T) {
 			})
 
 			res, err := tx.Execute(sf.Context(e), "", options.WithCommit())
+			require.NoError(t, err)
 
 			// time for event happened if is
 			time.Sleep(time.Millisecond)
-			require.Len(t, completed, 0)
+			require.Empty(t, completed)
 
 			_, err = res.NextResultSet(sf.Context(e))
 			require.NoError(t, err)
 			// time for event happened if is
 			time.Sleep(time.Millisecond)
-			require.Len(t, completed, 0)
+			require.Empty(t, completed)
 
 			_, err = res.NextResultSet(sf.Context(e))
 			require.NoError(t, err)
@@ -309,6 +311,7 @@ func TestTxOnCompleted(t *testing.T) {
 					responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
 					responseStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 						errorReturned = true
+
 						return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 					})
 
@@ -335,7 +338,6 @@ func TestTxOnCompleted(t *testing.T) {
 						return len(completed) > 0
 					})
 					require.Len(t, completed, 1)
-
 				})
 			})
 		}

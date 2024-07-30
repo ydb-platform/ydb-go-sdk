@@ -38,7 +38,7 @@ func (m *MockTopicClient) EXPECT() *MockTopicClientMockRecorder {
 }
 
 // UpdateOffsetsInTransaction mocks base method.
-func (m *MockTopicClient) UpdateOffsetsInTransaction(ctx context.Context, req rawtopic.UpdateOffsetsInTransactionRequest) error {
+func (m *MockTopicClient) UpdateOffsetsInTransaction(ctx context.Context, req *rawtopic.UpdateOffsetsInTransactionRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateOffsetsInTransaction", ctx, req)
 	ret0, _ := ret[0].(error)
@@ -46,31 +46,31 @@ func (m *MockTopicClient) UpdateOffsetsInTransaction(ctx context.Context, req ra
 }
 
 // UpdateOffsetsInTransaction indicates an expected call of UpdateOffsetsInTransaction.
-func (mr *MockTopicClientMockRecorder) UpdateOffsetsInTransaction(ctx, req any) *TopicClientUpdateOffsetsInTransactionCall {
+func (mr *MockTopicClientMockRecorder) UpdateOffsetsInTransaction(ctx, req any) *MockTopicClientUpdateOffsetsInTransactionCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateOffsetsInTransaction", reflect.TypeOf((*MockTopicClient)(nil).UpdateOffsetsInTransaction), ctx, req)
-	return &TopicClientUpdateOffsetsInTransactionCall{Call: call}
+	return &MockTopicClientUpdateOffsetsInTransactionCall{Call: call}
 }
 
-// TopicClientUpdateOffsetsInTransactionCall wrap *gomock.Call
-type TopicClientUpdateOffsetsInTransactionCall struct {
+// MockTopicClientUpdateOffsetsInTransactionCall wrap *gomock.Call
+type MockTopicClientUpdateOffsetsInTransactionCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *TopicClientUpdateOffsetsInTransactionCall) Return(arg0 error) *TopicClientUpdateOffsetsInTransactionCall {
+func (c *MockTopicClientUpdateOffsetsInTransactionCall) Return(arg0 error) *MockTopicClientUpdateOffsetsInTransactionCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *TopicClientUpdateOffsetsInTransactionCall) Do(f func(context.Context, rawtopic.UpdateOffsetsInTransactionRequest) error) *TopicClientUpdateOffsetsInTransactionCall {
+func (c *MockTopicClientUpdateOffsetsInTransactionCall) Do(f func(context.Context, *rawtopic.UpdateOffsetsInTransactionRequest) error) *MockTopicClientUpdateOffsetsInTransactionCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *TopicClientUpdateOffsetsInTransactionCall) DoAndReturn(f func(context.Context, rawtopic.UpdateOffsetsInTransactionRequest) error) *TopicClientUpdateOffsetsInTransactionCall {
+func (c *MockTopicClientUpdateOffsetsInTransactionCall) DoAndReturn(f func(context.Context, *rawtopic.UpdateOffsetsInTransactionRequest) error) *MockTopicClientUpdateOffsetsInTransactionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

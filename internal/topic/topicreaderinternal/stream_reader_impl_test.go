@@ -1201,12 +1201,12 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		require.NoError(t, err)
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
 		require.ErrorIs(t, err, testError)
-		require.Nil(t, xerrors.RetryableError(err))
-		require.Len(t, txMock.mockTx.OnCompleted, 0)
+		require.NoError(t, xerrors.RetryableError(err))
+		require.Empty(t, txMock.mockTx.OnCompleted)
 
 		require.True(t, e.reader.closed)
 		require.ErrorIs(t, e.reader.err, testError)
-		require.NotNil(t, xerrors.RetryableError(e.reader.err))
+		require.Error(t, xerrors.RetryableError(e.reader.err))
 		require.True(t, txMock.mockTx.RolledBack)
 	})
 }
