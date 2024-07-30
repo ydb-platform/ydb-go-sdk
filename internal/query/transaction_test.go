@@ -302,7 +302,6 @@ func TestTxOnCompleted(t *testing.T) {
 	t.Run("OnExecuteFailedInResponsePart", func(t *testing.T) {
 		for _, commit := range []bool{true, false} {
 			t.Run(fmt.Sprint("commit:", commit), func(t *testing.T) {
-
 				xtest.TestManyTimes(t, func(t testing.TB) {
 					e := fixenv.New(t)
 
@@ -310,11 +309,7 @@ func TestTxOnCompleted(t *testing.T) {
 					responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
 					responseStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 						errorReturned = true
-						return &Ydb_Query.ExecuteQueryResponsePart{
-							Status:         Ydb.StatusIds_BAD_SESSION,
-							ResultSetIndex: 0,
-							ResultSet:      &Ydb.ResultSet{},
-						}, nil
+						return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 					})
 
 					QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
@@ -333,12 +328,9 @@ func TestTxOnCompleted(t *testing.T) {
 					if commit {
 						opts = append(opts, query.WithCommit())
 					}
-					res, err := tx.Execute(sf.Context(e), "", opts...)
+					_, err := tx.Execute(sf.Context(e), "", opts...)
 					require.True(t, errorReturned)
-					require.NoError(t, err)
-					// TODO: Why res.Err() == nil?
-					_, _ = res.NextResultSet(sf.Context(e))
-					_ = res.Close(sf.Context(e))
+					require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION))
 					xtest.SpinWaitCondition(t, &completedMutex, func() bool {
 						return len(completed) > 0
 					})
