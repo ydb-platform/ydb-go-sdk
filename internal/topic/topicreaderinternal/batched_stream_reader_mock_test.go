@@ -123,9 +123,33 @@ func (m *MockbatchedStreamReader) PopBatchTx(ctx context.Context, tx *Transactio
 }
 
 // PopBatchTx indicates an expected call of PopBatchTx.
-func (mr *MockbatchedStreamReaderMockRecorder) PopBatchTx(ctx, tx, opts any) *gomock.Call {
+func (mr *MockbatchedStreamReaderMockRecorder) PopBatchTx(ctx, tx, opts any) *MockbatchedStreamReaderPopBatchTxCall {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopBatchTx", reflect.TypeOf((*MockbatchedStreamReader)(nil).PopBatchTx), ctx, tx, opts)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopBatchTx", reflect.TypeOf((*MockbatchedStreamReader)(nil).PopBatchTx), ctx, tx, opts)
+	return &MockbatchedStreamReaderPopBatchTxCall{Call: call}
+}
+
+// MockbatchedStreamReaderPopBatchTxCall wrap *gomock.Call
+type MockbatchedStreamReaderPopBatchTxCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockbatchedStreamReaderPopBatchTxCall) Return(arg0 *topicreadercommon.PublicBatch, arg1 error) *MockbatchedStreamReaderPopBatchTxCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockbatchedStreamReaderPopBatchTxCall) Do(f func(context.Context, *TransactionWrapper, ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)) *MockbatchedStreamReaderPopBatchTxCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockbatchedStreamReaderPopBatchTxCall) DoAndReturn(f func(context.Context, *TransactionWrapper, ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)) *MockbatchedStreamReaderPopBatchTxCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }
 
 // ReadMessageBatch mocks base method.
