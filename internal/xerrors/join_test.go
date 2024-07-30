@@ -58,7 +58,7 @@ func TestUnwrapJoined(t *testing.T) {
 	err1 := context.Canceled
 	err2 := context.DeadlineExceeded
 
-	var joined error = Join(err1, err2)
+	joined := Join(err1, err2)
 
 	unwrappable := joined.(interface{ Unwrap() []error }) //nolint:errorlint
 	inners := unwrappable.Unwrap()
