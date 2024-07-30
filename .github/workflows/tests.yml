@@ -13,7 +13,7 @@ on:
 jobs:
   unit:
     concurrency:
-      group: unit-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      group: unit-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
     strategy:
       fail-fast: false
@@ -44,7 +44,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
     concurrency:
-      group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
+      group: integration-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
@@ -95,7 +95,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   experiment:
     concurrency:
-      group: experiment-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
+      group: experiment-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
