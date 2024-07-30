@@ -124,7 +124,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 				CommitOffsets: []rawtopicreader.PartitionCommitOffset{
 					{
 						PartitionSessionID: e.partitionSessionID,
-						Offsets: []rawtopicreader.OffsetRange{
+						Offsets: []rawtopiccommon.OffsetRange{
 							{
 								Start: lastOffset + 1,
 								End:   lastOffset + 16,
@@ -259,7 +259,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		e.stream.EXPECT().Send(&rawtopicreader.CommitOffsetRequest{CommitOffsets: []rawtopicreader.PartitionCommitOffset{
 			{
 				PartitionSessionID: e.partitionSessionID,
-				Offsets: []rawtopicreader.OffsetRange{
+				Offsets: []rawtopiccommon.OffsetRange{
 					{
 						Start: committed,
 						End:   committed + 1,
@@ -411,7 +411,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.SendFromServer(&rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: e.partitionSessionID,
 			Graceful:           true,
-			CommittedOffset:    rawtopicreader.NewOffset(committedOffset),
+			CommittedOffset:    rawtopiccommon.NewOffset(committedOffset),
 		})
 
 		_, err := e.reader.ReadMessageBatch(readMessagesCtx, newReadMessageBatchOptions())
@@ -448,7 +448,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.SendFromServer(&rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: e.partitionSessionID,
 			Graceful:           false,
-			CommittedOffset:    rawtopicreader.NewOffset(committedOffset),
+			CommittedOffset:    rawtopiccommon.NewOffset(committedOffset),
 		})
 
 		_, err := e.reader.ReadMessageBatch(readMessagesCtx, newReadMessageBatchOptions())

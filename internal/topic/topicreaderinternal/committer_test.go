@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -130,7 +131,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		go func() {
 			<-commitSended
 			notifySended = true
-			c.OnCommitNotify(session, rawtopicreader.Offset(2))
+			c.OnCommitNotify(session, rawtopiccommon.Offset(2))
 		}()
 
 		<-commitCompleted
