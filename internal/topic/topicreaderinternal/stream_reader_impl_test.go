@@ -1137,7 +1137,7 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		txID := "test-tx-id"
 		sessionID := "test-session-id"
 
-		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), rawtopic.UpdateOffsetsInTransactionRequest{
+		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), &rawtopic.UpdateOffsetsInTransactionRequest{
 			OperationParams: rawydb.OperationParams{
 				OperationMode: rawydb.OperationParamsModeSync,
 			},

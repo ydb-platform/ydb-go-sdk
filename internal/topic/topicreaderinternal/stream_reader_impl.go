@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 	"reflect"
@@ -251,7 +250,6 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 			}
 		})
 	} else {
-		log.Printf("failed to add offsets in tx: %v", updateOffesetInTransactionErr)
 		_ = retry.Retry(ctx, func(ctx context.Context) (err error) {
 			return tx.Rollback(ctx)
 		})
