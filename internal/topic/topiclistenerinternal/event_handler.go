@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
@@ -16,7 +17,7 @@ type EventHandler interface {
 	// You can set topiclistener.StartPartitionSessionConfirm for change default settings.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	OnStartPartitionSessionRequest(ctx context.Context, event *PublicStartPartitionSessionEvent) error
+	OnStartPartitionSessionRequest(ctx context.Context, event *PublicEventStartPartitionSession) error
 
 	// OnReadMessages called with batch of messages. Max count of messages limited by internal buffer size
 	//
@@ -31,7 +32,7 @@ type EventHandler interface {
 	// It is guaranteed about the method will be called least once.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	OnStopPartitionSessionRequest(ctx context.Context, event *PublicStopPartitionSessionEvent) error
+	OnStopPartitionSessionRequest(ctx context.Context, event *PublicEventStopPartitionSession) error
 }
 
 // PublicReadMessages
@@ -42,25 +43,37 @@ type PublicReadMessages struct {
 	Batch            *topicreader.Batch
 }
 
-// PublicStartPartitionSessionEvent
+// PublicEventStartPartitionSession
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-type PublicStartPartitionSessionEvent struct {
+type PublicEventStartPartitionSession struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
 	CommittedOffset  int64
 	PartitionOffsets PublicOffsetsRange
-	respChan         chan PublicStartPartitionSessionConfirm
+	confirm          confirmStorage[PublicStartPartitionSessionConfirm]
+}
+
+func NewPublicStartPartitionSessionEvent(
+	session topicreadercommon.PublicPartitionSession,
+	committedOffset int64,
+	partitionOffsets PublicOffsetsRange,
+) *PublicEventStartPartitionSession {
+	return &PublicEventStartPartitionSession{
+		PartitionSession: session,
+		CommittedOffset:  committedOffset,
+		PartitionOffsets: partitionOffsets,
+	}
 }
 
 // Confirm
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (e *PublicStartPartitionSessionEvent) Confirm() {
+func (e *PublicEventStartPartitionSession) Confirm() {
 	e.ConfirmWithParams(PublicStartPartitionSessionConfirm{})
 }
 
-func (e *PublicStartPartitionSessionEvent) ConfirmWithParams(p PublicStartPartitionSessionConfirm) {
-	e.respChan <- p
+func (e *PublicEventStartPartitionSession) ConfirmWithParams(p PublicStartPartitionSessionConfirm) {
+	e.confirm.Set(p)
 }
 
 // PublicStartPartitionSessionConfirm
@@ -97,10 +110,10 @@ type PublicOffsetsRange struct {
 	End   int64
 }
 
-// PublicStopPartitionSessionEvent
+// PublicEventStopPartitionSession
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-type PublicStopPartitionSessionEvent struct {
+type PublicEventStopPartitionSession struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
 
 	// Graceful mean about server is waiting for client finish work with the partition and confirm stop the work
@@ -109,17 +122,24 @@ type PublicStopPartitionSessionEvent struct {
 	Graceful        bool
 	CommittedOffset int64
 
-	resp chan PublicStopPartitionSessionConfirm
+	confirm confirmStorage[empty.Struct]
+}
+
+func NewPublicStopPartitionSessionEvent(
+	partitionSession topicreadercommon.PublicPartitionSession,
+	graceful bool,
+	committedOffset int64,
+) *PublicEventStopPartitionSession {
+	return &PublicEventStopPartitionSession{
+		PartitionSession: partitionSession,
+		Graceful:         graceful,
+		CommittedOffset:  committedOffset,
+	}
 }
 
 // Confirm
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (e *PublicStopPartitionSessionEvent) Confirm() {
-	e.resp <- PublicStopPartitionSessionConfirm{}
+func (e *PublicEventStopPartitionSession) Confirm() {
+	e.confirm.Set(empty.Struct{})
 }
-
-// PublicStopPartitionSessionConfirm
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-type PublicStopPartitionSessionConfirm struct{}

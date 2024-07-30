@@ -1,4 +1,5 @@
 * Fixed handle reconnection timeout error
+* Fixed experimental topic listener handle stop partition event
 
 ## v3.76.1
 * Fixed `query.WithCommit()` flag behaviour for `tx.Execute` in query service
