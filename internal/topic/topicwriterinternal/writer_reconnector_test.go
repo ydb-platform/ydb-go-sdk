@@ -137,9 +137,10 @@ func TestWriterImpl_Write(t *testing.T) {
 					},
 				},
 				Codec: rawtopiccommon.CodecRaw,
-			}).Do(func(_ interface{}) {
+			}).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 				close(writeMessageReceived)
-			}).Return(nil)
+				return nil
+			})
 
 			writeCompleted := make(empty.Chan)
 			go func() {
@@ -187,9 +188,10 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		messContent := []byte("123")
 
 		messReceived := make(chan rawtopiccommon.Codec, 2)
-		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
+		e.stream.EXPECT().Send(gomock.Any()).DoAndReturn(func(message rawtopicwriter.ClientMessage) error {
 			writeReq := message.(*rawtopicwriter.WriteRequest)
 			messReceived <- writeReq.Codec
+			return nil
 		})
 
 		require.NoError(t, err)
@@ -216,9 +218,10 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		require.NoError(t, writer.Close())
 
 		messReceived := make(chan rawtopiccommon.Codec, 2)
-		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
+		e.stream.EXPECT().Send(gomock.Any()).DoAndReturn(func(message rawtopicwriter.ClientMessage) error {
 			writeReq := message.(*rawtopicwriter.WriteRequest)
 			messReceived <- writeReq.Codec
+			return nil
 		})
 
 		require.NoError(t, err)
@@ -241,9 +244,10 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		messContentLong := make([]byte, 100000)
 
 		messReceived := make(chan rawtopiccommon.Codec, 2)
-		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
+		e.stream.EXPECT().Send(gomock.Any()).DoAndReturn(func(message rawtopicwriter.ClientMessage) error {
 			writeReq := message.(*rawtopicwriter.WriteRequest)
 			messReceived <- writeReq.Codec
+			return nil
 		}).Times(codecMeasureIntervalBatches * 2)
 
 		codecs := make(map[rawtopiccommon.Codec]empty.Struct)
@@ -464,26 +468,30 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			}
 
 			streamClosed := make(empty.Chan)
-			strm.EXPECT().CloseSend().Do(func() {
+			strm.EXPECT().CloseSend().DoAndReturn(func() error {
 				t.Logf("closed stream: %v", name)
 				close(streamClosed)
+				return nil
 			})
 
-			strm.EXPECT().Send(&initReq).Do(func(_ interface{}) {
+			strm.EXPECT().Send(&initReq).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 				t.Logf("sent init request stream: %v", name)
+				return nil
 			})
 
-			strm.EXPECT().Recv().Do(func() {
+			strm.EXPECT().Recv().DoAndReturn(func() (rawtopicwriter.ServerMessage, error) {
 				t.Logf("receive init response stream: %v", name)
-			}).Return(&rawtopicwriter.InitResult{
-				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
-				SessionID:             name,
-			}, nil)
+				return &rawtopicwriter.InitResult{
+					ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+					SessionID:             name,
+				}, nil
+			})
 
-			strm.EXPECT().Recv().Do(func() {
+			strm.EXPECT().Recv().DoAndReturn(func() (rawtopicwriter.ServerMessage, error) {
 				xtest.WaitChannelClosed(t, streamClosed)
 				t.Logf("channel closed: %v", name)
-			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
+				return nil, errors.New("test stream closed")
+			}).MaxTimes(1)
 
 			return strm
 		}
@@ -494,9 +502,10 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+		}).Do(func(_ rawtopicwriter.ClientMessage) error {
 			t.Logf("strm2 sent message and return retriable error")
-		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
+			return xerrors.Retryable(errors.New("retriable on strm2"))
+		})
 
 		strm3 := newStream("strm3")
 		strm3.EXPECT().Send(&rawtopicwriter.WriteRequest{
@@ -504,9 +513,10 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+		}).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 			t.Logf("strm3 sent message and return unretriable error")
-		}).Return(errors.New("strm3"))
+			return errors.New("strm3")
+		})
 
 		connectsResult := []connectionAttemptContext{
 			{
@@ -572,9 +582,10 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 				},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+		}).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 			close(writeCompleted)
-		}).Return(nil)
+			return nil
+		})
 
 		flushCompleted := make(empty.Chan)
 		go func() {
@@ -1059,7 +1070,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	req := testCreateInitRequest(res.writer)
 
 	if options.customInitRequestHandler == nil {
-		res.stream.EXPECT().Send(&req).Do(func(_ interface{}) {
+		res.stream.EXPECT().Send(&req).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 			supportedCodecs := rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}
 			if options.topicCodecs != nil {
 				supportedCodecs = options.topicCodecs
@@ -1071,16 +1082,20 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 				PartitionID:           res.partitionID,
 				SupportedCodecs:       supportedCodecs,
 			})
-		}).Return(nil)
+			return nil
+		})
 	} else {
-		res.stream.EXPECT().Send(&req).Do(func(receivedRequest *rawtopicwriter.InitRequest) {
-			options.customInitRequestHandler(res, receivedRequest)
+		res.stream.EXPECT().Send(&req).DoAndReturn(func(receivedRequest rawtopicwriter.ClientMessage) error {
+			mess := receivedRequest.(*rawtopicwriter.InitRequest)
+			options.customInitRequestHandler(res, mess)
+			return nil
 		})
 	}
 
 	streamClosed := make(empty.Chan)
-	res.stream.EXPECT().CloseSend().Do(func() {
+	res.stream.EXPECT().CloseSend().DoAndReturn(func() error {
 		close(streamClosed)
+		return nil
 	})
 
 	res.writer.start()

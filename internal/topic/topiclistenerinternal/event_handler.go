@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
-//go:generate mockgen -source event_handler.go -destination event_handler_mock_test.go -package topiclistenerinternal -write_package_comment=false --typed
+//go:generate mockgen -source event_handler.go -destination event_handler_mock_test.go --typed -package topiclistenerinternal -write_package_comment=false
 
 type EventHandler interface {
 	// OnStartPartitionSessionRequest called when server send start partition session request method.

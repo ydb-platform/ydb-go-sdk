@@ -171,9 +171,10 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 		stream.EXPECT().Commit(
 			gomock.Any(),
 			gomock.Any(),
-		).Do(func(ctx context.Context, offset topicreadercommon.CommitRange) {
+		).DoAndReturn(func(ctx context.Context, offset topicreadercommon.CommitRange) error {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
+			return nil
 		})
 
 		reconnector := &readerReconnector{
@@ -190,10 +191,11 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 		stream.EXPECT().Commit(
 			gomock.Any(),
 			gomock.Any(),
-		).Do(func(ctx context.Context, offset topicreadercommon.CommitRange) {
+		).DoAndReturn(func(ctx context.Context, offset topicreadercommon.CommitRange) error {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
-		}).Return(testErr)
+			return testErr
+		})
 
 		reconnector := &readerReconnector{
 			streamVal:           stream,
@@ -315,8 +317,9 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	reconnector.initChannelsAndClock()
 
 	stream := NewMockbatchedStreamReader(mc)
-	stream.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Do(func(_ context.Context, err error) {
+	stream.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, err error) error {
 		require.Error(t, err)
+		return nil
 	})
 
 	connectionRequested := make(empty.Chan)
