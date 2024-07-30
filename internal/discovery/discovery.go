@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-//go:generate mockgen -destination grpc_client_mock_test.go -package discovery -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1 DiscoveryServiceClient
+//go:generate mockgen -destination grpc_client_mock_test.go --typed -package discovery -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1 DiscoveryServiceClient
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	return &Client{

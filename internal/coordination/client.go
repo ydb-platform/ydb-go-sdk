@@ -22,7 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-//go:generate mockgen -destination grpc_client_mock_test.go -package coordination -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1 CoordinationServiceClient,CoordinationService_SessionClient
+//go:generate mockgen -destination grpc_client_mock_test.go --typed -package coordination -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1 CoordinationServiceClient,CoordinationService_SessionClient
 
 var errNilClient = xerrors.Wrap(errors.New("coordination client is not initialized"))
 
