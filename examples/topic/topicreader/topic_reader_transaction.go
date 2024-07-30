@@ -8,35 +8,29 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
-func CommitMessagesToTransactino(ctx context.Context, db *ydb.Driver, reader *topicreader.Reader) error {
+func CommitMessagesToTransaction(ctx context.Context, db *ydb.Driver, reader *topicreader.Reader) error {
 	for { // loop
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 
-		batch, err := reader.ReadMessagesBatch(ctx)
-		if err != nil {
-			return err
-		}
-		id := batch.Messages[0].MessageGroupID
+		err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 
-		batchResult, err := processBatch(batch.Context(), batch)
-		if err != nil {
-			return err
-		}
+			batch, err := reader.PopBatchTx(ctx, tx) // the batch will be commited with commit the tx
+			id := batch.Messages[0].MessageGroupID
 
-		err = db.Query().DoTx(batch.Context(), func(ctx context.Context, tx query.TxActor) error {
+			batchResult, err := processBatch(batch.Context(), batch)
+			if err != nil {
+				return err
+			}
+
 			_, err = tx.Execute(ctx, `
 $last = SELECT MAX(val) FROM table WHERE id=$id;
 UPSERT INTO t (id, val) VALUES($id, COALESCE($last, 0) + $value)
 `, query.WithParameters(
 				ydb.ParamsBuilder().Param("$id").Text(id).Param("$value").Int64(int64(batchResult)).Build(),
 			))
-			if err != nil {
-				return nil
-			}
-
-			return reader.CommitMessagesInTx(ctx, tx, batch)
+			return err
 		})
 		if err != nil {
 			return err
