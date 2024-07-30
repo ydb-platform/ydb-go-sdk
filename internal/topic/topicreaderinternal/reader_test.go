@@ -27,6 +27,7 @@ func TestReader_Close(t *testing.T) {
 		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), ReadMessageBatchOptions{}).
 			DoAndReturn(func(ctx context.Context, options ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 				<-readerContext.Done()
+
 				return nil, testErr
 			})
 		baseReader.EXPECT().ReadMessageBatch(
@@ -34,15 +35,18 @@ func TestReader_Close(t *testing.T) {
 			ReadMessageBatchOptions{batcherGetOptions: batcherGetOptions{MaxCount: 1, MinCount: 1}},
 		).DoAndReturn(func(ctx context.Context, options ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 			<-readerContext.Done()
+
 			return nil, testErr
 		})
 		baseReader.EXPECT().Commit(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
 				<-readerContext.Done()
+
 				return testErr
 			})
 		baseReader.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ error) error {
 			readerCancel()
+
 			return nil
 		})
 

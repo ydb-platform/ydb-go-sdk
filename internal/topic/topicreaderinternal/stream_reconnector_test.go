@@ -174,6 +174,7 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 		).DoAndReturn(func(ctx context.Context, offset topicreadercommon.CommitRange) error {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
+
 			return nil
 		})
 
@@ -194,6 +195,7 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 		).DoAndReturn(func(ctx context.Context, offset topicreadercommon.CommitRange) error {
 			require.Equal(t, "v", ctx.Value(k{}))
 			require.Equal(t, expectedCommitRange, offset)
+
 			return testErr
 		})
 
@@ -319,6 +321,7 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	stream := NewMockbatchedStreamReader(mc)
 	stream.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, err error) error {
 		require.Error(t, err)
+
 		return nil
 	})
 
