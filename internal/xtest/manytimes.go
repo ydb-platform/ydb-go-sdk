@@ -44,6 +44,10 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 		// run test, then check stopAfter for guarantee run test least once
 		runTest(t, test, &testMutex)
 
+		if testing.Short() {
+			return
+		}
+
 		if time.Since(start) > options.stopAfter || t.Failed() {
 			return
 		}
