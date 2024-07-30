@@ -180,27 +180,6 @@ func Transport(err error, opts ...teOpt) error {
 	return te
 }
 
-func MustPessimizeEndpoint(err error, codes ...grpcCodes.Code) bool {
-	switch {
-	case err == nil:
-		return false
-
-	// all transport errors except selected codes
-	case IsTransportError(err) && !IsTransportError(
-		err,
-		append(
-			codes,
-			grpcCodes.ResourceExhausted,
-			grpcCodes.OutOfRange,
-		)...,
-	):
-		return true
-
-	default:
-		return false
-	}
-}
-
 func TransportError(err error) Error {
 	if err == nil {
 		return nil

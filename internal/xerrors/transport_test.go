@@ -143,7 +143,7 @@ func TestGrpcError(t *testing.T) {
 	}
 }
 
-func Test_transportError_Error(t *testing.T) {
+func TestTransportErrorString(t *testing.T) {
 	for _, tt := range []struct {
 		err  error
 		text string
