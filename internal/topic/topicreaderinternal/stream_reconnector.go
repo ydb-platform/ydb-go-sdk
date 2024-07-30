@@ -219,10 +219,11 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 		onReconnectionDone := trace.TopicOnReaderReconnect(r.tracer, request.reason)
 
 		if request.reason != nil {
-			if retryBackoff, stopRetryReason := r.checkErrRetryMode(
+			retryBackoff, stopRetryReason := r.checkErrRetryMode(
 				request.reason,
 				r.clock.Since(retriesStarted),
-			); stopRetryReason == nil {
+			)
+			if stopRetryReason == nil {
 				if err := func() error {
 					t := r.clock.NewTimer(retryBackoff.Delay(attempt))
 					defer t.Stop()

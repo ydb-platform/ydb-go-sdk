@@ -62,6 +62,12 @@ func TestRetriableError(t *testing.T) {
 	})
 	t.Run("unretryable", func(t *testing.T) {
 		require.NoError(t, RetryableError(errors.New("test")))
-		require.NoError(t, RetryableError(Nonretryable(Retryable(errors.New("test")))))
+		require.NoError(t, RetryableError(Unretryable(Retryable(errors.New("test")))))
 	})
+}
+
+func TestUnretryableUnwrap(t *testing.T) {
+	test := errors.New("test")
+	wrapped := Unretryable(test)
+	require.ErrorIs(t, wrapped, test)
 }

@@ -11,8 +11,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -235,9 +235,12 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 		newStream2.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).MinTimes(1)
 
 		reconnector := &readerReconnector{
-			connectTimeout: value.InfiniteDuration,
-			background:     *background.NewWorker(ctx, "test-worker, "+t.Name()),
+			background: *background.NewWorker(ctx, "test-worker, "+t.Name()),
+			retrySettings: topic.RetrySettings{
+				StartTimeout: value.InfiniteDuration,
+			},
 			tracer:         &trace.Topic{},
+			connectTimeout: value.InfiniteDuration,
 		}
 		reconnector.initChannelsAndClock()
 

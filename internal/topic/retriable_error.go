@@ -74,7 +74,7 @@ func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.
 	}
 
 	if retriesDuration > settings.StartTimeout {
-		return nil, fmt.Errorf("ydb: topic reader reconnection timeout, last error: %w", xerrors.Nonretryable(checkErr))
+		return nil, fmt.Errorf("ydb: topic reader reconnection timeout, last error: %w", xerrors.Unretryable(checkErr))
 	}
 
 	mode := retry.Check(checkErr)
@@ -88,14 +88,14 @@ func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.
 	case PublicRetryDecisionDefault:
 		isRetriable := mode.MustRetry(true)
 		if !isRetriable {
-			return nil, fmt.Errorf("ydb: topic reader unretriable error: %w", xerrors.Nonretryable(checkErr))
+			return nil, fmt.Errorf("ydb: topic reader unretriable error: %w", xerrors.Unretryable(checkErr))
 		}
 	case PublicRetryDecisionRetry:
 		// pass
 	case PublicRetryDecisionStop:
 		return nil, fmt.Errorf(
 			"ydb: topic reader unretriable error by check error callback: %w",
-			xerrors.Nonretryable(checkErr),
+			xerrors.Unretryable(checkErr),
 		)
 	default:
 		panic(fmt.Errorf("unexpected retry decision: %v", decision))

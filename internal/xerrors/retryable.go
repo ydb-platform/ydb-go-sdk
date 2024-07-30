@@ -123,8 +123,8 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 
 // RetryableError return Error if err is retriable error, else nil
 func RetryableError(err error) Error {
-	var unretriableErr untertryableError
-	if errors.Is(err, unretriableErr) {
+	var unretriableErr unretryableError
+	if errors.As(err, &unretriableErr) {
 		return nil
 	}
 
@@ -136,14 +136,14 @@ func RetryableError(err error) Error {
 	return nil
 }
 
-func Nonretryable(err error) untertryableError {
-	return untertryableError{err}
+func Unretryable(err error) unretryableError {
+	return unretryableError{err}
 }
 
-type untertryableError struct {
+type unretryableError struct {
 	error
 }
 
-func Unwrap(e untertryableError) error {
+func (e unretryableError) Unwrap() error {
 	return e.error
 }
