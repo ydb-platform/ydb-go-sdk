@@ -55,7 +55,7 @@ func (h *TopicEventsHandler) OnReadMessages(
 
 func (h *TopicEventsHandler) OnStartPartitionSessionRequest(
 	ctx context.Context,
-	event *topiclistener.StartPartitionSessionEvent,
+	event *topiclistener.EventStartPartitionSession,
 ) error {
 	lockID, offset, err := lockPartition(ctx, event.PartitionSession.TopicPath, event.PartitionSession.PartitionID)
 
@@ -75,7 +75,7 @@ func (h *TopicEventsHandler) OnStartPartitionSessionRequest(
 
 func (h *TopicEventsHandler) OnStopPartitionSessionRequest(
 	ctx context.Context,
-	event *topiclistener.StopPartitionSessionEvent,
+	event *topiclistener.EventStopPartitionSession,
 ) error {
 	h.m.Lock()
 	lockID := h.locks[event.PartitionSession.PartitionSessionID]
