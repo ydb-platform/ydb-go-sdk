@@ -15,7 +15,6 @@ func CommitMessagesToTransaction(ctx context.Context, db *ydb.Driver, reader *to
 		}
 
 		err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-
 			batch, err := reader.PopBatchTx(ctx, tx) // the batch will be commited with commit the tx
 			id := batch.Messages[0].MessageGroupID
 
