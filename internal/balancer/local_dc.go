@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -114,7 +115,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 
 func detectLocalDC(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
 	if len(endpoints) == 0 {
-		return "", xerrors.WithStackTrace(ErrNoEndpoints)
+		return "", xerrors.WithStackTrace(cluster.ErrNoEndpoints)
 	}
 	endpointsByDc := splitEndpointsByLocation(endpoints)
 

@@ -20,7 +20,6 @@ import (
 	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
@@ -488,7 +487,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 
 	d.discovery = xsync.OnceValue(func() (*internalDiscovery.Client, error) {
 		return internalDiscovery.New(xcontext.ValueOnly(ctx),
-			d.pool.Get(endpoint.New(d.config.Endpoint())),
+			d.balancer,
 			discoveryConfig.New(
 				append(
 					// prepend common params from root config
