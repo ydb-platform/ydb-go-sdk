@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -44,15 +45,14 @@ const (
 	txStateRollbacked
 )
 
+var _ tx.Identifier = (*transaction)(nil)
+
 type transaction struct {
-	id      string
+	tx.Identifier
+
 	s       *session
 	control *table.TransactionControl
 	state   txState
-}
-
-func (tx *transaction) ID() string {
-	return tx.id
 }
 
 // Execute executes query represented by text within transaction tx.
@@ -154,7 +154,7 @@ func (tx *transaction) CommitTx(
 		var (
 			request = &Ydb_Table.CommitTransactionRequest{
 				SessionId: tx.s.id,
-				TxId:      tx.id,
+				TxId:      tx.ID(),
 				OperationParams: operation.Params(
 					ctx,
 					tx.s.config.OperationTimeout(),
@@ -212,7 +212,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		_, err = tx.s.tableService.RollbackTransaction(ctx,
 			&Ydb_Table.RollbackTransactionRequest{
 				SessionId: tx.s.id,
-				TxId:      tx.id,
+				TxId:      tx.ID(),
 				OperationParams: operation.Params(
 					ctx,
 					tx.s.config.OperationTimeout(),

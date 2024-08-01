@@ -5,13 +5,15 @@ import (
 	"database/sql/driver"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type txFake struct {
+	tx.Identifier
+
 	beginCtx context.Context //nolint:containedctx
 	conn     *conn
 	ctx      context.Context //nolint:containedctx
@@ -39,21 +41,18 @@ func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.St
 }
 
 var (
-	_ driver.Tx                   = &txFake{}
-	_ driver.ExecerContext        = &txFake{}
-	_ driver.QueryerContext       = &txFake{}
-	_ table.TransactionIdentifier = &txFake{}
+	_ driver.Tx             = &txFake{}
+	_ driver.ExecerContext  = &txFake{}
+	_ driver.QueryerContext = &txFake{}
+	_ tx.Identifier         = &txFake{}
 )
 
 func (c *conn) beginTxFake(ctx context.Context, txOptions driver.TxOptions) (currentTx, error) {
 	return &txFake{
-		conn: c,
-		ctx:  ctx,
+		Identifier: tx.ID("FAKE"),
+		conn:       c,
+		ctx:        ctx,
 	}, nil
-}
-
-func (tx *txFake) ID() string {
-	return "FAKE"
 }
 
 func (tx *txFake) Commit() (err error) {
