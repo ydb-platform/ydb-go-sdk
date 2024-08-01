@@ -3,6 +3,7 @@ package topicoptions
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -21,132 +22,166 @@ var (
 	CheckErrorRetryDecisionStop    = topic.PublicRetryDecisionStop    // Do not retry
 )
 
-type withMeteringMode topictypes.MeteringMode
-
-func (mode withMeteringMode) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	(*topictypes.MeteringMode)(&mode).ToRaw(&request.MeteringMode)
+type withMeteringMode struct {
+	internal.InterfaceImplementation
+	val topictypes.MeteringMode
 }
 
-func (mode withMeteringMode) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
-	(*topictypes.MeteringMode)(&mode).ToRaw(&req.SetMeteringMode)
+func (opt withMeteringMode) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	(&opt.val).ToRaw(&request.MeteringMode)
 }
 
-type withMinActivePartitions int64
-
-func (minActivePartitions withMinActivePartitions) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.PartitionSettings.MinActivePartitions = int64(minActivePartitions)
+func (opt withMeteringMode) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	(&opt.val).ToRaw(&req.SetMeteringMode)
 }
 
-func (minActivePartitions withMinActivePartitions) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+type withMinActivePartitions struct {
+	internal.InterfaceImplementation
+	val int64
+}
+
+func (opt withMinActivePartitions) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.PartitionSettings.MinActivePartitions = opt.val
+}
+
+func (opt withMinActivePartitions) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	req.AlterPartitionSettings.SetMinActivePartitions.HasValue = true
-	req.AlterPartitionSettings.SetMinActivePartitions.Value = int64(minActivePartitions)
+	req.AlterPartitionSettings.SetMinActivePartitions.Value = opt.val
 }
 
-type withPartitionCountLimit int64
-
-func (partitionCountLimit withPartitionCountLimit) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.PartitionSettings.PartitionCountLimit = int64(partitionCountLimit)
+type withPartitionCountLimit struct {
+	internal.InterfaceImplementation
+	val int64
 }
 
-func (partitionCountLimit withPartitionCountLimit) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+func (opt withPartitionCountLimit) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.PartitionSettings.PartitionCountLimit = opt.val
+}
+
+func (opt withPartitionCountLimit) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	req.AlterPartitionSettings.SetPartitionCountLimit.HasValue = true
-	req.AlterPartitionSettings.SetPartitionCountLimit.Value = int64(partitionCountLimit)
+	req.AlterPartitionSettings.SetPartitionCountLimit.Value = opt.val
 }
 
-type withRetentionPeriod time.Duration
-
-func (retentionPeriod withRetentionPeriod) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.RetentionPeriod = time.Duration(retentionPeriod)
+type withRetentionPeriod struct {
+	internal.InterfaceImplementation
+	val time.Duration
 }
 
-func (retentionPeriod withRetentionPeriod) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+func (opt withRetentionPeriod) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.RetentionPeriod = opt.val
+}
+
+func (opt withRetentionPeriod) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	req.SetRetentionPeriod.HasValue = true
-	req.SetRetentionPeriod.Value = time.Duration(retentionPeriod)
+	req.SetRetentionPeriod.Value = opt.val
 }
 
-type withRetentionStorageMB int64
-
-func (retentionStorageMB withRetentionStorageMB) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.RetentionStorageMB = int64(retentionStorageMB)
+type withRetentionStorageMB struct {
+	internal.InterfaceImplementation
+	val int64
 }
 
-func (retentionStorageMB withRetentionStorageMB) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+func (opt withRetentionStorageMB) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.RetentionStorageMB = opt.val
+}
+
+func (opt withRetentionStorageMB) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	req.SetRetentionStorageMB.HasValue = true
-	req.SetRetentionStorageMB.Value = int64(retentionStorageMB)
+	req.SetRetentionStorageMB.Value = opt.val
 }
 
-type withSupportedCodecs []topictypes.Codec
+type withSupportedCodecs struct {
+	internal.InterfaceImplementation
+	val []topictypes.Codec
+}
 
-func (codecs withSupportedCodecs) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.SupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(codecs))
-	for i, c := range codecs {
+func (opt withSupportedCodecs) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.SupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(opt.val))
+	for i, c := range opt.val {
 		c.ToRaw(&request.SupportedCodecs[i])
 	}
 }
 
-func (codecs withSupportedCodecs) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+func (opt withSupportedCodecs) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	req.SetSupportedCodecs = true
-	req.SetSupportedCodecsValue = make(rawtopiccommon.SupportedCodecs, len(codecs))
-	for i, codec := range codecs {
+	req.SetSupportedCodecsValue = make(rawtopiccommon.SupportedCodecs, len(opt.val))
+	for i, codec := range opt.val {
 		req.SetSupportedCodecsValue[i] = rawtopiccommon.Codec(codec)
 	}
 }
 
-type withPartitionWriteSpeedBytesPerSecond int64
-
-func (bytesPerSecond withPartitionWriteSpeedBytesPerSecond) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.PartitionWriteSpeedBytesPerSecond = int64(bytesPerSecond)
+type withPartitionWriteSpeedBytesPerSecond struct {
+	internal.InterfaceImplementation
+	val int64
 }
 
-func (bytesPerSecond withPartitionWriteSpeedBytesPerSecond) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+func (opt withPartitionWriteSpeedBytesPerSecond) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.PartitionWriteSpeedBytesPerSecond = opt.val
+}
+
+func (opt withPartitionWriteSpeedBytesPerSecond) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	req.SetPartitionWriteSpeedBytesPerSecond.HasValue = true
-	req.SetPartitionWriteSpeedBytesPerSecond.Value = int64(bytesPerSecond)
+	req.SetPartitionWriteSpeedBytesPerSecond.Value = opt.val
 }
 
-type withPartitionWriteBurstBytes int64
-
-func (burstBytes withPartitionWriteBurstBytes) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.PartitionWriteBurstBytes = int64(burstBytes)
+type withPartitionWriteBurstBytes struct {
+	internal.InterfaceImplementation
+	val int64
 }
 
-func (burstBytes withPartitionWriteBurstBytes) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+func (opt withPartitionWriteBurstBytes) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.PartitionWriteBurstBytes = opt.val
+}
+
+func (opt withPartitionWriteBurstBytes) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	req.SetPartitionWriteBurstBytes.HasValue = true
-	req.SetPartitionWriteBurstBytes.Value = int64(burstBytes)
+	req.SetPartitionWriteBurstBytes.Value = opt.val
 }
 
-type withAttributes map[string]string
-
-func (attributes withAttributes) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.Attributes = attributes
+type withAttributes struct {
+	internal.InterfaceImplementation
+	val map[string]string
 }
 
-func (attributes withAttributes) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
-	req.AlterAttributes = attributes
+func (opt withAttributes) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.Attributes = opt.val
 }
 
-type withAddConsumers []topictypes.Consumer
+func (opt withAttributes) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	req.AlterAttributes = opt.val
+}
 
-func (consumers withAddConsumers) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.Consumers = make([]rawtopic.Consumer, len(consumers))
-	for i := range consumers {
-		consumers[i].ToRaw(&request.Consumers[i])
+type withAddConsumers struct {
+	internal.InterfaceImplementation
+	val []topictypes.Consumer
+}
+
+func (opt withAddConsumers) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.Consumers = make([]rawtopic.Consumer, len(opt.val))
+	for i := range opt.val {
+		opt.val[i].ToRaw(&request.Consumers[i])
 	}
 }
 
-func (consumers withAddConsumers) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
-	req.AddConsumers = make([]rawtopic.Consumer, len(consumers))
-	for i := range consumers {
-		consumers[i].ToRaw(&req.AddConsumers[i])
+func (opt withAddConsumers) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	req.AddConsumers = make([]rawtopic.Consumer, len(opt.val))
+	for i := range opt.val {
+		opt.val[i].ToRaw(&req.AddConsumers[i])
 	}
 }
 
-type withDropConsumers []string
+type withDropConsumers struct {
+	internal.InterfaceImplementation
+	consumersName []string
+}
 
-func (consumers withDropConsumers) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
-	req.DropConsumers = consumers
+func (opt withDropConsumers) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	req.DropConsumers = opt.consumersName
 }
 
 type withConsumerWithImportant struct {
+	internal.InterfaceImplementation
 	name      string
 	important bool
 }
@@ -159,6 +194,7 @@ func (consumerImportant withConsumerWithImportant) ApplyAlterOption(req *rawtopi
 }
 
 type withConsumerWithReadFrom struct {
+	internal.InterfaceImplementation
 	name     string
 	readFrom time.Time
 }
@@ -171,6 +207,7 @@ func (consumerReadFrom withConsumerWithReadFrom) ApplyAlterOption(req *rawtopic.
 }
 
 type withConsumerWithSupportedCodecs struct {
+	internal.InterfaceImplementation
 	name   string
 	codecs []topictypes.Codec
 }
@@ -187,6 +224,7 @@ func (consumerCodecs withConsumerWithSupportedCodecs) ApplyAlterOption(req *rawt
 }
 
 type withConsumerWithAttributes struct {
+	internal.InterfaceImplementation
 	name       string
 	attributes map[string]string
 }

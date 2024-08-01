@@ -3,6 +3,7 @@ package tx
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
@@ -27,6 +28,7 @@ var (
 // Transaction settings options
 type (
 	Option interface {
+		internal.Interface
 		ApplyTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
 	}
 	Settings []Option
@@ -65,7 +67,9 @@ func WithDefaultTxMode() Option {
 
 var _ Option = serializableReadWriteTxSettingsOption{}
 
-type serializableReadWriteTxSettingsOption struct{}
+type serializableReadWriteTxSettingsOption struct {
+	internal.InterfaceImplementation
+}
 
 func (o serializableReadWriteTxSettingsOption) ApplyTxSettingsOption(
 	a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings,
@@ -79,7 +83,9 @@ func WithSerializableReadWrite() Option {
 
 var _ Option = snapshotReadOnlyTxSettingsOption{}
 
-type snapshotReadOnlyTxSettingsOption struct{}
+type snapshotReadOnlyTxSettingsOption struct {
+	internal.InterfaceImplementation
+}
 
 func (snapshotReadOnlyTxSettingsOption) ApplyTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
@@ -93,7 +99,9 @@ func WithSnapshotReadOnly() Option {
 
 var _ Option = staleReadOnlySettingsOption{}
 
-type staleReadOnlySettingsOption struct{}
+type staleReadOnlySettingsOption struct {
+	internal.InterfaceImplementation
+}
 
 func (staleReadOnlySettingsOption) ApplyTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
@@ -108,13 +116,16 @@ func WithStaleReadOnly() Option {
 type (
 	onlineReadOnly       bool
 	OnlineReadOnlyOption interface {
+		internal.Interface
 		applyTxOnlineReadOnlyOption(opt *onlineReadOnly)
 	}
 )
 
 var _ OnlineReadOnlyOption = inconsistentReadsTxOnlineReadOnlyOption{}
 
-type inconsistentReadsTxOnlineReadOnlyOption struct{}
+type inconsistentReadsTxOnlineReadOnlyOption struct {
+	internal.InterfaceImplementation
+}
 
 func (i inconsistentReadsTxOnlineReadOnlyOption) applyTxOnlineReadOnlyOption(b *onlineReadOnly) {
 	*b = true
@@ -126,13 +137,16 @@ func WithInconsistentReads() OnlineReadOnlyOption {
 
 var _ Option = onlineReadOnlySettingsOption{}
 
-type onlineReadOnlySettingsOption []OnlineReadOnlyOption
+type onlineReadOnlySettingsOption struct {
+	internal.InterfaceImplementation
+	Options []OnlineReadOnlyOption
+}
 
 func (opts onlineReadOnlySettingsOption) ApplyTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
 ) {
 	var ro onlineReadOnly
-	for _, opt := range opts {
+	for _, opt := range opts.Options {
 		if opt != nil {
 			opt.applyTxOnlineReadOnlyOption(&ro)
 		}
@@ -145,5 +159,5 @@ func (opts onlineReadOnlySettingsOption) ApplyTxSettingsOption(
 }
 
 func WithOnlineReadOnly(opts ...OnlineReadOnlyOption) onlineReadOnlySettingsOption {
-	return opts
+	return onlineReadOnlySettingsOption{Options: opts}
 }

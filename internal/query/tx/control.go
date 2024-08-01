@@ -3,6 +3,7 @@ package tx
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
@@ -18,6 +19,7 @@ type (
 		applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl)
 	}
 	ControlOption interface {
+		internal.Interface
 		applyTxControlOption(txControl *Control)
 	}
 	Control struct {
@@ -25,6 +27,8 @@ type (
 		commit   bool
 	}
 	Identifier interface {
+		internal.Interface
+
 		ID() string
 		isYdbTx()
 	}
@@ -47,7 +51,10 @@ var (
 	_ Selector      = beginTxOptions{}
 )
 
-type beginTxOptions []Option
+type beginTxOptions struct {
+	internal.InterfaceImplementation
+	Options []Option
+}
 
 func (opts beginTxOptions) applyTxControlOption(txControl *Control) {
 	txControl.selector = opts
@@ -56,7 +63,7 @@ func (opts beginTxOptions) applyTxControlOption(txControl *Control) {
 func (opts beginTxOptions) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
 	selector := a.QueryTransactionControlBeginTx()
 	selector.BeginTx = a.QueryTransactionSettings()
-	for _, opt := range opts {
+	for _, opt := range opts.Options {
 		if opt != nil {
 			opt.ApplyTxSettingsOption(a, selector.BeginTx)
 		}
@@ -66,15 +73,19 @@ func (opts beginTxOptions) applyTxSelector(a *allocator.Allocator, txControl *Yd
 
 // BeginTx returns selector transaction control option
 func BeginTx(opts ...Option) beginTxOptions {
-	return opts
+	return beginTxOptions{Options: opts}
 }
 
 var (
-	_ ControlOption = txIDTxControlOption("")
-	_ Selector      = txIDTxControlOption("")
+	_ ControlOption = txIDTxControlOption{txID: ""}
+	_ Selector      = txIDTxControlOption{txID: ""}
 )
 
-type txIDTxControlOption string
+type txIDTxControlOption struct {
+	internal.InterfaceImplementation
+
+	txID string
+}
 
 func (id txIDTxControlOption) applyTxControlOption(txControl *Control) {
 	txControl.selector = id
@@ -82,19 +93,21 @@ func (id txIDTxControlOption) applyTxControlOption(txControl *Control) {
 
 func (id txIDTxControlOption) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
 	selector := a.QueryTransactionControlTxID()
-	selector.TxId = string(id)
+	selector.TxId = id.txID
 	txControl.TxSelector = selector
 }
 
 func WithTx(t Identifier) txIDTxControlOption {
-	return txIDTxControlOption(t.ID())
+	return txIDTxControlOption{txID: t.ID()}
 }
 
 func WithTxID(txID string) txIDTxControlOption {
-	return txIDTxControlOption(txID)
+	return txIDTxControlOption{txID: txID}
 }
 
-type commitTxOption struct{}
+type commitTxOption struct {
+	internal.InterfaceImplementation
+}
 
 func (c commitTxOption) applyTxControlOption(txControl *Control) {
 	txControl.commit = true

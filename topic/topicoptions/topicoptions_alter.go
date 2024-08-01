@@ -4,38 +4,40 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 // AlterOption type of options for change topic settings
 type AlterOption interface {
+	internal.Interface
 	ApplyAlterOption(req *rawtopic.AlterTopicRequest)
 }
 
 // AlterWithMeteringMode change metering mode for topic (need for serverless installations)
 func AlterWithMeteringMode(m topictypes.MeteringMode) AlterOption {
-	return withMeteringMode(m)
+	return withMeteringMode{val: m}
 }
 
 // AlterWithMinActivePartitions change min active partitions of the topic
 func AlterWithMinActivePartitions(minActivePartitions int64) AlterOption {
-	return withMinActivePartitions(minActivePartitions)
+	return withMinActivePartitions{val: minActivePartitions}
 }
 
 // AlterWithPartitionCountLimit change partition count limit of the topic
 func AlterWithPartitionCountLimit(partitionCountLimit int64) AlterOption {
-	return withPartitionCountLimit(partitionCountLimit)
+	return withPartitionCountLimit{val: partitionCountLimit}
 }
 
 // AlterWithRetentionPeriod change retention period of topic
 func AlterWithRetentionPeriod(retentionPeriod time.Duration) AlterOption {
-	return withRetentionPeriod(retentionPeriod)
+	return withRetentionPeriod{val: retentionPeriod}
 }
 
 // AlterWithRetentionStorageMB change retention storage size in MB.
 func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
-	return withRetentionStorageMB(retentionStorageMB)
+	return withRetentionStorageMB{val: retentionStorageMB}
 }
 
 // AlterWithSupportedCodecs change set of codec, allowed for the topic
@@ -44,22 +46,22 @@ func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
 		return codecs[i] < codecs[j]
 	})
 
-	return withSupportedCodecs(codecs)
+	return withSupportedCodecs{val: codecs}
 }
 
 // AlterWithPartitionWriteSpeedBytesPerSecond change limit of write speed for partitions of the topic
 func AlterWithPartitionWriteSpeedBytesPerSecond(bytesPerSecond int64) AlterOption {
-	return withPartitionWriteSpeedBytesPerSecond(bytesPerSecond)
+	return withPartitionWriteSpeedBytesPerSecond{val: bytesPerSecond}
 }
 
 // AlterWithPartitionWriteBurstBytes change burst size for write to partition of topic
 func AlterWithPartitionWriteBurstBytes(burstBytes int64) AlterOption {
-	return withPartitionWriteBurstBytes(burstBytes)
+	return withPartitionWriteBurstBytes{val: burstBytes}
 }
 
 // AlterWithAttributes change attributes map of topic
 func AlterWithAttributes(attributes map[string]string) AlterOption {
-	return withAttributes(attributes)
+	return withAttributes{val: attributes}
 }
 
 // AlterWithAddConsumers add consumer to the topic
@@ -68,14 +70,14 @@ func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
 		return consumers[i].Name < consumers[j].Name
 	})
 
-	return withAddConsumers(consumers)
+	return withAddConsumers{val: consumers}
 }
 
 // AlterWithDropConsumers drop consumer from the topic
 func AlterWithDropConsumers(consumersName ...string) AlterOption {
 	sort.Strings(consumersName)
 
-	return withDropConsumers(consumersName)
+	return withDropConsumers{consumersName: consumersName}
 }
 
 // AlterConsumerWithImportant set/remove important flag for the consumer of topic
