@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -101,11 +102,11 @@ func (c *conn) IsValid() bool {
 }
 
 type currentTx interface {
+	tx.Identifier
 	driver.Tx
 	driver.ExecerContext
 	driver.QueryerContext
 	driver.ConnPrepareContext
-	table.TransactionIdentifier
 }
 
 type resultNoRows struct{}

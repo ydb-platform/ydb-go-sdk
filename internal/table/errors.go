@@ -28,15 +28,15 @@ var (
 	// requested session is closed early.
 	errSessionClosed = xerrors.Wrap(errors.New("session closed early"))
 
-	// errNoProgress returned by a Client instance to indicate that
-	// operation could not be completed.
-	errNoProgress = xerrors.Wrap(errors.New("no progress"))
-
 	// errParamsRequired returned by a Client instance to indicate that required params is not defined
 	errParamsRequired = xerrors.Wrap(errors.New("params required"))
 )
 
 func isCreateSessionErrorRetriable(err error) bool {
+	if err == nil {
+		panic(err)
+	}
+
 	switch {
 	case
 		xerrors.Is(err, errSessionPoolOverflow),

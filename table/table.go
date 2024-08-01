@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -240,9 +241,7 @@ type DataQuery interface {
 	YQL() string
 }
 
-type TransactionIdentifier interface {
-	ID() string
-}
+type TransactionIdentifier = tx.Identifier
 
 type TransactionActor interface {
 	TransactionIdentifier

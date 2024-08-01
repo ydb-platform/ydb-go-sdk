@@ -4,6 +4,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
 var (
@@ -23,10 +24,6 @@ type (
 	Control struct {
 		selector Selector
 		commit   bool
-	}
-	Identifier interface {
-		ID() string
-		isYdbTx()
 	}
 )
 
@@ -90,7 +87,7 @@ func (id txIDTxControlOption) applyTxSelector(a *allocator.Allocator, txControl 
 	txControl.TxSelector = selector
 }
 
-func WithTx(t Identifier) txIDTxControlOption {
+func WithTx(t tx.Identifier) txIDTxControlOption {
 	return txIDTxControlOption(t.ID())
 }
 

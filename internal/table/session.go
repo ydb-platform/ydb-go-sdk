@@ -26,6 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -852,14 +853,14 @@ func (s *session) executeQueryResult(
 	table.Transaction, result.Result, error,
 ) {
 	tx := &transaction{
-		id: res.GetTxMeta().GetId(),
-		s:  s,
+		Identifier: tx.ID(res.GetTxMeta().GetId()),
+		s:          s,
 	}
 	if txControl.GetCommitTx() {
 		tx.state.Store(txStateCommitted)
 	} else {
 		tx.state.Store(txStateInitialized)
-		tx.control = table.TxControl(table.WithTxID(tx.id))
+		tx.control = table.TxControl(table.WithTxID(tx.ID()))
 	}
 
 	return tx, scanner.NewUnary(
@@ -1297,8 +1298,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	return nil
 }
 
-// BeginTransaction begins new transaction within given session with given
-// settings.
+// BeginTransaction begins new transaction within given session with given settings.
 func (s *session) BeginTransaction(
 	ctx context.Context,
 	txSettings *table.TransactionSettings,
@@ -1336,9 +1336,9 @@ func (s *session) BeginTransaction(
 		return nil, xerrors.WithStackTrace(err)
 	}
 	tx := &transaction{
-		id:      result.GetTxMeta().GetId(),
-		s:       s,
-		control: table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
+		Identifier: tx.ID(result.GetTxMeta().GetId()),
+		s:          s,
+		control:    table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
 	}
 	tx.state.Store(txStateInitialized)
 
