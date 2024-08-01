@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
@@ -13,17 +14,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type tx struct {
+type transaction struct {
+	tx.Identifier
+
 	conn *conn
 	ctx  context.Context //nolint:containedctx
 	tx   table.Transaction
 }
 
 var (
-	_ driver.Tx                   = &tx{}
-	_ driver.ExecerContext        = &tx{}
-	_ driver.QueryerContext       = &tx{}
-	_ table.TransactionIdentifier = &tx{}
+	_ driver.Tx             = &transaction{}
+	_ driver.ExecerContext  = &transaction{}
+	_ driver.QueryerContext = &transaction{}
+	_ tx.Identifier         = &transaction{}
 )
 
 func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (currentTx, error) {
@@ -40,24 +43,21 @@ func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (current
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	transaction, err := c.session.BeginTransaction(ctx, table.TxSettings(txc))
+	nativeTx, err := c.session.BeginTransaction(ctx, table.TxSettings(txc))
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
-	c.currentTx = &tx{
-		conn: c,
-		ctx:  ctx,
-		tx:   transaction,
+	c.currentTx = &transaction{
+		Identifier: tx.ID(nativeTx.ID()),
+		conn:       c,
+		ctx:        ctx,
+		tx:         nativeTx,
 	}
 
 	return c.currentTx, nil
 }
 
-func (tx *tx) ID() string {
-	return tx.tx.ID()
-}
-
-func (tx *tx) checkTxState() error {
+func (tx *transaction) checkTxState() error {
 	if tx.conn.currentTx == tx {
 		return nil
 	}
@@ -72,11 +72,11 @@ func (tx *tx) checkTxState() error {
 	)
 }
 
-func (tx *tx) Commit() (finalErr error) {
+func (tx *transaction) Commit() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).Commit"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).Commit"),
 			tx,
 		)
 	)
@@ -96,11 +96,11 @@ func (tx *tx) Commit() (finalErr error) {
 	return nil
 }
 
-func (tx *tx) Rollback() (finalErr error) {
+func (tx *transaction) Rollback() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).Rollback"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).Rollback"),
 			tx,
 		)
 	)
@@ -121,11 +121,11 @@ func (tx *tx) Rollback() (finalErr error) {
 	return err
 }
 
-func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (
+func (tx *transaction) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).QueryContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).QueryContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
@@ -163,11 +163,11 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	}, nil
 }
 
-func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
+func (tx *transaction) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).ExecContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).ExecContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
@@ -199,9 +199,9 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	return resultNoRows{}, nil
 }
 
-func (tx *tx) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
+func (tx *transaction) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).PrepareContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).PrepareContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {

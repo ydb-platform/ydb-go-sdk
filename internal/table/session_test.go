@@ -22,6 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -301,6 +302,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableCommitTransaction,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				tx := &transaction{
+					Identifier: tx.ID(""),
 					s: &session{
 						tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 						config:       config.New(),
@@ -314,6 +316,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableRollbackTransaction,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				tx := &transaction{
+					Identifier: tx.ID(""),
 					s: &session{
 						tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 						config:       config.New(),
