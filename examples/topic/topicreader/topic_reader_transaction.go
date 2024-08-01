@@ -87,9 +87,13 @@ func PopWithTransactionRecreateReader(
 		if err != nil {
 			return err
 		}
+		defer reader.Close(ctx)
 
 		for { // loop
 			tx, err := s.Begin(ctx, nil)
+			if err != nil {
+				return err
+			}
 
 			batch, err := reader.PopBatchTx(ctx, tx)
 			if err != nil {
