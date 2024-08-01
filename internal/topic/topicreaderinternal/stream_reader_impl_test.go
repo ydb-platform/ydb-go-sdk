@@ -1208,8 +1208,8 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
 		require.NoError(t, err)
 
-		require.Len(t, txMock.mockTx.OnCompleted, 1)
-		txMock.mockTx.OnCompleted[0](nil)
+		require.Len(t, txMock.onCompleted, 1)
+		txMock.onCompleted[0](nil)
 		require.Equal(t, initialCommitOffset+1, e.partitionSession.CommittedOffset())
 	})
 	t.Run("FailedAddCommitToTransactions", func(t *testing.T) {
@@ -1234,11 +1234,11 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
 		require.ErrorIs(t, err, testError)
 		require.NoError(t, xerrors.RetryableError(err))
-		require.Empty(t, txMock.mockTx.OnCompleted)
+		require.Empty(t, txMock.onCompleted)
 
 		require.True(t, e.reader.closed)
 		require.ErrorIs(t, e.reader.err, testError)
 		require.Error(t, xerrors.RetryableError(e.reader.err))
-		require.True(t, txMock.mockTx.RolledBack)
+		require.True(t, txMock.RolledBack)
 	})
 }

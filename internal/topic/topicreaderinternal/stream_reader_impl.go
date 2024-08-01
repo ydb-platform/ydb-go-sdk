@@ -20,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -188,7 +189,7 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 
 func (r *topicStreamReaderImpl) PopBatchTx(
 	ctx context.Context,
-	tx *TransactionWrapper,
+	tx tx.Notificator,
 	opts ReadMessageBatchOptions,
 ) (*topicreadercommon.PublicBatch, error) {
 	batch, err := r.ReadMessageBatch(ctx, opts)
@@ -205,7 +206,7 @@ func (r *topicStreamReaderImpl) PopBatchTx(
 
 func (r *topicStreamReaderImpl) commitWithTransaction(
 	ctx context.Context,
-	tx *TransactionWrapper,
+	tx tx.Notificator,
 	batch *topicreadercommon.PublicBatch,
 ) error {
 	commitRange := topicreadercommon.GetCommitRange(batch)
@@ -238,7 +239,7 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 		return err
 	})
 	if updateOffesetInTransactionErr == nil {
-		tx.OnTxCompleted(func(transactionResult error) {
+		tx.OnCompleted(func(transactionResult error) {
 			//nolint:godox
 			// TODO: trace
 			if transactionResult == nil {

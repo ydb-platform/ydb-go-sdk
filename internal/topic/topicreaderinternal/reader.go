@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -131,7 +132,7 @@ func (r *Reader) Close(ctx context.Context) error {
 
 func (r *Reader) PopBatchTx(
 	ctx context.Context,
-	tx *TransactionWrapper,
+	tx tx.Notificator,
 	opts ...PublicReadBatchOption,
 ) (*topicreadercommon.PublicBatch, error) {
 	batchOptions := r.getBatchOptions(opts)

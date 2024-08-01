@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
 //go:generate mockgen -source batched_stream_reader_interface.go --typed -destination batched_stream_reader_mock_test.go -package topicreaderinternal -write_package_comment=false
@@ -13,5 +14,5 @@ type batchedStreamReader interface {
 	ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)
 	Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error
 	CloseWithError(ctx context.Context, err error) error
-	PopBatchTx(ctx context.Context, tx *TransactionWrapper, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) //nolint:lll
+	PopBatchTx(ctx context.Context, tx tx.Notificator, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) //nolint:lll
 }

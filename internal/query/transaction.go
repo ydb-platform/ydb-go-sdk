@@ -2,7 +2,6 @@ package query
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -21,16 +20,14 @@ var (
 	_ tx.Identifier     = (*Transaction)(nil)
 )
 
-var ErrTransactionRollingBack = xerrors.Wrap(errors.New("ydb: the transaction is rolling back"))
-
 type Transaction struct {
 	tx.Identifier
 
 	s           *Session
-	onCompleted []OnTransactionCompletedFunc
+	onCompleted []tx.OnTransactionCompletedFunc
 }
 
-func (tx Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
+func (tx *Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
 	r, err := tx.Execute(ctx, q, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -49,7 +46,7 @@ func (tx Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxE
 	return row, nil
 }
 
-func (tx Transaction) ReadResultSet(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx *Transaction) ReadResultSet(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	rs query.ResultSet, _ error,
 ) {
 	r, err := tx.Execute(ctx, q, opts...)
@@ -77,7 +74,7 @@ func newTransaction(id string, s *Session) *Transaction {
 	}
 }
 
-func (tx Transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, finalErr error,
 ) {
 	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
@@ -131,7 +128,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx Transaction) CommitTx(ctx context.Context) (err error) {
+func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
 	defer func() {
 		tx.notifyOnCompleted(err)
 	}()
@@ -160,7 +157,7 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx Transaction) Rollback(ctx context.Context) error {
+func (tx *Transaction) Rollback(ctx context.Context) error {
 	//nolint:godox
 	// ToDo save local marker for deny any additional requests to the transaction?
 
@@ -178,7 +175,11 @@ func (tx Transaction) Rollback(ctx context.Context) error {
 	return nil
 }
 
-func (tx Transaction) notifyOnCompleted(err error) {
+func (tx *Transaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
+	tx.onCompleted = append(tx.onCompleted, f)
+}
+
+func (tx *Transaction) notifyOnCompleted(err error) {
 	for _, f := range tx.onCompleted {
 		f(err)
 	}
@@ -187,9 +188,3 @@ func (tx Transaction) notifyOnCompleted(err error) {
 func GetSessionID(tx *Transaction) string {
 	return tx.s.ID()
 }
-
-func OnTransactionCompleted(tx *Transaction, f OnTransactionCompletedFunc) {
-	tx.onCompleted = append(tx.onCompleted, f)
-}
-
-type OnTransactionCompletedFunc func(transactionResult error)

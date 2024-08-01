@@ -98,7 +98,7 @@ func (r *Reader) PopBatchTx(ctx context.Context, tx query.TxActor, opts ...ReadB
 		)))
 	}
 
-	return r.reader.PopBatchTx(ctx, topicreaderinternal.NewFromQueryTransaction(internalTx), opts...)
+	return r.reader.PopBatchTx(ctx, internalTx, opts...)
 }
 
 // CommitRangeGetter interface for get commit offsets

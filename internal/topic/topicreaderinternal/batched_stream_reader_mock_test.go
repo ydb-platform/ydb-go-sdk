@@ -11,6 +11,7 @@ import (
 	reflect "reflect"
 
 	topicreadercommon "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	tx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -114,7 +115,7 @@ func (c *MockbatchedStreamReaderCommitCall) DoAndReturn(f func(context.Context, 
 }
 
 // PopBatchTx mocks base method.
-func (m *MockbatchedStreamReader) PopBatchTx(ctx context.Context, tx *TransactionWrapper, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
+func (m *MockbatchedStreamReader) PopBatchTx(ctx context.Context, tx tx.Notificator, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PopBatchTx", ctx, tx, opts)
 	ret0, _ := ret[0].(*topicreadercommon.PublicBatch)
@@ -141,13 +142,13 @@ func (c *MockbatchedStreamReaderPopBatchTxCall) Return(arg0 *topicreadercommon.P
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockbatchedStreamReaderPopBatchTxCall) Do(f func(context.Context, *TransactionWrapper, ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)) *MockbatchedStreamReaderPopBatchTxCall {
+func (c *MockbatchedStreamReaderPopBatchTxCall) Do(f func(context.Context, tx.Notificator, ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)) *MockbatchedStreamReaderPopBatchTxCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockbatchedStreamReaderPopBatchTxCall) DoAndReturn(f func(context.Context, *TransactionWrapper, ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)) *MockbatchedStreamReaderPopBatchTxCall {
+func (c *MockbatchedStreamReaderPopBatchTxCall) DoAndReturn(f func(context.Context, tx.Notificator, ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)) *MockbatchedStreamReaderPopBatchTxCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

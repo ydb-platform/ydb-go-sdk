@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -79,7 +80,7 @@ func newReaderReconnector(
 
 func (r *readerReconnector) PopBatchTx(
 	ctx context.Context,
-	tx *TransactionWrapper,
+	tx tx.Notificator,
 	opts ReadMessageBatchOptions,
 ) (
 	*topicreadercommon.PublicBatch,
