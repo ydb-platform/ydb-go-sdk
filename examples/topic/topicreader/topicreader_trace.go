@@ -73,7 +73,7 @@ func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 	for {
 		batch, _ := reader.ReadMessagesBatch(readContext)
 
-		processBatch(batch.Context(), batch)
+		_, _ = processBatch(batch.Context(), batch)
 		_ = externalSystemCommit(
 			batch.Context(),
 			batch.Topic(),
@@ -145,7 +145,7 @@ func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db 
 	for {
 		batch, _ := r.ReadMessagesBatch(readContext)
 
-		processBatch(batch.Context(), batch)
+		_, _ = processBatch(batch.Context(), batch)
 		_ = externalSystemCommit(batch.Context(), batch.Topic(), batch.PartitionID(), getEndOffset(batch))
 	}
 }

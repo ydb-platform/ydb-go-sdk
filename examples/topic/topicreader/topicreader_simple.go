@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 
+	firestore "google.golang.org/genproto/firestore/bundle"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
-	firestore "google.golang.org/genproto/firestore/bundle"
 )
 
 // PrintMessageContent is simple example for easy start read messages
@@ -25,7 +26,7 @@ func PrintMessageContent(ctx context.Context, reader *topicreader.Reader) {
 func ReadMessagesByBatch(ctx context.Context, reader *topicreader.Reader) {
 	for {
 		batch, _ := reader.ReadMessagesBatch(ctx)
-		processBatch(batch.Context(), batch)
+		_, _ = processBatch(batch.Context(), batch)
 		_ = reader.Commit(batch.Context(), batch)
 	}
 }

@@ -19,7 +19,7 @@ func CommitMessagesToTransaction(ctx context.Context, db *ydb.Driver, reader *to
 			if err != nil {
 				return err
 			}
-			id := batch.Messages[0].MessageGroupID
+			id := batch.Messages[0].MessageGroupID //nolint:staticcheck
 
 			batchResult, err := processBatch(batch.Context(), batch)
 			if err != nil {
@@ -30,8 +30,12 @@ func CommitMessagesToTransaction(ctx context.Context, db *ydb.Driver, reader *to
 $last = SELECT MAX(val) FROM table WHERE id=$id;
 UPSERT INTO t (id, val) VALUES($id, COALESCE($last, 0) + $value)
 `, query.WithParameters(
-				ydb.ParamsBuilder().Param("$id").Text(id).Param("$value").Int64(int64(batchResult)).Build(),
+				ydb.ParamsBuilder().
+					Param("$id").Text(id).
+					Param("$value").Int64(int64(batchResult)).
+					Build(),
 			))
+
 			return err
 		})
 		if err != nil {
@@ -51,7 +55,7 @@ func PopWithTransaction(ctx context.Context, db *ydb.Driver, reader *topicreader
 			if err != nil {
 				return err
 			}
-			id := batch.Messages[0].MessageGroupID
+			id := batch.Messages[0].MessageGroupID //nolint:staticcheck
 
 			batchResult, err := processBatch(batch.Context(), batch)
 			if err != nil {
@@ -62,10 +66,13 @@ func PopWithTransaction(ctx context.Context, db *ydb.Driver, reader *topicreader
 $last = SELECT MAX(val) FROM table WHERE id=$id;
 UPSERT INTO t (id, val) VALUES($id, COALESCE($last, 0) + $value)
 `, query.WithParameters(
-				ydb.ParamsBuilder().Param("$id").Text(id).Param("$value").Int64(int64(batchResult)).Build(),
+				ydb.ParamsBuilder().
+					Param("$id").Text(id).
+					Param("$value").Int64(int64(batchResult)).
+					Build(),
 			))
 			if err != nil {
-				return nil
+				return err
 			}
 
 			return nil
@@ -99,7 +106,7 @@ func PopWithTransactionRecreateReader(
 			if err != nil {
 				return err
 			}
-			id := batch.Messages[0].MessageGroupID
+			id := batch.Messages[0].MessageGroupID //nolint:staticcheck
 
 			batchResult, err := processBatch(batch.Context(), batch)
 			if err != nil {
@@ -109,11 +116,15 @@ func PopWithTransactionRecreateReader(
 			_, err = tx.Execute(ctx, `
 $last = SELECT MAX(val) FROM table WHERE id=$id;
 UPSERT INTO t (id, val) VALUES($id, COALESCE($last, 0) + $value)
-`, query.WithParameters(
-				ydb.ParamsBuilder().Param("$id").Text(id).Param("$value").Int64(int64(batchResult)).Build(),
-			))
+`,
+				query.WithParameters(
+					ydb.ParamsBuilder().
+						Param("$id").Text(id).
+						Param("$value").Int64(int64(batchResult)).
+						Build(),
+				))
 			if err != nil {
-				return nil
+				return err
 			}
 
 			if err = tx.CommitTx(ctx); err != nil {
