@@ -80,7 +80,7 @@ func newReaderReconnector(
 
 func (r *readerReconnector) PopBatchTx(
 	ctx context.Context,
-	tx tx.Notificator,
+	tx tx.Transaction,
 	opts ReadMessageBatchOptions,
 ) (
 	*topicreadercommon.PublicBatch,

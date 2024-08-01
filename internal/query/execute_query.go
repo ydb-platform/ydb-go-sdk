@@ -53,7 +53,7 @@ func queryFromText(
 }
 
 func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient, q string, cfg executeConfig) (
-	_ *Transaction, _ *result, finalErr error,
+	_ *transaction, _ *result, finalErr error,
 ) {
 	a := allocator.New()
 	defer a.Free()

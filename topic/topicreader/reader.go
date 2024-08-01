@@ -2,12 +2,11 @@ package topicreader
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 
-	queryInternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -84,18 +83,15 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 // The reconnect is implementation detail and may be changed in the future.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (r *Reader) PopBatchTx(ctx context.Context, tx query.TxActor, opts ...ReadBatchOption) (*Batch, error) {
+func (r *Reader) PopBatchTx(ctx context.Context, transaction query.TxActor, opts ...ReadBatchOption) (*Batch, error) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err
 	}
 	defer r.outCall(&r.readInFlyght)
 
-	internalTx, ok := tx.(*queryInternal.Transaction)
-	if !ok {
-		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-			"ydb: mismatch types. Want query.Transaction, got: %T",
-			tx,
-		)))
+	internalTx, err := tx.AsTransaction(transaction)
+	if err != nil {
+		return nil, err
 	}
 
 	return r.reader.PopBatchTx(ctx, internalTx, opts...)

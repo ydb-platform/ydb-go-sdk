@@ -21,10 +21,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
+
+var _ tx.Transaction = &transaction{}
 
 func TestCommitTx(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
@@ -79,7 +82,7 @@ func TestTxOnCompleted(t *testing.T) {
 		tx := TransactionOverGrpcMock(e)
 
 		var completed []error
-		OnTransactionCompleted(tx, func(transactionResult error) {
+		tx.OnCompleted(func(transactionResult error) {
 			completed = append(completed, transactionResult)
 		})
 		err := tx.CommitTx(sf.Context(e))
@@ -98,7 +101,7 @@ func TestTxOnCompleted(t *testing.T) {
 		tx := TransactionOverGrpcMock(e)
 
 		var completed []error
-		OnTransactionCompleted(tx, func(transactionResult error) {
+		tx.OnCompleted(func(transactionResult error) {
 			completed = append(completed, transactionResult)
 		})
 		err := tx.CommitTx(sf.Context(e))
@@ -129,7 +132,7 @@ func TestTxOnCompleted(t *testing.T) {
 		tx := TransactionOverGrpcMock(e)
 		var completed []error
 
-		OnTransactionCompleted(tx, func(transactionResult error) {
+		tx.OnCompleted(func(transactionResult error) {
 			// notification before call to the server
 			require.False(t, rollbackCalled)
 			completed = append(completed, transactionResult)
@@ -152,7 +155,7 @@ func TestTxOnCompleted(t *testing.T) {
 		tx := TransactionOverGrpcMock(e)
 		var completed []error
 
-		OnTransactionCompleted(tx, func(transactionResult error) {
+		tx.OnCompleted(func(transactionResult error) {
 			completed = append(completed, transactionResult)
 		})
 
@@ -175,7 +178,7 @@ func TestTxOnCompleted(t *testing.T) {
 			var completedMutex sync.Mutex
 			var completed []error
 
-			OnTransactionCompleted(tx, func(transactionResult error) {
+			tx.OnCompleted(func(transactionResult error) {
 				completedMutex.Lock()
 				completed = append(completed, transactionResult)
 				completedMutex.Unlock()
@@ -203,7 +206,7 @@ func TestTxOnCompleted(t *testing.T) {
 			var completedMutex sync.Mutex
 			var completed []error
 
-			OnTransactionCompleted(tx, func(transactionResult error) {
+			tx.OnCompleted(func(transactionResult error) {
 				completedMutex.Lock()
 				completed = append(completed, transactionResult)
 				completedMutex.Unlock()
@@ -239,7 +242,7 @@ func TestTxOnCompleted(t *testing.T) {
 			var completedMutex sync.Mutex
 			var completed []error
 
-			OnTransactionCompleted(tx, func(transactionResult error) {
+			tx.OnCompleted(func(transactionResult error) {
 				completedMutex.Lock()
 				completed = append(completed, transactionResult)
 				completedMutex.Unlock()
@@ -284,7 +287,7 @@ func TestTxOnCompleted(t *testing.T) {
 				var completedMutex sync.Mutex
 				var completed []error
 
-				OnTransactionCompleted(tx, func(transactionResult error) {
+				tx.OnCompleted(func(transactionResult error) {
 					completedMutex.Lock()
 					completed = append(completed, transactionResult)
 					completedMutex.Unlock()
@@ -321,7 +324,7 @@ func TestTxOnCompleted(t *testing.T) {
 					var completedMutex sync.Mutex
 					var completed []error
 
-					OnTransactionCompleted(tx, func(transactionResult error) {
+					tx.OnCompleted(func(transactionResult error) {
 						completedMutex.Lock()
 						completed = append(completed, transactionResult)
 						completedMutex.Unlock()

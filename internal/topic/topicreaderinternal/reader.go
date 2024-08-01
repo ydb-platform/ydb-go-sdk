@@ -132,7 +132,7 @@ func (r *Reader) Close(ctx context.Context) error {
 
 func (r *Reader) PopBatchTx(
 	ctx context.Context,
-	tx tx.Notificator,
+	tx tx.Transaction,
 	opts ...PublicReadBatchOption,
 ) (*topicreadercommon.PublicBatch, error) {
 	batchOptions := r.getBatchOptions(opts)

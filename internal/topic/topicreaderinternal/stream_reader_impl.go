@@ -189,7 +189,7 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 
 func (r *topicStreamReaderImpl) PopBatchTx(
 	ctx context.Context,
-	tx tx.Notificator,
+	tx tx.Transaction,
 	opts ReadMessageBatchOptions,
 ) (*topicreadercommon.PublicBatch, error) {
 	batch, err := r.ReadMessageBatch(ctx, opts)
@@ -206,7 +206,7 @@ func (r *topicStreamReaderImpl) PopBatchTx(
 
 func (r *topicStreamReaderImpl) commitWithTransaction(
 	ctx context.Context,
-	tx tx.Notificator,
+	tx tx.Transaction,
 	batch *topicreadercommon.PublicBatch,
 ) error {
 	commitRange := topicreadercommon.GetCommitRange(batch)

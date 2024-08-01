@@ -35,5 +35,6 @@ func (m *mockTransaction) Rollback(ctx context.Context) error {
 	for _, f := range m.onCompleted {
 		f(query.ErrTransactionRollingBack)
 	}
+
 	return nil
 }

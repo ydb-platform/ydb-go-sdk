@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -16,18 +17,32 @@ import (
 )
 
 var (
-	_ query.Transaction = (*Transaction)(nil)
-	_ tx.Identifier     = (*Transaction)(nil)
+	_ query.Transaction = (*transaction)(nil)
+	_ tx.Identifier     = (*transaction)(nil)
 )
 
-type Transaction struct {
+type transaction struct {
 	tx.Identifier
 
 	s           *Session
 	onCompleted []tx.OnTransactionCompletedFunc
+
+	rollbackStarted atomic.Bool
 }
 
-func (tx *Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
+func (tx *transaction) SessionID() string {
+	return tx.s.ID()
+}
+
+func (tx *transaction) ReadRow(
+	ctx context.Context,
+	q string,
+	opts ...options.TxExecuteOption,
+) (row query.Row, _ error) {
+	if tx.rollbackStarted.Load() {
+		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
 	r, err := tx.Execute(ctx, q, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -46,9 +61,17 @@ func (tx *Transaction) ReadRow(ctx context.Context, q string, opts ...options.Tx
 	return row, nil
 }
 
-func (tx *Transaction) ReadResultSet(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx *transaction) ReadResultSet(
+	ctx context.Context,
+	q string,
+	opts ...options.TxExecuteOption,
+) (
 	rs query.ResultSet, _ error,
 ) {
+	if tx.rollbackStarted.Load() {
+		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
 	r, err := tx.Execute(ctx, q, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -67,18 +90,22 @@ func (tx *Transaction) ReadResultSet(ctx context.Context, q string, opts ...opti
 	return rs, nil
 }
 
-func newTransaction(id string, s *Session) *Transaction {
-	return &Transaction{
+func newTransaction(id string, s *Session) *transaction {
+	return &transaction{
 		Identifier: tx.ID(id),
 		s:          s,
 	}
 }
 
-func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx *transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, finalErr error,
 ) {
+	if tx.rollbackStarted.Load() {
+		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
 	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.Transaction.Execute"), tx.s, tx, q)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.transaction.Execute"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -128,7 +155,11 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
+func (tx *transaction) CommitTx(ctx context.Context) (err error) {
+	if tx.rollbackStarted.Load() {
+		return xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
 	defer func() {
 		tx.notifyOnCompleted(err)
 	}()
@@ -157,11 +188,15 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx *Transaction) Rollback(ctx context.Context) error {
+func (tx *transaction) Rollback(ctx context.Context) error {
+	// set flag for starting rollback and call notifications
+	// allow to rollback transaction many times - for handle retries on errors
+	if tx.rollbackStarted.CompareAndSwap(false, true) {
+		tx.notifyOnCompleted(xerrors.WithStackTrace(ErrTransactionRollingBack))
+	}
+
 	//nolint:godox
 	// ToDo save local marker for deny any additional requests to the transaction?
-
-	tx.notifyOnCompleted(xerrors.WithStackTrace(ErrTransactionRollingBack))
 
 	err := rollback(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
@@ -175,16 +210,12 @@ func (tx *Transaction) Rollback(ctx context.Context) error {
 	return nil
 }
 
-func (tx *Transaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
+func (tx *transaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
 	tx.onCompleted = append(tx.onCompleted, f)
 }
 
-func (tx *Transaction) notifyOnCompleted(err error) {
+func (tx *transaction) notifyOnCompleted(err error) {
 	for _, f := range tx.onCompleted {
 		f(err)
 	}
-}
-
-func GetSessionID(tx *Transaction) string {
-	return tx.s.ID()
 }
