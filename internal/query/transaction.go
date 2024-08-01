@@ -17,11 +17,11 @@ import (
 )
 
 var (
-	_ query.Transaction = (*transaction)(nil)
-	_ tx.Identifier     = (*transaction)(nil)
+	_ query.Transaction = (*Transaction)(nil)
+	_ tx.Identifier     = (*Transaction)(nil)
 )
 
-type transaction struct {
+type Transaction struct {
 	tx.Identifier
 
 	s           *Session
@@ -30,11 +30,11 @@ type transaction struct {
 	rollbackStarted atomic.Bool
 }
 
-func (tx *transaction) SessionID() string {
+func (tx *Transaction) SessionID() string {
 	return tx.s.ID()
 }
 
-func (tx *transaction) ReadRow(
+func (tx *Transaction) ReadRow(
 	ctx context.Context,
 	q string,
 	opts ...options.TxExecuteOption,
@@ -61,7 +61,7 @@ func (tx *transaction) ReadRow(
 	return row, nil
 }
 
-func (tx *transaction) ReadResultSet(
+func (tx *Transaction) ReadResultSet(
 	ctx context.Context,
 	q string,
 	opts ...options.TxExecuteOption,
@@ -90,14 +90,14 @@ func (tx *transaction) ReadResultSet(
 	return rs, nil
 }
 
-func newTransaction(id string, s *Session) *transaction {
-	return &transaction{
+func newTransaction(id string, s *Session) *Transaction {
+	return &Transaction{
 		Identifier: tx.ID(id),
 		s:          s,
 	}
 }
 
-func (tx *transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, finalErr error,
 ) {
 	if tx.rollbackStarted.Load() {
@@ -105,7 +105,7 @@ func (tx *transaction) Execute(ctx context.Context, q string, opts ...options.Tx
 	}
 
 	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.transaction.Execute"), tx.s, tx, q)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Transaction).Execute"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -155,7 +155,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx *transaction) CommitTx(ctx context.Context) (err error) {
+func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
 	if tx.rollbackStarted.Load() {
 		return xerrors.WithStackTrace(ErrTransactionRollingBack)
 	}
@@ -188,7 +188,7 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx *transaction) Rollback(ctx context.Context) error {
+func (tx *Transaction) Rollback(ctx context.Context) error {
 	// set flag for starting rollback and call notifications
 	// allow to rollback transaction many times - for handle retries on errors
 	if tx.rollbackStarted.CompareAndSwap(false, true) {
@@ -210,11 +210,11 @@ func (tx *transaction) Rollback(ctx context.Context) error {
 	return nil
 }
 
-func (tx *transaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
+func (tx *Transaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
 	tx.onCompleted = append(tx.onCompleted, f)
 }
 
-func (tx *transaction) notifyOnCompleted(err error) {
+func (tx *Transaction) notifyOnCompleted(err error) {
 	for _, f := range tx.onCompleted {
 		f(err)
 	}

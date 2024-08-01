@@ -27,7 +27,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-var _ tx.Transaction = &transaction{}
+var _ tx.Transaction = &Transaction{}
 
 func TestCommitTx(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
