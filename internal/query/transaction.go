@@ -65,7 +65,7 @@ func (tx Transaction) ReadResultSet(ctx context.Context, q string, opts ...optio
 
 func newTransaction(id string, s *Session) *Transaction {
 	return &Transaction{
-		Identifier: tx.ID(id),
+		Identifier: tx.NewID(id),
 		s:          s,
 	}
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
@@ -45,6 +46,8 @@ const (
 )
 
 type transaction struct {
+	internal.InterfaceImplementation
+
 	id      string
 	s       *session
 	control *table.TransactionControl

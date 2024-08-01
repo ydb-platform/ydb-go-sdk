@@ -4,38 +4,40 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 // CreateOption type for options of topic create
 type CreateOption interface {
+	internal.Interface
 	ApplyCreateOption(request *rawtopic.CreateTopicRequest)
 }
 
 // CreateWithMeteringMode set metering mode for the topic
 func CreateWithMeteringMode(mode topictypes.MeteringMode) CreateOption {
-	return withMeteringMode(mode)
+	return withMeteringMode{val: mode}
 }
 
 // CreateWithMinActivePartitions set min active partitions for the topic
 func CreateWithMinActivePartitions(count int64) CreateOption {
-	return withMinActivePartitions(count)
+	return withMinActivePartitions{val: count}
 }
 
 // CreateWithPartitionCountLimit set partition count limit for the topic
 func CreateWithPartitionCountLimit(count int64) CreateOption {
-	return withPartitionCountLimit(count)
+	return withPartitionCountLimit{val: count}
 }
 
 // CreateWithRetentionPeriod set retention time interval for the topic.
 func CreateWithRetentionPeriod(retentionPeriod time.Duration) CreateOption {
-	return withRetentionPeriod(retentionPeriod)
+	return withRetentionPeriod{val: retentionPeriod}
 }
 
 // CreateWithRetentionStorageMB set retention size for the topic.
 func CreateWithRetentionStorageMB(retentionStorageMB int64) CreateOption {
-	return withRetentionStorageMB(retentionStorageMB)
+	return withRetentionStorageMB{val: retentionStorageMB}
 }
 
 // CreateWithSupportedCodecs set supported codecs for the topic
@@ -44,22 +46,22 @@ func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
 		return codecs[i] < codecs[j]
 	})
 
-	return withSupportedCodecs(codecs)
+	return withSupportedCodecs{val: codecs}
 }
 
 // CreateWithPartitionWriteSpeedBytesPerSecond set write size limit for partitions of the topic
 func CreateWithPartitionWriteSpeedBytesPerSecond(partitionWriteSpeedBytesPerSecond int64) CreateOption {
-	return withPartitionWriteSpeedBytesPerSecond(partitionWriteSpeedBytesPerSecond)
+	return withPartitionWriteSpeedBytesPerSecond{val: partitionWriteSpeedBytesPerSecond}
 }
 
 // CreateWithPartitionWriteBurstBytes set burst limit for partitions of the topic
 func CreateWithPartitionWriteBurstBytes(partitionWriteBurstBytes int64) CreateOption {
-	return withPartitionWriteBurstBytes(partitionWriteBurstBytes)
+	return withPartitionWriteBurstBytes{val: partitionWriteBurstBytes}
 }
 
 // CreateWithAttributes set attributes for the topic.
 func CreateWithAttributes(attributes map[string]string) CreateOption {
-	return withAttributes(attributes)
+	return withAttributes{val: attributes}
 }
 
 // CreateWithConsumer create new consumers with the topic
@@ -68,5 +70,5 @@ func CreateWithConsumer(consumers ...topictypes.Consumer) CreateOption {
 		return consumers[i].Name < consumers[j].Name
 	})
 
-	return withAddConsumers(consumers)
+	return withAddConsumers{val: consumers}
 }

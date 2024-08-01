@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -87,6 +88,7 @@ type SessionInfo interface {
 }
 
 type Session interface {
+	internal.Interface
 	SessionInfo
 
 	CreateTable(
@@ -245,6 +247,8 @@ type TransactionIdentifier interface {
 }
 
 type TransactionActor interface {
+	internal.Interface
+
 	TransactionIdentifier
 
 	Execute(
@@ -262,6 +266,8 @@ type TransactionActor interface {
 }
 
 type Transaction interface {
+	internal.Interface
+
 	TransactionActor
 
 	CommitTx(
@@ -274,6 +280,8 @@ type Transaction interface {
 }
 
 type Statement interface {
+	internal.Interface
+
 	Execute(
 		ctx context.Context,
 		tx *TransactionControl,
