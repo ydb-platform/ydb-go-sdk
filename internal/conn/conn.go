@@ -380,7 +380,7 @@ func invoke(
 		defer onTransportError(ctx, err)
 
 		if !useWrapping {
-			return opID, issues, err
+			return opID, issues, withConnInfo(err, nodeID, address)
 		}
 
 		if sentMark.canRetry() {
@@ -545,7 +545,7 @@ func (c *conn) NewStream(
 		}()
 
 		if !useWrapping {
-			return nil, err
+			return nil, withConnInfo(err, c.NodeID(), c.Address())
 		}
 
 		if sentMark.canRetry() {

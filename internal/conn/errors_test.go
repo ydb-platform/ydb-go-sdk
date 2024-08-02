@@ -108,3 +108,21 @@ func TestIsBadConn(t *testing.T) {
 		})
 	}
 }
+
+func TestGrpcError(t *testing.T) {
+	err := withConnInfo(grpcStatus.Error(grpcCodes.Unavailable, "test"), 123, "test:123")
+	require.Equal(t, `rpc error: code = Unavailable desc = test`, err.Error())
+	var nodeID interface {
+		NodeID() uint32
+	}
+	require.ErrorAs(t, err, &nodeID)
+	require.Equal(t, uint32(123), nodeID.NodeID())
+	var address interface {
+		Address() string
+	}
+	require.ErrorAs(t, err, &address)
+	require.Equal(t, "test:123", address.Address())
+	s, has := grpcStatus.FromError(err)
+	require.True(t, has)
+	require.Equal(t, grpcCodes.Unavailable, s.Code())
+}
