@@ -89,17 +89,23 @@ func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 			},
 		},
 	}
-	defer func() {
-		if finalErr != nil && s != nil {
-			panic("abnormal result")
-		}
-	}()
 
 	onDone := trace.QueryOnSessionCreate(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.createSession"),
 	)
 	defer func() {
-		onDone(s, finalErr)
+		if s == nil && finalErr == nil {
+			panic("abnormal result: both nil")
+		}
+		if s != nil && finalErr != nil {
+			panic("abnormal result: both not nil")
+		}
+
+		if finalErr != nil {
+			onDone(nil, finalErr)
+		} else if s != nil {
+			onDone(s, nil)
+		}
 	}()
 
 	response, err := client.CreateSession(ctx, &Ydb_Query.CreateSessionRequest{})
@@ -107,17 +113,13 @@ func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	defer func() {
-		if finalErr != nil {
-			_ = deleteSession(ctx, client, response.GetSessionId())
-		}
-	}()
-
 	s.id = response.GetSessionId()
 	s.nodeID = response.GetNodeId()
 
 	err = s.attach(ctx)
 	if err != nil {
+		_ = deleteSession(ctx, client, response.GetSessionId())
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
