@@ -1,3 +1,4 @@
+## v3.76.2
 * Fixed bug with nil pointer dereference on trace callback from `query.createSession`
 * Fixed test message builder, now all method return itself pointer
 * Fixed handle reconnection timeout error
