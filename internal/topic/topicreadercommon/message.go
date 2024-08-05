@@ -66,6 +66,9 @@ func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 // Read implements io.Reader
 // Read uncompressed message content
 // return topicreader.UnexpectedCodec if message compressed with unknown codec
+//
+// Content of the message released from the memory after first read error
+// including io.EOF.
 func (m *PublicMessage) Read(p []byte) (n int, err error) {
 	m.dataConsumed = true
 
