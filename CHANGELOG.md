@@ -1,4 +1,10 @@
 * Added PopMessages from topic within transaction
+
+## v3.76.3
+* Changed interface `table.TransactionIdentifier` (added private method) for prohibition of any implementations outside ydb-go-sdk
+
+## v3.76.2
+* Fixed bug with nil pointer dereference on trace callback from `query.createSession`
 * Fixed test message builder, now all method return itself pointer
 * Fixed handle reconnection timeout error
 * Fixed experimental topic listener handle stop partition event
