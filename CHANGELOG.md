@@ -1,3 +1,5 @@
+* Changed interface `table.TransactionIdentifier` (added private method) for prohibition of any implementations outside ydb-go-sdk
+
 ## v3.76.2
 * Fixed bug with nil pointer dereference on trace callback from `query.createSession`
 * Fixed test message builder, now all method return itself pointer
