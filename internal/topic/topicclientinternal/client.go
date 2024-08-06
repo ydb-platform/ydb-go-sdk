@@ -258,7 +258,7 @@ func (c *Client) StartReader(
 	}
 	opts = append(defaultOpts, opts...)
 
-	internalReader, err := topicreaderinternal.NewReader(connector, consumer, readSelectors, opts...)
+	internalReader, err := topicreaderinternal.NewReader(&c.rawClient, connector, consumer, readSelectors, opts...)
 	if err != nil {
 		return nil, err
 	}

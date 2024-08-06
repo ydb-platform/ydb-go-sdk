@@ -10,6 +10,10 @@ type (
 	ID string
 )
 
+func NewID(id string) ID {
+	return ID(id)
+}
+
 func (id ID) ID() string {
 	return string(id)
 }

@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -23,10 +24,25 @@ var (
 type Transaction struct {
 	tx.Identifier
 
-	s *Session
+	s           *Session
+	onCompleted []tx.OnTransactionCompletedFunc
+
+	rollbackStarted atomic.Bool
 }
 
-func (tx Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
+func (tx *Transaction) SessionID() string {
+	return tx.s.ID()
+}
+
+func (tx *Transaction) ReadRow(
+	ctx context.Context,
+	q string,
+	opts ...options.TxExecuteOption,
+) (row query.Row, _ error) {
+	if tx.rollbackStarted.Load() {
+		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
 	r, err := tx.Execute(ctx, q, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -45,9 +61,17 @@ func (tx Transaction) ReadRow(ctx context.Context, q string, opts ...options.TxE
 	return row, nil
 }
 
-func (tx Transaction) ReadResultSet(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx *Transaction) ReadResultSet(
+	ctx context.Context,
+	q string,
+	opts ...options.TxExecuteOption,
+) (
 	rs query.ResultSet, _ error,
 ) {
+	if tx.rollbackStarted.Load() {
+		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
 	r, err := tx.Execute(ctx, q, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -73,16 +97,41 @@ func newTransaction(id string, s *Session) *Transaction {
 	}
 }
 
-func (tx Transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, finalErr error,
 ) {
+	if tx.rollbackStarted.Load() {
+		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
 	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.Transaction.Execute"), tx.s, tx, q)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Transaction).Execute"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings)
+	executeSettings := options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings
+
+	var res *result
+
+	// notification about complete transaction must be sended for any error or for successfully read all result if
+	// it was execution with commit flag
+	defer func() {
+		if finalErr == nil {
+			go func() {
+				<-res.Done()
+				resErr := res.Err()
+				if resErr != nil || executeSettings.TxControl().IsTxCommit() {
+					tx.notifyOnCompleted(resErr)
+				}
+			}()
+		} else {
+			tx.notifyOnCompleted(finalErr)
+		}
+	}()
+
+	var err error
+	_, res, err = execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)
@@ -106,8 +155,16 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx Transaction) CommitTx(ctx context.Context) error {
-	err := commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
+func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
+	if tx.rollbackStarted.Load() {
+		return xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
+	defer func() {
+		tx.notifyOnCompleted(err)
+	}()
+
+	err = commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
 			tx.s.setStatus(statusClosed)
@@ -131,7 +188,16 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx Transaction) Rollback(ctx context.Context) error {
+func (tx *Transaction) Rollback(ctx context.Context) error {
+	// set flag for starting rollback and call notifications
+	// allow to rollback transaction many times - for handle retries on errors
+	if tx.rollbackStarted.CompareAndSwap(false, true) {
+		tx.notifyOnCompleted(xerrors.WithStackTrace(ErrTransactionRollingBack))
+	}
+
+	//nolint:godox
+	// ToDo save local marker for deny any additional requests to the transaction?
+
 	err := rollback(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
@@ -142,4 +208,14 @@ func (tx Transaction) Rollback(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (tx *Transaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
+	tx.onCompleted = append(tx.onCompleted, f)
+}
+
+func (tx *Transaction) notifyOnCompleted(err error) {
+	for _, f := range tx.onCompleted {
+		f(err)
+	}
 }

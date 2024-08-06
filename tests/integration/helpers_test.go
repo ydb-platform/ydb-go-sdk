@@ -176,13 +176,14 @@ func (scope *scopeT) Folder() string {
 		folderPath := path.Join(driver.Name(), scope.T().Name())
 		scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 
-		scope.Logf("Create folder: %v", folderPath)
+		scope.Logf("Creating folder: %v", folderPath)
 		scope.Require.NoError(driver.Scheme().MakeDirectory(scope.Ctx, folderPath))
 		clean := func() {
 			if !scope.Failed() {
 				scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 			}
 		}
+		scope.Logf("Createing folder done: %v", folderPath)
 		return fixenv.NewGenericResultWithCleanup(folderPath, clean), nil
 	}
 	return fixenv.CacheResult(scope.Env, f)
@@ -217,11 +218,19 @@ func (scope *scopeT) TopicPath() string {
 		}
 		cleanup()
 
+		scope.Logf("Drop topic if exists: %q", topicPath)
+		if err := client.Drop(scope.Ctx, topicPath); err != nil && !ydb.IsOperationErrorSchemeError(err) {
+			scope.t.Logf("failed drop previous topic %q: %v", topicPath, err)
+		}
+
+		scope.Logf("Creating topic %q", topicPath)
 		err := client.Create(scope.Ctx, topicPath, topicoptions.CreateWithConsumer(
 			topictypes.Consumer{
 				Name: scope.TopicConsumerName(),
 			},
 		))
+
+		scope.Logf("Topic created: %q", topicPath)
 
 		return fixenv.NewGenericResultWithCleanup(topicPath, cleanup), err
 	}
@@ -229,8 +238,12 @@ func (scope *scopeT) TopicPath() string {
 }
 
 func (scope *scopeT) TopicReader() *topicreader.Reader {
+	return scope.TopicReaderNamed("default-reader")
+}
+
+func (scope *scopeT) TopicReaderNamed(name string) *topicreader.Reader {
 	f := func() (*fixenv.GenericResult[*topicreader.Reader], error) {
-		reader, err := scope.Driver().Topic().StartReader(
+		reader, err := scope.DriverWithGRPCLogging().Topic().StartReader(
 			scope.TopicConsumerName(),
 			topicoptions.ReadTopic(scope.TopicPath()),
 		)
@@ -242,7 +255,7 @@ func (scope *scopeT) TopicReader() *topicreader.Reader {
 		return fixenv.NewGenericResultWithCleanup(reader, cleanup), err
 	}
 
-	return fixenv.CacheResult(scope.Env, f)
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
 }
 
 func (scope *scopeT) TopicWriter() *topicwriter.Writer {
@@ -404,4 +417,11 @@ func (t *testLogger) flush() {
 		message := "\n" + strings.Join(t.messages, "\n")
 		t.test.Log(message)
 	})
+}
+
+func must[R any](res R, err error) R {
+	if err != nil {
+		panic(err)
+	}
+	return res
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -352,7 +354,7 @@ func TestTopicStreamReaderImpl_Create(t *testing.T) {
 		}, nil)
 		stream.EXPECT().CloseSend().Return(nil)
 
-		reader, err := newTopicStreamReader(topicreadercommon.NextReaderID(), stream, newTopicStreamReaderConfig())
+		reader, err := newTopicStreamReader(nil, topicreadercommon.NextReaderID(), stream, newTopicStreamReaderConfig())
 		require.Error(t, err)
 		require.Nil(t, reader)
 	})
@@ -979,15 +981,17 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 }
 
 type streamEnv struct {
-	ctx                    context.Context //nolint:containedctx
-	t                      testing.TB
-	reader                 *topicStreamReaderImpl
-	stopReadEvents         empty.Chan
-	stream                 *MockRawTopicReaderStream
-	partitionSessionID     partitionSessionID
-	mc                     *gomock.Controller
-	partitionSession       *topicreadercommon.PartitionSession
-	initialBufferSizeBytes int64
+	TopicClient             *MockTopicClient
+	ctx                     context.Context //nolint:containedctx
+	t                       testing.TB
+	reader                  *topicStreamReaderImpl
+	stopReadEvents          empty.Chan
+	stopReadEventsCloseOnce sync.Once
+	stream                  *MockRawTopicReaderStream
+	partitionSessionID      partitionSessionID
+	mc                      *gomock.Controller
+	partitionSession        *topicreadercommon.PartitionSession
+	initialBufferSizeBytes  int64
 
 	m                          xsync.Mutex
 	messagesFromServerToClient chan testStreamResult
@@ -1015,7 +1019,8 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
 	cfg.CommitterBatchTimeLag = 0
 
-	reader := newTopicStreamReaderStopped(topicreadercommon.NextReaderID(), stream, cfg)
+	topicClientMock := NewMockTopicClient(mc)
+	reader := newTopicStreamReaderStopped(topicClientMock, topicreadercommon.NextReaderID(), stream, cfg)
 	// reader.initSession() - skip stream level initialization
 
 	const testPartitionID = 5
@@ -1036,6 +1041,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	require.NoError(t, reader.sessionController.Add(session))
 
 	env := streamEnv{
+		TopicClient:                topicClientMock,
 		ctx:                        ctx,
 		t:                          t,
 		initialBufferSizeBytes:     initialBufferSizeBytes,
@@ -1059,12 +1065,13 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	streamClosed := make(empty.Chan)
 	stream.EXPECT().CloseSend().Return(nil).DoAndReturn(func() error {
 		close(streamClosed)
+		env.closeStream()
 
 		return nil
 	})
 
 	t.Cleanup(func() {
-		close(env.stopReadEvents)
+		env.closeStream()
 		_ = env.reader.CloseWithError(ctx, errors.New("test finished"))
 		xtest.WaitChannelClosed(t, streamClosed)
 	})
@@ -1145,4 +1152,93 @@ readMessages:
 			return res.msg, res.err
 		}
 	}
+}
+
+func (e *streamEnv) closeStream() {
+	e.stopReadEventsCloseOnce.Do(func() {
+		close(e.stopReadEvents)
+	})
+}
+
+func TestUpdateCommitInTransaction(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+
+		initialCommitOffset := e.partitionSession.CommittedOffset()
+		txID := "test-tx-id"
+		sessionID := "test-session-id"
+
+		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), &rawtopic.UpdateOffsetsInTransactionRequest{
+			OperationParams: rawydb.OperationParams{
+				OperationMode: rawydb.OperationParamsModeSync,
+			},
+			Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+				ID:      txID,
+				Session: sessionID,
+			},
+			Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
+				{
+					Path: e.partitionSession.Topic,
+					Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
+						{
+							PartitionID: e.partitionSession.PartitionID,
+							PartitionOffsets: []rawtopiccommon.OffsetRange{
+								{
+									Start: initialCommitOffset,
+									End:   initialCommitOffset + 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			Consumer: e.reader.cfg.Consumer,
+		})
+
+		txMock := newMockTransactionWrapper(sessionID, txID)
+
+		batch, err := topicreadercommon.NewBatch(e.partitionSession, []*topicreadercommon.PublicMessage{
+			topicreadercommon.NewPublicMessageBuilder().
+				Offset(e.partitionSession.CommittedOffset().ToInt64()).
+				PartitionSession(e.partitionSession).
+				Build(),
+		})
+		require.NoError(t, err)
+		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.NoError(t, err)
+
+		require.Len(t, txMock.onCompleted, 1)
+		txMock.onCompleted[0](nil)
+		require.Equal(t, initialCommitOffset+1, e.partitionSession.CommittedOffset())
+	})
+	t.Run("FailedAddCommitToTransactions", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+
+		txID := "test-tx-id"
+		sessionID := "test-session-id"
+
+		testError := errors.New("test error")
+		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), gomock.Any()).Return(testError)
+
+		txMock := newMockTransactionWrapper(sessionID, txID)
+
+		batch, err := topicreadercommon.NewBatch(e.partitionSession, []*topicreadercommon.PublicMessage{
+			topicreadercommon.NewPublicMessageBuilder().
+				Offset(e.partitionSession.CommittedOffset().ToInt64()).
+				PartitionSession(e.partitionSession).
+				Build(),
+		})
+		require.NoError(t, err)
+		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.ErrorIs(t, err, testError)
+		require.NoError(t, xerrors.RetryableError(err))
+		require.Empty(t, txMock.onCompleted)
+
+		require.True(t, e.reader.closed)
+		require.ErrorIs(t, e.reader.err, testError)
+		require.Error(t, xerrors.RetryableError(e.reader.err))
+		require.True(t, txMock.RolledBack)
+	})
 }

@@ -1,3 +1,5 @@
+* Added PopMessages from topic within transaction
+
 ## v3.76.3
 * Changed interface `table.TransactionIdentifier` (added private method) for prohibition of any implementations outside ydb-go-sdk
 

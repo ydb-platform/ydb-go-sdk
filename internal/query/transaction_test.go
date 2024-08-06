@@ -1,8 +1,15 @@
 package query
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/rekby/fixenv"
+	"github.com/rekby/fixenv/sf"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -14,10 +21,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
+
+var _ tx.Transaction = &Transaction{}
 
 func TestCommitTx(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
@@ -56,6 +66,284 @@ func TestCommitTx(t *testing.T) {
 		err := commitTx(ctx, service, "123", "456")
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+	})
+}
+
+func TestTxOnCompleted(t *testing.T) {
+	t.Run("OnCommitTxSuccess", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		QueryGrpcMock(e).EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
+			&Ydb_Query.CommitTransactionResponse{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil,
+		)
+
+		tx := TransactionOverGrpcMock(e)
+
+		var completed []error
+		tx.OnCompleted(func(transactionResult error) {
+			completed = append(completed, transactionResult)
+		})
+		err := tx.CommitTx(sf.Context(e))
+		require.NoError(t, err)
+		require.Equal(t, []error{nil}, completed)
+	})
+	t.Run("OnCommitTxFailed", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		testError := errors.New("test-error")
+
+		QueryGrpcMock(e).EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(nil,
+			testError,
+		)
+
+		tx := TransactionOverGrpcMock(e)
+
+		var completed []error
+		tx.OnCompleted(func(transactionResult error) {
+			completed = append(completed, transactionResult)
+		})
+		err := tx.CommitTx(sf.Context(e))
+		require.ErrorIs(t, err, testError)
+		require.Len(t, completed, 1)
+		require.ErrorIs(t, completed[0], err)
+	})
+	t.Run("OnRollback", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		rollbackCalled := false
+		QueryGrpcMock(e).EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(
+				ctx context.Context,
+				request *Ydb_Query.RollbackTransactionRequest,
+				option ...grpc.CallOption,
+			) (
+				*Ydb_Query.RollbackTransactionResponse,
+				error,
+			) {
+				rollbackCalled = true
+
+				return &Ydb_Query.RollbackTransactionResponse{
+					Status: Ydb.StatusIds_SUCCESS,
+				}, nil
+			})
+
+		tx := TransactionOverGrpcMock(e)
+		var completed []error
+
+		tx.OnCompleted(func(transactionResult error) {
+			// notification before call to the server
+			require.False(t, rollbackCalled)
+			completed = append(completed, transactionResult)
+		})
+
+		_ = tx.Rollback(sf.Context(e))
+		require.Len(t, completed, 1)
+		require.ErrorIs(t, completed[0], ErrTransactionRollingBack)
+	})
+	t.Run("OnExecuteWithoutCommitTxSuccess", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+		responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+		}, nil)
+
+		QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+		tx := TransactionOverGrpcMock(e)
+		var completed []error
+
+		tx.OnCompleted(func(transactionResult error) {
+			completed = append(completed, transactionResult)
+		})
+
+		_, err := tx.Execute(sf.Context(e), "")
+		require.NoError(t, err)
+		require.Empty(t, completed)
+	})
+	t.Run("OnExecuteWithoutTxSuccess", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			e := fixenv.New(t)
+
+			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil)
+
+			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+			tx := TransactionOverGrpcMock(e)
+			var completedMutex sync.Mutex
+			var completed []error
+
+			tx.OnCompleted(func(transactionResult error) {
+				completedMutex.Lock()
+				completed = append(completed, transactionResult)
+				completedMutex.Unlock()
+			})
+
+			res, err := tx.Execute(sf.Context(e), "")
+			require.NoError(t, err)
+			_ = res.Close(sf.Context(e))
+			time.Sleep(time.Millisecond) // time for reaction for closing channel
+			require.Empty(t, completed)
+		})
+	})
+	t.Run("OnExecuteWithTxSuccess", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			e := fixenv.New(t)
+
+			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil)
+
+			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+			tx := TransactionOverGrpcMock(e)
+			var completedMutex sync.Mutex
+			var completed []error
+
+			tx.OnCompleted(func(transactionResult error) {
+				completedMutex.Lock()
+				completed = append(completed, transactionResult)
+				completedMutex.Unlock()
+			})
+
+			res, err := tx.Execute(sf.Context(e), "", options.WithCommit())
+			_ = res.Close(sf.Context(e))
+			require.NoError(t, err)
+			xtest.SpinWaitCondition(t, &completedMutex, func() bool {
+				return len(completed) != 0
+			})
+			require.Equal(t, []error{nil}, completed)
+		})
+	})
+	t.Run("OnExecuteWithTxSuccessWithTwoResultSet", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			e := fixenv.New(t)
+
+			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				ResultSetIndex: 0,
+				ResultSet:      &Ydb.ResultSet{},
+			}, nil)
+			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 1,
+				ResultSet:      &Ydb.ResultSet{},
+			}, nil)
+
+			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+			tx := TransactionOverGrpcMock(e)
+			var completedMutex sync.Mutex
+			var completed []error
+
+			tx.OnCompleted(func(transactionResult error) {
+				completedMutex.Lock()
+				completed = append(completed, transactionResult)
+				completedMutex.Unlock()
+			})
+
+			res, err := tx.Execute(sf.Context(e), "", options.WithCommit())
+			require.NoError(t, err)
+
+			// time for event happened if is
+			time.Sleep(time.Millisecond)
+			require.Empty(t, completed)
+
+			_, err = res.NextResultSet(sf.Context(e))
+			require.NoError(t, err)
+			// time for event happened if is
+			time.Sleep(time.Millisecond)
+			require.Empty(t, completed)
+
+			_, err = res.NextResultSet(sf.Context(e))
+			require.NoError(t, err)
+
+			_ = res.Close(sf.Context(e))
+			require.NoError(t, err)
+			xtest.SpinWaitCondition(t, &completedMutex, func() bool {
+				return len(completed) != 0
+			})
+			require.Equal(t, []error{nil}, completed)
+		})
+	})
+	t.Run("OnExecuteFailedOnInitResponse", func(t *testing.T) {
+		for _, commit := range []bool{true, false} {
+			t.Run(fmt.Sprint("commit:", commit), func(t *testing.T) {
+				e := fixenv.New(t)
+
+				testErr := errors.New("test")
+				responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+				responseStream.EXPECT().Recv().Return(nil, testErr)
+
+				QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+				tx := TransactionOverGrpcMock(e)
+				var completedMutex sync.Mutex
+				var completed []error
+
+				tx.OnCompleted(func(transactionResult error) {
+					completedMutex.Lock()
+					completed = append(completed, transactionResult)
+					completedMutex.Unlock()
+				})
+
+				var opts []options.TxExecuteOption
+				if commit {
+					opts = append(opts, query.WithCommit())
+				}
+				_, err := tx.Execute(sf.Context(e), "", opts...)
+				require.ErrorIs(t, err, testErr)
+				require.Len(t, completed, 1)
+				require.ErrorIs(t, completed[0], testErr)
+			})
+		}
+	})
+	t.Run("OnExecuteFailedInResponsePart", func(t *testing.T) {
+		for _, commit := range []bool{true, false} {
+			t.Run(fmt.Sprint("commit:", commit), func(t *testing.T) {
+				xtest.TestManyTimes(t, func(t testing.TB) {
+					e := fixenv.New(t)
+
+					errorReturned := false
+					responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+					responseStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+						errorReturned = true
+
+						return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+					})
+
+					QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+					tx := TransactionOverGrpcMock(e)
+					var completedMutex sync.Mutex
+					var completed []error
+
+					tx.OnCompleted(func(transactionResult error) {
+						completedMutex.Lock()
+						completed = append(completed, transactionResult)
+						completedMutex.Unlock()
+					})
+
+					var opts []options.TxExecuteOption
+					if commit {
+						opts = append(opts, query.WithCommit())
+					}
+					_, err := tx.Execute(sf.Context(e), "", opts...)
+					require.True(t, errorReturned)
+					require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION))
+					xtest.SpinWaitCondition(t, &completedMutex, func() bool {
+						return len(completed) > 0
+					})
+					require.Len(t, completed, 1)
+				})
+			})
+		}
 	})
 }
 

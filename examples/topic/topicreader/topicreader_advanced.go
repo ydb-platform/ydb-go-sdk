@@ -16,7 +16,7 @@ func ReadMessagesWithCustomBatching(ctx context.Context, db *ydb.Driver) {
 
 	for {
 		batch, _ := reader.ReadMessagesBatch(ctx)
-		processBatch(batch.Context(), batch)
+		_, _ = processBatch(batch.Context(), batch)
 		_ = reader.Commit(batch.Context(), batch)
 	}
 }
@@ -58,7 +58,7 @@ func ProcessMessagesWithSyncCommit(ctx context.Context, db *ydb.Driver) {
 
 	for {
 		batch, _ := reader.ReadMessagesBatch(ctx)
-		processBatch(batch.Context(), batch)
+		_, _ = processBatch(batch.Context(), batch)
 		_ = reader.Commit(ctx, batch) // will wait response about commit from server
 	}
 }
@@ -86,7 +86,7 @@ func OwnReadProgressStorage(ctx context.Context, db *ydb.Driver) {
 	for {
 		batch, _ := reader.ReadMessagesBatch(ctx)
 
-		processBatch(batch.Context(), batch)
+		_, _ = processBatch(batch.Context(), batch)
 		_ = externalSystemCommit(
 			batch.Context(),
 			batch.Topic(),

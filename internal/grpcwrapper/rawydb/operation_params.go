@@ -34,3 +34,17 @@ const (
 func (mode OperationParamsMode) ToProto() Ydb_Operations.OperationParams_OperationMode {
 	return Ydb_Operations.OperationParams_OperationMode(mode)
 }
+
+func NewRawOperationParamsFromProto(proto *Ydb_Operations.OperationParams) (res OperationParams) {
+	res.OperationMode = OperationParamsMode(proto.GetOperationMode())
+	res.CancelAfter = rawoptional.Duration{
+		Value:    proto.GetCancelAfter().AsDuration(),
+		HasValue: proto.GetCancelAfter().AsDuration() > 0,
+	}
+	res.OperationTimeout = rawoptional.Duration{
+		Value:    proto.GetOperationTimeout().AsDuration(),
+		HasValue: proto.GetOperationTimeout().AsDuration() > 0,
+	}
+
+	return res
+}

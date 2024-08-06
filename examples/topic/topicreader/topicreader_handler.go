@@ -48,7 +48,7 @@ func (h *TopicEventsHandler) OnReadMessages(
 		log.Printf("Receive message: %v/%v/%v", mess.Topic(), mess.PartitionID(), mess.SeqNo)
 	}
 
-	processBatch(ctx, event.Batch)
+	_, _ = processBatch(ctx, event.Batch)
 
 	return nil
 }

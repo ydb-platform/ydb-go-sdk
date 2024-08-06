@@ -168,6 +168,8 @@ func (pmb *PublicMessageBuilder) WriteSessionMetadata(writeSessionMetadata map[s
 // Offset set message Offset
 func (pmb *PublicMessageBuilder) Offset(offset int64) *PublicMessageBuilder {
 	pmb.mess.Offset = offset
+	pmb.mess.commitRange.CommitOffsetStart = rawtopiccommon.Offset(offset)
+	pmb.mess.commitRange.CommitOffsetEnd = rawtopiccommon.Offset(offset + 1)
 
 	return pmb
 }
@@ -228,6 +230,12 @@ func (pmb *PublicMessageBuilder) Topic(topic string) *PublicMessageBuilder {
 // PartitionID set message PartitionID
 func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) *PublicMessageBuilder {
 	pmb.mess.commitRange.PartitionSession.PartitionID = partitionID
+
+	return pmb
+}
+
+func (pmb *PublicMessageBuilder) PartitionSession(session *PartitionSession) *PublicMessageBuilder {
+	pmb.mess.commitRange.PartitionSession = session
 
 	return pmb
 }

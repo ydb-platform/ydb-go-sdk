@@ -87,10 +87,3 @@ func (h *TestTopicListener_Handler) OnReadMessages(
 	close(h.done)
 	return nil
 }
-
-func must[R any](res R, err error) R {
-	if err != nil {
-		panic(err)
-	}
-	return res
-}

@@ -6,7 +6,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 // Reader allow to read message from YDB topics.
@@ -70,6 +72,29 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 	defer r.outCall(&r.commitInFlyght)
 
 	return r.reader.Commit(ctx, obj)
+}
+
+// PopBatchTx read messages batch and commit them within tx.
+// If tx failed - the batch will be received again.
+//
+// Now it means reconnect to the server and re-read messages from the server to the readers buffer.
+// It is expensive operation and will be good to minimize transaction failures.
+//
+// The reconnect is implementation detail and may be changed in the future.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (r *Reader) PopBatchTx(ctx context.Context, transaction query.TxActor, opts ...ReadBatchOption) (*Batch, error) {
+	if err := r.inCall(&r.readInFlyght); err != nil {
+		return nil, err
+	}
+	defer r.outCall(&r.readInFlyght)
+
+	internalTx, err := tx.AsTransaction(transaction)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.reader.PopBatchTx(ctx, internalTx, opts...)
 }
 
 // CommitRangeGetter interface for get commit offsets

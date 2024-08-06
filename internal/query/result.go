@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -274,6 +275,10 @@ func (r *result) NextResultSet(ctx context.Context) (_ query.ResultSet, err erro
 	}()
 
 	return r.nextResultSet(ctx)
+}
+
+func (r *result) Done() empty.ChanReadonly {
+	return r.closed
 }
 
 func (r *result) Err() error {

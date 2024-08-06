@@ -74,8 +74,19 @@ func (s *PartitionSession) CommittedOffset() rawtopiccommon.Offset {
 	return res
 }
 
-func (s *PartitionSession) SetCommittedOffset(v rawtopiccommon.Offset) {
-	s.committedOffsetVal.Store(v.ToInt64())
+// SetCommittedOffsetForward set new offset if new offset greater, then old
+func (s *PartitionSession) SetCommittedOffsetForward(v rawtopiccommon.Offset) {
+	newVal := int64(v)
+	for {
+		old := s.committedOffsetVal.Load()
+		if newVal <= old {
+			return
+		}
+
+		if s.committedOffsetVal.CompareAndSwap(old, newVal) {
+			return
+		}
+	}
 }
 
 func (s *PartitionSession) LastReceivedMessageOffset() rawtopiccommon.Offset {

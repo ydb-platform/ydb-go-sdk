@@ -374,28 +374,33 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 	})
 
 	t.Run("contextDeadlineInProgress", func(t *testing.T) {
-		mc := gomock.NewController(t)
-		defer mc.Finish()
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			mc := gomock.NewController(t)
+			defer mc.Finish()
 
-		reconnector := &readerReconnector{
-			tracer: &trace.Topic{},
-		}
-		reconnector.initChannelsAndClock()
+			reconnector := &readerReconnector{
+				tracer: &trace.Topic{},
+			}
+			reconnector.initChannelsAndClock()
 
-		stream := NewMockbatchedStreamReader(mc)
+			stream := NewMockbatchedStreamReader(mc)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		reconnector.readerConnect = readerConnectFuncMock(readerConnectFuncAnswer{
-			callback: func(ctx context.Context) (batchedStreamReader, error) {
-				cancel()
+			waitInitReturned := make(empty.Chan)
+			ctx, cancel := context.WithCancel(context.Background())
+			reconnector.readerConnect = readerConnectFuncMock(readerConnectFuncAnswer{
+				callback: func(ctx context.Context) (batchedStreamReader, error) {
+					cancel()
+					<-waitInitReturned
 
-				return stream, nil
-			},
+					return stream, nil
+				},
+			})
+			reconnector.start()
+
+			err := reconnector.WaitInit(ctx)
+			close(waitInitReturned)
+			require.ErrorIs(t, err, ctx.Err())
 		})
-		reconnector.start()
-
-		err := reconnector.WaitInit(ctx)
-		require.ErrorIs(t, err, ctx.Err())
 	})
 
 	t.Run("contextDeadlineBeforeStart", func(t *testing.T) {

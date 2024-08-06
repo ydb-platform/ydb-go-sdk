@@ -39,6 +39,10 @@ func (ctrl *Control) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl
 	return txControl
 }
 
+func (ctrl *Control) IsTxCommit() bool {
+	return ctrl.commit
+}
+
 var (
 	_ ControlOption = beginTxOptions{}
 	_ Selector      = beginTxOptions{}
