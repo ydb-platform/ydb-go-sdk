@@ -54,9 +54,6 @@ func (tx *Transaction) ReadRow(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if err = r.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
 
 	return row, nil
 }
@@ -81,9 +78,6 @@ func (tx *Transaction) ReadResultSet(
 	}()
 	rs, err = exactlyOneResultSetFromResult(ctx, r)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	if err = r.Err(); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -120,9 +114,8 @@ func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.Tx
 		if finalErr == nil {
 			go func() {
 				<-res.Done()
-				resErr := res.Err()
-				if resErr != nil || executeSettings.TxControl().IsTxCommit() {
-					tx.notifyOnCompleted(resErr)
+				if executeSettings.TxControl().IsTxCommit() {
+					tx.notifyOnCompleted(nil)
 				}
 			}()
 		} else {

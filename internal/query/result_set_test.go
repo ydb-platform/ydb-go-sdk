@@ -623,7 +623,7 @@ func TestResultSetNext(t *testing.T) {
 			recv, err := stream.Recv()
 			require.NoError(t, err)
 			rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-				part, err := nextPart(ctx, stream, nil)
+				part, err := nextPart(stream)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
@@ -722,7 +722,7 @@ func TestResultSetNext(t *testing.T) {
 			recv, err := stream.Recv()
 			require.NoError(t, err)
 			rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-				part, err := nextPart(ctx, stream, nil)
+				part, err := nextPart(stream)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
@@ -879,7 +879,7 @@ func TestResultSetNext(t *testing.T) {
 			recv, err := stream.Recv()
 			require.NoError(t, err)
 			rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-				part, err := nextPart(ctx, stream, nil)
+				part, err := nextPart(stream)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}

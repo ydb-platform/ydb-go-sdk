@@ -43,9 +43,6 @@ func (s *Session) ReadRow(ctx context.Context, q string, opts ...options.Execute
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if err = r.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
 
 	return row, nil
 }
@@ -62,9 +59,6 @@ func (s *Session) ReadResultSet(ctx context.Context, q string, opts ...options.E
 	}()
 	rs, err = exactlyOneResultSetFromResult(ctx, r)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	if err = r.Err(); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 

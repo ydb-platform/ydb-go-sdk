@@ -58,11 +58,11 @@ func Example_rangeWithLegacyGo() {
 	if err != nil {
 		panic(err)
 	}
-	r.Range(ctx)(func(rs query.ResultSet, err error) bool {
+	r.ResultSets(ctx)(func(rs query.ResultSet, err error) bool {
 		if err != nil {
 			return false
 		}
-		rs.Range(ctx)(func(row query.Row, err error) bool {
+		rs.Rows(ctx)(func(row query.Row, err error) bool {
 			if err != nil {
 				return false
 			}
@@ -98,12 +98,12 @@ func Example_rangeExperiment() {
 	if err != nil {
 		panic(err)
 	}
-	// for loop with Range available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
-	for rs, err := range r.Range(ctx) {
+	// for loop with ResultSets available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+	for rs, err := range r.ResultSets(ctx) {
 		if err != nil {
 			panic(err)
 		}
-		// for loop with Range available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+		// for loop with ResultSets available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
 		for row, err := range rs.Range(ctx) {
 			if err != nil {
 				panic(err)

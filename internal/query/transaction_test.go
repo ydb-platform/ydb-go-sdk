@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -171,6 +172,7 @@ func TestTxOnCompleted(t *testing.T) {
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
+			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 
@@ -199,6 +201,7 @@ func TestTxOnCompleted(t *testing.T) {
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
+			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 
@@ -235,6 +238,7 @@ func TestTxOnCompleted(t *testing.T) {
 				ResultSetIndex: 1,
 				ResultSet:      &Ydb.ResultSet{},
 			}, nil)
+			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 

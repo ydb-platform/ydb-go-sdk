@@ -61,7 +61,7 @@ func TestQueryRange(t *testing.T) {
 		)
 		require.NoError(t, err)
 		count := 0
-		for rs, err := range r.Range(ctx) {
+		for rs, err := range r.ResultSets(ctx) {
 			require.NoError(t, err)
 			for row, err := range rs.Range(ctx) {
 				require.NoError(t, err)
@@ -109,7 +109,7 @@ func TestQueryRange(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			for rs, err := range r.Range(ctx) {
+			for rs, err := range r.ResultSets(ctx) {
 				if err != nil {
 					return err
 				}
@@ -162,7 +162,7 @@ func TestQueryRange(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			for rs, err := range r.Range(ctx) {
+			for rs, err := range r.ResultSets(ctx) {
 				if err != nil {
 					return err
 				}

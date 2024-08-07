@@ -243,10 +243,6 @@ func clientExecute(ctx context.Context,
 			return xerrors.WithStackTrace(err)
 		}
 
-		if err = r.Err(); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
 		return nil
 	})
 	if err != nil {

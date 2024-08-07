@@ -1,3 +1,7 @@
+* Removed experimental method `query.Result.Err()`
+* Added the finishing reading the grpc stream on `query.Result.Close()` call
+* Renamed experimental method `query.Result.Range()` to `query.Result.ResultSets()`
+* Renamed experimental method `query.ResultSet.Range()` to `query.ResultSet.Rows()`
 * Removed support of `go1.20`
 * Added PopMessages from topic within transaction
 

@@ -40,11 +40,11 @@ type (
 	}
 )
 
-func (rs *materializedResultSet) Range(ctx context.Context) xiter.Seq2[query.Row, error] {
+func (rs *materializedResultSet) Rows(ctx context.Context) xiter.Seq2[query.Row, error] {
 	return rangeRows(ctx, rs)
 }
 
-func (rs *resultSet) Range(ctx context.Context) xiter.Seq2[query.Row, error] {
+func (rs *resultSet) Rows(ctx context.Context) xiter.Seq2[query.Row, error] {
 	return rangeRows(ctx, rs)
 }
 

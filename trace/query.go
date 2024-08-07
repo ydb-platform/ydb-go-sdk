@@ -2,8 +2,6 @@ package trace
 
 import (
 	"context"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 )
 
 // tool gtrace used from ./internal/cmd/gtrace
@@ -67,7 +65,6 @@ type (
 		OnSessionBegin        func(QuerySessionBeginStartInfo) func(info QuerySessionBeginDoneInfo)
 		OnTxExecute           func(QueryTxExecuteStartInfo) func(info QueryTxExecuteDoneInfo)
 		OnResultNew           func(QueryResultNewStartInfo) func(info QueryResultNewDoneInfo)
-		OnResultNextPart      func(QueryResultNextPartStartInfo) func(info QueryResultNextPartDoneInfo)
 		OnResultNextResultSet func(QueryResultNextResultSetStartInfo) func(info QueryResultNextResultSetDoneInfo)
 		OnResultClose         func(QueryResultCloseStartInfo) func(info QueryResultCloseDoneInfo)
 		OnResultSetNextRow    func(QueryResultSetNextRowStartInfo) func(info QueryResultSetNextRowDoneInfo)
@@ -249,20 +246,6 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryResultCloseDoneInfo struct {
-		Error error
-	}
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	QueryResultNextPartStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Call    call
-	}
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	QueryResultNextPartDoneInfo struct {
-		Stats *Ydb_TableStats.QueryStats
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
