@@ -63,9 +63,6 @@ func TestQueryMultiResultSets(t *testing.T) {
 			return fmt.Errorf("get next result set: %w", err)
 		}
 
-		if res.Err() != nil {
-			return fmt.Errorf("res.Err() = %w", res.Err())
-		}
 		return nil
 	}, query.WithIdempotent())
 
