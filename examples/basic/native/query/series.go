@@ -1,3 +1,6 @@
+//go:build go1.22 && goexperiment.rangefunc
+// +build go1.22,goexperiment.rangefunc
+
 package main
 
 import (
