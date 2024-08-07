@@ -58,11 +58,11 @@ func Example_rangeWithLegacyGo() {
 	if err != nil {
 		panic(err)
 	}
-	r.ResultSets(ctx)(func(rs query.ResultSet, err error) bool {
+	for rs, err := range r.ResultSets(ctx) {
 		if err != nil {
 			return false
 		}
-		rs.Rows(ctx)(func(row query.Row, err error) bool {
+		for row, err := range rs.Rows(ctx) {
 			if err != nil {
 				return false
 			}
@@ -77,10 +77,10 @@ func Example_rangeWithLegacyGo() {
 			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
 
 			return true
-		})
+		}
 
 		return true
-	})
+	}
 }
 
 func Example_rangeExperiment() {
