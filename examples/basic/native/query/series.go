@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"path"
 	"time"
@@ -37,22 +35,12 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 				_ = result.Close(ctx)
 			}()
 
-			for {
-				resultSet, err := result.NextResultSet(ctx)
+			for resultSet, err := range result.ResultSets(ctx) { // GOEXPERIMENT=rangefunc
 				if err != nil {
-					if errors.Is(err, io.EOF) {
-						return result.Err()
-					}
-
 					return err
 				}
-				for {
-					row, err := resultSet.NextRow(ctx)
+				for row, err := range resultSet.Rows(ctx) { // GOEXPERIMENT=rangefunc
 					if err != nil {
-						if errors.Is(err, io.EOF) {
-							return result.Err()
-						}
-
 						return err
 					}
 
@@ -68,6 +56,8 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 					log.Printf("%+v", info)
 				}
 			}
+
+			return nil
 		},
 	)
 }
