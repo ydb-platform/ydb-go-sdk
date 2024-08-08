@@ -17,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestResultNextResultSet(t *testing.T) {
@@ -2851,9 +2850,8 @@ func TestMaterializedResultStats(t *testing.T) {
 	newResult := func(
 		ctx context.Context,
 		stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
-		t *trace.Query,
 	) (query.Result, error) {
-		r, _, err := newResult(ctx, stream, t)
+		r, _, err := newResult(ctx, stream)
 		if err != nil {
 			return nil, err
 		}
@@ -3190,7 +3188,7 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, err := newResult(ctx, stream, nil)
+			result, err := newResult(ctx, stream)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -3549,7 +3547,7 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, err := newResult(ctx, stream, nil)
+			result, err := newResult(ctx, stream)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -3909,7 +3907,7 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, err := newResult(ctx, stream, nil)
+			result, err := newResult(ctx, stream)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -4244,7 +4242,7 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, err := newResult(ctx, stream, nil)
+			result, err := newResult(ctx, stream)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)

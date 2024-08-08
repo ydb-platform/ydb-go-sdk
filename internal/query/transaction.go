@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -106,25 +107,25 @@ func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.Tx
 
 	executeSettings := options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings
 
-	var res *result
-
-	// notification about complete transaction must be sended for any error or for successfully read all result if
-	// it was execution with commit flag
-	defer func() {
-		if finalErr == nil {
-			go func() {
-				<-res.Done()
-				if executeSettings.TxControl().IsTxCommit() {
+	var resultOpts []resultOption
+	if executeSettings.TxControl().IsTxCommit() {
+		// notification about complete transaction must be sended for any error or for successfully read all result if
+		// it was execution with commit flag
+		var once sync.Once
+		resultOpts = append(resultOpts,
+			onEOF(func() {
+				once.Do(func() {
 					tx.notifyOnCompleted(nil)
-				}
-			}()
-		} else {
-			tx.notifyOnCompleted(finalErr)
-		}
-	}()
-
-	var err error
-	_, res, err = execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings)
+				})
+			}),
+			onErr(func(err error) {
+				once.Do(func() {
+					tx.notifyOnCompleted(err)
+				})
+			}),
+		)
+	}
+	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings, resultOpts...)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)

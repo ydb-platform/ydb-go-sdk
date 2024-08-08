@@ -52,7 +52,9 @@ func queryFromText(
 	return content
 }
 
-func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient, q string, cfg executeConfig) (
+func execute(
+	ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient, q string, cfg executeConfig, opts ...resultOption,
+) (
 	_ *Transaction, _ *result, finalErr error,
 ) {
 	a := allocator.New()
@@ -67,7 +69,7 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, s.cfg.Trace())
+	r, txID, err := newResult(ctx, stream, append(opts, withTrace(s.cfg.Trace()))...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
