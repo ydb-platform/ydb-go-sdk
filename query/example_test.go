@@ -60,7 +60,7 @@ func Example_rangeWithLegacyGo() {
 	}
 	for rs, err := range r.ResultSets(ctx) {
 		if err != nil {
-			return false
+			panic(err)
 		}
 		for row, err := range rs.Rows(ctx) {
 			if err != nil {
@@ -71,12 +71,10 @@ func Example_rangeWithLegacyGo() {
 				query.Named("myStr", &myStr),
 			)
 			if err != nil {
-				return false
+				panic(err)
 			}
 
 			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
-
-			return true
 		}
 
 		return true
