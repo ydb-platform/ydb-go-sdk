@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ydb.fullname" . }}
+  labels:
+    {{- include "ydb.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ydb.selectorLabels" . | nindent 6 }}
+  revisionHistoryLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "ydb.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 -}}
+      {{- end }}
+      containers:
+        - args:
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=127.0.0.1:8080
+            - --leader-elect
+            {{- if not .Values.webhook.enabled }}
+            - --disable-webhooks
+            {{- end }}
+            {{- if .Values.metrics.enabled }}
+            - --with-service-monitors=true
+            {{- end }}
+            {{- if .Values.mgmtCluster.enabled }}
+            - --mgmt-cluster-name={{- .Values.mgmtCluster.name }}
+            - --mgmt-cluster-kubeconfig=/mgmt-cluster/kubeconfig
+            {{- end }}
+          command:
+            - /manager
+          image: {{ default "cr.yandex/yc/ydb-kubernetes-operator" .Values.image.repository }}:
+            {{- if eq .Values.image.tag "REPLACED_BY_CHART_APP_VERSION_IF_UNSPECIFIED" -}}
+              {{- .Chart.AppVersion -}}
+            {{- else -}}
+              {{- .Values.image.tag -}}
+            {{- end }}
+          imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: manager
+          ports:
+            - containerPort: {{ .Values.webhook.service.port }}
+              name: webhook
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12  }}
+          securityContext:
+            allowPrivilegeEscalation: false
+          {{- if or .Values.webhook.enabled .Values.mgmtCluster.enabled }}
+          {{- if .Values.webhook.enabled }}
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: webhook-tls
+          {{- end }}
+          {{- if .Values.mgmtCluster.enabled }}
+            - mountPath: /mgmt-cluster
+              name: mgmt-cluster-kubeconfig
+          {{- end }}
+          {{- end }}
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: {{ include "ydb.fullname" . }}
+      terminationGracePeriodSeconds: 10
+      {{- if or .Values.webhook.enabled .Values.mgmtCluster.enabled }}
+      volumes:
+        {{- if .Values.webhook.enabled }}
+        - name: webhook-tls
+          secret:
+            secretName: {{ include "ydb.fullname" . }}-webhook
+            {{- if .Values.webhook.patch.enabled }}
+            items:
+              - key: ca
+                path: ca.crt
+              - key: cert
+                path: tls.crt
+              - key: key
+                path: tls.key
+            {{- end }}
+        {{- end }}
+        {{- if .Values.mgmtCluster.enabled }}
+        - name: mgmt-cluster-kubeconfig
+          secret:
+            secretName: {{ .Values.mgmtCluster.kubeconfig }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.imagePullSecrets }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- end }}

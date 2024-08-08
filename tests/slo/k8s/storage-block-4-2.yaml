@@ -1,0 +1,196 @@
+apiVersion: ydb.tech/v1alpha1
+kind: Storage
+metadata:
+  name: storage
+  namespace: ydb
+spec:
+  dataStore: []
+  image:
+    name: cr.yandex/crptqonuodf51kdj7a7d/ydb:24.1.12
+  nodes: 8
+  erasure: block-4-2
+  configuration: |-
+    actor_system_config:
+        executor:
+            - name: System
+              threads: 1
+              type: BASIC
+            - name: User
+              threads: 1
+              type: BASIC
+            - name: Batch
+              threads: 1
+              type: BASIC
+            - name: IO
+              threads: 1
+              time_per_mailbox_micro_secs: 100
+              type: IO
+            - name: IC
+              spin_threshold: 10
+              threads: 4
+              time_per_mailbox_micro_secs: 100
+              type: BASIC
+        scheduler:
+            progress_threshold: 10000
+            resolution: 256
+            spin_threshold: 0
+    blob_storage_config:
+        service_set:
+            groups:
+                - erasure_species: block-4-2
+                  rings:
+                    - fail_domains:
+                        - vdisk_locations:
+                            - node_id: storage-0
+                              path: SectorMap:1:4
+                              pdisk_category: SSD
+                        - vdisk_locations:
+                            - node_id: storage-1
+                              path: SectorMap:1:4
+                              pdisk_category: SSD
+                        - vdisk_locations:
+                            - node_id: storage-2
+                              path: SectorMap:1:4
+                              pdisk_category: SSD
+                        - vdisk_locations:
+                            - node_id: storage-3
+                              path: SectorMap:1:4
+                              pdisk_category: SSD
+                        - vdisk_locations:
+                            - node_id: storage-4
+                              path: SectorMap:1:4
+                              pdisk_category: SSD
+                        - vdisk_locations:
+                            - node_id: storage-5
+                              path: SectorMap:1:4
+                              pdisk_category: SSD
+                        - vdisk_locations:
+                            - node_id: storage-6
+                              path: SectorMap:1:4
+                              pdisk_category: SSD
+                        - vdisk_locations:
+                            - node_id: storage-7
+                              path: SectorMap:1:4
+                              pdisk_category: SSD
+    channel_profile_config:
+        profile:
+            - channel:
+                - erasure_species: block-4-2
+                  pdisk_category: 1
+                  storage_pool_kind: ssd
+                - erasure_species: block-4-2
+                  pdisk_category: 1
+                  storage_pool_kind: ssd
+                - erasure_species: block-4-2
+                  pdisk_category: 1
+                  storage_pool_kind: ssd
+              profile_id: 0
+    domains_config:
+        domain:
+            - name: Root
+              storage_pool_types:
+                - kind: ssd
+                  pool_config:
+                    box_id: 1
+                    erasure_species: block-4-2
+                    kind: ssd
+                    pdisk_filter:
+                        - property:
+                            - type: SSD
+                    vdisk_kind: Default
+        state_storage:
+            - ring:
+                node:
+                    - 1
+                    - 2
+                    - 3
+                    - 4
+                    - 5
+                    - 6
+                    - 7
+                    - 8
+                nto_select: 5
+              ssid: 1
+    grpc_config:
+        port: 2135
+    host_configs:
+        - drive:
+            - path: SectorMap:1:4
+              type: SSD
+          host_config_id: 1
+    hosts:
+        - address: ""
+          host: storage-0
+          host_config_id: 1
+          node_id: 1
+          port: 19001
+          walle_location:
+            body: 12340
+            data_center: az-1
+            rack: "0"
+        - address: ""
+          host: storage-1
+          host_config_id: 1
+          node_id: 2
+          port: 19001
+          walle_location:
+            body: 12341
+            data_center: az-1
+            rack: "1"
+        - address: ""
+          host: storage-2
+          host_config_id: 1
+          node_id: 3
+          port: 19001
+          walle_location:
+            body: 12342
+            data_center: az-1
+            rack: "2"
+        - address: ""
+          host: storage-3
+          host_config_id: 1
+          node_id: 4
+          port: 19001
+          walle_location:
+            body: 12343
+            data_center: az-1
+            rack: "3"
+        - address: ""
+          host: storage-4
+          host_config_id: 1
+          node_id: 5
+          port: 19001
+          walle_location:
+            body: 12344
+            data_center: az-1
+            rack: "4"
+        - address: ""
+          host: storage-5
+          host_config_id: 1
+          node_id: 6
+          port: 19001
+          walle_location:
+            body: 12345
+            data_center: az-1
+            rack: "5"
+        - address: ""
+          host: storage-6
+          host_config_id: 1
+          node_id: 7
+          port: 19001
+          walle_location:
+            body: 12346
+            data_center: az-1
+            rack: "6"
+        - address: ""
+          host: storage-7
+          host_config_id: 1
+          node_id: 8
+          port: 19001
+          walle_location:
+            body: 12347
+            data_center: az-1
+            rack: "7"
+    static_erasure: block-4-2
+    table_service_config:
+        sql_version: 1

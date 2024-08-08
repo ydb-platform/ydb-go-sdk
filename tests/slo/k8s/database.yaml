@@ -1,0 +1,15 @@
+apiVersion: ydb.tech/v1alpha1
+kind: Database
+metadata:
+  name: database
+  namespace: ydb
+spec:
+  image:
+    name: cr.yandex/crptqonuodf51kdj7a7d/ydb:24.1.12
+  nodes: 3
+  resources:
+    storageUnits:
+      - count: 1
+        unitKind: ssd
+  storageClusterRef:
+    name: storage
