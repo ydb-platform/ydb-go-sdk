@@ -63,7 +63,7 @@ func TestQueryRange(t *testing.T) {
 		count := 0
 		for rs, err := range r.ResultSets(ctx) {
 			require.NoError(t, err)
-			for row, err := range rs.Range(ctx) {
+			for row, err := range rs.Rows(ctx) {
 				require.NoError(t, err)
 
 				var (
@@ -113,7 +113,7 @@ func TestQueryRange(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				for row, err := range rs.Range(ctx) {
+				for row, err := range rs.Rows(ctx) {
 					if err != nil {
 						return err
 					}
@@ -133,7 +133,7 @@ func TestQueryRange(t *testing.T) {
 					}
 				}
 			}
-			return r.Err()
+			return nil
 		}, query.WithIdempotent())
 		require.NoError(t, err)
 	})
@@ -166,7 +166,7 @@ func TestQueryRange(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				for row, err := range rs.Range(ctx) {
+				for row, err := range rs.Rows(ctx) {
 					if err != nil {
 						return err
 					}
@@ -186,7 +186,7 @@ func TestQueryRange(t *testing.T) {
 					}
 				}
 			}
-			return r.Err()
+			return nil
 		}, query.WithIdempotent())
 		require.NoError(t, err)
 	})

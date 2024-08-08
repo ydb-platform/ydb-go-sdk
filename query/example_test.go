@@ -64,7 +64,7 @@ func Example_rangeWithLegacyGo() {
 		}
 		for row, err := range rs.Rows(ctx) {
 			if err != nil {
-				return false
+				panic(err)
 			}
 			err = row.ScanNamed(
 				query.Named("id", &id),
@@ -76,8 +76,6 @@ func Example_rangeWithLegacyGo() {
 
 			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
 		}
-
-		return true
 	}
 }
 
@@ -102,7 +100,7 @@ func Example_rangeExperiment() {
 			panic(err)
 		}
 		// for loop with ResultSets available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
-		for row, err := range rs.Range(ctx) {
+		for row, err := range rs.Rows(ctx) {
 			if err != nil {
 				panic(err)
 			}
