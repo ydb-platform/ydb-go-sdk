@@ -58,8 +58,7 @@ type conn struct {
 	state             atomic.Uint32
 	childStreams      *xcontext.CancelsGuard
 	lastUsage         xsync.LastUsage
-	onClose           []func(*conn)
-	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
+	onTransportErrors []func(err error)
 }
 
 func (c *conn) Address() string {
@@ -220,7 +219,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		}
 
 		defer func() {
-			c.onTransportError(ctx, err)
+			c.onTransportError(err)
 		}()
 
 		return nil, xerrors.WithStackTrace(
@@ -237,9 +236,9 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	return c.grpcConn, nil
 }
 
-func (c *conn) onTransportError(ctx context.Context, cause error) {
+func (c *conn) onTransportError(err error) {
 	for _, onTransportError := range c.onTransportErrors {
-		onTransportError(ctx, c, cause)
+		onTransportError(err)
 	}
 }
 
@@ -291,9 +290,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 
 		c.setState(ctx, Destroyed)
 
-		for _, onClose := range c.onClose {
-			onClose(c)
-		}
+		c.childStreams.Cancel()
 
 		onDone(err)
 	}()
@@ -309,8 +306,6 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		xerrors.WithNodeID(c.NodeID()),
 	))
 }
-
-var onTransportErrorStub = func(ctx context.Context, err error) {}
 
 func replyWrapper(reply any) (opID string, issues []trace.Issue) {
 	switch t := reply.(type) {
@@ -328,16 +323,23 @@ func replyWrapper(reply any) (opID string, issues []trace.Issue) {
 	return opID, issues
 }
 
+type (
+	invokeSettings struct {
+		onTransportError func(error)
+		address          string
+		nodeID           uint32
+	}
+	invokeOption func(s *invokeSettings)
+)
+
 //nolint:funlen
 func invoke(
 	ctx context.Context,
 	method string,
 	req, reply any,
 	cc grpc.ClientConnInterface,
-	onTransportError func(context.Context, error),
-	address string,
-	nodeID uint32,
-	opts ...grpc.CallOption,
+	grpcCallOpts []grpc.CallOption,
+	opts ...invokeOption,
 ) (
 	opID string,
 	issues []trace.Issue,
@@ -352,17 +354,24 @@ func invoke(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	if onTransportError == nil {
-		onTransportError = onTransportErrorStub
+	s := invokeSettings{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&s)
+		}
 	}
 
-	err = cc.Invoke(ctx, method, req, reply, opts...)
+	err = cc.Invoke(ctx, method, req, reply, grpcCallOpts...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return opID, issues, xerrors.WithStackTrace(err)
 		}
 
-		defer onTransportError(ctx, err)
+		defer func() {
+			if s.onTransportError != nil {
+				s.onTransportError(err)
+			}
+		}()
 
 		if !useWrapping {
 			return opID, issues, err
@@ -378,8 +387,8 @@ func invoke(
 		}
 
 		return opID, issues, xerrors.WithStackTrace(xerrors.Transport(err,
-			xerrors.WithAddress(address),
-			xerrors.WithNodeID(nodeID),
+			xerrors.WithAddress(s.address),
+			xerrors.WithNodeID(s.nodeID),
 			xerrors.WithTraceID(traceID),
 		))
 	}
@@ -400,8 +409,8 @@ func invoke(
 			return opID, issues, xerrors.WithStackTrace(
 				xerrors.Operation(
 					xerrors.FromOperation(t.GetOperation()),
-					xerrors.WithAddress(address),
-					xerrors.WithNodeID(nodeID),
+					xerrors.WithAddress(s.address),
+					xerrors.WithNodeID(s.nodeID),
 					xerrors.WithTraceID(traceID),
 				),
 			)
@@ -411,8 +420,8 @@ func invoke(
 			return opID, issues, xerrors.WithStackTrace(
 				xerrors.Operation(
 					xerrors.FromOperation(t),
-					xerrors.WithAddress(address),
-					xerrors.WithNodeID(nodeID),
+					xerrors.WithAddress(s.address),
+					xerrors.WithNodeID(s.nodeID),
 					xerrors.WithTraceID(traceID),
 				),
 			)
@@ -453,16 +462,12 @@ func (c *conn) Invoke(
 	stop := c.lastUsage.Start()
 	defer stop()
 
-	opID, issues, err = invoke(
-		ctx,
-		method,
-		req,
-		res,
-		cc,
-		c.onTransportError,
-		c.Address(),
-		c.NodeID(),
-		append(opts, grpc.Trailer(&md))...,
+	opID, issues, err = invoke(ctx, method, req, res, cc, append(opts, grpc.Trailer(&md)),
+		func(s *invokeSettings) {
+			s.onTransportError = c.onTransportError
+			s.address = c.Address()
+			s.nodeID = c.NodeID()
+		},
 	)
 
 	return err
@@ -526,7 +531,7 @@ func (c *conn) NewStream(
 		}
 
 		defer func() {
-			c.onTransportError(ctx, err)
+			c.onTransportError(err)
 		}()
 
 		if !useWrapping {
@@ -553,15 +558,7 @@ func (c *conn) NewStream(
 
 type option func(c *conn)
 
-func withOnClose(onClose func(*conn)) option {
-	return func(c *conn) {
-		if onClose != nil {
-			c.onClose = append(c.onClose, onClose)
-		}
-	}
-}
-
-func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, cause error)) option {
+func withOnTransportError(onTransportError func(err error)) option {
 	return func(c *conn) {
 		if onTransportError != nil {
 			c.onTransportErrors = append(c.onTransportErrors, onTransportError)
@@ -569,18 +566,13 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 	}
 }
 
-func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
+func dial(_ context.Context, e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
 		endpoint:     e,
 		config:       config,
 		done:         make(chan struct{}),
 		lastUsage:    xsync.NewLastUsage(),
 		childStreams: xcontext.NewCancelsGuard(),
-		onClose: []func(*conn){
-			func(c *conn) {
-				c.childStreams.Cancel()
-			},
-		},
 	}
 	c.state.Store(uint32(Created))
 	for _, opt := range opts {
@@ -590,10 +582,6 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	}
 
 	return c
-}
-
-func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
-	return newConn(e, config, opts...)
 }
 
 var _ stats.Handler = statsHandler{}

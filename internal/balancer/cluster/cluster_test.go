@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"context"
-	"math"
 	"strconv"
 	"sync"
 	"testing"
@@ -90,73 +89,82 @@ func TestCluster(t *testing.T) {
 				AddrField:   "5",
 				NodeIDField: 5,
 			},
-		})
+		}, WithFilter(func(e endpoint.Info) bool {
+			return e.NodeID()%2 == 0
+		}), WithFallback(true))
 
 		{ // initial state
 			require.Len(t, s.All(), 5)
-			require.Len(t, s.index, 5)
-			require.Len(t, s.prefer, 5)
-		}
-
-		{ // without first endpoint
-			e, err := s.Next(ctx)
-			require.NoError(t, err)
-			require.NotNil(t, e)
-			s = Without(s, e)
-			require.Len(t, s.All(), 5)
-			require.Len(t, s.index, 5)
-			require.Len(t, s.prefer, 4)
-			require.Len(t, s.fallback, 1)
-		}
-
-		{ // without second endpoint
-			e, err := s.Next(ctx)
-			require.NoError(t, err)
-			require.NotNil(t, e)
-			s = Without(s, e)
-			require.Len(t, s.All(), 5)
-			require.Len(t, s.index, 5)
-			require.Len(t, s.prefer, 3)
-			require.Len(t, s.fallback, 2)
-		}
-
-		{ // without third endpoint
-			e, err := s.Next(ctx)
-			require.NoError(t, err)
-			require.NotNil(t, e)
-			s = Without(s, e)
-			require.Len(t, s.All(), 5)
+			require.InEpsilon(t, 1.0, s.Availability(), 0.001)
 			require.Len(t, s.index, 5)
 			require.Len(t, s.prefer, 2)
 			require.Len(t, s.fallback, 3)
 		}
 
-		{ // without fourth endpoint
+		{ // without first endpoint (excluded from prefer)
 			e, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, e)
 			s = Without(s, e)
 			require.Len(t, s.All(), 5)
-			require.Len(t, s.index, 5)
+			require.InEpsilon(t, 4.0/5.0, s.Availability(), 0.001)
+			require.Len(t, s.index, 4)
 			require.Len(t, s.prefer, 1)
-			require.Len(t, s.fallback, 4)
+			require.Len(t, s.fallback, 3)
 		}
 
-		{ // without fifth endpoint
+		{ // without second endpoint (excluded from prefer)
 			e, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, e)
 			s = Without(s, e)
 			require.Len(t, s.All(), 5)
-			require.Len(t, s.index, 5)
+			require.InEpsilon(t, 3.0/5.0, s.Availability(), 0.001)
+			require.Len(t, s.index, 3)
 			require.Empty(t, s.prefer)
-			require.Len(t, s.fallback, 5)
+			require.Len(t, s.fallback, 3)
 		}
 
-		{ // next from fallback is ok
+		{ // without third endpoint (excluded from fallback)
 			e, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, e)
+			s = Without(s, e)
+			require.Len(t, s.All(), 5)
+			require.InEpsilon(t, 2.0/5.0, s.Availability(), 0.001)
+			require.Len(t, s.index, 2)
+			require.Empty(t, s.prefer)
+			require.Len(t, s.fallback, 2)
+		}
+
+		{ // without fourth endpoint (excluded from fallback)
+			e, err := s.Next(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, e)
+			s = Without(s, e)
+			require.Len(t, s.All(), 5)
+			require.InEpsilon(t, 1.0/5.0, s.Availability(), 0.001)
+			require.Len(t, s.index, 1)
+			require.Empty(t, s.prefer)
+			require.Len(t, s.fallback, 1)
+		}
+
+		{ // without fifth endpoint (excluded from fallback)
+			e, err := s.Next(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, e)
+			s = Without(s, e)
+			require.Len(t, s.All(), 5)
+			require.Zero(t, s.Availability())
+			require.Empty(t, s.index)
+			require.Empty(t, s.prefer)
+			require.Empty(t, s.fallback)
+		}
+
+		{ // empty prefer and fallback lists
+			e, err := s.Next(ctx)
+			require.ErrorIs(t, err, ErrNoEndpoints)
+			require.Nil(t, e)
 		}
 	})
 
@@ -272,7 +280,7 @@ func TestCluster(t *testing.T) {
 		const (
 			buckets = 10
 			total   = 1000000
-			epsilon = int(float64(total) / float64(buckets) * 0.015)
+			epsilon = float64(total) / float64(buckets) * 0.0015
 		)
 		endpoints := make([]endpoint.Endpoint, buckets)
 
@@ -294,11 +302,7 @@ func TestCluster(t *testing.T) {
 		}
 
 		for i := range distribution {
-			if distribution[i] < total/buckets-epsilon || distribution[i] > total/buckets+epsilon {
-				t.Errorf("unexpected distribuition[%d] = %0.1f%%", i,
-					math.Abs(float64(distribution[i]-total/buckets)/float64(total/buckets)*100),
-				)
-			}
+			require.InEpsilon(t, total/buckets, distribution[i], epsilon)
 		}
 	})
 }
