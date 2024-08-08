@@ -327,6 +327,16 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 	}
 
 	f := func() (*fixenv.GenericResult[string], error) {
+		tablePath := path.Join(scope.Folder(), params.tableName)
+
+		// drop previous table if exists
+		err := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+			return s.DropTable(ctx, tablePath)
+		})
+		if err != nil && !ydb.IsOperationErrorSchemeError(err) {
+			return nil, fmt.Errorf("failed to drop previous table: %w", err)
+		}
+
 		createTableErr := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) (err error) {
 			if len(params.createTableOptions) == 0 {
 				tmpl, err := template.New("").Parse(params.createTableQueryTemplate)
@@ -350,19 +360,23 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 				return s.ExecuteSchemeQuery(ctx, query.String())
 			}
 
-			return s.CreateTable(ctx, path.Join(scope.Folder(), params.tableName), params.createTableOptions...)
+			return s.CreateTable(ctx, tablePath, params.createTableOptions...)
 		})
+
+		if createTableErr != nil {
+			return nil, err
+		}
 
 		cleanup := func() {
 			// doesn't drop table after fail test - for debugging
-			if createTableErr == nil && !scope.t.Failed() {
+			if !scope.t.Failed() {
 				_ = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
-					return s.DropTable(ctx, params.tableName)
+					return s.DropTable(ctx, tablePath)
 				})
 			}
 		}
 
-		return fixenv.NewGenericResultWithCleanup(params.tableName, cleanup), createTableErr
+		return fixenv.NewGenericResultWithCleanup(params.tableName, cleanup), nil
 	}
 
 	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: params.tableName})
