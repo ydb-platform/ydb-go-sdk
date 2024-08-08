@@ -1,11 +1,7 @@
 package xslices
 
-import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xmath"
-)
-
 func Diff[T any](from, to []T, cmp func(lhs, rhs T) int) (steady, added, dropped []T) {
-	steady = make([]T, 0, xmath.Min(len(to), len(from)))
+	steady = make([]T, 0, min(len(to), len(from)))
 	added = make([]T, 0, len(to))
 	dropped = make([]T, 0, len(from))
 

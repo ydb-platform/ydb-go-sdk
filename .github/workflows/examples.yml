@@ -70,7 +70,7 @@ jobs:
           - 5432:5432
     env:
       OS: ubuntu-latest
-      GO: 1.20.x
+      GO: 1.22.x
       POSTGRES_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/basic?sslmode=disable
     steps:
       - name: Checkout code
@@ -93,7 +93,7 @@ jobs:
         application: [ gorm, xorm ]
     env:
       OS: ubuntu-latest
-      GO: 1.20.x
+      GO: 1.22.x
       SQLITE_CONNECTION_STRING: ${{ matrix.application }}.db
     steps:
       - name: Checkout code

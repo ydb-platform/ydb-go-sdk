@@ -1,3 +1,4 @@
+* Removed support of `go1.20`
 * Added PopMessages from topic within transaction
 
 ## v3.76.3
