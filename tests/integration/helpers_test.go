@@ -363,7 +363,6 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 		}
 
 		return fixenv.NewGenericResultWithCleanup(params.tableName, cleanup), createTableErr
-
 	}
 
 	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: params.tableName})
