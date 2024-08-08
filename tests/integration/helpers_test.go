@@ -145,7 +145,7 @@ func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 }
 
 func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
-	return scope.Cache(nil, nil, func() (res interface{}, err error) {
+	f := func() (*fixenv.GenericResult[*sql.DB], error) {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
 		connector, err := ydb.Connector(driver, opts...)
@@ -160,8 +160,9 @@ func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
 		if err != nil {
 			return nil, err
 		}
-		return db, nil
-	}).(*sql.DB)
+		return fixenv.NewGenericResult(db), nil
+	}
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
@@ -190,15 +191,15 @@ func (scope *scopeT) Folder() string {
 }
 
 func (scope *scopeT) Logger() *testLogger {
-	return scope.Cache(nil, nil, func() (res interface{}, err error) {
-		return newLogger(scope.t), nil
+	return scope.CacheResult(func() (*fixenv.Result, error) {
+		return fixenv.NewResult(newLogger(scope.t)), nil
 	}).(*testLogger)
 }
 
 func (scope *scopeT) LoggerMinLevel(level log.Level) *testLogger {
-	return scope.Cache(level, nil, func() (res interface{}, err error) {
-		return newLoggerWithMinLevel(scope.t, level), nil
-	}).(*testLogger)
+	return scope.CacheResult(func() (res *fixenv.Result, err error) {
+		return fixenv.NewResult(newLoggerWithMinLevel(scope.t, level)), nil
+	}, fixenv.CacheOptions{CacheKey: level}).(*testLogger)
 }
 
 func (scope *scopeT) TopicConsumerName() string {
@@ -324,8 +325,9 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 			opt(&params)
 		}
 	}
-	return scope.Cache(params.tableName, nil, func() (res interface{}, err error) {
-		err = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) (err error) {
+
+	f := func() (*fixenv.GenericResult[string], error) {
+		createTableErr := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) (err error) {
 			if len(params.createTableOptions) == 0 {
 				tmpl, err := template.New("").Parse(params.createTableQueryTemplate)
 				if err != nil {
@@ -347,10 +349,23 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 				}
 				return s.ExecuteSchemeQuery(ctx, query.String())
 			}
+
 			return s.CreateTable(ctx, path.Join(scope.Folder(), params.tableName), params.createTableOptions...)
 		})
-		return params.tableName, err
-	}).(string)
+
+		cleanup := func() {
+			// doesn't drop table after fail test - for debugging
+			if createTableErr == nil && !scope.t.Failed() {
+				_ = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+					return s.DropTable(ctx, params.tableName)
+				})
+			}
+		}
+
+		return fixenv.NewGenericResultWithCleanup(params.tableName, cleanup), createTableErr
+	}
+
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: params.tableName})
 }
 
 // TablePath return path to example table with struct:
