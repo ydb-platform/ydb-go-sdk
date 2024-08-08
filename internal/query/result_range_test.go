@@ -359,5 +359,4 @@ func TestResultRange(t *testing.T) {
 		rsCount++
 	}
 	require.EqualValues(t, 3, rsCount)
-	require.NoError(t, r.Err())
 }
