@@ -1,12 +1,12 @@
 package balancers
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
@@ -94,7 +94,7 @@ func PreferLocations(balancer *balancerConfig.Config, locations ...string) *bala
 	}
 
 	// Prevent modify source locations
-	locations = xslices.Clone(locations)
+	locations = slices.Clone(locations)
 
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
