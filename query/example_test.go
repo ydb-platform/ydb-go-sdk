@@ -162,7 +162,7 @@ func Example_selectWithoutParameters() {
 				}
 			}
 
-			return res.Err() // return finally result error for auto-retry with driver
+			return nil
 		},
 		query.WithIdempotent(),
 	)
@@ -229,7 +229,7 @@ func Example_selectWithParameters() {
 				}
 			}
 
-			return res.Err() // return finally result error for auto-retry with driver
+			return nil
 		},
 		options.WithIdempotent(),
 	)
@@ -289,7 +289,7 @@ func Example_txSelect() {
 				}
 			}
 
-			return res.Err() // return finally result error for auto-retry with driver
+			return nil
 		},
 		options.WithIdempotent(),
 		options.WithTxSettings(query.TxSettings(
