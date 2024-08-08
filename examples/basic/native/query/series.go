@@ -1,11 +1,10 @@
-//go:build go1.22 && goexperiment.rangefunc
-// +build go1.22,goexperiment.rangefunc
-
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"path"
 	"time"
@@ -38,12 +37,22 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 				_ = result.Close(ctx)
 			}()
 
-			for resultSet, err := range result.ResultSets(ctx) { // GOEXPERIMENT=rangefunc
+			for {
+				resultSet, err := result.NextResultSet(ctx)
 				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
 					return err
 				}
-				for row, err := range resultSet.Rows(ctx) { // GOEXPERIMENT=rangefunc
+				for {
+					row, err := resultSet.NextRow(ctx)
 					if err != nil {
+						if errors.Is(err, io.EOF) {
+							break
+						}
+
 						return err
 					}
 
