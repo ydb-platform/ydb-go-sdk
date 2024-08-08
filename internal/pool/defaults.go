@@ -1,6 +1,8 @@
 package pool
 
-const DefaultLimit = 50
+const (
+	DefaultLimit = 50
+)
 
 var defaultTrace = &Trace{
 	OnNew: func(info *NewStartInfo) func(info *NewDoneInfo) {
