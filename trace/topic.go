@@ -63,6 +63,15 @@ type (
 			OnReadStreamUpdateTokenDoneInfo,
 		)
 
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderPopBatchTx func(TopicReaderPopBatchTxStartInfo) func(TopicReaderPopBatchTxDoneInfo)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderUpdateOffsetsInTransaction func(TopicReaderOnUpdateOffsetsInTransactionStartInfo) func(TopicReaderOnUpdateOffsetsInTransactionDoneInfo)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderTransactionCompleted func(TopicReaderTransactionCompletedStartInfo) func(TopicReaderTransactionCompletedDoneInfo)
+
 		// TopicReaderMessageEvents
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -296,6 +305,45 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	OnReadStreamUpdateTokenDoneInfo struct {
 		Error error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderPopBatchTxStartInfo struct {
+		Context              *context.Context
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderPopBatchTxDoneInfo struct {
+		Error error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderOnUpdateOffsetsInTransactionStartInfo struct {
+		Context              *context.Context
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderOnUpdateOffsetsInTransactionDoneInfo struct {
+		Error error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderTransactionCompletedStartInfo struct {
+		Context              *context.Context
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+		TransactionResult    error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderTransactionCompletedDoneInfo struct {
 	}
 
 	////////////

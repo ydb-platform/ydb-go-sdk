@@ -192,6 +192,7 @@ func (r *topicStreamReaderImpl) PopBatchTx(
 	tx tx.Transaction,
 	opts ReadMessageBatchOptions,
 ) (*topicreadercommon.PublicBatch, error) {
+
 	batch, err := r.ReadMessageBatch(ctx, opts)
 	if err != nil {
 		return nil, err

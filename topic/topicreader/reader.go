@@ -93,6 +93,7 @@ func (r *Reader) PopBatchTx(ctx context.Context, transaction query.TxActor, opts
 	if err != nil {
 		return nil, err
 	}
+	internalTx.ID()
 
 	return r.reader.PopBatchTx(ctx, internalTx, opts...)
 }
