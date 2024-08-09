@@ -56,6 +56,7 @@ const (
 
 	TopicReaderStreamLifeCycleEvents
 	TopicReaderStreamEvents
+	TopicReaderTransactionEvents
 	TopicReaderMessageEvents
 	TopicReaderPartitionEvents
 

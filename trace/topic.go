@@ -63,6 +63,37 @@ type (
 			OnReadStreamUpdateTokenDoneInfo,
 		)
 
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderPopBatchTx func(TopicReaderPopBatchTxStartInfo) func(TopicReaderPopBatchTxDoneInfo)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderStreamPopBatchTx func(
+			TopicReaderStreamPopBatchTxStartInfo,
+		) func(
+			TopicReaderStreamPopBatchTxDoneInfo,
+		)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderUpdateOffsetsInTransaction func(
+			TopicReaderOnUpdateOffsetsInTransactionStartInfo,
+		) func(
+			TopicReaderOnUpdateOffsetsInTransactionDoneInfo,
+		)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderTransactionCompleted func(
+			TopicReaderTransactionCompletedStartInfo,
+		) func(
+			TopicReaderTransactionCompletedDoneInfo,
+		)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderTransactionRollback func(
+			TopicReaderTransactionRollbackStartInfo,
+		) func(
+			TopicReaderTransactionRollbackDoneInfo,
+		)
+
 		// TopicReaderMessageEvents
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -296,6 +327,77 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	OnReadStreamUpdateTokenDoneInfo struct {
 		Error error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderPopBatchTxStartInfo struct {
+		Context              *context.Context
+		ReaderID             int64
+		TransactionSessionID string
+		TransactionID        string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderPopBatchTxDoneInfo struct {
+		StartOffset   int64
+		EndOffset     int64
+		MessagesCount int
+		Error         error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderStreamPopBatchTxStartInfo struct {
+		Context              *context.Context
+		ReaderID             int64
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderStreamPopBatchTxDoneInfo struct {
+		Error error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderOnUpdateOffsetsInTransactionStartInfo struct {
+		Context              *context.Context
+		ReaderID             int64
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderOnUpdateOffsetsInTransactionDoneInfo struct {
+		Error error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderTransactionCompletedStartInfo struct {
+		Context              *context.Context
+		ReaderID             int64
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+		TransactionResult    error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderTransactionCompletedDoneInfo struct{}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderTransactionRollbackStartInfo struct {
+		Context              *context.Context
+		ReaderID             int64
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderTransactionRollbackDoneInfo struct {
+		RollbackError error
 	}
 
 	////////////
