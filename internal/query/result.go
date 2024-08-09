@@ -128,7 +128,7 @@ func newResult(
 	case <-ctx.Done():
 		return nil, txID, xerrors.WithStackTrace(ctx.Err())
 	default:
-		part, err := r.nextPart()
+		part, err := r.nextPart(ctx)
 		if err != nil {
 			return nil, txID, xerrors.WithStackTrace(err)
 		}
@@ -148,10 +148,19 @@ func (r *result) Stats() stats.QueryStats {
 	return stats.FromQueryStats(r.stats)
 }
 
-func (r *result) nextPart() (
-	*Ydb_Query.ExecuteQueryResponsePart, error,
+func (r *result) nextPart(ctx context.Context) (
+	part *Ydb_Query.ExecuteQueryResponsePart, err error,
 ) {
-	part, err := nextPart(r.stream)
+	if r.trace != nil {
+		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*result).Close"),
+		)
+		defer func() {
+			onDone(part.GetExecStats(), err)
+		}()
+	}
+
+	part, err = nextPart(r.stream)
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
 			for _, onEOF := range r.onEOF {
@@ -225,12 +234,12 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
 				r.resultSetIndex = resultSetIndex
 
-				return newResultSet(r.getNextResultSetPart(nextResultSetIndex), r.lastPart, r.trace), nil
+				return newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart, r.trace), nil
 			}
 			if r.stream == nil {
 				return nil, xerrors.WithStackTrace(io.EOF)
 			}
-			part, err := r.nextPart()
+			part, err := r.nextPart(ctx)
 			if err != nil {
 				r.closeOnce()
 
@@ -260,7 +269,8 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	}
 }
 
-func (r *result) getNextResultSetPart(
+func (r *result) nextPartFunc(
+	ctx context.Context,
 	nextResultSetIndex int64,
 ) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
@@ -271,7 +281,7 @@ func (r *result) getNextResultSetPart(
 			if r.stream == nil {
 				return nil, xerrors.WithStackTrace(io.EOF)
 			}
-			part, err := r.nextPart()
+			part, err := r.nextPart(ctx)
 			if err != nil {
 				r.closeOnce()
 

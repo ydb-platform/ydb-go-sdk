@@ -4,6 +4,8 @@ package trace
 
 import (
 	"context"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 )
 
 // queryComposeOptions is a holder of options
@@ -753,6 +755,41 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
+		h1 := t.OnResultNextPart
+		h2 := x.OnResultNextPart
+		ret.OnResultNextPart = func(q QueryResultNextPartStartInfo) func(QueryResultNextPartDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryResultNextPartDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryResultNextPartDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnResultNextResultSet
 		h2 := x.OnResultNextResultSet
 		ret.OnResultNextResultSet = func(q QueryResultNextResultSetStartInfo) func(QueryResultNextResultSetDoneInfo) {
@@ -1271,6 +1308,21 @@ func (t *Query) onResultNew(q QueryResultNewStartInfo) func(info QueryResultNewD
 	}
 	return res
 }
+func (t *Query) onResultNextPart(q QueryResultNextPartStartInfo) func(info QueryResultNextPartDoneInfo) {
+	fn := t.OnResultNextPart
+	if fn == nil {
+		return func(QueryResultNextPartDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryResultNextPartDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Query) onResultNextResultSet(q QueryResultNextResultSetStartInfo) func(info QueryResultNextResultSetDoneInfo) {
 	fn := t.OnResultNextResultSet
 	if fn == nil {
@@ -1621,6 +1673,19 @@ func QueryOnResultNew(t *Query, c *context.Context, call call) func(error) {
 	res := t.onResultNew(p)
 	return func(e error) {
 		var p QueryResultNewDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnResultNextPart(t *Query, c *context.Context, call call) func(stats *Ydb_TableStats.QueryStats, _ error) {
+	var p QueryResultNextPartStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onResultNextPart(p)
+	return func(stats *Ydb_TableStats.QueryStats, e error) {
+		var p QueryResultNextPartDoneInfo
+		p.Stats = stats
 		p.Error = e
 		res(p)
 	}

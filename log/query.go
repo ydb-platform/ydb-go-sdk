@@ -515,6 +515,33 @@ func internalQuery(
 				}
 			}
 		},
+		OnResultNextPart: func(info trace.QueryResultNextPartStartInfo) func(info trace.QueryResultNextPartDoneInfo) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "next", "part")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryResultNextPartDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						Stringer("stats", info.Stats),
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
 		OnResultNextResultSet: func(
 			info trace.QueryResultNextResultSetStartInfo,
 		) func(
