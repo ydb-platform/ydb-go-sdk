@@ -154,7 +154,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 				return err
 			}
 
-			return res.Err()
+			return nil
 		},
 		query.WithIdempotent(),
 		query.WithTrace(&trace.Query{
@@ -203,7 +203,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 				_ = res.Close(ctx)
 			}()
 
-			return res.Err()
+			return nil
 		},
 		query.WithIdempotent(),
 		query.WithTrace(&trace.Query{

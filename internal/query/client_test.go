@@ -444,7 +444,6 @@ func TestClient(t *testing.T) {
 				require.ErrorIs(t, err, io.EOF)
 				require.Nil(t, r3)
 			}
-			require.NoError(t, r.Err())
 		})
 	})
 }

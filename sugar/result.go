@@ -24,7 +24,7 @@ func (r *result) NextResultSet(ctx context.Context) bool {
 		return false
 	}
 
-	return err == nil && r.rs != nil && r.r.Err() == nil
+	return err == nil && r.rs != nil
 }
 
 func (r *result) NextRow() bool {
@@ -38,7 +38,7 @@ func (r *result) NextRow() bool {
 		return false
 	}
 
-	return r.row != nil && r.r.Err() == nil
+	return r.row != nil
 }
 
 func (r *result) Scan(indexedValues ...indexed.RequiredOrOptional) error {
@@ -64,7 +64,7 @@ func (r *result) ScanStruct(dst interface{}) error {
 }
 
 func (r *result) Err() error {
-	return r.r.Err()
+	return nil
 }
 
 func (r *result) Close() error {

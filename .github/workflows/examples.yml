@@ -33,6 +33,7 @@ jobs:
         options: '-h localhost'
     env:
       OS: ubuntu-latest
+      GO: 1.22.x
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
       YDB_VERSION: ${{ matrix.ydb-version }}

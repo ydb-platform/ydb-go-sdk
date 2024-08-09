@@ -77,7 +77,7 @@ func Example_query() {
 				}
 			}
 
-			return res.Err() // return finally result error for auto-retry with driver
+			return nil
 		},
 		query.WithIdempotent(),
 	)

@@ -58,29 +58,25 @@ func Example_rangeWithLegacyGo() {
 	if err != nil {
 		panic(err)
 	}
-	r.Range(ctx)(func(rs query.ResultSet, err error) bool {
+	for rs, err := range r.ResultSets(ctx) {
 		if err != nil {
-			return false
+			panic(err)
 		}
-		rs.Range(ctx)(func(row query.Row, err error) bool {
+		for row, err := range rs.Rows(ctx) {
 			if err != nil {
-				return false
+				panic(err)
 			}
 			err = row.ScanNamed(
 				query.Named("id", &id),
 				query.Named("myStr", &myStr),
 			)
 			if err != nil {
-				return false
+				panic(err)
 			}
 
 			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
-
-			return true
-		})
-
-		return true
-	})
+		}
+	}
 }
 
 func Example_rangeExperiment() {
@@ -98,13 +94,13 @@ func Example_rangeExperiment() {
 	if err != nil {
 		panic(err)
 	}
-	// for loop with Range available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
-	for rs, err := range r.Range(ctx) {
+	// for loop with ResultSets available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+	for rs, err := range r.ResultSets(ctx) {
 		if err != nil {
 			panic(err)
 		}
-		// for loop with Range available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
-		for row, err := range rs.Range(ctx) {
+		// for loop with ResultSets available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+		for row, err := range rs.Rows(ctx) {
 			if err != nil {
 				panic(err)
 			}
@@ -166,7 +162,7 @@ func Example_selectWithoutParameters() {
 				}
 			}
 
-			return res.Err() // return finally result error for auto-retry with driver
+			return nil
 		},
 		query.WithIdempotent(),
 	)
@@ -233,7 +229,7 @@ func Example_selectWithParameters() {
 				}
 			}
 
-			return res.Err() // return finally result error for auto-retry with driver
+			return nil
 		},
 		options.WithIdempotent(),
 	)
@@ -293,7 +289,7 @@ func Example_txSelect() {
 				}
 			}
 
-			return res.Err() // return finally result error for auto-retry with driver
+			return nil
 		},
 		options.WithIdempotent(),
 		options.WithTxSettings(query.TxSettings(

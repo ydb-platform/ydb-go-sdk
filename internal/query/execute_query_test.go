@@ -457,10 +457,8 @@ func TestExecute(t *testing.T) {
 		{
 			t.Log("nextResultSet")
 			_, err := r.nextResultSet(context.Background())
-			require.ErrorIs(t, err, errClosedResult)
+			require.ErrorIs(t, err, io.EOF)
 		}
-		t.Log("check final error")
-		require.NoError(t, r.Err())
 	})
 	t.Run("TransportError", func(t *testing.T) {
 		t.Run("OnCall", func(t *testing.T) {
@@ -621,9 +619,6 @@ func TestExecute(t *testing.T) {
 					require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 				}
 			}
-			t.Log("check final error")
-			require.Error(t, r.Err())
-			require.True(t, xerrors.IsTransportError(r.Err(), grpcCodes.Unavailable))
 		})
 	})
 	t.Run("OperationError", func(t *testing.T) {
@@ -749,9 +744,6 @@ func TestExecute(t *testing.T) {
 					require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 				}
 			}
-			t.Log("check final error")
-			require.Error(t, r.Err())
-			require.True(t, xerrors.IsOperationError(r.Err(), Ydb.StatusIds_UNAVAILABLE))
 		})
 	})
 }

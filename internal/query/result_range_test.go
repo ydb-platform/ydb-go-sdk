@@ -344,14 +344,14 @@ func TestResultRange(t *testing.T) {
 		},
 	}, nil)
 	stream.EXPECT().Recv().Return(nil, io.EOF)
-	r, _, err := newResult(ctx, stream, nil, nil)
+	r, _, err := newResult(ctx, stream, nil)
 	require.NoError(t, err)
 	defer r.Close(ctx)
 	rsCount := 0
-	for rs, err := range r.Range(ctx) {
+	for rs, err := range r.ResultSets(ctx) {
 		require.NoError(t, err)
 		rowsCount := 0
-		for _, err := range rs.Range(ctx) {
+		for _, err := range rs.Rows(ctx) {
 			require.NoError(t, err)
 			rowsCount++
 		}
@@ -359,5 +359,4 @@ func TestResultRange(t *testing.T) {
 		rsCount++
 	}
 	require.EqualValues(t, 3, rsCount)
-	require.NoError(t, r.Err())
 }

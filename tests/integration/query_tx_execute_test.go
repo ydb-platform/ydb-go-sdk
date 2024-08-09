@@ -48,7 +48,7 @@ func TestQueryTxExecute(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		return res.Err()
+		return nil
 	}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
 	require.NoError(t, err)
 	require.Equal(t, []string{"col1"}, columnNames)
