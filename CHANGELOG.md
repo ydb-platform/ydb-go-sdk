@@ -1,3 +1,4 @@
+## v3.76.4
 * Added traces and logs for read messages from topic within transaction
 * Changed result type of `query.Session.NodeID()` from `int64` to `uint32` for compatibility with table session and discovery
 * Removed experimental method `query.Result.Err()`
