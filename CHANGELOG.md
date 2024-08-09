@@ -1,3 +1,4 @@
+* Changed result type of `query.Session.NodeID()` from `int64` to `uint32` for compatibility with table session and discovery
 * Removed experimental method `query.Result.Err()`
 * Added the finishing reading the grpc stream on `query.Result.Close()` call
 * Renamed experimental method `query.Result.Range()` to `query.Result.ResultSets()`
