@@ -1,3 +1,4 @@
+* Added traces and logs for read messages from topic within transaction
 * Removed support of `go1.20`
 * Added PopMessages from topic within transaction
 

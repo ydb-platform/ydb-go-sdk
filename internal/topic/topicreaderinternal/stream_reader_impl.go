@@ -191,7 +191,20 @@ func (r *topicStreamReaderImpl) PopBatchTx(
 	ctx context.Context,
 	tx tx.Transaction,
 	opts ReadMessageBatchOptions,
-) (*topicreadercommon.PublicBatch, error) {
+) (_ *topicreadercommon.PublicBatch, resErr error) {
+	traceCtx := ctx
+	onDone := trace.TopicOnReaderStreamPopBatchTx(
+		r.cfg.Trace,
+		&traceCtx,
+		r.readerID,
+		r.readConnectionID,
+		tx.SessionID(),
+		tx.ID(),
+	)
+	ctx = traceCtx
+	defer func() {
+		onDone(resErr)
+	}()
 
 	batch, err := r.ReadMessageBatch(ctx, opts)
 	if err != nil {
@@ -210,49 +223,45 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 	tx tx.Transaction,
 	batch *topicreadercommon.PublicBatch,
 ) error {
-	commitRange := topicreadercommon.GetCommitRange(batch)
+	req := r.createUpdateOffsetRequest(ctx, batch, tx)
+
 	updateOffesetInTransactionErr := retry.Retry(ctx, func(ctx context.Context) (err error) {
-		err = r.topicClient.UpdateOffsetsInTransaction(ctx, &rawtopic.UpdateOffsetsInTransactionRequest{
-			OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
-			Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
-				ID:      tx.ID(),
-				Session: tx.SessionID(),
-			},
-			Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
-				{
-					Path: batch.Topic(),
-					Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
-						{
-							PartitionID: batch.PartitionID(),
-							PartitionOffsets: []rawtopiccommon.OffsetRange{
-								{
-									Start: commitRange.CommitOffsetStart,
-									End:   commitRange.CommitOffsetEnd,
-								},
-							},
-						},
-					},
-				},
-			},
-			Consumer: r.cfg.Consumer,
-		})
+		traceCtx := ctx
+		onDone := trace.TopicOnReaderUpdateOffsetsInTransaction(
+			r.cfg.Trace,
+			&traceCtx,
+			r.readerID,
+			r.readConnectionID,
+			tx.SessionID(),
+			tx.ID(),
+		)
+		defer func() {
+			onDone(err)
+		}()
+
+		ctx = traceCtx
+		err = r.topicClient.UpdateOffsetsInTransaction(ctx, req)
 
 		return err
 	})
 	if updateOffesetInTransactionErr == nil {
-		tx.OnCompleted(func(transactionResult error) {
-			//nolint:godox
-			// TODO: trace
-			if transactionResult == nil {
-				topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
-			} else {
-				_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.RetryableError(
-					fmt.Errorf("ydb: failed batch commit because transaction doesn't committed: %w", updateOffesetInTransactionErr),
-				)))
-			}
-		})
+		r.addOnTransactionCompletedHandler(ctx, tx, batch, updateOffesetInTransactionErr)
 	} else {
 		_ = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			traceCtx := ctx
+			onDone := trace.TopicOnReaderTransactionRollback(
+				r.cfg.Trace,
+				&traceCtx,
+				r.readerID,
+				r.readConnectionID,
+				tx.SessionID(),
+				tx.ID(),
+			)
+			ctx = traceCtx
+			defer func() {
+				onDone(err)
+			}()
+
 			return tx.Rollback(ctx)
 		})
 
@@ -264,6 +273,72 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 	}
 
 	return nil
+}
+
+func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
+	ctx context.Context,
+	tx tx.Transaction,
+	batch *topicreadercommon.PublicBatch,
+	updateOffesetInTransactionErr error,
+) {
+	commitRange := topicreadercommon.GetCommitRange(batch)
+	tx.OnCompleted(func(transactionResult error) {
+		traceCtx := ctx
+		onDone := trace.TopicOnReaderTransactionCompleted(
+			r.cfg.Trace,
+			&traceCtx,
+			r.readerID,
+			r.readConnectionID,
+			tx.SessionID(),
+			tx.ID(),
+			transactionResult,
+		)
+		defer onDone()
+
+		ctx = traceCtx
+		//nolint:godox
+		// TODO: trace
+		if transactionResult == nil {
+			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+		} else {
+			_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.RetryableError(
+				fmt.Errorf("ydb: failed batch commit because transaction doesn't committed: %w", updateOffesetInTransactionErr),
+			)))
+		}
+	})
+}
+
+func (r *topicStreamReaderImpl) createUpdateOffsetRequest(
+	ctx context.Context,
+	batch *topicreadercommon.PublicBatch,
+	tx tx.Transaction,
+) *rawtopic.UpdateOffsetsInTransactionRequest {
+	commitRange := topicreadercommon.GetCommitRange(batch)
+
+	return &rawtopic.UpdateOffsetsInTransactionRequest{
+		OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
+		Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+			ID:      tx.ID(),
+			Session: tx.SessionID(),
+		},
+		Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
+			{
+				Path: batch.Topic(),
+				Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
+					{
+						PartitionID: batch.PartitionID(),
+						PartitionOffsets: []rawtopiccommon.OffsetRange{
+							{
+								Start: commitRange.CommitOffsetStart,
+								End:   commitRange.CommitOffsetEnd,
+							},
+						},
+					},
+				},
+			},
+		},
+		Consumer: r.cfg.Consumer,
+	}
 }
 
 func (r *topicStreamReaderImpl) ReadMessageBatch(

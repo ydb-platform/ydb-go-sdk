@@ -67,10 +67,32 @@ type (
 		OnReaderPopBatchTx func(TopicReaderPopBatchTxStartInfo) func(TopicReaderPopBatchTxDoneInfo)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnReaderUpdateOffsetsInTransaction func(TopicReaderOnUpdateOffsetsInTransactionStartInfo) func(TopicReaderOnUpdateOffsetsInTransactionDoneInfo)
+		OnReaderStreamPopBatchTx func(
+			TopicReaderStreamPopBatchTxStartInfo,
+		) func(
+			TopicReaderStreamPopBatchTxDoneInfo,
+		)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnReaderTransactionCompleted func(TopicReaderTransactionCompletedStartInfo) func(TopicReaderTransactionCompletedDoneInfo)
+		OnReaderUpdateOffsetsInTransaction func(
+			TopicReaderOnUpdateOffsetsInTransactionStartInfo,
+		) func(
+			TopicReaderOnUpdateOffsetsInTransactionDoneInfo,
+		)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderTransactionCompleted func(
+			TopicReaderTransactionCompletedStartInfo,
+		) func(
+			TopicReaderTransactionCompletedDoneInfo,
+		)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderTransactionRollback func(
+			TopicReaderTransactionRollbackStartInfo,
+		) func(
+			TopicReaderTransactionRollbackDoneInfo,
+		)
 
 		// TopicReaderMessageEvents
 
@@ -310,19 +332,37 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPopBatchTxStartInfo struct {
 		Context              *context.Context
-		ReaderConnectionID   string
+		ReaderID             int64
 		TransactionSessionID string
 		TransactionID        string
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPopBatchTxDoneInfo struct {
+		StartOffset   int64
+		EndOffset     int64
+		MessagesCount int
+		Error         error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderStreamPopBatchTxStartInfo struct {
+		Context              *context.Context
+		ReaderID             int64
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderStreamPopBatchTxDoneInfo struct {
 		Error error
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderOnUpdateOffsetsInTransactionStartInfo struct {
 		Context              *context.Context
+		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
 		TransactionID        string
@@ -336,6 +376,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderTransactionCompletedStartInfo struct {
 		Context              *context.Context
+		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
 		TransactionID        string
@@ -343,7 +384,20 @@ type (
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	TopicReaderTransactionCompletedDoneInfo struct {
+	TopicReaderTransactionCompletedDoneInfo struct{}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderTransactionRollbackStartInfo struct {
+		Context              *context.Context
+		ReaderID             int64
+		ReaderConnectionID   string
+		TransactionSessionID string
+		TransactionID        string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderTransactionRollbackDoneInfo struct {
+		RollbackError error
 	}
 
 	////////////

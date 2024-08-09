@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Reader allow to read message from YDB topics.
@@ -83,7 +84,14 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 // The reconnect is implementation detail and may be changed in the future.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (r *Reader) PopBatchTx(ctx context.Context, transaction query.TxActor, opts ...ReadBatchOption) (*Batch, error) {
+func (r *Reader) PopBatchTx(
+	ctx context.Context,
+	transaction query.TxActor,
+	opts ...ReadBatchOption,
+) (
+	resBatch *Batch,
+	resErr error,
+) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err
 	}
@@ -93,7 +101,25 @@ func (r *Reader) PopBatchTx(ctx context.Context, transaction query.TxActor, opts
 	if err != nil {
 		return nil, err
 	}
-	internalTx.ID()
+
+	tracer := r.reader.Tracer()
+
+	traceCtx := ctx
+	onDone := trace.TopicOnReaderPopBatchTx(tracer, &traceCtx, r.reader.ID(), internalTx.SessionID(), internalTx.ID())
+	ctx = traceCtx
+
+	defer func() {
+		var startOffset, endOffset int64
+		var messagesCount int
+
+		if resBatch != nil {
+			messagesCount = len(resBatch.Messages)
+			commitRange := topicreadercommon.GetCommitRange(resBatch)
+			startOffset = commitRange.CommitOffsetStart.ToInt64()
+			endOffset = commitRange.CommitOffsetEnd.ToInt64()
+		}
+		onDone(startOffset, endOffset, messagesCount, resErr)
+	}()
 
 	return r.reader.PopBatchTx(ctx, internalTx, opts...)
 }

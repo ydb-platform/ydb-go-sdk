@@ -438,6 +438,202 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		)
 	}
 
+	t.OnReaderPopBatchTx = func(
+		startInfo trace.TopicReaderPopBatchTxStartInfo,
+	) func(trace.TopicReaderPopBatchTxDoneInfo) {
+		if d.Details()&trace.TopicReaderCustomerEvents == 0 {
+			return nil
+		}
+
+		start := time.Now()
+		ctx := with(*startInfo.Context, TRACE, "ydb", "topic", "reader", "customer", "popbatchtx")
+		l.Log(WithLevel(ctx, TRACE), "starting pop batch tx",
+			Int64("reader_id", startInfo.ReaderID),
+			String("transaction_session_id", startInfo.TransactionSessionID),
+			String("transaction_id", startInfo.TransactionID),
+		)
+
+		return func(doneInfo trace.TopicReaderPopBatchTxDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(
+					WithLevel(ctx, DEBUG), "pop batch done",
+					Int64("reader_id", startInfo.ReaderID),
+					String("transaction_session_id", startInfo.TransactionSessionID),
+					String("transaction_id", startInfo.TransactionID),
+					Int("messaged_count", doneInfo.MessagesCount),
+					Int64("start_offset", doneInfo.StartOffset),
+					Int64("end_offset", doneInfo.EndOffset),
+					latencyField(start),
+					versionField(),
+				)
+			} else {
+				l.Log(
+					WithLevel(ctx, WARN), "pop batch failed",
+					Int64("reader_id", startInfo.ReaderID),
+					String("transaction_session_id", startInfo.TransactionSessionID),
+					String("transaction_id", startInfo.TransactionID),
+					Error(doneInfo.Error),
+					latencyField(start),
+					versionField(),
+				)
+			}
+		}
+	}
+
+	t.OnReaderStreamPopBatchTx = func(
+		startInfo trace.TopicReaderStreamPopBatchTxStartInfo,
+	) func(
+		trace.TopicReaderStreamPopBatchTxDoneInfo,
+	) {
+		if d.Details()&trace.TopicReaderTransactionEvents == 0 {
+			return nil
+		}
+
+		start := time.Now()
+		ctx := with(*startInfo.Context, TRACE, "ydb", "topic", "reader", "transaction", "popbatchtx_on_stream")
+		l.Log(WithLevel(ctx, TRACE), "starting pop batch tx",
+			Int64("reader_id", startInfo.ReaderID),
+			String("reader_connection_id", startInfo.ReaderConnectionID),
+			String("transaction_session_id", startInfo.TransactionSessionID),
+			String("transaction_id", startInfo.TransactionID),
+			versionField(),
+		)
+
+		return func(doneInfo trace.TopicReaderStreamPopBatchTxDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(
+					WithLevel(ctx, DEBUG), "pop batch on stream done",
+					Int64("reader_id", startInfo.ReaderID),
+					String("transaction_session_id", startInfo.TransactionSessionID),
+					String("transaction_id", startInfo.TransactionID),
+					latencyField(start),
+					versionField(),
+				)
+			} else {
+				l.Log(
+					WithLevel(ctx, WARN), "pop batch on stream failed",
+					Int64("reader_id", startInfo.ReaderID),
+					String("transaction_session_id", startInfo.TransactionSessionID),
+					String("transaction_id", startInfo.TransactionID),
+					Error(doneInfo.Error),
+					latencyField(start),
+					versionField(),
+				)
+			}
+		}
+	}
+
+	t.OnReaderUpdateOffsetsInTransaction = func(
+		startInfo trace.TopicReaderOnUpdateOffsetsInTransactionStartInfo,
+	) func(
+		trace.TopicReaderOnUpdateOffsetsInTransactionDoneInfo,
+	) {
+		if d.Details()&trace.TopicReaderTransactionEvents == 0 {
+			return nil
+		}
+
+		start := time.Now()
+		ctx := with(*startInfo.Context, TRACE, "ydb", "topic", "reader", "transaction", "update_offsets")
+		l.Log(WithLevel(ctx, TRACE), "starting update offsets in transaction",
+			Int64("reader_id", startInfo.ReaderID),
+			String("reader_connection_id", startInfo.ReaderConnectionID),
+			String("transaction_session_id", startInfo.TransactionSessionID),
+			String("transaction_id", startInfo.TransactionID),
+			versionField(),
+		)
+
+		return func(doneInfo trace.TopicReaderOnUpdateOffsetsInTransactionDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(
+					WithLevel(ctx, DEBUG), "pop batch on stream done",
+					Int64("reader_id", startInfo.ReaderID),
+					String("transaction_session_id", startInfo.TransactionSessionID),
+					String("transaction_id", startInfo.TransactionID),
+					latencyField(start),
+					versionField(),
+				)
+			} else {
+				l.Log(
+					WithLevel(ctx, WARN), "pop batch on stream failed",
+					Int64("reader_id", startInfo.ReaderID),
+					String("transaction_session_id", startInfo.TransactionSessionID),
+					String("transaction_id", startInfo.TransactionID),
+					Error(doneInfo.Error),
+					latencyField(start),
+					versionField(),
+				)
+			}
+		}
+	}
+
+	t.OnReaderTransactionRollback = func(
+		startInfo trace.TopicReaderTransactionRollbackStartInfo,
+	) func(
+		trace.TopicReaderTransactionRollbackDoneInfo,
+	) {
+		if d.Details()&trace.TopicReaderTransactionEvents == 0 {
+			return nil
+		}
+
+		start := time.Now()
+		ctx := with(*startInfo.Context, TRACE, "ydb", "topic", "reader", "transaction", "update_offsets")
+		l.Log(WithLevel(ctx, TRACE), "starting update offsets in transaction",
+			Int64("reader_id", startInfo.ReaderID),
+			String("reader_connection_id", startInfo.ReaderConnectionID),
+			String("transaction_session_id", startInfo.TransactionSessionID),
+			String("transaction_id", startInfo.TransactionID),
+			versionField(),
+		)
+
+		return func(doneInfo trace.TopicReaderTransactionRollbackDoneInfo) {
+			if doneInfo.RollbackError == nil {
+				l.Log(
+					WithLevel(ctx, DEBUG), "pop batch on stream done",
+					Int64("reader_id", startInfo.ReaderID),
+					String("transaction_session_id", startInfo.TransactionSessionID),
+					String("transaction_id", startInfo.TransactionID),
+					latencyField(start),
+					versionField(),
+				)
+			} else {
+				l.Log(
+					WithLevel(ctx, WARN), "pop batch on stream failed",
+					Int64("reader_id", startInfo.ReaderID),
+					String("transaction_session_id", startInfo.TransactionSessionID),
+					String("transaction_id", startInfo.TransactionID),
+					Error(doneInfo.RollbackError),
+					latencyField(start),
+					versionField(),
+				)
+			}
+		}
+	}
+
+	t.OnReaderTransactionCompleted = func(
+		startInfo trace.TopicReaderTransactionCompletedStartInfo,
+	) func(
+		trace.TopicReaderTransactionCompletedDoneInfo,
+	) {
+		if d.Details()&trace.TopicReaderTransactionEvents == 0 {
+			return nil
+		}
+
+		// expected as very short in memory operation without errors, no need log start separately
+		start := time.Now()
+
+		return func(doneInfo trace.TopicReaderTransactionCompletedDoneInfo) {
+			ctx := with(*startInfo.Context, TRACE, "ydb", "topic", "reader", "transaction", "update_offsets")
+			l.Log(WithLevel(ctx, TRACE), "starting update offsets in transaction",
+				Int64("reader_id", startInfo.ReaderID),
+				String("reader_connection_id", startInfo.ReaderConnectionID),
+				String("transaction_session_id", startInfo.TransactionSessionID),
+				String("transaction_id", startInfo.TransactionID),
+				latencyField(start),
+				versionField(),
+			)
+		}
+	}
+
 	///
 	/// Topic writer
 	///
