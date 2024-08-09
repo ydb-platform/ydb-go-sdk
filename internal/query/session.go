@@ -24,8 +24,8 @@ var _ query.Session = (*Session)(nil)
 type Session struct {
 	cfg        *config.Config
 	id         string
-	nodeID     int64
 	grpcClient Ydb_Query_V1.QueryServiceClient
+	nodeID     uint32
 	statusCode statusCode
 	closeOnce  func(ctx context.Context) error
 	checks     []func(s *Session) bool
@@ -108,7 +108,7 @@ func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 	}
 
 	s.id = response.GetSessionId()
-	s.nodeID = response.GetNodeId()
+	s.nodeID = uint32(response.GetNodeId())
 
 	err = s.attach(ctx)
 	if err != nil {
@@ -278,7 +278,7 @@ func (s *Session) ID() string {
 	return s.id
 }
 
-func (s *Session) NodeID() int64 {
+func (s *Session) NodeID() uint32 {
 	return s.nodeID
 }
 

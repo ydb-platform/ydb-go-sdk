@@ -13,7 +13,7 @@ import (
 type (
 	querySessionInfo interface {
 		ID() string
-		NodeID() int64
+		NodeID() uint32
 		Status() string
 	}
 	queryTransactionInfo interface {
