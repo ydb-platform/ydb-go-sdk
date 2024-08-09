@@ -24,8 +24,8 @@ var _ query.Session = (*Session)(nil)
 type Session struct {
 	cfg        *config.Config
 	id         string
-	nodeID     uint32
 	grpcClient Ydb_Query_V1.QueryServiceClient
+	nodeID     uint32
 	statusCode statusCode
 	closeOnce  func(ctx context.Context) error
 	checks     []func(s *Session) bool
