@@ -153,7 +153,7 @@ func (r *result) nextPart(ctx context.Context) (
 ) {
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*result).Close"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*result).nextPart"),
 		)
 		defer func() {
 			onDone(part.GetExecStats(), err)
