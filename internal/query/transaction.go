@@ -2,7 +2,6 @@ package query
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -111,17 +110,9 @@ func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.Tx
 	if executeSettings.TxControl().IsTxCommit() {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
-		var once sync.Once
 		resultOpts = append(resultOpts,
-			onEOF(func() {
-				once.Do(func() {
-					tx.notifyOnCompleted(nil)
-				})
-			}),
-			onErr(func(err error) {
-				once.Do(func() {
-					tx.notifyOnCompleted(err)
-				})
+			onNextPartErr(func(err error) {
+				tx.notifyOnCompleted(xerrors.HideEOF(err))
 			}),
 		)
 	}

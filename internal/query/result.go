@@ -38,8 +38,7 @@ type (
 		resultSetIndex int64
 		closed         chan struct{}
 		trace          *trace.Query
-		onEOF          []func()
-		onErr          []func(err error)
+		onNextPartErr  []func(err error)
 	}
 )
 
@@ -88,15 +87,9 @@ func withTrace(t *trace.Query) resultOption {
 	}
 }
 
-func onEOF(onEOF func()) resultOption {
+func onNextPartErr(callback func(err error)) resultOption {
 	return func(s *result) {
-		s.onEOF = append(s.onEOF, onEOF)
-	}
-}
-
-func onErr(onErr func(err error)) resultOption {
-	return func(s *result) {
-		s.onErr = append(s.onErr, onErr)
+		s.onNextPartErr = append(s.onNextPartErr, callback)
 	}
 }
 
@@ -105,13 +98,19 @@ func newResult(
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	opts ...resultOption,
 ) (_ *result, txID string, finalErr error) {
-	r := &result{
+	r := result{
 		stream:         stream,
+		closed:         make(chan struct{}),
 		resultSetIndex: -1,
 	}
+	r.closeOnce = sync.OnceFunc(func() {
+		close(r.closed)
+		r.stream = nil
+	})
+
 	for _, opt := range opts {
 		if opt != nil {
-			opt(r)
+			opt(&r)
 		}
 	}
 
@@ -133,14 +132,10 @@ func newResult(
 			return nil, txID, xerrors.WithStackTrace(err)
 		}
 
-		r.closed = make(chan struct{})
 		r.lastPart = part
 		r.stats = part.GetExecStats()
-		r.closeOnce = sync.OnceFunc(func() {
-			close(r.closed)
-		})
 
-		return r, part.GetTxMeta().GetId(), nil
+		return &r, part.GetTxMeta().GetId(), nil
 	}
 }
 
@@ -162,14 +157,10 @@ func (r *result) nextPart(ctx context.Context) (
 
 	part, err = nextPart(r.stream)
 	if err != nil {
-		if xerrors.Is(err, io.EOF) {
-			for _, onEOF := range r.onEOF {
-				onEOF()
-			}
-		} else {
-			for _, onErr := range r.onErr {
-				onErr(err)
-			}
+		r.closeOnce()
+
+		for _, callback := range r.onNextPartErr {
+			callback(err)
 		}
 
 		return nil, xerrors.WithStackTrace(err)
@@ -206,16 +197,8 @@ func (r *result) Close(ctx context.Context) (finalErr error) {
 		case <-r.closed:
 			return nil
 		default:
-			_, err := r.stream.Recv()
+			_, err := r.nextPart(ctx)
 			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					for _, onEOF := range r.onEOF {
-						onEOF()
-					}
-
-					return nil
-				}
-
 				return xerrors.WithStackTrace(err)
 			}
 		}
@@ -241,15 +224,6 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 			}
 			part, err := r.nextPart(ctx)
 			if err != nil {
-				r.closeOnce()
-
-				if xerrors.Is(err, io.EOF) {
-					for _, onEOF := range r.onEOF {
-						onEOF()
-					}
-					r.stream = nil
-				}
-
 				return nil, xerrors.WithStackTrace(err)
 			}
 			if stats := part.GetExecStats(); stats != nil {
@@ -283,12 +257,6 @@ func (r *result) nextPartFunc(
 			}
 			part, err := r.nextPart(ctx)
 			if err != nil {
-				r.closeOnce()
-
-				if xerrors.Is(err, io.EOF) {
-					r.stream = nil
-				}
-
 				return nil, xerrors.WithStackTrace(err)
 			}
 			r.lastPart = part
