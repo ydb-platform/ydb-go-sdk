@@ -155,18 +155,23 @@ func (r *result) nextPart(ctx context.Context) (
 		}()
 	}
 
-	part, err = nextPart(r.stream)
-	if err != nil {
-		r.closeOnce()
+	select {
+	case <-r.closed:
+		return nil, xerrors.WithStackTrace(io.EOF)
+	default:
+		part, err = nextPart(r.stream)
+		if err != nil {
+			r.closeOnce()
 
-		for _, callback := range r.onNextPartErr {
-			callback(err)
+			for _, callback := range r.onNextPartErr {
+				callback(err)
+			}
+
+			return nil, xerrors.WithStackTrace(err)
 		}
 
-		return nil, xerrors.WithStackTrace(err)
+		return part, nil
 	}
-
-	return part, nil
 }
 
 func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
@@ -199,6 +204,10 @@ func (r *result) Close(ctx context.Context) (finalErr error) {
 		default:
 			_, err := r.nextPart(ctx)
 			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					return nil
+				}
+
 				return xerrors.WithStackTrace(err)
 			}
 		}
