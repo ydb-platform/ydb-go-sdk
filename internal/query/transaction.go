@@ -2,6 +2,8 @@ package query
 
 import (
 	"context"
+	"slices"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -24,10 +26,12 @@ var (
 type Transaction struct {
 	tx.Identifier
 
-	s           *Session
-	onCompleted []tx.OnTransactionCompletedFunc
-
+	s               *Session
 	rollbackStarted atomic.Bool
+
+	m                 sync.Mutex
+	onCompletedCalled bool
+	onCompleted       []tx.OnTransactionCompletedFunc
 }
 
 func (tx *Transaction) SessionID() string {
@@ -211,11 +215,24 @@ func (tx *Transaction) Rollback(ctx context.Context) error {
 }
 
 func (tx *Transaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
+	tx.m.Lock()
+	defer tx.m.Unlock()
+
 	tx.onCompleted = append(tx.onCompleted, f)
 }
 
 func (tx *Transaction) notifyOnCompleted(err error) {
-	for _, f := range tx.onCompleted {
+	tx.m.Lock()
+	notifyCalled := tx.onCompletedCalled
+	tx.onCompletedCalled = true
+	onCompletedFunctions := slices.Clone(tx.onCompleted)
+	tx.m.Unlock()
+
+	if notifyCalled {
+		return
+	}
+
+	for _, f := range onCompletedFunctions {
 		f(err)
 	}
 }
