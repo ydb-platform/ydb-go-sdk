@@ -17,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestResultNextResultSet(t *testing.T) {
@@ -350,7 +349,7 @@ func TestResultNextResultSet(t *testing.T) {
 			},
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		{
@@ -448,12 +447,10 @@ func TestResultNextResultSet(t *testing.T) {
 		{
 			t.Log("nextResultSet")
 			rs, err := r.nextResultSet(context.Background())
-			require.ErrorIs(t, err, errClosedResult)
+			require.ErrorIs(t, err, io.EOF)
 			require.Nil(t, rs)
 			require.Equal(t, -1, rs.Index())
 		}
-		t.Log("check final error")
-		require.NoError(t, r.Err())
 	})
 	t.Run("InterruptStream", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(xtest.Context(t))
@@ -519,7 +516,7 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		{
@@ -540,7 +537,7 @@ func TestResultNextResultSet(t *testing.T) {
 				require.EqualValues(t, 1, rs.rowIndex)
 			}
 			t.Log("explicit interrupt stream")
-			require.NoError(t, r.closeOnce(ctx))
+			r.closeOnce()
 			{
 				t.Log("next (row=3)")
 				_, err := rs.nextRow(context.Background())
@@ -550,16 +547,14 @@ func TestResultNextResultSet(t *testing.T) {
 			{
 				t.Log("next (row=4)")
 				_, err := rs.nextRow(context.Background())
-				require.ErrorIs(t, err, errClosedResult)
+				require.ErrorIs(t, err, io.EOF)
 			}
 		}
 		{
 			t.Log("nextResultSet")
 			_, err := r.nextResultSet(context.Background())
-			require.ErrorIs(t, err, errClosedResult)
+			require.ErrorIs(t, err, io.EOF)
 		}
-		t.Log("check final error")
-		require.ErrorIs(t, r.Err(), errClosedResult)
 	})
 	t.Run("WrongResultSetIndex", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(xtest.Context(t))
@@ -836,7 +831,7 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		{
@@ -891,8 +886,6 @@ func TestResultNextResultSet(t *testing.T) {
 			_, err := r.nextResultSet(ctx)
 			require.ErrorIs(t, err, errWrongNextResultSetIndex)
 		}
-		t.Log("check final error")
-		require.ErrorIs(t, r.Err(), errWrongNextResultSetIndex)
 	})
 }
 
@@ -942,7 +935,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 			},
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
@@ -1010,7 +1003,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
@@ -1062,7 +1055,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		}, nil)
 		testErr := errors.New("test-err")
 		stream.EXPECT().Recv().Return(nil, testErr)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
@@ -1152,7 +1145,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneResultSetFromResult(ctx, r)
@@ -1204,7 +1197,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		}, nil)
 		testErr := errors.New("test-err")
 		stream.EXPECT().Recv().Return(nil, testErr)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
@@ -1270,7 +1263,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 			},
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		rs, err := exactlyOneResultSetFromResult(ctx, r)
@@ -1380,7 +1373,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		rs, err := exactlyOneResultSetFromResult(ctx, r)
@@ -1432,7 +1425,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 		}, nil)
 		testErr := errors.New("test-err")
 		stream.EXPECT().Recv().Return(nil, testErr)
-		r, _, err := newResult(ctx, stream, nil, nil)
+		r, _, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		rs, err := exactlyOneResultSetFromResult(ctx, r)
@@ -1772,7 +1765,7 @@ func TestResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, _, err := newResult(ctx, stream, nil, nil)
+			result, _, err := newResult(ctx, stream, nil)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -2131,7 +2124,7 @@ func TestResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, _, err := newResult(ctx, stream, nil, nil)
+			result, _, err := newResult(ctx, stream, nil)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -2491,7 +2484,7 @@ func TestResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, _, err := newResult(ctx, stream, nil, nil)
+			result, _, err := newResult(ctx, stream, nil)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -2826,7 +2819,7 @@ func TestResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, _, err := newResult(ctx, stream, nil, nil)
+			result, _, err := newResult(ctx, stream, nil)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -2857,10 +2850,8 @@ func TestMaterializedResultStats(t *testing.T) {
 	newResult := func(
 		ctx context.Context,
 		stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
-		t *trace.Query,
-		closeResult context.CancelFunc,
 	) (query.Result, error) {
-		r, _, err := newResult(ctx, stream, t, closeResult)
+		r, _, err := newResult(ctx, stream)
 		if err != nil {
 			return nil, err
 		}
@@ -3197,7 +3188,7 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, err := newResult(ctx, stream, nil, nil)
+			result, err := newResult(ctx, stream)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -3556,7 +3547,7 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, err := newResult(ctx, stream, nil, nil)
+			result, err := newResult(ctx, stream)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -3916,7 +3907,7 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, err := newResult(ctx, stream, nil, nil)
+			result, err := newResult(ctx, stream)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)
@@ -4251,7 +4242,7 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			result, err := newResult(ctx, stream, nil, nil)
+			result, err := newResult(ctx, stream)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			defer result.Close(ctx)

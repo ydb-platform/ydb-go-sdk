@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -171,6 +172,7 @@ func TestTxOnCompleted(t *testing.T) {
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
+			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 
@@ -199,6 +201,7 @@ func TestTxOnCompleted(t *testing.T) {
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
+			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 
@@ -235,6 +238,7 @@ func TestTxOnCompleted(t *testing.T) {
 				ResultSetIndex: 1,
 				ResultSet:      &Ydb.ResultSet{},
 			}, nil)
+			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 
@@ -284,23 +288,16 @@ func TestTxOnCompleted(t *testing.T) {
 				QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 
 				tx := TransactionOverGrpcMock(e)
-				var completedMutex sync.Mutex
-				var completed []error
+				var transactionResult error
 
-				tx.OnCompleted(func(transactionResult error) {
-					completedMutex.Lock()
-					completed = append(completed, transactionResult)
-					completedMutex.Unlock()
+				tx.OnCompleted(func(err error) {
+					transactionResult = err
 				})
 
-				var opts []options.TxExecuteOption
-				if commit {
-					opts = append(opts, query.WithCommit())
-				}
-				_, err := tx.Execute(sf.Context(e), "", opts...)
+				_, err := tx.Execute(sf.Context(e), "", query.WithCommit())
 				require.ErrorIs(t, err, testErr)
-				require.Len(t, completed, 1)
-				require.ErrorIs(t, completed[0], testErr)
+				require.Error(t, transactionResult)
+				require.ErrorIs(t, transactionResult, testErr)
 			})
 		}
 	})
@@ -321,26 +318,17 @@ func TestTxOnCompleted(t *testing.T) {
 					QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 
 					tx := TransactionOverGrpcMock(e)
-					var completedMutex sync.Mutex
-					var completed []error
+					var transactionResult error
 
-					tx.OnCompleted(func(transactionResult error) {
-						completedMutex.Lock()
-						completed = append(completed, transactionResult)
-						completedMutex.Unlock()
+					tx.OnCompleted(func(err error) {
+						transactionResult = err
 					})
 
-					var opts []options.TxExecuteOption
-					if commit {
-						opts = append(opts, query.WithCommit())
-					}
-					_, err := tx.Execute(sf.Context(e), "", opts...)
+					_, err := tx.Execute(sf.Context(e), "", query.WithCommit())
 					require.True(t, errorReturned)
 					require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION))
-					xtest.SpinWaitCondition(t, &completedMutex, func() bool {
-						return len(completed) > 0
-					})
-					require.Len(t, completed, 1)
+					require.Error(t, transactionResult)
+					require.True(t, xerrors.IsOperationError(transactionResult, Ydb.StatusIds_BAD_SESSION))
 				})
 			})
 		}

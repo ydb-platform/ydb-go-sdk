@@ -41,7 +41,7 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 				resultSet, err := result.NextResultSet(ctx)
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-						return result.Err()
+						break
 					}
 
 					return err
@@ -50,7 +50,7 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 					row, err := resultSet.NextRow(ctx)
 					if err != nil {
 						if errors.Is(err, io.EOF) {
-							return result.Err()
+							break
 						}
 
 						return err
@@ -68,6 +68,8 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 					log.Printf("%+v", info)
 				}
 			}
+
+			return nil
 		},
 	)
 }

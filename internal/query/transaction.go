@@ -58,9 +58,6 @@ func (tx *Transaction) ReadRow(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if err = r.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
 
 	return row, nil
 }
@@ -85,9 +82,6 @@ func (tx *Transaction) ReadResultSet(
 	}()
 	rs, err = exactlyOneResultSetFromResult(ctx, r)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	if err = r.Err(); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -116,26 +110,17 @@ func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.Tx
 
 	executeSettings := options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings
 
-	var res *result
-
-	// notification about complete transaction must be sended for any error or for successfully read all result if
-	// it was execution with commit flag
-	defer func() {
-		if finalErr == nil {
-			go func() {
-				<-res.Done()
-				resErr := res.Err()
-				if resErr != nil || executeSettings.TxControl().IsTxCommit() {
-					tx.notifyOnCompleted(resErr)
-				}
-			}()
-		} else {
-			tx.notifyOnCompleted(finalErr)
-		}
-	}()
-
-	var err error
-	_, res, err = execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings)
+	var resultOpts []resultOption
+	if executeSettings.TxControl().IsTxCommit() {
+		// notification about complete transaction must be sended for any error or for successfully read all result if
+		// it was execution with commit flag
+		resultOpts = append(resultOpts,
+			onNextPartErr(func(err error) {
+				tx.notifyOnCompleted(xerrors.HideEOF(err))
+			}),
+		)
+	}
+	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings, resultOpts...)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)

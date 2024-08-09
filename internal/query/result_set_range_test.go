@@ -62,7 +62,7 @@ func TestResultSetRange(t *testing.T) {
 		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
-		for _, err := range rs.Range(ctx) {
+		for _, err := range rs.Rows(ctx) {
 			require.NoError(t, err)
 			count++
 		}
@@ -149,7 +149,7 @@ func TestResultSetRange(t *testing.T) {
 		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
-		for row, err := range rs.Range(ctx) {
+		for row, err := range rs.Rows(ctx) {
 			require.NoError(t, err)
 			require.EqualValues(t, count, rs.rowIndex)
 			var (
@@ -237,7 +237,7 @@ func TestResultSetRange(t *testing.T) {
 		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
-		for _, err := range rs.Range(ctx) {
+		for _, err := range rs.Rows(ctx) {
 			require.NoError(t, err)
 			require.EqualValues(t, count, rs.rowIndex)
 			if count > 0 {
@@ -387,7 +387,7 @@ func TestResultSetRange(t *testing.T) {
 		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
-		for row, err := range rs.Range(ctx) {
+		for row, err := range rs.Rows(ctx) {
 			require.NoError(t, err)
 			var (
 				a uint64
@@ -505,7 +505,7 @@ func TestResultSetRange(t *testing.T) {
 		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
-		for row, err := range rs.Range(ctx) {
+		for row, err := range rs.Rows(ctx) {
 			require.NoError(t, err)
 			var (
 				a uint64
@@ -596,7 +596,7 @@ func TestResultSetRange(t *testing.T) {
 			count     = 0
 			cancelled = false
 		)
-		for _, err := range rs.Range(childCtx) {
+		for _, err := range rs.Rows(childCtx) {
 			count++
 			if !cancelled {
 				require.NoError(t, err)
@@ -675,7 +675,7 @@ func TestResultSetRange(t *testing.T) {
 		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-			part, err := nextPart(ctx, stream, nil)
+			part, err := nextPart(stream)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -691,7 +691,7 @@ func TestResultSetRange(t *testing.T) {
 		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
-		for _, err := range rs.Range(ctx) {
+		for _, err := range rs.Rows(ctx) {
 			if count < 3 {
 				require.NoError(t, err)
 			} else {
@@ -766,7 +766,7 @@ func TestResultSetRange(t *testing.T) {
 		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-			part, err := nextPart(ctx, stream, nil)
+			part, err := nextPart(stream)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -782,7 +782,7 @@ func TestResultSetRange(t *testing.T) {
 		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
-		for _, err := range rs.Range(ctx) {
+		for _, err := range rs.Rows(ctx) {
 			if count < 3 {
 				require.NoError(t, err)
 			} else {
@@ -915,7 +915,7 @@ func TestResultSetRange(t *testing.T) {
 		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-			part, err := nextPart(ctx, stream, nil)
+			part, err := nextPart(stream)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -924,7 +924,7 @@ func TestResultSetRange(t *testing.T) {
 		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
-		for _, err := range rs.Range(ctx) {
+		for _, err := range rs.Rows(ctx) {
 			if count < 3 {
 				require.NoError(t, err)
 			} else {

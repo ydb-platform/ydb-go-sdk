@@ -72,7 +72,6 @@ func TestQueryExecute(t *testing.T) {
 		require.NoError(t, err)
 		err = row.Scan(&p1, &p2, &p3)
 		require.NoError(t, err)
-		require.NoError(t, result.Err())
 		require.EqualValues(t, "test", p1)
 		require.EqualValues(t, 100500000000, p2)
 		require.EqualValues(t, time.Duration(100500000000), p3)
@@ -144,7 +143,7 @@ func TestQueryExecute(t *testing.T) {
 						if _, ok := queryStats.NextPhase(); !ok {
 							return fmt.Errorf("unexpected empty query phases")
 						}
-						return result.Err()
+						return nil
 					}, query.WithIdempotent())
 					require.NoError(t, err)
 				})
@@ -199,7 +198,7 @@ func TestQueryExecute(t *testing.T) {
 						if _, ok := queryStats.NextPhase(); !ok {
 							return fmt.Errorf("unexpected empty query phases")
 						}
-						return result.Err()
+						return nil
 					}, query.WithIdempotent())
 					require.NoError(t, err)
 				})
@@ -267,7 +266,7 @@ func TestQueryExecute(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			return result.Err()
+			return nil
 		}, query.WithIdempotent())
 		require.NoError(t, err)
 		require.EqualValues(t, "test", p1)
@@ -315,7 +314,7 @@ func TestQueryExecute(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			return result.Err()
+			return nil
 		}, query.WithIdempotent())
 		require.NoError(t, err)
 		require.EqualValues(t, "test", p1)
@@ -360,7 +359,7 @@ func TestQueryExecute(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			return result.Err()
+			return nil
 		}, query.WithIdempotent())
 		require.NoError(t, err)
 		require.NotNil(t, data.P1)
@@ -396,9 +395,6 @@ func TestQueryExecute(t *testing.T) {
 				if v != 1 {
 					return fmt.Errorf("unexpected value from database: %d", v)
 				}
-				if err = result.Err(); err != nil {
-					return err
-				}
 				return tx.CommitTx(ctx)
 			}, query.WithIdempotent())
 			require.NoError(t, err)
@@ -427,9 +423,6 @@ func TestQueryExecute(t *testing.T) {
 				if v != 1 {
 					return fmt.Errorf("unexpected value from database: %d", v)
 				}
-				if err = result.Err(); err != nil {
-					return err
-				}
 				result, err = tx.Execute(ctx, `SELECT 2`, query.WithCommit())
 				if err != nil {
 					return err
@@ -449,7 +442,7 @@ func TestQueryExecute(t *testing.T) {
 				if v != 2 {
 					return fmt.Errorf("unexpected value from database: %d", v)
 				}
-				return result.Err()
+				return nil
 			}, query.WithIdempotent())
 			require.NoError(t, err)
 		})
