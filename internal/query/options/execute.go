@@ -25,17 +25,19 @@ type (
 
 		txControl *tx.Control
 	}
-	ExecuteOption interface {
+	QueryOption interface {
 		applyExecuteOption(s *Execute)
 	}
+	ExecOption        = QueryOption
 	txExecuteSettings struct {
 		ExecuteSettings *Execute
 
 		commitTx bool
 	}
-	TxExecuteOption interface {
+	TxQueryOption interface {
 		applyTxExecuteOption(s *txExecuteSettings)
 	}
+	TxExecOption     = TxQueryOption
 	txCommitOption   struct{}
 	ParametersOption params.Parameters
 	TxControlOption  struct {
@@ -118,7 +120,7 @@ func defaultCommonExecuteSettings() commonExecuteSettings {
 	}
 }
 
-func ExecuteSettings(opts ...ExecuteOption) (settings *Execute) {
+func ExecuteSettings(opts ...ExecOption) (settings *Execute) {
 	settings = &Execute{
 		commonExecuteSettings: defaultCommonExecuteSettings(),
 	}
@@ -165,7 +167,7 @@ func (s *commonExecuteSettings) Params() *params.Parameters {
 	return &s.params
 }
 
-func TxExecuteSettings(id string, opts ...TxExecuteOption) (settings *txExecuteSettings) {
+func TxExecuteSettings(id string, opts ...TxExecOption) (settings *txExecuteSettings) {
 	settings = &txExecuteSettings{
 		ExecuteSettings: ExecuteSettings(),
 	}
@@ -192,19 +194,19 @@ func TxExecuteSettings(id string, opts ...TxExecuteOption) (settings *txExecuteS
 	return settings
 }
 
-var _ ExecuteOption = ParametersOption{}
+var _ ExecOption = ParametersOption{}
 
 func WithParameters(parameters *params.Parameters) ParametersOption {
 	return ParametersOption(*parameters)
 }
 
 var (
-	_ ExecuteOption   = ExecMode(0)
-	_ ExecuteOption   = StatsMode(0)
-	_ TxExecuteOption = ExecMode(0)
-	_ TxExecuteOption = StatsMode(0)
-	_ TxExecuteOption = txCommitOption{}
-	_ ExecuteOption   = TxControlOption{}
+	_ ExecOption   = ExecMode(0)
+	_ ExecOption   = StatsMode(0)
+	_ TxExecOption = ExecMode(0)
+	_ TxExecOption = StatsMode(0)
+	_ TxExecOption = txCommitOption{}
+	_ ExecOption   = TxControlOption{}
 )
 
 func WithCommit() txCommitOption {

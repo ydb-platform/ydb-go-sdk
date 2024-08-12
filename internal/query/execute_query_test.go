@@ -752,7 +752,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 	a := allocator.New()
 	for _, tt := range []struct {
 		name        string
-		opts        []options.ExecuteOption
+		opts        []options.ExecOption
 		request     *Ydb_Query.ExecuteQueryRequest
 		callOptions []grpc.CallOption
 	}{
@@ -773,7 +773,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithTxControl",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithTxControl(query.SerializableReadWriteTxControl(query.CommitTx())),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -801,7 +801,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithParams",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithParameters(
 					params.Builder{}.
 						Param("$a").Text("A").
@@ -863,7 +863,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithExplain",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithExecMode(options.ExecModeExplain),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -881,7 +881,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithValidate",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithExecMode(options.ExecModeValidate),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -899,7 +899,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithValidate",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithExecMode(options.ExecModeParse),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -917,7 +917,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsFull",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithStatsMode(options.StatsModeFull),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -935,7 +935,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsBasic",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithStatsMode(options.StatsModeBasic),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -953,7 +953,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsProfile",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithStatsMode(options.StatsModeProfile),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -971,7 +971,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithGrpcCallOptions",
-			opts: []options.ExecuteOption{
+			opts: []options.ExecOption{
 				options.WithCallOptions(grpc.Header(&metadata.MD{
 					"ext-header": []string{"test"},
 				})),

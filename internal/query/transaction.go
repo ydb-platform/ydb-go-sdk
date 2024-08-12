@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"io"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -38,56 +39,6 @@ func (tx *Transaction) SessionID() string {
 	return tx.s.ID()
 }
 
-func (tx *Transaction) ReadRow(
-	ctx context.Context,
-	q string,
-	opts ...options.TxExecuteOption,
-) (row query.Row, _ error) {
-	if tx.rollbackStarted.Load() {
-		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
-	}
-
-	r, err := tx.Execute(ctx, q, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	defer func() {
-		_ = r.Close(ctx)
-	}()
-	row, err = exactlyOneRowFromResult(ctx, r)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return row, nil
-}
-
-func (tx *Transaction) ReadResultSet(
-	ctx context.Context,
-	q string,
-	opts ...options.TxExecuteOption,
-) (
-	rs query.ResultSet, _ error,
-) {
-	if tx.rollbackStarted.Load() {
-		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
-	}
-
-	r, err := tx.Execute(ctx, q, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	defer func() {
-		_ = r.Close(ctx)
-	}()
-	rs, err = exactlyOneResultSetFromResult(ctx, r)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return rs, nil
-}
-
 func newTransaction(id string, s *Session) *Transaction {
 	return &Transaction{
 		Identifier: tx.ID(id),
@@ -95,15 +46,15 @@ func newTransaction(id string, s *Session) *Transaction {
 	}
 }
 
-func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
-	r query.Result, finalErr error,
+func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.TxExecOption) (
+	finalErr error,
 ) {
 	if tx.rollbackStarted.Load() {
-		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
+		return xerrors.WithStackTrace(ErrTransactionRollingBack)
 	}
 
-	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Execute"), tx.s, tx, q)
+	onDone := trace.QueryOnTxExec(tx.s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Exec"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -120,7 +71,53 @@ func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.Tx
 			}),
 		)
 	}
-	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings, resultOpts...)
+	_, r, err := execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings, resultOpts...)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			tx.s.setStatus(statusClosed)
+		}
+
+		return xerrors.WithStackTrace(err)
+	}
+
+	for {
+		_, err = r.NextResultSet(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return nil
+			}
+
+			return xerrors.WithStackTrace(err)
+		}
+	}
+}
+
+func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.TxQueryOption) (
+	_ query.Result, finalErr error,
+) {
+	if tx.rollbackStarted.Load() {
+		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
+	}
+
+	onDone := trace.QueryOnTxQuery(tx.s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"), tx.s, tx, q)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	executeSettings := options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings
+
+	var resultOpts []resultOption
+	if executeSettings.TxControl().IsTxCommit() {
+		// notification about complete transaction must be sended for any error or for successfully read all result if
+		// it was execution with commit flag
+		resultOpts = append(resultOpts,
+			onNextPartErr(func(err error) {
+				tx.notifyOnCompleted(xerrors.HideEOF(err))
+			}),
+		)
+	}
+	_, r, err := execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings, resultOpts...)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)
@@ -129,7 +126,7 @@ func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.Tx
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return res, nil
+	return r, nil
 }
 
 func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {

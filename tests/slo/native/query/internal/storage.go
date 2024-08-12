@@ -112,7 +112,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 				return err
 			}
 
-			_, res, err := session.Execute(ctx,
+			_, res, err := session.Query(ctx,
 				fmt.Sprintf(readQuery, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -184,7 +184,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 				return err
 			}
 
-			_, res, err := session.Execute(ctx,
+			_, err = session.Exec(ctx,
 				fmt.Sprintf(writeQuery, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -198,10 +198,6 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 			if err != nil {
 				return err
 			}
-
-			defer func() {
-				_ = res.Close(ctx)
-			}()
 
 			return nil
 		},
@@ -225,7 +221,7 @@ func (s *Storage) CreateTable(ctx context.Context) error {
 
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
-			_, _, err := session.Execute(ctx,
+			_, err := session.Exec(ctx,
 				fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
 					s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
 				),
@@ -248,7 +244,7 @@ func (s *Storage) DropTable(ctx context.Context) error {
 
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
-			_, _, err := session.Execute(ctx,
+			_, err := session.Exec(ctx,
 				fmt.Sprintf(dropTableQuery, s.tablePath),
 				query.WithTxControl(query.NoTx()),
 			)

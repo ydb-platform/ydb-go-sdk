@@ -261,15 +261,15 @@ func internalQuery(
 				}
 			}
 		},
-		OnReadRow: func(info trace.QueryReadRowStartInfo) func(trace.QueryReadRowDoneInfo) {
+		OnExec: func(info trace.QueryExecStartInfo) func(trace.QueryExecDoneInfo) {
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "read", "row")
+			ctx := with(*info.Context, TRACE, "ydb", "query", "exec")
 			l.Log(ctx, "start")
 			start := time.Now()
 
-			return func(info trace.QueryReadRowDoneInfo) {
+			return func(info trace.QueryExecDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						latencyField(start),
@@ -287,15 +287,67 @@ func internalQuery(
 				}
 			}
 		},
-		OnReadResultSet: func(info trace.QueryReadResultSetStartInfo) func(trace.QueryReadResultSetDoneInfo) {
+		OnQuery: func(info trace.QueryQueryStartInfo) func(trace.QueryQueryDoneInfo) {
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "read", "result", "set")
+			ctx := with(*info.Context, TRACE, "ydb", "query", "query")
 			l.Log(ctx, "start")
 			start := time.Now()
 
-			return func(info trace.QueryReadResultSetDoneInfo) {
+			return func(info trace.QueryQueryDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := ERROR
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnQueryRow: func(info trace.QueryQueryRowStartInfo) func(trace.QueryQueryRowDoneInfo) {
+			if d.Details()&trace.QueryEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "query", "row")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryQueryRowDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := ERROR
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnQueryResultSet: func(info trace.QueryQueryResultSetStartInfo) func(trace.QueryQueryResultSetDoneInfo) {
+			if d.Details()&trace.QueryEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "query", "result", "set")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryQueryResultSetDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						latencyField(start),
@@ -399,11 +451,11 @@ func internalQuery(
 				}
 			}
 		},
-		OnSessionExecute: func(info trace.QuerySessionExecuteStartInfo) func(info trace.QuerySessionExecuteDoneInfo) {
+		OnSessionExec: func(info trace.QuerySessionExecStartInfo) func(info trace.QuerySessionExecDoneInfo) {
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "execute")
+			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "exec")
 			l.Log(ctx, "start",
 				String("SessionID", info.Session.ID()),
 				String("SessionStatus", info.Session.Status()),
@@ -411,7 +463,37 @@ func internalQuery(
 			)
 			start := time.Now()
 
-			return func(info trace.QuerySessionExecuteDoneInfo) {
+			return func(info trace.QuerySessionExecDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnSessionQuery: func(info trace.QuerySessionQueryStartInfo) func(info trace.QuerySessionQueryDoneInfo) {
+			if d.Details()&trace.QuerySessionEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "query")
+			l.Log(ctx, "start",
+				String("SessionID", info.Session.ID()),
+				String("SessionStatus", info.Session.Status()),
+				String("Query", info.Query),
+			)
+			start := time.Now()
+
+			return func(info trace.QuerySessionQueryDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						latencyField(start),
@@ -459,11 +541,11 @@ func internalQuery(
 				}
 			}
 		},
-		OnTxExecute: func(info trace.QueryTxExecuteStartInfo) func(info trace.QueryTxExecuteDoneInfo) {
+		OnTxExec: func(info trace.QueryTxExecStartInfo) func(info trace.QueryTxExecDoneInfo) {
 			if d.Details()&trace.QueryTransactionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "execute")
+			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "exec")
 			l.Log(ctx, "start",
 				String("SessionID", info.Session.ID()),
 				String("TransactionID", info.Tx.ID()),
@@ -471,7 +553,37 @@ func internalQuery(
 			)
 			start := time.Now()
 
-			return func(info trace.QueryTxExecuteDoneInfo) {
+			return func(info trace.QueryTxExecDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, DEBUG), "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnTxQuery: func(info trace.QueryTxQueryStartInfo) func(info trace.QueryTxQueryDoneInfo) {
+			if d.Details()&trace.QueryTransactionEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "query")
+			l.Log(ctx, "start",
+				String("SessionID", info.Session.ID()),
+				String("TransactionID", info.Tx.ID()),
+				String("SessionStatus", info.Session.Status()),
+			)
+			start := time.Now()
+
+			return func(info trace.QueryTxQueryDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, DEBUG), "done",
 						latencyField(start),

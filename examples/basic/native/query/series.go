@@ -16,7 +16,7 @@ import (
 func read(ctx context.Context, c query.Client, prefix string) error {
 	return c.Do(ctx,
 		func(ctx context.Context, s query.Session) (err error) {
-			_, result, err := s.Execute(ctx, fmt.Sprintf(`
+			_, result, err := s.Query(ctx, fmt.Sprintf(`
 					PRAGMA TablePathPrefix("%s");
 					DECLARE $seriesID AS Uint64;
 					SELECT
@@ -79,7 +79,7 @@ func fillTablesWithData(ctx context.Context, c query.Client, prefix string) erro
 
 	return c.Do(ctx,
 		func(ctx context.Context, s query.Session) (err error) {
-			_, _, err = s.Execute(ctx,
+			_, err = s.Exec(ctx,
 				fmt.Sprintf(`
 					PRAGMA TablePathPrefix("%s");
 					
@@ -147,7 +147,7 @@ func fillTablesWithData(ctx context.Context, c query.Client, prefix string) erro
 func createTables(ctx context.Context, c query.Client, prefix string) error {
 	return c.Do(ctx,
 		func(ctx context.Context, s query.Session) error {
-			_, _, err := s.Execute(ctx, fmt.Sprintf(`
+			_, err := s.Exec(ctx, fmt.Sprintf(`
 					CREATE TABLE IF NOT EXISTS %s (
 					    series_id Bytes,
 					    title Text,
@@ -164,7 +164,7 @@ func createTables(ctx context.Context, c query.Client, prefix string) error {
 				return err
 			}
 
-			_, _, err = s.Execute(ctx, fmt.Sprintf(`
+			_, err = s.Exec(ctx, fmt.Sprintf(`
 					CREATE TABLE IF NOT EXISTS %s (
 					    series_id Bytes,
 					    season_id Bytes,
@@ -181,7 +181,7 @@ func createTables(ctx context.Context, c query.Client, prefix string) error {
 				return err
 			}
 
-			_, _, err = s.Execute(ctx, fmt.Sprintf(`
+			_, err = s.Exec(ctx, fmt.Sprintf(`
 					CREATE TABLE IF NOT EXISTS  %s (
 					    series_id Bytes,
 					    season_id Bytes,

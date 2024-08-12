@@ -405,9 +405,9 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnExecute
-		h2 := x.OnExecute
-		ret.OnExecute = func(q QueryExecuteStartInfo) func(QueryExecuteDoneInfo) {
+		h1 := t.OnExec
+		h2 := x.OnExec
+		ret.OnExec = func(q QueryExecStartInfo) func(QueryExecDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -415,14 +415,14 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryExecuteDoneInfo)
+			var r, r1 func(QueryExecDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(q QueryExecuteDoneInfo) {
+			return func(q QueryExecDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -440,9 +440,9 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnReadRow
-		h2 := x.OnReadRow
-		ret.OnReadRow = func(q QueryReadRowStartInfo) func(QueryReadRowDoneInfo) {
+		h1 := t.OnQuery
+		h2 := x.OnQuery
+		ret.OnQuery = func(q QueryQueryStartInfo) func(QueryQueryDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -450,14 +450,14 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryReadRowDoneInfo)
+			var r, r1 func(QueryQueryDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(q QueryReadRowDoneInfo) {
+			return func(q QueryQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -475,9 +475,9 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnReadResultSet
-		h2 := x.OnReadResultSet
-		ret.OnReadResultSet = func(q QueryReadResultSetStartInfo) func(QueryReadResultSetDoneInfo) {
+		h1 := t.OnQueryResultSet
+		h2 := x.OnQueryResultSet
+		ret.OnQueryResultSet = func(q QueryQueryResultSetStartInfo) func(QueryQueryResultSetDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -485,14 +485,49 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryReadResultSetDoneInfo)
+			var r, r1 func(QueryQueryResultSetDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(q QueryReadResultSetDoneInfo) {
+			return func(q QueryQueryResultSetDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnQueryRow
+		h2 := x.OnQueryRow
+		ret.OnQueryRow = func(q QueryQueryRowStartInfo) func(QueryQueryRowDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryQueryRowDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryQueryRowDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -615,9 +650,9 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnSessionExecute
-		h2 := x.OnSessionExecute
-		ret.OnSessionExecute = func(q QuerySessionExecuteStartInfo) func(QuerySessionExecuteDoneInfo) {
+		h1 := t.OnSessionExec
+		h2 := x.OnSessionExec
+		ret.OnSessionExec = func(q QuerySessionExecStartInfo) func(QuerySessionExecDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -625,14 +660,49 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QuerySessionExecuteDoneInfo)
+			var r, r1 func(QuerySessionExecDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(info QuerySessionExecuteDoneInfo) {
+			return func(info QuerySessionExecDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnSessionQuery
+		h2 := x.OnSessionQuery
+		ret.OnSessionQuery = func(q QuerySessionQueryStartInfo) func(QuerySessionQueryDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QuerySessionQueryDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QuerySessionQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -685,9 +755,9 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnTxExecute
-		h2 := x.OnTxExecute
-		ret.OnTxExecute = func(q QueryTxExecuteStartInfo) func(QueryTxExecuteDoneInfo) {
+		h1 := t.OnTxExec
+		h2 := x.OnTxExec
+		ret.OnTxExec = func(q QueryTxExecStartInfo) func(QueryTxExecDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -695,14 +765,49 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryTxExecuteDoneInfo)
+			var r, r1 func(QueryTxExecDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(info QueryTxExecuteDoneInfo) {
+			return func(info QueryTxExecDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnTxQuery
+		h2 := x.OnTxQuery
+		ret.OnTxQuery = func(q QueryTxQueryStartInfo) func(QueryTxQueryDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryTxQueryDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryTxQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -1158,46 +1263,61 @@ func (t *Query) onDoTx(q QueryDoTxStartInfo) func(QueryDoTxDoneInfo) {
 	}
 	return res
 }
-func (t *Query) onExecute(q QueryExecuteStartInfo) func(QueryExecuteDoneInfo) {
-	fn := t.OnExecute
+func (t *Query) onExec(q QueryExecStartInfo) func(QueryExecDoneInfo) {
+	fn := t.OnExec
 	if fn == nil {
-		return func(QueryExecuteDoneInfo) {
+		return func(QueryExecDoneInfo) {
 			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QueryExecuteDoneInfo) {
+		return func(QueryExecDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t *Query) onReadRow(q QueryReadRowStartInfo) func(QueryReadRowDoneInfo) {
-	fn := t.OnReadRow
+func (t *Query) onQuery(q QueryQueryStartInfo) func(QueryQueryDoneInfo) {
+	fn := t.OnQuery
 	if fn == nil {
-		return func(QueryReadRowDoneInfo) {
+		return func(QueryQueryDoneInfo) {
 			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QueryReadRowDoneInfo) {
+		return func(QueryQueryDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t *Query) onReadResultSet(q QueryReadResultSetStartInfo) func(QueryReadResultSetDoneInfo) {
-	fn := t.OnReadResultSet
+func (t *Query) onQueryResultSet(q QueryQueryResultSetStartInfo) func(QueryQueryResultSetDoneInfo) {
+	fn := t.OnQueryResultSet
 	if fn == nil {
-		return func(QueryReadResultSetDoneInfo) {
+		return func(QueryQueryResultSetDoneInfo) {
 			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QueryReadResultSetDoneInfo) {
+		return func(QueryQueryResultSetDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onQueryRow(q QueryQueryRowStartInfo) func(QueryQueryRowDoneInfo) {
+	fn := t.OnQueryRow
+	if fn == nil {
+		return func(QueryQueryRowDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryQueryRowDoneInfo) {
 			return
 		}
 	}
@@ -1248,16 +1368,31 @@ func (t *Query) onSessionDelete(q QuerySessionDeleteStartInfo) func(info QuerySe
 	}
 	return res
 }
-func (t *Query) onSessionExecute(q QuerySessionExecuteStartInfo) func(info QuerySessionExecuteDoneInfo) {
-	fn := t.OnSessionExecute
+func (t *Query) onSessionExec(q QuerySessionExecStartInfo) func(info QuerySessionExecDoneInfo) {
+	fn := t.OnSessionExec
 	if fn == nil {
-		return func(QuerySessionExecuteDoneInfo) {
+		return func(QuerySessionExecDoneInfo) {
 			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QuerySessionExecuteDoneInfo) {
+		return func(QuerySessionExecDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onSessionQuery(q QuerySessionQueryStartInfo) func(info QuerySessionQueryDoneInfo) {
+	fn := t.OnSessionQuery
+	if fn == nil {
+		return func(QuerySessionQueryDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QuerySessionQueryDoneInfo) {
 			return
 		}
 	}
@@ -1278,16 +1413,31 @@ func (t *Query) onSessionBegin(q QuerySessionBeginStartInfo) func(info QuerySess
 	}
 	return res
 }
-func (t *Query) onTxExecute(q QueryTxExecuteStartInfo) func(info QueryTxExecuteDoneInfo) {
-	fn := t.OnTxExecute
+func (t *Query) onTxExec(q QueryTxExecStartInfo) func(info QueryTxExecDoneInfo) {
+	fn := t.OnTxExec
 	if fn == nil {
-		return func(QueryTxExecuteDoneInfo) {
+		return func(QueryTxExecDoneInfo) {
 			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QueryTxExecuteDoneInfo) {
+		return func(QueryTxExecDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onTxQuery(q QueryTxQueryStartInfo) func(info QueryTxQueryDoneInfo) {
+	fn := t.OnTxQuery
+	if fn == nil {
+		return func(QueryTxQueryDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryTxQueryDoneInfo) {
 			return
 		}
 	}
@@ -1545,40 +1695,53 @@ func QueryOnDoTx(t *Query, c *context.Context, call call) func(attempts int, _ e
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnExecute(t *Query, c *context.Context, call call, query string) func(error) {
-	var p QueryExecuteStartInfo
+func QueryOnExec(t *Query, c *context.Context, call call, query string) func(error) {
+	var p QueryExecStartInfo
 	p.Context = c
 	p.Call = call
 	p.Query = query
-	res := t.onExecute(p)
+	res := t.onExec(p)
 	return func(e error) {
-		var p QueryExecuteDoneInfo
+		var p QueryExecDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnReadRow(t *Query, c *context.Context, call call, query string) func(error) {
-	var p QueryReadRowStartInfo
+func QueryOnQuery(t *Query, c *context.Context, call call, query string) func(error) {
+	var p QueryQueryStartInfo
 	p.Context = c
 	p.Call = call
 	p.Query = query
-	res := t.onReadRow(p)
+	res := t.onQuery(p)
 	return func(e error) {
-		var p QueryReadRowDoneInfo
+		var p QueryQueryDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnReadResultSet(t *Query, c *context.Context, call call, query string) func(error) {
-	var p QueryReadResultSetStartInfo
+func QueryOnQueryResultSet(t *Query, c *context.Context, call call, query string) func(error) {
+	var p QueryQueryResultSetStartInfo
 	p.Context = c
 	p.Call = call
 	p.Query = query
-	res := t.onReadResultSet(p)
+	res := t.onQueryResultSet(p)
 	return func(e error) {
-		var p QueryReadResultSetDoneInfo
+		var p QueryQueryResultSetDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnQueryRow(t *Query, c *context.Context, call call, query string) func(error) {
+	var p QueryQueryRowStartInfo
+	p.Context = c
+	p.Call = call
+	p.Query = query
+	res := t.onQueryRow(p)
+	return func(e error) {
+		var p QueryQueryRowDoneInfo
 		p.Error = e
 		res(p)
 	}
@@ -1623,15 +1786,29 @@ func QueryOnSessionDelete(t *Query, c *context.Context, call call, session query
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionExecute(t *Query, c *context.Context, call call, session querySessionInfo, query string) func(error) {
-	var p QuerySessionExecuteStartInfo
+func QueryOnSessionExec(t *Query, c *context.Context, call call, session querySessionInfo, query string) func(error) {
+	var p QuerySessionExecStartInfo
 	p.Context = c
 	p.Call = call
 	p.Session = session
 	p.Query = query
-	res := t.onSessionExecute(p)
+	res := t.onSessionExec(p)
 	return func(e error) {
-		var p QuerySessionExecuteDoneInfo
+		var p QuerySessionExecDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnSessionQuery(t *Query, c *context.Context, call call, session querySessionInfo, query string) func(error) {
+	var p QuerySessionQueryStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	p.Query = query
+	res := t.onSessionQuery(p)
+	return func(e error) {
+		var p QuerySessionQueryDoneInfo
 		p.Error = e
 		res(p)
 	}
@@ -1651,16 +1828,31 @@ func QueryOnSessionBegin(t *Query, c *context.Context, call call, session queryS
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxExecute(t *Query, c *context.Context, call call, session querySessionInfo, tx queryTransactionInfo, query string) func(error) {
-	var p QueryTxExecuteStartInfo
+func QueryOnTxExec(t *Query, c *context.Context, call call, session querySessionInfo, tx queryTransactionInfo, query string) func(error) {
+	var p QueryTxExecStartInfo
 	p.Context = c
 	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	p.Query = query
-	res := t.onTxExecute(p)
+	res := t.onTxExec(p)
 	return func(e error) {
-		var p QueryTxExecuteDoneInfo
+		var p QueryTxExecDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnTxQuery(t *Query, c *context.Context, call call, session querySessionInfo, tx queryTransactionInfo, query string) func(error) {
+	var p QueryTxQueryStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	p.Tx = tx
+	p.Query = query
+	res := t.onTxQuery(p)
+	return func(e error) {
+		var p QueryTxQueryDoneInfo
 		p.Error = e
 		res(p)
 	}

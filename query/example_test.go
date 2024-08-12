@@ -25,7 +25,7 @@ func Example_readRow() {
 		myStr string // optional value
 	)
 	// Do retry operation on errors with best effort
-	row, err := db.Query().ReadRow(ctx, // context manage exiting from Do
+	row, err := db.Query().QueryRow(ctx, // context manage exiting from Do
 		`SELECT 42 as id, "my string" as myStr`,
 	)
 	if err != nil {
@@ -54,7 +54,7 @@ func Example_rangeWithLegacyGo() {
 		id    int32  // required value
 		myStr string // optional value
 	)
-	r, err := db.Query().Execute(ctx, `SELECT 42 as id, "my string" as myStr`)
+	r, err := db.Query().Query(ctx, `SELECT 42 as id, "my string" as myStr`)
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +90,7 @@ func Example_rangeExperiment() {
 		id    int32  // required value
 		myStr string // optional value
 	)
-	r, err := db.Query().Execute(ctx, `SELECT 42 as id, "my string" as myStr`)
+	r, err := db.Query().Query(ctx, `SELECT 42 as id, "my string" as myStr`)
 	if err != nil {
 		panic(err)
 	}
@@ -131,7 +131,7 @@ func Example_selectWithoutParameters() {
 	// Do retry operation on errors with best effort
 	err = db.Query().Do(ctx, // context manage exiting from Do
 		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx,
+			_, res, err := s.Query(ctx,
 				`SELECT 42 as id, "my string" as myStr`,
 			)
 			if err != nil {
@@ -189,7 +189,7 @@ func Example_selectWithParameters() {
 	// Do retry operation on errors with best effort
 	err = db.Query().Do(ctx, // context manage exiting from Do
 		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx,
+			_, res, err := s.Query(ctx,
 				`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
 				options.WithParameters(
 					ydb.ParamsBuilder().
@@ -255,7 +255,7 @@ func Example_txSelect() {
 	// Do retry operation on errors with best effort
 	err = db.Query().DoTx(ctx, // context manage exiting from Do
 		func(ctx context.Context, tx query.TxActor) (err error) { // retry operation
-			res, err := tx.Execute(ctx,
+			res, err := tx.Query(ctx,
 				`SELECT 42 as id, "my string" as myStr`,
 			)
 			if err != nil {

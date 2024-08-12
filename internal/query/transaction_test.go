@@ -143,7 +143,29 @@ func TestTxOnCompleted(t *testing.T) {
 		require.Len(t, completed, 1)
 		require.ErrorIs(t, completed[0], ErrTransactionRollingBack)
 	})
-	t.Run("OnExecuteWithoutCommitTxSuccess", func(t *testing.T) {
+	t.Run("OnExecWithoutCommitTxSuccess", func(t *testing.T) {
+		e := fixenv.New(t)
+
+		responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+		responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+		}, nil)
+		responseStream.EXPECT().Recv().Return(nil, io.EOF)
+
+		QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+		tx := TransactionOverGrpcMock(e)
+		var completed []error
+
+		tx.OnCompleted(func(transactionResult error) {
+			completed = append(completed, transactionResult)
+		})
+
+		err := tx.Exec(sf.Context(e), "")
+		require.NoError(t, err)
+		require.Empty(t, completed)
+	})
+	t.Run("OnQueryWithoutCommitTxSuccess", func(t *testing.T) {
 		e := fixenv.New(t)
 
 		responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
@@ -160,11 +182,11 @@ func TestTxOnCompleted(t *testing.T) {
 			completed = append(completed, transactionResult)
 		})
 
-		_, err := tx.Execute(sf.Context(e), "")
+		_, err := tx.Query(sf.Context(e), "")
 		require.NoError(t, err)
 		require.Empty(t, completed)
 	})
-	t.Run("OnExecuteWithoutTxSuccess", func(t *testing.T) {
+	t.Run("OnExecWithoutTxSuccess", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := fixenv.New(t)
 
@@ -186,14 +208,41 @@ func TestTxOnCompleted(t *testing.T) {
 				completedMutex.Unlock()
 			})
 
-			res, err := tx.Execute(sf.Context(e), "")
+			err := tx.Exec(sf.Context(e), "")
+			require.NoError(t, err)
+			require.Empty(t, completed)
+		})
+	})
+	t.Run("OnQueryWithoutTxSuccess", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			e := fixenv.New(t)
+
+			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil)
+			responseStream.EXPECT().Recv().Return(nil, io.EOF)
+
+			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+			tx := TransactionOverGrpcMock(e)
+			var completedMutex sync.Mutex
+			var completed []error
+
+			tx.OnCompleted(func(transactionResult error) {
+				completedMutex.Lock()
+				completed = append(completed, transactionResult)
+				completedMutex.Unlock()
+			})
+
+			res, err := tx.Query(sf.Context(e), "")
 			require.NoError(t, err)
 			_ = res.Close(sf.Context(e))
 			time.Sleep(time.Millisecond) // time for reaction for closing channel
 			require.Empty(t, completed)
 		})
 	})
-	t.Run("OnExecuteWithTxSuccess", func(t *testing.T) {
+	t.Run("OnExecWithTxSuccess", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := fixenv.New(t)
 
@@ -215,7 +264,37 @@ func TestTxOnCompleted(t *testing.T) {
 				completedMutex.Unlock()
 			})
 
-			res, err := tx.Execute(sf.Context(e), "", options.WithCommit())
+			err := tx.Exec(sf.Context(e), "", options.WithCommit())
+			require.NoError(t, err)
+			xtest.SpinWaitCondition(t, &completedMutex, func() bool {
+				return len(completed) != 0
+			})
+			require.Equal(t, []error{nil}, completed)
+		})
+	})
+	t.Run("OnQueryWithTxSuccess", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			e := fixenv.New(t)
+
+			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil)
+			responseStream.EXPECT().Recv().Return(nil, io.EOF)
+
+			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
+
+			tx := TransactionOverGrpcMock(e)
+			var completedMutex sync.Mutex
+			var completed []error
+
+			tx.OnCompleted(func(transactionResult error) {
+				completedMutex.Lock()
+				completed = append(completed, transactionResult)
+				completedMutex.Unlock()
+			})
+
+			res, err := tx.Query(sf.Context(e), "", options.WithCommit())
 			_ = res.Close(sf.Context(e))
 			require.NoError(t, err)
 			xtest.SpinWaitCondition(t, &completedMutex, func() bool {
@@ -224,7 +303,7 @@ func TestTxOnCompleted(t *testing.T) {
 			require.Equal(t, []error{nil}, completed)
 		})
 	})
-	t.Run("OnExecuteWithTxSuccessWithTwoResultSet", func(t *testing.T) {
+	t.Run("OnQueryWithTxSuccessWithTwoResultSet", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := fixenv.New(t)
 
@@ -252,7 +331,7 @@ func TestTxOnCompleted(t *testing.T) {
 				completedMutex.Unlock()
 			})
 
-			res, err := tx.Execute(sf.Context(e), "", options.WithCommit())
+			res, err := tx.Query(sf.Context(e), "", options.WithCommit())
 			require.NoError(t, err)
 
 			// time for event happened if is
@@ -294,7 +373,7 @@ func TestTxOnCompleted(t *testing.T) {
 					transactionResult = err
 				})
 
-				_, err := tx.Execute(sf.Context(e), "", query.WithCommit())
+				err := tx.Exec(sf.Context(e), "", query.WithCommit())
 				require.ErrorIs(t, err, testErr)
 				require.Error(t, transactionResult)
 				require.ErrorIs(t, transactionResult, testErr)
@@ -324,7 +403,7 @@ func TestTxOnCompleted(t *testing.T) {
 						transactionResult = err
 					})
 
-					_, err := tx.Execute(sf.Context(e), "", query.WithCommit())
+					err := tx.Exec(sf.Context(e), "", query.WithCommit())
 					require.True(t, errorReturned)
 					require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION))
 					require.Error(t, transactionResult)
@@ -414,7 +493,7 @@ func TestTxExecuteSettings(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		txID     string
-		txOpts   []options.TxExecuteOption
+		txOpts   []options.TxExecOption
 		settings executeConfig
 	}{
 		{
@@ -430,7 +509,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithStats",
-			txOpts: []options.TxExecuteOption{
+			txOpts: []options.TxExecOption{
 				options.WithStatsMode(options.StatsModeFull),
 			},
 			settings: testExecuteSettings{
@@ -442,7 +521,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithExecMode",
-			txOpts: []options.TxExecuteOption{
+			txOpts: []options.TxExecOption{
 				options.WithExecMode(options.ExecModeExplain),
 			},
 			settings: testExecuteSettings{
@@ -454,7 +533,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithSyntax",
-			txOpts: []options.TxExecuteOption{
+			txOpts: []options.TxExecOption{
 				options.WithSyntax(options.SyntaxPostgreSQL),
 			},
 			settings: testExecuteSettings{
@@ -466,7 +545,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithGrpcOptions",
-			txOpts: []options.TxExecuteOption{
+			txOpts: []options.TxExecOption{
 				options.WithCallOptions(grpc.CallContentSubtype("test")),
 			},
 			settings: testExecuteSettings{
@@ -481,7 +560,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithParams",
-			txOpts: []options.TxExecuteOption{
+			txOpts: []options.TxExecOption{
 				options.WithParameters(
 					params.Builder{}.Param("$a").Text("A").Build(),
 				),
@@ -496,7 +575,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithCommitTx",
-			txOpts: []options.TxExecuteOption{
+			txOpts: []options.TxExecOption{
 				options.WithCommit(),
 			},
 			settings: testExecuteSettings{

@@ -1,3 +1,10 @@
+* Splitted experimental method `query.Client.Execute` to methods `query.Client.Exec` without result and `query.Client.Query` with result
+* Renamed experimental method `query.Client.ReadResultSet` to `query.Client.QueryResultSet`
+* Renamed experimental method `query.Client.ReadRow` to `query.Client.QueryRow`
+* Removed experimental methods `query.Session.ReadResultSet` and  `query.Session.ReadRows`
+* Removed experimental methods `query.Transaction.ReadResultSet` and  `query.Transaction.ReadRows`
+* Removed experimental method `query.Client.Stats`
+
 ## v3.76.6
 * Replaced requirements from go1.22 + experimantal flag to go1.23 for experimental range-over interface
 

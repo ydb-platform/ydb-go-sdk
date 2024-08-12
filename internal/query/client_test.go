@@ -209,10 +209,180 @@ func TestClient(t *testing.T) {
 			require.Equal(t, 10, counter)
 		})
 	})
-	t.Run("Execute", func(t *testing.T) {
+	t.Run("Exec", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			r, err := clientExecute(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			err := clientExec(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					Status: Ydb.StatusIds_SUCCESS,
+					TxMeta: &Ydb_Query.TransactionMeta{
+						Id: "456",
+					},
+					ResultSetIndex: 0,
+					ResultSet: &Ydb.ResultSet{
+						Columns: []*Ydb.Column{
+							{
+								Name: "a",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									},
+								},
+							},
+							{
+								Name: "b",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UTF8,
+									},
+								},
+							},
+						},
+						Rows: []*Ydb.Value{
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 1,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "1",
+									},
+								}},
+							},
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 2,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "2",
+									},
+								}},
+							},
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 3,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "3",
+									},
+								}},
+							},
+						},
+					},
+				}, nil)
+				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					Status:         Ydb.StatusIds_SUCCESS,
+					ResultSetIndex: 0,
+					ResultSet: &Ydb.ResultSet{
+						Rows: []*Ydb.Value{
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 4,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "4",
+									},
+								}},
+							},
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 5,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "5",
+									},
+								}},
+							},
+						},
+					},
+				}, nil)
+				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					Status:         Ydb.StatusIds_SUCCESS,
+					ResultSetIndex: 1,
+					ResultSet: &Ydb.ResultSet{
+						Columns: []*Ydb.Column{
+							{
+								Name: "c",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									},
+								},
+							},
+							{
+								Name: "d",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UTF8,
+									},
+								},
+							},
+							{
+								Name: "e",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_BOOL,
+									},
+								},
+							},
+						},
+						Rows: []*Ydb.Value{
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 1,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "1",
+									},
+								}, {
+									Value: &Ydb.Value_BoolValue{
+										BoolValue: true,
+									},
+								}},
+							},
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 2,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "2",
+									},
+								}, {
+									Value: &Ydb.Value_BoolValue{
+										BoolValue: false,
+									},
+								}},
+							},
+						},
+					},
+				}, nil)
+				stream.EXPECT().Recv().Return(nil, io.EOF)
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+				return newTestSessionWithClient("123", client), nil
+			}), "")
+			require.NoError(t, err)
+		})
+	})
+	t.Run("Query", func(t *testing.T) {
+		t.Run("HappyWay", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			r, err := clientQuery(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status: Ydb.StatusIds_SUCCESS,

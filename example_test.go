@@ -35,7 +35,7 @@ func Example_query() {
 	err = db.Query().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
 		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx,
+			_, res, err := s.Query(ctx,
 				`SELECT $id as myId, $str as myStr`,
 				query.WithParameters(
 					ydb.ParamsBuilder().

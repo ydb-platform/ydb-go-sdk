@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"io"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -29,40 +30,6 @@ type Session struct {
 	statusCode statusCode
 	closeOnce  func(ctx context.Context) error
 	checks     []func(s *Session) bool
-}
-
-func (s *Session) ReadRow(ctx context.Context, q string, opts ...options.ExecuteOption) (row query.Row, _ error) {
-	_, r, err := s.Execute(ctx, q, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	defer func() {
-		_ = r.Close(ctx)
-	}()
-	row, err = exactlyOneRowFromResult(ctx, r)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return row, nil
-}
-
-func (s *Session) ReadResultSet(ctx context.Context, q string, opts ...options.ExecuteOption) (
-	rs query.ResultSet, _ error,
-) {
-	_, r, err := s.Execute(ctx, q, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	defer func() {
-		_ = r.Close(ctx)
-	}()
-	rs, err = exactlyOneResultSetFromResult(ctx, r)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return rs, nil
 }
 
 func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config) (
@@ -294,11 +261,40 @@ func (s *Session) Status() string {
 	return s.status().String()
 }
 
-func (s *Session) Execute(
-	ctx context.Context, q string, opts ...options.ExecuteOption,
+func (s *Session) Exec(
+	ctx context.Context, q string, opts ...options.ExecOption,
+) (_ query.Transaction, err error) {
+	onDone := trace.QueryOnSessionExec(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"), s, q)
+	defer func() {
+		onDone(err)
+	}()
+
+	tx, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
+	if err != nil {
+		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
+			s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+	for {
+		_, err = r.NextResultSet(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return tx, nil
+			}
+
+			return nil, xerrors.WithStackTrace(err)
+		}
+	}
+}
+
+func (s *Session) Query(
+	ctx context.Context, q string, opts ...options.ExecOption,
 ) (_ query.Transaction, _ query.Result, err error) {
-	onDone := trace.QueryOnSessionExecute(s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Execute"), s, q)
+	onDone := trace.QueryOnSessionQuery(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"), s, q)
 	defer func() {
 		onDone(err)
 	}()

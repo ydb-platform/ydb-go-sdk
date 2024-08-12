@@ -20,28 +20,19 @@ type (
 	Session interface {
 		SessionInfo
 
-		// Execute executes query.
+		// Exec executes query.
 		//
-		// Execute used by default:
+		// Exec used by default:
 		// - DefaultTxControl (NoTx)
-		// - flag WithKeepInCache(true) if params is not empty.
-		Execute(ctx context.Context, query string, opts ...options.ExecuteOption) (tx Transaction, r Result, err error)
+		Exec(ctx context.Context, query string, opts ...options.ExecOption) (tx Transaction, err error)
+
+		// Query executes query and returns result
+		//
+		// Query used by default:
+		// - DefaultTxControl (NoTx)
+		Query(ctx context.Context, query string, opts ...options.ExecOption) (tx Transaction, r Result, err error)
 
 		Begin(ctx context.Context, txSettings TransactionSettings) (Transaction, error)
-
-		// ReadRow is a helper which read only one row from first result set in result
-		//
-		// ReadRow returns error if result contains more than one result set or more than one row
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		ReadRow(ctx context.Context, query string, opts ...options.ExecuteOption) (Row, error)
-
-		// ReadResultSet is a helper which read all rows from first result set in result
-		//
-		// ReadRow returns error if result contains more than one result set
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		ReadResultSet(ctx context.Context, query string, opts ...options.ExecuteOption) (ResultSet, error)
 	}
 )
 
@@ -76,7 +67,7 @@ func WithTxSettings(txSettings tx.Settings) options.DoTxOption {
 	return options.WithTxSettings(txSettings)
 }
 
-func WithCommit() options.TxExecuteOption {
+func WithCommit() options.TxExecOption {
 	return options.WithCommit()
 }
 

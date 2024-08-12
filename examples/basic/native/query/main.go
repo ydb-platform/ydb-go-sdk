@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -15,20 +16,18 @@ import (
 
 func isYdbVersionHaveQueryService() error {
 	minYdbVersion := strings.Split("24.1", ".")
-	ydbVersion := strings.Split(os.Getenv("YDB_VERSION"), ".")
-	for i, component := range ydbVersion {
+	ydbVersion, has := os.LookupEnv("YDB_VERSION")
+	if !has {
+		return nil
+	}
+	versionComponents := strings.Split(ydbVersion, ".")
+	for i, component := range versionComponents {
 		if i < len(minYdbVersion) {
 			if r := strings.Compare(component, minYdbVersion[i]); r < 0 {
 				return fmt.Errorf("example '%s' run on minimal YDB version '%v', but current version is '%s'",
 					os.Args[0],
 					strings.Join(minYdbVersion, "."),
-					func() string {
-						if len(ydbVersion) > 0 && ydbVersion[0] != "" {
-							return strings.Join(ydbVersion, ".")
-						}
-
-						return "undefined"
-					}(),
+					ydbVersion,
 				)
 			} else if r > 0 {
 				return nil
@@ -38,6 +37,8 @@ func isYdbVersionHaveQueryService() error {
 
 	return nil
 }
+
+var connectionString = flag.String("ydb", os.Getenv("YDB_CONNECTION_STRING"), "")
 
 func main() {
 	if err := isYdbVersionHaveQueryService(); err != nil {
@@ -49,13 +50,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	dsn, exists := os.LookupEnv("YDB_CONNECTION_STRING")
-	if !exists {
-		panic("YDB_CONNECTION_STRING environment variable not defined")
-	}
+	flag.Parse()
 
-	db, err := ydb.Open(ctx,
-		dsn,
+	db, err := ydb.Open(ctx, *connectionString,
 		environ.WithEnvironCredentials(),
 	)
 	if err != nil {
