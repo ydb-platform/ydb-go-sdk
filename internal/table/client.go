@@ -27,7 +27,7 @@ type sessionBuilder func(ctx context.Context) (*session, error)
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.New"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
 	defer func() {
 		onDone(config.SizeLimit())
@@ -265,7 +265,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 						onDone := trace.TableOnCreateSession(c.config.Trace(), info.Context,
 							stack.FunctionID(
-								"github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).CreateSession"))
+								"github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"))
 
 						return func(info trace.RetryLoopDoneInfo) {
 							onDone(s, info.Attempts, info.Error)
@@ -388,7 +388,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 	)
 
 	onDone := trace.TableOnPoolGet(settings.t, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolGet"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).internalPoolGet"),
 	)
 	defer func() {
 		onDone(s, i, finalErr)
@@ -488,7 +488,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 	})
 
 	waitDone := trace.TableOnPoolWait(t, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolWaitFromCh"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).internalPoolWaitFromCh"),
 	)
 
 	defer func() {
@@ -554,7 +554,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 // panic.
 func (c *Client) Put(ctx context.Context, s *session) (err error) {
 	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Put"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Put"),
 		s,
 	)
 	defer func() {
@@ -611,7 +611,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 			close(c.done)
 
 			onDone := trace.TableOnClose(c.config.Trace(), &ctx,
-				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Close"),
+				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Close"),
 			)
 			defer func() {
 				onDone(err)
@@ -657,7 +657,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	config := c.retryOptions(opts...)
 
 	attempts, onDone := 0, trace.TableOnDo(config.Trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Do"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Do"),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
@@ -686,7 +686,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 	config := c.retryOptions(opts...)
 
 	attempts, onDone := 0, trace.TableOnDoTx(config.Trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).DoTx"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).DoTx"),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {

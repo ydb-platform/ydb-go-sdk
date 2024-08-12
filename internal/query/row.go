@@ -38,7 +38,7 @@ func (r row) Scan(dst ...interface{}) (err error) {
 	var (
 		ctx    = r.ctx
 		onDone = trace.QueryOnRowScan(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.Scan"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.row.Scan"),
 		)
 	)
 	defer func() {
@@ -52,7 +52,7 @@ func (r row) ScanNamed(dst ...scanner.NamedDestination) (err error) {
 	var (
 		ctx    = r.ctx
 		onDone = trace.QueryOnRowScanNamed(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.ScanNamed"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.row.ScanNamed"),
 		)
 	)
 	defer func() {
@@ -66,7 +66,7 @@ func (r row) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) (err 
 	var (
 		ctx    = r.ctx
 		onDone = trace.QueryOnRowScanStruct(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.ScanStruct"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.row.ScanStruct"),
 		)
 	)
 	defer func() {

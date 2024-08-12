@@ -115,7 +115,7 @@ func (d *Driver) trace() *trace.Driver {
 //nolint:nonamedreturns
 func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	onDone := trace.DriverOnClose(d.trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.(*Driver).Close"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.(*Driver).Close"),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -254,7 +254,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 
 	onDone := trace.DriverOnInit(
 		d.trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.Open"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.Open"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {
@@ -292,7 +292,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 
 	onDone := trace.DriverOnInit(
 		d.trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.New"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.New"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {

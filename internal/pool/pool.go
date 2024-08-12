@@ -160,7 +160,7 @@ func New[PT Item[T], T any](
 
 	onDone := p.trace.OnNew(&NewStartInfo{
 		Context: &ctx,
-		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/pool.New"),
+		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.New"),
 	})
 
 	defer func() {
@@ -282,7 +282,7 @@ func (p *Pool[PT, T]) Stats() Stats {
 func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 	onDone := p.trace.OnGet(&GetStartInfo{
 		Context: &ctx,
-		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/pool.(*Pool).getItem"),
+		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).getItem"),
 	})
 	defer func() {
 		onDone(&GetDoneInfo{
@@ -342,7 +342,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 	onDone := p.trace.OnPut(&PutStartInfo{
 		Context: &ctx,
-		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/pool.(*Pool).putItem"),
+		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).putItem"),
 	})
 	defer func() {
 		onDone(&PutDoneInfo{
@@ -395,7 +395,7 @@ func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) error {
 func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
 	onDone := p.trace.OnTry(&TryStartInfo{
 		Context: &ctx,
-		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/pool.(*Pool).try"),
+		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).try"),
 	})
 	defer func() {
 		onDone(&TryDoneInfo{
@@ -435,7 +435,7 @@ func (p *Pool[PT, T]) With(
 	var (
 		onDone = p.trace.OnWith(&WithStartInfo{
 			Context: &ctx,
-			Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/pool.(*Pool).With"),
+			Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).With"),
 		})
 		attempts int
 	)
@@ -470,7 +470,7 @@ func (p *Pool[PT, T]) With(
 func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	onDone := p.trace.OnClose(&CloseStartInfo{
 		Context: &ctx,
-		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/pool.(*Pool).Close"),
+		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).Close"),
 	})
 	defer func() {
 		onDone(&CloseDoneInfo{

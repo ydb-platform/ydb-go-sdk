@@ -103,7 +103,7 @@ func (tx *Transaction) Execute(ctx context.Context, q string, opts ...options.Tx
 	}
 
 	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Transaction).Execute"), tx.s, tx, q)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Execute"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
 	}()
