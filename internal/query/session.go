@@ -85,7 +85,7 @@ func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 	}
 
 	onDone := trace.QueryOnSessionCreate(s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.createSession"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.createSession"),
 	)
 	defer func() {
 		if s == nil && finalErr == nil {
@@ -124,7 +124,7 @@ func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 
 func (s *Session) attach(ctx context.Context) (finalErr error) {
 	onDone := trace.QueryOnSessionAttach(s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).attach"), s)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).attach"), s)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -214,7 +214,7 @@ func (s *Session) IsAlive() bool {
 
 func (s *Session) Close(ctx context.Context) (err error) {
 	onDone := trace.QueryOnSessionDelete(s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).Close"), s)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Close"), s)
 	defer func() {
 		onDone(err)
 	}()
@@ -256,7 +256,7 @@ func (s *Session) Begin(
 	var tx *Transaction
 
 	onDone := trace.QueryOnSessionBegin(s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).Begin"), s)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
 	defer func() {
 		onDone(err, tx)
 	}()
@@ -298,7 +298,7 @@ func (s *Session) Execute(
 	ctx context.Context, q string, opts ...options.ExecuteOption,
 ) (_ query.Transaction, _ query.Result, err error) {
 	onDone := trace.QueryOnSessionExecute(s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).Execute"), s, q)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Execute"), s, q)
 	defer func() {
 		onDone(err)
 	}()

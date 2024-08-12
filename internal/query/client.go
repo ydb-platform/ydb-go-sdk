@@ -138,7 +138,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 
 	var (
 		onDone = trace.QueryOnDo(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Do"),
 		)
 		attempts = 0
 	)
@@ -203,7 +203,7 @@ func (c *Client) ReadRow(ctx context.Context, q string, opts ...options.ExecuteO
 	defer cancel()
 
 	onDone := trace.QueryOnReadRow(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).ReadRow"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).ReadRow"),
 		q,
 	)
 	defer func() {
@@ -257,7 +257,7 @@ func (c *Client) Execute(ctx context.Context, q string, opts ...options.ExecuteO
 	defer cancel()
 
 	onDone := trace.QueryOnExecute(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Execute"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Execute"),
 		q,
 	)
 	defer func() {
@@ -280,7 +280,7 @@ func (c *Client) ReadResultSet(
 	defer cancel()
 
 	onDone := trace.QueryOnReadResultSet(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).ReadResultSet"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).ReadResultSet"),
 		q,
 	)
 	defer func() {
@@ -308,7 +308,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 
 	var (
 		onDone = trace.QueryOnDoTx(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).DoTx"),
 		)
 		attempts = 0
 	)
@@ -348,7 +348,7 @@ func newPool(
 
 func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.New"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
 	defer onDone()
 

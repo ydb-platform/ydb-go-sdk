@@ -63,7 +63,7 @@ func (tx *transaction) Execute(
 ) (r result.Result, err error) {
 	onDone := trace.TableOnTxExecute(
 		tx.s.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).Execute"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).Execute"),
 		tx.s, tx, queryFromText(query), parameters,
 	)
 	defer func() {
@@ -105,7 +105,7 @@ func (tx *transaction) ExecuteStatement(
 
 	onDone := trace.TableOnTxExecuteStatement(
 		tx.s.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).ExecuteStatement"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).ExecuteStatement"),
 		tx.s, tx, val.query, parameters,
 	)
 	defer func() {
@@ -138,7 +138,7 @@ func (tx *transaction) CommitTx(
 ) (r result.Result, err error) {
 	onDone := trace.TableOnTxCommit(
 		tx.s.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).CommitTx"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).CommitTx"),
 		tx.s, tx,
 	)
 	defer func() {
@@ -196,7 +196,7 @@ func (tx *transaction) CommitTx(
 func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	onDone := trace.TableOnTxRollback(
 		tx.s.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).Rollback"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).Rollback"),
 		tx.s, tx,
 	)
 	defer func() {

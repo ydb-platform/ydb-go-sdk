@@ -41,7 +41,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamCloseSend(s.parentConn.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).CloseSend"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).CloseSend"),
 		)
 	)
 	defer func() {
@@ -77,7 +77,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamSendMsg(s.parentConn.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).SendMsg"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).SendMsg"),
 		)
 	)
 	defer func() {
@@ -122,7 +122,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 func (s *grpcClientStream) finish(err error) {
 	s.streamCancel()
 	trace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.streamCtx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).finish"), err,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
 	)
 }
 
@@ -130,7 +130,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).RecvMsg"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).RecvMsg"),
 		)
 	)
 	defer func() {

@@ -76,7 +76,7 @@ func (tx *transaction) Commit() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).Commit"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*transaction).Commit"),
 			tx,
 		)
 	)
@@ -100,7 +100,7 @@ func (tx *transaction) Rollback() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).Rollback"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*transaction).Rollback"),
 			tx,
 		)
 	)
@@ -125,7 +125,7 @@ func (tx *transaction) QueryContext(ctx context.Context, query string, args []dr
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).QueryContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*transaction).QueryContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
@@ -167,7 +167,7 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).ExecContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*transaction).ExecContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
@@ -201,7 +201,7 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 
 func (tx *transaction) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*transaction).PrepareContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*transaction).PrepareContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {

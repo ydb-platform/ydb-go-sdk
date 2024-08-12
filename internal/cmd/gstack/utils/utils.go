@@ -76,7 +76,7 @@ func WriteFile(filename string, formatted []byte, perm fs.FileMode) error {
 }
 
 func makeCall(fset *token.FileSet, path string, arg FunctionIDArg) (string, error) {
-	basePath := filepath.Join("github.com", "ydb-platform", version.Prefix, version.Major, "")
+	basePath := filepath.Join("github.com", "ydb-platform", version.Package, "v"+version.Major, "")
 	packageName, err := getPackageName(fset, arg)
 	if err != nil {
 		return "", err
