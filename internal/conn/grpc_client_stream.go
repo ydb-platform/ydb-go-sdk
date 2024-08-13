@@ -120,10 +120,10 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) finish(err error) {
-	s.streamCancel()
 	trace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.streamCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
 	)
+	s.streamCancel()
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
