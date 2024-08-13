@@ -131,7 +131,7 @@ func Example_selectWithoutParameters() {
 	// Do retry operation on errors with best effort
 	err = db.Query().Do(ctx, // context manage exiting from Do
 		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Query(ctx,
+			res, err := s.Query(ctx,
 				`SELECT 42 as id, "my string" as myStr`,
 			)
 			if err != nil {
@@ -189,7 +189,7 @@ func Example_selectWithParameters() {
 	// Do retry operation on errors with best effort
 	err = db.Query().Do(ctx, // context manage exiting from Do
 		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Query(ctx,
+			res, err := s.Query(ctx,
 				`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
 				options.WithParameters(
 					ydb.ParamsBuilder().

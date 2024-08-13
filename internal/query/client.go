@@ -206,7 +206,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.QueryOp
 	}()
 
 	err := do(ctx, c.pool, func(ctx context.Context, s query.Session) error {
-		_, r, err := s.Query(ctx, q, opts...)
+		r, err := s.Query(ctx, q, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -251,7 +251,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.QueryOp
 
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.ExecOption) (finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
-		_, streamResult, err := s.Query(ctx, q, opts...)
+		streamResult, err := s.Query(ctx, q, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -311,7 +311,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	r query.Result, err error,
 ) {
 	err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
-		_, streamResult, err := s.Query(ctx, q, opts...)
+		streamResult, err := s.Query(ctx, q, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -369,7 +369,7 @@ func (c *Client) QueryResultSet(
 	}()
 
 	err := do(ctx, c.pool, func(ctx context.Context, s query.Session) error {
-		_, r, err := s.Query(ctx, q, opts...)
+		r, err := s.Query(ctx, q, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}

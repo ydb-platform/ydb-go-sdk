@@ -35,7 +35,7 @@ func Example_query() {
 	err = db.Query().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
 		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Query(ctx,
+			streamResult, err := s.Query(ctx,
 				`SELECT $id as myId, $str as myStr`,
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -47,9 +47,9 @@ func Example_query() {
 			if err != nil {
 				return err // for auto-retry with driver
 			}
-			defer func() { _ = res.Close(ctx) }() // cleanup resources
-			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
+			defer func() { _ = streamResult.Close(ctx) }() // cleanup resources
+			for {                                          // iterate over result sets
+				rs, err := streamResult.NextResultSet(ctx)
 				if err != nil {
 					if errors.Is(err, io.EOF) {
 						break

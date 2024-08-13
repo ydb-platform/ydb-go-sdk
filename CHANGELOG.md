@@ -1,3 +1,4 @@
+* Removed tx result from `query.Session.Execute` (tx can be obtained from `query.Session.Begin`)
 * Splitted experimental method `query.Client.Execute` to methods `query.Client.Exec` without result and `query.Client.Query` with result
 * Renamed experimental method `query.Client.ReadResultSet` to `query.Client.QueryResultSet`
 * Renamed experimental method `query.Client.ReadRow` to `query.Client.QueryRow`

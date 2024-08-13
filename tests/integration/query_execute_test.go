@@ -96,7 +96,7 @@ func TestQueryExecute(t *testing.T) {
 			p3 time.Duration
 		)
 		err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-			_, result, err := s.Query(ctx, `
+			result, err := s.Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
@@ -140,7 +140,7 @@ func TestQueryExecute(t *testing.T) {
 			p3 time.Duration
 		)
 		err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-			_, result, err := s.Query(ctx, `
+			result, err := s.Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
@@ -189,7 +189,7 @@ func TestQueryExecute(t *testing.T) {
 			P4 *string       `sql:"p4"`
 		}
 		err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-			_, result, err := s.Query(ctx, `
+			result, err := s.Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
@@ -229,82 +229,33 @@ func TestQueryExecute(t *testing.T) {
 		require.Nil(t, data.P4)
 	})
 	t.Run("Tx", func(t *testing.T) {
-		t.Run("Explicit", func(t *testing.T) {
-			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-				tx, err := s.Begin(ctx, query.TxSettings(query.WithSerializableReadWrite()))
-				if err != nil {
-					return err
-				}
-				result, err := tx.Query(ctx, `SELECT 1`)
-				if err != nil {
-					return err
-				}
-				resultSet, err := result.NextResultSet(ctx)
-				if err != nil {
-					return err
-				}
-				row, err := resultSet.NextRow(ctx)
-				if err != nil {
-					return err
-				}
-				var v int32
-				err = row.Scan(&v)
-				if err != nil {
-					return err
-				}
-				if v != 1 {
-					return fmt.Errorf("unexpected value from database: %d", v)
-				}
-				return tx.CommitTx(ctx)
-			}, query.WithIdempotent())
-			require.NoError(t, err)
-		})
-		t.Run("Lazy", func(t *testing.T) {
-			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-				tx, result, err := s.Query(ctx, `SELECT 1`,
-					query.WithTxControl(query.TxControl(query.BeginTx(query.WithSerializableReadWrite()))),
-				)
-				if err != nil {
-					return err
-				}
-				resultSet, err := result.NextResultSet(ctx)
-				if err != nil {
-					return err
-				}
-				row, err := resultSet.NextRow(ctx)
-				if err != nil {
-					return err
-				}
-				var v int32
-				err = row.Scan(&v)
-				if err != nil {
-					return err
-				}
-				if v != 1 {
-					return fmt.Errorf("unexpected value from database: %d", v)
-				}
-				result, err = tx.Query(ctx, `SELECT 2`, query.WithCommit())
-				if err != nil {
-					return err
-				}
-				resultSet, err = result.NextResultSet(ctx)
-				if err != nil {
-					return err
-				}
-				row, err = resultSet.NextRow(ctx)
-				if err != nil {
-					return err
-				}
-				err = row.Scan(&v)
-				if err != nil {
-					return err
-				}
-				if v != 2 {
-					return fmt.Errorf("unexpected value from database: %d", v)
-				}
-				return nil
-			}, query.WithIdempotent())
-			require.NoError(t, err)
-		})
+		err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
+			tx, err := s.Begin(ctx, query.TxSettings(query.WithSerializableReadWrite()))
+			if err != nil {
+				return err
+			}
+			result, err := tx.Query(ctx, `SELECT 1`)
+			if err != nil {
+				return err
+			}
+			resultSet, err := result.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			row, err := resultSet.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var v int32
+			err = row.Scan(&v)
+			if err != nil {
+				return err
+			}
+			if v != 1 {
+				return fmt.Errorf("unexpected value from database: %d", v)
+			}
+			return tx.CommitTx(ctx)
+		}, query.WithIdempotent())
+		require.NoError(t, err)
 	})
 }

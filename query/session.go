@@ -24,13 +24,13 @@ type (
 		//
 		// Exec used by default:
 		// - DefaultTxControl (NoTx)
-		Exec(ctx context.Context, query string, opts ...options.ExecOption) (tx Transaction, err error)
+		Exec(ctx context.Context, query string, opts ...options.ExecOption) error
 
 		// Query executes query and returns result
 		//
 		// Query used by default:
 		// - DefaultTxControl (NoTx)
-		Query(ctx context.Context, query string, opts ...options.ExecOption) (tx Transaction, r Result, err error)
+		Query(ctx context.Context, query string, opts ...options.ExecOption) (r Result, err error)
 
 		Begin(ctx context.Context, txSettings TransactionSettings) (Transaction, error)
 	}

@@ -76,7 +76,7 @@ func TestQueryWithCommitTxFlag(t *testing.T) {
 
 		// read row within other (implicit) transaction
 		q2 := fmt.Sprintf("SELECT COUNT(*) FROM `%v`", tableName)
-		_, r, err := s.Query(ctx, q2)
+		r, err := s.Query(ctx, q2)
 		if err != nil {
 			return fmt.Errorf("failed query: %w", err)
 		}

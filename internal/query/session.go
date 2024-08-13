@@ -263,14 +263,43 @@ func (s *Session) Status() string {
 
 func (s *Session) Exec(
 	ctx context.Context, q string, opts ...options.ExecOption,
-) (_ query.Transaction, err error) {
+) (finalErr error) {
 	onDone := trace.QueryOnSessionExec(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"), s, q)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	_, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
+	if err != nil {
+		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
+			s.setStatus(statusClosed)
+		}
+
+		return xerrors.WithStackTrace(err)
+	}
+	for {
+		_, err = r.NextResultSet(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return nil
+			}
+
+			return xerrors.WithStackTrace(err)
+		}
+	}
+}
+
+func (s *Session) Query(
+	ctx context.Context, q string, opts ...options.ExecOption,
+) (_ query.Result, err error) {
+	onDone := trace.QueryOnSessionQuery(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"), s, q)
 	defer func() {
 		onDone(err)
 	}()
 
-	tx, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
+	_, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
 			s.setStatus(statusClosed)
@@ -278,35 +307,6 @@ func (s *Session) Exec(
 
 		return nil, xerrors.WithStackTrace(err)
 	}
-	for {
-		_, err = r.NextResultSet(ctx)
-		if err != nil {
-			if xerrors.Is(err, io.EOF) {
-				return tx, nil
-			}
 
-			return nil, xerrors.WithStackTrace(err)
-		}
-	}
-}
-
-func (s *Session) Query(
-	ctx context.Context, q string, opts ...options.ExecOption,
-) (_ query.Transaction, _ query.Result, err error) {
-	onDone := trace.QueryOnSessionQuery(s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"), s, q)
-	defer func() {
-		onDone(err)
-	}()
-
-	tx, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
-	if err != nil {
-		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
-			s.setStatus(statusClosed)
-		}
-
-		return nil, nil, xerrors.WithStackTrace(err)
-	}
-
-	return tx, r, nil
+	return r, nil
 }
