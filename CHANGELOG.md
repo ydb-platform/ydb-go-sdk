@@ -1,3 +1,4 @@
+* Fixed out of index item creation in pool
 * Fixed tracing of `(*grpcClientStream).finish` event
 
 ## v3.76.4

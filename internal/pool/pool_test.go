@@ -289,6 +289,32 @@ func TestPool(t *testing.T) {
 			wg.Wait()
 		}, xtest.StopAfter(42*time.Second))
 	})
+	t.Run("ParallelCreation", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			p := New[*testItem, testItem](rootCtx)
+			var wg sync.WaitGroup
+			for range make([]struct{}, DefaultLimit*10) {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+						return nil
+					})
+					if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
+						t.Failed()
+					}
+					stats := p.Stats()
+					require.LessOrEqual(t, stats.Idle+stats.InUse, DefaultLimit)
+				}()
+			}
+
+			wg.Wait()
+			stats := p.Stats()
+			require.Equal(t, DefaultLimit, stats.Limit)
+			require.Equal(t, 0, stats.InUse)
+			require.LessOrEqual(t, stats.Idle, DefaultLimit)
+		}, xtest.StopAfter(30*time.Second))
+	})
 }
 
 func TestSafeStatsRace(t *testing.T) {
