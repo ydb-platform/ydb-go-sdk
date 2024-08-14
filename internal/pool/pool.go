@@ -294,48 +294,51 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	select {
-	case <-p.done:
-		return nil, xerrors.WithStackTrace(errClosedPool)
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
-	default:
-		var item PT
-		p.mu.WithLock(func() {
-			if len(p.idle) > 0 {
-				item, p.idle = p.idle[0], p.idle[1:]
-				p.stats.Idle().Dec()
-			}
-		})
-
-		if item != nil {
-			if item.IsAlive() {
-				return item, nil
-			}
-			_ = p.closeItem(ctx, item)
+	for {
+		select {
+		case <-p.done:
+			return nil, xerrors.WithStackTrace(errClosedPool)
+		case <-ctx.Done():
+			return nil, xerrors.WithStackTrace(ctx.Err())
+		default:
+			var item PT
 			p.mu.WithLock(func() {
-				delete(p.index, item)
+				if len(p.idle) > 0 {
+					item, p.idle = p.idle[0], p.idle[1:]
+					p.stats.Idle().Dec()
+				}
 			})
-			p.stats.Index().Dec()
-		}
 
-		item, err := p.createItem(ctx)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		addedToIndex := false
-		p.mu.WithLock(func() {
-			if len(p.index) < p.limit {
-				p.index[item] = struct{}{}
-				addedToIndex = true
+			if item != nil {
+				if item.IsAlive() {
+					return item, nil
+				}
+				_ = p.closeItem(ctx, item)
+				p.mu.WithLock(func() {
+					delete(p.index, item)
+				})
+				p.stats.Index().Dec()
 			}
-		})
-		if addedToIndex {
-			p.stats.Index().Inc()
+			var err error
+			var newItem PT
+			p.mu.WithLock(func() {
+				if len(p.index) >= p.limit {
+					return
+				}
+				newItem, err = p.createItem(ctx)
+				if err != nil {
+					return
+				}
+				p.index[newItem] = struct{}{}
+				p.stats.Index().Inc()
+			})
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+			if newItem != nil {
+				return newItem, nil
+			}
 		}
-
-		return item, nil
 	}
 }
 
