@@ -25,13 +25,13 @@ type mockQueryResultSetClient struct {
 }
 
 func (c *mockQueryResultSetClient) Exec(
-	ctx context.Context, query string, opts ...options.ExecOption,
+	ctx context.Context, query string, opts ...options.Execute,
 ) error {
 	panic("unexpected call")
 }
 
 func (c *mockQueryResultSetClient) Query(
-	ctx context.Context, query string, opts ...options.QueryOption,
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.Result, error) {
 	panic("unexpected call")
 }
@@ -49,13 +49,13 @@ func (c *mockQueryResultSetClient) DoTx(
 }
 
 func (c *mockQueryResultSetClient) QueryRow(
-	ctx context.Context, query string, opts ...options.QueryOption,
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.Row, error) {
 	panic("unexpected call")
 }
 
 func (c *mockQueryResultSetClient) QueryResultSet(
-	ctx context.Context, query string, opts ...options.QueryOption,
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.ResultSet, error) {
 	return c.rs, nil
 }
@@ -65,13 +65,13 @@ type mockQueryRowClient struct {
 }
 
 func (c *mockQueryRowClient) Exec(
-	ctx context.Context, query string, opts ...options.ExecOption,
+	ctx context.Context, query string, opts ...options.Execute,
 ) error {
 	panic("unexpected call")
 }
 
 func (c *mockQueryRowClient) Query(
-	ctx context.Context, query string, opts ...options.QueryOption,
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.Result, error) {
 	panic("unexpected call")
 }
@@ -89,13 +89,13 @@ func (c *mockQueryRowClient) DoTx(
 }
 
 func (c *mockQueryRowClient) QueryRow(
-	ctx context.Context, query string, opts ...options.QueryOption,
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.Row, error) {
 	return c.row, nil
 }
 
 func (c *mockQueryRowClient) QueryResultSet(
-	ctx context.Context, query string, opts ...options.QueryOption,
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.ResultSet, error) {
 	panic("unexpected call")
 }

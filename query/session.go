@@ -16,21 +16,25 @@ type (
 		NodeID() uint32
 		Status() string
 	}
-
-	Session interface {
-		SessionInfo
-
+	// Executor defines main operations
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	Executor interface {
 		// Exec executes query.
 		//
 		// Exec used by default:
-		// - DefaultTxControl (NoTx)
-		Exec(ctx context.Context, query string, opts ...options.ExecOption) error
+		// - DefaultTxControl
+		Exec(ctx context.Context, query string, opts ...options.Execute) error
 
-		// Query executes query and returns result
+		// Query executes query.
 		//
 		// Query used by default:
-		// - DefaultTxControl (NoTx)
-		Query(ctx context.Context, query string, opts ...options.ExecOption) (r Result, err error)
+		// - DefaultTxControl
+		Query(ctx context.Context, query string, opts ...options.Execute) (r Result, err error)
+	}
+	Session interface {
+		SessionInfo
+		Executor
 
 		Begin(ctx context.Context, txSettings TransactionSettings) (Transaction, error)
 	}
@@ -59,7 +63,7 @@ func WithParameters(parameters *params.Parameters) options.ParametersOption {
 	return options.WithParameters(parameters)
 }
 
-func WithTxControl(txControl *tx.Control) options.TxControlOption {
+func WithTxControl(txControl *tx.Control) options.Execute {
 	return options.WithTxControl(txControl)
 }
 
@@ -67,7 +71,7 @@ func WithTxSettings(txSettings tx.Settings) options.DoTxOption {
 	return options.WithTxSettings(txSettings)
 }
 
-func WithCommit() options.TxExecOption {
+func WithCommit() options.Execute {
 	return options.WithCommit()
 }
 

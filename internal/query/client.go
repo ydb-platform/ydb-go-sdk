@@ -193,7 +193,7 @@ func doTx(
 }
 
 // QueryRow is a helper which read only one row from first result set in result
-func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.QueryOption) (row query.Row, finalErr error) {
+func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute) (row query.Row, finalErr error) {
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
@@ -249,7 +249,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.QueryOp
 	return row, nil
 }
 
-func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.ExecOption) (finalErr error) {
+func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
 		streamResult, err := s.Query(ctx, q, opts...)
 		if err != nil {
@@ -287,7 +287,7 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 	return nil
 }
 
-func (c *Client) Exec(ctx context.Context, q string, opts ...options.ExecOption) (finalErr error) {
+func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
@@ -307,7 +307,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.ExecOption)
 	return nil
 }
 
-func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...options.QueryOption) (
+func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (
 	r query.Result, err error,
 ) {
 	err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
@@ -333,7 +333,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	return r, nil
 }
 
-func (c *Client) Query(ctx context.Context, q string, opts ...options.QueryOption) (r query.Result, err error) {
+func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (r query.Result, err error) {
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
@@ -355,7 +355,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.QueryOptio
 
 // QueryResultSet is a helper which read all rows from first result set in result
 func (c *Client) QueryResultSet(
-	ctx context.Context, q string, opts ...options.ExecOption,
+	ctx context.Context, q string, opts ...options.Execute,
 ) (rs query.ResultSet, finalErr error) {
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()

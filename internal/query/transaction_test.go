@@ -22,6 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -489,17 +490,28 @@ func (s testExecuteSettings) CallOptions() []grpc.CallOption {
 
 var _ executeConfig = testExecuteSettings{}
 
-func TestTxExecuteSettings(t *testing.T) {
+type txMock func() *internal.Control
+
+func (tx txMock) txControl() *internal.Control {
+	if tx == nil {
+		return internal.NewControl(internal.WithTxID(""))
+	}
+
+	return tx()
+}
+
+func TestExecuteSettings(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
-		txID     string
-		txOpts   []options.TxExecOption
+		tx       txMock
+		txOpts   []options.Execute
 		settings executeConfig
 	}{
 		{
-			name:   "WithTxID",
-			txID:   "test",
-			txOpts: nil,
+			name: "WithTxID",
+			tx: func() *internal.Control {
+				return internal.NewControl(internal.WithTxID("test"))
+			},
 			settings: testExecuteSettings{
 				execMode:  options.ExecModeExecute,
 				statsMode: options.StatsModeNone,
@@ -509,7 +521,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithStats",
-			txOpts: []options.TxExecOption{
+			txOpts: []options.Execute{
 				options.WithStatsMode(options.StatsModeFull),
 			},
 			settings: testExecuteSettings{
@@ -521,7 +533,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithExecMode",
-			txOpts: []options.TxExecOption{
+			txOpts: []options.Execute{
 				options.WithExecMode(options.ExecModeExplain),
 			},
 			settings: testExecuteSettings{
@@ -533,7 +545,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithSyntax",
-			txOpts: []options.TxExecOption{
+			txOpts: []options.Execute{
 				options.WithSyntax(options.SyntaxPostgreSQL),
 			},
 			settings: testExecuteSettings{
@@ -545,7 +557,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithGrpcOptions",
-			txOpts: []options.TxExecOption{
+			txOpts: []options.Execute{
 				options.WithCallOptions(grpc.CallContentSubtype("test")),
 			},
 			settings: testExecuteSettings{
@@ -560,7 +572,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithParams",
-			txOpts: []options.TxExecOption{
+			txOpts: []options.Execute{
 				options.WithParameters(
 					params.Builder{}.Param("$a").Text("A").Build(),
 				),
@@ -575,7 +587,7 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithCommitTx",
-			txOpts: []options.TxExecOption{
+			txOpts: []options.Execute{
 				options.WithCommit(),
 			},
 			settings: testExecuteSettings{
@@ -589,7 +601,7 @@ func TestTxExecuteSettings(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
-			settings := options.TxExecuteSettings(tt.txID, tt.txOpts...).ExecuteSettings
+			settings := executeSettings(tt.tx, tt.txOpts...)
 			require.Equal(t, tt.settings.Syntax(), settings.Syntax())
 			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())

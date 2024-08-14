@@ -9,10 +9,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -193,52 +193,22 @@ func (s *Session) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func begin(
-	ctx context.Context,
-	client Ydb_Query_V1.QueryServiceClient,
-	s *Session,
-	txSettings query.TransactionSettings,
-) (*Transaction, error) {
-	a := allocator.New()
-	defer a.Free()
-	response, err := client.BeginTransaction(ctx,
-		&Ydb_Query.BeginTransactionRequest{
-			SessionId:  s.id,
-			TxSettings: txSettings.ToYDB(a),
-		},
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return newTransaction(response.GetTxMeta().GetId(), s), nil
-}
-
 func (s *Session) Begin(
 	ctx context.Context,
 	txSettings query.TransactionSettings,
 ) (
 	_ query.Transaction, err error,
 ) {
-	var tx *Transaction
-
 	onDone := trace.QueryOnSessionBegin(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
 	defer func() {
-		onDone(err, tx)
+		onDone(err, tx.ID("lazy"))
 	}()
 
-	tx, err = begin(ctx, s.grpcClient, s, txSettings)
-	if err != nil {
-		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
-			s.setStatus(statusClosed)
-		}
-
-		return nil, xerrors.WithStackTrace(err)
-	}
-	tx.s = s
-
-	return tx, nil
+	return &Transaction{
+		s:          s,
+		txSettings: txSettings,
+	}, nil
 }
 
 func (s *Session) ID() string {
@@ -262,7 +232,7 @@ func (s *Session) Status() string {
 }
 
 func (s *Session) Exec(
-	ctx context.Context, q string, opts ...options.ExecOption,
+	ctx context.Context, q string, opts ...options.Execute,
 ) (finalErr error) {
 	onDone := trace.QueryOnSessionExec(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"), s, q)
@@ -291,7 +261,7 @@ func (s *Session) Exec(
 }
 
 func (s *Session) Query(
-	ctx context.Context, q string, opts ...options.ExecOption,
+	ctx context.Context, q string, opts ...options.Execute,
 ) (_ query.Result, err error) {
 	onDone := trace.QueryOnSessionQuery(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"), s, q)

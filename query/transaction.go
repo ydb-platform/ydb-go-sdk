@@ -3,7 +3,6 @@ package query
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
@@ -11,18 +10,7 @@ import (
 type (
 	TxActor interface {
 		tx.Identifier
-
-		// Exec executes query.
-		//
-		// Exec used by default:
-		// - DefaultTxControl
-		Exec(ctx context.Context, query string, opts ...options.TxExecOption) error
-
-		// Query executes query.
-		//
-		// Query used by default:
-		// - DefaultTxControl
-		Query(ctx context.Context, query string, opts ...options.TxQueryOption) (r Result, err error)
+		Executor
 	}
 	Transaction interface {
 		TxActor

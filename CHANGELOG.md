@@ -1,9 +1,11 @@
 * Removed tx result from `query.Session.Execute` (tx can be obtained from `query.Session.Begin`)
+* Changed behaviour of `query.Session.Begin` to `noop` for lazy initialization with first call `query.TxActor.Execute`
 * Splitted experimental method `query.Client.Execute` to methods `query.Client.Exec` without result and `query.Client.Query` with result
+* Splitted experimental method `query.TxActor.Execute` to methods `query.TxActor.Exec` without result and `query.TxActor.Query` with result
 * Renamed experimental method `query.Client.ReadResultSet` to `query.Client.QueryResultSet`
 * Renamed experimental method `query.Client.ReadRow` to `query.Client.QueryRow`
 * Removed experimental methods `query.Session.ReadResultSet` and  `query.Session.ReadRows`
-* Removed experimental methods `query.Transaction.ReadResultSet` and  `query.Transaction.ReadRows`
+* Removed experimental methods `query.TxActor.ReadResultSet` and  `query.TxActor.ReadRows`
 * Removed experimental method `query.Client.Stats`
 
 ## v3.76.6

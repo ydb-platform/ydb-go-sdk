@@ -360,7 +360,6 @@ func TestExecute(t *testing.T) {
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		require.EqualValues(t, "456", tx.ID())
-		require.EqualValues(t, "123", tx.s.id)
 		require.EqualValues(t, -1, r.resultSetIndex)
 		{
 			t.Log("nextResultSet")
@@ -575,7 +574,6 @@ func TestExecute(t *testing.T) {
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			require.EqualValues(t, "456", tx.ID())
-			require.EqualValues(t, "123", tx.s.id)
 			require.EqualValues(t, -1, r.resultSetIndex)
 			{
 				t.Log("nextResultSet")
@@ -712,7 +710,6 @@ func TestExecute(t *testing.T) {
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			require.EqualValues(t, "456", tx.ID())
-			require.EqualValues(t, "123", tx.s.id)
 			require.EqualValues(t, -1, r.resultSetIndex)
 			{
 				t.Log("nextResultSet")
@@ -752,7 +749,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 	a := allocator.New()
 	for _, tt := range []struct {
 		name        string
-		opts        []options.ExecOption
+		opts        []options.Execute
 		request     *Ydb_Query.ExecuteQueryRequest
 		callOptions []grpc.CallOption
 	}{
@@ -773,7 +770,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithTxControl",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithTxControl(query.SerializableReadWriteTxControl(query.CommitTx())),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -801,7 +798,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithParams",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithParameters(
 					params.Builder{}.
 						Param("$a").Text("A").
@@ -863,7 +860,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithExplain",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithExecMode(options.ExecModeExplain),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -881,7 +878,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithValidate",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithExecMode(options.ExecModeValidate),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -899,7 +896,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithValidate",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithExecMode(options.ExecModeParse),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -917,7 +914,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsFull",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithStatsMode(options.StatsModeFull),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -935,7 +932,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsBasic",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithStatsMode(options.StatsModeBasic),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -953,7 +950,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsProfile",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithStatsMode(options.StatsModeProfile),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
@@ -971,7 +968,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithGrpcCallOptions",
-			opts: []options.ExecOption{
+			opts: []options.Execute{
 				options.WithCallOptions(grpc.Header(&metadata.MD{
 					"ext-header": []string{"test"},
 				})),

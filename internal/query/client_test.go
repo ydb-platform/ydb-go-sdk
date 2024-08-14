@@ -169,16 +169,82 @@ func TestClient(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.BeginTransactionResponse{
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "456",
+				},
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
 			}, nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
 			err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client), nil
 			}), func(ctx context.Context, tx query.TxActor) error {
-				return nil
+				defer func() {
+					require.Equal(t, "456", tx.ID())
+				}()
+
+				return tx.Exec(ctx, "")
 			}, &trace.Query{})
 			require.NoError(t, err)
 		})

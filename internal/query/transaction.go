@@ -12,8 +12,9 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	queryTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -21,32 +22,61 @@ import (
 
 var (
 	_ query.Transaction = (*Transaction)(nil)
-	_ tx.Identifier     = (*Transaction)(nil)
+	_ baseTx.Identifier = (*Transaction)(nil)
 )
 
-type Transaction struct {
-	tx.Identifier
+type (
+	Transaction struct {
+		baseTx.Identifier
 
-	s               *Session
-	rollbackStarted atomic.Bool
+		s          *Session
+		txSettings query.TransactionSettings
 
-	m                 sync.Mutex
-	onCompletedCalled bool
-	onCompleted       []tx.OnTransactionCompletedFunc
-}
+		rollbackStarted atomic.Bool
+
+		m                 sync.Mutex
+		onCompletedCalled bool
+		onCompleted       []baseTx.OnTransactionCompletedFunc
+	}
+)
 
 func (tx *Transaction) SessionID() string {
 	return tx.s.ID()
 }
 
-func newTransaction(id string, s *Session) *Transaction {
-	return &Transaction{
-		Identifier: tx.ID(id),
-		s:          s,
-	}
+func executeSettings(
+	tx interface {
+		txControl() *queryTx.Control
+	},
+	opts ...options.Execute,
+) executeConfig {
+	return options.ExecuteSettings(
+		append(
+			[]options.Execute{options.WithTxControl(tx.txControl())},
+			opts...,
+		)...,
+	)
 }
 
-func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.TxExecOption) (
+func (tx *Transaction) txControl() *queryTx.Control {
+	if tx.Identifier != nil {
+		return queryTx.NewControl(queryTx.WithTxID(tx.Identifier.ID()))
+	}
+
+	return queryTx.NewControl(
+		queryTx.BeginTx(tx.txSettings...),
+	)
+}
+
+func (tx *Transaction) ID() string {
+	if tx.Identifier == nil {
+		return "LAZY_TX"
+	}
+
+	return tx.Identifier.ID()
+}
+
+func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execute) (
 	finalErr error,
 ) {
 	if tx.rollbackStarted.Load() {
@@ -59,10 +89,10 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.TxExe
 		onDone(finalErr)
 	}()
 
-	executeSettings := options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings
+	settings := executeSettings(tx, opts...)
 
 	var resultOpts []resultOption
-	if executeSettings.TxControl().IsTxCommit() {
+	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
@@ -71,13 +101,18 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.TxExe
 			}),
 		)
 	}
-	_, r, err := execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings, resultOpts...)
+
+	txID, r, err := execute(ctx, tx.s, tx.s.grpcClient, q, settings, resultOpts...)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)
 		}
 
 		return xerrors.WithStackTrace(err)
+	}
+
+	if tx.Identifier == nil {
+		tx.Identifier = txID
 	}
 
 	for {
@@ -92,7 +127,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.TxExe
 	}
 }
 
-func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.TxQueryOption) (
+func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Execute) (
 	_ query.Result, finalErr error,
 ) {
 	if tx.rollbackStarted.Load() {
@@ -105,10 +140,10 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.TxQu
 		onDone(finalErr)
 	}()
 
-	executeSettings := options.TxExecuteSettings(tx.ID(), opts...).ExecuteSettings
+	settings := executeSettings(tx, opts...)
 
 	var resultOpts []resultOption
-	if executeSettings.TxControl().IsTxCommit() {
+	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
@@ -117,13 +152,17 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.TxQu
 			}),
 		)
 	}
-	_, r, err := execute(ctx, tx.s, tx.s.grpcClient, q, executeSettings, resultOpts...)
+	txID, r, err := execute(ctx, tx.s, tx.s.grpcClient, q, settings, resultOpts...)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)
 		}
 
 		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if tx.Identifier == nil {
+		tx.Identifier = txID
 	}
 
 	return r, nil
@@ -149,6 +188,10 @@ func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
 	defer func() {
 		tx.notifyOnCompleted(err)
 	}()
+
+	if tx.Identifier == nil {
+		return nil
+	}
 
 	err = commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
@@ -184,6 +227,10 @@ func (tx *Transaction) Rollback(ctx context.Context) error {
 	//nolint:godox
 	// ToDo save local marker for deny any additional requests to the transaction?
 
+	if tx.Identifier == nil {
+		return nil
+	}
+
 	err := rollback(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
@@ -196,7 +243,7 @@ func (tx *Transaction) Rollback(ctx context.Context) error {
 	return nil
 }
 
-func (tx *Transaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
+func (tx *Transaction) OnCompleted(f baseTx.OnTransactionCompletedFunc) {
 	tx.m.Lock()
 	defer tx.m.Unlock()
 

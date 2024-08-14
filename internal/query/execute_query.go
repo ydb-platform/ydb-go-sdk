@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -55,7 +56,7 @@ func queryFromText(
 func execute(
 	ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient, q string, cfg executeConfig, opts ...resultOption,
 ) (
-	_ *Transaction, _ *result, finalErr error,
+	_ tx.Identifier, _ *result, finalErr error,
 ) {
 	a := allocator.New()
 	defer a.Free()
@@ -78,5 +79,5 @@ func execute(
 		return nil, r, nil
 	}
 
-	return newTransaction(txID, s), r, nil
+	return tx.ID(txID), r, nil
 }
