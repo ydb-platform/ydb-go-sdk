@@ -334,7 +334,7 @@ type (
 		Context              *context.Context
 		ReaderID             int64
 		TransactionSessionID string
-		TransactionID        string
+		Tx                   txInfo
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -351,7 +351,7 @@ type (
 		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
-		TransactionID        string
+		Tx                   txInfo
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -365,7 +365,7 @@ type (
 		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
-		TransactionID        string
+		Tx                   txInfo
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -379,7 +379,7 @@ type (
 		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
-		TransactionID        string
+		Tx                   txInfo
 		TransactionResult    error
 	}
 
@@ -392,7 +392,7 @@ type (
 		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
-		TransactionID        string
+		Tx                   txInfo
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

@@ -1814,13 +1814,13 @@ func QueryOnSessionQuery(t *Query, c *context.Context, call call, session queryS
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionBegin(t *Query, c *context.Context, call call, session querySessionInfo) func(_ error, tx queryTransactionInfo) {
+func QueryOnSessionBegin(t *Query, c *context.Context, call call, session querySessionInfo) func(_ error, tx txInfo) {
 	var p QuerySessionBeginStartInfo
 	p.Context = c
 	p.Call = call
 	p.Session = session
 	res := t.onSessionBegin(p)
-	return func(e error, tx queryTransactionInfo) {
+	return func(e error, tx txInfo) {
 		var p QuerySessionBeginDoneInfo
 		p.Error = e
 		p.Tx = tx
@@ -1828,7 +1828,7 @@ func QueryOnSessionBegin(t *Query, c *context.Context, call call, session queryS
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxExec(t *Query, c *context.Context, call call, session querySessionInfo, tx queryTransactionInfo, query string) func(error) {
+func QueryOnTxExec(t *Query, c *context.Context, call call, session querySessionInfo, tx txInfo, query string) func(error) {
 	var p QueryTxExecStartInfo
 	p.Context = c
 	p.Call = call
@@ -1843,7 +1843,7 @@ func QueryOnTxExec(t *Query, c *context.Context, call call, session querySession
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxQuery(t *Query, c *context.Context, call call, session querySessionInfo, tx queryTransactionInfo, query string) func(error) {
+func QueryOnTxQuery(t *Query, c *context.Context, call call, session querySessionInfo, tx txInfo, query string) func(error) {
 	var p QueryTxQueryStartInfo
 	p.Context = c
 	p.Call = call

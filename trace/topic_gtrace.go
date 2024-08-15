@@ -1392,12 +1392,12 @@ func TopicOnReaderUpdateToken(t *Topic, readerConnectionID string) func(tokenLen
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderPopBatchTx(t *Topic, c *context.Context, readerID int64, transactionSessionID string, transactionID string) func(startOffset int64, endOffset int64, messagesCount int, _ error) {
+func TopicOnReaderPopBatchTx(t *Topic, c *context.Context, readerID int64, transactionSessionID string, tx txInfo) func(startOffset int64, endOffset int64, messagesCount int, _ error) {
 	var p TopicReaderPopBatchTxStartInfo
 	p.Context = c
 	p.ReaderID = readerID
 	p.TransactionSessionID = transactionSessionID
-	p.TransactionID = transactionID
+	p.Tx = tx
 	res := t.onReaderPopBatchTx(p)
 	return func(startOffset int64, endOffset int64, messagesCount int, e error) {
 		var p TopicReaderPopBatchTxDoneInfo
@@ -1409,13 +1409,13 @@ func TopicOnReaderPopBatchTx(t *Topic, c *context.Context, readerID int64, trans
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderStreamPopBatchTx(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, transactionID string) func(error) {
+func TopicOnReaderStreamPopBatchTx(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, tx txInfo) func(error) {
 	var p TopicReaderStreamPopBatchTxStartInfo
 	p.Context = c
 	p.ReaderID = readerID
 	p.ReaderConnectionID = readerConnectionID
 	p.TransactionSessionID = transactionSessionID
-	p.TransactionID = transactionID
+	p.Tx = tx
 	res := t.onReaderStreamPopBatchTx(p)
 	return func(e error) {
 		var p TopicReaderStreamPopBatchTxDoneInfo
@@ -1424,13 +1424,13 @@ func TopicOnReaderStreamPopBatchTx(t *Topic, c *context.Context, readerID int64,
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderUpdateOffsetsInTransaction(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, transactionID string) func(error) {
+func TopicOnReaderUpdateOffsetsInTransaction(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, tx txInfo) func(error) {
 	var p TopicReaderOnUpdateOffsetsInTransactionStartInfo
 	p.Context = c
 	p.ReaderID = readerID
 	p.ReaderConnectionID = readerConnectionID
 	p.TransactionSessionID = transactionSessionID
-	p.TransactionID = transactionID
+	p.Tx = tx
 	res := t.onReaderUpdateOffsetsInTransaction(p)
 	return func(e error) {
 		var p TopicReaderOnUpdateOffsetsInTransactionDoneInfo
@@ -1439,13 +1439,13 @@ func TopicOnReaderUpdateOffsetsInTransaction(t *Topic, c *context.Context, reade
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderTransactionCompleted(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, transactionID string, transactionResult error) func() {
+func TopicOnReaderTransactionCompleted(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, tx txInfo, transactionResult error) func() {
 	var p TopicReaderTransactionCompletedStartInfo
 	p.Context = c
 	p.ReaderID = readerID
 	p.ReaderConnectionID = readerConnectionID
 	p.TransactionSessionID = transactionSessionID
-	p.TransactionID = transactionID
+	p.Tx = tx
 	p.TransactionResult = transactionResult
 	res := t.onReaderTransactionCompleted(p)
 	return func() {
@@ -1454,13 +1454,13 @@ func TopicOnReaderTransactionCompleted(t *Topic, c *context.Context, readerID in
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderTransactionRollback(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, transactionID string) func(rollbackError error) {
+func TopicOnReaderTransactionRollback(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, tx txInfo) func(rollbackError error) {
 	var p TopicReaderTransactionRollbackStartInfo
 	p.Context = c
 	p.ReaderID = readerID
 	p.ReaderConnectionID = readerConnectionID
 	p.TransactionSessionID = transactionSessionID
-	p.TransactionID = transactionID
+	p.Tx = tx
 	res := t.onReaderTransactionRollback(p)
 	return func(rollbackError error) {
 		var p TopicReaderTransactionRollbackDoneInfo

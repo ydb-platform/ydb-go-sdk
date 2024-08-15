@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	_ query.Transaction = (*Transaction)(nil)
-	_ baseTx.Identifier = (*Transaction)(nil)
+	_ query.Transaction  = (*Transaction)(nil)
+	_ baseTx.Transaction = (*Transaction)(nil)
 )
 
 type (

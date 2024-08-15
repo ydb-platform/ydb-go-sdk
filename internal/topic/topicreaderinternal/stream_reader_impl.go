@@ -199,7 +199,7 @@ func (r *topicStreamReaderImpl) PopBatchTx(
 		r.readerID,
 		r.readConnectionID,
 		tx.SessionID(),
-		tx.ID(),
+		tx,
 	)
 	ctx = traceCtx
 	defer func() {
@@ -233,7 +233,7 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 			r.readerID,
 			r.readConnectionID,
 			tx.SessionID(),
-			tx.ID(),
+			tx,
 		)
 		defer func() {
 			onDone(err)
@@ -255,7 +255,7 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 				r.readerID,
 				r.readConnectionID,
 				tx.SessionID(),
-				tx.ID(),
+				tx,
 			)
 			ctx = traceCtx
 			defer func() {
@@ -290,7 +290,7 @@ func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
 			r.readerID,
 			r.readConnectionID,
 			tx.SessionID(),
-			tx.ID(),
+			tx,
 			transactionResult,
 		)
 		defer onDone()

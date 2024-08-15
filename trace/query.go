@@ -16,9 +16,6 @@ type (
 		NodeID() uint32
 		Status() string
 	}
-	queryTransactionInfo interface {
-		ID() string
-	}
 
 	// Query specified trace of retry call activity.
 	// gtrace:gen
@@ -255,7 +252,7 @@ type (
 		Call    call
 
 		Session querySessionInfo
-		Tx      queryTransactionInfo
+		Tx      txInfo
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -272,7 +269,7 @@ type (
 		Call    call
 
 		Session querySessionInfo
-		Tx      queryTransactionInfo
+		Tx      txInfo
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -306,7 +303,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionBeginDoneInfo struct {
 		Error error
-		Tx    queryTransactionInfo
+		Tx    txInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryResultNewStartInfo struct {

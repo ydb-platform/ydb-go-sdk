@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -86,7 +85,7 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (r *Reader) PopBatchTx(
 	ctx context.Context,
-	transaction query.TxActor,
+	transaction tx.Identifier,
 	opts ...ReadBatchOption,
 ) (
 	resBatch *Batch,
@@ -105,7 +104,7 @@ func (r *Reader) PopBatchTx(
 	tracer := r.reader.Tracer()
 
 	traceCtx := ctx
-	onDone := trace.TopicOnReaderPopBatchTx(tracer, &traceCtx, r.reader.ID(), internalTx.SessionID(), internalTx.ID())
+	onDone := trace.TopicOnReaderPopBatchTx(tracer, &traceCtx, r.reader.ID(), internalTx.SessionID(), internalTx)
 	ctx = traceCtx
 
 	defer func() {
