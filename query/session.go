@@ -16,22 +16,6 @@ type (
 		NodeID() uint32
 		Status() string
 	}
-	// Executor defines main operations
-	//
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	Executor interface {
-		// Exec executes query.
-		//
-		// Exec used by default:
-		// - DefaultTxControl
-		Exec(ctx context.Context, query string, opts ...options.Execute) error
-
-		// Query executes query.
-		//
-		// Query used by default:
-		// - DefaultTxControl
-		Query(ctx context.Context, query string, opts ...options.Execute) (r Result, err error)
-	}
 	Session interface {
 		SessionInfo
 		Executor

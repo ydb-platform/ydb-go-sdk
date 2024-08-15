@@ -720,6 +720,76 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
+		h1 := t.OnSessionQueryResultSet
+		h2 := x.OnSessionQueryResultSet
+		ret.OnSessionQueryResultSet = func(q QuerySessionQueryResultSetStartInfo) func(QuerySessionQueryResultSetDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QuerySessionQueryResultSetDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QuerySessionQueryResultSetDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnSessionQueryRow
+		h2 := x.OnSessionQueryRow
+		ret.OnSessionQueryRow = func(q QuerySessionQueryRowStartInfo) func(QuerySessionQueryRowDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QuerySessionQueryRowDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QuerySessionQueryRowDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnSessionBegin
 		h2 := x.OnSessionBegin
 		ret.OnSessionBegin = func(q QuerySessionBeginStartInfo) func(QuerySessionBeginDoneInfo) {
@@ -820,6 +890,76 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 				}
 				if r1 != nil {
 					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnTxQueryResultSet
+		h2 := x.OnTxQueryResultSet
+		ret.OnTxQueryResultSet = func(q QueryTxQueryResultSetStartInfo) func(QueryTxQueryResultSetDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryTxQueryResultSetDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryTxQueryResultSetDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnTxQueryRow
+		h2 := x.OnTxQueryRow
+		ret.OnTxQueryRow = func(q QueryTxQueryRowStartInfo) func(QueryTxQueryRowDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryTxQueryRowDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryTxQueryRowDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
 				}
 			}
 		}
@@ -1398,6 +1538,36 @@ func (t *Query) onSessionQuery(q QuerySessionQueryStartInfo) func(info QuerySess
 	}
 	return res
 }
+func (t *Query) onSessionQueryResultSet(q QuerySessionQueryResultSetStartInfo) func(QuerySessionQueryResultSetDoneInfo) {
+	fn := t.OnSessionQueryResultSet
+	if fn == nil {
+		return func(QuerySessionQueryResultSetDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QuerySessionQueryResultSetDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onSessionQueryRow(q QuerySessionQueryRowStartInfo) func(QuerySessionQueryRowDoneInfo) {
+	fn := t.OnSessionQueryRow
+	if fn == nil {
+		return func(QuerySessionQueryRowDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QuerySessionQueryRowDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Query) onSessionBegin(q QuerySessionBeginStartInfo) func(info QuerySessionBeginDoneInfo) {
 	fn := t.OnSessionBegin
 	if fn == nil {
@@ -1438,6 +1608,36 @@ func (t *Query) onTxQuery(q QueryTxQueryStartInfo) func(info QueryTxQueryDoneInf
 	res := fn(q)
 	if res == nil {
 		return func(QueryTxQueryDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onTxQueryResultSet(q QueryTxQueryResultSetStartInfo) func(QueryTxQueryResultSetDoneInfo) {
+	fn := t.OnTxQueryResultSet
+	if fn == nil {
+		return func(QueryTxQueryResultSetDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryTxQueryResultSetDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onTxQueryRow(q QueryTxQueryRowStartInfo) func(QueryTxQueryRowDoneInfo) {
+	fn := t.OnTxQueryRow
+	if fn == nil {
+		return func(QueryTxQueryRowDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryTxQueryRowDoneInfo) {
 			return
 		}
 	}
@@ -1747,12 +1947,12 @@ func QueryOnQueryRow(t *Query, c *context.Context, call call, query string) func
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionCreate(t *Query, c *context.Context, call call) func(session querySessionInfo, _ error) {
+func QueryOnSessionCreate(t *Query, c *context.Context, call call) func(session sessionInfo, _ error) {
 	var p QuerySessionCreateStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onSessionCreate(p)
-	return func(session querySessionInfo, e error) {
+	return func(session sessionInfo, e error) {
 		var p QuerySessionCreateDoneInfo
 		p.Session = session
 		p.Error = e
@@ -1760,7 +1960,7 @@ func QueryOnSessionCreate(t *Query, c *context.Context, call call) func(session 
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionAttach(t *Query, c *context.Context, call call, session querySessionInfo) func(error) {
+func QueryOnSessionAttach(t *Query, c *context.Context, call call, session sessionInfo) func(error) {
 	var p QuerySessionAttachStartInfo
 	p.Context = c
 	p.Call = call
@@ -1773,7 +1973,7 @@ func QueryOnSessionAttach(t *Query, c *context.Context, call call, session query
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionDelete(t *Query, c *context.Context, call call, session querySessionInfo) func(error) {
+func QueryOnSessionDelete(t *Query, c *context.Context, call call, session sessionInfo) func(error) {
 	var p QuerySessionDeleteStartInfo
 	p.Context = c
 	p.Call = call
@@ -1786,7 +1986,7 @@ func QueryOnSessionDelete(t *Query, c *context.Context, call call, session query
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionExec(t *Query, c *context.Context, call call, session querySessionInfo, query string) func(error) {
+func QueryOnSessionExec(t *Query, c *context.Context, call call, session sessionInfo, query string) func(error) {
 	var p QuerySessionExecStartInfo
 	p.Context = c
 	p.Call = call
@@ -1800,7 +2000,7 @@ func QueryOnSessionExec(t *Query, c *context.Context, call call, session querySe
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionQuery(t *Query, c *context.Context, call call, session querySessionInfo, query string) func(error) {
+func QueryOnSessionQuery(t *Query, c *context.Context, call call, session sessionInfo, query string) func(error) {
 	var p QuerySessionQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1814,7 +2014,35 @@ func QueryOnSessionQuery(t *Query, c *context.Context, call call, session queryS
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionBegin(t *Query, c *context.Context, call call, session querySessionInfo) func(_ error, tx txInfo) {
+func QueryOnSessionQueryResultSet(t *Query, c *context.Context, call call, session sessionInfo, query string) func(error) {
+	var p QuerySessionQueryResultSetStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	p.Query = query
+	res := t.onSessionQueryResultSet(p)
+	return func(e error) {
+		var p QuerySessionQueryResultSetDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnSessionQueryRow(t *Query, c *context.Context, call call, session sessionInfo, query string) func(error) {
+	var p QuerySessionQueryRowStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	p.Query = query
+	res := t.onSessionQueryRow(p)
+	return func(e error) {
+		var p QuerySessionQueryRowDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnSessionBegin(t *Query, c *context.Context, call call, session sessionInfo) func(_ error, tx txInfo) {
 	var p QuerySessionBeginStartInfo
 	p.Context = c
 	p.Call = call
@@ -1828,7 +2056,7 @@ func QueryOnSessionBegin(t *Query, c *context.Context, call call, session queryS
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxExec(t *Query, c *context.Context, call call, session querySessionInfo, tx txInfo, query string) func(error) {
+func QueryOnTxExec(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo, query string) func(error) {
 	var p QueryTxExecStartInfo
 	p.Context = c
 	p.Call = call
@@ -1843,7 +2071,7 @@ func QueryOnTxExec(t *Query, c *context.Context, call call, session querySession
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxQuery(t *Query, c *context.Context, call call, session querySessionInfo, tx txInfo, query string) func(error) {
+func QueryOnTxQuery(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo, query string) func(error) {
 	var p QueryTxQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1853,6 +2081,34 @@ func QueryOnTxQuery(t *Query, c *context.Context, call call, session querySessio
 	res := t.onTxQuery(p)
 	return func(e error) {
 		var p QueryTxQueryDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnTxQueryResultSet(t *Query, c *context.Context, call call, tx txInfo, query string) func(error) {
+	var p QueryTxQueryResultSetStartInfo
+	p.Context = c
+	p.Call = call
+	p.Tx = tx
+	p.Query = query
+	res := t.onTxQueryResultSet(p)
+	return func(e error) {
+		var p QueryTxQueryResultSetDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnTxQueryRow(t *Query, c *context.Context, call call, tx txInfo, query string) func(error) {
+	var p QueryTxQueryRowStartInfo
+	p.Context = c
+	p.Call = call
+	p.Tx = tx
+	p.Query = query
+	res := t.onTxQueryRow(p)
+	return func(e error) {
+		var p QueryTxQueryRowDoneInfo
 		p.Error = e
 		res(p)
 	}

@@ -11,12 +11,6 @@ import (
 //go:generate gtrace
 
 type (
-	querySessionInfo interface {
-		ID() string
-		NodeID() uint32
-		Status() string
-	}
-
 	// Query specified trace of retry call activity.
 	// gtrace:gen
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -65,17 +59,35 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnSessionQuery func(QuerySessionQueryStartInfo) func(info QuerySessionQueryDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnSessionBegin        func(QuerySessionBeginStartInfo) func(info QuerySessionBeginDoneInfo)
-		OnTxExec              func(QueryTxExecStartInfo) func(info QueryTxExecDoneInfo)
-		OnTxQuery             func(QueryTxQueryStartInfo) func(info QueryTxQueryDoneInfo)
-		OnResultNew           func(QueryResultNewStartInfo) func(info QueryResultNewDoneInfo)
-		OnResultNextPart      func(QueryResultNextPartStartInfo) func(info QueryResultNextPartDoneInfo)
+		OnSessionQueryResultSet func(QuerySessionQueryResultSetStartInfo) func(QuerySessionQueryResultSetDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnSessionQueryRow func(QuerySessionQueryRowStartInfo) func(QuerySessionQueryRowDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnSessionBegin func(QuerySessionBeginStartInfo) func(info QuerySessionBeginDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnTxExec func(QueryTxExecStartInfo) func(info QueryTxExecDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnTxQuery func(QueryTxQueryStartInfo) func(info QueryTxQueryDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnTxQueryResultSet func(QueryTxQueryResultSetStartInfo) func(QueryTxQueryResultSetDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnTxQueryRow func(QueryTxQueryRowStartInfo) func(QueryTxQueryRowDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnResultNew func(QueryResultNewStartInfo) func(info QueryResultNewDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnResultNextPart func(QueryResultNextPartStartInfo) func(info QueryResultNextPartDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnResultNextResultSet func(QueryResultNextResultSetStartInfo) func(info QueryResultNextResultSetDoneInfo)
-		OnResultClose         func(QueryResultCloseStartInfo) func(info QueryResultCloseDoneInfo)
-		OnResultSetNextRow    func(QueryResultSetNextRowStartInfo) func(info QueryResultSetNextRowDoneInfo)
-		OnRowScan             func(QueryRowScanStartInfo) func(info QueryRowScanDoneInfo)
-		OnRowScanNamed        func(QueryRowScanNamedStartInfo) func(info QueryRowScanNamedDoneInfo)
-		OnRowScanStruct       func(QueryRowScanStructStartInfo) func(info QueryRowScanStructDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnResultClose func(QueryResultCloseStartInfo) func(info QueryResultCloseDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnResultSetNextRow func(QueryResultSetNextRowStartInfo) func(info QueryResultSetNextRowDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnRowScan func(QueryRowScanStartInfo) func(info QueryRowScanDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnRowScanNamed func(QueryRowScanNamedStartInfo) func(info QueryRowScanNamedDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnRowScanStruct func(QueryRowScanStructStartInfo) func(info QueryRowScanStructDoneInfo)
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -152,6 +164,38 @@ type (
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QuerySessionQueryResultSetStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Session sessionInfo
+		Query   string
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QuerySessionQueryResultSetDoneInfo struct {
+		Error error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QueryTxQueryResultSetStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Tx    txInfo
+		Query string
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QueryTxQueryResultSetDoneInfo struct {
+		Error error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryRowStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -164,6 +208,38 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryRowDoneInfo struct {
+		Error error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QuerySessionQueryRowStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Session sessionInfo
+		Query   string
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QuerySessionQueryRowDoneInfo struct {
+		Error error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QueryTxQueryRowStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Tx    txInfo
+		Query string
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QueryTxQueryRowDoneInfo struct {
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -207,7 +283,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionCreateDoneInfo struct {
-		Session querySessionInfo
+		Session sessionInfo
 		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -219,7 +295,7 @@ type (
 		Context *context.Context
 		Call    call
 
-		Session querySessionInfo
+		Session sessionInfo
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -235,7 +311,7 @@ type (
 		Context *context.Context
 		Call    call
 
-		Session querySessionInfo
+		Session sessionInfo
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -251,7 +327,7 @@ type (
 		Context *context.Context
 		Call    call
 
-		Session querySessionInfo
+		Session sessionInfo
 		Tx      txInfo
 		Query   string
 	}
@@ -268,7 +344,7 @@ type (
 		Context *context.Context
 		Call    call
 
-		Session querySessionInfo
+		Session sessionInfo
 		Tx      txInfo
 		Query   string
 	}
@@ -284,7 +360,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session querySessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionAttachDoneInfo struct {
@@ -298,7 +374,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session querySessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionBeginDoneInfo struct {
@@ -418,7 +494,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session querySessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionDeleteDoneInfo struct {

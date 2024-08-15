@@ -132,17 +132,16 @@ func TestTxOnCompleted(t *testing.T) {
 			})
 
 		tx := TransactionOverGrpcMock(e)
-		var completed []error
+		var completed error
 
 		tx.OnCompleted(func(transactionResult error) {
 			// notification before call to the server
 			require.False(t, rollbackCalled)
-			completed = append(completed, transactionResult)
+			completed = transactionResult
 		})
 
 		_ = tx.Rollback(sf.Context(e))
-		require.Len(t, completed, 1)
-		require.ErrorIs(t, completed[0], ErrTransactionRollingBack)
+		require.ErrorIs(t, completed, ErrTransactionRollingBack)
 	})
 	t.Run("OnExecWithoutCommitTxSuccess", func(t *testing.T) {
 		e := fixenv.New(t)

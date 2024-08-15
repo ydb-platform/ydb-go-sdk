@@ -10,7 +10,7 @@ import (
 func SessionOverGrpcMock(e fixenv.Env) *Session {
 	f := func() (*fixenv.GenericResult[*Session], error) {
 		s := newTestSession(fmt.Sprintf("test-session-id-%v", e.T().Name()))
-		s.grpcClient = QueryGrpcMock(e)
+		s.queryServiceClient = QueryGrpcMock(e)
 
 		return fixenv.NewGenericResult(s), nil
 	}

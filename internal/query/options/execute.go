@@ -37,8 +37,8 @@ func (t txCommitOption) applyExecuteOption(s *executeSettings) {
 	s.txControl.Commit = true
 }
 
-func (txControl txControlOption) applyExecuteOption(s *executeSettings) {
-	s.txControl = (*tx.Control)(&txControl)
+func (txControl *txControlOption) applyExecuteOption(s *executeSettings) {
+	s.txControl = (*tx.Control)(txControl)
 }
 
 func (syntax Syntax) applyExecuteOption(s *executeSettings) {
@@ -143,7 +143,7 @@ var (
 	_ Execute = ExecMode(0)
 	_ Execute = StatsMode(0)
 	_ Execute = txCommitOption{}
-	_ Execute = txControlOption{}
+	_ Execute = (*txControlOption)(nil)
 )
 
 func WithCommit() txCommitOption {

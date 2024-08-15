@@ -2,11 +2,9 @@ package query
 
 import (
 	"context"
-	"io"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -23,22 +21,100 @@ import (
 var _ query.Session = (*Session)(nil)
 
 type Session struct {
-	cfg        *config.Config
-	id         string
-	grpcClient Ydb_Query_V1.QueryServiceClient
-	nodeID     uint32
-	statusCode statusCode
-	closeOnce  func(ctx context.Context) error
-	checks     []func(s *Session) bool
+	cfg                *config.Config
+	id                 string
+	queryServiceClient Ydb_Query_V1.QueryServiceClient
+	nodeID             uint32
+	statusCode         statusCode
+	closeOnce          func(ctx context.Context) error
+	checks             []func(s *Session) bool
+}
+
+func (s *Session) QueryResultSet(
+	ctx context.Context, q string, opts ...options.Execute,
+) (rs query.ResultSet, finalErr error) {
+	onDone := trace.QueryOnSessionQueryResultSet(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryResultSet"), s, q)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	settings := options.ExecuteSettings(opts...)
+
+	resultOpts := []resultOption{
+		withTrace(s.cfg.Trace()),
+	}
+	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	rs, err = readResultSet(ctx, r)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rs, nil
+}
+
+func (s *Session) queryRow(
+	ctx context.Context, q string, settings executeConfig, resultOpts ...resultOption,
+) (row query.Row, finalErr error) {
+	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	row, err = readRow(ctx, r)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
+}
+
+func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execute) (_ query.Row, finalErr error) {
+	onDone := trace.QueryOnSessionQueryRow(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryRow"), s, q)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	row, err := s.queryRow(ctx, q, options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()))
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
 }
 
 func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config) (
 	s *Session, finalErr error,
 ) {
 	s = &Session{
-		cfg:        cfg,
-		grpcClient: client,
-		statusCode: statusUnknown,
+		cfg:                cfg,
+		queryServiceClient: client,
+		statusCode:         statusUnknown,
 		checks: []func(s *Session) bool{
 			func(s *Session) bool {
 				switch s.status() {
@@ -103,7 +179,7 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		}
 	}()
 
-	attach, err := s.grpcClient.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
+	attach, err := s.queryServiceClient.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
 		SessionId: s.id,
 	})
 	if err != nil {
@@ -148,7 +224,7 @@ func (s *Session) closeAndDeleteSession(cancelAttach context.CancelFunc) func(ct
 		}
 		defer cancel()
 
-		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
+		if err = deleteSession(ctx, s.queryServiceClient, s.id); err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 
@@ -240,38 +316,50 @@ func (s *Session) Exec(
 		onDone(finalErr)
 	}()
 
-	_, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
+	settings := options.ExecuteSettings(opts...)
+
+	resultOpts := []resultOption{
+		withTrace(s.cfg.Trace()),
+	}
+
+	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
-		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
+		if xerrors.IsOperationError(err) {
 			s.setStatus(statusClosed)
 		}
 
 		return xerrors.WithStackTrace(err)
 	}
-	for {
-		_, err = r.NextResultSet(ctx)
-		if err != nil {
-			if xerrors.Is(err, io.EOF) {
-				return nil
-			}
 
-			return xerrors.WithStackTrace(err)
+	err = readAll(ctx, r)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			s.setStatus(statusClosed)
 		}
+
+		return xerrors.WithStackTrace(err)
 	}
+
+	return nil
 }
 
 func (s *Session) Query(
 	ctx context.Context, q string, opts ...options.Execute,
-) (_ query.Result, err error) {
+) (_ query.Result, finalErr error) {
 	onDone := trace.QueryOnSessionQuery(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"), s, q)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
 
-	_, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
+	settings := options.ExecuteSettings(opts...)
+
+	resultOpts := []resultOption{
+		withTrace(s.cfg.Trace()),
+	}
+	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
-		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
+		if xerrors.IsOperationError(err) {
 			s.setStatus(statusClosed)
 		}
 

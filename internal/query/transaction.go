@@ -2,10 +2,6 @@ package query
 
 import (
 	"context"
-	"io"
-	"slices"
-	"sync"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -16,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -32,13 +29,105 @@ type (
 		s          *Session
 		txSettings query.TransactionSettings
 
-		rollbackStarted atomic.Bool
-
-		m                 sync.Mutex
-		onCompletedCalled bool
-		onCompleted       []baseTx.OnTransactionCompletedFunc
+		onCompleted xsync.Set[*baseTx.OnTransactionCompletedFunc]
 	}
 )
+
+func (tx *Transaction) QueryResultSet(
+	ctx context.Context, q string, opts ...options.Execute,
+) (rs query.ResultSet, finalErr error) {
+	onDone := trace.QueryOnTxQueryResultSet(tx.s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"), tx, q)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	settings := executeSettings(tx, opts...)
+
+	resultOpts := []resultOption{
+		withTrace(tx.s.cfg.Trace()),
+	}
+	if settings.TxControl().Commit {
+		// notification about complete transaction must be sended for any error or for successfully read all result if
+		// it was execution with commit flag
+		resultOpts = append(resultOpts,
+			onNextPartErr(func(err error) {
+				tx.notifyOnCompleted(xerrors.HideEOF(err))
+			}),
+		)
+	}
+	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			tx.s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if tx.Identifier == nil {
+		tx.Identifier = txID
+	}
+
+	rs, err = readResultSet(ctx, r)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			tx.s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rs, nil
+}
+
+func (tx *Transaction) QueryRow(
+	ctx context.Context, q string, opts ...options.Execute,
+) (row query.Row, finalErr error) {
+	onDone := trace.QueryOnTxQueryRow(tx.s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryRow"), tx, q)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	settings := executeSettings(tx, opts...)
+
+	resultOpts := []resultOption{
+		withTrace(tx.s.cfg.Trace()),
+	}
+	if settings.TxControl().Commit {
+		// notification about complete transaction must be sended for any error or for successfully read all result if
+		// it was execution with commit flag
+		resultOpts = append(resultOpts,
+			onNextPartErr(func(err error) {
+				tx.notifyOnCompleted(xerrors.HideEOF(err))
+			}),
+		)
+	}
+	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			tx.s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if tx.Identifier == nil {
+		tx.Identifier = txID
+	}
+
+	row, err = readRow(ctx, r)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			tx.s.setStatus(statusClosed)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
+}
 
 func (tx *Transaction) SessionID() string {
 	return tx.s.ID()
@@ -79,10 +168,6 @@ func (tx *Transaction) ID() string {
 func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execute) (
 	finalErr error,
 ) {
-	if tx.rollbackStarted.Load() {
-		return xerrors.WithStackTrace(ErrTransactionRollingBack)
-	}
-
 	onDone := trace.QueryOnTxExec(tx.s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Exec"), tx.s, tx, q)
 	defer func() {
@@ -91,7 +176,9 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 
 	settings := executeSettings(tx, opts...)
 
-	var resultOpts []resultOption
+	resultOpts := []resultOption{
+		withTrace(tx.s.cfg.Trace()),
+	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
@@ -102,7 +189,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		)
 	}
 
-	txID, r, err := execute(ctx, tx.s, tx.s.grpcClient, q, settings, resultOpts...)
+	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)
@@ -115,25 +202,21 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		tx.Identifier = txID
 	}
 
-	for {
-		_, err = r.NextResultSet(ctx)
-		if err != nil {
-			if xerrors.Is(err, io.EOF) {
-				return nil
-			}
-
-			return xerrors.WithStackTrace(err)
+	err = readAll(ctx, r)
+	if err != nil {
+		if xerrors.IsOperationError(err) {
+			tx.s.setStatus(statusClosed)
 		}
+
+		return xerrors.WithStackTrace(err)
 	}
+
+	return nil
 }
 
 func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Execute) (
 	_ query.Result, finalErr error,
 ) {
-	if tx.rollbackStarted.Load() {
-		return nil, xerrors.WithStackTrace(ErrTransactionRollingBack)
-	}
-
 	onDone := trace.QueryOnTxQuery(tx.s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"), tx.s, tx, q)
 	defer func() {
@@ -142,7 +225,9 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 
 	settings := executeSettings(tx, opts...)
 
-	var resultOpts []resultOption
+	resultOpts := []resultOption{
+		withTrace(tx.s.cfg.Trace()),
+	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
@@ -152,7 +237,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			}),
 		)
 	}
-	txID, r, err := execute(ctx, tx.s, tx.s.grpcClient, q, settings, resultOpts...)
+	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
 		if xerrors.IsOperationError(err) {
 			tx.s.setStatus(statusClosed)
@@ -181,10 +266,6 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
-	if tx.rollbackStarted.Load() {
-		return xerrors.WithStackTrace(ErrTransactionRollingBack)
-	}
-
 	defer func() {
 		tx.notifyOnCompleted(err)
 	}()
@@ -193,7 +274,7 @@ func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
 		return nil
 	}
 
-	err = commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
+	err = commitTx(ctx, tx.s.queryServiceClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
 			tx.s.setStatus(statusClosed)
@@ -218,20 +299,13 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx *Transaction) Rollback(ctx context.Context) error {
-	// set flag for starting rollback and call notifications
-	// allow to rollback transaction many times - for handle retries on errors
-	if tx.rollbackStarted.CompareAndSwap(false, true) {
-		tx.notifyOnCompleted(xerrors.WithStackTrace(ErrTransactionRollingBack))
-	}
-
-	//nolint:godox
-	// ToDo save local marker for deny any additional requests to the transaction?
-
 	if tx.Identifier == nil {
 		return nil
 	}
 
-	err := rollback(ctx, tx.s.grpcClient, tx.s.id, tx.ID())
+	tx.notifyOnCompleted(ErrTransactionRollingBack)
+
+	err := rollback(ctx, tx.s.queryServiceClient, tx.s.id, tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
 			tx.s.setStatus(statusClosed)
@@ -244,24 +318,13 @@ func (tx *Transaction) Rollback(ctx context.Context) error {
 }
 
 func (tx *Transaction) OnCompleted(f baseTx.OnTransactionCompletedFunc) {
-	tx.m.Lock()
-	defer tx.m.Unlock()
-
-	tx.onCompleted = append(tx.onCompleted, f)
+	tx.onCompleted.Add(&f)
 }
 
 func (tx *Transaction) notifyOnCompleted(err error) {
-	tx.m.Lock()
-	notifyCalled := tx.onCompletedCalled
-	tx.onCompletedCalled = true
-	onCompletedFunctions := slices.Clone(tx.onCompleted)
-	tx.m.Unlock()
+	tx.onCompleted.Range(func(f *baseTx.OnTransactionCompletedFunc) bool {
+		(*f)(err)
 
-	if notifyCalled {
-		return
-	}
-
-	for _, f := range onCompletedFunctions {
-		f(err)
-	}
+		return tx.onCompleted.Remove(f)
+	})
 }

@@ -365,7 +365,7 @@ func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs quer
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
+	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
 func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Result, error) {
@@ -395,7 +395,7 @@ func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Resu
 			rows = append(rows, row)
 		}
 
-		resultSets = append(resultSets, NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
+		resultSets = append(resultSets, MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
 	}
 
 	return newMaterializedResult(resultSets, r.Stats()), nil

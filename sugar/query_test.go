@@ -152,7 +152,7 @@ func TestUnmarshallResultSet(t *testing.T) {
 		ID  uint64 `sql:"id"`
 		Str string `sql:"myStr"`
 	}
-	v, err := sugar.UnmarshallResultSet[myStruct](internalQuery.NewMaterializedResultSet(-1, nil, nil,
+	v, err := sugar.UnmarshallResultSet[myStruct](internalQuery.MaterializedResultSet(-1, nil, nil,
 		[]query.Row{
 			func() query.Row {
 				row, err := internalQuery.NewRow(ctx, []*Ydb.Column{

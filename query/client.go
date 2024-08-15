@@ -9,46 +9,79 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Client interface {
-	Executor
-
-	// Do provide the best effort for execute operation.
-	//
-	// Do implements internal busy loop until one of the following conditions is met:
-	// - deadline was canceled or deadlined
-	// - retry operation returned nil as error
-	//
-	// Warning: if context without deadline or cancellation func than Do can run indefinitely.
-	Do(ctx context.Context, op Operation, opts ...DoOption) error
-
-	// DoTx provide the best effort for execute transaction.
-	//
-	// DoTx implements internal busy loop until one of the following conditions is met:
-	// - deadline was canceled or deadlined
-	// - retry operation returned nil as error
-	//
-	// DoTx makes auto selector (with TransactionSettings, by default - SerializableReadWrite), commit and
-	// rollback (on error) of transaction.
-	//
-	// If op TxOperation returns nil - transaction will be committed
-	// If op TxOperation return non nil - transaction will be rollback
-	// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
-	DoTx(ctx context.Context, op TxOperation, opts ...DoTxOption) error
-
-	// QueryResultSet is a helper which read all rows from first result set in result
-	//
-	// ReadRow returns error if result contains more than one result set
+type (
+	// Executor is an interface for execute queries
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (ResultSet, error)
+	Executor interface {
+		// Exec execute query without result
+		//
+		// Exec used by default:
+		// - DefaultTxControl
+		Exec(ctx context.Context, query string, opts ...options.Execute) error
 
-	// QueryRow is a helper which read only one row from first result set in result
-	//
-	// ReadRow returns error if result contains more than one result set or more than one row
+		// Query execute query with result
+		//
+		// Exec used by default:
+		// - DefaultTxControl
+		Query(ctx context.Context, query string, opts ...options.Execute) (r Result, err error)
+
+		// QueryResultSet execute query and take the exactly single materialized result set from result
+		//
+		// Exec used by default:
+		// - DefaultTxControl
+		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (rs ResultSet, err error)
+
+		// QueryRow execute query and take the exactly single row from exactly single result set from result
+		//
+		// Exec used by default:
+		// - DefaultTxControl
+		QueryRow(ctx context.Context, query string, opts ...options.Execute) (row Row, err error)
+	}
+	// Client defines API of query client
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	QueryRow(ctx context.Context, query string, opts ...options.Execute) (Row, error)
-}
+	Client interface {
+		Executor
+
+		// Do provide the best effort for execute operation.
+		//
+		// Do implements internal busy loop until one of the following conditions is met:
+		// - deadline was canceled or deadlined
+		// - retry operation returned nil as error
+		//
+		// Warning: if context without deadline or cancellation func than Do can run indefinitely.
+		Do(ctx context.Context, op Operation, opts ...DoOption) error
+
+		// DoTx provide the best effort for execute transaction.
+		//
+		// DoTx implements internal busy loop until one of the following conditions is met:
+		// - deadline was canceled or deadlined
+		// - retry operation returned nil as error
+		//
+		// DoTx makes auto selector (with TransactionSettings, by default - SerializableReadWrite), commit and
+		// rollback (on error) of transaction.
+		//
+		// If op TxOperation returns nil - transaction will be committed
+		// If op TxOperation return non nil - transaction will be rollback
+		// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
+		DoTx(ctx context.Context, op TxOperation, opts ...DoTxOption) error
+
+		// QueryResultSet is a helper which read all rows from first result set in result
+		//
+		// ReadRow returns error if result contains more than one result set
+		//
+		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (ResultSet, error)
+
+		// QueryRow is a helper which read only one row from first result set in result
+		//
+		// ReadRow returns error if result contains more than one result set or more than one row
+		//
+		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+		QueryRow(ctx context.Context, query string, opts ...options.Execute) (Row, error)
+	}
+)
 
 type (
 	// Operation is the interface that holds an operation for retry.

@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -54,14 +55,15 @@ func queryFromText(
 }
 
 func execute(
-	ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient, q string, cfg executeConfig, opts ...resultOption,
+	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
+	q string, settings executeConfig, opts ...resultOption,
 ) (
 	_ tx.Identifier, _ *result, finalErr error,
 ) {
 	a := allocator.New()
 	defer a.Free()
 
-	request, callOptions := executeQueryRequest(a, s.id, q, cfg)
+	request, callOptions := executeQueryRequest(a, sessionID, q, settings)
 
 	executeCtx := xcontext.ValueOnly(ctx)
 
@@ -70,7 +72,7 @@ func execute(
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, append(opts, withTrace(s.cfg.Trace()))...)
+	r, txID, err := newResult(ctx, stream, opts...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -80,4 +82,111 @@ func execute(
 	}
 
 	return tx.ID(txID), r, nil
+}
+
+func readAll(ctx context.Context, r *result) error {
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+
+	for {
+		_, err := r.nextResultSet(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return nil
+			}
+
+			return xerrors.WithStackTrace(err)
+		}
+	}
+}
+
+func readResultSet(ctx context.Context, r *result) (_ *resultSet, finalErr error) {
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+
+	rs, err := r.nextResultSet(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	_, err = r.nextResultSet(ctx)
+	if err == nil {
+		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	}
+	if !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rs, nil
+}
+
+func readMaterializedResultSet(ctx context.Context, r *result) (_ *materializedResultSet, finalErr error) {
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+
+	rs, err := r.nextResultSet(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	var rows []query.Row
+	for {
+		row, err := rs.nextRow(ctx) //nolint:govet
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		rows = append(rows, row)
+	}
+
+	_, err = r.nextResultSet(ctx)
+	if err == nil {
+		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	}
+	if !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
+}
+
+func readRow(ctx context.Context, r *result) (_ *row, finalErr error) {
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+
+	rs, err := r.nextResultSet(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	row, err := rs.nextRow(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	_, err = rs.nextRow(ctx)
+	if err == nil {
+		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
+	}
+	if !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	_, err = r.NextResultSet(ctx)
+	if err == nil {
+		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	}
+	if !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
 }

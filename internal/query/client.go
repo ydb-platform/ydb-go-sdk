@@ -2,7 +2,6 @@ package query
 
 import (
 	"context"
-	"io"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -40,9 +39,9 @@ type (
 		InUse         atomic.Int32
 	}
 	Client struct {
-		config *config.Config
-		client Ydb_Query_V1.QueryServiceClient
-		pool   sessionPool
+		config             *config.Config
+		queryServiceClient Ydb_Query_V1.QueryServiceClient
+		pool               sessionPool
 
 		done chan struct{}
 	}
@@ -105,7 +104,7 @@ func (c *Client) Close(ctx context.Context) error {
 func do(
 	ctx context.Context,
 	pool sessionPool,
-	op query.Operation,
+	op func(ctx context.Context, s *Session) error,
 	opts ...retry.Option,
 ) (finalErr error) {
 	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
@@ -141,7 +140,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 		onDone(attempts, finalErr)
 	}()
 
-	err := do(ctx, c.pool, func(ctx context.Context, s query.Session) error {
+	err := do(ctx, c.pool, func(ctx context.Context, s *Session) error {
 		attempts++
 
 		return op(ctx, s)
@@ -159,7 +158,7 @@ func doTx(
 ) (finalErr error) {
 	doTxOpts := options.ParseDoTxOpts(t, opts...)
 
-	err := do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
+	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		tx, err := s.Begin(ctx, doTxOpts.TxSettings())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -192,51 +191,12 @@ func doTx(
 	return nil
 }
 
-// QueryRow is a helper which read only one row from first result set in result
-func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute) (row query.Row, finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
-
-	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
-		q,
-	)
-	defer func() {
-		onDone(finalErr)
-	}()
-
-	err := do(ctx, c.pool, func(ctx context.Context, s query.Session) error {
-		r, err := s.Query(ctx, q, opts...)
+func clientQueryRow(
+	ctx context.Context, pool sessionPool, q string, settings executeConfig, resultOpts ...resultOption,
+) (row query.Row, finalErr error) {
+	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
+		row, err = s.queryRow(ctx, q, settings, resultOpts...)
 		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-		defer func() {
-			_ = r.Close(ctx)
-		}()
-
-		rs, err := r.NextResultSet(ctx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		row, err = rs.NextRow(ctx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		_, err = rs.NextRow(ctx)
-		if err == nil {
-			return xerrors.WithStackTrace(errMoreThanOneRow)
-		}
-		if !xerrors.Is(err, io.EOF) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		_, err = r.NextResultSet(ctx)
-		if err == nil {
-			return xerrors.WithStackTrace(errMoreThanOneResultSet)
-		}
-		if !xerrors.Is(err, io.EOF) {
 			return xerrors.WithStackTrace(err)
 		}
 
@@ -249,36 +209,35 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 	return row, nil
 }
 
+// QueryRow is a helper which read only one row from first result set in result
+func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute) (_ query.Row, finalErr error) {
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
+	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
+		q,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	row, err := clientQueryRow(ctx, c.pool, q, options.ExecuteSettings(opts...), withTrace(c.config.Trace()))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
+}
+
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
-	err := do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
-		streamResult, err := s.Query(ctx, q, opts...)
+	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
+		err = s.Exec(ctx, q, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		defer func() {
-			_ = streamResult.Close(ctx)
-		}()
 
-		for {
-			rs, err := streamResult.NextResultSet(ctx)
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					return nil
-				}
-
-				return xerrors.WithStackTrace(err)
-			}
-			for {
-				_, err = rs.NextRow(ctx)
-				if err != nil {
-					if xerrors.Is(err, io.EOF) {
-						break
-					}
-
-					return xerrors.WithStackTrace(err)
-				}
-			}
-		}
+		return nil
 	})
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -310,7 +269,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (
 	r query.Result, err error,
 ) {
-	err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
+	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.Query(ctx, q, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -353,6 +312,37 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 	return r, nil
 }
 
+func clientQueryResultSet(
+	ctx context.Context, pool sessionPool, q string, settings executeConfig, resultOpts ...resultOption,
+) (rs query.ResultSet, finalErr error) {
+	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
+		_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
+		if err != nil {
+			if xerrors.IsOperationError(err) {
+				s.setStatus(statusClosed)
+			}
+
+			return xerrors.WithStackTrace(err)
+		}
+
+		rs, err = readMaterializedResultSet(ctx, r)
+		if err != nil {
+			if xerrors.IsOperationError(err) {
+				s.setStatus(statusClosed)
+			}
+
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rs, nil
+}
+
 // QueryResultSet is a helper which read all rows from first result set in result
 func (c *Client) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
@@ -368,46 +358,7 @@ func (c *Client) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	err := do(ctx, c.pool, func(ctx context.Context, s query.Session) error {
-		r, err := s.Query(ctx, q, opts...)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-		defer func() {
-			_ = r.Close(ctx)
-		}()
-
-		rs, err = r.NextResultSet(ctx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		var rows []query.Row
-		for {
-			row, err := rs.NextRow(ctx) //nolint:govet
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					rs = NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows)
-
-					break
-				}
-
-				return xerrors.WithStackTrace(err)
-			}
-
-			rows = append(rows, row)
-		}
-
-		_, err = r.NextResultSet(ctx)
-		if err == nil {
-			return xerrors.WithStackTrace(errMoreThanOneResultSet)
-		}
-		if !xerrors.Is(err, io.EOF) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return nil
-	})
+	rs, err := clientQueryResultSet(ctx, c.pool, q, options.ExecuteSettings(opts...), withTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -468,9 +419,9 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 	grpcClient := Ydb_Query_V1.NewQueryServiceClient(balancer)
 
 	client := &Client{
-		config: cfg,
-		client: grpcClient,
-		done:   make(chan struct{}),
+		config:             cfg,
+		queryServiceClient: grpcClient,
+		done:               make(chan struct{}),
 		pool: newPool(ctx, cfg, func(ctx context.Context) (_ *Session, err error) {
 			var (
 				createCtx    context.Context
