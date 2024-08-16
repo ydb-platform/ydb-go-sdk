@@ -1,3 +1,5 @@
+* Replaced requirements from go1.22 + experimantal flag to go1.23 for experimental range-over interface
+
 ## v3.76.5
 * Fixed out of index item creation in `internal/pool.Pool`
 * Fixed tracing of `(*grpcClientStream).finish` event

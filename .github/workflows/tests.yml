@@ -127,7 +127,6 @@ jobs:
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
       HIDE_APPLICATION_OUTPUT: 1
-      GOEXPERIMENT: rangefunc
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

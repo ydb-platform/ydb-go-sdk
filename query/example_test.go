@@ -1,4 +1,4 @@
-//go:build go1.22 && goexperiment.rangefunc
+//go:build go1.23
 
 package query_test
 
@@ -6,9 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"io"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -94,12 +94,12 @@ func Example_rangeExperiment() {
 	if err != nil {
 		panic(err)
 	}
-	// for loop with ResultSets available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+	// for loop with ResultSets available with Go version 1.23+
 	for rs, err := range r.ResultSets(ctx) {
 		if err != nil {
 			panic(err)
 		}
-		// for loop with ResultSets available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+		// for loop with ResultSets available with Go version 1.23+
 		for row, err := range rs.Rows(ctx) {
 			if err != nil {
 				panic(err)

@@ -18,7 +18,7 @@ type (
 		NextResultSet(ctx context.Context) (ResultSet, error)
 
 		// ResultSets is experimental API for range iterators available
-		// with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+		// with Go version 1.23+
 		ResultSets(ctx context.Context) xiter.Seq2[ResultSet, error]
 
 		Stats() stats.QueryStats
@@ -29,7 +29,7 @@ type (
 		ColumnTypes() []Type
 		NextRow(ctx context.Context) (Row, error)
 
-		// Rows is experimental API for range iterators available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+		// Rows is experimental API for range iterators available with Go version 1.23+
 		Rows(ctx context.Context) xiter.Seq2[Row, error]
 	}
 	Row interface {
