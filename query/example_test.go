@@ -344,22 +344,14 @@ func Example_rertryWithTx() {
 				return err // for auto-retry with driver
 			}
 			defer func() { _ = res.Close(ctx) }() // cleanup resources
-			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
+			// for loop with ResultSets available with Go version 1.23+
+			for rs, err := range res.ResultSets(ctx) {
 				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
 					return err
 				}
-				for { // iterate over rows
-					row, err := rs.NextRow(ctx)
+				// for loop with ResultSets available with Go version 1.23+
+				for row, err := range rs.NextRow(ctx) {
 					if err != nil {
-						if errors.Is(err, io.EOF) {
-							break
-						}
-
 						return err
 					}
 					if err = row.ScanNamed(

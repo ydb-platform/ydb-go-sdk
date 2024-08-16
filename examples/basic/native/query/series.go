@@ -27,7 +27,6 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 						series
 				`, prefix),
 				query.WithTxControl(query.TxControl(query.BeginTx(query.WithOnlineReadOnly()))),
-				query.WithStatsMode(query.StatsModeBasic),
 			)
 			if err != nil {
 				return err
