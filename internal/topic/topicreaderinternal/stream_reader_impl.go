@@ -223,8 +223,11 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 	tx tx.Transaction,
 	batch *topicreadercommon.PublicBatch,
 ) error {
-	req := r.createUpdateOffsetRequest(ctx, batch, tx)
+	if err := tx.UnLazy(ctx); err != nil {
+		return fmt.Errorf("ydb: failed to materialize transaction: %w", err)
+	}
 
+	req := r.createUpdateOffsetRequest(ctx, batch, tx)
 	updateOffesetInTransactionErr := retry.Retry(ctx, func(ctx context.Context) (err error) {
 		traceCtx := ctx
 		onDone := trace.TopicOnReaderUpdateOffsetsInTransaction(
