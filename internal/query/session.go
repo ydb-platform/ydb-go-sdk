@@ -66,7 +66,7 @@ func (s *Session) QueryResultSet(
 }
 
 func (s *Session) queryRow(
-	ctx context.Context, q string, settings executeConfig, resultOpts ...resultOption,
+	ctx context.Context, q string, settings executeSettings, resultOpts ...resultOption,
 ) (row query.Row, finalErr error) {
 	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {

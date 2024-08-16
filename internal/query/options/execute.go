@@ -6,32 +6,56 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+)
+
+var (
+	_ Execute = callOptionsOption(nil)
+	_ Execute = (*txCommitOption)(nil)
+	_ Execute = parametersOption{}
+	_ Execute = (*txControlOption)(nil)
+	_ Execute = syntaxOption(0)
+	_ Execute = statsModeOption{}
+	_ Execute = execModeOption(0)
 )
 
 type (
-	Syntax                Ydb_Query.Syntax
-	ExecMode              Ydb_Query.ExecMode
-	StatsMode             Ydb_Query.StatsMode
-	CallOptions           []grpc.CallOption
-	commonExecuteSettings struct {
-		syntax      Syntax
-		params      params.Parameters
-		execMode    ExecMode
-		statsMode   StatsMode
-		callOptions []grpc.CallOption
-	}
-	executeSettings struct {
-		commonExecuteSettings
+	Syntax    Ydb_Query.Syntax
+	ExecMode  Ydb_Query.ExecMode
+	StatsMode Ydb_Query.StatsMode
 
-		txControl *tx.Control
+	// executeSettings is a holder for execute settings
+	executeSettings struct {
+		syntax        Syntax
+		params        params.Parameters
+		execMode      ExecMode
+		statsMode     StatsMode
+		statsCallback func(queryStats stats.QueryStats)
+		callOptions   []grpc.CallOption
+		txControl     *tx.Control
 	}
+
+	// Execute is an interface for execute method options
 	Execute interface {
 		applyExecuteOption(s *executeSettings)
 	}
-	txCommitOption   struct{}
-	ParametersOption params.Parameters
-	txControlOption  tx.Control
+
+	// execute options
+	callOptionsOption []grpc.CallOption
+	txCommitOption    struct{}
+	parametersOption  params.Parameters
+	txControlOption   tx.Control
+	syntaxOption      = Syntax
+	statsModeOption   struct {
+		mode     StatsMode
+		callback func(stats.QueryStats)
+	}
+	execModeOption = ExecMode
 )
+
+func (s *executeSettings) StatsCallback() func(stats.QueryStats) {
+	return s.statsCallback
+}
 
 func (t txCommitOption) applyExecuteOption(s *executeSettings) {
 	s.txControl.Commit = true
@@ -50,11 +74,11 @@ const (
 	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG)
 )
 
-func (params ParametersOption) applyExecuteOption(s *executeSettings) {
+func (params parametersOption) applyExecuteOption(s *executeSettings) {
 	s.params = append(s.params, params...)
 }
 
-func (opts CallOptions) applyExecuteOption(s *executeSettings) {
+func (opts callOptionsOption) applyExecuteOption(s *executeSettings) {
 	s.callOptions = append(s.callOptions, opts...)
 }
 
@@ -80,50 +104,48 @@ const (
 	StatsModeProfile = StatsMode(Ydb_Query.StatsMode_STATS_MODE_PROFILE)
 )
 
-func defaultCommonExecuteSettings() commonExecuteSettings {
-	return commonExecuteSettings{
+func defaultExecuteSettings() executeSettings {
+	return executeSettings{
 		syntax:    SyntaxYQL,
 		execMode:  ExecModeExecute,
 		statsMode: StatsModeNone,
+		txControl: tx.DefaultTxControl(),
 	}
 }
 
 func ExecuteSettings(opts ...Execute) *executeSettings {
-	settings := &executeSettings{
-		commonExecuteSettings: defaultCommonExecuteSettings(),
-		txControl:             tx.DefaultTxControl(),
-	}
+	settings := defaultExecuteSettings()
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt.applyExecuteOption(settings)
+			opt.applyExecuteOption(&settings)
 		}
 	}
 
-	return settings
+	return &settings
 }
 
 func (s *executeSettings) TxControl() *tx.Control {
 	return s.txControl
 }
 
-func (s *commonExecuteSettings) CallOptions() []grpc.CallOption {
+func (s *executeSettings) CallOptions() []grpc.CallOption {
 	return s.callOptions
 }
 
-func (s *commonExecuteSettings) Syntax() Syntax {
+func (s *executeSettings) Syntax() Syntax {
 	return s.syntax
 }
 
-func (s *commonExecuteSettings) ExecMode() ExecMode {
+func (s *executeSettings) ExecMode() ExecMode {
 	return s.execMode
 }
 
-func (s *commonExecuteSettings) StatsMode() StatsMode {
+func (s *executeSettings) StatsMode() StatsMode {
 	return s.statsMode
 }
 
-func (s *commonExecuteSettings) Params() *params.Parameters {
+func (s *executeSettings) Params() *params.Parameters {
 	if len(s.params) == 0 {
 		return nil
 	}
@@ -131,10 +153,8 @@ func (s *commonExecuteSettings) Params() *params.Parameters {
 	return &s.params
 }
 
-var _ Execute = ParametersOption{}
-
-func WithParameters(parameters *params.Parameters) ParametersOption {
-	return ParametersOption(*parameters)
+func WithParameters(parameters *params.Parameters) parametersOption {
+	return parametersOption(*parameters)
 }
 
 var (
@@ -150,25 +170,27 @@ func WithCommit() txCommitOption {
 	return txCommitOption{}
 }
 
-type ExecModeOption = ExecMode
-
-func WithExecMode(mode ExecMode) ExecMode {
+func WithExecMode(mode ExecMode) execModeOption {
 	return mode
 }
 
-type SyntaxOption = Syntax
-
-func WithSyntax(syntax Syntax) SyntaxOption {
+func WithSyntax(syntax Syntax) syntaxOption {
 	return syntax
 }
 
-type StatsModeOption = StatsMode
-
-func WithStatsMode(mode StatsMode) StatsMode {
-	return mode
+func (opt statsModeOption) applyExecuteOption(s *executeSettings) {
+	s.statsMode = opt.mode
+	s.statsCallback = opt.callback
 }
 
-func WithCallOptions(opts ...grpc.CallOption) CallOptions {
+func WithStatsMode(mode StatsMode, callback func(stats.QueryStats)) statsModeOption {
+	return statsModeOption{
+		mode:     mode,
+		callback: callback,
+	}
+}
+
+func WithCallOptions(opts ...grpc.CallOption) callOptionsOption {
 	return opts
 }
 

@@ -15,18 +15,20 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-type executeConfig interface {
+type executeSettings interface {
 	ExecMode() options.ExecMode
 	StatsMode() options.StatsMode
+	StatsCallback() func(stats stats.QueryStats)
 	TxControl() *query.TransactionControl
 	Syntax() options.Syntax
 	Params() *params.Parameters
 	CallOptions() []grpc.CallOption
 }
 
-func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeConfig) (
+func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeSettings) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
 ) {
@@ -56,7 +58,7 @@ func queryFromText(
 
 func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
-	q string, settings executeConfig, opts ...resultOption,
+	q string, settings executeSettings, opts ...resultOption,
 ) (
 	_ tx.Identifier, _ *result, finalErr error,
 ) {
@@ -72,7 +74,7 @@ func execute(
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, opts...)
+	r, txID, err := newResult(ctx, stream, append(opts, withStatsCallback(settings.StatsCallback()))...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}

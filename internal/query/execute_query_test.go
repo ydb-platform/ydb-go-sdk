@@ -915,7 +915,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		{
 			name: "WithStatsFull",
 			opts: []options.Execute{
-				options.WithStatsMode(options.StatsModeFull),
+				options.WithStatsMode(options.StatsModeFull, nil),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsFull",
@@ -933,7 +933,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		{
 			name: "WithStatsBasic",
 			opts: []options.Execute{
-				options.WithStatsMode(options.StatsModeBasic),
+				options.WithStatsMode(options.StatsModeBasic, nil),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsBasic",
@@ -951,7 +951,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		{
 			name: "WithStatsProfile",
 			opts: []options.Execute{
-				options.WithStatsMode(options.StatsModeProfile),
+				options.WithStatsMode(options.StatsModeProfile, nil),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsProfile",

@@ -77,7 +77,12 @@ func (tx *Transaction) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	settings := executeSettings(tx, opts...)
+	settings := options.ExecuteSettings(
+		append(
+			[]options.Execute{options.WithTxControl(tx.txControl())},
+			opts...,
+		)...,
+	)
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.cfg.Trace()),
@@ -125,7 +130,12 @@ func (tx *Transaction) QueryRow(
 		onDone(finalErr)
 	}()
 
-	settings := executeSettings(tx, opts...)
+	settings := options.ExecuteSettings(
+		append(
+			[]options.Execute{options.WithTxControl(tx.txControl())},
+			opts...,
+		)...,
+	)
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.cfg.Trace()),
@@ -168,20 +178,6 @@ func (tx *Transaction) SessionID() string {
 	return tx.s.ID()
 }
 
-func executeSettings(
-	tx interface {
-		txControl() *queryTx.Control
-	},
-	opts ...options.Execute,
-) executeConfig {
-	return options.ExecuteSettings(
-		append(
-			[]options.Execute{options.WithTxControl(tx.txControl())},
-			opts...,
-		)...,
-	)
-}
-
 func (tx *Transaction) txControl() *queryTx.Control {
 	if tx.Identifier != nil {
 		return queryTx.NewControl(queryTx.WithTxID(tx.Identifier.ID()))
@@ -209,7 +205,12 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		onDone(finalErr)
 	}()
 
-	settings := executeSettings(tx, opts...)
+	settings := options.ExecuteSettings(
+		append(
+			[]options.Execute{options.WithTxControl(tx.txControl())},
+			opts...,
+		)...,
+	)
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.cfg.Trace()),
@@ -258,7 +259,12 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 		onDone(finalErr)
 	}()
 
-	settings := executeSettings(tx, opts...)
+	settings := options.ExecuteSettings(
+		append(
+			[]options.Execute{options.WithTxControl(tx.txControl())},
+			opts...,
+		)...,
+	)
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.cfg.Trace()),

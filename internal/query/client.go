@@ -192,7 +192,7 @@ func doTx(
 }
 
 func clientQueryRow(
-	ctx context.Context, pool sessionPool, q string, settings executeConfig, resultOpts ...resultOption,
+	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
 ) (row query.Row, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		row, err = s.queryRow(ctx, q, settings, resultOpts...)
@@ -313,7 +313,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 }
 
 func clientQueryResultSet(
-	ctx context.Context, pool sessionPool, q string, settings executeConfig, resultOpts ...resultOption,
+	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
 ) (rs query.ResultSet, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
 		_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)

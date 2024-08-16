@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 )
 
 type (
@@ -22,6 +23,7 @@ type (
 
 		Begin(ctx context.Context, txSettings TransactionSettings) (Transaction, error)
 	}
+	Stats = stats.QueryStats
 )
 
 const (
@@ -43,7 +45,7 @@ const (
 	StatsModeProfile = options.StatsModeProfile
 )
 
-func WithParameters(parameters *params.Parameters) options.ParametersOption {
+func WithParameters(parameters *params.Parameters) options.Execute {
 	return options.WithParameters(parameters)
 }
 
@@ -59,18 +61,18 @@ func WithCommit() options.Execute {
 	return options.WithCommit()
 }
 
-func WithExecMode(mode options.ExecMode) options.ExecModeOption {
+func WithExecMode(mode options.ExecMode) options.Execute {
 	return options.WithExecMode(mode)
 }
 
-func WithSyntax(syntax options.Syntax) options.SyntaxOption {
+func WithSyntax(syntax options.Syntax) options.Execute {
 	return options.WithSyntax(syntax)
 }
 
-func WithStatsMode(mode options.StatsMode) options.StatsModeOption {
-	return options.WithStatsMode(mode)
+func WithStatsMode(mode options.StatsMode, callback func(Stats)) options.Execute {
+	return options.WithStatsMode(mode, callback)
 }
 
-func WithCallOptions(opts ...grpc.CallOption) options.CallOptions {
+func WithCallOptions(opts ...grpc.CallOption) options.Execute {
 	return options.WithCallOptions(opts...)
 }

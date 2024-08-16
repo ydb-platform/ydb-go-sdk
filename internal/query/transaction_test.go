@@ -27,6 +27,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 var _ tx.Transaction = &Transaction{}
@@ -503,6 +504,10 @@ type testExecuteSettings struct {
 	callOptions []grpc.CallOption
 }
 
+func (s testExecuteSettings) StatsCallback() func(stats stats.QueryStats) {
+	return nil
+}
+
 func (s testExecuteSettings) ExecMode() options.ExecMode {
 	return s.execMode
 }
@@ -527,7 +532,7 @@ func (s testExecuteSettings) CallOptions() []grpc.CallOption {
 	return s.callOptions
 }
 
-var _ executeConfig = testExecuteSettings{}
+var _ executeSettings = testExecuteSettings{}
 
 type txMock func() *internal.Control
 
@@ -544,7 +549,7 @@ func TestExecuteSettings(t *testing.T) {
 		name     string
 		tx       txMock
 		txOpts   []options.Execute
-		settings executeConfig
+		settings executeSettings
 	}{
 		{
 			name: "WithTxID",
@@ -561,7 +566,7 @@ func TestExecuteSettings(t *testing.T) {
 		{
 			name: "WithStats",
 			txOpts: []options.Execute{
-				options.WithStatsMode(options.StatsModeFull),
+				options.WithStatsMode(options.StatsModeFull, nil),
 			},
 			settings: testExecuteSettings{
 				execMode:  options.ExecModeExecute,
@@ -640,7 +645,12 @@ func TestExecuteSettings(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
-			settings := executeSettings(tt.tx, tt.txOpts...)
+			settings := options.ExecuteSettings(
+				append(
+					[]options.Execute{options.WithTxControl(tt.tx.txControl())},
+					tt.txOpts...,
+				)...,
+			)
 			require.Equal(t, tt.settings.Syntax(), settings.Syntax())
 			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
