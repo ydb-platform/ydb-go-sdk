@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	queryTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -32,6 +33,42 @@ type (
 		onCompleted xsync.Set[*baseTx.OnTransactionCompletedFunc]
 	}
 )
+
+func (tx *Transaction) IsLazy() bool {
+	return tx.Identifier == nil
+}
+
+func begin(
+	ctx context.Context,
+	client Ydb_Query_V1.QueryServiceClient,
+	s *Session,
+	txSettings query.TransactionSettings,
+) (baseTx.Identifier, error) {
+	a := allocator.New()
+	defer a.Free()
+	response, err := client.BeginTransaction(ctx,
+		&Ydb_Query.BeginTransactionRequest{
+			SessionId:  s.id,
+			TxSettings: txSettings.ToYDB(a),
+		},
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return baseTx.NewID(response.GetTxMeta().GetId()), nil
+}
+
+func (tx *Transaction) UnLazy(ctx context.Context) error {
+	txID, err := begin(ctx, tx.s.queryServiceClient, tx.s, tx.txSettings)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	tx.Identifier = txID
+
+	return nil
+}
 
 func (tx *Transaction) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
