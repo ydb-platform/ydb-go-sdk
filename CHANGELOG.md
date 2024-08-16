@@ -1,3 +1,4 @@
+## v3.76.6
 * Replaced requirements from go1.22 + experimantal flag to go1.23 for experimental range-over interface
 
 ## v3.76.5
