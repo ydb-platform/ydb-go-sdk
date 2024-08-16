@@ -350,7 +350,7 @@ func Example_rertryWithTx() {
 					return err
 				}
 				// for loop with ResultSets available with Go version 1.23+
-				for row, err := range rs.NextRow(ctx) {
+				for row, err := range rs.Rows(ctx) {
 					if err != nil {
 						return err
 					}
