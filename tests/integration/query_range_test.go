@@ -1,5 +1,5 @@
-//go:build integration && go1.22 && goexperiment.rangefunc
-// +build integration,go1.22,goexperiment.rangefunc
+//go:build integration && go1.23
+// +build integration,go1.23
 
 package integration
 
