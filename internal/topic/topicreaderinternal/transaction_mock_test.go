@@ -16,22 +16,19 @@ func newMockTransactionWrapper(sessionID, transactinID string) *mockTransaction 
 	}
 }
 
-type mockTransaction struct {
+type mockTransaction struct { //nolint:maligned
 	tx.Identifier
-	materialized   bool
 	materializedID tx.Identifier
+	materialized   bool
 	sessionID      string
 	onCompleted    []tx.OnTransactionCompletedFunc
 	RolledBack     bool
 }
 
-func (m *mockTransaction) IsLazy() bool {
-	return !m.materialized
-}
-
 func (m *mockTransaction) UnLazy(_ context.Context) error {
 	m.materialized = true
 	m.Identifier = m.materializedID
+
 	return nil
 }
 

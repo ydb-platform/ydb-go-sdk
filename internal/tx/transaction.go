@@ -9,7 +9,6 @@ import (
 
 type Transaction interface {
 	Identifier
-	IsLazy() bool
 	UnLazy(ctx context.Context) error
 	SessionID() string
 	OnCompleted(f OnTransactionCompletedFunc)

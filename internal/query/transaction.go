@@ -34,10 +34,6 @@ type (
 	}
 )
 
-func (tx *Transaction) IsLazy() bool {
-	return tx.Identifier == nil
-}
-
 func begin(
 	ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
@@ -59,13 +55,15 @@ func begin(
 	return baseTx.NewID(response.GetTxMeta().GetId()), nil
 }
 
-func (tx *Transaction) UnLazy(ctx context.Context) error {
-	txID, err := begin(ctx, tx.s.queryServiceClient, tx.s, tx.txSettings)
+func (tx *Transaction) UnLazy(ctx context.Context) (err error) {
+	if tx.Identifier != nil {
+		return nil
+	}
+
+	tx.Identifier, err = begin(ctx, tx.s.queryServiceClient, tx.s, tx.txSettings)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
-
-	tx.Identifier = txID
 
 	return nil
 }
