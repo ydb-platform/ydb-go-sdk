@@ -115,6 +115,10 @@ func (e *withIssuesError) Is(target error) bool {
 	return false
 }
 
+func (e *withIssuesError) Unwrap() []error {
+	return e.issues
+}
+
 // Issue struct
 type Issue struct {
 	Message  string
