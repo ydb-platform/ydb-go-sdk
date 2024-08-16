@@ -49,6 +49,7 @@ func TestQueryExecute(t *testing.T) {
 			p2 uint64
 			p3 time.Duration
 		)
+		var s query.Stats
 		result, err := db.Query().Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
@@ -63,7 +64,9 @@ func TestQueryExecute(t *testing.T) {
 					Build(),
 			),
 			query.WithSyntax(query.SyntaxYQL),
-			query.WithStatsMode(query.StatsModeFull),
+			query.WithStatsMode(query.StatsModeFull, func(stats query.Stats) {
+				s = stats
+			}),
 		)
 		require.NoError(t, err)
 		resultSet, err := result.NextResultSet(ctx)
@@ -76,7 +79,6 @@ func TestQueryExecute(t *testing.T) {
 		require.EqualValues(t, 100500000000, p2)
 		require.EqualValues(t, time.Duration(100500000000), p3)
 		t.Run("Stats", func(t *testing.T) {
-			s := result.Stats()
 			require.NotNil(t, s)
 			t.Logf("Stats: %+v", s)
 			require.NotZero(t, s.QueryAST())
