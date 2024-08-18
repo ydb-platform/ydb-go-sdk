@@ -27,7 +27,7 @@ func TestQueryTxExecute(t *testing.T) {
 		columnTypes []string
 	)
 	err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-		res, err := tx.Execute(ctx, "SELECT 1 AS col1")
+		res, err := tx.Query(ctx, "SELECT 1 AS col1")
 		if err != nil {
 			return err
 		}
@@ -69,19 +69,26 @@ func TestQueryWithCommitTxFlag(t *testing.T) {
 			return fmt.Errorf("failed start transaction: %w", err)
 		}
 		q := fmt.Sprintf("UPSERT INTO `%v` (id, val) VALUES(1, \"2\")", tableName)
-		res, err := tx.Execute(ctx, q, query.WithCommit())
+		err = tx.Exec(ctx, q, query.WithCommit())
 		if err != nil {
 			return fmt.Errorf("failed execute insert: %w", err)
-		}
-		if err = res.Close(ctx); err != nil {
-			return err
 		}
 
 		// read row within other (implicit) transaction
 		q2 := fmt.Sprintf("SELECT COUNT(*) FROM `%v`", tableName)
-		row, err := s.ReadRow(ctx, q2)
+		r, err := s.Query(ctx, q2)
 		if err != nil {
-			return fmt.Errorf("failed read row: %w", err)
+			return fmt.Errorf("failed query: %w", err)
+		}
+
+		rs, err := r.NextResultSet(ctx)
+		if err != nil {
+			return fmt.Errorf("failed iterate to next result set: %w", err)
+		}
+
+		row, err := rs.NextRow(ctx)
+		if err != nil {
+			return fmt.Errorf("failed iterate to next row: %w", err)
 		}
 
 		if err = row.Scan(&count); err != nil {

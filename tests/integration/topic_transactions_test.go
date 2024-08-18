@@ -47,7 +47,11 @@ func TestTopicReadInTransaction(t *testing.T) {
 
 	require.NoError(t, scope.Driver().Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 		reader := scope.TopicReaderNamed("second")
-		tx.Execute(ctx, "", query.WithCommit())
+		// err := tx.Exec(ctx, "SELECT 1", query.WithCommit())
+		err := tx.Exec(ctx, "SELECT 1")
+		if err != nil {
+			return err
+		}
 
 		scope.Logf("trying second pop batch")
 		batch, err := reader.PopBatchTx(ctx, tx)

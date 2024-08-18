@@ -112,7 +112,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 				return err
 			}
 
-			_, res, err := session.Execute(ctx,
+			res, err := session.Query(ctx,
 				fmt.Sprintf(readQuery, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -180,11 +180,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 
 	err := s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) (err error) {
-			if err = ctx.Err(); err != nil {
-				return err
-			}
-
-			_, res, err := session.Execute(ctx,
+			return session.Exec(ctx,
 				fmt.Sprintf(writeQuery, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -195,15 +191,6 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 						Build(),
 				),
 			)
-			if err != nil {
-				return err
-			}
-
-			defer func() {
-				_ = res.Close(ctx)
-			}()
-
-			return nil
 		},
 		query.WithIdempotent(),
 		query.WithTrace(&trace.Query{
@@ -225,21 +212,19 @@ func (s *Storage) CreateTable(ctx context.Context) error {
 
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
-			_, _, err := session.Execute(ctx,
+			return session.Exec(ctx,
 				fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
 					s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
 				),
-				query.WithTxControl(query.NoTx()))
-
-			return err
+				query.WithTxControl(query.NoTx()),
+			)
 		}, query.WithIdempotent(),
 		query.WithLabel("CREATE TABLE"),
 	)
 }
 
 func (s *Storage) DropTable(ctx context.Context) error {
-	err := ctx.Err()
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 
@@ -248,12 +233,10 @@ func (s *Storage) DropTable(ctx context.Context) error {
 
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
-			_, _, err := session.Execute(ctx,
+			return session.Exec(ctx,
 				fmt.Sprintf(dropTableQuery, s.tablePath),
 				query.WithTxControl(query.NoTx()),
 			)
-
-			return err
 		},
 		query.WithIdempotent(),
 		query.WithLabel("DROP TABLE"),

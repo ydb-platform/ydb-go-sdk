@@ -9,6 +9,7 @@ import (
 
 type Transaction interface {
 	Identifier
+	UnLazy(ctx context.Context) error
 	SessionID() string
 	OnCompleted(f OnTransactionCompletedFunc)
 	Rollback(ctx context.Context) error
@@ -22,7 +23,7 @@ func AsTransaction(id Identifier) (Transaction, error) {
 	}
 
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-		"ydb: waiting ydb transaction object of type query.Transaction, got: %T",
+		"waiting transaction object of type query.Transaction, got: %T",
 		id,
 	)))
 }

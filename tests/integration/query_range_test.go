@@ -51,7 +51,7 @@ func TestQueryRange(t *testing.T) {
 				},
 			)
 		}
-		r, err := db.Query().Execute(ctx, `
+		r, err := db.Query().Query(ctx, `
 				DECLARE $values AS List<Struct<p1:Text,p2:Uint64,p3:Interval>>;
 				SELECT p1, p2, p3 FROM AS_TABLE($values);
 			`,
@@ -91,7 +91,7 @@ func TestQueryRange(t *testing.T) {
 			p3 time.Duration
 		)
 		err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-			_, r, err := s.Execute(ctx, `
+			r, err := s.Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
@@ -144,7 +144,7 @@ func TestQueryRange(t *testing.T) {
 			p3 time.Duration
 		)
 		err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-			r, err := tx.Execute(ctx, `
+			r, err := tx.Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;

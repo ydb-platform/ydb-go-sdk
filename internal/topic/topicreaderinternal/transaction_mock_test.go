@@ -9,17 +9,27 @@ import (
 
 func newMockTransactionWrapper(sessionID, transactinID string) *mockTransaction {
 	return &mockTransaction{
-		Identifier:  tx.NewID(transactinID),
-		sessionID:   sessionID,
-		onCompleted: nil,
+		Identifier:     tx.NewID("lazy-id"),
+		materializedID: tx.NewID(transactinID),
+		sessionID:      sessionID,
+		onCompleted:    nil,
 	}
 }
 
-type mockTransaction struct {
+type mockTransaction struct { //nolint:maligned
 	tx.Identifier
-	sessionID   string
-	onCompleted []tx.OnTransactionCompletedFunc
-	RolledBack  bool
+	materializedID tx.Identifier
+	materialized   bool
+	sessionID      string
+	onCompleted    []tx.OnTransactionCompletedFunc
+	RolledBack     bool
+}
+
+func (m *mockTransaction) UnLazy(_ context.Context) error {
+	m.materialized = true
+	m.Identifier = m.materializedID
+
+	return nil
 }
 
 func (m *mockTransaction) SessionID() string {

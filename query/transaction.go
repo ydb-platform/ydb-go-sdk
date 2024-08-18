@@ -3,7 +3,6 @@ package query
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
@@ -11,27 +10,7 @@ import (
 type (
 	TxActor interface {
 		tx.Identifier
-
-		// Execute executes query.
-		//
-		// Execute used by default:
-		// - DefaultTxControl
-		// - flag WithKeepInCache(true) if params is not empty.
-		Execute(ctx context.Context, query string, opts ...options.TxExecuteOption) (r Result, err error)
-
-		// ReadRow is a helper which read only one row from first result set in result
-		//
-		// ReadRow returns error if result contains more than one result set or more than one row
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		ReadRow(ctx context.Context, query string, opts ...options.TxExecuteOption) (Row, error)
-
-		// ReadResultSet is a helper which read all rows from first result set in result
-		//
-		// ReadRow returns error if result contains more than one result set
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		ReadResultSet(ctx context.Context, query string, opts ...options.TxExecuteOption) (ResultSet, error)
+		Executor
 	}
 	Transaction interface {
 		TxActor

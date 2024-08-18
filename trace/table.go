@@ -2,7 +2,6 @@ package trace
 
 import (
 	"context"
-	"time"
 )
 
 // tool gtrace used from ./internal/cmd/gtrace
@@ -94,15 +93,6 @@ type (
 		ID() string
 		YQL() string
 	}
-	tableSessionInfo interface {
-		ID() string
-		NodeID() uint32
-		Status() string
-		LastUsage() time.Time
-	}
-	tableTransactionInfo interface {
-		ID() string
-	}
 	tableResultErr interface {
 		Err() error
 	}
@@ -121,7 +111,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionNewDoneInfo struct {
-		Session tableSessionInfo
+		Session sessionInfo
 		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -132,7 +122,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableKeepAliveDoneInfo struct {
@@ -146,7 +136,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableBulkUpsertDoneInfo struct {
@@ -160,7 +150,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionDeleteDoneInfo struct {
@@ -174,7 +164,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -190,7 +180,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
 		Call        call
-		Session     tableSessionInfo
+		Session     sessionInfo
 		Query       tableDataQuery
 		Parameters  tableQueryParameters
 		KeepInCache bool
@@ -203,8 +193,8 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Call       call
-		Session    tableSessionInfo
-		Tx         tableTransactionInfo
+		Session    sessionInfo
+		Tx         txInfo
 		Query      tableDataQuery
 		Parameters tableQueryParameters
 	}
@@ -216,8 +206,8 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context        *context.Context
 		Call           call
-		Session        tableSessionInfo
-		Tx             tableTransactionInfo
+		Session        sessionInfo
+		Tx             txInfo
 		StatementQuery tableDataQuery
 		Parameters     tableQueryParameters
 	}
@@ -229,7 +219,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -240,7 +230,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableExecuteDataQueryDoneInfo struct {
-		Tx       tableTransactionInfo
+		Tx       txInfo
 		Prepared bool
 		Result   tableResult
 		Error    error
@@ -263,7 +253,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionQueryStreamReadDoneInfo struct {
@@ -277,7 +267,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Call       call
-		Session    tableSessionInfo
+		Session    sessionInfo
 		Query      tableDataQuery
 		Parameters tableQueryParameters
 	}
@@ -293,11 +283,11 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxBeginDoneInfo struct {
-		Tx    tableTransactionInfo
+		Tx    txInfo
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -308,8 +298,8 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
-		Tx      tableTransactionInfo
+		Session sessionInfo
+		Tx      txInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxCommitDoneInfo struct {
@@ -323,8 +313,8 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
-		Tx      tableTransactionInfo
+		Session sessionInfo
+		Tx      txInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxRollbackDoneInfo struct {
@@ -359,7 +349,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewDoneInfo struct {
-		Session tableSessionInfo
+		Session sessionInfo
 		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -373,7 +363,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolGetDoneInfo struct {
-		Session  tableSessionInfo
+		Session  sessionInfo
 		Attempts int
 		Error    error
 	}
@@ -391,7 +381,7 @@ type (
 	// that a wait iteration donned without any significant tableResultErr
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolWaitDoneInfo struct {
-		Session tableSessionInfo
+		Session sessionInfo
 		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -402,7 +392,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolPutDoneInfo struct {
@@ -416,17 +406,17 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionCloseDoneInfo struct{}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionAddInfo struct {
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionRemoveInfo struct {
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCloseStartInfo struct {
@@ -488,7 +478,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCreateSessionDoneInfo struct {
-		Session  tableSessionInfo
+		Session  sessionInfo
 		Attempts int
 		Error    error
 	}

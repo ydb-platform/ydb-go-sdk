@@ -13,49 +13,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
-
-func TestBegin(t *testing.T) {
-	t.Run("HappyWay", func(t *testing.T) {
-		ctx := xtest.Context(t)
-		ctrl := gomock.NewController(t)
-		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.BeginTransactionResponse{
-			Status: Ydb.StatusIds_SUCCESS,
-			TxMeta: &Ydb_Query.TransactionMeta{
-				Id: "123",
-			},
-		}, nil)
-		t.Log("begin")
-		tx, err := begin(ctx, client, &Session{id: "123"}, query.TxSettings())
-		require.NoError(t, err)
-		require.Equal(t, "123", tx.ID())
-	})
-	t.Run("TransportError", func(t *testing.T) {
-		ctx := xtest.Context(t)
-		ctrl := gomock.NewController(t)
-		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-		t.Log("begin")
-		_, err := begin(ctx, client, &Session{id: "123"}, query.TxSettings())
-		require.Error(t, err)
-		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
-	})
-	t.Run("OperationError", func(t *testing.T) {
-		ctx := xtest.Context(t)
-		ctrl := gomock.NewController(t)
-		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil,
-			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
-		)
-		t.Log("begin")
-		_, err := begin(ctx, client, &Session{id: "123"}, query.TxSettings())
-		require.Error(t, err)
-		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
-	})
-}
 
 func TestCreateSession(t *testing.T) {
 	trace := &trace.Query{

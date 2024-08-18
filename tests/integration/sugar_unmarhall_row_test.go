@@ -35,7 +35,7 @@ func TestSugarUnmarshallRow(t *testing.T) {
 			Str string `sql:"myStr"`
 		}
 
-		row, err := db.Query().ReadRow(ctx, `SELECT 42 as id, "my string" as myStr`)
+		row, err := db.Query().QueryRow(ctx, `SELECT 42 as id, "my string" as myStr`)
 		require.NoError(t, err)
 
 		one, err := sugar.UnmarshallRow[myStruct](row)
@@ -50,7 +50,7 @@ func TestSugarUnmarshallRow(t *testing.T) {
 			Str string `sql:"myStr"`
 		}
 
-		row, err := db.Query().ReadRow(ctx, `SELECT 42 as id, "my string" as myStr, 123 as unexpected_column`)
+		row, err := db.Query().QueryRow(ctx, `SELECT 42 as id, "my string" as myStr, 123 as unexpected_column`)
 		require.NoError(t, err)
 
 		one, err := sugar.UnmarshallRow[myStruct](row)
@@ -64,7 +64,7 @@ func TestSugarUnmarshallRow(t *testing.T) {
 			UnexpectedField int    `sql:"unexpected_column"`
 		}
 
-		row, err := db.Query().ReadRow(ctx, `SELECT 42 as id, "my string" as myStr`)
+		row, err := db.Query().QueryRow(ctx, `SELECT 42 as id, "my string" as myStr`)
 		require.NoError(t, err)
 
 		one, err := sugar.UnmarshallRow[myStruct](row)

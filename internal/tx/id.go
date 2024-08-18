@@ -10,6 +10,8 @@ type (
 	ID string
 )
 
+var Lazy = ID("")
+
 func NewID(id string) ID {
 	return ID(id)
 }

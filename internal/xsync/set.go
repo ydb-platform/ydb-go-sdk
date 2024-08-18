@@ -30,6 +30,12 @@ func (s *Set[K]) Size() int {
 	return int(s.size.Load())
 }
 
+func (s *Set[K]) Range(f func(key K) bool) {
+	s.m.Range(func(k, v any) bool {
+		return f(k.(K)) //nolint:forcetypeassert
+	})
+}
+
 func (s *Set[K]) Remove(key K) bool {
 	_, exists := s.m.LoadAndDelete(key)
 

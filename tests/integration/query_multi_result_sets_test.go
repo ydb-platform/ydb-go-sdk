@@ -24,7 +24,7 @@ func TestQueryMultiResultSets(t *testing.T) {
 	var i, j, k int
 	db := scope.Driver()
 	err := db.Query().Do(scope.Ctx, func(ctx context.Context, s query.Session) (err error) {
-		_, res, err := s.Execute(ctx, `SELECT 42; SELECT 43, 44;`)
+		res, err := s.Query(ctx, `SELECT 42; SELECT 43, 44;`)
 		if err != nil {
 			return fmt.Errorf("can't get result: %w", err)
 		}

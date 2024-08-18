@@ -94,7 +94,7 @@ func (rs *materializedResultSet) Index() int {
 	return rs.index
 }
 
-func NewMaterializedResultSet(
+func MaterializedResultSet(
 	index int,
 	columnNames []string,
 	columnTypes []types.Type,

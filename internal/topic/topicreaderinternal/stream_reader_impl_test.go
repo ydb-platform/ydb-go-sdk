@@ -1210,6 +1210,7 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 
 		require.Len(t, txMock.onCompleted, 1)
 		txMock.onCompleted[0](nil)
+		require.True(t, txMock.materialized)
 		require.Equal(t, initialCommitOffset+1, e.partitionSession.CommittedOffset())
 	})
 	t.Run("FailedAddCommitToTransactions", func(t *testing.T) {
@@ -1240,5 +1241,6 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		require.ErrorIs(t, e.reader.err, testError)
 		require.Error(t, xerrors.RetryableError(e.reader.err))
 		require.True(t, txMock.RolledBack)
+		require.True(t, txMock.materialized)
 	})
 }

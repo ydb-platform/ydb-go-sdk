@@ -64,7 +64,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnectorConnectDoneInfo struct {
 		Error   error
-		Session tableSessionInfo
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnPingStartInfo struct {
@@ -102,7 +102,7 @@ type (
 		Context   *context.Context
 		Call      call
 		TxContext context.Context //nolint:containedctx
-		Tx        tableTransactionInfo
+		Tx        txInfo
 		Query     string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -133,7 +133,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnBeginDoneInfo struct {
-		Tx    tableTransactionInfo
+		Tx    txInfo
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -194,7 +194,7 @@ type (
 		Context   *context.Context
 		Call      call
 		TxContext context.Context //nolint:containedctx
-		Tx        tableTransactionInfo
+		Tx        txInfo
 		Query     string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -210,7 +210,7 @@ type (
 		Context   *context.Context
 		Call      call
 		TxContext context.Context //nolint:containedctx
-		Tx        tableTransactionInfo
+		Tx        txInfo
 		Query     string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -225,7 +225,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Tx      tableTransactionInfo
+		Tx      txInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxCommitDoneInfo struct {
@@ -239,7 +239,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Tx      tableTransactionInfo
+		Tx      txInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxRollbackDoneInfo struct {

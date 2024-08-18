@@ -26,7 +26,7 @@ func CommitMessagesToTransaction(ctx context.Context, db *ydb.Driver, reader *to
 				return err
 			}
 
-			_, err = tx.Execute(ctx, `
+			err = tx.Exec(ctx, `
 $last = SELECT MAX(val) FROM table WHERE id=$id;
 UPSERT INTO t (id, val) VALUES($id, COALESCE($last, 0) + $value)
 `, query.WithParameters(
@@ -62,7 +62,7 @@ func PopWithTransaction(ctx context.Context, db *ydb.Driver, reader *topicreader
 				return err
 			}
 
-			_, err = tx.Execute(ctx, `
+			err = tx.Exec(ctx, `
 $last = SELECT MAX(val) FROM table WHERE id=$id;
 UPSERT INTO t (id, val) VALUES($id, COALESCE($last, 0) + $value)
 `, query.WithParameters(
@@ -113,7 +113,7 @@ func PopWithTransactionRecreateReader(
 				return err
 			}
 
-			_, err = tx.Execute(ctx, `
+			err = tx.Exec(ctx, `
 $last = SELECT MAX(val) FROM table WHERE id=$id;
 UPSERT INTO t (id, val) VALUES($id, COALESCE($last, 0) + $value)
 `,

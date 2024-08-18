@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -17,82 +16,86 @@ import (
 )
 
 var (
-	_ query.Client = (*mockReadRowClient)(nil)
-	_ query.Client = (*mockReadResultSetClient)(nil)
+	_ query.Client = (*mockQueryRowClient)(nil)
+	_ query.Client = (*mockQueryResultSetClient)(nil)
 )
 
-type mockReadResultSetClient struct {
+type mockQueryResultSetClient struct {
 	rs query.ResultSet
 }
 
-func (c *mockReadResultSetClient) Stats() *pool.Stats {
-	return nil
+func (c *mockQueryResultSetClient) Exec(
+	ctx context.Context, query string, opts ...options.Execute,
+) error {
+	panic("unexpected call")
 }
 
-func (c *mockReadResultSetClient) Execute(
-	ctx context.Context, query string, opts ...options.ExecuteOption,
+func (c *mockQueryResultSetClient) Query(
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.Result, error) {
 	panic("unexpected call")
 }
 
-func (c *mockReadResultSetClient) Do(
+func (c *mockQueryResultSetClient) Do(
 	ctx context.Context, op query.Operation, opts ...options.DoOption,
 ) error {
 	panic("unexpected call")
 }
 
-func (c *mockReadResultSetClient) DoTx(
+func (c *mockQueryResultSetClient) DoTx(
 	ctx context.Context, op query.TxOperation, opts ...options.DoTxOption,
 ) error {
 	panic("unexpected call")
 }
 
-func (c *mockReadResultSetClient) ReadRow(
-	ctx context.Context, query string, opts ...options.ExecuteOption,
+func (c *mockQueryResultSetClient) QueryRow(
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.Row, error) {
 	panic("unexpected call")
 }
 
-func (c *mockReadResultSetClient) ReadResultSet(
-	ctx context.Context, query string, opts ...options.ExecuteOption,
+func (c *mockQueryResultSetClient) QueryResultSet(
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.ResultSet, error) {
 	return c.rs, nil
 }
 
-type mockReadRowClient struct {
+type mockQueryRowClient struct {
 	row query.Row
 }
 
-func (c *mockReadRowClient) Stats() *pool.Stats {
-	return nil
+func (c *mockQueryRowClient) Exec(
+	ctx context.Context, query string, opts ...options.Execute,
+) error {
+	panic("unexpected call")
 }
 
-func (c *mockReadRowClient) Execute(
-	ctx context.Context, query string, opts ...options.ExecuteOption,
+func (c *mockQueryRowClient) Query(
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.Result, error) {
 	panic("unexpected call")
 }
 
-func (c *mockReadRowClient) Do(
+func (c *mockQueryRowClient) Do(
 	ctx context.Context, op query.Operation, opts ...options.DoOption,
 ) error {
 	panic("unexpected call")
 }
 
-func (c *mockReadRowClient) DoTx(
+func (c *mockQueryRowClient) DoTx(
 	ctx context.Context, op query.TxOperation, opts ...options.DoTxOption,
 ) error {
 	panic("unexpected call")
 }
 
-func (c *mockReadRowClient) ReadRow(
-	ctx context.Context, query string, opts ...options.ExecuteOption,
+func (c *mockQueryRowClient) QueryRow(
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.Row, error) {
 	return c.row, nil
 }
 
-func (c *mockReadRowClient) ReadResultSet(
-	ctx context.Context, query string, opts ...options.ExecuteOption,
+func (c *mockQueryRowClient) QueryResultSet(
+	ctx context.Context, query string, opts ...options.Execute,
 ) (query.ResultSet, error) {
 	panic("unexpected call")
 }
@@ -149,7 +152,7 @@ func TestUnmarshallResultSet(t *testing.T) {
 		ID  uint64 `sql:"id"`
 		Str string `sql:"myStr"`
 	}
-	v, err := sugar.UnmarshallResultSet[myStruct](internalQuery.NewMaterializedResultSet(-1, nil, nil,
+	v, err := sugar.UnmarshallResultSet[myStruct](internalQuery.MaterializedResultSet(-1, nil, nil,
 		[]query.Row{
 			func() query.Row {
 				row, err := internalQuery.NewRow(ctx, []*Ydb.Column{

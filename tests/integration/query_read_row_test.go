@@ -44,7 +44,7 @@ func TestQueryReadRow(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	row, err := db.Query().ReadRow(ctx, `
+	row, err := db.Query().QueryRow(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;

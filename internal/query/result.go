@@ -9,7 +9,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
@@ -28,23 +27,19 @@ type (
 	materializedResult struct {
 		resultSets []query.ResultSet
 		idx        int
-		stats      stats.QueryStats
 	}
 	result struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		closeOnce      func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
-		stats          *Ydb_TableStats.QueryStats
 		resultSetIndex int64
 		closed         chan struct{}
 		trace          *trace.Query
+		statsCallback  func(queryStats stats.QueryStats)
 		onNextPartErr  []func(err error)
 	}
+	resultOption func(s *result)
 )
-
-func (r *materializedResult) Stats() stats.QueryStats {
-	return r.stats
-}
 
 func (r *materializedResult) ResultSets(ctx context.Context) xiter.Seq2[query.ResultSet, error] {
 	return rangeResultSets(ctx, r)
@@ -70,20 +65,15 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (query.ResultSet
 	return r.resultSets[r.idx], nil
 }
 
-func newMaterializedResult(resultSets []query.ResultSet, stats stats.QueryStats) *materializedResult {
-	return &materializedResult{
-		resultSets: resultSets,
-		stats:      stats,
-	}
-}
-
-type (
-	resultOption func(s *result)
-)
-
 func withTrace(t *trace.Query) resultOption {
 	return func(s *result) {
 		s.trace = t
+	}
+}
+
+func withStatsCallback(callback func(queryStats stats.QueryStats)) resultOption {
+	return func(s *result) {
+		s.statsCallback = callback
 	}
 }
 
@@ -133,14 +123,13 @@ func newResult(
 		}
 
 		r.lastPart = part
-		r.stats = part.GetExecStats()
+
+		if r.statsCallback != nil {
+			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
+		}
 
 		return &r, part.GetTxMeta().GetId(), nil
 	}
-}
-
-func (r *result) Stats() stats.QueryStats {
-	return stats.FromQueryStats(r.stats)
 }
 
 func (r *result) nextPart(ctx context.Context) (
@@ -235,8 +224,8 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
-			if stats := part.GetExecStats(); stats != nil {
-				r.stats = stats
+			if part.GetExecStats() != nil && r.statsCallback != nil {
+				r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
 				r.closeOnce()
@@ -269,8 +258,8 @@ func (r *result) nextPartFunc(
 				return nil, xerrors.WithStackTrace(err)
 			}
 			r.lastPart = part
-			if stats := part.GetExecStats(); stats != nil {
-				r.stats = stats
+			if part.GetExecStats() != nil && r.statsCallback != nil {
+				r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 			}
 			if part.GetResultSetIndex() > nextResultSetIndex {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
@@ -365,7 +354,7 @@ func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs quer
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
+	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
 func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Result, error) {
@@ -395,8 +384,10 @@ func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Resu
 			rows = append(rows, row)
 		}
 
-		resultSets = append(resultSets, NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
+		resultSets = append(resultSets, MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
 	}
 
-	return newMaterializedResult(resultSets, r.Stats()), nil
+	return &materializedResult{
+		resultSets: resultSets,
+	}, nil
 }
