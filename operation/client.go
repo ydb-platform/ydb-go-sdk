@@ -60,7 +60,7 @@ func get(
 			Ready:  response.GetOperation().GetReady(),
 			Status: response.GetOperation().GetStatus().String(),
 		}, nil
-	})
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -94,7 +94,7 @@ func list(
 		}
 
 		return operations, nil
-	})
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -137,7 +137,7 @@ func cancel(
 		}
 
 		return nil
-	})
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -173,7 +173,7 @@ func forget(
 		}
 
 		return nil
-	})
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
