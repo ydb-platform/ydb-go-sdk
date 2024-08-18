@@ -36,15 +36,10 @@ type (
 		ConsumedUnits float64
 		Metadata      ExecuteScriptOperationMetadata
 	}
-	FetchScriptResultData struct {
+	FetchScriptResult struct {
 		ResultSetIndex int64
 		ResultSet      result.Set
 		NextToken      string
-	}
-	FetchScriptResult struct {
-		Ready  bool
-		Status string
-		Data   *FetchScriptResultData
 	}
 )
 

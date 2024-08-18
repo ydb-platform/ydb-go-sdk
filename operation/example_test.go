@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/operation"
 )
 
 func Example_listOperations() {
@@ -14,12 +15,22 @@ func Example_listOperations() {
 		panic(err)
 	}
 	defer db.Close(ctx) // cleanup resources
-	operations, err := db.Operation().List(ctx)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("operations:")
-	for _, op := range operations {
-		fmt.Println(" -", op)
+	var nextToken string
+	for i := 0; ; i++ {
+		operations, err := db.Operation().List(ctx, "scriptexec",
+			operation.WithPageSize(10),
+			operation.WithPageToken(nextToken),
+		)
+		if err != nil {
+			panic(err)
+		}
+		nextToken = operations.NextToken
+		fmt.Printf("page#%d. operations:\n", i)
+		for _, op := range operations.Operations {
+			fmt.Println(" -", op)
+		}
+		if operations.NextToken == "" {
+			break
+		}
 	}
 }

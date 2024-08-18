@@ -22,6 +22,10 @@ type (
 	Client struct {
 		operationServiceClient Ydb_Operation_V1.OperationServiceClient
 	}
+	ListOperations struct {
+		NextToken  string
+		Operations []*Operation
+	}
 	// Operation describes operation
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
@@ -79,8 +83,8 @@ func get(
 
 func list(
 	ctx context.Context, client Ydb_Operation_V1.OperationServiceClient, request *Ydb_Operations.ListOperationsRequest,
-) ([]*Operation, error) {
-	operations, err := retry.RetryWithResult(ctx, func(ctx context.Context) (operations []*Operation, _ error) {
+) (*ListOperations, error) {
+	operations, err := retry.RetryWithResult(ctx, func(ctx context.Context) (operations *ListOperations, _ error) {
 		response, err := client.ListOperations(conn.WithoutWrapping(ctx), request)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -93,8 +97,13 @@ func list(
 			))
 		}
 
+		operations = &ListOperations{
+			NextToken:  response.GetNextPageToken(),
+			Operations: make([]*Operation, 0, len(response.GetOperations())),
+		}
+
 		for _, op := range response.GetOperations() {
-			operations = append(operations, &Operation{
+			operations.Operations = append(operations.Operations, &Operation{
 				ID:            op.GetId(),
 				Ready:         op.GetReady(),
 				Status:        op.GetStatus().String(),
@@ -114,8 +123,12 @@ func list(
 // List returns list of operations that match the specified filter in the request.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (c *Client) List(ctx context.Context, opts ...options.List) ([]*Operation, error) {
-	request := &options.ListOperationsRequest{}
+func (c *Client) List(ctx context.Context, kind string, opts ...options.List) (*ListOperations, error) {
+	request := &options.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+			Kind: kind,
+		},
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(request)

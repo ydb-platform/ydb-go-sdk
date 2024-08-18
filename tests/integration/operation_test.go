@@ -36,10 +36,10 @@ func TestOperationList(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	operations, err := db.Operation().List(ctx)
+	operations, err := db.Operation().List(ctx, "scriptexec")
 	require.NoError(t, err)
 
-	for _, op := range operations {
+	for _, op := range operations.Operations {
 		t.Log(op)
 	}
 }
