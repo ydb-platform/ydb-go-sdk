@@ -19,15 +19,6 @@ type (
 		closer.Closer
 		IsAlive() bool
 	}
-	safeStats struct {
-		mu       xsync.RWMutex
-		v        Stats
-		onChange func(Stats)
-	}
-	statsItemAddr struct {
-		v        *int
-		onChange func(func())
-	}
 	lazyItem[PT Item[T], T any] struct {
 		mutex      xsync.RWMutex
 		createItem func(ctx context.Context) (PT, error)
@@ -42,75 +33,9 @@ type (
 		closeTimeout  time.Duration
 
 		idle chan *lazyItem[PT, T]
-
-		stats *safeStats
 	}
 	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
-
-func (field statsItemAddr) Inc() {
-	field.onChange(func() {
-		*field.v++
-	})
-}
-
-func (field statsItemAddr) Dec() {
-	field.onChange(func() {
-		*field.v--
-	})
-}
-
-func (s *safeStats) Get() Stats {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.v
-}
-
-func (s *safeStats) Index() statsItemAddr {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return statsItemAddr{
-		v: &s.v.Index,
-		onChange: func(f func()) {
-			s.mu.WithLock(f)
-			if s.onChange != nil {
-				s.onChange(s.Get())
-			}
-		},
-	}
-}
-
-func (s *safeStats) Idle() statsItemAddr {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return statsItemAddr{
-		v: &s.v.Idle,
-		onChange: func(f func()) {
-			s.mu.WithLock(f)
-			if s.onChange != nil {
-				s.onChange(s.Get())
-			}
-		},
-	}
-}
-
-func (s *safeStats) InUse() statsItemAddr {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return statsItemAddr{
-		v: &s.v.InUse,
-		onChange: func(f func()) {
-			s.mu.WithLock(f)
-			if s.onChange != nil {
-				s.onChange(s.Get())
-			}
-		},
-	}
-}
 
 func WithCreateFunc[PT Item[T], T any](f func(ctx context.Context) (PT, error)) option[PT, T] {
 	return func(p *Pool[PT, T]) {
@@ -142,7 +67,7 @@ func WithTrace[PT Item[T], T any](t *Trace) option[PT, T] {
 	}
 }
 
-func New[PT Item[T], T any](
+func New[PT Item[T], T any]( //nolint:funlen
 	ctx context.Context,
 	opts ...option[PT, T],
 ) *Pool[PT, T] {
@@ -170,15 +95,60 @@ func New[PT Item[T], T any](
 	}()
 
 	p.idle = make(chan *lazyItem[PT, T], p.limit)
-	createItem := createItemWithTimeoutHandling(p.createItem, p)
+
+	sema := make(chan struct{}, p.limit)
+	createItemsCh := make(chan PT, p.limit)
+
+	success := make(chan struct{})
+	close(success)
+
+	createItemRequest := func(ctx context.Context) <-chan struct{} {
+		sema <- struct{}{}
+		go func() {
+			defer func() {
+				<-sema
+			}()
+			var (
+				createCtx    = xcontext.ValueOnly(ctx)
+				cancelCreate context.CancelFunc
+			)
+
+			if d := p.createTimeout; d > 0 {
+				createCtx, cancelCreate = xcontext.WithTimeout(createCtx, d)
+			} else {
+				createCtx, cancelCreate = xcontext.WithCancel(createCtx)
+			}
+			defer cancelCreate()
+
+			newItem, err := p.createItem(createCtx)
+			if err == nil {
+				createItemsCh <- newItem
+			}
+		}()
+
+		return success
+	}
+
+	createItem := func(ctx context.Context) (PT, error) {
+		select {
+		case <-ctx.Done():
+			return nil, xerrors.WithStackTrace(ctx.Err())
+		case newItem := <-createItemsCh:
+			return newItem, nil
+		case <-createItemRequest(ctx):
+			select {
+			case <-ctx.Done():
+				return nil, xerrors.WithStackTrace(ctx.Err())
+			case newItem := <-createItemsCh:
+				return newItem, nil
+			}
+		}
+	}
+
 	for range make([]struct{}, p.limit) {
 		p.idle <- &lazyItem[PT, T]{
 			createItem: createItem,
 		}
-	}
-	p.stats = &safeStats{
-		v:        Stats{Limit: p.limit},
-		onChange: p.trace.OnChange,
 	}
 
 	return p
@@ -191,81 +161,14 @@ func defaultCreateItem[T any, PT Item[T]](ctx context.Context) (PT, error) {
 	return &item, nil
 }
 
-// createItemWithTimeoutHandling wraps the createItem function with timeout handling
-func createItemWithTimeoutHandling[PT Item[T], T any](
-	createItem func(ctx context.Context) (PT, error),
-	p *Pool[PT, T],
-) func(ctx context.Context) (PT, error) {
-	return func(ctx context.Context) (PT, error) {
-		var (
-			ch        = make(chan PT)
-			createErr error
-		)
-		go func() {
-			defer close(ch)
-			createErr = createItemWithContext(ctx, p, createItem, ch)
-		}()
-
-		select {
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		case item, has := <-ch:
-			if !has {
-				if ctxErr := ctx.Err(); ctxErr == nil && xerrors.IsContextError(createErr) {
-					return nil, xerrors.WithStackTrace(xerrors.Retryable(createErr))
-				}
-
-				return nil, xerrors.WithStackTrace(createErr)
-			}
-
-			return item, nil
-		}
-	}
-}
-
-// createItemWithContext handles the creation of an item with context handling
-func createItemWithContext[PT Item[T], T any](
-	ctx context.Context,
-	p *Pool[PT, T],
-	createItem func(ctx context.Context) (PT, error),
-	ch chan PT,
-) error {
-	var (
-		createCtx    = xcontext.ValueOnly(ctx)
-		cancelCreate context.CancelFunc
-	)
-
-	if d := p.createTimeout; d > 0 {
-		createCtx, cancelCreate = xcontext.WithTimeout(createCtx, d)
-	} else {
-		createCtx, cancelCreate = xcontext.WithCancel(createCtx)
-	}
-	defer cancelCreate()
-
-	newItem, err := createItem(createCtx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	needCloseItem := true
-	defer func() {
-		if needCloseItem {
-			_ = p.closeItem(ctx, newItem)
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return xerrors.WithStackTrace(ctx.Err())
-	case ch <- newItem:
-		needCloseItem = false
-
-		return nil
-	}
-}
-
 func (p *Pool[PT, T]) Stats() Stats {
-	return p.stats.Get()
+	idle := len(p.idle)
+
+	return Stats{
+		Limit: p.limit,
+		Idle:  idle,
+		InUse: p.limit - idle,
+	}
 }
 
 func (p *Pool[PT, T]) getItem(ctx context.Context) (_ *lazyItem[PT, T], finalErr error) {
@@ -291,8 +194,13 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ *lazyItem[PT, T], finalErr
 		idle.mutex.Lock()
 		defer idle.mutex.Unlock()
 
-		if idle.item != nil && idle.item.IsAlive() {
-			return idle, nil
+		if idle.item != nil {
+			if idle.item.IsAlive() {
+				return idle, nil
+			}
+
+			_ = idle.item.Close(ctx)
+			idle.item = nil
 		}
 
 		item, err := p.createItem(ctx)
@@ -336,20 +244,6 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, idle *lazyItem[PT, T]) (final
 	}
 
 	return nil
-}
-
-func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) error {
-	ctx = xcontext.ValueOnly(ctx)
-
-	var cancel context.CancelFunc
-	if d := p.closeTimeout; d > 0 {
-		ctx, cancel = xcontext.WithTimeout(ctx, d)
-	} else {
-		ctx, cancel = xcontext.WithCancel(ctx)
-	}
-	defer cancel()
-
-	return item.Close(ctx)
 }
 
 func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {

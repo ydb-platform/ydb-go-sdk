@@ -3,7 +3,6 @@ package pool
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -315,32 +314,4 @@ func TestPool(t *testing.T) {
 			require.LessOrEqual(t, stats.Idle, DefaultLimit)
 		}, xtest.StopAfter(30*time.Second))
 	})
-}
-
-func TestSafeStatsRace(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		var (
-			wg sync.WaitGroup
-			s  = &safeStats{}
-		)
-		wg.Add(1000)
-		for range make([]struct{}, 1000) {
-			go func() {
-				defer wg.Done()
-				require.NotPanics(t, func() {
-					switch rand.Int31n(4) { //nolint:gosec
-					case 0:
-						s.Index().Inc()
-					case 1:
-						s.InUse().Inc()
-					case 2:
-						s.Idle().Inc()
-					default:
-						s.Get()
-					}
-				})
-			}()
-		}
-		wg.Wait()
-	}, xtest.StopAfter(5*time.Second))
 }

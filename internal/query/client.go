@@ -264,7 +264,6 @@ func (p *poolStub) Close(ctx context.Context) error {
 func (p *poolStub) Stats() pool.Stats {
 	return pool.Stats{
 		Limit: -1,
-		Index: 0,
 		Idle:  0,
 		InUse: int(p.InUse.Load()),
 	}
@@ -701,7 +700,7 @@ func poolTrace(t *trace.Query) *pool.Trace {
 			}
 		},
 		OnChange: func(info pool.ChangeInfo) {
-			trace.QueryOnPoolChange(t, info.Limit, info.Index, info.Idle, info.InUse)
+			trace.QueryOnPoolChange(t, info.Limit, info.Idle, info.InUse)
 		},
 	}
 }
