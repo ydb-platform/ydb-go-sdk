@@ -1263,10 +1263,10 @@ func TestQueryScript(t *testing.T) {
 		require.EqualValues(t, "123", op.ID)
 		r, err := fetchScriptResults(ctx, service, op.ID)
 		require.NoError(t, err)
-		require.EqualValues(t, 0, r.Data.ResultSetIndex)
-		require.Equal(t, "456", r.Data.NextToken)
-		require.NotNil(t, r.Data.ResultSet)
-		row, err := r.Data.ResultSet.NextRow(ctx)
+		require.EqualValues(t, 0, r.ResultSetIndex)
+		require.Equal(t, "456", r.NextToken)
+		require.NotNil(t, r.ResultSet)
+		row, err := r.ResultSet.NextRow(ctx)
 		require.NoError(t, err)
 		var (
 			a int

@@ -116,6 +116,15 @@ func TestQueryExecuteScript(sourceTest *testing.T) {
 	)
 	require.NoError(t, err)
 
+	for {
+		status, err := db.Operation().Get(ctx, op.ID)
+		require.NoError(t, err)
+		if status.Ready {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
 	var (
 		nextToken string
 		rowsCount = 0
@@ -128,15 +137,11 @@ func TestQueryExecuteScript(sourceTest *testing.T) {
 			query.WithFetchToken(nextToken),
 		)
 		require.NoError(t, err)
-		if !result.Ready {
-			time.Sleep(time.Second)
-			continue
-		}
-		nextToken = result.Data.NextToken
-		require.EqualValues(t, 0, result.Data.ResultSetIndex)
+		nextToken = result.NextToken
+		require.EqualValues(t, 0, result.ResultSetIndex)
 		t.Logf("reading next 1000 rows. Current rows count: %v\n", rowsCount)
 		for {
-			row, err := result.Data.ResultSet.NextRow(ctx)
+			row, err := result.ResultSet.NextRow(ctx)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
 					break
@@ -148,7 +153,7 @@ func TestQueryExecuteScript(sourceTest *testing.T) {
 			err = row.Scan(&val)
 			checkSum += uint64(val)
 		}
-		if result.Data.NextToken == "" {
+		if result.NextToken == "" {
 			break
 		}
 	}

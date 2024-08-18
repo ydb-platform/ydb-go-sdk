@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -374,4 +375,67 @@ func Example_rertryWithTx() {
 		fmt.Printf("unexpected error: %v", err)
 	}
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+}
+
+func Example_executeScript() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx)                      // cleanup resources
+	op, err := db.Query().ExecuteScript(ctx, // context manage exiting from Do
+		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+		time.Hour,
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$id").Uint64(123).
+				Param("$myStr").Text("123").
+				Build(),
+		),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		status, err := db.Operation().Get(ctx, op.ID)
+		if err != nil {
+			panic(err)
+		}
+		if status.Ready {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	var nextToken string
+	for {
+		result, err := db.Query().FetchScriptResults(ctx, op.ID,
+			query.WithResultSetIndex(0),
+			query.WithRowsLimit(1000),
+			query.WithFetchToken(nextToken),
+		)
+		if err != nil {
+			panic(err)
+		}
+		nextToken = result.NextToken
+		for row, err := range result.ResultSet.Rows(ctx) {
+			if err != nil {
+				panic(err)
+			}
+			var (
+				id    int64
+				myStr string
+			)
+			err = row.Scan(&id, &myStr)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+		}
+		if result.NextToken == "" {
+			break
+		}
+	}
 }

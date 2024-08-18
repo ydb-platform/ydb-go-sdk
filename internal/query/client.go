@@ -5,16 +5,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Operation_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -49,36 +46,13 @@ type (
 		InUse         atomic.Int32
 	}
 	Client struct {
-		config                 *config.Config
-		queryServiceClient     Ydb_Query_V1.QueryServiceClient
-		operationServiceClient Ydb_Operation_V1.OperationServiceClient
-		pool                   sessionPool
+		config             *config.Config
+		queryServiceClient Ydb_Query_V1.QueryServiceClient
+		pool               sessionPool
 
 		done chan struct{}
 	}
 )
-
-func fetchScriptResultsWithFallback(ctx context.Context,
-	queryServiceClient Ydb_Query_V1.QueryServiceClient,
-	operationServiceClient Ydb_Operation_V1.OperationServiceClient,
-	opID string, opts ...options.FetchScriptOption,
-) (*options.FetchScriptResult, error) {
-	r, err := fetchScriptResults(ctx, queryServiceClient, opID, opts...)
-	if err != nil {
-		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST) {
-			r, err = scriptOperationStatus(ctx, operationServiceClient, opID)
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-
-			return r, nil
-		}
-
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return r, nil
-}
 
 func fetchScriptResults(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
@@ -115,13 +89,9 @@ func fetchScriptResults(ctx context.Context,
 		}
 
 		return &options.FetchScriptResult{
-			Ready:  true,
-			Status: response.GetStatus().String(),
-			Data: &options.FetchScriptResultData{
-				ResultSetIndex: response.GetResultSetIndex(),
-				ResultSet:      MaterializedResultSet(int(response.GetResultSetIndex()), columnNames, columnTypes, rows),
-				NextToken:      response.GetNextFetchToken(),
-			},
+			ResultSetIndex: response.GetResultSetIndex(),
+			ResultSet:      MaterializedResultSet(int(response.GetResultSetIndex()), columnNames, columnTypes, rows),
+			NextToken:      response.GetNextFetchToken(),
 		}, nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
@@ -131,40 +101,11 @@ func fetchScriptResults(ctx context.Context,
 	return r, nil
 }
 
-func scriptOperationStatus(
-	ctx context.Context, client Ydb_Operation_V1.OperationServiceClient, opID string,
-) (*options.FetchScriptResult, error) {
-	status, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.FetchScriptResult, error) {
-		response, err := client.GetOperation(conn.WithoutWrapping(ctx), &Ydb_Operations.GetOperationRequest{
-			Id: opID,
-		})
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		var md Ydb_Query.ExecuteScriptMetadata
-		err = response.GetOperation().GetMetadata().UnmarshalTo(&md)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		return &options.FetchScriptResult{
-			Ready:  response.GetOperation().GetReady(),
-			Status: response.GetOperation().GetStatus().String(),
-		}, nil
-	})
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return status, nil
-}
-
 func (c *Client) FetchScriptResults(ctx context.Context,
 	opID string, opts ...options.FetchScriptOption,
 ) (*options.FetchScriptResult, error) {
 	r, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.FetchScriptResult, error) {
-		r, err := fetchScriptResultsWithFallback(ctx, c.queryServiceClient, c.operationServiceClient, opID,
+		r, err := fetchScriptResults(ctx, c.queryServiceClient, opID,
 			append(opts, func(request *options.FetchScriptResultsRequest) {
 				request.Trace = c.config.Trace()
 			})...,
@@ -688,10 +629,9 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 	grpcClient := Ydb_Query_V1.NewQueryServiceClient(balancer)
 
 	client := &Client{
-		config:                 cfg,
-		queryServiceClient:     grpcClient,
-		operationServiceClient: Ydb_Operation_V1.NewOperationServiceClient(balancer),
-		done:                   make(chan struct{}),
+		config:             cfg,
+		queryServiceClient: grpcClient,
+		done:               make(chan struct{}),
 		pool: newPool(ctx, cfg, func(ctx context.Context) (_ *Session, err error) {
 			var (
 				createCtx    context.Context
