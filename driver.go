@@ -38,6 +38,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -66,6 +67,8 @@ type Driver struct {
 
 	discovery        *xsync.Once[*internalDiscovery.Client]
 	discoveryOptions []discoveryConfig.Option
+
+	operation *xsync.Once[*operation.Client]
 
 	table        *xsync.Once[*internalTable.Client]
 	tableOptions []tableConfig.Option
@@ -148,8 +151,10 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.scheme.Close,
 		d.scripting.Close,
 		d.table.Close,
+		d.operation.Close,
 		d.query.Close,
 		d.topic.Close,
+		d.discovery.Close,
 		d.balancer.Close,
 		d.pool.Release,
 	)
@@ -213,6 +218,11 @@ func (d *Driver) Ratelimiter() ratelimiter.Client {
 // Discovery returns discovery client
 func (d *Driver) Discovery() discovery.Client {
 	return d.discovery.Must()
+}
+
+// Operation returns operation client
+func (d *Driver) Operation() *operation.Client {
+	return d.operation.Must()
 }
 
 // Scripting returns scripting client
@@ -502,6 +512,12 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 					d.discoveryOptions...,
 				)...,
 			),
+		), nil
+	})
+
+	d.operation = xsync.OnceValue(func() (*operation.Client, error) {
+		return operation.New(xcontext.ValueOnly(ctx),
+			d.pool.Get(endpoint.New(d.config.Endpoint())),
 		), nil
 	})
 
