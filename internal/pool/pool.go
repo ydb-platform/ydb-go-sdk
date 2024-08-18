@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -17,8 +16,8 @@ import (
 type (
 	Item[T any] interface {
 		*T
+		closer.Closer
 		IsAlive() bool
-		Close(ctx context.Context) error
 	}
 	safeStats struct {
 		mu       xsync.RWMutex
@@ -29,6 +28,11 @@ type (
 		v        *int
 		onChange func(func())
 	}
+	lazyItem[PT Item[T], T any] struct {
+		mutex      xsync.RWMutex
+		createItem func(ctx context.Context) (PT, error)
+		item       PT
+	}
 	Pool[PT Item[T], T any] struct {
 		trace *Trace
 		limit int
@@ -37,10 +41,7 @@ type (
 		createTimeout time.Duration
 		closeTimeout  time.Duration
 
-		mu    xsync.Mutex
-		idle  []PT
-		index map[PT]struct{}
-		done  chan struct{}
+		idle chan *lazyItem[PT, T]
 
 		stats *safeStats
 	}
@@ -149,7 +150,6 @@ func New[PT Item[T], T any](
 		trace:      defaultTrace,
 		limit:      DefaultLimit,
 		createItem: defaultCreateItem[T, PT],
-		done:       make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -169,10 +169,13 @@ func New[PT Item[T], T any](
 		})
 	}()
 
-	p.createItem = createItemWithTimeoutHandling(p.createItem, p)
-
-	p.idle = make([]PT, 0, p.limit)
-	p.index = make(map[PT]struct{}, p.limit)
+	p.idle = make(chan *lazyItem[PT, T], p.limit)
+	createItem := createItemWithTimeoutHandling(p.createItem, p)
+	for range make([]struct{}, p.limit) {
+		p.idle <- &lazyItem[PT, T]{
+			createItem: createItem,
+		}
+	}
 	p.stats = &safeStats{
 		v:        Stats{Limit: p.limit},
 		onChange: p.trace.OnChange,
@@ -204,8 +207,6 @@ func createItemWithTimeoutHandling[PT Item[T], T any](
 		}()
 
 		select {
-		case <-p.done:
-			return nil, xerrors.WithStackTrace(errClosedPool)
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		case item, has := <-ch:
@@ -254,19 +255,7 @@ func createItemWithContext[PT Item[T], T any](
 	}()
 
 	select {
-	case <-p.done:
-		return xerrors.WithStackTrace(errClosedPool)
 	case <-ctx.Done():
-		p.mu.Lock()
-		defer p.mu.Unlock()
-
-		if len(p.index) < p.limit {
-			p.idle = append(p.idle, newItem)
-			p.index[newItem] = struct{}{}
-			p.stats.Index().Inc()
-			needCloseItem = false
-		}
-
 		return xerrors.WithStackTrace(ctx.Err())
 	case ch <- newItem:
 		needCloseItem = false
@@ -279,7 +268,7 @@ func (p *Pool[PT, T]) Stats() Stats {
 	return p.stats.Get()
 }
 
-func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
+func (p *Pool[PT, T]) getItem(ctx context.Context) (_ *lazyItem[PT, T], finalErr error) {
 	onDone := p.trace.OnGet(&GetStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).getItem"),
@@ -290,64 +279,43 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 		})
 	}()
 
-	if err := ctx.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
+	select {
+	case <-ctx.Done():
+		return nil, xerrors.WithStackTrace(ctx.Err())
 
-	for {
-		select {
-		case <-p.done:
+	case idle, has := <-p.idle:
+		if !has {
 			return nil, xerrors.WithStackTrace(errClosedPool)
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		default:
-			var item PT
-			p.mu.WithLock(func() {
-				if len(p.idle) > 0 {
-					item, p.idle = p.idle[0], p.idle[1:]
-					p.stats.Idle().Dec()
-				}
-			})
-
-			if item != nil {
-				if item.IsAlive() {
-					return item, nil
-				}
-				_ = p.closeItem(ctx, item)
-				p.mu.WithLock(func() {
-					delete(p.index, item)
-				})
-				p.stats.Index().Dec()
-			}
-			var err error
-			var newItem PT
-			p.mu.WithLock(func() {
-				if len(p.index) >= p.limit {
-					return
-				}
-				newItem, err = p.createItem(ctx)
-				if err != nil {
-					return
-				}
-				p.index[newItem] = struct{}{}
-				p.stats.Index().Inc()
-			})
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			if newItem != nil {
-				return newItem, nil
-			}
 		}
+
+		idle.mutex.Lock()
+		defer idle.mutex.Unlock()
+
+		if idle.item != nil && idle.item.IsAlive() {
+			return idle, nil
+		}
+
+		item, err := p.createItem(ctx)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(
+				xerrors.Retryable(err, xerrors.WithName("internal/pool.(*Pool).getItem")),
+			)
+		}
+
+		idle.item = item
+
+		return idle, nil
 	}
 }
 
-func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
+func (p *Pool[PT, T]) putItem(ctx context.Context, idle *lazyItem[PT, T]) (finalErr error) {
 	onDone := p.trace.OnPut(&PutStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).putItem"),
 	})
 	defer func() {
+		p.idle <- idle
+
 		onDone(&PutDoneInfo{
 			Error: finalErr,
 		})
@@ -357,28 +325,17 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	select {
-	case <-p.done:
-		return xerrors.WithStackTrace(errClosedPool)
-	default:
-		if !item.IsAlive() {
-			_ = p.closeItem(ctx, item)
+	idle.mutex.Lock()
+	defer idle.mutex.Unlock()
 
-			p.mu.WithLock(func() {
-				delete(p.index, item)
-			})
-			p.stats.Index().Dec()
+	if idle.item != nil && !idle.item.IsAlive() {
+		_ = idle.item.Close(ctx)
+		idle.item = nil
 
-			return xerrors.WithStackTrace(errItemIsNotAlive)
-		}
-
-		p.mu.WithLock(func() {
-			p.idle = append(p.idle, item)
-		})
-		p.stats.Idle().Inc()
-
-		return nil
+		return xerrors.WithStackTrace(errItemIsNotAlive)
 	}
+
+	return nil
 }
 
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) error {
@@ -406,7 +363,7 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		})
 	}()
 
-	item, err := p.getItem(ctx)
+	idle, err := p.getItem(ctx)
 	if err != nil {
 		if xerrors.IsYdb(err) {
 			return xerrors.WithStackTrace(xerrors.Retryable(err))
@@ -416,13 +373,10 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	}
 
 	defer func() {
-		_ = p.putItem(ctx, item)
+		_ = p.putItem(ctx, idle)
 	}()
 
-	p.stats.InUse().Inc()
-	defer p.stats.InUse().Dec()
-
-	err = f(ctx, item)
+	err = f(ctx, idle.item)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -481,21 +435,17 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 		})
 	}()
 
-	close(p.done)
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	var g errgroup.Group
-	for item := range p.index {
-		item := item
-		g.Go(func() error {
-			return item.Close(ctx)
+	for range make([]struct{}, p.limit) {
+		item := <-p.idle
+		item.mutex.WithLock(func() {
+			if item.item != nil {
+				_ = item.item.Close(ctx)
+				item.item = nil
+			}
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return xerrors.WithStackTrace(err)
-	}
+
+	close(p.idle)
 
 	return nil
 }
