@@ -221,6 +221,8 @@ func (d *Driver) Discovery() discovery.Client {
 }
 
 // Operation returns operation client
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (d *Driver) Operation() *operation.Client {
 	return d.operation.Must()
 }

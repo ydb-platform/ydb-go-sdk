@@ -8,7 +8,7 @@
 * Removed experimental methods `query.Session.ReadResultSet` and  `query.Session.ReadRows`
 * Removed experimental methods `query.TxActor.ReadResultSet` and  `query.TxActor.ReadRows`
 * Removed experimental method `query.Client.Stats`
-* Added operation service client through `db.Operation()` method (supports methods `Get`, `List`, `Cancel` and `Forget`)
+* Added experimental support for operation service client through `db.Operation()` method (supports methods `Get`, `List`, `Cancel` and `Forget`)
 
 ## v3.76.6
 * Replaced requirements from go1.22 + experimantal flag to go1.23 for experimental range-over interface

@@ -16,9 +16,15 @@ import (
 )
 
 type (
+	// Client is an operation service client for manage long operations in YDB
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Client struct {
 		operationServiceClient Ydb_Operation_V1.OperationServiceClient
 	}
+	// Operation describes operation
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Operation struct {
 		ID            string
 		Ready         bool
@@ -27,6 +33,9 @@ type (
 	}
 )
 
+// Get returns operation status by ID
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) Get(ctx context.Context, opID string) (*Operation, error) {
 	op, err := get(ctx, c.operationServiceClient, opID)
 	if err != nil {
@@ -102,6 +111,9 @@ func list(
 	return operations, nil
 }
 
+// List returns list of operations that match the specified filter in the request.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) List(ctx context.Context, opts ...options.List) ([]*Operation, error) {
 	request := &options.ListOperationsRequest{}
 	for _, opt := range opts {
@@ -145,6 +157,9 @@ func cancel(
 	return nil
 }
 
+// Cancel starts cancellation of a long-running operation.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) Cancel(ctx context.Context, opID string) error {
 	err := cancel(ctx, c.operationServiceClient, opID)
 	if err != nil {
@@ -181,6 +196,10 @@ func forget(
 	return nil
 }
 
+// Forget forgets long-running operation. It does not cancel the operation and
+// returns an error if operation was not completed.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) Forget(ctx context.Context, opID string) error {
 	err := forget(ctx, c.operationServiceClient, opID)
 	if err != nil {
