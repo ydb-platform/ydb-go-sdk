@@ -3,10 +3,13 @@ package query
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
@@ -28,6 +31,35 @@ type executeSettings interface {
 	CallOptions() []grpc.CallOption
 }
 
+type executeScriptConfig interface {
+	executeSettings
+
+	ResultsTTL() time.Duration
+	OperationParams() *Ydb_Operations.OperationParams
+}
+
+func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScriptConfig) (
+	*Ydb_Query.ExecuteScriptRequest,
+	[]grpc.CallOption,
+) {
+	request := &Ydb_Query.ExecuteScriptRequest{
+		OperationParams: &Ydb_Operations.OperationParams{
+			OperationMode:    0,
+			OperationTimeout: nil,
+			CancelAfter:      nil,
+			Labels:           nil,
+			ReportCostInfo:   0,
+		},
+		ExecMode:      Ydb_Query.ExecMode(cfg.ExecMode()),
+		ScriptContent: queryQueryContent(a, Ydb_Query.Syntax(cfg.Syntax()), q),
+		Parameters:    cfg.Params().ToYDB(a),
+		StatsMode:     Ydb_Query.StatsMode(cfg.StatsMode()),
+		ResultsTtl:    durationpb.New(cfg.ResultsTTL()),
+	}
+
+	return request, cfg.CallOptions()
+}
+
 func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeSettings) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
@@ -45,13 +77,19 @@ func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg execut
 	return request, cfg.CallOptions()
 }
 
+func queryQueryContent(a *allocator.Allocator, syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
+	content := a.QueryQueryContent()
+	content.Syntax = syntax
+	content.Text = q
+
+	return content
+}
+
 func queryFromText(
 	a *allocator.Allocator, q string, syntax Ydb_Query.Syntax,
 ) *Ydb_Query.ExecuteQueryRequest_QueryContent {
 	content := a.QueryExecuteQueryRequestQueryContent()
-	content.QueryContent = a.QueryQueryContent()
-	content.QueryContent.Syntax = syntax
-	content.QueryContent.Text = q
+	content.QueryContent = queryQueryContent(a, syntax, q)
 
 	return content
 }
@@ -60,7 +98,7 @@ func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
 	q string, settings executeSettings, opts ...resultOption,
 ) (
-	_ tx.Identifier, _ *result, finalErr error,
+	_ tx.Identifier, _ *streamResult, finalErr error,
 ) {
 	a := allocator.New()
 	defer a.Free()
@@ -86,7 +124,7 @@ func execute(
 	return tx.ID(txID), r, nil
 }
 
-func readAll(ctx context.Context, r *result) error {
+func readAll(ctx context.Context, r *streamResult) error {
 	defer func() {
 		_ = r.Close(ctx)
 	}()
@@ -103,7 +141,7 @@ func readAll(ctx context.Context, r *result) error {
 	}
 }
 
-func readResultSet(ctx context.Context, r *result) (_ *resultSet, finalErr error) {
+func readResultSet(ctx context.Context, r *streamResult) (_ *resultSet, finalErr error) {
 	defer func() {
 		_ = r.Close(ctx)
 	}()
@@ -124,7 +162,7 @@ func readResultSet(ctx context.Context, r *result) (_ *resultSet, finalErr error
 	return rs, nil
 }
 
-func readMaterializedResultSet(ctx context.Context, r *result) (_ *materializedResultSet, finalErr error) {
+func readMaterializedResultSet(ctx context.Context, r *streamResult) (_ *materializedResultSet, finalErr error) {
 	defer func() {
 		_ = r.Close(ctx)
 	}()
@@ -159,7 +197,7 @@ func readMaterializedResultSet(ctx context.Context, r *result) (_ *materializedR
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
-func readRow(ctx context.Context, r *result) (_ *row, finalErr error) {
+func readRow(ctx context.Context, r *streamResult) (_ *row, finalErr error) {
 	defer func() {
 		_ = r.Close(ctx)
 	}()

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
@@ -34,7 +35,7 @@ func TestTopicReadInTransaction(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		content := string(must(io.ReadAll(batch.Messages[0])))
+		content := string(xtest.Must(io.ReadAll(batch.Messages[0])))
 		require.Equal(t, "asd", content)
 		_ = reader.Close(ctx)
 		return nil
@@ -59,7 +60,7 @@ func TestTopicReadInTransaction(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		content := string(must(io.ReadAll(batch.Messages[0])))
+		content := string(xtest.Must(io.ReadAll(batch.Messages[0])))
 		require.Equal(t, "bbb", content)
 		return nil
 	}))

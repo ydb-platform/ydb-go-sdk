@@ -1104,146 +1104,6 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 			}
 		}
 	}
-	{
-		h1 := t.OnResultSetNextRow
-		h2 := x.OnResultSetNextRow
-		ret.OnResultSetNextRow = func(q QueryResultSetNextRowStartInfo) func(QueryResultSetNextRowDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(QueryResultSetNextRowDoneInfo)
-			if h1 != nil {
-				r = h1(q)
-			}
-			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(info QueryResultSetNextRowDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(info)
-				}
-				if r1 != nil {
-					r1(info)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnRowScan
-		h2 := x.OnRowScan
-		ret.OnRowScan = func(q QueryRowScanStartInfo) func(QueryRowScanDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(QueryRowScanDoneInfo)
-			if h1 != nil {
-				r = h1(q)
-			}
-			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(info QueryRowScanDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(info)
-				}
-				if r1 != nil {
-					r1(info)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnRowScanNamed
-		h2 := x.OnRowScanNamed
-		ret.OnRowScanNamed = func(q QueryRowScanNamedStartInfo) func(QueryRowScanNamedDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(QueryRowScanNamedDoneInfo)
-			if h1 != nil {
-				r = h1(q)
-			}
-			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(info QueryRowScanNamedDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(info)
-				}
-				if r1 != nil {
-					r1(info)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnRowScanStruct
-		h2 := x.OnRowScanStruct
-		ret.OnRowScanStruct = func(q QueryRowScanStructStartInfo) func(QueryRowScanStructDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(QueryRowScanStructDoneInfo)
-			if h1 != nil {
-				r = h1(q)
-			}
-			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(info QueryRowScanStructDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(info)
-				}
-				if r1 != nil {
-					r1(info)
-				}
-			}
-		}
-	}
 	return &ret
 }
 func (t *Query) onNew(q QueryNewStartInfo) func(info QueryNewDoneInfo) {
@@ -1703,66 +1563,7 @@ func (t *Query) onResultClose(q QueryResultCloseStartInfo) func(info QueryResult
 	}
 	return res
 }
-func (t *Query) onResultSetNextRow(q QueryResultSetNextRowStartInfo) func(info QueryResultSetNextRowDoneInfo) {
-	fn := t.OnResultSetNextRow
-	if fn == nil {
-		return func(QueryResultSetNextRowDoneInfo) {
-			return
-		}
-	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryResultSetNextRowDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Query) onRowScan(q QueryRowScanStartInfo) func(info QueryRowScanDoneInfo) {
-	fn := t.OnRowScan
-	if fn == nil {
-		return func(QueryRowScanDoneInfo) {
-			return
-		}
-	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryRowScanDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Query) onRowScanNamed(q QueryRowScanNamedStartInfo) func(info QueryRowScanNamedDoneInfo) {
-	fn := t.OnRowScanNamed
-	if fn == nil {
-		return func(QueryRowScanNamedDoneInfo) {
-			return
-		}
-	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryRowScanNamedDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Query) onRowScanStruct(q QueryRowScanStructStartInfo) func(info QueryRowScanStructDoneInfo) {
-	fn := t.OnRowScanStruct
-	if fn == nil {
-		return func(QueryRowScanStructDoneInfo) {
-			return
-		}
-	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryRowScanStructDoneInfo) {
-			return
-		}
-	}
-	return res
-}
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnNew(t *Query, c *context.Context, call call) func() {
 	var p QueryNewStartInfo
@@ -1774,6 +1575,7 @@ func QueryOnNew(t *Query, c *context.Context, call call) func() {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnClose(t *Query, c *context.Context, call call) func(error) {
 	var p QueryCloseStartInfo
@@ -1786,6 +1588,7 @@ func QueryOnClose(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnPoolNew(t *Query, c *context.Context, call call) func(limit int) {
 	var p QueryPoolNewStartInfo
@@ -1798,6 +1601,7 @@ func QueryOnPoolNew(t *Query, c *context.Context, call call) func(limit int) {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnPoolClose(t *Query, c *context.Context, call call) func(error) {
 	var p QueryPoolCloseStartInfo
@@ -1810,6 +1614,7 @@ func QueryOnPoolClose(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnPoolTry(t *Query, c *context.Context, call call) func(error) {
 	var p QueryPoolTryStartInfo
@@ -1822,6 +1627,7 @@ func QueryOnPoolTry(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnPoolWith(t *Query, c *context.Context, call call) func(_ error, attempts int) {
 	var p QueryPoolWithStartInfo
@@ -1835,6 +1641,7 @@ func QueryOnPoolWith(t *Query, c *context.Context, call call) func(_ error, atte
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnPoolPut(t *Query, c *context.Context, call call) func(error) {
 	var p QueryPoolPutStartInfo
@@ -1847,6 +1654,7 @@ func QueryOnPoolPut(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnPoolGet(t *Query, c *context.Context, call call) func(error) {
 	var p QueryPoolGetStartInfo
@@ -1859,6 +1667,7 @@ func QueryOnPoolGet(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnPoolChange(t *Query, limit int, index int, idle int, inUse int) {
 	var p QueryPoolChange
@@ -1868,6 +1677,7 @@ func QueryOnPoolChange(t *Query, limit int, index int, idle int, inUse int) {
 	p.InUse = inUse
 	t.onPoolChange(p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnDo(t *Query, c *context.Context, call call) func(attempts int, _ error) {
 	var p QueryDoStartInfo
@@ -1881,6 +1691,7 @@ func QueryOnDo(t *Query, c *context.Context, call call) func(attempts int, _ err
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnDoTx(t *Query, c *context.Context, call call) func(attempts int, _ error) {
 	var p QueryDoTxStartInfo
@@ -1894,6 +1705,7 @@ func QueryOnDoTx(t *Query, c *context.Context, call call) func(attempts int, _ e
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnExec(t *Query, c *context.Context, call call, query string) func(error) {
 	var p QueryExecStartInfo
@@ -1907,6 +1719,7 @@ func QueryOnExec(t *Query, c *context.Context, call call, query string) func(err
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnQuery(t *Query, c *context.Context, call call, query string) func(error) {
 	var p QueryQueryStartInfo
@@ -1920,6 +1733,7 @@ func QueryOnQuery(t *Query, c *context.Context, call call, query string) func(er
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnQueryResultSet(t *Query, c *context.Context, call call, query string) func(error) {
 	var p QueryQueryResultSetStartInfo
@@ -1933,6 +1747,7 @@ func QueryOnQueryResultSet(t *Query, c *context.Context, call call, query string
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnQueryRow(t *Query, c *context.Context, call call, query string) func(error) {
 	var p QueryQueryRowStartInfo
@@ -1959,6 +1774,7 @@ func QueryOnSessionCreate(t *Query, c *context.Context, call call) func(session 
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnSessionAttach(t *Query, c *context.Context, call call, session sessionInfo) func(error) {
 	var p QuerySessionAttachStartInfo
@@ -1972,6 +1788,7 @@ func QueryOnSessionAttach(t *Query, c *context.Context, call call, session sessi
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnSessionDelete(t *Query, c *context.Context, call call, session sessionInfo) func(error) {
 	var p QuerySessionDeleteStartInfo
@@ -1985,6 +1802,7 @@ func QueryOnSessionDelete(t *Query, c *context.Context, call call, session sessi
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnSessionExec(t *Query, c *context.Context, call call, session sessionInfo, query string) func(error) {
 	var p QuerySessionExecStartInfo
@@ -1999,6 +1817,7 @@ func QueryOnSessionExec(t *Query, c *context.Context, call call, session session
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnSessionQuery(t *Query, c *context.Context, call call, session sessionInfo, query string) func(error) {
 	var p QuerySessionQueryStartInfo
@@ -2055,6 +1874,7 @@ func QueryOnSessionBegin(t *Query, c *context.Context, call call, session sessio
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnTxExec(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo, query string) func(error) {
 	var p QueryTxExecStartInfo
@@ -2113,6 +1933,7 @@ func QueryOnTxQueryRow(t *Query, c *context.Context, call call, tx txInfo, query
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnResultNew(t *Query, c *context.Context, call call) func(error) {
 	var p QueryResultNewStartInfo
@@ -2125,6 +1946,7 @@ func QueryOnResultNew(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnResultNextPart(t *Query, c *context.Context, call call) func(stats *Ydb_TableStats.QueryStats, _ error) {
 	var p QueryResultNextPartStartInfo
@@ -2138,6 +1960,7 @@ func QueryOnResultNextPart(t *Query, c *context.Context, call call) func(stats *
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnResultNextResultSet(t *Query, c *context.Context, call call) func(error) {
 	var p QueryResultNextResultSetStartInfo
@@ -2150,6 +1973,7 @@ func QueryOnResultNextResultSet(t *Query, c *context.Context, call call) func(er
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnResultClose(t *Query, c *context.Context, call call) func(error) {
 	var p QueryResultCloseStartInfo
@@ -2158,54 +1982,6 @@ func QueryOnResultClose(t *Query, c *context.Context, call call) func(error) {
 	res := t.onResultClose(p)
 	return func(e error) {
 		var p QueryResultCloseDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnResultSetNextRow(t *Query, c *context.Context, call call) func(error) {
-	var p QueryResultSetNextRowStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onResultSetNextRow(p)
-	return func(e error) {
-		var p QueryResultSetNextRowDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnRowScan(t *Query, c *context.Context, call call) func(error) {
-	var p QueryRowScanStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onRowScan(p)
-	return func(e error) {
-		var p QueryRowScanDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnRowScanNamed(t *Query, c *context.Context, call call) func(error) {
-	var p QueryRowScanNamedStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onRowScanNamed(p)
-	return func(e error) {
-		var p QueryRowScanNamedDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnRowScanStruct(t *Query, c *context.Context, call call) func(error) {
-	var p QueryRowScanStructStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onRowScanStruct(p)
-	return func(e error) {
-		var p QueryRowScanStructDoneInfo
 		p.Error = e
 		res(p)
 	}

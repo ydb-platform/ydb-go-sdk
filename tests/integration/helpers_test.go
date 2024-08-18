@@ -447,10 +447,3 @@ func (t *testLogger) flush() {
 		t.test.Log(message)
 	})
 }
-
-func must[R any](res R, err error) R {
-	if err != nil {
-		panic(err)
-	}
-	return res
-}

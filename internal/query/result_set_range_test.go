@@ -59,7 +59,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
 		for _, err := range rs.Rows(ctx) {
@@ -146,7 +146,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
 		for row, err := range rs.Rows(ctx) {
@@ -234,7 +234,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
 		for _, err := range rs.Rows(ctx) {
@@ -384,7 +384,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
 		for row, err := range rs.Rows(ctx) {
@@ -502,7 +502,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
 		for row, err := range rs.Rows(ctx) {
@@ -590,7 +590,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		var (
 			count     = 0
@@ -688,7 +688,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
 		for _, err := range rs.Rows(ctx) {
@@ -779,7 +779,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
 		for _, err := range rs.Rows(ctx) {
@@ -921,7 +921,7 @@ func TestResultSetRange(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv, nil)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		count := 0
 		for _, err := range rs.Rows(ctx) {

@@ -9,10 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"go.uber.org/mock/gomock"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -1166,4 +1169,118 @@ func testPool(
 		pool.WithLimit[*Session, Session](1),
 		pool.WithCreateFunc(createSession),
 	)
+}
+
+func TestQueryScript(t *testing.T) {
+	ctx := xtest.Context(t)
+	t.Run("HappyWay", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		service := NewMockQueryServiceClient(ctrl)
+		service.EXPECT().ExecuteScript(gomock.Any(), gomock.Any()).Return(&Ydb_Operations.Operation{
+			Id:     "123",
+			Ready:  true,
+			Status: Ydb.StatusIds_SUCCESS,
+			Metadata: xtest.Must(anypb.New(&Ydb_Query.ExecuteScriptMetadata{
+				ExecutionId: "123",
+				ExecStatus:  Ydb_Query.ExecStatus_EXEC_STATUS_STARTING,
+				ScriptContent: &Ydb_Query.QueryContent{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "SELECT 1 AS a, 2 AS b",
+				},
+				ResultSetsMeta: []*Ydb_Query.ResultSetMeta{
+					{
+						Columns: []*Ydb.Column{
+							{
+								Name: "a",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
+								},
+							},
+							{
+								Name: "b",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
+								},
+							},
+						},
+					},
+				},
+				ExecMode: Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
+				ExecStats: &Ydb_TableStats.QueryStats{
+					QueryPhases:      nil,
+					Compilation:      nil,
+					ProcessCpuTimeUs: 0,
+					QueryPlan:        "",
+					QueryAst:         "",
+					TotalDurationUs:  0,
+					TotalCpuTimeUs:   0,
+				},
+			})),
+			CostInfo: nil,
+		}, nil)
+		service.EXPECT().FetchScriptResults(gomock.Any(), gomock.Any()).Return(&Ydb_Query.FetchScriptResultsResponse{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_Int32Value{
+									Int32Value: 1,
+								},
+								VariantIndex: 0,
+							},
+							{
+								Value: &Ydb.Value_Int32Value{
+									Int32Value: 2,
+								},
+								VariantIndex: 0,
+							},
+						},
+					},
+				},
+				Truncated: false,
+			},
+			NextFetchToken: "456",
+		}, nil)
+		op, err := executeScript(ctx, service, &Ydb_Query.ExecuteScriptRequest{})
+		require.NoError(t, err)
+		require.EqualValues(t, "123", op.ID)
+		r, err := fetchScriptResults(ctx, service, op.ID)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, r.Data.ResultSetIndex)
+		require.Equal(t, "456", r.Data.NextToken)
+		require.NotNil(t, r.Data.ResultSet)
+		row, err := r.Data.ResultSet.NextRow(ctx)
+		require.NoError(t, err)
+		var (
+			a int
+			b int
+		)
+		err = row.Scan(&a, &b)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, a)
+		require.EqualValues(t, 2, b)
+	})
+	t.Run("Error", func(t *testing.T) {
+		t.Run("OnExecute", func(t *testing.T) {
+		})
+		t.Run("OnFetch", func(t *testing.T) {
+		})
+	})
 }
