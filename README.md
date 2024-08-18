@@ -78,27 +78,17 @@ if err != nil {
 err := db.Query().Do( // Do retry operation on errors with best effort
 	ctx, // context manage exiting from Do
 	func(ctx context.Context, s query.Session) (err error) { // retry operation
-		_, res, err := s.Execute(ctx, `SELECT 42 as id, "myStr" as myStr;`))
+		streamResult, err := s.Query(ctx, `SELECT 42 as id, "myStr" as myStr;`))
 		if err != nil {
 			return err // for auto-retry with driver
 		}
-		defer func() { _ = res.Close(ctx) }() // cleanup resources
-		for {                                 // iterate over result sets
-			rs, err := res.NextResultSet(ctx)
+		defer func() { _ = streamResult.Close(ctx) }() // cleanup resources
+		for s, err := range streamResult.ResultSets(ctx) {
 			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
-
 				return err
 			}
-			for { // iterate over rows
-				row, err := rs.NextRow(ctx)
+			for row, err := range rs.Rows(ctx) {
 				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
 					return err
 				}
 				type myStruct struct {
@@ -112,7 +102,7 @@ err := db.Query().Do( // Do retry operation on errors with best effort
 			}
 		}
 
-		return res.Err() // return finally result error for auto-retry with driver
+		return nil
 	},
 	query.WithIdempotent(),
 )
