@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -38,7 +39,7 @@ func TestTopicListener(t *testing.T) {
 	require.NotNil(t, handler.onPartitionStart)
 	require.NotNil(t, handler.readMessages)
 
-	content := string(must(io.ReadAll(handler.readMessages.Batch.Messages[0])))
+	content := string(xtest.Must(io.ReadAll(handler.readMessages.Batch.Messages[0])))
 	require.Equal(t, "asd", content)
 
 	require.NoError(t, listener.Close(scope.Ctx))

@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -19,16 +20,16 @@ import (
 )
 
 var (
-	_ query.Result = (*result)(nil)
-	_ query.Result = (*materializedResult)(nil)
+	_ result.Result = (*streamResult)(nil)
+	_ result.Result = (*materializedResult)(nil)
 )
 
 type (
 	materializedResult struct {
-		resultSets []query.ResultSet
+		resultSets []result.Set
 		idx        int
 	}
-	result struct {
+	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		closeOnce      func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
@@ -38,14 +39,14 @@ type (
 		statsCallback  func(queryStats stats.QueryStats)
 		onNextPartErr  []func(err error)
 	}
-	resultOption func(s *result)
+	resultOption func(s *streamResult)
 )
 
-func (r *materializedResult) ResultSets(ctx context.Context) xiter.Seq2[query.ResultSet, error] {
+func (r *materializedResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, error] {
 	return rangeResultSets(ctx, r)
 }
 
-func (r *result) ResultSets(ctx context.Context) xiter.Seq2[query.ResultSet, error] {
+func (r *streamResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, error] {
 	return rangeResultSets(ctx, r)
 }
 
@@ -53,7 +54,7 @@ func (r *materializedResult) Close(ctx context.Context) error {
 	return nil
 }
 
-func (r *materializedResult) NextResultSet(ctx context.Context) (query.ResultSet, error) {
+func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, error) {
 	if r.idx == len(r.resultSets) {
 		return nil, xerrors.WithStackTrace(io.EOF)
 	}
@@ -66,19 +67,19 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (query.ResultSet
 }
 
 func withTrace(t *trace.Query) resultOption {
-	return func(s *result) {
+	return func(s *streamResult) {
 		s.trace = t
 	}
 }
 
 func withStatsCallback(callback func(queryStats stats.QueryStats)) resultOption {
-	return func(s *result) {
+	return func(s *streamResult) {
 		s.statsCallback = callback
 	}
 }
 
 func onNextPartErr(callback func(err error)) resultOption {
-	return func(s *result) {
+	return func(s *streamResult) {
 		s.onNextPartErr = append(s.onNextPartErr, callback)
 	}
 }
@@ -87,8 +88,8 @@ func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	opts ...resultOption,
-) (_ *result, txID string, finalErr error) {
-	r := result{
+) (_ *streamResult, txID string, finalErr error) {
+	r := streamResult{
 		stream:         stream,
 		closed:         make(chan struct{}),
 		resultSetIndex: -1,
@@ -132,12 +133,12 @@ func newResult(
 	}
 }
 
-func (r *result) nextPart(ctx context.Context) (
+func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, err error,
 ) {
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*result).nextPart"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart"),
 		)
 		defer func() {
 			onDone(part.GetExecStats(), err)
@@ -174,12 +175,12 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 	return part, nil
 }
 
-func (r *result) Close(ctx context.Context) (finalErr error) {
+func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.closeOnce()
 
 	if r.trace != nil {
 		onDone := trace.QueryOnResultClose(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*result).Close"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
 		)
 		defer func() {
 			onDone(finalErr)
@@ -203,7 +204,7 @@ func (r *result) Close(ctx context.Context) (finalErr error) {
 	}
 }
 
-func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
+func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
 		select {
@@ -215,7 +216,7 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
 				r.resultSetIndex = resultSetIndex
 
-				return newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart, r.trace), nil
+				return newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart), nil
 			}
 			if r.stream == nil {
 				return nil, xerrors.WithStackTrace(io.EOF)
@@ -241,7 +242,7 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	}
 }
 
-func (r *result) nextPartFunc(
+func (r *streamResult) nextPartFunc(
 	ctx context.Context,
 	nextResultSetIndex int64,
 ) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
@@ -273,10 +274,10 @@ func (r *result) nextPartFunc(
 	}
 }
 
-func (r *result) NextResultSet(ctx context.Context) (_ query.ResultSet, err error) {
+func (r *streamResult) NextResultSet(ctx context.Context) (_ result.Set, err error) {
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*result).NextResultSet"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).NextResultSet"),
 		)
 		defer func() {
 			onDone(err)
@@ -286,7 +287,7 @@ func (r *result) NextResultSet(ctx context.Context) (_ query.ResultSet, err erro
 	return r.nextResultSet(ctx)
 }
 
-func exactlyOneRowFromResult(ctx context.Context, r query.Result) (row query.Row, err error) {
+func exactlyOneRowFromResult(ctx context.Context, r result.Result) (row result.Row, err error) {
 	rs, err := r.NextResultSet(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -319,7 +320,7 @@ func exactlyOneRowFromResult(ctx context.Context, r query.Result) (row query.Row
 	return row, nil
 }
 
-func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs query.ResultSet, err error) {
+func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs result.Set, err error) {
 	var rows []query.Row
 	rs, err = r.NextResultSet(ctx)
 	if err != nil {
@@ -357,8 +358,8 @@ func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs quer
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
-func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Result, error) {
-	var resultSets []query.ResultSet
+func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Result, error) {
+	var resultSets []result.Set
 
 	for {
 		rs, err := r.NextResultSet(ctx)

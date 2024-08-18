@@ -8,12 +8,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -35,7 +33,6 @@ type (
 		columns     []*Ydb.Column
 		currentPart *Ydb_Query.ExecuteQueryResponsePart
 		rowIndex    int
-		trace       *trace.Query
 		done        chan struct{}
 	}
 )
@@ -111,19 +108,13 @@ func MaterializedResultSet(
 func newResultSet(
 	recv func() (*Ydb_Query.ExecuteQueryResponsePart, error),
 	part *Ydb_Query.ExecuteQueryResponsePart,
-	t *trace.Query,
 ) *resultSet {
-	if t == nil {
-		t = &trace.Query{}
-	}
-
 	return &resultSet{
 		index:       part.GetResultSetIndex(),
 		recv:        recv,
 		currentPart: part,
 		rowIndex:    -1,
 		columns:     part.GetResultSet().GetColumns(),
-		trace:       t,
 		done:        make(chan struct{}),
 	}
 }
@@ -164,20 +155,13 @@ func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 			}
 
 			if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
-				return NewRow(ctx, rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex], rs.trace)
+				return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex]), nil
 			}
 		}
 	}
 }
 
 func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
-	onDone := trace.QueryOnResultSetNextRow(rs.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*resultSet).NextRow"),
-	)
-	defer func() {
-		onDone(err)
-	}()
-
 	return rs.nextRow(ctx)
 }
 

@@ -547,12 +547,7 @@ func mustNewBatch(
 	session *topicreadercommon.PartitionSession,
 	messages []*topicreadercommon.PublicMessage,
 ) *topicreadercommon.PublicBatch {
-	batch, err := topicreadercommon.NewBatch(session, messages)
-	if err != nil {
-		panic(err)
-	}
-
-	return batch
+	return xtest.Must(topicreadercommon.NewBatch(session, messages))
 }
 
 func testTime(num int) time.Time {

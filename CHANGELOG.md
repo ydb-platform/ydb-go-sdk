@@ -1,3 +1,4 @@
+* Added experimental support for executing scripts over query service client (`query.Client.ExecuteScript` and `query.CLient.FetchScriptResults`)
 * Removed tx result from `query.Session.Execute` (tx can be obtained from `query.Session.Begin`)
 * Changed behaviour of `query.Session.Begin` to `noop` for lazy initialization with first call `query.TxActor.Execute`
 * Splitted experimental method `query.Client.Execute` to methods `query.Client.Exec` without result and `query.Client.Query` with result

@@ -3,15 +3,25 @@ package query
 import (
 	"context"
 	"sync/atomic"
+	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Operation_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -39,13 +49,272 @@ type (
 		InUse         atomic.Int32
 	}
 	Client struct {
-		config             *config.Config
-		queryServiceClient Ydb_Query_V1.QueryServiceClient
-		pool               sessionPool
+		config                 *config.Config
+		queryServiceClient     Ydb_Query_V1.QueryServiceClient
+		operationServiceClient Ydb_Operation_V1.OperationServiceClient
+		pool                   sessionPool
 
 		done chan struct{}
 	}
 )
+
+func fetchScriptResultsWithFallback(ctx context.Context,
+	queryServiceClient Ydb_Query_V1.QueryServiceClient,
+	operationServiceClient Ydb_Operation_V1.OperationServiceClient,
+	opID string, opts ...options.FetchScriptOption,
+) (*options.FetchScriptResult, error) {
+	r, err := fetchScriptResults(ctx, queryServiceClient, opID, opts...)
+	if err != nil {
+		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST) {
+			r, err = scriptOperationStatus(ctx, operationServiceClient, opID)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+
+			return r, nil
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
+}
+
+func fetchScriptResults(ctx context.Context,
+	client Ydb_Query_V1.QueryServiceClient,
+	opID string, opts ...options.FetchScriptOption,
+) (*options.FetchScriptResult, error) {
+	r, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.FetchScriptResult, error) {
+		request := &options.FetchScriptResultsRequest{
+			FetchScriptResultsRequest: Ydb_Query.FetchScriptResultsRequest{
+				OperationId: opID,
+			},
+		}
+		for _, opt := range opts {
+			if opt != nil {
+				opt(request)
+			}
+		}
+
+		response, err := client.FetchScriptResults(ctx, &request.FetchScriptResultsRequest)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		rs := response.GetResultSet()
+		columns := rs.GetColumns()
+		columnNames := make([]string, len(columns))
+		columnTypes := make([]types.Type, len(columns))
+		for i := range columns {
+			columnNames[i] = columns[i].GetName()
+			columnTypes[i] = types.TypeFromYDB(columns[i].GetType())
+		}
+		rows := make([]query.Row, len(rs.GetRows()))
+		for i, r := range rs.GetRows() {
+			rows[i] = NewRow(columns, r)
+		}
+
+		return &options.FetchScriptResult{
+			Ready:  true,
+			Status: response.GetStatus().String(),
+			Data: &options.FetchScriptResultData{
+				ResultSetIndex: response.GetResultSetIndex(),
+				ResultSet:      MaterializedResultSet(int(response.GetResultSetIndex()), columnNames, columnTypes, rows),
+				NextToken:      response.GetNextFetchToken(),
+			},
+		}, nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
+}
+
+func scriptOperationStatus(
+	ctx context.Context, client Ydb_Operation_V1.OperationServiceClient, opID string,
+) (*options.FetchScriptResult, error) {
+	status, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.FetchScriptResult, error) {
+		response, err := client.GetOperation(conn.WithoutWrapping(ctx), &Ydb_Operations.GetOperationRequest{
+			Id: opID,
+		})
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		var md Ydb_Query.ExecuteScriptMetadata
+		err = response.GetOperation().GetMetadata().UnmarshalTo(&md)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return &options.FetchScriptResult{
+			Ready:  response.GetOperation().GetReady(),
+			Status: response.GetOperation().GetStatus().String(),
+		}, nil
+	})
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return status, nil
+}
+
+func (c *Client) FetchScriptResults(ctx context.Context,
+	opID string, opts ...options.FetchScriptOption,
+) (*options.FetchScriptResult, error) {
+	r, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.FetchScriptResult, error) {
+		r, err := fetchScriptResultsWithFallback(ctx, c.queryServiceClient, c.operationServiceClient, opID,
+			append(opts, func(request *options.FetchScriptResultsRequest) {
+				request.Trace = c.config.Trace()
+			})...,
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return r, nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
+}
+
+type executeScriptSettings struct {
+	executeSettings
+	ttl             time.Duration
+	operationParams *Ydb_Operations.OperationParams
+}
+
+func (s *executeScriptSettings) OperationParams() *Ydb_Operations.OperationParams {
+	return s.operationParams
+}
+
+func (s *executeScriptSettings) ResultsTTL() time.Duration {
+	return s.ttl
+}
+
+func executeScript(ctx context.Context, //nolint:funlen
+	client Ydb_Query_V1.QueryServiceClient, request *Ydb_Query.ExecuteScriptRequest, grpcOpts ...grpc.CallOption,
+) (*options.ExecuteScriptOperation, error) {
+	op, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.ExecuteScriptOperation, error) {
+		response, err := client.ExecuteScript(ctx, request, grpcOpts...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		var md Ydb_Query.ExecuteScriptMetadata
+		err = response.GetMetadata().UnmarshalTo(&md)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return &options.ExecuteScriptOperation{
+			ID:            response.GetId(),
+			ConsumedUnits: response.GetCostInfo().GetConsumedUnits(),
+			Metadata: struct {
+				ID     string
+				Script struct {
+					Syntax options.Syntax
+					Query  string
+				}
+				Mode           options.ExecMode
+				Stats          stats.QueryStats
+				ResultSetsMeta []struct {
+					Columns []struct {
+						Name string
+						Type query.Type
+					}
+				}
+			}{
+				ID: md.GetExecutionId(),
+				Script: struct {
+					Syntax options.Syntax
+					Query  string
+				}{
+					Syntax: options.Syntax(md.GetScriptContent().GetSyntax()),
+					Query:  md.GetScriptContent().GetText(),
+				},
+				Mode:  options.ExecMode(md.GetExecMode()),
+				Stats: stats.FromQueryStats(md.GetExecStats()),
+				ResultSetsMeta: func() (
+					resultSetsMeta []struct {
+						Columns []struct {
+							Name string
+							Type query.Type
+						}
+					},
+				) {
+					for _, rs := range md.GetResultSetsMeta() {
+						resultSetsMeta = append(resultSetsMeta, struct {
+							Columns []struct {
+								Name string
+								Type query.Type
+							}
+						}{
+							Columns: func() (
+								columns []struct {
+									Name string
+									Type types.Type
+								},
+							) {
+								for _, c := range rs.GetColumns() {
+									columns = append(columns, struct {
+										Name string
+										Type types.Type
+									}{
+										Name: c.GetName(),
+										Type: types.TypeFromYDB(c.GetType()),
+									})
+								}
+
+								return columns
+							}(),
+						})
+					}
+
+					return resultSetsMeta
+				}(),
+			},
+		}, nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return op, xerrors.WithStackTrace(err)
+	}
+
+	return op, nil
+}
+
+func (c *Client) ExecuteScript(
+	ctx context.Context, q string, ttl time.Duration, opts ...options.Execute,
+) (
+	op *options.ExecuteScriptOperation, err error,
+) {
+	a := allocator.New()
+	defer a.Free()
+
+	settings := &executeScriptSettings{
+		executeSettings: options.ExecuteSettings(opts...),
+		ttl:             ttl,
+		operationParams: operation.Params(
+			ctx,
+			c.config.OperationTimeout(),
+			c.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
+	}
+
+	request, grpcOpts := executeQueryScriptRequest(a, q, settings)
+
+	op, err = executeScript(ctx, c.queryServiceClient, request, grpcOpts...)
+	if err != nil {
+		return op, xerrors.WithStackTrace(err)
+	}
+
+	return op, nil
+}
 
 func (p *poolStub) Close(ctx context.Context) error {
 	return nil
@@ -419,9 +688,10 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 	grpcClient := Ydb_Query_V1.NewQueryServiceClient(balancer)
 
 	client := &Client{
-		config:             cfg,
-		queryServiceClient: grpcClient,
-		done:               make(chan struct{}),
+		config:                 cfg,
+		queryServiceClient:     grpcClient,
+		operationServiceClient: Ydb_Operation_V1.NewOperationServiceClient(balancer),
+		done:                   make(chan struct{}),
 		pool: newPool(ctx, cfg, func(ctx context.Context) (_ *Session, err error) {
 			var (
 				createCtx    context.Context

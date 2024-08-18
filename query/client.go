@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
@@ -80,8 +81,34 @@ type (
 		//
 		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 		QueryRow(ctx context.Context, query string, opts ...options.Execute) (Row, error)
+
+		// ExecuteScript starts long executing script with polling results later
+		//
+		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+		ExecuteScript(
+			ctx context.Context, query string, ttl time.Duration, ops ...options.Execute,
+		) (*options.ExecuteScriptOperation, error)
+
+		// FetchScriptResults fetching the script results
+		//
+		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+		FetchScriptResults(
+			ctx context.Context, opID string, opts ...options.FetchScriptOption,
+		) (*options.FetchScriptResult, error)
 	}
 )
+
+func WithFetchToken(fetchToken string) options.FetchScriptOption {
+	return options.WithFetchToken(fetchToken)
+}
+
+func WithResultSetIndex(resultSetIndex int64) options.FetchScriptOption {
+	return options.WithResultSetIndex(resultSetIndex)
+}
+
+func WithRowsLimit(rowsLimit int64) options.FetchScriptOption {
+	return options.WithRowsLimit(rowsLimit)
+}
 
 type (
 	// Operation is the interface that holds an operation for retry.

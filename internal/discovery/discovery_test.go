@@ -19,14 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func must[T any](t T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-
-	return t
-}
-
 func TestDiscover(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -39,7 +31,7 @@ func TestDiscover(t *testing.T) {
 			Operation: &Ydb_Operations.Operation{
 				Ready:  true,
 				Status: Ydb.StatusIds_SUCCESS,
-				Result: must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
+				Result: xtest.Must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
 					Endpoints: []*Ydb_Discovery.EndpointInfo{
 						{
 							Address: "node1",
@@ -133,7 +125,7 @@ func TestDiscover(t *testing.T) {
 			Operation: &Ydb_Operations.Operation{
 				Ready:  true,
 				Status: Ydb.StatusIds_SUCCESS,
-				Result: must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
+				Result: xtest.Must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
 					Endpoints: []*Ydb_Discovery.EndpointInfo{
 						{
 							Address: "node1",

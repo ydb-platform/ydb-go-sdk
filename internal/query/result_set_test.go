@@ -58,7 +58,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -143,7 +143,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -302,7 +302,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -440,7 +440,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -543,7 +543,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(childCtx)
@@ -635,7 +635,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -734,7 +734,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -885,7 +885,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -947,7 +947,7 @@ func TestResultSetNext(t *testing.T) {
 		}
 
 		return part, nil
-	}, recv, nil)
+	}, recv)
 	require.EqualValues(t, 0, rs.Index())
 	t.Run("Columns", func(t *testing.T) {
 		require.EqualValues(t, []string{"a", "b"}, rs.Columns())
