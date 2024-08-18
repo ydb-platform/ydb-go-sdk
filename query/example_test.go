@@ -383,11 +383,7 @@ func Example_executeScript() {
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close(ctx) // cleanup resources
-	var (
-		id    int32  // required value
-		myStr string // required value
-	)
+	defer db.Close(ctx)                      // cleanup resources
 	op, err := db.Query().ExecuteScript(ctx, // context manage exiting from Do
 		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
 		time.Hour,
