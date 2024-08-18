@@ -17,7 +17,7 @@ func Example_listOperations() {
 	defer db.Close(ctx) // cleanup resources
 	var nextToken string
 	for i := 0; ; i++ {
-		operations, err := db.Operation().List(ctx, "scriptexec",
+		operations, err := db.Operation().List(ctx, "buildindex",
 			operation.WithPageSize(10),
 			operation.WithPageToken(nextToken),
 		)
@@ -29,7 +29,7 @@ func Example_listOperations() {
 		for _, op := range operations.Operations {
 			fmt.Println(" -", op)
 		}
-		if operations.NextToken == "" {
+		if len(operations.Operations) == 0 {
 			break
 		}
 	}
