@@ -182,11 +182,11 @@ func executeScript(ctx context.Context, //nolint:funlen
 				Stats: stats.FromQueryStats(md.GetExecStats()),
 				ResultSetsMeta: func() (
 					resultSetsMeta []struct {
-						Columns []struct {
-							Name string
-							Type query.Type
-						}
-					},
+					Columns []struct {
+						Name string
+						Type query.Type
+					}
+				},
 				) {
 					for _, rs := range md.GetResultSetsMeta() {
 						resultSetsMeta = append(resultSetsMeta, struct {
@@ -197,9 +197,9 @@ func executeScript(ctx context.Context, //nolint:funlen
 						}{
 							Columns: func() (
 								columns []struct {
-									Name string
-									Type types.Type
-								},
+								Name string
+								Type types.Type
+							},
 							) {
 								for _, c := range rs.GetColumns() {
 									columns = append(columns, struct {
@@ -491,7 +491,9 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		_, streamResult, err := execute(ctx, s.id, s.queryServiceClient, q, options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()))
+		_, streamResult, err := execute(ctx, s.id, s.queryServiceClient, q,
+			options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()),
+		)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
