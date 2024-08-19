@@ -182,11 +182,11 @@ func executeScript(ctx context.Context, //nolint:funlen
 				Stats: stats.FromQueryStats(md.GetExecStats()),
 				ResultSetsMeta: func() (
 					resultSetsMeta []struct {
-					Columns []struct {
-						Name string
-						Type query.Type
-					}
-				},
+						Columns []struct {
+							Name string
+							Type query.Type
+						}
+					},
 				) {
 					for _, rs := range md.GetResultSetsMeta() {
 						resultSetsMeta = append(resultSetsMeta, struct {
@@ -197,9 +197,9 @@ func executeScript(ctx context.Context, //nolint:funlen
 						}{
 							Columns: func() (
 								columns []struct {
-								Name string
-								Type types.Type
-							},
+									Name string
+									Type types.Type
+								},
 							) {
 								for _, c := range rs.GetColumns() {
 									columns = append(columns, struct {
