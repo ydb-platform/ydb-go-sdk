@@ -39,26 +39,13 @@ func (s *Session) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	settings := options.ExecuteSettings(opts...)
-
-	resultOpts := []resultOption{
-		withTrace(s.cfg.Trace()),
-	}
-	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
+	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()))
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	rs, err = readResultSet(ctx, r)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -70,19 +57,11 @@ func (s *Session) queryRow(
 ) (row query.Row, finalErr error) {
 	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	row, err = readRow(ctx, r)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -98,10 +77,6 @@ func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execut
 
 	row, err := s.queryRow(ctx, q, options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()))
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -316,27 +291,13 @@ func (s *Session) Exec(
 		onDone(finalErr)
 	}()
 
-	settings := options.ExecuteSettings(opts...)
-
-	resultOpts := []resultOption{
-		withTrace(s.cfg.Trace()),
-	}
-
-	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
+	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()))
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			s.setStatus(statusClosed)
-		}
-
 		return xerrors.WithStackTrace(err)
 	}
 
 	err = readAll(ctx, r)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			s.setStatus(statusClosed)
-		}
-
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -352,17 +313,8 @@ func (s *Session) Query(
 		onDone(finalErr)
 	}()
 
-	settings := options.ExecuteSettings(opts...)
-
-	resultOpts := []resultOption{
-		withTrace(s.cfg.Trace()),
-	}
-	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
+	_, r, err := execute(ctx, s.id, s.queryServiceClient, q, options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()))
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 

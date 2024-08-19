@@ -52,12 +52,12 @@ func TestQueryRange(t *testing.T) {
 			)
 		}
 		r, err := db.Query().Query(ctx, `
-				DECLARE $values AS List<Struct<p1:Text,p2:Uint64,p3:Interval>>;
-				SELECT p1, p2, p3 FROM AS_TABLE($values);
-			`,
+			DECLARE $values AS List<Struct<p1:Text,p2:Uint64,p3:Interval>>;
+			SELECT p1, p2, p3 FROM AS_TABLE($values);`,
 			query.WithParameters(
 				ydb.ParamsBuilder().Param("$values").BeginList().AddItems(listItems...).EndList().Build(),
 			),
+			query.WithIdempotent(),
 		)
 		require.NoError(t, err)
 		count := 0

@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
@@ -29,6 +30,7 @@ type executeSettings interface {
 	Syntax() options.Syntax
 	Params() *params.Parameters
 	CallOptions() []grpc.CallOption
+	RetryOpts() []retry.Option
 }
 
 type executeScriptConfig interface {

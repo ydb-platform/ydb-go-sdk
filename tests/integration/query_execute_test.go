@@ -67,6 +67,7 @@ func TestQueryExecute(t *testing.T) {
 			query.WithStatsMode(query.StatsModeFull, func(stats query.Stats) {
 				s = stats
 			}),
+			query.WithIdempotent(),
 		)
 		require.NoError(t, err)
 		resultSet, err := result.NextResultSet(ctx)
@@ -112,6 +113,7 @@ func TestQueryExecute(t *testing.T) {
 						Build(),
 				),
 				query.WithSyntax(query.SyntaxYQL),
+				query.WithIdempotent(),
 			)
 			if err != nil {
 				return err
@@ -156,6 +158,7 @@ func TestQueryExecute(t *testing.T) {
 						Build(),
 				),
 				query.WithSyntax(query.SyntaxYQL),
+				query.WithIdempotent(),
 			)
 			if err != nil {
 				return err
@@ -195,8 +198,7 @@ func TestQueryExecute(t *testing.T) {
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
-				SELECT CAST($p1 AS Optional<Text>) AS p1, $p2 AS p2, $p3 AS p3, CAST(NULL AS Optional<Text>) AS p4;
-				`,
+				SELECT CAST($p1 AS Optional<Text>) AS p1, $p2 AS p2, $p3 AS p3, CAST(NULL AS Optional<Text>) AS p4;`,
 				query.WithParameters(
 					ydb.ParamsBuilder().
 						Param("$p1").Text("test").
@@ -205,6 +207,7 @@ func TestQueryExecute(t *testing.T) {
 						Build(),
 				),
 				query.WithSyntax(query.SyntaxYQL),
+				query.WithIdempotent(),
 			)
 			if err != nil {
 				return err

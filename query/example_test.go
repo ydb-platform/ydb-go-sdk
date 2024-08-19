@@ -27,6 +27,7 @@ func Example_queryWithMaterializedResult() {
 	// Do retry operation on errors with best effort
 	materilizedResult, err := db.Query().Query(ctx, // context manage exiting from Do
 		`SELECT 42 as id, "my string" as myStr`,
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		panic(err)
@@ -70,6 +71,7 @@ func Example_queryWithMaterializedResultSet() {
 	// Do retry operation on errors with best effort
 	materilizedResultSet, err := db.Query().QueryResultSet(ctx, // context manage exiting from Do
 		`SELECT 42 as id, "my string" as myStr`,
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		panic(err)
@@ -105,6 +107,7 @@ func Example_queryRow() {
 	// Do retry operation on errors with best effort
 	row, err := db.Query().QueryRow(ctx, // context manage exiting from Do
 		`SELECT 42 as id, "my string" as myStr`,
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		panic(err)
@@ -132,7 +135,9 @@ func Example_withoutRangeIterators() {
 		id    int32  // required value
 		myStr string // optional value
 	)
-	materializedResult, err := db.Query().Query(ctx, `SELECT 42 as id, "my string" as myStr`)
+	materializedResult, err := db.Query().Query(ctx, `SELECT 42 as id, "my string" as myStr`,
+		query.WithIdempotent(),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -185,6 +190,7 @@ func Example_selectWithParameters() {
 				Param("$myStr").Text("123").
 				Build(),
 		),
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		panic(err)
@@ -225,6 +231,7 @@ func Example_resultStats() {
 		query.WithStatsMode(query.StatsModeFull, func(s query.Stats) {
 			stats = s
 		}),
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		panic(err)
@@ -393,6 +400,7 @@ func Example_executeScript() {
 				Param("$myStr").Text("123").
 				Build(),
 		),
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		panic(err)

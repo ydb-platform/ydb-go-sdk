@@ -44,6 +44,10 @@ type (
 	}
 )
 
+func (opts RetryOptionsOption) applyExecuteOption(s *executeSettings) {
+	s.retryOptions = append(s.retryOptions, opts...)
+}
+
 func (s *doSettings) Trace() *trace.Query {
 	return s.trace
 }
