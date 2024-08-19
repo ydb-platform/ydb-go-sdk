@@ -8,6 +8,7 @@
 * Removed experimental methods `query.Session.ReadResultSet` and  `query.Session.ReadRows`
 * Removed experimental methods `query.TxActor.ReadResultSet` and  `query.TxActor.ReadRows`
 * Removed experimental method `query.Client.Stats`
+* Option `query.WithIdempotent()` allowed for `query.Client.{Exec,Query,QueryResultSet,QueryRow}` methods now
 * Added experimental support for operation service client through `db.Operation()` method (supports methods `Get`, `List`, `Cancel` and `Forget`)
 
 ## v3.76.6

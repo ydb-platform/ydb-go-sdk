@@ -98,10 +98,6 @@ func (tx *Transaction) QueryResultSet(
 	}
 	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			tx.s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -111,10 +107,6 @@ func (tx *Transaction) QueryResultSet(
 
 	rs, err = readResultSet(ctx, r)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			tx.s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -151,10 +143,6 @@ func (tx *Transaction) QueryRow(
 	}
 	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			tx.s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -164,10 +152,6 @@ func (tx *Transaction) QueryRow(
 
 	row, err = readRow(ctx, r)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			tx.s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -227,10 +211,6 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 
 	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			tx.s.setStatus(statusClosed)
-		}
-
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -240,10 +220,6 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 
 	err = readAll(ctx, r)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			tx.s.setStatus(statusClosed)
-		}
-
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -280,10 +256,6 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	}
 	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
 	if err != nil {
-		if xerrors.IsOperationError(err) {
-			tx.s.setStatus(statusClosed)
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 

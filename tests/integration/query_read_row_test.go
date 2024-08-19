@@ -45,11 +45,10 @@ func TestQueryReadRow(t *testing.T) {
 	require.NoError(t, err)
 
 	row, err := db.Query().QueryRow(ctx, `
-				DECLARE $p1 AS Text;
-				DECLARE $p2 AS Uint64;
-				DECLARE $p3 AS Interval;
-				SELECT $p1, $p2, $p3;
-				`,
+		DECLARE $p1 AS Text;
+		DECLARE $p2 AS Uint64;
+		DECLARE $p3 AS Interval;
+		SELECT $p1, $p2, $p3;`,
 		query.WithParameters(
 			ydb.ParamsBuilder().
 				Param("$p1").Text("test").
@@ -58,6 +57,7 @@ func TestQueryReadRow(t *testing.T) {
 				Build(),
 		),
 		query.WithSyntax(query.SyntaxYQL),
+		query.WithIdempotent(),
 	)
 	require.NoError(t, err)
 

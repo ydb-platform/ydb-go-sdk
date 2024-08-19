@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"io"
 	"sync"
 	"testing"
@@ -502,6 +503,10 @@ type testExecuteSettings struct {
 	syntax      options.Syntax
 	params      *params.Parameters
 	callOptions []grpc.CallOption
+}
+
+func (s testExecuteSettings) RetryOpts() []retry.Option {
+	return nil
 }
 
 func (s testExecuteSettings) StatsCallback() func(stats stats.QueryStats) {

@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 var (
@@ -33,6 +34,7 @@ type (
 		statsCallback func(queryStats stats.QueryStats)
 		callOptions   []grpc.CallOption
 		txControl     *tx.Control
+		retryOptions  []retry.Option
 	}
 
 	// Execute is an interface for execute method options
@@ -52,6 +54,10 @@ type (
 	}
 	execModeOption = ExecMode
 )
+
+func (s *executeSettings) RetryOpts() []retry.Option {
+	return s.retryOptions
+}
 
 func (s *executeSettings) StatsCallback() func(stats.QueryStats) {
 	return s.statsCallback

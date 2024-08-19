@@ -322,6 +322,10 @@ func do(
 
 		err := op(ctx, s)
 		if err != nil {
+			if xerrors.IsOperationError(err) {
+				s.setStatus(statusClosed)
+			}
+
 			return xerrors.WithStackTrace(err)
 		}
 
@@ -411,7 +415,7 @@ func clientQueryRow(
 		}
 
 		return nil
-	})
+	}, settings.RetryOpts()...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -441,14 +445,20 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 }
 
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
+	settings := options.ExecuteSettings(opts...)
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		err = s.Exec(ctx, q, opts...)
+		_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, withTrace(s.cfg.Trace()))
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		err = readAll(ctx, r)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 
 		return nil
-	})
+	}, settings.RetryOpts()...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -479,8 +489,13 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (
 	r query.Result, err error,
 ) {
+	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.Query(ctx, q, opts...)
+		_, streamResult, err := execute(ctx, s.id, s.queryServiceClient, q, options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()))
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -494,7 +509,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 		}
 
 		return nil
-	})
+	}, settings.RetryOpts()...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -528,24 +543,16 @@ func clientQueryResultSet(
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
 		_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
 		if err != nil {
-			if xerrors.IsOperationError(err) {
-				s.setStatus(statusClosed)
-			}
-
 			return xerrors.WithStackTrace(err)
 		}
 
 		rs, err = readMaterializedResultSet(ctx, r)
 		if err != nil {
-			if xerrors.IsOperationError(err) {
-				s.setStatus(statusClosed)
-			}
-
 			return xerrors.WithStackTrace(err)
 		}
 
 		return nil
-	})
+	}, settings.RetryOpts()...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
