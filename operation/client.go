@@ -123,10 +123,10 @@ func list(
 // List returns list of operations that match the specified filter in the request.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (c *Client) List(ctx context.Context, kind string, opts ...options.List) (*ListOperations, error) {
+func (c *Client) List(ctx context.Context, kind kind, opts ...options.List) (*ListOperations, error) {
 	request := &options.ListOperationsRequest{
 		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
-			Kind: kind,
+			Kind: string(kind),
 		},
 	}
 	for _, opt := range opts {

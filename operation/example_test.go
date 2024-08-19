@@ -17,7 +17,7 @@ func Example_listOperations() {
 	defer db.Close(ctx) // cleanup resources
 	var nextToken string
 	for i := 0; ; i++ {
-		operations, err := db.Operation().List(ctx, "buildindex",
+		operations, err := db.Operation().List(ctx, operation.KindScriptExec,
 			operation.WithPageSize(10),
 			operation.WithPageToken(nextToken),
 		)

@@ -39,7 +39,7 @@ func TestOperationList(t *testing.T) {
 
 	var nextToken string
 	for {
-		operations, err := db.Operation().List(ctx, "buildindex",
+		operations, err := db.Operation().List(ctx, operation.KindBuildIndex,
 			operation.WithPageSize(10),
 			operation.WithPageToken(nextToken),
 		)
