@@ -3,7 +3,6 @@ package pool
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -287,7 +286,7 @@ func TestPool(t *testing.T) {
 				require.NoError(t, err)
 			}()
 			wg.Wait()
-		}, xtest.StopAfter(42*time.Second))
+		}, xtest.StopAfter(14*time.Second))
 	})
 	t.Run("ParallelCreation", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
@@ -313,34 +312,6 @@ func TestPool(t *testing.T) {
 			require.Equal(t, DefaultLimit, stats.Limit)
 			require.Equal(t, 0, stats.InUse)
 			require.LessOrEqual(t, stats.Idle, DefaultLimit)
-		}, xtest.StopAfter(30*time.Second))
+		}, xtest.StopAfter(14*time.Second))
 	})
-}
-
-func TestSafeStatsRace(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		var (
-			wg sync.WaitGroup
-			s  = &safeStats{}
-		)
-		wg.Add(1000)
-		for range make([]struct{}, 1000) {
-			go func() {
-				defer wg.Done()
-				require.NotPanics(t, func() {
-					switch rand.Int31n(4) { //nolint:gosec
-					case 0:
-						s.Index().Inc()
-					case 1:
-						s.InUse().Inc()
-					case 2:
-						s.Idle().Inc()
-					default:
-						s.Get()
-					}
-				})
-			}()
-		}
-		wg.Wait()
-	}, xtest.StopAfter(5*time.Second))
 }

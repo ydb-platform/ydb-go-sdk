@@ -20,15 +20,6 @@ type (
 		IsAlive() bool
 		Close(ctx context.Context) error
 	}
-	safeStats struct {
-		mu       xsync.RWMutex
-		v        Stats
-		onChange func(Stats)
-	}
-	statsItemAddr struct {
-		v        *int
-		onChange func(func())
-	}
 	Pool[PT Item[T], T any] struct {
 		trace *Trace
 		limit int
@@ -37,79 +28,17 @@ type (
 		createTimeout time.Duration
 		closeTimeout  time.Duration
 
-		mu    xsync.Mutex
+		sema chan struct{}
+
+		mu    xsync.RWMutex
 		idle  []PT
 		index map[PT]struct{}
 		done  chan struct{}
 
-		stats *safeStats
+		stats *Stats
 	}
 	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
-
-func (field statsItemAddr) Inc() {
-	field.onChange(func() {
-		*field.v++
-	})
-}
-
-func (field statsItemAddr) Dec() {
-	field.onChange(func() {
-		*field.v--
-	})
-}
-
-func (s *safeStats) Get() Stats {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.v
-}
-
-func (s *safeStats) Index() statsItemAddr {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return statsItemAddr{
-		v: &s.v.Index,
-		onChange: func(f func()) {
-			s.mu.WithLock(f)
-			if s.onChange != nil {
-				s.onChange(s.Get())
-			}
-		},
-	}
-}
-
-func (s *safeStats) Idle() statsItemAddr {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return statsItemAddr{
-		v: &s.v.Idle,
-		onChange: func(f func()) {
-			s.mu.WithLock(f)
-			if s.onChange != nil {
-				s.onChange(s.Get())
-			}
-		},
-	}
-}
-
-func (s *safeStats) InUse() statsItemAddr {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return statsItemAddr{
-		v: &s.v.InUse,
-		onChange: func(f func()) {
-			s.mu.WithLock(f)
-			if s.onChange != nil {
-				s.onChange(s.Get())
-			}
-		},
-	}
-}
 
 func WithCreateFunc[PT Item[T], T any](f func(ctx context.Context) (PT, error)) option[PT, T] {
 	return func(p *Pool[PT, T]) {
@@ -170,13 +99,10 @@ func New[PT Item[T], T any](
 	}()
 
 	p.createItem = createItemWithTimeoutHandling(p.createItem, p)
-
+	p.sema = make(chan struct{}, p.limit)
 	p.idle = make([]PT, 0, p.limit)
 	p.index = make(map[PT]struct{}, p.limit)
-	p.stats = &safeStats{
-		v:        Stats{Limit: p.limit},
-		onChange: p.trace.OnChange,
-	}
+	p.stats = &Stats{Limit: p.limit}
 
 	return p
 }
@@ -263,7 +189,7 @@ func createItemWithContext[PT Item[T], T any](
 		if len(p.index) < p.limit {
 			p.idle = append(p.idle, newItem)
 			p.index[newItem] = struct{}{}
-			p.stats.Index().Inc()
+			p.stats.Index++
 			needCloseItem = false
 		}
 
@@ -276,10 +202,13 @@ func createItemWithContext[PT Item[T], T any](
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
-	return p.stats.Get()
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return *p.stats
 }
 
-func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
+func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) {
 	onDone := p.trace.OnGet(&GetStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).getItem"),
@@ -290,56 +219,29 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 		})
 	}()
 
-	if err := ctx.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	for {
-		select {
-		case <-p.done:
-			return nil, xerrors.WithStackTrace(errClosedPool)
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		default:
-			var item PT
-			p.mu.WithLock(func() {
-				if len(p.idle) > 0 {
-					item, p.idle = p.idle[0], p.idle[1:]
-					p.stats.Idle().Dec()
-				}
-			})
+	if len(p.idle) > 0 {
+		item, p.idle = p.idle[0], p.idle[1:]
+		p.stats.Idle--
 
-			if item != nil {
-				if item.IsAlive() {
-					return item, nil
-				}
-				_ = p.closeItem(ctx, item)
-				p.mu.WithLock(func() {
-					delete(p.index, item)
-				})
-				p.stats.Index().Dec()
-			}
-			var err error
-			var newItem PT
-			p.mu.WithLock(func() {
-				if len(p.index) >= p.limit {
-					return
-				}
-				newItem, err = p.createItem(ctx)
-				if err != nil {
-					return
-				}
-				p.index[newItem] = struct{}{}
-				p.stats.Index().Inc()
-			})
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			if newItem != nil {
-				return newItem, nil
-			}
+		if item.IsAlive() {
+			return item, nil
 		}
+
+		_ = p.closeItem(ctx, item)
 	}
+
+	newItem, err := p.createItem(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(err))
+	}
+
+	p.stats.Index++
+	p.index[newItem] = struct{}{}
+
+	return newItem, nil
 }
 
 func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
@@ -353,37 +255,28 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 		})
 	}()
 
-	if err := ctx.Err(); err != nil {
-		return xerrors.WithStackTrace(err)
+	if !item.IsAlive() {
+		_ = p.closeItem(ctx, item)
+
+		return xerrors.WithStackTrace(errItemIsNotAlive)
 	}
 
-	select {
-	case <-p.done:
-		return xerrors.WithStackTrace(errClosedPool)
-	default:
-		if !item.IsAlive() {
-			_ = p.closeItem(ctx, item)
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-			p.mu.WithLock(func() {
-				delete(p.index, item)
-			})
-			p.stats.Index().Dec()
+	if len(p.idle) >= p.limit {
+		_ = p.closeItem(ctx, item)
 
-			return xerrors.WithStackTrace(errItemIsNotAlive)
-		}
-
-		p.mu.WithLock(func() {
-			p.idle = append(p.idle, item)
-		})
-		p.stats.Idle().Inc()
-
-		return nil
+		return xerrors.WithStackTrace(errPoolIsOverflow)
 	}
+
+	p.idle = append(p.idle, item)
+	p.stats.Idle--
+
+	return nil
 }
 
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) error {
-	ctx = xcontext.ValueOnly(ctx)
-
 	var cancel context.CancelFunc
 	if d := p.closeTimeout; d > 0 {
 		ctx, cancel = xcontext.WithTimeout(ctx, d)
@@ -391,6 +284,13 @@ func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) error {
 		ctx, cancel = xcontext.WithCancel(ctx)
 	}
 	defer cancel()
+
+	defer func() {
+		p.mu.WithLock(func() {
+			delete(p.index, item)
+			p.stats.Index--
+		})
+	}()
 
 	return item.Close(ctx)
 }
@@ -406,6 +306,17 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		})
 	}()
 
+	select {
+	case <-p.done:
+		return xerrors.WithStackTrace(errClosedPool)
+	case <-ctx.Done():
+		return xerrors.WithStackTrace(ctx.Err())
+	case p.sema <- struct{}{}:
+		defer func() {
+			<-p.sema
+		}()
+	}
+
 	item, err := p.getItem(ctx)
 	if err != nil {
 		if xerrors.IsYdb(err) {
@@ -419,8 +330,14 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		_ = p.putItem(ctx, item)
 	}()
 
-	p.stats.InUse().Inc()
-	defer p.stats.InUse().Dec()
+	p.mu.Lock()
+	p.stats.InUse++
+	p.mu.Unlock()
+	defer func() {
+		p.mu.Lock()
+		p.stats.InUse--
+		p.mu.Unlock()
+	}()
 
 	err = f(ctx, item)
 	if err != nil {
