@@ -19,7 +19,7 @@ type (
 		closer.Closer
 		IsAlive() bool
 	}
-	lazyItem[PT Item[T], T any] struct {
+	itemHolder[PT Item[T], T any] struct {
 		mutex      xsync.RWMutex
 		createItem func(ctx context.Context) (PT, error)
 		item       PT
@@ -32,7 +32,9 @@ type (
 		createTimeout time.Duration
 		closeTimeout  time.Duration
 
-		idle chan *lazyItem[PT, T]
+		idle chan *itemHolder[PT, T]
+
+		stats *xsync.Value[Stats]
 	}
 	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
@@ -94,7 +96,11 @@ func New[PT Item[T], T any]( //nolint:funlen
 		})
 	}()
 
-	p.idle = make(chan *lazyItem[PT, T], p.limit)
+	p.idle = make(chan *itemHolder[PT, T], p.limit)
+	p.stats = xsync.NewValue(Stats{
+		Limit: p.limit,
+		Idle:  p.limit,
+	})
 
 	sema := make(chan struct{}, p.limit)
 	createItemsCh := make(chan PT, p.limit)
@@ -120,9 +126,19 @@ func New[PT Item[T], T any]( //nolint:funlen
 			}
 			defer cancelCreate()
 
+			p.stats.Change(func(old Stats) Stats {
+				old.CreateInProgress++
+
+				return old
+			})
 			newItem, err := p.createItem(createCtx)
 			if err == nil {
 				createItemsCh <- newItem
+				p.stats.Change(func(old Stats) Stats {
+					old.CreateInProgress--
+
+					return old
+				})
 			}
 		}()
 
@@ -146,7 +162,7 @@ func New[PT Item[T], T any]( //nolint:funlen
 	}
 
 	for range make([]struct{}, p.limit) {
-		p.idle <- &lazyItem[PT, T]{
+		p.idle <- &itemHolder[PT, T]{
 			createItem: createItem,
 		}
 	}
@@ -162,16 +178,10 @@ func defaultCreateItem[T any, PT Item[T]](ctx context.Context) (PT, error) {
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
-	idle := len(p.idle)
-
-	return Stats{
-		Limit: p.limit,
-		Idle:  idle,
-		InUse: p.limit - idle,
-	}
+	return p.stats.Load()
 }
 
-func (p *Pool[PT, T]) getItem(ctx context.Context) (_ *lazyItem[PT, T], finalErr error) {
+func (p *Pool[PT, T]) getItem(ctx context.Context) (_ *itemHolder[PT, T], finalErr error) {
 	onDone := p.trace.OnGet(&GetStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).getItem"),
@@ -191,6 +201,12 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ *lazyItem[PT, T], finalErr
 			return nil, xerrors.WithStackTrace(errClosedPool)
 		}
 
+		p.stats.Change(func(old Stats) Stats {
+			old.Idle--
+
+			return old
+		})
+
 		idle.mutex.Lock()
 		defer idle.mutex.Unlock()
 
@@ -201,9 +217,15 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ *lazyItem[PT, T], finalErr
 
 			_ = idle.item.Close(ctx)
 			idle.item = nil
+
+			p.stats.Change(func(old Stats) Stats {
+				old.Index--
+
+				return old
+			})
 		}
 
-		item, err := p.createItem(ctx)
+		item, err := idle.createItem(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(
 				xerrors.Retryable(err, xerrors.WithName("internal/pool.(*Pool).getItem")),
@@ -212,17 +234,29 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ *lazyItem[PT, T], finalErr
 
 		idle.item = item
 
+		p.stats.Change(func(old Stats) Stats {
+			old.Index++
+
+			return old
+		})
+
 		return idle, nil
 	}
 }
 
-func (p *Pool[PT, T]) putItem(ctx context.Context, idle *lazyItem[PT, T]) (finalErr error) {
+func (p *Pool[PT, T]) putItem(ctx context.Context, idle *itemHolder[PT, T]) (finalErr error) {
 	onDone := p.trace.OnPut(&PutStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).putItem"),
 	})
 	defer func() {
 		p.idle <- idle
+
+		p.stats.Change(func(old Stats) Stats {
+			old.Idle++
+
+			return old
+		})
 
 		onDone(&PutDoneInfo{
 			Error: finalErr,
@@ -266,7 +300,19 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		return xerrors.WithStackTrace(err)
 	}
 
+	p.stats.Change(func(old Stats) Stats {
+		old.InUse++
+
+		return old
+	})
+
 	defer func() {
+		p.stats.Change(func(old Stats) Stats {
+			old.InUse--
+
+			return old
+		})
+
 		_ = p.putItem(ctx, idle)
 	}()
 

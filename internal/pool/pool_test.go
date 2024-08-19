@@ -290,7 +290,13 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("ParallelCreation", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
-			p := New[*testItem, testItem](rootCtx)
+			p := New[*testItem, testItem](rootCtx, WithCreateFunc(func(ctx context.Context) (*testItem, error) {
+				time.Sleep(time.Millisecond)
+
+				item := testItem{}
+
+				return &item, nil
+			}))
 			var wg sync.WaitGroup
 			for range make([]struct{}, DefaultLimit*10) {
 				wg.Add(1)

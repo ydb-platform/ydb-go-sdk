@@ -1,7 +1,9 @@
 package pool
 
 type Stats struct {
-	Limit int
-	Idle  int
-	InUse int
+	Limit            int
+	Index            int
+	Idle             int
+	InUse            int
+	CreateInProgress int
 }

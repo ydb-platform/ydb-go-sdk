@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -38,7 +39,6 @@ type (
 	sessionPool interface {
 		closer.Closer
 
-		Stats() pool.Stats
 		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
 	}
 	poolStub struct {
@@ -259,14 +259,6 @@ func (c *Client) ExecuteScript(
 
 func (p *poolStub) Close(ctx context.Context) error {
 	return nil
-}
-
-func (p *poolStub) Stats() pool.Stats {
-	return pool.Stats{
-		Limit: -1,
-		Idle:  0,
-		InUse: int(p.InUse.Load()),
-	}
 }
 
 func (p *poolStub) With(
@@ -552,6 +544,18 @@ func clientQueryResultSet(
 	return rs, nil
 }
 
+func (c *Client) Stats() (*pool.Stats, error) {
+	if poolStats, has := c.pool.(interface {
+		Stats() pool.Stats
+	}); has {
+		stats := poolStats.Stats()
+
+		return &stats, nil
+	}
+
+	return nil, xerrors.WithStackTrace(fmt.Errorf("client pool %T not supported stats", c.pool))
+}
+
 // QueryResultSet is a helper which read all rows from first result set in result
 func (c *Client) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
@@ -700,7 +704,7 @@ func poolTrace(t *trace.Query) *pool.Trace {
 			}
 		},
 		OnChange: func(info pool.ChangeInfo) {
-			trace.QueryOnPoolChange(t, info.Limit, info.Idle, info.InUse)
+			trace.QueryOnPoolChange(t, info.Limit, info.Index, info.Idle, info.InUse)
 		},
 	}
 }

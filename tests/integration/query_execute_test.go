@@ -28,6 +28,8 @@ func TestQueryExecute(t *testing.T) {
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 
+	os.Setenv("YDB_GO_SDK_QUERY_SERVICE_USE_SESSION_POOL", "1")
+
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
