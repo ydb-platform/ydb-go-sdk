@@ -1660,12 +1660,10 @@ func QueryOnPoolGet(t *Query, c *context.Context, call call) func(error) {
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnPoolChange(t *Query, limit int, index int, idle int, inUse int) {
+func QueryOnPoolChange(t *Query, limit int, idle int) {
 	var p QueryPoolChange
 	p.Limit = limit
-	p.Index = index
 	p.Idle = idle
-	p.InUse = inUse
 	t.onPoolChange(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
