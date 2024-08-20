@@ -135,7 +135,7 @@ func makeCreateItemFunc[PT Item[T], T any]( //nolint:funlen
 	appendToIdle func(item PT) error,
 ) func(ctx context.Context) (PT, error) {
 	return func(ctx context.Context) (PT, error) {
-		var ch = make(chan struct {
+		ch := make(chan struct {
 			item PT
 			err  error
 		})

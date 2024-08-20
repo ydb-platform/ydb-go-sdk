@@ -50,7 +50,7 @@ func TestOperationList(t *testing.T) {
 			t.Log(op)
 		}
 
-		if len(operations.Operations) == 0 {
+		if len(operations.Operations) == 0 || nextToken == "" {
 			break
 		}
 	}
