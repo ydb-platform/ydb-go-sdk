@@ -799,7 +799,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 
 		return func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
 			if doneInfo.Error == nil {
-				l.Log(ctx, "send messages completed",
+				l.Log(ctx, "writing messages to grpc buffer completed",
 					String("writer_instance_id", info.WriterInstanceID),
 					String("session_id", info.SessionID),
 					Any("codec", info.Codec),
@@ -808,7 +808,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 					latencyField(start),
 				)
 			} else {
-				l.Log(WithLevel(ctx, WARN), "send messages completed",
+				l.Log(WithLevel(ctx, WARN), "writing messages to grpc buffer completed",
 					Error(doneInfo.Error),
 					String("writer_instance_id", info.WriterInstanceID),
 					String("session_id", info.SessionID),
