@@ -123,14 +123,14 @@ func TestWithLock(t *testing.T) {
 func TestWithRLock(t *testing.T) {
 	t.Run("sync.RWMutex", func(t *testing.T) {
 		mtx := sync.RWMutex{}
-		v := WithLock(&mtx, func() int {
+		v := WithRLock(&mtx, func() int {
 			return 123
 		})
 		require.Equal(t, 123, v)
 	})
 	t.Run("xsync.RWMutex", func(t *testing.T) {
 		mtx := RWMutex{}
-		v := WithLock(&mtx, func() int {
+		v := WithRLock(&mtx, func() int {
 			return 123
 		})
 		require.Equal(t, 123, v)

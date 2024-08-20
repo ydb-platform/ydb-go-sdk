@@ -40,7 +40,7 @@ func (s *Set[T]) Values() []T {
 	values := make([]T, 0, s.size.Load())
 
 	s.m.Range(func(k, v any) bool {
-		values = append(values, k.(T))
+		values = append(values, k.(T)) //nolint:forcetypeassert
 
 		return true
 	})

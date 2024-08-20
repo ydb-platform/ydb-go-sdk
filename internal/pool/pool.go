@@ -129,7 +129,7 @@ func defaultCreateItem[T any, PT Item[T]](context.Context) (PT, error) {
 }
 
 // makeCreateItemFunc wraps the createItem function with timeout handling
-func makeCreateItemFunc[PT Item[T], T any](
+func makeCreateItemFunc[PT Item[T], T any]( //nolint:funlen
 	config Config[PT, T],
 	done <-chan struct{},
 	appendToIdle func(item PT) error,
@@ -206,6 +206,9 @@ func (p *Pool[PT, T]) onChangeStats() {
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	return Stats{
 		Limit: p.config.limit,
 		Idle:  len(p.idle),
@@ -301,7 +304,10 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 	}
 }
 
-func makeAsyncCloseItemFunc[PT Item[T], T any](closeTimeout time.Duration, done <-chan struct{}) func(ctx context.Context, item PT) {
+func makeAsyncCloseItemFunc[PT Item[T], T any](
+	closeTimeout time.Duration,
+	done <-chan struct{},
+) func(ctx context.Context, item PT) {
 	return func(ctx context.Context, item PT) {
 		closeItemCtx, closeItemCancel := xcontext.WithDone(xcontext.ValueOnly(ctx), done)
 		defer closeItemCancel()
