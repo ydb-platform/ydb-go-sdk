@@ -32,3 +32,23 @@ func (l *RWMutex) WithRLock(f func()) {
 
 	f()
 }
+
+func WithLock[T any](l interface {
+	Lock()
+	Unlock()
+}, f func() T) T {
+	l.Lock()
+	defer l.Unlock()
+
+	return f()
+}
+
+func WithRLock[T any](l interface {
+	RLock()
+	RUnlock()
+}, f func() T) T {
+	l.RLock()
+	defer l.RUnlock()
+
+	return f()
+}

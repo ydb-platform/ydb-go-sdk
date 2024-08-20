@@ -98,7 +98,7 @@ func New[PT Item[T], T any](
 		})
 	}()
 
-	p.createItem = createItemWithTimeoutHandling(p.createItem, p)
+	p.createItem = asyncCreateItemWithTimeout(p.createItem, p)
 	p.sema = make(chan struct{}, p.limit)
 	p.idle = make([]PT, 0, p.limit)
 	p.index = make(map[PT]struct{}, p.limit)
@@ -114,19 +114,66 @@ func defaultCreateItem[T any, PT Item[T]](ctx context.Context) (PT, error) {
 	return &item, nil
 }
 
-// createItemWithTimeoutHandling wraps the createItem function with timeout handling
-func createItemWithTimeoutHandling[PT Item[T], T any](
+// asyncCreateItemWithTimeout wraps the createItem function with timeout handling
+func asyncCreateItemWithTimeout[PT Item[T], T any](
 	createItem func(ctx context.Context) (PT, error),
 	p *Pool[PT, T],
 ) func(ctx context.Context) (PT, error) {
 	return func(ctx context.Context) (PT, error) {
-		var (
-			ch        = make(chan PT)
-			createErr error
-		)
+		var ch = make(chan struct {
+			item PT
+			err  error
+		})
+
 		go func() {
 			defer close(ch)
-			createErr = createItemWithContext(ctx, p, createItem, ch)
+
+			createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
+			defer cancelCreate()
+
+			if d := p.createTimeout; d > 0 {
+				createCtx, cancelCreate = xcontext.WithTimeout(createCtx, d)
+				defer cancelCreate()
+			}
+
+			p.mu.WithLock(func() {
+				p.stats.CreateInProgress++
+			})
+
+			newItem, err := createItem(createCtx)
+			p.mu.WithLock(func() {
+				p.stats.CreateInProgress--
+			})
+
+			select {
+			case ch <- struct {
+				item PT
+				err  error
+			}{
+				item: newItem,
+				err:  xerrors.WithStackTrace(err),
+			}:
+			default:
+				if newItem == nil {
+					return
+				}
+
+				if !xsync.WithLock(&p.mu, func() bool {
+					if len(p.idle) >= p.limit {
+						return false // not appended
+					}
+
+					p.idle = append(p.idle, newItem)
+					p.stats.Idle++
+
+					p.index[newItem] = struct{}{}
+					p.stats.Index++
+
+					return true // // item appended
+				}) {
+					_ = newItem.Close(ctx)
+				}
+			}
 		}()
 
 		select {
@@ -134,70 +181,21 @@ func createItemWithTimeoutHandling[PT Item[T], T any](
 			return nil, xerrors.WithStackTrace(errClosedPool)
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
-		case item, has := <-ch:
+		case result, has := <-ch:
 			if !has {
-				if ctxErr := ctx.Err(); ctxErr == nil && xerrors.IsContextError(createErr) {
-					return nil, xerrors.WithStackTrace(xerrors.Retryable(createErr))
-				}
-
-				return nil, xerrors.WithStackTrace(createErr)
+				return nil, xerrors.WithStackTrace(errNoProgress)
 			}
 
-			return item, nil
+			if result.err != nil {
+				if xerrors.IsContextError(result.err) {
+					return nil, xerrors.WithStackTrace(xerrors.Retryable(result.err))
+				}
+
+				return nil, xerrors.WithStackTrace(result.err)
+			}
+
+			return result.item, nil
 		}
-	}
-}
-
-// createItemWithContext handles the creation of an item with context handling
-func createItemWithContext[PT Item[T], T any](
-	ctx context.Context,
-	p *Pool[PT, T],
-	createItem func(ctx context.Context) (PT, error),
-	ch chan PT,
-) error {
-	var (
-		createCtx    = xcontext.ValueOnly(ctx)
-		cancelCreate context.CancelFunc
-	)
-
-	if d := p.createTimeout; d > 0 {
-		createCtx, cancelCreate = xcontext.WithTimeout(createCtx, d)
-	} else {
-		createCtx, cancelCreate = xcontext.WithCancel(createCtx)
-	}
-	defer cancelCreate()
-
-	newItem, err := createItem(createCtx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	needCloseItem := true
-	defer func() {
-		if needCloseItem {
-			_ = p.closeItem(ctx, newItem)
-		}
-	}()
-
-	select {
-	case <-p.done:
-		return xerrors.WithStackTrace(errClosedPool)
-	case <-ctx.Done():
-		p.mu.Lock()
-		defer p.mu.Unlock()
-
-		if len(p.index) < p.limit {
-			p.idle = append(p.idle, newItem)
-			p.index[newItem] = struct{}{}
-			p.stats.Index++
-			needCloseItem = false
-		}
-
-		return xerrors.WithStackTrace(ctx.Err())
-	case ch <- newItem:
-		needCloseItem = false
-
-		return nil
 	}
 }
 
@@ -220,17 +218,20 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) {
 	}()
 
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if len(p.idle) > 0 {
 		item, p.idle = p.idle[0], p.idle[1:]
 		p.stats.Idle--
+	}
+	p.mu.Unlock()
 
+	if item != nil {
 		if item.IsAlive() {
 			return item, nil
 		}
 
 		_ = p.closeItem(ctx, item)
+
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errItemIsNotAlive))
 	}
 
 	newItem, err := p.createItem(ctx)
@@ -238,8 +239,10 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(err))
 	}
 
-	p.stats.Index++
-	p.index[newItem] = struct{}{}
+	p.mu.WithLock(func() {
+		p.stats.Index++
+		p.index[newItem] = struct{}{}
+	})
 
 	return newItem, nil
 }
