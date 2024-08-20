@@ -5,18 +5,18 @@ import (
 	"sync/atomic"
 )
 
-type Set[K comparable] struct {
+type Set[T comparable] struct {
 	m    sync.Map
 	size atomic.Int32
 }
 
-func (s *Set[K]) Has(key K) bool {
+func (s *Set[T]) Has(key T) bool {
 	_, ok := s.m.Load(key)
 
 	return ok
 }
 
-func (s *Set[K]) Add(key K) bool {
+func (s *Set[T]) Add(key T) bool {
 	_, exists := s.m.LoadOrStore(key, struct{}{})
 
 	if !exists {
@@ -26,17 +26,29 @@ func (s *Set[K]) Add(key K) bool {
 	return !exists
 }
 
-func (s *Set[K]) Size() int {
+func (s *Set[T]) Size() int {
 	return int(s.size.Load())
 }
 
-func (s *Set[K]) Range(f func(key K) bool) {
+func (s *Set[T]) Range(f func(key T) bool) {
 	s.m.Range(func(k, v any) bool {
-		return f(k.(K)) //nolint:forcetypeassert
+		return f(k.(T)) //nolint:forcetypeassert
 	})
 }
 
-func (s *Set[K]) Remove(key K) bool {
+func (s *Set[T]) Values() []T {
+	values := make([]T, 0, s.size.Load())
+
+	s.m.Range(func(k, v any) bool {
+		values = append(values, k.(T))
+
+		return true
+	})
+
+	return values
+}
+
+func (s *Set[T]) Remove(key T) bool {
 	_, exists := s.m.LoadAndDelete(key)
 
 	if exists {
@@ -46,7 +58,7 @@ func (s *Set[K]) Remove(key K) bool {
 	return exists
 }
 
-func (s *Set[K]) Clear() (removed int) {
+func (s *Set[T]) Clear() (removed int) {
 	s.m.Range(func(k, v any) bool {
 		removed++
 

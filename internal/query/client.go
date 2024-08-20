@@ -2,7 +2,6 @@ package query
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -43,7 +42,6 @@ type (
 	}
 	poolStub struct {
 		createSession func(ctx context.Context) (*Session, error)
-		InUse         atomic.Int32
 	}
 	Client struct {
 		config             *config.Config
@@ -264,20 +262,13 @@ func (p *poolStub) Close(ctx context.Context) error {
 func (p *poolStub) Stats() pool.Stats {
 	return pool.Stats{
 		Limit: -1,
-		Index: 0,
 		Idle:  0,
-		InUse: int(p.InUse.Load()),
 	}
 }
 
 func (p *poolStub) With(
 	ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option,
 ) error {
-	p.InUse.Add(1)
-	defer func() {
-		p.InUse.Add(-1)
-	}()
-
 	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
 		s, err := p.createSession(ctx)
 		if err != nil {
@@ -710,7 +701,7 @@ func poolTrace(t *trace.Query) *pool.Trace {
 			}
 		},
 		OnChange: func(info pool.ChangeInfo) {
-			trace.QueryOnPoolChange(t, info.Limit, info.Index, info.Idle, info.InUse)
+			trace.QueryOnPoolChange(t, info.Limit, info.Idle)
 		},
 	}
 }

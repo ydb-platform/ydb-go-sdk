@@ -56,7 +56,7 @@ func TestPool(t *testing.T) {
 		})
 		t.Run("WithLimit", func(t *testing.T) {
 			p := New[*testItem, testItem](rootCtx, WithLimit[*testItem, testItem](1))
-			require.EqualValues(t, 1, p.limit)
+			require.EqualValues(t, 1, p.config.limit)
 		})
 		t.Run("WithCreateFunc", func(t *testing.T) {
 			var newCounter int64
@@ -73,7 +73,7 @@ func TestPool(t *testing.T) {
 				return nil
 			})
 			require.NoError(t, err)
-			require.EqualValues(t, p.limit, atomic.LoadInt64(&newCounter))
+			require.EqualValues(t, p.config.limit, atomic.LoadInt64(&newCounter))
 		})
 	})
 	t.Run("Retry", func(t *testing.T) {
@@ -247,6 +247,9 @@ func TestPool(t *testing.T) {
 						return v, nil
 					}),
 				)
+				p.closeItem = func(ctx context.Context, item *testItem) {
+					_ = item.Close(ctx)
+				}
 				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					if atomic.LoadInt64(&newItems) < 10 {
 						return expErr
@@ -265,7 +268,11 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("Stress", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
-			p := New[*testItem, testItem](rootCtx)
+			trace := *defaultTrace
+			trace.OnChange = func(info ChangeInfo) {
+				require.GreaterOrEqual(t, info.Limit, info.Idle)
+			}
+			p := New[*testItem, testItem](rootCtx, WithTrace[*testItem, testItem](&trace))
 			var wg sync.WaitGroup
 			wg.Add(DefaultLimit*2 + 1)
 			for range make([]struct{}, DefaultLimit*2) {
@@ -290,7 +297,12 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("ParallelCreation", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
-			p := New[*testItem, testItem](rootCtx)
+			trace := *defaultTrace
+			trace.OnChange = func(info ChangeInfo) {
+				require.Equal(t, DefaultLimit, info.Limit)
+				require.LessOrEqual(t, info.Idle, DefaultLimit)
+			}
+			p := New[*testItem, testItem](rootCtx, WithTrace[*testItem, testItem](&trace))
 			var wg sync.WaitGroup
 			for range make([]struct{}, DefaultLimit*10) {
 				wg.Add(1)
@@ -303,15 +315,11 @@ func TestPool(t *testing.T) {
 						t.Failed()
 					}
 					stats := p.Stats()
-					require.LessOrEqual(t, stats.Idle+stats.InUse, DefaultLimit)
+					require.LessOrEqual(t, stats.Idle, DefaultLimit)
 				}()
 			}
 
 			wg.Wait()
-			stats := p.Stats()
-			require.Equal(t, DefaultLimit, stats.Limit)
-			require.Equal(t, 0, stats.InUse)
-			require.LessOrEqual(t, stats.Idle, DefaultLimit)
 		}, xtest.StopAfter(14*time.Second))
 	})
 }
