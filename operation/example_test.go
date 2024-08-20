@@ -29,7 +29,7 @@ func Example_listOperations() {
 		for _, op := range operations.Operations {
 			fmt.Println(" -", op)
 		}
-		if len(operations.Operations) == 0 || nextToken == "" {
+		if nextToken == "" {
 			break
 		}
 	}

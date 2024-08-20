@@ -39,7 +39,7 @@ func TestOperationList(t *testing.T) {
 
 	var nextToken string
 	for {
-		operations, err := db.Operation().List(ctx, operation.KindBuildIndex,
+		operations, err := db.Operation().List(ctx, operation.KindImportS3,
 			operation.WithPageSize(10),
 			operation.WithPageToken(nextToken),
 		)
@@ -50,7 +50,7 @@ func TestOperationList(t *testing.T) {
 			t.Log(op)
 		}
 
-		if len(operations.Operations) == 0 || nextToken == "" {
+		if nextToken == "" {
 			break
 		}
 	}
