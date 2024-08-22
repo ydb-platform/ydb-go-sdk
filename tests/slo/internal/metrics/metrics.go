@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -127,7 +128,7 @@ func (j Span) Stop(err error, attempts int) {
 	latency := time.Since(j.start)
 
 	if attempts > 1 {
-		fmt.Printf("more than 1 attempt for request (request_type: %q, attempts: %d, start: %s, latency: %s, err: %v)\n",
+		log.Printf("more than 1 attempt for request (request_type: %q, attempts: %d, start: %s, latency: %s, err: %v)",
 			j.name,
 			attempts,
 			j.start.Format(time.DateTime),

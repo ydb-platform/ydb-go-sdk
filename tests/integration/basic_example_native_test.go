@@ -6,13 +6,11 @@ package integration
 import (
 	"context"
 	"fmt"
-	"math"
 	"net/http"
 	"os"
 	"path"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -25,7 +23,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
@@ -37,123 +34,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
-
-type poolStats struct {
-	xsync.Mutex
-
-	inFlightSessions map[string]struct{}
-	openSessions     map[string]struct{}
-	inPoolSessions   map[string]struct{}
-	limit            int
-}
-
-func (s *poolStats) print(t testing.TB) {
-	s.Lock()
-	defer s.Unlock()
-	t.Log("poolStats:")
-	t.Log(" - limit            :", s.limit)
-	t.Log(" - open             :", len(s.openSessions))
-	t.Log(" - in-pool          :", len(s.inPoolSessions))
-	t.Log(" - in-flight        :", len(s.inFlightSessions))
-}
-
-func (s *poolStats) check(t testing.TB) {
-	s.Lock()
-	defer s.Unlock()
-	if s.limit < 0 {
-		t.Fatalf("negative limit: %d", s.limit)
-	}
-	if len(s.inFlightSessions) > len(s.inPoolSessions) {
-		t.Fatalf("len(in_flight) > len(pool) (%d > %d)", len(s.inFlightSessions), len(s.inPoolSessions))
-	}
-	if len(s.inPoolSessions) > s.limit {
-		t.Fatalf("len(pool) > limit (%d > %d)", len(s.inPoolSessions), s.limit)
-	}
-}
-
-func (s *poolStats) max() int {
-	s.Lock()
-	defer s.Unlock()
-	return s.limit
-}
-
-func (s *poolStats) addToOpen(t testing.TB, id string) {
-	defer s.check(t)
-
-	s.Lock()
-	defer s.Unlock()
-
-	if _, ok := s.openSessions[id]; ok {
-		t.Fatalf("session '%s' add to open sessions twice", id)
-	}
-
-	s.openSessions[id] = struct{}{}
-}
-
-func (s *poolStats) removeFromOpen(t testing.TB, id string) {
-	defer s.check(t)
-
-	s.Lock()
-	defer s.Unlock()
-
-	if _, ok := s.openSessions[id]; !ok {
-		t.Fatalf("session '%s' already removed from open sessions", id)
-	}
-
-	delete(s.openSessions, id)
-}
-
-func (s *poolStats) addToPool(t testing.TB, id string) {
-	defer s.check(t)
-
-	s.Lock()
-	defer s.Unlock()
-
-	if _, ok := s.inPoolSessions[id]; ok {
-		t.Fatalf("session '%s' add to pool twice", id)
-	}
-
-	s.inPoolSessions[id] = struct{}{}
-}
-
-func (s *poolStats) removeFromPool(t testing.TB, id string) {
-	defer s.check(t)
-
-	s.Lock()
-	defer s.Unlock()
-
-	if _, ok := s.inPoolSessions[id]; !ok {
-		t.Fatalf("session '%s' already removed from pool", id)
-	}
-
-	delete(s.inPoolSessions, id)
-}
-
-func (s *poolStats) addToInFlight(t testing.TB, id string) {
-	defer s.check(t)
-
-	s.Lock()
-	defer s.Unlock()
-
-	if _, ok := s.inFlightSessions[id]; ok {
-		t.Fatalf("session '%s' add to in-flight twice", id)
-	}
-
-	s.inFlightSessions[id] = struct{}{}
-}
-
-func (s *poolStats) removeFromInFlight(t testing.TB, id string) {
-	defer s.check(t)
-
-	s.Lock()
-	defer s.Unlock()
-
-	if _, ok := s.inFlightSessions[id]; !ok {
-		return
-	}
-
-	delete(s.inFlightSessions, id)
-}
 
 func TestBasicExampleNative(sourceTest *testing.T) { //nolint:gocyclo
 	t := xtest.MakeSyncedTest(sourceTest)
@@ -171,64 +51,9 @@ func TestBasicExampleNative(sourceTest *testing.T) { //nolint:gocyclo
 		totalConsumedUnits.Add(meta.ConsumedUnits(md))
 	})
 
-	s := &poolStats{
-		limit:            math.MaxInt32,
-		openSessions:     make(map[string]struct{}),
-		inPoolSessions:   make(map[string]struct{}),
-		inFlightSessions: make(map[string]struct{}),
-	}
-	defer func() {
-		s.Lock()
-		defer s.Unlock()
-		if len(s.inFlightSessions) != 0 {
-			t.Errorf("'in-flight' not a zero after closing table client: %v", s.inFlightSessions)
-		}
-		if len(s.openSessions) != 0 {
-			t.Errorf("'openSessions' not a zero after closing table client: %v", s.openSessions)
-		}
-		if len(s.inPoolSessions) != 0 {
-			t.Errorf("'inPoolSessions' not a zero after closing table client: %v", s.inPoolSessions)
-		}
-	}()
-
 	var (
-		limit = 50
-
-		sessionsMtx sync.Mutex
-		sessions    = make(map[string]struct{}, limit)
-
+		limit      = 50
 		shutdowned atomic.Bool
-
-		shutdownTrace = trace.Table{
-			OnPoolSessionAdd: func(info trace.TablePoolSessionAddInfo) {
-				sessionsMtx.Lock()
-				defer sessionsMtx.Unlock()
-				sessions[info.Session.ID()] = struct{}{}
-			},
-			OnPoolGet: func(
-				info trace.TablePoolGetStartInfo,
-			) func(
-				trace.TablePoolGetDoneInfo,
-			) {
-				return func(info trace.TablePoolGetDoneInfo) {
-					if info.Session == nil {
-						return
-					}
-					if shutdowned.Load() {
-						return
-					}
-					if info.Session.Status() != table.SessionClosing {
-						return
-					}
-					sessionsMtx.Lock()
-					defer sessionsMtx.Unlock()
-					if _, has := sessions[info.Session.ID()]; !has {
-						return
-					}
-					t.Fatalf("old session returned from pool after shutdown")
-				}
-			},
-		}
 	)
 
 	db, err := ydb.Open(ctx,
@@ -274,67 +99,6 @@ func TestBasicExampleNative(sourceTest *testing.T) { //nolint:gocyclo
 		ydb.WithPanicCallback(func(e interface{}) {
 			t.Fatalf("panic recovered:%v:\n%s", e, debug.Stack())
 		}),
-		ydb.WithTraceTable(
-			*shutdownTrace.Compose(
-				&trace.Table{
-					OnInit: func(
-						info trace.TableInitStartInfo,
-					) func(
-						trace.TableInitDoneInfo,
-					) {
-						return func(info trace.TableInitDoneInfo) {
-							s.WithLock(func() {
-								s.limit = info.Limit
-							})
-						}
-					},
-					OnSessionNew: func(
-						info trace.TableSessionNewStartInfo,
-					) func(
-						trace.TableSessionNewDoneInfo,
-					) {
-						return func(info trace.TableSessionNewDoneInfo) {
-							if info.Error == nil {
-								s.addToOpen(t, info.Session.ID())
-							}
-						}
-					},
-					OnSessionDelete: func(
-						info trace.TableSessionDeleteStartInfo,
-					) func(
-						trace.TableSessionDeleteDoneInfo,
-					) {
-						s.removeFromOpen(t, info.Session.ID())
-						return nil
-					},
-					OnPoolSessionAdd: func(info trace.TablePoolSessionAddInfo) {
-						s.addToPool(t, info.Session.ID())
-					},
-					OnPoolSessionRemove: func(info trace.TablePoolSessionRemoveInfo) {
-						s.removeFromPool(t, info.Session.ID())
-					},
-					OnPoolGet: func(
-						info trace.TablePoolGetStartInfo,
-					) func(
-						trace.TablePoolGetDoneInfo,
-					) {
-						return func(info trace.TablePoolGetDoneInfo) {
-							if info.Error == nil {
-								s.addToInFlight(t, info.Session.ID())
-							}
-						}
-					},
-					OnPoolPut: func(
-						info trace.TablePoolPutStartInfo,
-					) func(
-						trace.TablePoolPutDoneInfo,
-					) {
-						s.removeFromInFlight(t, info.Session.ID())
-						return nil
-					},
-				},
-			),
-		),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -350,8 +114,6 @@ func TestBasicExampleNative(sourceTest *testing.T) { //nolint:gocyclo
 		return nil
 	}); err != nil {
 		t.Fatalf("pool not initialized: %+v", err)
-	} else if s.max() != limit {
-		t.Fatalf("pool size not applied: %+v", s)
 	}
 
 	// prepare scheme

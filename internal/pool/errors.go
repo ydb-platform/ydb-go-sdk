@@ -2,6 +2,11 @@ package pool
 
 import (
 	"errors"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	grpcCodes "google.golang.org/grpc/codes"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var (
@@ -10,3 +15,25 @@ var (
 	errPoolIsOverflow = errors.New("pool is overflow")
 	errNoProgress     = errors.New("no progress")
 )
+
+func isRetriable(err error) bool {
+	if err == nil {
+		panic(err)
+	}
+
+	switch {
+	case
+		xerrors.Is(err, errPoolIsOverflow),
+		xerrors.IsRetryableError(err),
+		xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED),
+		xerrors.IsTransportError(
+			err,
+			grpcCodes.ResourceExhausted,
+			grpcCodes.DeadlineExceeded,
+			grpcCodes.Unavailable,
+		):
+		return true
+	default:
+		return false
+	}
+}
