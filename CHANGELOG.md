@@ -1,3 +1,4 @@
+## v3.77.0
 * Changed log message about send topic message
 * Added experimental support for executing scripts over query service client (`query.Client.ExecuteScript` and `query.CLient.FetchScriptResults`)
 * Removed tx result from `query.Session.Execute` (tx can be obtained from `query.Session.Begin`)
