@@ -1,3 +1,5 @@
+* Added log topic writer ack
+
 ## v3.77.0
 * Changed log message about send topic message
 * Added experimental support for executing scripts over query service client (`query.Client.ExecuteScript` and `query.CLient.FetchScriptResults`)

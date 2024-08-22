@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
@@ -221,6 +222,48 @@ func (r *WriteResult) fromProto(response *Ydb_Topic.StreamWriteMessage_WriteResp
 	return r.WriteStatistics.fromProto(response.GetWriteStatistics())
 }
 
+// GetAcks implemtnts trace.TopicWriterResultMessagesInfoAcks interface
+func (r *WriteResult) GetAcks() (res traceAck) {
+	res.AcksCount = len(r.Acks)
+	if res.AcksCount > 0 {
+		res.SeqNoMin = r.Acks[0].SeqNo
+		res.WrittenOffsetMin = r.Acks[0].MessageWriteStatus.WrittenOffset
+	}
+	for i := range r.Acks {
+		ack := &r.Acks[i]
+		if ack.MessageWriteStatus.Type == WriteStatusTypeWritten {
+			res.WrittenCount++
+		}
+		if ack.MessageWriteStatus.Type == WriteStatusTypeSkipped {
+			res.SkipCount++
+		}
+
+		if ack.SeqNo < res.SeqNoMin {
+			res.SeqNoMin = ack.SeqNo
+		} else if ack.SeqNo > res.SeqNoMax {
+			res.SeqNoMax = ack.SeqNo
+		}
+
+		if ack.MessageWriteStatus.WrittenOffset < res.SeqNoMin {
+			res.WrittenOffsetMin = ack.MessageWriteStatus.WrittenOffset
+		} else if ack.MessageWriteStatus.WrittenOffset > res.WrittenOffsetMax {
+			res.WrittenOffsetMax = ack.MessageWriteStatus.WrittenOffset
+		}
+	}
+
+	return res
+}
+
+type traceAck = struct {
+	AcksCount        int
+	SeqNoMin         int64
+	SeqNoMax         int64
+	WrittenOffsetMin int64
+	WrittenOffsetMax int64
+	WrittenCount     int
+	SkipCount        int
+}
+
 type WriteAck struct {
 	SeqNo              int64
 	MessageWriteStatus MessageWriteStatus
@@ -268,6 +311,19 @@ const (
 	WriteStatusTypeWritten
 	WriteStatusTypeSkipped
 )
+
+func (t WriteStatusType) String() string {
+	switch t {
+	case WriteStatusTypeUnknown:
+		return "Unknown"
+	case WriteStatusTypeSkipped:
+		return "Skipped"
+	case WriteStatusTypeWritten:
+		return "Written"
+	default:
+		return strconv.Itoa(int(t))
+	}
+}
 
 type WriteStatusSkipReason int
 

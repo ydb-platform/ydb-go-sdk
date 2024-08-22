@@ -864,6 +864,25 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 		}
 	}
 	{
+		h1 := t.OnWriterReceiveResult
+		h2 := x.OnWriterReceiveResult
+		ret.OnWriterReceiveResult = func(t TopicWriterResultMessagesInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
 		h1 := t.OnWriterReadUnknownGrpcMessage
 		h2 := x.OnWriterReadUnknownGrpcMessage
 		ret.OnWriterReadUnknownGrpcMessage = func(t TopicOnWriterReadUnknownGrpcMessageInfo) {
@@ -1238,6 +1257,13 @@ func (t *Topic) onWriterSendMessages(t1 TopicWriterSendMessagesStartInfo) func(T
 	}
 	return res
 }
+func (t *Topic) onWriterReceiveResult(t1 TopicWriterResultMessagesInfo) {
+	fn := t.OnWriterReceiveResult
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
 func (t *Topic) onWriterReadUnknownGrpcMessage(t1 TopicOnWriterReadUnknownGrpcMessageInfo) {
 	fn := t.OnWriterReadUnknownGrpcMessage
 	if fn == nil {
@@ -1587,6 +1613,15 @@ func TopicOnWriterSendMessages(t *Topic, writerInstanceID string, sessionID stri
 		p.Error = e
 		res(p)
 	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnWriterReceiveResult(t *Topic, writerInstanceID string, sessionID string, partitionID int64, acks TopicWriterResultMessagesInfoAcks) {
+	var p TopicWriterResultMessagesInfo
+	p.WriterInstanceID = writerInstanceID
+	p.SessionID = sessionID
+	p.PartitionID = partitionID
+	p.Acks = acks
+	t.onWriterReceiveResult(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TopicOnWriterReadUnknownGrpcMessage(t *Topic, writerInstanceID string, sessionID string, e error) {
