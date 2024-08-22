@@ -150,3 +150,16 @@ type unretryableError struct {
 func (e unretryableError) Unwrap() error {
 	return e.error
 }
+
+func IsRetryableError(err error) bool {
+	if err == nil {
+		return true
+	}
+
+	var e *retryableError
+	if errors.As(err, &e) {
+		return e != nil
+	}
+
+	return false
+}

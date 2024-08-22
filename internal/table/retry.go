@@ -3,6 +3,8 @@ package table
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -11,26 +13,23 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// SessionProvider is the interface that holds session lifecycle logic.
-type SessionProvider interface {
-	// Get returns alive idle session or creates new one.
-	Get(ctx context.Context) (*session, error)
+// sessionPool is the interface that holds session lifecycle logic.
+type sessionPool interface {
+	closer.Closer
 
-	// Put takes no longer needed session for reuse or deletion depending
-	// on implementation.
-	// Put must be fast, if necessary must be async
-	Put(ctx context.Context, s *session) (err error)
+	Stats() pool.Stats
+	With(ctx context.Context, f func(ctx context.Context, s *session) error, opts ...retry.Option) error
 }
 
 func do(
 	ctx context.Context,
-	c SessionProvider,
+	pool sessionPool,
 	config *config.Config,
 	op table.Operation,
 	onAttempt func(err error),
 	opts ...retry.Option,
 ) (err error) {
-	return retryBackoff(ctx, c,
+	return retryBackoff(ctx, pool,
 		func(ctx context.Context, s table.Session) (err error) {
 			defer func() {
 				if onAttempt != nil {
@@ -62,33 +61,19 @@ func do(
 
 func retryBackoff(
 	ctx context.Context,
-	p SessionProvider,
+	pool sessionPool,
 	op table.Operation,
 	opts ...retry.Option,
 ) error {
-	return retry.Retry(ctx,
-		func(ctx context.Context) (err error) {
-			var s *session
+	return pool.With(ctx, func(ctx context.Context, s *session) error {
+		if err := op(ctx, s); err != nil {
+			s.checkError(err)
 
-			s, err = p.Get(ctx)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
+			return xerrors.WithStackTrace(err)
+		}
 
-			defer func() {
-				_ = p.Put(ctx, s)
-			}()
-
-			if err = op(ctx, s); err != nil {
-				s.checkError(err)
-
-				return xerrors.WithStackTrace(err)
-			}
-
-			return nil
-		},
-		opts...,
-	)
+		return nil
+	}, opts...)
 }
 
 func (c *Client) retryOptions(opts ...table.Option) *table.Options {

@@ -57,6 +57,10 @@ type session struct {
 	nodeID       atomic.Uint32
 }
 
+func (s *session) IsAlive() bool {
+	return s.Status() == table.SessionReady
+}
+
 func (s *session) LastUsage() time.Time {
 	return time.Unix(s.lastUsage.Load(), 0)
 }
@@ -108,14 +112,6 @@ func (s *session) SetStatus(status table.SessionStatus) {
 
 func (s *session) isClosed() bool {
 	return s.Status() == table.SessionClosed
-}
-
-func (s *session) isClosing() bool {
-	return s.Status() == table.SessionClosing
-}
-
-func (s *session) isReady() bool {
-	return s.Status() == table.SessionReady
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (

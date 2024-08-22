@@ -69,6 +69,7 @@ type (
 		// Safe replacement of context are provided only inside stack.Callerback function
 		Context *context.Context
 		Call    stack.Caller
+		Item    any
 	}
 	PutDoneInfo struct {
 		Error error
@@ -82,6 +83,20 @@ type (
 		Call    stack.Caller
 	}
 	GetDoneInfo struct {
+		Item     any
+		Attempts int
+		Error    error
+	}
+	WaitStartInfo struct {
+		// Context make available context in trace stack.Callerback function.
+		// Pointer to context provide replacement of context in trace stack.Callerback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside stack.Callerback function
+		Context *context.Context
+		Call    stack.Caller
+	}
+	WaitDoneInfo struct {
+		Item  any
 		Error error
 	}
 	ChangeInfo = Stats

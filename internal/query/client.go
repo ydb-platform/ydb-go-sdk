@@ -541,7 +541,7 @@ func newPool(
 			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
 			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
-			pool.WithCreateFunc(createSession),
+			pool.WithCreateItemFunc(createSession),
 		)
 	}
 
