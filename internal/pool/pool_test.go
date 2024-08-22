@@ -26,6 +26,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 type (
@@ -229,9 +231,7 @@ func TestPool(t *testing.T) {
 					return &v, nil
 				}),
 				// replace default async closer for sync testing
-				withCloseItemFunc(func(ctx context.Context, item *testItem) {
-					_ = item.Close(ctx)
-				}),
+				WithSyncCloseItem[*testItem, testItem](),
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
 
@@ -301,9 +301,7 @@ func TestPool(t *testing.T) {
 					}
 					p := New[*testItem, testItem](rootCtx,
 						// replace default async closer for sync testing
-						withCloseItemFunc(func(ctx context.Context, item *testItem) {
-							_ = item.Close(ctx)
-						}),
+						WithSyncCloseItem[*testItem, testItem](),
 						WithLimit[*testItem, testItem](1),
 						WithTrace[*testItem, testItem](&Trace{
 							onWait: func() func(item any, err error) {
@@ -394,9 +392,7 @@ func TestPool(t *testing.T) {
 					}),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					// replace default async closer for sync testing
-					withCloseItemFunc[*testItem, testItem](func(ctx context.Context, item *testItem) {
-						_ = item.Close(ctx)
-					}),
+					WithSyncCloseItem[*testItem, testItem](),
 					WithClock[*testItem, testItem](fakeClock),
 					WithIdleThreshold[*testItem, testItem](idleThreshold),
 					WithTrace[*testItem, testItem](defaultTrace),
@@ -560,9 +556,7 @@ func TestPool(t *testing.T) {
 					defer cancel()
 					p := New[*testItem, testItem](rootCtx,
 						// replace default async closer for sync testing
-						withCloseItemFunc(func(ctx context.Context, item *testItem) {
-							_ = item.Close(ctx)
-						}),
+						WithSyncCloseItem[*testItem, testItem](),
 					)
 					defer func() {
 						_ = p.Close(context.Background())
@@ -618,6 +612,60 @@ func TestPool(t *testing.T) {
 				})
 			})
 		})
+		t.Run("DoBackoffRetryCancelation", func(t *testing.T) {
+			for _, testErr := range []error{
+				// Errors leading to Wait repeat.
+				xerrors.Transport(
+					grpcStatus.Error(grpcCodes.ResourceExhausted, ""),
+				),
+				fmt.Errorf("wrap transport error: %w", xerrors.Transport(
+					grpcStatus.Error(grpcCodes.ResourceExhausted, ""),
+				)),
+				xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+				fmt.Errorf("wrap op error: %w", xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
+			} {
+				t.Run("", func(t *testing.T) {
+					backoff := make(chan chan time.Time)
+					ctx, cancel := xcontext.WithCancel(context.Background())
+					p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
+
+					results := make(chan error)
+					go func() {
+						err := p.With(ctx,
+							func(ctx context.Context, item *testItem) error {
+								return testErr
+							},
+							retry.WithFastBackoff(
+								testutil.BackoffFunc(func(n int) <-chan time.Time {
+									ch := make(chan time.Time)
+									backoff <- ch
+
+									return ch
+								}),
+							),
+							retry.WithSlowBackoff(
+								testutil.BackoffFunc(func(n int) <-chan time.Time {
+									ch := make(chan time.Time)
+									backoff <- ch
+
+									return ch
+								}),
+							),
+						)
+						results <- err
+					}()
+
+					select {
+					case <-backoff:
+						t.Logf("expected result")
+					case res := <-results:
+						t.Fatalf("unexpected result: %v", res)
+					}
+
+					cancel()
+				})
+			}
+		})
 	})
 	t.Run("Item", func(t *testing.T) {
 		t.Run("Close", func(t *testing.T) {
@@ -642,9 +690,7 @@ func TestPool(t *testing.T) {
 						return v, nil
 					}),
 					// replace default async closer for sync testing
-					withCloseItemFunc(func(ctx context.Context, item *testItem) {
-						_ = item.Close(ctx)
-					}),
+					WithSyncCloseItem[*testItem, testItem](),
 				)
 				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					return nil
@@ -684,9 +730,7 @@ func TestPool(t *testing.T) {
 						return v, nil
 					}),
 					// replace default async closer for sync testing
-					withCloseItemFunc(func(ctx context.Context, item *testItem) {
-						_ = item.Close(ctx)
-					}),
+					WithSyncCloseItem[*testItem, testItem](),
 				)
 				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					if newItems.Load() < 10 {
@@ -744,9 +788,7 @@ func TestPool(t *testing.T) {
 					return &v, nil
 				}),
 				// replace default async closer for sync testing
-				withCloseItemFunc(func(ctx context.Context, item *testItem) {
-					_ = item.Close(ctx)
-				}),
+				WithSyncCloseItem[*testItem, testItem](),
 			)
 			defer func() {
 				_ = p.Close(context.Background())
@@ -778,9 +820,7 @@ func TestPool(t *testing.T) {
 				p := New[*testItem, testItem](rootCtx,
 					WithTrace[*testItem, testItem](trace),
 					// replace default async closer for sync testing
-					withCloseItemFunc(func(ctx context.Context, item *testItem) {
-						_ = item.Close(ctx)
-					}),
+					WithSyncCloseItem[*testItem, testItem](),
 				)
 				r := xrand.New(xrand.WithLock())
 				var wg sync.WaitGroup
@@ -848,9 +888,7 @@ func TestPool(t *testing.T) {
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 				// replace default async closer for sync testing
-				withCloseItemFunc(func(ctx context.Context, item *testItem) {
-					_ = item.Close(ctx)
-				}),
+				WithSyncCloseItem[*testItem, testItem](),
 			)
 			item := mustGetItem(t, p)
 			if err := p.putItem(context.Background(), item); err != nil {
@@ -867,9 +905,7 @@ func TestPool(t *testing.T) {
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 				// replace default async closer for sync testing
-				withCloseItemFunc(func(ctx context.Context, item *testItem) {
-					_ = item.Close(ctx)
-				}),
+				WithSyncCloseItem[*testItem, testItem](),
 			)
 			item := mustGetItem(t, p)
 			mustPutItem(t, p, item)

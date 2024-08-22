@@ -11,6 +11,7 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -70,6 +71,7 @@ func TestDoBackoffRetryCancelation(t *testing.T) {
 
 			select {
 			case <-backoff:
+				t.Logf("expected result")
 			case res := <-results:
 				t.Fatalf("unexpected result: %v", res)
 			}
@@ -80,75 +82,64 @@ func TestDoBackoffRetryCancelation(t *testing.T) {
 }
 
 func TestDoBadSession(t *testing.T) {
-	closed := make(map[table.Session]bool)
-	p := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (*session, error) {
-			s := simpleSession(t)
-			s.onClose = append(s.onClose, func(s *session) {
-				closed[s] = true
-			})
+	ctx := xtest.Context(t)
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		closed := make(map[table.Session]bool)
+		p := pool.New[*session, session](ctx,
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+				s := simpleSession(t)
+				s.onClose = append(s.onClose, func(s *session) {
+					closed[s] = true
+				})
 
-			return s, nil
-		},
-		OnPut: func(ctx context.Context, s *session) error {
-			if s.isClosing() {
-				return s.Close(ctx)
-			}
+				return s, nil
+			}),
+			pool.WithSyncCloseItem[*session, session](),
+		)
+		var (
+			i          int
+			maxRetryes = 100
+			sessions   []table.Session
+		)
+		ctx, cancel := xcontext.WithCancel(context.Background())
+		err := do(ctx, p, config.New(),
+			func(ctx context.Context, s table.Session) error {
+				sessions = append(sessions, s)
+				i++
+				if i > maxRetryes {
+					cancel()
+				}
 
-			return nil
-		},
-	}
-	var (
-		i          int
-		maxRetryes = 100
-		sessions   []table.Session
-	)
-	ctx, cancel := xcontext.WithCancel(context.Background())
-	err := do(ctx, p, config.New(),
-		func(ctx context.Context, s table.Session) error {
-			sessions = append(sessions, s)
-			i++
-			if i > maxRetryes {
-				cancel()
-			}
-
-			return xerrors.Operation(
-				xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
-			)
-		},
-		func(err error) {},
-	)
-	if !xerrors.Is(err, context.Canceled) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	seen := make(map[table.Session]bool, len(sessions))
-	for _, s := range sessions {
-		if seen[s] {
-			t.Errorf("session used twice")
-		} else {
-			seen[s] = true
+				return xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+			},
+			func(err error) {},
+		)
+		if !xerrors.Is(err, context.Canceled) {
+			t.Errorf("unexpected error: %v", err)
 		}
-		if !closed[s] {
-			t.Errorf("bad session was not closed")
+		seen := make(map[table.Session]bool, len(sessions))
+		for _, s := range sessions {
+			if seen[s] {
+				t.Errorf("session used twice")
+			} else {
+				seen[s] = true
+			}
+			if !closed[s] {
+				t.Errorf("bad session was not closed")
+			}
 		}
-	}
+	})
 }
 
 func TestDoCreateSessionError(t *testing.T) {
-	p := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (*session, error) {
-			return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
-		},
-		OnPut: func(ctx context.Context, s *session) error {
-			if s.isClosing() {
-				return s.Close(ctx)
-			}
-
-			return nil
-		},
-	}
 	ctx, cancel := xcontext.WithTimeout(xtest.Context(t), time.Second)
 	defer cancel()
+	p := pool.New[*session, session](ctx,
+		pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+			return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
+		}),
+		pool.WithSyncCloseItem[*session, session](),
+	)
 	err := do(ctx, p, config.New(),
 		func(ctx context.Context, s table.Session) error {
 			return nil
@@ -160,56 +151,6 @@ func TestDoCreateSessionError(t *testing.T) {
 	}
 	if !xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE) {
 		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestDoSessionClosing(t *testing.T) {
-	closed := make(map[table.Session]bool)
-	p := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (*session, error) {
-			s := simpleSession(t)
-			s.onClose = append(s.onClose, func(s *session) {
-				closed[s] = true
-			})
-
-			return s, nil
-		},
-		OnPut: func(ctx context.Context, s *session) error {
-			if s.isClosing() {
-				return s.Close(ctx)
-			}
-
-			return nil
-		},
-	}
-	var sessions []table.Session
-	for i := 0; i < 1000; i++ {
-		err := do(
-			context.Background(),
-			p,
-			config.New(),
-			func(ctx context.Context, s table.Session) error {
-				sessions = append(sessions, s)
-				s.(*session).SetStatus(table.SessionClosing)
-
-				return nil
-			},
-			nil,
-		)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	}
-	seen := make(map[table.Session]bool, len(sessions))
-	for _, s := range sessions {
-		if seen[s] {
-			t.Errorf("session used twice")
-		} else {
-			seen[s] = true
-		}
-		if !closed[s] {
-			t.Errorf("bad session was not closed")
-		}
 	}
 }
 
@@ -360,9 +301,13 @@ func TestDoContextDeadline(t *testing.T) {
 	client := &Client{
 		cc: testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
-	p := SessionProviderFunc{
-		OnGet: client.internalPoolCreateSession,
-	}
+	ctx := xtest.Context(t)
+	p := pool.New[*session, session](ctx,
+		pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+			return newSession(ctx, client.cc, config.New())
+		}),
+		pool.WithSyncCloseItem[*session, session](),
+	)
 	r := xrand.New(xrand.WithLock())
 	for i := range timeouts {
 		for j := range sleeps {
@@ -406,11 +351,13 @@ func TestDoWithCustomErrors(t *testing.T) {
 	var (
 		limit = 10
 		ctx   = context.Background()
-		p     = SessionProviderFunc{
-			OnGet: func(ctx context.Context) (*session, error) {
+		p     = pool.New[*session, session](ctx,
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
 				return simpleSession(t), nil
-			},
-		}
+			}),
+			pool.WithLimit[*session, session](limit),
+			pool.WithSyncCloseItem[*session, session](),
+		)
 	)
 	for _, test := range []struct {
 		error         error
@@ -514,59 +461,32 @@ func TestDoWithCustomErrors(t *testing.T) {
 	}
 }
 
-type SessionProviderFunc struct {
-	OnGet func(context.Context) (*session, error)
-	OnPut func(context.Context, *session) error
-}
-
-var _ SessionProvider = SessionProviderFunc{}
-
-func (f SessionProviderFunc) Get(ctx context.Context) (*session, error) {
-	if f.OnGet == nil {
-		return nil, xerrors.WithStackTrace(errNoSession)
-	}
-
-	return f.OnGet(ctx)
-}
-
-func (f SessionProviderFunc) Put(ctx context.Context, s *session) error {
-	if f.OnPut == nil {
-		return xerrors.WithStackTrace(testutil.ErrNotImplemented)
-	}
-
-	return f.OnPut(ctx, s)
-}
-
-// SingleSession returns SessionProvider that uses only given session during
-// retries.
-func SingleSession(s *session) SessionProvider {
+// SingleSession returns sessionPool that uses only given session during retries.
+func SingleSession(s *session) sessionPool {
 	return &singleSession{s: s}
 }
 
 type singleSession struct {
-	s     *session
-	empty bool
+	s *session
 }
 
-func (s *singleSession) Get(context.Context) (*session, error) {
-	if s.empty {
-		return nil, xerrors.WithStackTrace(errNoSession)
-	}
-	s.empty = true
-
-	return s.s, nil
+func (s *singleSession) Close(ctx context.Context) error {
+	return s.s.Close(ctx)
 }
 
-func (s *singleSession) Put(_ context.Context, x *session) error {
-	if x != s.s {
-		return xerrors.WithStackTrace(errUnexpectedSession)
+func (s *singleSession) Stats() pool.Stats {
+	return pool.Stats{
+		Limit: 1,
+		Index: 1,
 	}
-	if !s.empty {
-		return xerrors.WithStackTrace(errSessionOverflow)
-	}
-	s.empty = false
+}
 
-	return nil
+func (s *singleSession) With(ctx context.Context,
+	f func(ctx context.Context, s *session) error, opts ...retry.Option,
+) error {
+	return retry.Retry(ctx, func(ctx context.Context) error {
+		return f(ctx, s.s)
+	}, opts...)
 }
 
 var (

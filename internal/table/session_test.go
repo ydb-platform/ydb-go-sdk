@@ -273,8 +273,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableCreateSession,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
-				_, err := c.internalPoolCreateSession(ctx)
-				require.NoError(t, err)
+				_ = simpleSession(t)
 			},
 		},
 		{
