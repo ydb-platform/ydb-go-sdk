@@ -289,7 +289,7 @@ func (c *Client) isClosed() bool {
 }
 
 // c.mu must NOT be held.
-func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err error) {
+func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err error) { //nolint:funlen
 	if c.isClosed() {
 		return nil, errClosedClient
 	}
@@ -322,7 +322,9 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 					touched: c.clock.Now(),
 				}
 				trace.TableOnPoolSessionAdd(c.config.Trace(), s)
-				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+				trace.TableOnPoolStateChange(c.config.Trace(),
+					c.limit, len(c.index), c.idle.Len(), c.waitQ.Len(), c.createInProgress, len(c.index),
+				)
 			})
 		}), withCreateSessionOnClose(func(s *session) {
 			c.mu.WithLock(func() {
@@ -334,7 +336,9 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 				delete(c.index, s)
 
 				trace.TableOnPoolSessionRemove(c.config.Trace(), s)
-				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
+				trace.TableOnPoolStateChange(c.config.Trace(),
+					c.limit, len(c.index), c.idle.Len(), c.waitQ.Len(), c.createInProgress, len(c.index),
+				)
 
 				if !c.isClosed() {
 					c.internalPoolNotify(nil)

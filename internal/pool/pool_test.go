@@ -268,11 +268,12 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("Stress", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
-			trace := *defaultTrace
-			trace.OnChange = func(info ChangeInfo) {
-				require.GreaterOrEqual(t, info.Limit, info.Idle)
+			trace := &Trace{
+				OnChange: func(info Stats) {
+					require.GreaterOrEqual(t, info.Limit, info.Idle)
+				},
 			}
-			p := New[*testItem, testItem](rootCtx, WithTrace[*testItem, testItem](&trace))
+			p := New[*testItem, testItem](rootCtx, WithTrace[*testItem, testItem](trace))
 			var wg sync.WaitGroup
 			wg.Add(DefaultLimit*2 + 1)
 			for range make([]struct{}, DefaultLimit*2) {
@@ -297,12 +298,13 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("ParallelCreation", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
-			trace := *defaultTrace
-			trace.OnChange = func(info ChangeInfo) {
-				require.Equal(t, DefaultLimit, info.Limit)
-				require.LessOrEqual(t, info.Idle, DefaultLimit)
+			trace := &Trace{
+				OnChange: func(info Stats) {
+					require.Equal(t, DefaultLimit, info.Limit)
+					require.LessOrEqual(t, info.Idle, DefaultLimit)
+				},
 			}
-			p := New[*testItem, testItem](rootCtx, WithTrace[*testItem, testItem](&trace))
+			p := New[*testItem, testItem](rootCtx, WithTrace[*testItem, testItem](trace))
 			var wg sync.WaitGroup
 			for range make([]struct{}, DefaultLimit*10) {
 				wg.Add(1)
