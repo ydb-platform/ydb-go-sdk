@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation/metadata"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -22,25 +23,28 @@ type (
 	Client struct {
 		operationServiceClient Ydb_Operation_V1.OperationServiceClient
 	}
-	ListOperations struct {
-		NextToken  string
-		Operations []*Operation
-	}
-	// Operation describes operation
-	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	Operation struct {
+	listOperations[PT metadata.Constraint[T], T metadata.TypesConstraint] struct {
+		NextToken  string
+		Operations []*typedOperation[PT, T]
+	}
+	operation struct {
 		ID            string
 		Ready         bool
 		Status        string
 		ConsumedUnits float64
+	}
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	typedOperation[PT metadata.Constraint[T], T metadata.TypesConstraint] struct {
+		operation
+		Metadata *T
 	}
 )
 
 // Get returns operation status by ID
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (c *Client) Get(ctx context.Context, opID string) (*Operation, error) {
+func (c *Client) Get(ctx context.Context, opID string) (*operation, error) {
 	op, err := get(ctx, c.operationServiceClient, opID)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -51,8 +55,8 @@ func (c *Client) Get(ctx context.Context, opID string) (*Operation, error) {
 
 func get(
 	ctx context.Context, client Ydb_Operation_V1.OperationServiceClient, opID string,
-) (*Operation, error) {
-	status, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Operation, error) {
+) (*operation, error) {
+	status, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*operation, error) {
 		response, err := client.GetOperation(
 			conn.WithoutWrapping(ctx),
 			&Ydb_Operations.GetOperationRequest{
@@ -69,7 +73,7 @@ func get(
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		return &Operation{
+		return &operation{
 			Ready:  response.GetOperation().GetReady(),
 			Status: response.GetOperation().GetStatus().String(),
 		}, nil
@@ -81,10 +85,12 @@ func get(
 	return status, nil
 }
 
-func list(
+func list[PT metadata.Constraint[T], T metadata.TypesConstraint](
 	ctx context.Context, client Ydb_Operation_V1.OperationServiceClient, request *Ydb_Operations.ListOperationsRequest,
-) (*ListOperations, error) {
-	operations, err := retry.RetryWithResult(ctx, func(ctx context.Context) (operations *ListOperations, _ error) {
+) (*listOperations[PT, T], error) {
+	operations, err := retry.RetryWithResult(ctx, func(ctx context.Context) (
+		operations *listOperations[PT, T], _ error,
+	) {
 		response, err := client.ListOperations(conn.WithoutWrapping(ctx), request)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -97,45 +103,25 @@ func list(
 			))
 		}
 
-		operations = &ListOperations{
+		operations = &listOperations[PT, T]{
 			NextToken:  response.GetNextPageToken(),
-			Operations: make([]*Operation, 0, len(response.GetOperations())),
+			Operations: make([]*typedOperation[PT, T], 0, len(response.GetOperations())),
 		}
 
 		for _, op := range response.GetOperations() {
-			operations.Operations = append(operations.Operations, &Operation{
-				ID:            op.GetId(),
-				Ready:         op.GetReady(),
-				Status:        op.GetStatus().String(),
-				ConsumedUnits: op.GetCostInfo().GetConsumedUnits(),
+			operations.Operations = append(operations.Operations, &typedOperation[PT, T]{
+				operation: operation{
+					ID:            op.GetId(),
+					Ready:         op.GetReady(),
+					Status:        op.GetStatus().String(),
+					ConsumedUnits: op.GetCostInfo().GetConsumedUnits(),
+				},
+				Metadata: metadata.FromProto[PT, T](op.GetMetadata()),
 			})
 		}
 
 		return operations, nil
 	}, retry.WithIdempotent(true))
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return operations, nil
-}
-
-// List returns list of operations that match the specified filter in the request.
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (c *Client) List(ctx context.Context, kind kind, opts ...options.List) (*ListOperations, error) {
-	request := &options.ListOperationsRequest{
-		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
-			Kind: string(kind),
-		},
-	}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(request)
-		}
-	}
-
-	operations, err := list(ctx, c.operationServiceClient, &request.ListOperationsRequest)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -224,6 +210,122 @@ func (c *Client) Forget(ctx context.Context, opID string) error {
 
 func (c *Client) Close(ctx context.Context) error {
 	return nil
+}
+
+// ListBuildIndex returns list of build index operations
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (c *Client) ListBuildIndex(ctx context.Context) (
+	*listOperations[*metadata.BuildIndex, metadata.BuildIndex], error,
+) {
+	request := &options.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+			Kind: kindBuildIndex,
+		},
+	}
+
+	operations, err := list[*metadata.BuildIndex, metadata.BuildIndex](
+		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return operations, nil
+}
+
+// ListImportFromS3 returns list of import from s3 operations
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (c *Client) ListImportFromS3(ctx context.Context) (
+	*listOperations[*metadata.ImportFromS3, metadata.ImportFromS3], error,
+) {
+	request := &options.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+			Kind: kindImportFromS3,
+		},
+	}
+
+	operations, err := list[*metadata.ImportFromS3, metadata.ImportFromS3](
+		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return operations, nil
+}
+
+// ListExportToS3 returns list of export to s3 operations
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (c *Client) ListExportToS3(ctx context.Context) (
+	*listOperations[*metadata.ExportToS3, metadata.ExportToS3], error,
+) {
+	request := &options.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+			Kind: kindExportToS3,
+		},
+	}
+
+	operations, err := list[*metadata.ExportToS3, metadata.ExportToS3](
+		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return operations, nil
+}
+
+// ListExportToYT returns list of export to YT operations
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (c *Client) ListExportToYT(ctx context.Context) (
+	*listOperations[*metadata.ExportToYT, metadata.ExportToYT], error,
+) {
+	request := &options.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+			Kind: kindExportToYT,
+		},
+	}
+
+	operations, err := list[*metadata.ExportToYT, metadata.ExportToYT](
+		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return operations, nil
+}
+
+// ListExecuteQuery returns list of query executions
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (c *Client) ListExecuteQuery(ctx context.Context, opts ...options.List) (
+	*listOperations[*metadata.ExecuteQuery, metadata.ExecuteQuery], error,
+) {
+	request := &options.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+			Kind: kindExecuteQuery,
+		},
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(request)
+		}
+	}
+
+	operations, err := list[*metadata.ExecuteQuery, metadata.ExecuteQuery](
+		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return operations, nil
 }
 
 func New(ctx context.Context, balancer grpc.ClientConnInterface) *Client {
