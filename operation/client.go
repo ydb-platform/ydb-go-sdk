@@ -24,8 +24,12 @@ type (
 		operationServiceClient Ydb_Operation_V1.OperationServiceClient
 	}
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	listOperationsWithNextToken[PT metadata.Constraint[T], T metadata.TypesConstraint] struct {
+		listOperations[PT, T]
+		NextToken string
+	}
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	listOperations[PT metadata.Constraint[T], T metadata.TypesConstraint] struct {
-		NextToken  string
 		Operations []*typedOperation[PT, T]
 	}
 	operation struct {
@@ -87,9 +91,9 @@ func get(
 
 func list[PT metadata.Constraint[T], T metadata.TypesConstraint](
 	ctx context.Context, client Ydb_Operation_V1.OperationServiceClient, request *Ydb_Operations.ListOperationsRequest,
-) (*listOperations[PT, T], error) {
+) (*listOperationsWithNextToken[PT, T], error) {
 	operations, err := retry.RetryWithResult(ctx, func(ctx context.Context) (
-		operations *listOperations[PT, T], _ error,
+		operations *listOperationsWithNextToken[PT, T], _ error,
 	) {
 		response, err := client.ListOperations(conn.WithoutWrapping(ctx), request)
 		if err != nil {
@@ -103,9 +107,11 @@ func list[PT metadata.Constraint[T], T metadata.TypesConstraint](
 			))
 		}
 
-		operations = &listOperations[PT, T]{
-			NextToken:  response.GetNextPageToken(),
-			Operations: make([]*typedOperation[PT, T], 0, len(response.GetOperations())),
+		operations = &listOperationsWithNextToken[PT, T]{
+			listOperations: listOperations[PT, T]{
+				Operations: make([]*typedOperation[PT, T], 0, len(response.GetOperations())),
+			},
+			NextToken: response.GetNextPageToken(),
 		}
 
 		for _, op := range response.GetOperations() {
@@ -231,7 +237,7 @@ func (c *Client) ListBuildIndex(ctx context.Context) (
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return operations, nil
+	return &operations.listOperations, nil
 }
 
 // ListImportFromS3 returns list of import from s3 operations
@@ -253,7 +259,7 @@ func (c *Client) ListImportFromS3(ctx context.Context) (
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return operations, nil
+	return &operations.listOperations, nil
 }
 
 // ListExportToS3 returns list of export to s3 operations
@@ -275,7 +281,7 @@ func (c *Client) ListExportToS3(ctx context.Context) (
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return operations, nil
+	return &operations.listOperations, nil
 }
 
 // ListExportToYT returns list of export to YT operations
@@ -297,14 +303,14 @@ func (c *Client) ListExportToYT(ctx context.Context) (
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return operations, nil
+	return &operations.listOperations, nil
 }
 
 // ListExecuteQuery returns list of query executions
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) ListExecuteQuery(ctx context.Context, opts ...options.List) (
-	*listOperations[*metadata.ExecuteQuery, metadata.ExecuteQuery], error,
+	*listOperationsWithNextToken[*metadata.ExecuteQuery, metadata.ExecuteQuery], error,
 ) {
 	request := &options.ListOperationsRequest{
 		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
