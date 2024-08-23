@@ -26,33 +26,92 @@ func TestQueryTxExecute(t *testing.T) {
 		columnNames []string
 		columnTypes []string
 	)
-	err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-		res, err := tx.Query(ctx, "SELECT 1 AS col1")
-		if err != nil {
-			return err
-		}
-		rs, err := res.NextResultSet(ctx)
-		if err != nil {
-			return err
-		}
-		columnNames = rs.Columns()
-		for _, t := range rs.ColumnTypes() {
-			columnTypes = append(columnTypes, t.Yql())
-		}
-		row, err := rs.NextRow(ctx)
-		if err != nil {
-			return err
-		}
-		var col1 int
-		err = row.ScanNamed(query.Named("col1", &col1))
-		if err != nil {
-			return err
-		}
-		return nil
-	}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
-	require.NoError(t, err)
-	require.Equal(t, []string{"col1"}, columnNames)
-	require.Equal(t, []string{"Int32"}, columnTypes)
+	t.Run("SerializableReadWrite", func(t *testing.T) {
+		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			columnNames = rs.Columns()
+			for _, t := range rs.ColumnTypes() {
+				columnTypes = append(columnTypes, t.Yql())
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			return nil
+		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
+		require.NoError(t, err)
+		require.Equal(t, []string{"col1"}, columnNames)
+		require.Equal(t, []string{"Int32"}, columnTypes)
+	})
+	t.Run("SnapshotReadOnly", func(t *testing.T) {
+		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			columnNames = rs.Columns()
+			for _, t := range rs.ColumnTypes() {
+				columnTypes = append(columnTypes, t.Yql())
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			return nil
+		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSnapshotReadOnly())))
+		require.NoError(t, err)
+		require.Equal(t, []string{"col1"}, columnNames)
+		require.Equal(t, []string{"Int32"}, columnTypes)
+	})
+	t.Run("OnlineReadOnly", func(t *testing.T) {
+		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			columnNames = rs.Columns()
+			for _, t := range rs.ColumnTypes() {
+				columnTypes = append(columnTypes, t.Yql())
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			return nil
+		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithOnlineReadOnly())))
+		require.Error(t, err)
+		require.ErrorIs(t, err, query.ErrIncompatibleTxSettings)
+	})
 }
 
 func TestQueryWithCommitTxFlag(t *testing.T) {
