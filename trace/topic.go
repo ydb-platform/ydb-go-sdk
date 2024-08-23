@@ -121,6 +121,8 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterSendMessages func(TopicWriterSendMessagesStartInfo) func(TopicWriterSendMessagesDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnWriterReceiveResult func(TopicWriterResultMessagesInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterReadUnknownGrpcMessage func(TopicOnWriterReadUnknownGrpcMessageInfo)
 	}
 
@@ -468,6 +470,27 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterSendMessagesDoneInfo struct {
 		Error error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicWriterResultMessagesInfo struct {
+		WriterInstanceID string
+		SessionID        string
+		PartitionID      int64
+		Acks             TopicWriterResultMessagesInfoAcks
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicWriterResultMessagesInfoAcks interface {
+		GetAcks() struct {
+			AcksCount        int
+			SeqNoMin         int64
+			SeqNoMax         int64
+			WrittenOffsetMin int64
+			WrittenOffsetMax int64
+			WrittenCount     int
+			SkipCount        int
+		}
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

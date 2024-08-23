@@ -820,6 +820,25 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			}
 		}
 	}
+	t.OnWriterReceiveResult = func(info trace.TopicWriterResultMessagesInfo) {
+		if d.Details()&trace.TopicWriterStreamEvents == 0 {
+			return
+		}
+		acks := info.Acks.GetAcks()
+		ctx := with(context.Background(), DEBUG, "ydb", "topic", "writer", "receive", "result")
+		l.Log(ctx, "topic writer receive result from server",
+			String("writer_instance_id", info.WriterInstanceID),
+			String("session_id", info.SessionID),
+			Int("acks_count", acks.AcksCount),
+			Int64("seq_no_min", acks.SeqNoMin),
+			Int64("seq_no_max", acks.SeqNoMax),
+			Int64("written_offset_min", acks.WrittenOffsetMin),
+			Int64("written_offset_max", acks.WrittenOffsetMax),
+			Int("written_offset_count", acks.WrittenCount),
+			Int("skip_count", acks.SkipCount),
+			versionField(),
+		)
+	}
 	t.OnWriterReadUnknownGrpcMessage = func(info trace.TopicOnWriterReadUnknownGrpcMessageInfo) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return
