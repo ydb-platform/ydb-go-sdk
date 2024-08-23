@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -135,7 +134,7 @@ func (s *executeScriptSettings) ResultsTTL() time.Duration {
 	return s.ttl
 }
 
-func executeScript(ctx context.Context, //nolint:funlen
+func executeScript(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient, request *Ydb_Query.ExecuteScriptRequest, grpcOpts ...grpc.CallOption,
 ) (*options.ExecuteScriptOperation, error) {
 	op, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.ExecuteScriptOperation, error) {
@@ -144,79 +143,10 @@ func executeScript(ctx context.Context, //nolint:funlen
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		var md Ydb_Query.ExecuteScriptMetadata
-		err = response.GetMetadata().UnmarshalTo(&md)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
 		return &options.ExecuteScriptOperation{
 			ID:            response.GetId(),
 			ConsumedUnits: response.GetCostInfo().GetConsumedUnits(),
-			Metadata: struct {
-				ID     string
-				Script struct {
-					Syntax options.Syntax
-					Query  string
-				}
-				Mode           options.ExecMode
-				Stats          stats.QueryStats
-				ResultSetsMeta []struct {
-					Columns []struct {
-						Name string
-						Type query.Type
-					}
-				}
-			}{
-				ID: md.GetExecutionId(),
-				Script: struct {
-					Syntax options.Syntax
-					Query  string
-				}{
-					Syntax: options.Syntax(md.GetScriptContent().GetSyntax()),
-					Query:  md.GetScriptContent().GetText(),
-				},
-				Mode:  options.ExecMode(md.GetExecMode()),
-				Stats: stats.FromQueryStats(md.GetExecStats()),
-				ResultSetsMeta: func() (
-					resultSetsMeta []struct {
-						Columns []struct {
-							Name string
-							Type query.Type
-						}
-					},
-				) {
-					for _, rs := range md.GetResultSetsMeta() {
-						resultSetsMeta = append(resultSetsMeta, struct {
-							Columns []struct {
-								Name string
-								Type query.Type
-							}
-						}{
-							Columns: func() (
-								columns []struct {
-									Name string
-									Type types.Type
-								},
-							) {
-								for _, c := range rs.GetColumns() {
-									columns = append(columns, struct {
-										Name string
-										Type types.Type
-									}{
-										Name: c.GetName(),
-										Type: types.TypeFromYDB(c.GetType()),
-									})
-								}
-
-								return columns
-							}(),
-						})
-					}
-
-					return resultSetsMeta
-				}(),
-			},
+			Metadata:      options.ToMetadataExecuteQuery(response.GetMetadata()),
 		}, nil
 	}, retry.WithIdempotent(true))
 	if err != nil {

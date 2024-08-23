@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -36,22 +35,10 @@ func TestOperationList(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+	operations, err := db.Operation().ListBuildIndex(ctx)
+	require.NoError(t, err)
 
-	var nextToken string
-	for {
-		operations, err := db.Operation().List(ctx, operation.KindBuildIndex,
-			operation.WithPageSize(10),
-			operation.WithPageToken(nextToken),
-		)
-		require.NoError(t, err)
-		nextToken = operations.NextToken
-
-		for _, op := range operations.Operations {
-			t.Log(op)
-		}
-
-		if len(operations.Operations) == 0 || nextToken == "" {
-			break
-		}
+	for _, op := range operations.Operations {
+		t.Logf("operation: %+v\n", op)
 	}
 }

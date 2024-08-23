@@ -1,11 +1,9 @@
 package operation
 
-type kind string
-
 const (
-	KindScriptExec = kind("scriptexec")
-	KindBuildIndex = kind("buildindex")
-	KindImportS3   = kind("import/s3")
-	KindExportS3   = kind("export/s3")
-	KindExportYT   = kind("export/yt")
+	kindExecuteQuery = "scriptexec"
+	kindBuildIndex   = "buildindex"
+	kindImportFromS3 = "import/s3"
+	kindExportToS3   = "export/s3"
+	kindExportToYT   = "export/yt"
 )

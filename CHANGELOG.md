@@ -1,4 +1,5 @@
 * Added log topic writer ack
+* Replaced `operation.Client.List` to five methods for listing operations `operation.List{BuildIndex,ImportFromS3,ExportToS3,ExportToYT,ExecuteQuery}`
 
 ## v3.77.0
 * Changed log message about send topic message
