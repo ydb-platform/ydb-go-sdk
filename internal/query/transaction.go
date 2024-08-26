@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -23,12 +24,18 @@ var (
 	_ baseTx.Transaction = (*Transaction)(nil)
 )
 
+const (
+	LazyTxID = "LAZY_TX"
+)
+
 type (
 	Transaction struct {
 		baseTx.Identifier
 
 		s          *Session
 		txSettings query.TransactionSettings
+
+		completed bool
 
 		onCompleted xsync.Set[*baseTx.OnTransactionCompletedFunc]
 	}
@@ -77,12 +84,14 @@ func (tx *Transaction) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	settings := options.ExecuteSettings(
-		append(
-			[]options.Execute{options.WithTxControl(tx.txControl())},
-			opts...,
-		)...,
-	)
+	if tx.completed {
+		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
+	}
+
+	settings, err := tx.executeSettings(opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.cfg.Trace()),
@@ -101,7 +110,15 @@ func (tx *Transaction) QueryResultSet(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if tx.Identifier == nil {
+	if settings.TxControl().Commit {
+		if txID != nil {
+			return nil, xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
+		}
+		tx.completed = true
+	} else if tx.Identifier == nil {
+		if txID == nil {
+			return nil, xerrors.WithStackTrace(errExpectedTxID)
+		}
 		tx.Identifier = txID
 	}
 
@@ -189,12 +206,14 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		onDone(finalErr)
 	}()
 
-	settings := options.ExecuteSettings(
-		append(
-			[]options.Execute{options.WithTxControl(tx.txControl())},
-			opts...,
-		)...,
-	)
+	if tx.completed {
+		return xerrors.WithStackTrace(errExecuteOnCompletedTx)
+	}
+
+	settings, err := tx.executeSettings(opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.cfg.Trace()),
@@ -214,7 +233,15 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		return xerrors.WithStackTrace(err)
 	}
 
-	if tx.Identifier == nil {
+	if settings.TxControl().Commit {
+		if txID != nil {
+			return xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
+		}
+		tx.completed = true
+	} else if tx.Identifier == nil {
+		if txID == nil {
+			return xerrors.WithStackTrace(errExpectedTxID)
+		}
 		tx.Identifier = txID
 	}
 
@@ -226,6 +253,37 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	return nil
 }
 
+func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettings, _ error) {
+	for _, opt := range opts {
+		if opt == nil {
+			return nil, xerrors.WithStackTrace(errExpectedTxID)
+		}
+		if _, has := opt.(options.ExecuteNoTx); has {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("%T: %w", opt, ErrOptionNotForTxExecute),
+			)
+		}
+	}
+
+	if tx.Identifier != nil {
+		return options.ExecuteSettings(append([]options.Execute{
+			options.WithTxControl(
+				queryTx.NewControl(
+					queryTx.WithTxID(tx.Identifier.ID()),
+				),
+			),
+		}, opts...)...), nil
+	}
+
+	return options.ExecuteSettings(append([]options.Execute{
+		options.WithTxControl(
+			queryTx.NewControl(
+				queryTx.BeginTx(tx.txSettings...),
+			),
+		),
+	}, opts...)...), nil
+}
+
 func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Execute) (
 	_ query.Result, finalErr error,
 ) {
@@ -235,12 +293,14 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 		onDone(finalErr)
 	}()
 
-	settings := options.ExecuteSettings(
-		append(
-			[]options.Execute{options.WithTxControl(tx.txControl())},
-			opts...,
-		)...,
-	)
+	if tx.completed {
+		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
+	}
+
+	settings, err := tx.executeSettings(opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.cfg.Trace()),
@@ -259,7 +319,17 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if tx.Identifier == nil {
+	if settings.TxControl().Commit {
+		if txID != nil {
+			return nil, xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
+		}
+		tx.completed = true
+
+		return r, nil
+	} else if tx.Identifier == nil {
+		if txID == nil {
+			return nil, xerrors.WithStackTrace(errExpectedTxID)
+		}
 		tx.Identifier = txID
 	}
 
@@ -281,6 +351,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
 	defer func() {
 		tx.notifyOnCompleted(err)
+		tx.completed = true
 	}()
 
 	if tx.Identifier == nil {
@@ -315,6 +386,8 @@ func (tx *Transaction) Rollback(ctx context.Context) error {
 	if tx.Identifier == nil {
 		return nil
 	}
+
+	tx.completed = true
 
 	tx.notifyOnCompleted(ErrTransactionRollingBack)
 

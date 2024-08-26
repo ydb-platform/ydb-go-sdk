@@ -42,6 +42,10 @@ type (
 		applyExecuteOption(s *executeSettings)
 	}
 
+	ExecuteNoTx interface {
+		thisOptionIsNotForExecuteOnTx()
+	}
+
 	// execute options
 	callOptionsOption []grpc.CallOption
 	txCommitOption    struct{}
@@ -70,6 +74,8 @@ func (t txCommitOption) applyExecuteOption(s *executeSettings) {
 func (txControl *txControlOption) applyExecuteOption(s *executeSettings) {
 	s.txControl = (*tx.Control)(txControl)
 }
+
+func (txControl *txControlOption) thisOptionIsNotForExecuteOnTx() {}
 
 func (syntax Syntax) applyExecuteOption(s *executeSettings) {
 	s.syntax = syntax
