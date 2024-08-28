@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run SLO
-        uses: ydb-platform/slo-tests@main
+        uses: ydb-platform/slo-tests@k8s-local
         continue-on-error: true
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
