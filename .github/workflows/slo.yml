@@ -28,13 +28,8 @@ jobs:
         continue-on-error: true
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KUBECONFIG_B64: ${{ secrets.SLO_KUBE_CONFIG }}
           AWS_CREDENTIALS_B64: ${{ secrets.SLO_AWS_CREDENTIALS }}
           AWS_CONFIG_B64: ${{ secrets.SLO_AWS_CONFIG }}
-          DOCKER_USERNAME: ${{ secrets.SLO_DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.SLO_DOCKER_PASSWORD }}
-          DOCKER_REPO: ${{ secrets.SLO_DOCKER_REPO }}
-          DOCKER_FOLDER: ${{ secrets.SLO_DOCKER_FOLDER }}
           s3_endpoint: ${{ secrets.SLO_S3_ENDPOINT }}
           s3_images_folder: ${{ vars.SLO_S3_IMAGES_FOLDER }}
           grafana_domain: ${{ vars.SLO_GRAFANA_DOMAIN }}
