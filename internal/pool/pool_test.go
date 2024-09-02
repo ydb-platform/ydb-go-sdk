@@ -20,18 +20,48 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-type testItem struct {
-	v uint32
+type (
+	testItem struct {
+		v uint32
 
-	closed bytes.Buffer
+		closed bytes.Buffer
 
-	onClose   func() error
-	onIsAlive func() bool
+		onClose   func() error
+		onIsAlive func() bool
+	}
+	testWaitChPool struct {
+		xsync.Pool[chan *testItem]
+		testHookGetWaitCh func()
+	}
+)
+
+func (p *testWaitChPool) GetOrNew() *chan *testItem {
+	if p.testHookGetWaitCh != nil {
+		p.testHookGetWaitCh()
+	}
+	return p.Pool.GetOrNew()
 }
+
+func (p *testWaitChPool) whenWantWaitCh() <-chan struct{} {
+	var (
+		prev = p.testHookGetWaitCh
+		ch   = make(chan struct{})
+	)
+	p.testHookGetWaitCh = func() {
+		p.testHookGetWaitCh = prev
+		close(ch)
+	}
+	return ch
+}
+
+func (p *testWaitChPool) Put(ch *chan *testItem) {}
 
 func (t *testItem) IsAlive() bool {
 	if t.onIsAlive != nil {
@@ -122,37 +152,6 @@ func TestPool(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, p.config.limit, atomic.LoadInt64(&newCounter))
 		})
-		t.Run("ParallelCreation", func(t *testing.T) {
-			xtest.TestManyTimes(t, func(t testing.TB) {
-				trace := *defaultTrace
-				trace.OnChange = func(info ChangeInfo) {
-					require.Equal(t, DefaultLimit, info.Limit)
-					require.LessOrEqual(t, info.Idle, DefaultLimit)
-				}
-				p := New[*testItem, testItem](rootCtx,
-					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithTrace[*testItem, testItem](&trace),
-				)
-				var wg sync.WaitGroup
-				for range make([]struct{}, DefaultLimit*10) {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
-							return nil
-						})
-						if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
-							t.Failed()
-						}
-						stats := p.Stats()
-						require.LessOrEqual(t, stats.Idle, DefaultLimit)
-					}()
-				}
-
-				wg.Wait()
-			})
-		})
 	})
 	t.Run("Close", func(t *testing.T) {
 		counter := 0
@@ -229,90 +228,189 @@ func TestPool(t *testing.T) {
 
 			require.True(t, closed[2]) // after putItem s3 must be closed
 		})
-	})
-	t.Run("TestSessionPoolCloseIdleSessions", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			var (
-				idleThreshold = 4 * time.Second
-				closedCount   atomic.Int64
-				fakeClock     = clockwork.NewFakeClock()
-			)
-			p := New[*testItem, testItem](rootCtx,
-				WithLimit[*testItem, testItem](2),
-				WithCreateItemTimeout[*testItem, testItem](0),
-				WithCreateItemFunc[*testItem, testItem](func(ctx context.Context) (*testItem, error) {
-					v := testItem{
-						v: 0,
-						onClose: func() error {
-							closedCount.Add(1)
+		t.Run("WhenWaiting", func(t *testing.T) {
+			for _, test := range []struct {
+				name string
+				racy bool
+			}{
+				{
+					name: "normal",
+					racy: false,
+				},
+				{
+					name: "racy",
+					racy: true,
+				},
+			} {
+				t.Run(test.name, func(t *testing.T) {
+					var (
+						get  = make(chan struct{})
+						wait = make(chan struct{})
+						got  = make(chan error)
+					)
+					waitChPool := &testWaitChPool{
+						Pool: xsync.Pool[chan *testItem]{
+							New: func() *chan *testItem {
+								ch := make(chan *testItem)
 
-							return nil
+								return &ch
+							},
 						},
 					}
+					p := New[*testItem, testItem](rootCtx,
+						// replace default async closer for sync testing
+						withCloseItemFunc(func(ctx context.Context, item *testItem) {
+							_ = item.Close(ctx)
+						}),
+						WithLimit[*testItem, testItem](1),
+						WithTrace[*testItem, testItem](&Trace{
+							onWait: func(info *waitStartInfo) func(*waitDoneInfo) {
+								wait <- struct{}{}
 
-					return &v, nil
-				}),
-				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				// replace default async closer for sync testing
-				withCloseItemFunc[*testItem, testItem](func(ctx context.Context, item *testItem) {
-					_ = item.Close(ctx)
-				}),
-				WithClock[*testItem, testItem](fakeClock),
-				WithIdleThreshold[*testItem, testItem](idleThreshold),
-			)
+								return nil
+							},
+						}),
+					)
+					p.waitChPool = waitChPool
+					defer func() {
+						_ = p.Close(context.Background())
+					}()
 
-			s1 := mustGetItem(t, p)
-			s2 := mustGetItem(t, p)
+					// first call getItem creates an item and store in index
+					// second call getItem from pool with limit === 1 will skip
+					// create item step (because pool have not enough space for
+					// creating new items) and will freeze until wait free item from pool
+					mustGetItem(t, p)
 
-			// Put both items at the absolutely same time.
-			// That is, both items must be updated their touched timestamp.
-			mustPutItem(t, p, s1)
-			mustPutItem(t, p, s2)
+					go func() {
+						p.config.trace.OnGet = func(info *GetStartInfo) func(*GetDoneInfo) {
+							get <- struct{}{}
 
-			require.Len(t, p.index, 2)
-			require.Equal(t, 2, p.idle.Len())
+							return nil
+						}
 
-			// Move clock to longer than idleThreshold
-			fakeClock.Advance(idleThreshold + time.Nanosecond)
+						_, err := p.getItem(context.Background())
+						got <- err
+					}()
 
-			// on get item from idle list the pool must check the item idle timestamp
-			// both existing items must be closed
-			// getItem must create a new item and return it from getItem
-			s3 := mustGetItem(t, p)
+					regWait := waitChPool.whenWantWaitCh()
+					<-get     // Await for getter blocked on awaiting session.
+					<-regWait // Let the getter register itself in the wait queue.
 
-			require.Len(t, p.index, 1)
+					if test.racy {
+						// We are testing the case, when session consumer registered
+						// himself in the wait queue, but not ready to receive the
+						// session when session arrives (that is, stuck between
+						// pushing channel in the list and reading from the channel).
+						_ = p.Close(context.Background())
+						<-wait
+					} else {
+						// We are testing the normal case, when session consumer registered
+						// himself in the wait queue and successfully blocked on
+						// reading from signaling channel.
+						<-wait
+						// Let the waiting goroutine to block on reading from channel.
+						_ = p.Close(context.Background())
+					}
 
-			if !closedCount.CompareAndSwap(2, 0) {
-				t.Fatal("unexpected number of closed items")
+					const timeout = time.Second
+					select {
+					case err := <-got:
+						if !xerrors.Is(err, errClosedPool) {
+							t.Fatalf(
+								"unexpected error: %q; want %q'",
+								err, errClosedPool,
+							)
+						}
+					case <-p.config.clock.After(timeout):
+						t.Fatalf("no result after %s", timeout)
+					}
+				})
 			}
+		})
+		t.Run("IdleSessions", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				var (
+					idleThreshold = 4 * time.Second
+					closedCount   atomic.Int64
+					fakeClock     = clockwork.NewFakeClock()
+				)
+				p := New[*testItem, testItem](rootCtx,
+					WithLimit[*testItem, testItem](2),
+					WithCreateItemTimeout[*testItem, testItem](0),
+					WithCreateItemFunc[*testItem, testItem](func(ctx context.Context) (*testItem, error) {
+						v := testItem{
+							v: 0,
+							onClose: func() error {
+								closedCount.Add(1)
 
-			// Move time to idleThreshold / 2 - this emulate a "spent" some time working within item.
-			fakeClock.Advance(idleThreshold / 2)
+								return nil
+							},
+						}
 
-			// Now put that item back
-			// pool must update a touched timestamp of item
-			mustPutItem(t, p, s3)
+						return &v, nil
+					}),
+					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
+					// replace default async closer for sync testing
+					withCloseItemFunc[*testItem, testItem](func(ctx context.Context, item *testItem) {
+						_ = item.Close(ctx)
+					}),
+					WithClock[*testItem, testItem](fakeClock),
+					WithIdleThreshold[*testItem, testItem](idleThreshold),
+				)
 
-			// Move time to idleThreshold / 2
-			// Total time since last updating touched timestampe is more than idleThreshold
-			fakeClock.Advance(idleThreshold/2 + time.Nanosecond)
+				s1 := mustGetItem(t, p)
+				s2 := mustGetItem(t, p)
 
-			require.Len(t, p.index, 1)
-			require.Equal(t, 1, p.idle.Len())
+				// Put both items at the absolutely same time.
+				// That is, both items must be updated their touched timestamp.
+				mustPutItem(t, p, s1)
+				mustPutItem(t, p, s2)
 
-			s4 := mustGetItem(t, p)
-			require.Equal(t, s3, s4)
-			require.Len(t, p.index, 1)
-			require.Equal(t, 0, p.idle.Len())
-			mustPutItem(t, p, s4)
+				require.Len(t, p.index, 2)
+				require.Equal(t, 2, p.idle.Len())
 
-			_ = p.Close(context.Background())
+				// Move clock to longer than idleThreshold
+				fakeClock.Advance(idleThreshold + time.Nanosecond)
 
-			require.Empty(t, p.index)
-			require.Equal(t, 0, p.idle.Len())
-		}, xtest.StopAfter(3*time.Second))
+				// on get item from idle list the pool must check the item idle timestamp
+				// both existing items must be closed
+				// getItem must create a new item and return it from getItem
+				s3 := mustGetItem(t, p)
+
+				require.Len(t, p.index, 1)
+
+				if !closedCount.CompareAndSwap(2, 0) {
+					t.Fatal("unexpected number of closed items")
+				}
+
+				// Move time to idleThreshold / 2 - this emulate a "spent" some time working within item.
+				fakeClock.Advance(idleThreshold / 2)
+
+				// Now put that item back
+				// pool must update a touched timestamp of item
+				mustPutItem(t, p, s3)
+
+				// Move time to idleThreshold / 2
+				// Total time since last updating touched timestampe is more than idleThreshold
+				fakeClock.Advance(idleThreshold/2 + time.Nanosecond)
+
+				require.Len(t, p.index, 1)
+				require.Equal(t, 1, p.idle.Len())
+
+				s4 := mustGetItem(t, p)
+				require.Equal(t, s3, s4)
+				require.Len(t, p.index, 1)
+				require.Equal(t, 0, p.idle.Len())
+				mustPutItem(t, p, s4)
+
+				_ = p.Close(context.Background())
+
+				require.Empty(t, p.index)
+				require.Equal(t, 0, p.idle.Len())
+			}, xtest.StopAfter(3*time.Second))
+		})
 	})
-
 	t.Run("Retry", func(t *testing.T) {
 		t.Run("CreateItem", func(t *testing.T) {
 			t.Run("context", func(t *testing.T) {
@@ -408,6 +506,51 @@ func TestPool(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+			})
+			t.Run("NilNil", func(t *testing.T) {
+				xtest.TestManyTimes(t, func(t testing.TB) {
+					limit := 100
+					ctx, cancel := xcontext.WithTimeout(
+						context.Background(),
+						55*time.Second,
+					)
+					defer cancel()
+					p := New[*testItem, testItem](rootCtx,
+						// replace default async closer for sync testing
+						withCloseItemFunc(func(ctx context.Context, item *testItem) {
+							_ = item.Close(ctx)
+						}),
+					)
+					defer func() {
+						_ = p.Close(context.Background())
+					}()
+					r := xrand.New(xrand.WithLock())
+					errCh := make(chan error, limit*10)
+					fn := func(wg *sync.WaitGroup) {
+						defer wg.Done()
+						childCtx, childCancel := xcontext.WithTimeout(
+							ctx,
+							time.Duration(r.Int64(int64(time.Second))),
+						)
+						defer childCancel()
+						s, err := p.createItem(childCtx)
+						if s == nil && err == nil {
+							errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
+						}
+					}
+					wg := &sync.WaitGroup{}
+					wg.Add(limit * 10)
+					for i := 0; i < limit*10; i++ {
+						go fn(wg)
+					}
+					go func() {
+						wg.Wait()
+						close(errCh)
+					}()
+					for e := range errCh {
+						t.Fatal(e)
+					}
+				})
 			})
 		})
 		t.Run("On", func(t *testing.T) {
@@ -582,7 +725,7 @@ func TestPool(t *testing.T) {
 			mustGetItem(t, p)
 			assertCreated(2)
 		})
-		t.Run("Stress", func(t *testing.T) {
+		t.Run("Racy", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				trace := *defaultTrace
 				trace.OnChange = func(info ChangeInfo) {
@@ -595,12 +738,18 @@ func TestPool(t *testing.T) {
 						_ = item.Close(ctx)
 					}),
 				)
+				r := xrand.New(xrand.WithLock())
 				var wg sync.WaitGroup
 				wg.Add(DefaultLimit*2 + 1)
 				for range make([]struct{}, DefaultLimit*2) {
 					go func() {
 						defer wg.Done()
-						err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+						childCtx, childCancel := xcontext.WithTimeout(
+							rootCtx,
+							time.Duration(r.Int64(int64(time.Second))),
+						)
+						defer childCancel()
+						err := p.With(childCtx, func(ctx context.Context, testItem *testItem) error {
 							return nil
 						})
 						if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
@@ -614,6 +763,37 @@ func TestPool(t *testing.T) {
 					err := p.Close(rootCtx)
 					require.NoError(t, err)
 				}()
+				wg.Wait()
+			})
+		})
+		t.Run("ParallelCreation", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				trace := *defaultTrace
+				trace.OnChange = func(info ChangeInfo) {
+					require.Equal(t, DefaultLimit, info.Limit)
+					require.LessOrEqual(t, info.Idle, DefaultLimit)
+				}
+				p := New[*testItem, testItem](rootCtx,
+					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
+					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
+					WithTrace[*testItem, testItem](&trace),
+				)
+				var wg sync.WaitGroup
+				for range make([]struct{}, DefaultLimit*10) {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+							return nil
+						})
+						if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
+							t.Failed()
+						}
+						stats := p.Stats()
+						require.LessOrEqual(t, stats.Idle, DefaultLimit)
+					}()
+				}
+
 				wg.Wait()
 			})
 		})

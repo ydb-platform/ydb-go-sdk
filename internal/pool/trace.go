@@ -14,6 +14,7 @@ type (
 		OnWith   func(*WithStartInfo) func(*WithDoneInfo)
 		OnPut    func(*PutStartInfo) func(*PutDoneInfo)
 		OnGet    func(*GetStartInfo) func(*GetDoneInfo)
+		onWait   func(*waitStartInfo) func(*waitDoneInfo)
 		OnChange func(ChangeInfo)
 	}
 	NewStartInfo struct {
@@ -86,6 +87,11 @@ type (
 		Item     any
 		Attempts int
 		Error    error
+	}
+	waitStartInfo struct{}
+	waitDoneInfo  struct {
+		Item  any
+		Error error
 	}
 	WaitStartInfo struct {
 		// Context make available context in trace stack.Callerback function.

@@ -36,6 +36,10 @@ type (
 		idle    *xlist.Element[PT]
 		touched time.Time
 	}
+	waitChPool[PT Item[T], T any] interface {
+		GetOrNew() *chan PT
+		Put(t *chan PT)
+	}
 	Pool[PT Item[T], T any] struct {
 		config Config[PT, T]
 
@@ -47,7 +51,7 @@ type (
 		index            map[PT]itemInfo[PT, T]
 		idle             xlist.List[PT]
 		waitQ            xlist.List[*chan PT]
-		waitChPool       xsync.Pool[chan PT]
+		waitChPool       waitChPool[PT, T]
 
 		done chan struct{}
 	}
@@ -118,7 +122,7 @@ func New[PT Item[T], T any](
 		index: make(map[PT]itemInfo[PT, T]),
 		idle:  xlist.New[PT](),
 		waitQ: xlist.New[*chan PT](),
-		waitChPool: xsync.Pool[chan PT]{
+		waitChPool: &xsync.Pool[chan PT]{
 			New: func() *chan PT {
 				ch := make(chan PT)
 
@@ -667,6 +671,18 @@ func (p *Pool[PT, T]) waitFromCh(ctx context.Context) (item PT, finalErr error) 
 			return p.stats()
 		})
 	})
+
+	if onWait := p.config.trace.onWait; onWait != nil {
+		onDone := onWait(&waitStartInfo{})
+		if onDone != nil {
+			defer func() {
+				onDone(&waitDoneInfo{
+					Item:  item,
+					Error: finalErr,
+				})
+			}()
+		}
+	}
 
 	var deadliine <-chan time.Time
 	if timeout := p.config.createTimeout; timeout > 0 {
