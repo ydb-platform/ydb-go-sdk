@@ -60,7 +60,7 @@ func (p *testWaitChPool) whenWantWaitCh() <-chan struct{} {
 		p.testHookGetWaitCh = prev
 		close(ch)
 	}
-	
+
 	return ch
 }
 
