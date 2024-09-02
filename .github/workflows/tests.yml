@@ -35,7 +35,7 @@ jobs:
       - name: Run tests
         run: go test -race -coverprofile unit.txt -covermode atomic -v ./...
       - name: Upload unit-tests coverage report to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},go-${{ matrix.go-version }}
@@ -88,7 +88,7 @@ jobs:
       - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile integration.txt -covermode atomic ./tests/integration
       - name: Upload integration-tests coverage report to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./integration.txt
           flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
@@ -141,7 +141,7 @@ jobs:
       - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile experiment.txt -covermode atomic ./...
       - name: Upload experimental-tests coverage report to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./experiment.txt
           flags: experiment,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
