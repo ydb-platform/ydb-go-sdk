@@ -68,9 +68,23 @@ type (
 		// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
 		DoTx(ctx context.Context, op TxOperation, opts ...DoTxOption) error
 
+		// Exec execute query without result
+		//
+		// Exec used by default:
+		// - DefaultTxControl
+		Exec(ctx context.Context, query string, opts ...options.Execute) error
+
+		// Query execute query with materialized result
+		//
+		// Warning: the large result from query will be materialized and can happened to "OOM killed" problem
+		//
+		// Exec used by default:
+		// - DefaultTxControl
+		Query(ctx context.Context, query string, opts ...options.Execute) (r Result, err error)
+
 		// QueryResultSet is a helper which read all rows from first result set in result
 		//
-		// ReadRow returns error if result contains more than one result set
+		// Warning: the large result set from query will be materialized and can happened to "OOM killed" problem
 		//
 		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (ResultSet, error)
