@@ -8,7 +8,7 @@ import (
 
 type (
 	Trace struct {
-		OnNew    func(*NewStartInfo) func(*NewDoneInfo)
+		OnNew    func(ctx *context.Context, call stack.Caller) func(limit int)
 		OnClose  func(*CloseStartInfo) func(*CloseDoneInfo)
 		OnTry    func(*TryStartInfo) func(*TryDoneInfo)
 		OnWith   func(*WithStartInfo) func(*WithDoneInfo)
@@ -16,17 +16,6 @@ type (
 		OnGet    func(*GetStartInfo) func(*GetDoneInfo)
 		onWait   func(*waitStartInfo) func(*waitDoneInfo)
 		OnChange func(ChangeInfo)
-	}
-	NewStartInfo struct {
-		// Context make available context in trace stack.Callerback function.
-		// Pointer to context provide replacement of context in trace stack.Callerback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside stack.Callerback function
-		Context *context.Context
-		Call    stack.Caller
-	}
-	NewDoneInfo struct {
-		Limit int
 	}
 	CloseStartInfo struct {
 		// Context make available context in trace stack.Callerback function.

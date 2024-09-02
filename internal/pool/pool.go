@@ -112,7 +112,7 @@ func New[PT Item[T], T any](
 ) *Pool[PT, T] {
 	p := &Pool[PT, T]{
 		config: Config[PT, T]{
-			trace:         defaultTrace,
+			trace:         &Trace{},
 			clock:         clockwork.NewRealClock(),
 			limit:         DefaultLimit,
 			createItem:    defaultCreateItem[T, PT],
@@ -139,15 +139,12 @@ func New[PT Item[T], T any](
 	}
 
 	if onNew := p.config.trace.OnNew; onNew != nil {
-		onDone := onNew(&NewStartInfo{
-			Context: &ctx,
-			Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.New"),
-		})
+		onDone := onNew(&ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.New"),
+		)
 		if onDone != nil {
 			defer func() {
-				onDone(&NewDoneInfo{
-					Limit: p.config.limit,
-				})
+				onDone(p.config.limit)
 			}()
 		}
 	}

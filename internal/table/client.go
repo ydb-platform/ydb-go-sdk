@@ -41,9 +41,9 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				return newSession(ctx, cc, config)
 			}),
 			pool.WithTrace[*session, session](&pool.Trace{
-				OnNew: func(info *pool.NewStartInfo) func(*pool.NewDoneInfo) {
-					return func(info *pool.NewDoneInfo) {
-						onDone(info.Limit)
+				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
+					return func(limit int) {
+						onDone(limit)
 					}
 				},
 				OnPut: func(info *pool.PutStartInfo) func(*pool.PutDoneInfo) {

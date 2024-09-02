@@ -588,11 +588,10 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 
 func poolTrace(t *trace.Query) *pool.Trace {
 	return &pool.Trace{
-		OnNew: func(info *pool.NewStartInfo) func(*pool.NewDoneInfo) {
-			onDone := trace.QueryOnPoolNew(t, info.Context, info.Call)
-
-			return func(info *pool.NewDoneInfo) {
-				onDone(info.Limit)
+		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
+			onDone := trace.QueryOnPoolNew(t, ctx, call)
+			return func(limit int) {
+				onDone(limit)
 			}
 		},
 		OnClose: func(info *pool.CloseStartInfo) func(*pool.CloseDoneInfo) {

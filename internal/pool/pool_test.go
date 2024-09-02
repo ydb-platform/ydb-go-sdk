@@ -727,12 +727,13 @@ func TestPool(t *testing.T) {
 		})
 		t.Run("Racy", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
-				trace := *defaultTrace
-				trace.OnChange = func(info ChangeInfo) {
-					require.GreaterOrEqual(t, info.Limit, info.Idle)
+				trace := &Trace{
+					OnChange: func(info ChangeInfo) {
+						require.GreaterOrEqual(t, info.Limit, info.Idle)
+					},
 				}
 				p := New[*testItem, testItem](rootCtx,
-					WithTrace[*testItem, testItem](&trace),
+					WithTrace[*testItem, testItem](trace),
 					// replace default async closer for sync testing
 					withCloseItemFunc(func(ctx context.Context, item *testItem) {
 						_ = item.Close(ctx)
@@ -768,15 +769,16 @@ func TestPool(t *testing.T) {
 		})
 		t.Run("ParallelCreation", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
-				trace := *defaultTrace
-				trace.OnChange = func(info ChangeInfo) {
-					require.Equal(t, DefaultLimit, info.Limit)
-					require.LessOrEqual(t, info.Idle, DefaultLimit)
+				trace := &Trace{
+					OnChange: func(info ChangeInfo) {
+						require.Equal(t, DefaultLimit, info.Limit)
+						require.LessOrEqual(t, info.Idle, DefaultLimit)
+					},
 				}
 				p := New[*testItem, testItem](rootCtx,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithTrace[*testItem, testItem](&trace),
+					WithTrace[*testItem, testItem](trace),
 				)
 				var wg sync.WaitGroup
 				for range make([]struct{}, DefaultLimit*10) {
