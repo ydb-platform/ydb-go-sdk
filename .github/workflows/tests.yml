@@ -40,6 +40,7 @@ jobs:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},go-${{ matrix.go-version }}
           name: unit
+          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
@@ -92,6 +93,7 @@ jobs:
           file: ./integration.txt
           flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: integration
+          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   experiment:
@@ -144,5 +146,6 @@ jobs:
           file: ./experiment.txt
           flags: experiment,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: experiment
+          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
