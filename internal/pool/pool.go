@@ -301,15 +301,12 @@ func (p *Pool[PT, T]) changeState(changeState func() Stats) {
 
 func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
 	if onTry := p.config.trace.OnTry; onTry != nil {
-		onDone := onTry(&TryStartInfo{
-			Context: &ctx,
-			Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).try"),
-		})
+		onDone := onTry(&ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).try"),
+		)
 		if onDone != nil {
 			defer func() {
-				onDone(&TryDoneInfo{
-					Error: finalErr,
-				})
+				onDone(finalErr)
 			}()
 		}
 	}
