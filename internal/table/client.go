@@ -68,11 +68,10 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 						)
 					}
 				},
-				OnWith: func(info *pool.WithStartInfo) func(*pool.WithDoneInfo) {
-					onDone := trace.TableOnPoolWith(config.Trace(), info.Context, info.Call)
-
-					return func(info *pool.WithDoneInfo) {
-						onDone(info.Attempts, info.Error)
+				OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
+					onDone := trace.TableOnPoolWith(config.Trace(), ctx, call)
+					return func(attempts int, err error) {
+						onDone(attempts, err)
 					}
 				},
 				OnChange: func(info pool.ChangeInfo) {

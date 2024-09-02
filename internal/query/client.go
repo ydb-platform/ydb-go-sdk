@@ -606,11 +606,10 @@ func poolTrace(t *trace.Query) *pool.Trace {
 				onDone(err)
 			}
 		},
-		OnWith: func(info *pool.WithStartInfo) func(*pool.WithDoneInfo) {
-			onDone := trace.QueryOnPoolWith(t, info.Context, info.Call)
-
-			return func(info *pool.WithDoneInfo) {
-				onDone(info.Error, info.Attempts)
+		OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
+			onDone := trace.QueryOnPoolWith(t, ctx, call)
+			return func(attempts int, err error) {
+				onDone(attempts, err)
 			}
 		},
 		OnPut: func(info *pool.PutStartInfo) func(*pool.PutDoneInfo) {

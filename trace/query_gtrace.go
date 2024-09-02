@@ -1623,15 +1623,15 @@ func QueryOnPoolTry(t *Query, c *context.Context, call call) func(error) {
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnPoolWith(t *Query, c *context.Context, call call) func(_ error, attempts int) {
+func QueryOnPoolWith(t *Query, c *context.Context, call call) func(attempts int, _ error) {
 	var p QueryPoolWithStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onPoolWith(p)
-	return func(e error, attempts int) {
+	return func(attempts int, e error) {
 		var p QueryPoolWithDoneInfo
-		p.Error = e
 		p.Attempts = attempts
+		p.Error = e
 		res(p)
 	}
 }

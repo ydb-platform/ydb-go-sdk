@@ -347,16 +347,12 @@ func (p *Pool[PT, T]) With(
 ) (finalErr error) {
 	var attempts int
 	if onWith := p.config.trace.OnWith; onWith != nil {
-		onDone := onWith(&WithStartInfo{
-			Context: &ctx,
-			Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).With"),
-		})
+		onDone := onWith(&ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).With"),
+		)
 		if onDone != nil {
 			defer func() {
-				onDone(&WithDoneInfo{
-					Error:    finalErr,
-					Attempts: attempts,
-				})
+				onDone(attempts, finalErr)
 			}()
 		}
 	}
