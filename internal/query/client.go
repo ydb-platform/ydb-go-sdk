@@ -594,11 +594,10 @@ func poolTrace(t *trace.Query) *pool.Trace {
 				onDone(limit)
 			}
 		},
-		OnClose: func(info *pool.CloseStartInfo) func(*pool.CloseDoneInfo) {
-			onDone := trace.QueryOnClose(t, info.Context, info.Call)
-
-			return func(info *pool.CloseDoneInfo) {
-				onDone(info.Error)
+		OnClose: func(ctx *context.Context, call stack.Caller) func(err error) {
+			onDone := trace.QueryOnClose(t, ctx, call)
+			return func(err error) {
+				onDone(err)
 			}
 		},
 		OnTry: func(info *pool.TryStartInfo) func(*pool.TryDoneInfo) {

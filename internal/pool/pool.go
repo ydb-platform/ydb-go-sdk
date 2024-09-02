@@ -382,15 +382,12 @@ func (p *Pool[PT, T]) With(
 
 func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	if onClose := p.config.trace.OnClose; onClose != nil {
-		onDone := onClose(&CloseStartInfo{
-			Context: &ctx,
-			Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).Close"),
-		})
+		onDone := onClose(&ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).Close"),
+		)
 		if onDone != nil {
 			defer func() {
-				onDone(&CloseDoneInfo{
-					Error: finalErr,
-				})
+				onDone(finalErr)
 			}()
 		}
 	}
