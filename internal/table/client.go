@@ -55,19 +55,16 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 						onDone(err)
 					}
 				},
-				OnGet: func(info *pool.GetStartInfo) func(*pool.GetDoneInfo) {
-					onDone := trace.TableOnPoolGet(config.Trace(), info.Context, info.Call)
+				OnGet: func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
+					onDone := trace.TableOnPoolGet(config.Trace(), ctx, call)
 
-					return func(info *pool.GetDoneInfo) {
-						onDone(
-							info.Item.(*session), //nolint:forcetypeassert
-							info.Attempts, info.Error,
-						)
+					return func(item any, attempts int, err error) {
+						onDone(item.(*session), attempts, err) //nolint:forcetypeassert
 					}
 				},
 				OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
 					onDone := trace.TableOnPoolWith(config.Trace(), ctx, call)
-					
+
 					return func(attempts int, err error) {
 						onDone(attempts, err)
 					}

@@ -559,17 +559,12 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 	)
 
 	if onGet := p.config.trace.OnGet; onGet != nil {
-		onDone := onGet(&GetStartInfo{
-			Context: &ctx,
-			Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).getItem"),
-		})
+		onDone := onGet(&ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).getItem"),
+		)
 		if onDone != nil {
 			defer func() {
-				onDone(&GetDoneInfo{
-					Item:     item,
-					Attempts: attempt,
-					Error:    finalErr,
-				})
+				onDone(item, attempt, finalErr)
 			}()
 		}
 	}

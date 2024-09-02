@@ -13,22 +13,9 @@ type (
 		OnTry    func(ctx *context.Context, call stack.Caller) func(err error)
 		OnWith   func(ctx *context.Context, call stack.Caller) func(attempts int, err error)
 		OnPut    func(ctx *context.Context, call stack.Caller, item any) func(err error)
-		OnGet    func(*GetStartInfo) func(*GetDoneInfo)
+		OnGet    func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error)
 		onWait   func(*waitStartInfo) func(*waitDoneInfo)
 		OnChange func(ChangeInfo)
-	}
-	GetStartInfo struct {
-		// Context make available context in trace stack.Callerback function.
-		// Pointer to context provide replacement of context in trace stack.Callerback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside stack.Callerback function
-		Context *context.Context
-		Call    stack.Caller
-	}
-	GetDoneInfo struct {
-		Item     any
-		Attempts int
-		Error    error
 	}
 	waitStartInfo struct{}
 	waitDoneInfo  struct {

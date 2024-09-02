@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"path"
 	"runtime"
 	"runtime/debug"
@@ -283,7 +284,7 @@ func TestPool(t *testing.T) {
 					mustGetItem(t, p)
 
 					go func() {
-						p.config.trace.OnGet = func(info *GetStartInfo) func(*GetDoneInfo) {
+						p.config.trace.OnGet = func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
 							get <- struct{}{}
 
 							return nil
