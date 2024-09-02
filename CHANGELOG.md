@@ -1,3 +1,6 @@
+* Extracted session pool implementation from table client to `internal/pool`
+* Replaced internal table client pool entities to `internal/pool`
+
 ## v3.77.1
 * Added log topic writer ack
 * Replaced `operation.Client.List` to five methods for listing operations `operation.List{BuildIndex,ImportFromS3,ExportToS3,ExportToYT,ExecuteQuery}`
