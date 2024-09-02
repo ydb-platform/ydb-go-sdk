@@ -73,12 +73,6 @@ jobs:
           workload_build_context4: ../..
           workload_build_options4: -f Dockerfile --build-arg SRC_PATH=native/query --build-arg JOB_NAME=workload-native-query
 
-          language_id5: 'native-query-with-pool'
-          workload_path5: 'tests/slo'
-          language5: 'Native ydb-go-sdk/v3 over query-service with session pool'
-          workload_build_context5: ../..
-          workload_build_options5: -f Dockerfile --build-arg SRC_PATH=native/query/with/pool --build-arg JOB_NAME=workload-native-query-with-pool
-
       - uses: actions/upload-artifact@v4
         if: always()
         with:

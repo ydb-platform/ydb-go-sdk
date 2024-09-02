@@ -532,24 +532,6 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
-func newPool(
-	ctx context.Context, cfg *config.Config, createSession func(ctx context.Context) (*Session, error),
-) sessionPool {
-	if cfg.UseSessionPool() {
-		return pool.New(ctx,
-			pool.WithLimit[*Session, Session](cfg.PoolLimit()),
-			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
-			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
-			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
-			pool.WithCreateItemFunc(createSession),
-		)
-	}
-
-	return &poolStub{
-		createSession: createSession,
-	}
-}
-
 func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
@@ -562,25 +544,31 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 		config:             cfg,
 		queryServiceClient: grpcClient,
 		done:               make(chan struct{}),
-		pool: newPool(ctx, cfg, func(ctx context.Context) (_ *Session, err error) {
-			var (
-				createCtx    context.Context
-				cancelCreate context.CancelFunc
-			)
-			if d := cfg.SessionCreateTimeout(); d > 0 {
-				createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
-			} else {
-				createCtx, cancelCreate = xcontext.WithCancel(ctx)
-			}
-			defer cancelCreate()
+		pool: pool.New(ctx,
+			pool.WithLimit[*Session, Session](cfg.PoolLimit()),
+			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
+			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
+			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
+			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
+				var (
+					createCtx    context.Context
+					cancelCreate context.CancelFunc
+				)
+				if d := cfg.SessionCreateTimeout(); d > 0 {
+					createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
+				} else {
+					createCtx, cancelCreate = xcontext.WithCancel(ctx)
+				}
+				defer cancelCreate()
 
-			s, err := createSession(createCtx, grpcClient, cfg)
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
+				s, err := createSession(createCtx, grpcClient, cfg)
+				if err != nil {
+					return nil, xerrors.WithStackTrace(err)
+				}
 
-			return s, nil
-		}),
+				return s, nil
+			}),
+		),
 	}
 
 	return client
