@@ -69,13 +69,9 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 						onDone(attempts, err)
 					}
 				},
-				OnChange: func(info pool.ChangeInfo) {
+				OnChange: func(stats pool.Stats) {
 					trace.TableOnPoolStateChange(config.Trace(),
-						info.Limit,
-						info.Index,
-						info.Idle,
-						info.Wait,
-						info.CreateInProgress,
+						stats.Limit, stats.Index, stats.Idle, stats.Wait, stats.CreateInProgress,
 					)
 				},
 			}),

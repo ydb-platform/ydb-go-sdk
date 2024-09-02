@@ -655,13 +655,10 @@ func (p *Pool[PT, T]) waitFromCh(ctx context.Context) (item PT, finalErr error) 
 	})
 
 	if onWait := p.config.trace.onWait; onWait != nil {
-		onDone := onWait(&waitStartInfo{})
+		onDone := onWait()
 		if onDone != nil {
 			defer func() {
-				onDone(&waitDoneInfo{
-					Item:  item,
-					Error: finalErr,
-				})
+				onDone(item, finalErr)
 			}()
 		}
 	}

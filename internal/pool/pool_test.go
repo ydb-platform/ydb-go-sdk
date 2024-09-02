@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"path"
 	"runtime"
 	"runtime/debug"
@@ -21,6 +20,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -47,6 +47,7 @@ func (p *testWaitChPool) GetOrNew() *chan *testItem {
 	if p.testHookGetWaitCh != nil {
 		p.testHookGetWaitCh()
 	}
+
 	return p.Pool.GetOrNew()
 }
 
@@ -59,6 +60,7 @@ func (p *testWaitChPool) whenWantWaitCh() <-chan struct{} {
 		p.testHookGetWaitCh = prev
 		close(ch)
 	}
+	
 	return ch
 }
 
@@ -265,7 +267,7 @@ func TestPool(t *testing.T) {
 						}),
 						WithLimit[*testItem, testItem](1),
 						WithTrace[*testItem, testItem](&Trace{
-							onWait: func(info *waitStartInfo) func(*waitDoneInfo) {
+							onWait: func() func(item any, err error) {
 								wait <- struct{}{}
 
 								return nil
@@ -729,8 +731,8 @@ func TestPool(t *testing.T) {
 		t.Run("Racy", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				trace := &Trace{
-					OnChange: func(info ChangeInfo) {
-						require.GreaterOrEqual(t, info.Limit, info.Idle)
+					OnChange: func(stats Stats) {
+						require.GreaterOrEqual(t, stats.Limit, stats.Idle)
 					},
 				}
 				p := New[*testItem, testItem](rootCtx,
@@ -771,9 +773,9 @@ func TestPool(t *testing.T) {
 		t.Run("ParallelCreation", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				trace := &Trace{
-					OnChange: func(info ChangeInfo) {
-						require.Equal(t, DefaultLimit, info.Limit)
-						require.LessOrEqual(t, info.Idle, DefaultLimit)
+					OnChange: func(stats Stats) {
+						require.Equal(t, DefaultLimit, stats.Limit)
+						require.LessOrEqual(t, stats.Idle, DefaultLimit)
 					},
 				}
 				p := New[*testItem, testItem](rootCtx,

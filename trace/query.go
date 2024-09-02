@@ -548,7 +548,10 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolChange struct {
-		Limit int
-		Idle  int
+		Limit            int
+		Index            int
+		Idle             int
+		Wait             int
+		CreateInProgress int
 	}
 )
