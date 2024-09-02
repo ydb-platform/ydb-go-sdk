@@ -734,16 +734,13 @@ func (p *Pool[PT, T]) waitFromCh(ctx context.Context) (item PT, finalErr error) 
 // p.mu must be free.
 func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 	if onPut := p.config.trace.OnPut; onPut != nil {
-		onDone := onPut(&PutStartInfo{
-			Context: &ctx,
-			Call:    stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).putItem"),
-			Item:    item,
-		})
+		onDone := onPut(&ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).putItem"),
+			item,
+		)
 		if onDone != nil {
 			defer func() {
-				onDone(&PutDoneInfo{
-					Error: finalErr,
-				})
+				onDone(finalErr)
 			}()
 		}
 	}

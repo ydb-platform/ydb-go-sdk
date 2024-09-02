@@ -590,33 +590,37 @@ func poolTrace(t *trace.Query) *pool.Trace {
 	return &pool.Trace{
 		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
 			onDone := trace.QueryOnPoolNew(t, ctx, call)
+
 			return func(limit int) {
 				onDone(limit)
 			}
 		},
 		OnClose: func(ctx *context.Context, call stack.Caller) func(err error) {
 			onDone := trace.QueryOnClose(t, ctx, call)
+
 			return func(err error) {
 				onDone(err)
 			}
 		},
 		OnTry: func(ctx *context.Context, call stack.Caller) func(err error) {
 			onDone := trace.QueryOnPoolTry(t, ctx, call)
+
 			return func(err error) {
 				onDone(err)
 			}
 		},
 		OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
 			onDone := trace.QueryOnPoolWith(t, ctx, call)
+
 			return func(attempts int, err error) {
 				onDone(attempts, err)
 			}
 		},
-		OnPut: func(info *pool.PutStartInfo) func(*pool.PutDoneInfo) {
-			onDone := trace.QueryOnPoolPut(t, info.Context, info.Call)
+		OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
+			onDone := trace.QueryOnPoolPut(t, ctx, call, item.(*Session))
 
-			return func(info *pool.PutDoneInfo) {
-				onDone(info.Error)
+			return func(err error) {
+				onDone(err)
 			}
 		},
 		OnGet: func(info *pool.GetStartInfo) func(*pool.GetDoneInfo) {

@@ -46,16 +46,13 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 						onDone(limit)
 					}
 				},
-				OnPut: func(info *pool.PutStartInfo) func(*pool.PutDoneInfo) {
+				OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
 					onDone := trace.TableOnPoolPut( //nolint:forcetypeassert
-						config.Trace(),
-						info.Context,
-						info.Call,
-						info.Item.(*session),
+						config.Trace(), ctx, call, item.(*session),
 					)
 
-					return func(info *pool.PutDoneInfo) {
-						onDone(info.Error)
+					return func(err error) {
+						onDone(err)
 					}
 				},
 				OnGet: func(info *pool.GetStartInfo) func(*pool.GetDoneInfo) {
@@ -70,6 +67,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				},
 				OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
 					onDone := trace.TableOnPoolWith(config.Trace(), ctx, call)
+					
 					return func(attempts int, err error) {
 						onDone(attempts, err)
 					}
