@@ -43,6 +43,39 @@ type (
 	}
 )
 
+var defaultTrace = &Trace{
+	OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
+		return func(limit int) {
+		}
+	},
+	OnClose: func(ctx *context.Context, call stack.Caller) func(err error) {
+		return func(err error) {
+		}
+	},
+	OnTry: func(ctx *context.Context, call stack.Caller) func(err error) {
+		return func(err error) {
+		}
+	},
+	OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
+		return func(attempts int, err error) {
+		}
+	},
+	OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
+		return func(err error) {
+		}
+	},
+	OnGet: func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
+		return func(item any, attempts int, err error) {
+		}
+	},
+	onWait: func() func(item any, err error) {
+		return func(item any, err error) {
+		}
+	},
+	OnChange: func(stats Stats) {
+	},
+}
+
 func (p *testWaitChPool) GetOrNew() *chan *testItem {
 	if p.testHookGetWaitCh != nil {
 		p.testHookGetWaitCh()
@@ -128,14 +161,18 @@ func TestPool(t *testing.T) {
 	rootCtx := xtest.Context(t)
 	t.Run("New", func(t *testing.T) {
 		t.Run("Default", func(t *testing.T) {
-			p := New[*testItem, testItem](rootCtx)
+			p := New[*testItem, testItem](rootCtx,
+				WithTrace[*testItem, testItem](defaultTrace),
+			)
 			err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 				return nil
 			})
 			require.NoError(t, err)
 		})
 		t.Run("WithLimit", func(t *testing.T) {
-			p := New[*testItem, testItem](rootCtx, WithLimit[*testItem, testItem](1))
+			p := New[*testItem, testItem](rootCtx, WithLimit[*testItem, testItem](1),
+				WithTrace[*testItem, testItem](defaultTrace),
+			)
 			require.EqualValues(t, 1, p.config.limit)
 		})
 		t.Run("WithCreateItemFunc", func(t *testing.T) {
@@ -148,6 +185,7 @@ func TestPool(t *testing.T) {
 
 					return &v, nil
 				}),
+				WithTrace[*testItem, testItem](defaultTrace),
 			)
 			err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
 				return nil
@@ -194,6 +232,7 @@ func TestPool(t *testing.T) {
 				withCloseItemFunc(func(ctx context.Context, item *testItem) {
 					_ = item.Close(ctx)
 				}),
+				WithTrace[*testItem, testItem](defaultTrace),
 			)
 
 			defer func() {
@@ -360,6 +399,7 @@ func TestPool(t *testing.T) {
 					}),
 					WithClock[*testItem, testItem](fakeClock),
 					WithIdleThreshold[*testItem, testItem](idleThreshold),
+					WithTrace[*testItem, testItem](defaultTrace),
 				)
 
 				s1 := mustGetItem(t, p)
