@@ -2,13 +2,12 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"sync"
-	"time"
 
 	"golang.org/x/time/rate"
 
 	"slo/internal/generator"
+	"slo/internal/log"
 	"slo/internal/metrics"
 )
 
@@ -28,7 +27,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 	var row generator.Row
 	row, err = gen.Generate()
 	if err != nil {
-		fmt.Printf("[%s] generate error: %v\n", time.Now().Format(time.RFC3339), err)
+		log.Printf("generate error: %v", err)
 
 		return err
 	}
@@ -39,7 +38,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 	defer func() {
 		m.Stop(err, attempts)
 		if err != nil {
-			fmt.Printf("[%s] error when stop 'write' worker: %v\n", time.Now().Format(time.RFC3339), err)
+			log.Printf("error when stop 'write' worker: %v", err)
 		}
 	}()
 
