@@ -822,6 +822,79 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			}
 		}
 	}
+	{
+		h1 := t.OnPoolSessionAdd
+		h2 := x.OnPoolSessionAdd
+		ret.OnPoolSessionAdd = func(info TablePoolSessionAddInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolSessionRemove
+		h2 := x.OnPoolSessionRemove
+		ret.OnPoolSessionRemove = func(info TablePoolSessionRemoveInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolWait
+		h2 := x.OnPoolWait
+		ret.OnPoolWait = func(t TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TablePoolWaitDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TablePoolWaitDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
 	return &ret
 }
 func (t *Table) onInit(t1 TableInitStartInfo) func(TableInitDoneInfo) {
@@ -1161,6 +1234,35 @@ func (t *Table) onPoolStateChange(t1 TablePoolStateChangeInfo) {
 	}
 	fn(t1)
 }
+func (t *Table) onPoolSessionAdd(info TablePoolSessionAddInfo) {
+	fn := t.OnPoolSessionAdd
+	if fn == nil {
+		return
+	}
+	fn(info)
+}
+func (t *Table) onPoolSessionRemove(info TablePoolSessionRemoveInfo) {
+	fn := t.OnPoolSessionRemove
+	if fn == nil {
+		return
+	}
+	fn(info)
+}
+func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo) {
+	fn := t.OnPoolWait
+	if fn == nil {
+		return func(TablePoolWaitDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TablePoolWaitDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnInit(t *Table, c *context.Context, call call) func(limit int) {
 	var p TableInitStartInfo
@@ -1487,4 +1589,29 @@ func TableOnPoolStateChange(t *Table, limit int, index int, idle int, wait int, 
 	p.CreateInProgress = createInProgress
 	p.Size = size
 	t.onPoolStateChange(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnPoolSessionAdd(t *Table, session sessionInfo) {
+	var p TablePoolSessionAddInfo
+	p.Session = session
+	t.onPoolSessionAdd(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnPoolSessionRemove(t *Table, session sessionInfo) {
+	var p TablePoolSessionRemoveInfo
+	p.Session = session
+	t.onPoolSessionRemove(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnPoolWait(t *Table, c *context.Context, call call) func(session sessionInfo, _ error) {
+	var p TablePoolWaitStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolWait(p)
+	return func(session sessionInfo, e error) {
+		var p TablePoolWaitDoneInfo
+		p.Session = session
+		p.Error = e
+		res(p)
+	}
 }
