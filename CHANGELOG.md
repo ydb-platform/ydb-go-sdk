@@ -1,3 +1,4 @@
+* Changed result type of method `query.Executor.QueryResultSet` from `query.ResultSet` to `query.ClosableResultSet`
 * Added `table/types.DecimalValueFromString` decimal type constructor
 
 ## v3.77.1

@@ -4,13 +4,13 @@ import (
 	"context"
 	"io"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-func rangeResultSets(ctx context.Context, r query.Result) xiter.Seq2[query.ResultSet, error] {
-	return func(yield func(query.ResultSet, error) bool) {
+func rangeResultSets(ctx context.Context, r result.Result) xiter.Seq2[result.Set, error] {
+	return func(yield func(result.Set, error) bool) {
 		for {
 			rs, err := r.NextResultSet(ctx)
 			if err != nil {
@@ -26,8 +26,8 @@ func rangeResultSets(ctx context.Context, r query.Result) xiter.Seq2[query.Resul
 	}
 }
 
-func rangeRows(ctx context.Context, rs query.ResultSet) xiter.Seq2[query.Row, error] {
-	return func(yield func(query.Row, error) bool) {
+func rangeRows(ctx context.Context, rs result.Set) xiter.Seq2[result.Set, error] {
+	return func(yield func(result.Row, error) bool) {
 		for {
 			rs, err := rs.NextRow(ctx)
 			if err != nil {

@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -77,7 +78,7 @@ func (tx *Transaction) UnLazy(ctx context.Context) (err error) {
 
 func (tx *Transaction) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
-) (rs query.ResultSet, finalErr error) {
+) (rs result.ClosableResultSet, finalErr error) {
 	onDone := trace.QueryOnTxQueryResultSet(tx.s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"), tx, q)
 	defer func() {

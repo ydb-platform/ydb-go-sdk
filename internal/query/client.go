@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -462,7 +463,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 
 func clientQueryResultSet(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
-) (rs query.ResultSet, finalErr error) {
+) (rs result.ClosableResultSet, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
 		_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
 		if err != nil {
@@ -486,7 +487,7 @@ func clientQueryResultSet(
 // QueryResultSet is a helper which read all rows from first result set in result
 func (c *Client) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
-) (rs query.ResultSet, finalErr error) {
+) (rs result.ClosableResultSet, finalErr error) {
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 

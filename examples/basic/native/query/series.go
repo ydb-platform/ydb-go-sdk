@@ -17,8 +17,6 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 	return c.Do(ctx,
 		func(ctx context.Context, s query.Session) (err error) {
 			result, err := s.Query(ctx, fmt.Sprintf(`
-					PRAGMA TablePathPrefix("%s");
-					DECLARE $seriesID AS Uint64;
 					SELECT
 						series_id,
 						title,

@@ -25,19 +25,19 @@ type (
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		Query(ctx context.Context, query string, opts ...options.Execute) (r Result, err error)
+		Query(ctx context.Context, query string, opts ...options.Execute) (Result, error)
 
 		// QueryResultSet execute query and take the exactly single materialized result set from result
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (rs ResultSet, err error)
+		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (resultSetWithClose, error)
 
 		// QueryRow execute query and take the exactly single row from exactly single result set from result
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		QueryRow(ctx context.Context, query string, opts ...options.Execute) (row Row, err error)
+		QueryRow(ctx context.Context, query string, opts ...options.Execute) (Row, error)
 	}
 	// Client defines API of query client
 	//
@@ -80,14 +80,14 @@ type (
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		Query(ctx context.Context, query string, opts ...options.Execute) (r Result, err error)
+		Query(ctx context.Context, query string, opts ...options.Execute) (Result, error)
 
 		// QueryResultSet is a helper which read all rows from first result set in result
 		//
 		// Warning: the large result set from query will be materialized and can happened to "OOM killed" problem
 		//
 		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (ResultSet, error)
+		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (resultSetWithClose, error)
 
 		// QueryRow is a helper which read only one row from first result set in result
 		//

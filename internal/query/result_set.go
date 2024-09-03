@@ -35,7 +35,19 @@ type (
 		rowIndex    int
 		done        chan struct{}
 	}
+	resultSetWithClose struct {
+		*resultSet
+		close func(ctx context.Context) error
+	}
 )
+
+func (*materializedResultSet) Close(context.Context) error {
+	return nil
+}
+
+func (rs *resultSetWithClose) Close(ctx context.Context) error {
+	return rs.close(ctx)
+}
 
 func (rs *materializedResultSet) Rows(ctx context.Context) xiter.Seq2[query.Row, error] {
 	return rangeRows(ctx, rs)
