@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -275,11 +276,22 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 		onDone(attempts, finalErr)
 	}()
 
-	err := do(ctx, c.pool, func(ctx context.Context, s *Session) error {
-		attempts++
+	err := do(ctx, c.pool,
+		func(ctx context.Context, s *Session) error {
+			attempts++
 
-		return op(ctx, s)
-	}, options.ParseDoOpts(c.config.Trace(), opts...).RetryOpts()...)
+			return op(ctx, s)
+		},
+		append([]retry.Option{
+			retry.WithTrace(&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
+					}
+				},
+			}),
+		}, options.ParseDoOpts(c.config.Trace(), opts...).RetryOpts()...)...,
+	)
 
 	return err
 }
@@ -288,13 +300,11 @@ func doTx(
 	ctx context.Context,
 	pool sessionPool,
 	op query.TxOperation,
-	t *trace.Query,
-	opts ...options.DoTxOption,
+	txSettings tx.Settings,
+	opts ...retry.Option,
 ) (finalErr error) {
-	doTxOpts := options.ParseDoTxOpts(t, opts...)
-
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		tx, err := s.Begin(ctx, doTxOpts.TxSettings())
+		tx, err := s.Begin(ctx, txSettings)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -318,7 +328,7 @@ func doTx(
 		}
 
 		return nil
-	}, doTxOpts.RetryOpts()...)
+	}, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -514,17 +524,33 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 		onDone = trace.QueryOnDoTx(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).DoTx"),
 		)
+		doTxOpts = options.ParseDoTxOpts(opts...)
 		attempts = 0
 	)
 	defer func() {
 		onDone(attempts, finalErr)
 	}()
 
-	err := doTx(ctx, c.pool, func(ctx context.Context, tx query.TxActor) error {
-		attempts++
+	err := doTx(ctx, c.pool,
+		func(ctx context.Context, tx query.TxActor) error {
+			attempts++
 
-		return op(ctx, tx)
-	}, c.config.Trace(), opts...)
+			return op(ctx, tx)
+		},
+		doTxOpts.TxSettings(),
+		append(
+			[]retry.Option{
+				retry.WithTrace(&trace.Retry{
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopDoneInfo) {
+							attempts = info.Attempts
+						}
+					},
+				}),
+			},
+			doTxOpts.RetryOpts()...,
+		)...,
+	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

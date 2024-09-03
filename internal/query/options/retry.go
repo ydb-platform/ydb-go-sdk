@@ -114,12 +114,10 @@ func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 	return s
 }
 
-func ParseDoTxOpts(t *trace.Query, opts ...DoTxOption) (s *doTxSettings) {
+func ParseDoTxOpts(opts ...DoTxOption) (s *doTxSettings) {
 	s = &doTxSettings{
 		txSettings: tx.NewSettings(tx.WithDefaultTxMode()),
-		doSettings: doSettings{
-			trace: t,
-		},
+		doSettings: doSettings{},
 	}
 
 	for _, opt := range opts {

@@ -20,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -249,7 +250,7 @@ func TestClient(t *testing.T) {
 				}()
 
 				return tx.Exec(ctx, "")
-			}, &trace.Query{})
+			}, tx.NewSettings(tx.WithDefaultTxMode()))
 			require.NoError(t, err)
 		})
 		t.Run("RetryableError", func(t *testing.T) {
@@ -274,7 +275,7 @@ func TestClient(t *testing.T) {
 				}
 
 				return nil
-			}, &trace.Query{})
+			}, tx.NewSettings(tx.WithDefaultTxMode()))
 			require.NoError(t, err)
 			require.Equal(t, 10, counter)
 		})
