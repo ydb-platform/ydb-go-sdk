@@ -40,20 +40,18 @@ jobs:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},go-${{ matrix.go-version }}
           name: unit
-          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
     concurrency:
       group: integration-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.21.x, 1.22.x, 1.23.x]
         ydb-version: [23.3, 24.1]
-        os: [ubuntu]
     services:
       ydb:
         image: ydbplatform/local-ydb:${{ matrix.ydb-version }}
@@ -93,14 +91,13 @@ jobs:
           file: ./integration.txt
           flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: integration
-          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   experiment:
     concurrency:
       group: experiment-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -146,6 +143,5 @@ jobs:
           file: ./experiment.txt
           flags: experiment,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: experiment
-          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
