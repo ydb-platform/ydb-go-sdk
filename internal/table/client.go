@@ -71,7 +71,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				},
 				OnChange: func(stats pool.Stats) {
 					trace.TableOnPoolStateChange(config.Trace(),
-						stats.Limit, stats.Index, stats.Idle, stats.Wait, stats.CreateInProgress,
+						stats.Limit, stats.Index, stats.Idle, stats.Wait, stats.CreateInProgress, stats.Index,
 					)
 				},
 			}),

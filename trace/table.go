@@ -333,6 +333,11 @@ type (
 		Idle             int
 		Wait             int
 		CreateInProgress int
+
+		// Deprecated: use Index field instead.
+		// Will be removed after March 2025.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		Size int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewStartInfo struct {
