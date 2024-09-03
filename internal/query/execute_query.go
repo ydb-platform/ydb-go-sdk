@@ -144,10 +144,6 @@ func readAll(ctx context.Context, r *streamResult) error {
 }
 
 func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose, finalErr error) {
-	defer func() {
-		_ = r.Close(ctx)
-	}()
-
 	rs, err := r.nextResultSet(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

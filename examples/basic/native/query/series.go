@@ -16,15 +16,14 @@ import (
 func read(ctx context.Context, c query.Client, prefix string) error {
 	return c.Do(ctx,
 		func(ctx context.Context, s query.Session) (err error) {
-			result, err := s.Query(ctx, fmt.Sprintf(`
+			result, err := s.Query(ctx, `
 					SELECT
 						series_id,
 						title,
 						release_date
 					FROM
 						series
-				`, prefix),
-				query.WithTxControl(query.TxControl(query.BeginTx(query.WithOnlineReadOnly()))),
+				`, query.WithTxControl(query.TxControl(query.BeginTx(query.WithSnapshotReadOnly()))),
 			)
 			if err != nil {
 				return err
