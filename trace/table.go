@@ -74,6 +74,15 @@ type (
 		OnPoolWith func(TablePoolWithStartInfo) func(TablePoolWithDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnPoolStateChange func(TablePoolStateChangeInfo)
+
+		// Deprecated
+		// Will be removed after March 2025.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		OnPoolSessionAdd func(info TablePoolSessionAddInfo)
+		// Deprecated
+		// Will be removed after March 2025.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		OnPoolSessionRemove func(info TablePoolSessionRemoveInfo)
 	}
 )
 
@@ -408,11 +417,15 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionCloseDoneInfo struct{}
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	// Deprecated
+	// Will be removed after March 2025.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolSessionAddInfo struct {
 		Session sessionInfo
 	}
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	// Deprecated
+	// Will be removed after March 2025.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolSessionRemoveInfo struct {
 		Session sessionInfo
 	}
