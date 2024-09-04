@@ -58,7 +58,7 @@ type topicStreamReaderImpl struct {
 	batcher   *batcher
 	committer *committer
 
-	stream           RawTopicReaderStream
+	stream           topicreadercommon.RawTopicReaderStream
 	readConnectionID string
 	readerID         int64
 
@@ -122,7 +122,7 @@ func (cfg *topicStreamReaderConfig) Validate() []error {
 func newTopicStreamReader(
 	client TopicClient,
 	readerID int64,
-	stream RawTopicReaderStream,
+	stream topicreadercommon.RawTopicReaderStream,
 	cfg topicStreamReaderConfig, //nolint:gocritic
 ) (_ *topicStreamReaderImpl, err error) {
 	defer func() {
@@ -145,7 +145,7 @@ func newTopicStreamReader(
 func newTopicStreamReaderStopped(
 	client TopicClient,
 	readerID int64,
-	stream RawTopicReaderStream,
+	stream topicreadercommon.RawTopicReaderStream,
 	cfg topicStreamReaderConfig, //nolint:gocritic
 ) *topicStreamReaderImpl {
 	labeledContext := pprof.WithLabels(cfg.BaseContext, pprof.Labels("base-context", "topic-stream-reader"))
@@ -161,7 +161,7 @@ func newTopicStreamReaderStopped(
 		ctx:                   stopPump,
 		topicClient:           client,
 		freeBytes:             make(chan int, 1),
-		stream:                &syncedStream{stream: stream},
+		stream:                topicreadercommon.NewSyncedStream(stream),
 		cancel:                cancel,
 		batcher:               newBatcher(),
 		readConnectionID:      "preinitID-" + readerConnectionID.String(),
