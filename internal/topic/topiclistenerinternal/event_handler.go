@@ -41,8 +41,20 @@ type EventHandler interface {
 type PublicReadMessages struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
 	Batch            *topicreadercommon.PublicBatch
-	committed        atomic.Bool
 	listener         *streamListener
+	committed        atomic.Bool
+}
+
+func NewPublicReadMessages(
+	session topicreadercommon.PublicPartitionSession,
+	batch *topicreadercommon.PublicBatch,
+	listener *streamListener,
+) *PublicReadMessages {
+	return &PublicReadMessages{
+		PartitionSession: session,
+		Batch:            batch,
+		listener:         listener,
+	}
 }
 
 // Confirm of the process messages from the batch.
@@ -54,10 +66,7 @@ func (e *PublicReadMessages) Confirm() {
 		return
 	}
 
-}
-
-func NewPublicReadMessages(session topicreadercommon.PublicPartitionSession, batch *topicreadercommon.PublicBatch, listener *streamListener) {
-
+	_ = e.listener.sendCommit(e.Batch)
 }
 
 // PublicEventStartPartitionSession

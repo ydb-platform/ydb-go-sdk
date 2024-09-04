@@ -37,6 +37,14 @@ func (r *CommitRanges) GetCommitsInfo() []trace.TopicReaderStreamCommitInfo {
 	return res
 }
 
+func (r *CommitRanges) ToRawMessage() *rawtopicreader.CommitOffsetRequest {
+	res := &rawtopicreader.CommitOffsetRequest{}
+
+	res.CommitOffsets = r.ToPartitionsOffsets()
+
+	return res
+}
+
 func NewCommitRangesWithCapacity(capacity int) CommitRanges {
 	return CommitRanges{Ranges: make([]CommitRange, 0, capacity)}
 }

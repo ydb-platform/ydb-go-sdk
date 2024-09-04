@@ -151,7 +151,7 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 			c.tracer,
 			&commits,
 		)
-		err := sendCommitMessage(c.send, commits)
+		err := c.send(commits.ToRawMessage())
 		onDone(err)
 
 		if err != nil {
@@ -282,12 +282,4 @@ func newCommitWaiter(session *topicreadercommon.PartitionSession, endOffset rawt
 		EndOffset: endOffset,
 		Committed: make(empty.Chan, 1),
 	}
-}
-
-func sendCommitMessage(send sendMessageToServerFunc, batch topicreadercommon.CommitRanges) error {
-	req := &rawtopicreader.CommitOffsetRequest{
-		CommitOffsets: batch.ToPartitionsOffsets(),
-	}
-
-	return send(req)
 }

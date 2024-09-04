@@ -185,6 +185,70 @@ func TestStreamListener_CloseSessionsOnCloseListener(t *testing.T) {
 	require.NoError(t, StreamListener(e).Close(sf.Context(e), errors.New("test")))
 }
 
+func TestCommitBatch(t *testing.T) {
+	e := fixenv.New(t)
+
+	commitCounter := 0
+	const (
+		startOffset = 86
+		endOffset   = 88
+	)
+	PartitionSession(e).SetLastReceivedMessageOffset(startOffset - 1)
+	StreamMock(e).EXPECT().Send(&rawtopicreader.CommitOffsetRequest{
+		CommitOffsets: []rawtopicreader.PartitionCommitOffset{
+			{
+				PartitionSessionID: PartitionSession(e).StreamPartitionSessionID,
+				Offsets: []rawtopiccommon.OffsetRange{
+					{
+						Start: startOffset,
+						End:   endOffset,
+					},
+				},
+			},
+		},
+	}).DoAndReturn(func(message rawtopicreader.ClientMessage) error {
+		commitCounter++
+
+		return nil
+	})
+
+	EventHandlerMock(e).EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).DoAndReturn(func(
+		ctx context.Context,
+		messages *PublicReadMessages,
+	) error {
+		require.Equal(t, 0, commitCounter)
+		messages.Confirm()
+		require.Equal(t, 1, commitCounter)
+		messages.Confirm()
+		require.Equal(t, 1, commitCounter)
+
+		return nil
+	})
+
+	StreamListener(e).onReceiveServerMessage(sf.Context(e), &rawtopicreader.ReadResponse{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		BytesSize: 10,
+		PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: PartitionSession(e).StreamPartitionSessionID,
+				Batches: []rawtopicreader.Batch{
+					{
+						Codec: rawtopiccommon.CodecRaw,
+						MessageData: []rawtopicreader.MessageData{
+							{Offset: startOffset},
+							{Offset: endOffset - 1},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	require.Equal(t, 1, commitCounter)
+}
+
 func testTime(num int) time.Time {
 	return time.Date(2000, 1, 1, 0, 0, num, 0, time.UTC)
 }

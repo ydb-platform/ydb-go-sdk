@@ -23,7 +23,7 @@ import (
 type streamListener struct {
 	cfg *StreamListenerConfig
 
-	stream      rawtopicreader.TopicReaderStreamInterface
+	stream      topicreadercommon.RawTopicReaderStream
 	streamClose context.CancelCauseFunc
 	handler     EventHandler
 	sessionID   string
@@ -144,7 +144,7 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 			err,
 		)))
 	}
-	l.stream = stream
+	l.stream = topicreadercommon.NewSyncedStream(stream)
 
 	initMessage := topicreadercommon.CreateInitMessage(l.cfg.Consumer, l.cfg.Selectors)
 	err = stream.Send(initMessage)
@@ -370,16 +370,25 @@ func (l *streamListener) onReadResponse(m *rawtopicreader.ReadResponse) error {
 	}
 
 	for _, batch := range batches {
-		if err = l.handler.OnReadMessages(batch.Context(), &PublicReadMessages{
-			PartitionSession: topicreadercommon.BatchGetPartitionSession(batch).ToPublic(),
-			Batch:            batch,
-		}); err != nil {
+		if err = l.handler.OnReadMessages(batch.Context(), NewPublicReadMessages(
+			topicreadercommon.BatchGetPartitionSession(batch).ToPublic(),
+			batch,
+			l,
+		)); err != nil {
 			return err
 		}
 	}
 	l.sendDataRequest(m.BytesSize)
 
 	return nil
+}
+
+func (l *streamListener) sendCommit(b *topicreadercommon.PublicBatch) error {
+	commitRanges := topicreadercommon.CommitRanges{
+		Ranges: []topicreadercommon.CommitRange{topicreadercommon.GetCommitRange(b)},
+	}
+
+	return l.stream.Send(commitRanges.ToRawMessage())
 }
 
 func (l *streamListener) sendDataRequest(bytesCount int) {
