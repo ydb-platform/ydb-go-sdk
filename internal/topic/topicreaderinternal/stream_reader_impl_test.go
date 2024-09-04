@@ -197,7 +197,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 	})
 	xtest.TestManyTimesWithName(t, "WrongOrderCommitWithSyncMode", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
-		e.reader.cfg.CommitMode = CommitModeSync
+		e.reader.cfg.CommitMode = topicreadercommon.CommitModeSync
 		e.Start()
 
 		lastOffset := e.partitionSession.LastReceivedMessageOffset()
@@ -259,7 +259,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		require.ErrorIs(t, e.reader.Commit(
 			e.ctx,
 			topicreadercommon.GetCommitRange(batch.Messages[1]),
-		), ErrWrongCommitOrderInSyncMode)
+		), topicreadercommon.ErrWrongCommitOrderInSyncMode)
 		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
 
@@ -941,7 +941,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 }
 
 func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
-	commitByMode := func(mode PublicCommitMode) error {
+	commitByMode := func(mode topicreadercommon.PublicCommitMode) error {
 		sleep := func() {
 			time.Sleep(time.Second / 10)
 		}
@@ -970,13 +970,13 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 		return commitErr
 	}
 	t.Run("CommitModeNone", func(t *testing.T) {
-		require.ErrorIs(t, commitByMode(CommitModeNone), ErrCommitDisabled)
+		require.ErrorIs(t, commitByMode(topicreadercommon.CommitModeNone), topicreadercommon.ErrCommitDisabled)
 	})
 	t.Run("CommitModeSync", func(t *testing.T) {
-		require.ErrorIs(t, commitByMode(CommitModeSync), PublicErrCommitSessionToExpiredSession)
+		require.ErrorIs(t, commitByMode(topicreadercommon.CommitModeSync), topicreadercommon.PublicErrCommitSessionToExpiredSession)
 	})
 	t.Run("CommitModeAsync", func(t *testing.T) {
-		require.NoError(t, commitByMode(CommitModeAsync))
+		require.NoError(t, commitByMode(topicreadercommon.CommitModeAsync))
 	})
 }
 

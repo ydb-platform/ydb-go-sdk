@@ -1,4 +1,4 @@
-package topicreaderinternal
+package topicreadercommon
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -32,15 +31,15 @@ func TestCommitterCommit(t *testing.T) {
 		ctx, cancel := xcontext.WithCancel(ctx)
 		cancel()
 
-		err := c.Commit(ctx, topicreadercommon.CommitRange{})
+		err := c.Commit(ctx, CommitRange{})
 		require.ErrorIs(t, err, context.Canceled)
 	})
 }
 
 func TestCommitterCommitDisabled(t *testing.T) {
 	ctx := xtest.Context(t)
-	c := &committer{mode: CommitModeNone}
-	err := c.Commit(ctx, topicreadercommon.CommitRange{})
+	c := &Committer{mode: CommitModeNone}
+	err := c.Commit(ctx, CommitRange{})
 	require.ErrorIs(t, err, ErrCommitDisabled)
 }
 
@@ -49,7 +48,7 @@ func TestCommitterCommitAsync(t *testing.T) {
 		ctx := xtest.Context(t)
 		session := newTestPartitionSession(context.Background(), 1)
 
-		cRange := topicreadercommon.CommitRange{
+		cRange := CommitRange{
 			CommitOffsetStart: 1,
 			CommitOffsetEnd:   2,
 			PartitionSession:  session,
@@ -78,7 +77,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		ctx := xtest.Context(t)
 		session := newTestPartitionSession(context.Background(), 1)
 
-		cRange := topicreadercommon.CommitRange{
+		cRange := CommitRange{
 			CommitOffsetStart: 1,
 			CommitOffsetEnd:   2,
 			PartitionSession:  session,
@@ -106,7 +105,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		ctx := xtest.Context(t)
 		session := newTestPartitionSession(context.Background(), 1)
 
-		cRange := topicreadercommon.CommitRange{
+		cRange := CommitRange{
 			CommitOffsetStart: 1,
 			CommitOffsetEnd:   2,
 			PartitionSession:  session,
@@ -143,7 +142,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		session := newTestPartitionSession(context.Background(), 1)
 		session.SetCommittedOffsetForward(2)
 
-		cRange := topicreadercommon.CommitRange{
+		cRange := CommitRange{
 			CommitOffsetStart: 1,
 			CommitOffsetEnd:   2,
 			PartitionSession:  session,
@@ -160,7 +159,7 @@ func TestCommitterCommitSync(t *testing.T) {
 
 		session := newTestPartitionSession(sessionCtx, 1)
 		session.SetCommittedOffsetForward(1)
-		cRange := topicreadercommon.CommitRange{
+		cRange := CommitRange{
 			CommitOffsetStart: 1,
 			CommitOffsetEnd:   2,
 			PartitionSession:  session,
@@ -196,7 +195,7 @@ func TestCommitterBuffer(t *testing.T) {
 			return nil
 		}
 
-		_, err := c.pushCommit(topicreadercommon.CommitRange{PartitionSession: newTestPartitionSession(
+		_, err := c.pushCommit(CommitRange{PartitionSession: newTestPartitionSession(
 			context.Background(), 2,
 		)})
 		require.NoError(t, err)
@@ -227,11 +226,11 @@ func TestCommitterBuffer(t *testing.T) {
 			return nil
 		}
 
-		_, err := c.pushCommit(topicreadercommon.CommitRange{PartitionSession: newTestPartitionSession(
+		_, err := c.pushCommit(CommitRange{PartitionSession: newTestPartitionSession(
 			context.Background(), 1,
 		)})
 		require.NoError(t, err)
-		_, err = c.pushCommit(topicreadercommon.CommitRange{PartitionSession: newTestPartitionSession(
+		_, err = c.pushCommit(CommitRange{PartitionSession: newTestPartitionSession(
 			context.Background(), 2,
 		)})
 		require.NoError(t, err)
@@ -263,7 +262,7 @@ func TestCommitterBuffer(t *testing.T) {
 
 			return nil
 		}
-		c.commits.AppendCommitRanges([]topicreadercommon.CommitRange{
+		c.commits.AppendCommitRanges([]CommitRange{
 			{PartitionSession: newTestPartitionSession(
 				context.Background(), 1,
 			)},
@@ -275,7 +274,7 @@ func TestCommitterBuffer(t *testing.T) {
 			)},
 		})
 
-		_, err := c.pushCommit(topicreadercommon.CommitRange{PartitionSession: newTestPartitionSession(
+		_, err := c.pushCommit(CommitRange{PartitionSession: newTestPartitionSession(
 			context.Background(), 4,
 		)})
 		require.NoError(t, err)
@@ -309,7 +308,7 @@ func TestCommitterBuffer(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			_, err := c.pushCommit(
-				topicreadercommon.CommitRange{
+				CommitRange{
 					PartitionSession: newTestPartitionSession(
 						context.Background(), rawtopicreader.PartitionSessionID(i),
 					),
@@ -324,7 +323,7 @@ func TestCommitterBuffer(t *testing.T) {
 		})
 		require.False(t, isSended())
 
-		_, err := c.pushCommit(topicreadercommon.CommitRange{PartitionSession: newTestPartitionSession(
+		_, err := c.pushCommit(CommitRange{PartitionSession: newTestPartitionSession(
 			context.Background(), 3,
 		)})
 		require.NoError(t, err)
@@ -344,7 +343,7 @@ func TestCommitterBuffer(t *testing.T) {
 
 			return nil
 		}
-		_, err := c.pushCommit(topicreadercommon.CommitRange{PartitionSession: newTestPartitionSession(
+		_, err := c.pushCommit(CommitRange{PartitionSession: newTestPartitionSession(
 			context.Background(), 0,
 		)})
 		require.NoError(t, err)
@@ -375,7 +374,7 @@ func TestCommitterBuffer(t *testing.T) {
 
 			return nil
 		}
-		c.commits.AppendCommitRange(topicreadercommon.CommitRange{PartitionSession: newTestPartitionSession(
+		c.commits.AppendCommitRange(CommitRange{PartitionSession: newTestPartitionSession(
 			context.Background(), 0,
 		)})
 		require.NoError(t, c.Close(ctx, nil))
@@ -383,8 +382,8 @@ func TestCommitterBuffer(t *testing.T) {
 	})
 }
 
-func newTestCommitter(ctx context.Context, t testing.TB) *committer {
-	res := newCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
+func newTestCommitter(ctx context.Context, t testing.TB) *Committer {
+	res := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
 	})
 	res.Start()
@@ -400,8 +399,8 @@ func newTestCommitter(ctx context.Context, t testing.TB) *committer {
 func newTestPartitionSession(
 	ctx context.Context,
 	partitionSessionID rawtopicreader.PartitionSessionID,
-) *topicreadercommon.PartitionSession {
-	return topicreadercommon.NewPartitionSession(
+) *PartitionSession {
+	return NewPartitionSession(
 		ctx,
 		"",
 		0,
@@ -413,8 +412,8 @@ func newTestPartitionSession(
 	)
 }
 
-func testNewCommitRanges(commitable ...topicreadercommon.PublicCommitRangeGetter) *topicreadercommon.CommitRanges {
-	var res topicreadercommon.CommitRanges
+func testNewCommitRanges(commitable ...PublicCommitRangeGetter) *CommitRanges {
+	var res CommitRanges
 	res.Append(commitable...)
 
 	return &res

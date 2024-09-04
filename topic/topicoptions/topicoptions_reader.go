@@ -172,15 +172,15 @@ func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) Rea
 }
 
 // CommitMode variants of commit mode of the reader
-type CommitMode = topicreaderinternal.PublicCommitMode
+type CommitMode = topicreadercommon.PublicCommitMode
 
 const (
 	// CommitModeAsync - commit return true if commit success add to internal send buffer (but not sent to server)
 	// now it is grpc buffer, in feature it may be internal sdk buffer
-	CommitModeAsync = topicreaderinternal.CommitModeAsync // default
+	CommitModeAsync = topicreadercommon.CommitModeAsync // default
 
 	// CommitModeNone - reader will not be commit operation
-	CommitModeNone = topicreaderinternal.CommitModeNone
+	CommitModeNone = topicreadercommon.CommitModeNone
 
 	// CommitModeSync - commit return true when sdk receive ack of commit from server
 	// The mode needs strong ordering client code for prevent deadlock.
@@ -193,7 +193,7 @@ const (
 	// CommitOffset(2) - server will wait commit offset 1 before send ack about offset 1 and 2 committed.
 	// CommitOffset(1)
 	// SDK will detect the problem and return error instead of deadlock.
-	CommitModeSync = topicreaderinternal.CommitModeSync
+	CommitModeSync = topicreadercommon.CommitModeSync
 )
 
 // WithCommitMode

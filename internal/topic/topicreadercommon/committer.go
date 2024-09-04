@@ -1,4 +1,4 @@
-package topicreaderinternal
+package topicreadercommon
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -23,7 +22,7 @@ var (
 	ErrWrongCommitOrderInSyncMode = xerrors.Wrap(errors.New("ydb: wrong commit order in sync mode"))
 )
 
-type sendMessageToServerFunc func(msg rawtopicreader.ClientMessage) error
+type SendMessageToServerFunc func(msg rawtopicreader.ClientMessage) error
 
 type PublicCommitMode int
 
@@ -33,15 +32,15 @@ const (
 	CommitModeSync
 )
 
-func (m PublicCommitMode) commitsEnabled() bool {
+func (m PublicCommitMode) CommitsEnabled() bool {
 	return m != CommitModeNone
 }
 
-type committer struct {
+type Committer struct {
 	BufferTimeLagTrigger time.Duration // 0 mean no additional time lag
 	BufferCountTrigger   int
 
-	send sendMessageToServerFunc
+	send SendMessageToServerFunc
 	mode PublicCommitMode
 
 	clock            clockwork.Clock
@@ -51,16 +50,16 @@ type committer struct {
 
 	m       xsync.Mutex
 	waiters []commitWaiter
-	commits topicreadercommon.CommitRanges
+	commits CommitRanges
 }
 
-func newCommitterStopped(
+func NewCommitterStopped(
 	tracer *trace.Topic,
 	lifeContext context.Context, //nolint:revive
 	mode PublicCommitMode,
-	send sendMessageToServerFunc,
-) *committer {
-	res := &committer{
+	send SendMessageToServerFunc,
+) *Committer {
+	res := &Committer{
 		mode:             mode,
 		clock:            clockwork.NewRealClock(),
 		send:             send,
@@ -72,20 +71,20 @@ func newCommitterStopped(
 	return res
 }
 
-func (c *committer) initChannels() {
+func (c *Committer) initChannels() {
 	c.commitLoopSignal = make(empty.Chan, 1)
 }
 
-func (c *committer) Start() {
+func (c *Committer) Start() {
 	c.backgroundWorker.Start("commit pusher", c.pushCommitsLoop)
 }
 
-func (c *committer) Close(ctx context.Context, err error) error {
+func (c *Committer) Close(ctx context.Context, err error) error {
 	return c.backgroundWorker.Close(ctx, err)
 }
 
-func (c *committer) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
-	if !c.mode.commitsEnabled() {
+func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
+	if !c.mode.CommitsEnabled() {
 		return ErrCommitDisabled
 	}
 
@@ -101,7 +100,7 @@ func (c *committer) Commit(ctx context.Context, commitRange topicreadercommon.Co
 	return c.waitCommitAck(ctx, waiter)
 }
 
-func (c *committer) pushCommit(commitRange topicreadercommon.CommitRange) (commitWaiter, error) {
+func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	var resErr error
 	waiter := newCommitWaiter(commitRange.PartitionSession, commitRange.CommitOffsetEnd)
 	c.m.WithLock(func() {
@@ -125,14 +124,14 @@ func (c *committer) pushCommit(commitRange topicreadercommon.CommitRange) (commi
 	return waiter, resErr
 }
 
-func (c *committer) pushCommitsLoop(ctx context.Context) {
+func (c *Committer) pushCommitsLoop(ctx context.Context) {
 	for {
 		c.waitSendTrigger(ctx)
 
-		var commits topicreadercommon.CommitRanges
+		var commits CommitRanges
 		c.m.WithLock(func() {
 			commits = c.commits
-			c.commits = topicreadercommon.NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:gomnd
+			c.commits = NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:gomnd
 		})
 
 		if commits.Len() == 0 && c.backgroundWorker.Context().Err() != nil {
@@ -160,7 +159,7 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 	}
 }
 
-func (c *committer) waitSendTrigger(ctx context.Context) {
+func (c *Committer) waitSendTrigger(ctx context.Context) {
 	ctxDone := ctx.Done()
 	select {
 	case <-ctxDone:
@@ -205,7 +204,7 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 	}
 }
 
-func (c *committer) waitCommitAck(ctx context.Context, waiter commitWaiter) error {
+func (c *Committer) waitCommitAck(ctx context.Context, waiter commitWaiter) error {
 	if c.mode != CommitModeSync {
 		return nil
 	}
@@ -227,7 +226,7 @@ func (c *committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 	}
 }
 
-func (c *committer) OnCommitNotify(session *topicreadercommon.PartitionSession, offset rawtopiccommon.Offset) {
+func (c *Committer) OnCommitNotify(session *PartitionSession, offset rawtopiccommon.Offset) {
 	c.m.WithLock(func() {
 		for i := range c.waiters {
 			waiter := c.waiters[i]
@@ -241,11 +240,11 @@ func (c *committer) OnCommitNotify(session *topicreadercommon.PartitionSession, 
 	})
 }
 
-func (c *committer) addWaiterNeedLock(waiter commitWaiter) {
+func (c *Committer) addWaiterNeedLock(waiter commitWaiter) {
 	c.waiters = append(c.waiters, waiter)
 }
 
-func (c *committer) removeWaiterByIDNeedLock(id int64) {
+func (c *Committer) removeWaiterByIDNeedLock(id int64) {
 	newWaiters := c.waiters[:0]
 	for i := range c.waiters {
 		if c.waiters[i].ID == id {
@@ -259,13 +258,13 @@ func (c *committer) removeWaiterByIDNeedLock(id int64) {
 
 type commitWaiter struct {
 	ID        int64
-	Session   *topicreadercommon.PartitionSession
+	Session   *PartitionSession
 	EndOffset rawtopiccommon.Offset
 	Committed empty.Chan
 }
 
 func (w *commitWaiter) checkCondition(
-	session *topicreadercommon.PartitionSession,
+	session *PartitionSession,
 	offset rawtopiccommon.Offset,
 ) (finished bool) {
 	return session == w.Session && offset >= w.EndOffset
@@ -273,7 +272,7 @@ func (w *commitWaiter) checkCondition(
 
 var commitWaiterLastID int64
 
-func newCommitWaiter(session *topicreadercommon.PartitionSession, endOffset rawtopiccommon.Offset) commitWaiter {
+func newCommitWaiter(session *PartitionSession, endOffset rawtopiccommon.Offset) commitWaiter {
 	id := atomic.AddInt64(&commitWaiterLastID, 1)
 
 	return commitWaiter{
