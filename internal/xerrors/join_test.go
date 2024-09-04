@@ -60,7 +60,7 @@ func TestUnwrapJoined(t *testing.T) {
 
 	joined := Join(err1, err2)
 
-	unwrappable := joined.(interface{ Unwrap() []error }) //nolint:errorlint
+	unwrappable := joined.(interface{ Unwrap() []error })
 	inners := unwrappable.Unwrap()
 	assert.Contains(t, inners, err1)
 	assert.Contains(t, inners, err2)

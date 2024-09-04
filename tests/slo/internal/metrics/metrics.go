@@ -34,28 +34,28 @@ func New(url, label, jobName string) (*Metrics, error) {
 	}
 
 	m.oks = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+		prometheus.GaugeOpts{ //nolint:promlinter
 			Name: "oks",
 			Help: "amount of OK requests",
 		},
 		[]string{"jobName"},
 	)
 	m.notOks = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+		prometheus.GaugeOpts{ //nolint:promlinter
 			Name: "not_oks",
 			Help: "amount of not OK requests",
 		},
 		[]string{"jobName"},
 	)
 	m.inflight = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+		prometheus.GaugeOpts{ //nolint:promlinter
 			Name: "inflight",
 			Help: "amount of requests in flight",
 		},
 		[]string{"jobName"},
 	)
 	m.latencies = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+		prometheus.SummaryOpts{ //nolint:promlinter
 			Name: "latency",
 			Help: "summary of latencies in ms",
 			Objectives: map[float64]float64{
@@ -68,7 +68,7 @@ func New(url, label, jobName string) (*Metrics, error) {
 		[]string{"status", "jobName"},
 	)
 	m.attempts = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+		prometheus.HistogramOpts{ //nolint:promlinter
 			Name:    "attempts",
 			Help:    "summary of amount for request",
 			Buckets: prometheus.LinearBuckets(1, 1, 10), //nolint:gomnd

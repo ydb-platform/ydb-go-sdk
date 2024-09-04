@@ -126,7 +126,6 @@ func (c *conn) park(ctx context.Context) (err error) {
 	}
 
 	err = c.close(ctx)
-
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

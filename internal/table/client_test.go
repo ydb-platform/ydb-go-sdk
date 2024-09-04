@@ -643,7 +643,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 					testutil.TableDeleteSession: func(interface{}) (proto.Message, error) {
 						deleted++
 
-						return nil, nil
+						return nil, nil //nolint:nilnil
 					},
 				},
 			),
