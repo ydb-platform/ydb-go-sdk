@@ -189,6 +189,15 @@ func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
 	return value.DecimalValueFromBigInt(v, precision, scale)
 }
 
+func DecimalValueFromString(str string, precision, scale uint32) (Value, error) {
+	bigI, err := decimal.Parse(str, precision, scale)
+	if err != nil {
+		return nil, err
+	}
+
+	return value.DecimalValueFromBigInt(bigI, precision, scale), nil
+}
+
 func TupleValue(vs ...Value) Value {
 	return value.TupleValue(vs...)
 }

@@ -1,3 +1,5 @@
+* Added `table/types.DecimalValueFromString` decimal type constructor
+
 ## v3.77.1
 * Added log topic writer ack
 * Replaced `operation.Client.List` to five methods for listing operations `operation.List{BuildIndex,ImportFromS3,ExportToS3,ExportToYT,ExecuteQuery}`

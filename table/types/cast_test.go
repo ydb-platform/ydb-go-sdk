@@ -2,6 +2,7 @@ package types
 
 import (
 	"math/big"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -83,6 +84,35 @@ func TestToDecimal(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.d, d)
+			}
+		})
+	}
+}
+
+func TestDecimalParse(t *testing.T) {
+	for i, tt := range []struct {
+		raw     string
+		literal string
+		err     bool
+	}{
+		{
+			raw:     "-1234567.890123456",
+			literal: `Decimal("-1234567.890123456",22,9)`,
+			err:     false,
+		},
+		{
+			raw:     "not a decimal",
+			literal: ``,
+			err:     true,
+		},
+	} {
+		t.Run(strconv.Itoa(i)+"."+tt.raw, func(t *testing.T) {
+			dec, err := DecimalValueFromString(tt.raw, 22, 9)
+			if err != nil {
+				require.True(t, tt.err)
+				require.Nil(t, dec)
+			} else {
+				require.Equal(t, tt.literal, dec.Yql())
 			}
 		})
 	}
