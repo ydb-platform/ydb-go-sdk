@@ -104,6 +104,7 @@ jobs:
       matrix:
         go-version: [1.23.x]
         ydb-version: [nightly]
+        os: [ubuntu]
     services:
       ydb:
         image: ydbplatform/local-ydb:${{ matrix.ydb-version }}
