@@ -93,6 +93,10 @@ func main() {
 
 			x := big.NewInt(42 * 1000000000)
 			x.Mul(x, big.NewInt(2))
+			parsedDecimal, err := types.DecimalValueFromString("42.00", 22, 9)
+			if err != nil {
+				panic(err)
+			}
 
 			_, _, err = s.Execute(ctx, txc, render(writeQuery, templateConfig{
 				TablePathPrefix: prefix,
@@ -102,6 +106,10 @@ func main() {
 						types.StructValue(
 							types.StructFieldValue("id", types.Uint32Value(42)),
 							types.StructFieldValue("value", types.DecimalValueFromBigInt(x, 22, 9)),
+						),
+						types.StructValue(
+							types.StructFieldValue("id", types.Uint32Value(43)),
+							types.StructFieldValue("value", parsedDecimal),
 						),
 					),
 				),
