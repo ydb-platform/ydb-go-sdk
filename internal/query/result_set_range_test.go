@@ -521,6 +521,7 @@ func TestResultSetRange(t *testing.T) {
 	})
 	t.Run("CanceledContext", func(t *testing.T) {
 		childCtx, cancel := context.WithCancel(xtest.Context(t))
+		defer cancel()
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,

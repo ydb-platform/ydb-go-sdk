@@ -52,7 +52,6 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	defer stop()
 
 	err = s.stream.CloseSend()
-
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return xerrors.WithStackTrace(err)
@@ -88,7 +87,6 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	defer stop()
 
 	err = s.stream.SendMsg(m)
-
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return xerrors.WithStackTrace(err)
@@ -144,7 +142,6 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
 	defer stop()
 
 	err = s.stream.RecvMsg(m)
-
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF

@@ -98,7 +98,7 @@ func deleteExpiredRange(ctx context.Context, c table.Client, prefix string, time
 	// As single key range usually represents a single shard, so we batch deletions here
 	// without introducing distributed transactions.
 	var (
-		docIds []uint64
+		docIDs []uint64
 		docID  uint64
 		ts     uint64
 	)
@@ -113,20 +113,20 @@ func deleteExpiredRange(ctx context.Context, c table.Client, prefix string, time
 			}
 
 			if ts <= timestamp {
-				docIds = append(docIds, docID)
+				docIDs = append(docIDs, docID)
 			}
-			if len(docIds) >= deleteBatchSize {
-				if err := deleteExpiredDocuments(ctx, c, prefix, docIds, timestamp); err != nil {
+			if len(docIDs) >= deleteBatchSize {
+				if err := deleteExpiredDocuments(ctx, c, prefix, docIDs, timestamp); err != nil {
 					return err
 				}
-				docIds = []uint64{}
+				docIDs = []uint64{}
 			}
 		}
-		if len(docIds) > 0 {
-			if err := deleteExpiredDocuments(ctx, c, prefix, docIds, timestamp); err != nil {
+		if len(docIDs) > 0 {
+			if err := deleteExpiredDocuments(ctx, c, prefix, docIDs, timestamp); err != nil {
 				return err
 			}
-			docIds = []uint64{}
+			docIDs = []uint64{}
 		}
 	}
 

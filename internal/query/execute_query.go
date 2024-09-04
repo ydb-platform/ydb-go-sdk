@@ -176,7 +176,7 @@ func readMaterializedResultSet(ctx context.Context, r *streamResult) (_ *materia
 
 	var rows []query.Row
 	for {
-		row, err := rs.nextRow(ctx) //nolint:govet
+		row, err := rs.nextRow(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				break

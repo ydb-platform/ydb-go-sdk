@@ -49,7 +49,6 @@ func do(
 
 				return op(xcontext.MarkRetryCall(ctx), s)
 			}()
-
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}

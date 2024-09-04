@@ -232,7 +232,7 @@ func TestSelectRandomConnection(t *testing.T) {
 			case "2":
 				second++
 			default:
-				t.Errorf(c.Endpoint().Address())
+				t.Error(c.Endpoint().Address())
 			}
 		}
 		require.Equal(t, 100, first+second)

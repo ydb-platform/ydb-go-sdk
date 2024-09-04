@@ -87,7 +87,6 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 				},
 			},
 		})
-
 		if err != nil {
 			return fmt.Errorf("failed to send error response: %w", err)
 		}
@@ -125,7 +124,6 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 			},
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to sent write ack: %w", err)
 	}
