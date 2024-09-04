@@ -7,13 +7,13 @@ import (
 )
 
 type (
-	Result             = result.Result
-	ResultSet          = result.Set
-	resultSetWithClose = result.ClosableResultSet
-	Row                = result.Row
-	Type               = types.Type
-	NamedDestination   = scanner.NamedDestination
-	ScanStructOption   = scanner.ScanStructOption
+	Result            = result.Result
+	ResultSet         = result.Set
+	ClosableResultSet = result.ClosableResultSet
+	Row               = result.Row
+	Type              = types.Type
+	NamedDestination  = scanner.NamedDestination
+	ScanStructOption  = scanner.ScanStructOption
 )
 
 func Named(columnName string, destinationValueReference interface{}) (dst NamedDestination) {

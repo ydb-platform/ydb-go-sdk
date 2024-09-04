@@ -31,7 +31,7 @@ type (
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (resultSetWithClose, error)
+		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (ClosableResultSet, error)
 
 		// QueryRow execute query and take the exactly single row from exactly single result set from result
 		//
@@ -87,7 +87,7 @@ type (
 		// Warning: the large result set from query will be materialized and can happened to "OOM killed" problem
 		//
 		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (resultSetWithClose, error)
+		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (ClosableResultSet, error)
 
 		// QueryRow is a helper which read only one row from first result set in result
 		//

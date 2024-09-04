@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func TestResultRange(t *testing.T) {
+func TestResultRangeResultSets(t *testing.T) {
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 	ctrl := gomock.NewController(t)

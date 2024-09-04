@@ -186,7 +186,7 @@ func (c *Client) ExecuteScript(
 	return op, nil
 }
 
-func (p *poolStub) Close(ctx context.Context) error {
+func (p *poolStub) Close(context.Context) error {
 	return nil
 }
 

@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func TestResultSetRange(t *testing.T) {
+func TestResultSetRangeRows(t *testing.T) {
 	ctx := xtest.Context(t)
 	ctrl := gomock.NewController(t)
 	t.Run("EmptyResultSet", func(t *testing.T) {
