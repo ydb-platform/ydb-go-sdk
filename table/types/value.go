@@ -194,6 +194,7 @@ func DecimalValueFromString(str string, precision, scale uint32) (Value, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	return value.DecimalValueFromBigInt(bigI, precision, scale), nil
 }
 
