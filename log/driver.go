@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -302,7 +303,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			start := time.Now()
 
 			return func(info trace.DriverConnStreamRecvMsgDoneInfo) {
-				if info.Error == nil {
+				if xerrors.HideEOF(info.Error) == nil {
 					l.Log(ctx, "done",
 						latencyField(start),
 					)
