@@ -143,11 +143,7 @@ func readAll(ctx context.Context, r *streamResult) error {
 	}
 }
 
-func readResultSet(ctx context.Context, r *streamResult) (_ *resultSet, finalErr error) {
-	defer func() {
-		_ = r.Close(ctx)
-	}()
-
+func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose, finalErr error) {
 	rs, err := r.nextResultSet(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -161,7 +157,10 @@ func readResultSet(ctx context.Context, r *streamResult) (_ *resultSet, finalErr
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return rs, nil
+	return &resultSetWithClose{
+		resultSet: rs,
+		close:     r.Close,
+	}, nil
 }
 
 func readMaterializedResultSet(ctx context.Context, r *streamResult) (_ *materializedResultSet, finalErr error) {

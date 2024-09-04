@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	queryTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -77,7 +78,7 @@ func (tx *Transaction) UnLazy(ctx context.Context) (err error) {
 
 func (tx *Transaction) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
-) (rs query.ResultSet, finalErr error) {
+) (rs result.ClosableResultSet, finalErr error) {
 	onDone := trace.QueryOnTxQueryResultSet(tx.s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"), tx, q)
 	defer func() {

@@ -42,6 +42,23 @@ type (
 	resultOption func(s *streamResult)
 )
 
+func rangeResultSets(ctx context.Context, r result.Result) xiter.Seq2[result.Set, error] {
+	return func(yield func(result.Set, error) bool) {
+		for {
+			rs, err := r.NextResultSet(ctx)
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					return
+				}
+			}
+			cont := yield(rs, err)
+			if !cont || err != nil {
+				return
+			}
+		}
+	}
+}
+
 func (r *materializedResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, error] {
 	return rangeResultSets(ctx, r)
 }

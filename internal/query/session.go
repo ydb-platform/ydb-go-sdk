@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -32,7 +33,7 @@ type Session struct {
 
 func (s *Session) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
-) (rs query.ResultSet, finalErr error) {
+) (rs result.ClosableResultSet, finalErr error) {
 	onDone := trace.QueryOnSessionQueryResultSet(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryResultSet"), s, q)
 	defer func() {

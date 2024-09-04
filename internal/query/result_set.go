@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
@@ -35,13 +36,42 @@ type (
 		rowIndex    int
 		done        chan struct{}
 	}
+	resultSetWithClose struct {
+		*resultSet
+		close func(ctx context.Context) error
+	}
 )
 
-func (rs *materializedResultSet) Rows(ctx context.Context) xiter.Seq2[query.Row, error] {
+func rangeRows(ctx context.Context, rs result.Set) xiter.Seq2[result.Row, error] {
+	return func(yield func(result.Row, error) bool) {
+		for {
+			rs, err := rs.NextRow(ctx)
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					return
+				}
+			}
+			cont := yield(rs, err)
+			if !cont || err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (*materializedResultSet) Close(context.Context) error {
+	return nil
+}
+
+func (rs *resultSetWithClose) Close(ctx context.Context) error {
+	return rs.close(ctx)
+}
+
+func (rs *materializedResultSet) Rows(ctx context.Context) xiter.Seq2[result.Row, error] {
 	return rangeRows(ctx, rs)
 }
 
-func (rs *resultSet) Rows(ctx context.Context) xiter.Seq2[query.Row, error] {
+func (rs *resultSet) Rows(ctx context.Context) xiter.Seq2[result.Row, error] {
 	return rangeRows(ctx, rs)
 }
 

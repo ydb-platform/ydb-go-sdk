@@ -29,6 +29,10 @@ type (
 		// Rows is experimental API for range iterators available with Go version 1.23+
 		Rows(ctx context.Context) xiter.Seq2[Row, error]
 	}
+	ClosableResultSet interface {
+		Set
+		closer.Closer
+	}
 	Row interface {
 		Scan(dst ...interface{}) error
 		ScanNamed(dst ...scanner.NamedDestination) error

@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestResultNextResultSet(t *testing.T) {
@@ -1433,6 +1434,153 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 		require.ErrorIs(t, err, testErr)
 		require.Nil(t, rs)
 	})
+}
+
+func TestCloseResultOnCloseClosableResultSet(t *testing.T) {
+	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		Status: Ydb.StatusIds_SUCCESS,
+		TxMeta: &Ydb_Query.TransactionMeta{
+			Id: "456",
+		},
+		ResultSetIndex: 0,
+		ResultSet: &Ydb.ResultSet{
+			Columns: []*Ydb.Column{
+				{
+					Name: "a",
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UINT64,
+						},
+					},
+				},
+				{
+					Name: "b",
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UTF8,
+						},
+					},
+				},
+			},
+			Rows: []*Ydb.Value{
+				{
+					Items: []*Ydb.Value{{
+						Value: &Ydb.Value_Uint64Value{
+							Uint64Value: 1,
+						},
+					}, {
+						Value: &Ydb.Value_TextValue{
+							TextValue: "1",
+						},
+					}},
+				},
+				{
+					Items: []*Ydb.Value{{
+						Value: &Ydb.Value_Uint64Value{
+							Uint64Value: 2,
+						},
+					}, {
+						Value: &Ydb.Value_TextValue{
+							TextValue: "2",
+						},
+					}},
+				},
+			},
+		},
+	}, nil)
+	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		Status: Ydb.StatusIds_SUCCESS,
+		TxMeta: &Ydb_Query.TransactionMeta{
+			Id: "456",
+		},
+		ResultSetIndex: 0,
+		ResultSet: &Ydb.ResultSet{
+			Columns: []*Ydb.Column{
+				{
+					Name: "a",
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UINT64,
+						},
+					},
+				},
+				{
+					Name: "b",
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UTF8,
+						},
+					},
+				},
+			},
+			Rows: []*Ydb.Value{
+				{
+					Items: []*Ydb.Value{{
+						Value: &Ydb.Value_Uint64Value{
+							Uint64Value: 1,
+						},
+					}, {
+						Value: &Ydb.Value_TextValue{
+							TextValue: "1",
+						},
+					}},
+				},
+				{
+					Items: []*Ydb.Value{{
+						Value: &Ydb.Value_Uint64Value{
+							Uint64Value: 2,
+						},
+					}, {
+						Value: &Ydb.Value_TextValue{
+							TextValue: "2",
+						},
+					}},
+				},
+			},
+		},
+	}, nil)
+	stream.EXPECT().Recv().Return(nil, io.EOF)
+	var closed bool
+	r, _, err := newResult(ctx, stream, withTrace(&trace.Query{
+		OnResultClose: func(info trace.QueryResultCloseStartInfo) func(info trace.QueryResultCloseDoneInfo) {
+			require.False(t, closed)
+			closed = true
+
+			return nil
+		},
+	}))
+
+	require.NoError(t, err)
+
+	rs, err := readResultSet(ctx, r)
+	require.NoError(t, err)
+	var (
+		a uint64
+		b string
+	)
+	r1, err1 := rs.NextRow(ctx)
+	require.NoError(t, err1)
+	require.NotNil(t, r1)
+	scanErr1 := r1.Scan(&a, &b)
+	require.NoError(t, scanErr1)
+	require.EqualValues(t, 1, a)
+	require.EqualValues(t, "1", b)
+	r2, err2 := rs.NextRow(ctx)
+	require.NoError(t, err2)
+	require.NotNil(t, r2)
+	scanErr2 := r2.Scan(&a, &b)
+	require.NoError(t, scanErr2)
+	require.EqualValues(t, 2, a)
+	require.EqualValues(t, "2", b)
+	r3, err3 := rs.NextRow(ctx)
+	require.ErrorIs(t, err3, io.EOF)
+	require.Nil(t, r3)
+	err = rs.Close(ctx)
+	require.NoError(t, err)
+	require.True(t, closed)
 }
 
 func TestResultStats(t *testing.T) {
