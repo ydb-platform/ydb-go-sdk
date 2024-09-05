@@ -64,7 +64,6 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 }
 
 func (lr *TopicListenerReconnector) connect(connectionCtx context.Context) {
-
 	sl, connRes := newStreamListener(
 		connectionCtx,
 		lr.client,
