@@ -1,6 +1,7 @@
 package topiclistenerinternal
 
 import (
+	"errors"
 	"sync/atomic"
 
 	"github.com/rekby/fixenv"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreadermock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func StreamListener(e fixenv.Env) *streamListener {
@@ -29,11 +31,22 @@ func listenerAndHandler(e fixenv.Env) listenerAndHandlerPair {
 		listener.streamClose = func(cause error) {}
 		listener.handler = handler
 		listener.sessions = PartitionStorage(e)
+		listener.syncCommitter = topicreadercommon.NewCommitterStopped(
+			&trace.Topic{},
+			sf.Context(e),
+			topicreadercommon.CommitModeSync,
+			listener.stream.Send,
+		)
+		listener.syncCommitter.Start()
 
-		return fixenv.NewGenericResult(listenerAndHandlerPair{
+		stop := func() {
+			_ = listener.syncCommitter.Close(sf.Context(e), errors.New("test finished"))
+		}
+
+		return fixenv.NewGenericResultWithCleanup(listenerAndHandlerPair{
 			handlerMock: handler,
 			listener:    listener,
-		}), nil
+		}, stop), nil
 	}
 
 	return fixenv.CacheResult(e, f)

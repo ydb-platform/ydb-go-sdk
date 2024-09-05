@@ -970,10 +970,18 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 		return commitErr
 	}
 	t.Run("CommitModeNone", func(t *testing.T) {
-		require.ErrorIs(t, commitByMode(topicreadercommon.CommitModeNone), topicreadercommon.ErrCommitDisabled)
+		require.ErrorIs(
+			t,
+			commitByMode(topicreadercommon.CommitModeNone),
+			topicreadercommon.ErrCommitDisabled,
+		)
 	})
 	t.Run("CommitModeSync", func(t *testing.T) {
-		require.ErrorIs(t, commitByMode(topicreadercommon.CommitModeSync), topicreadercommon.PublicErrCommitSessionToExpiredSession)
+		require.ErrorIs(
+			t,
+			commitByMode(topicreadercommon.CommitModeSync),
+			topicreadercommon.PublicErrCommitSessionToExpiredSession,
+		)
 	})
 	t.Run("CommitModeAsync", func(t *testing.T) {
 		require.NoError(t, commitByMode(topicreadercommon.CommitModeAsync))

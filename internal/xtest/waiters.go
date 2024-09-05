@@ -40,7 +40,7 @@ func WaitChannelClosedWithTimeout(t testing.TB, ch <-chan struct{}, timeout time
 
 	select {
 	case <-time.After(timeout):
-		t.Fatal()
+		t.Fatal("failed timeout")
 	case <-ch:
 		// pass
 	}

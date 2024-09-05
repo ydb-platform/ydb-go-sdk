@@ -69,6 +69,14 @@ func (e *PublicReadMessages) Confirm() {
 	_ = e.listener.sendCommit(e.Batch)
 }
 
+// ConfirmWithAck commit the batch and wait ack from the server. The method will be blocked until
+// receive ack, error or expire ctx.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
+	return e.listener.syncCommitter.Commit(ctx, topicreadercommon.GetCommitRange(e.Batch))
+}
+
 // PublicEventStartPartitionSession
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental

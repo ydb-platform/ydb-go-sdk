@@ -515,7 +515,10 @@ func (r *topicStreamReaderImpl) onUpdateTokenResponse(m *rawtopicreader.UpdateTo
 
 func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) (err error) {
 	defer func() {
-		if errors.Is(err, topicreadercommon.PublicErrCommitSessionToExpiredSession) && r.cfg.CommitMode == topicreadercommon.CommitModeAsync {
+		if errors.Is(
+			err,
+			topicreadercommon.PublicErrCommitSessionToExpiredSession,
+		) && r.cfg.CommitMode == topicreadercommon.CommitModeAsync {
 			err = nil
 		}
 	}()
