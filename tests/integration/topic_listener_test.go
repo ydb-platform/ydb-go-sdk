@@ -131,7 +131,6 @@ func TestTopicListenerCommit(t *testing.T) {
 
 		xtest.WaitChannelClosed(t, confirmed)
 		require.NoError(t, listener.Close(scope.Ctx))
-
 	})
 	t.Run("CommitWithAck", func(t *testing.T) {
 		scope := newScope(t)
@@ -184,7 +183,6 @@ func TestTopicListenerCommit(t *testing.T) {
 		require.Equal(t, "qqq", messData)
 
 		require.NoError(t, listener.Close(scope.Ctx))
-
 	})
 }
 
