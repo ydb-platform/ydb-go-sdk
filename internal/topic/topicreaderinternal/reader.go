@@ -8,7 +8,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -25,17 +24,9 @@ var (
 	errCommitSessionFromOtherReader = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 )
 
-//go:generate mockgen -destination raw_topic_reader_stream_mock_test.go --typed -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
-
-type RawTopicReaderStream interface {
-	Recv() (rawtopicreader.ServerMessage, error)
-	Send(msg rawtopicreader.ClientMessage) error
-	CloseSend() error
-}
-
 // TopicSteamReaderConnect connect to grpc stream
 // when connectionCtx closed stream must stop work and return errors for all methods
-type TopicSteamReaderConnect func(connectionCtx context.Context) (RawTopicReaderStream, error)
+type TopicSteamReaderConnect func(connectionCtx context.Context) (topicreadercommon.RawTopicReaderStream, error)
 
 type Reader struct {
 	reader             batchedStreamReader

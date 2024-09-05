@@ -245,7 +245,7 @@ func (c *Client) StartReader(
 	opts ...topicoptions.ReaderOption,
 ) (*topicreader.Reader, error) {
 	var connector topicreaderinternal.TopicSteamReaderConnect = func(ctx context.Context) (
-		topicreaderinternal.RawTopicReaderStream, error,
+		topicreadercommon.RawTopicReaderStream, error,
 	) {
 		return c.rawClient.StreamRead(ctx)
 	}

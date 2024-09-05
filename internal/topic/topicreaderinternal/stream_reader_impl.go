@@ -29,8 +29,6 @@ import (
 )
 
 var (
-	PublicErrCommitSessionToExpiredSession = xerrors.Wrap(errors.New("ydb: commit to expired session"))
-
 	errCommitWithNilPartitionSession = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
 	errUnexpectedEmptyConsumerName   = xerrors.Wrap(errors.New("ydb: create ydb reader with empty consumer name. Set one of: consumer name or option WithReaderWithoutConsumer")) //nolint:lll
 	errCantCommitWithoutConsumer     = xerrors.Wrap(errors.New("ydb: reader can't commit messages without consumer"))
@@ -56,9 +54,9 @@ type topicStreamReaderImpl struct {
 	rawMessagesFromBuffer chan rawtopicreader.ServerMessage
 
 	batcher   *batcher
-	committer *committer
+	committer *topicreadercommon.Committer
 
-	stream           RawTopicReaderStream
+	stream           topicreadercommon.RawTopicReaderStream
 	readConnectionID string
 	readerID         int64
 
@@ -80,7 +78,7 @@ type topicStreamReaderConfig struct {
 	ReadSelectors                   []*topicreadercommon.PublicReadSelector
 	Trace                           *trace.Topic
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
-	CommitMode                      PublicCommitMode
+	CommitMode                      topicreadercommon.PublicCommitMode
 	Decoders                        topicreadercommon.DecoderMap
 }
 
@@ -90,7 +88,7 @@ func newTopicStreamReaderConfig() topicStreamReaderConfig {
 		BufferSizeProtoBytes:  topicreadercommon.DefaultBufferSize,
 		Cred:                  credentials.NewAnonymousCredentials(),
 		CredUpdateInterval:    time.Hour,
-		CommitMode:            CommitModeAsync,
+		CommitMode:            topicreadercommon.CommitModeAsync,
 		CommitterBatchTimeLag: time.Second,
 		Decoders:              topicreadercommon.NewDecoderMap(),
 		Trace:                 &trace.Topic{},
@@ -106,7 +104,7 @@ func (cfg *topicStreamReaderConfig) Validate() []error {
 	if cfg.Consumer == "" && !cfg.ReadWithoutConsumer {
 		validateErrors = append(validateErrors, errUnexpectedEmptyConsumerName)
 	}
-	if cfg.ReadWithoutConsumer && cfg.CommitMode != CommitModeNone {
+	if cfg.ReadWithoutConsumer && cfg.CommitMode != topicreadercommon.CommitModeNone {
 		validateErrors = append(validateErrors, errCantCommitWithoutConsumer)
 	}
 	if cfg.BufferSizeProtoBytes <= 0 {
@@ -122,7 +120,7 @@ func (cfg *topicStreamReaderConfig) Validate() []error {
 func newTopicStreamReader(
 	client TopicClient,
 	readerID int64,
-	stream RawTopicReaderStream,
+	stream topicreadercommon.RawTopicReaderStream,
 	cfg topicStreamReaderConfig, //nolint:gocritic
 ) (_ *topicStreamReaderImpl, err error) {
 	defer func() {
@@ -145,7 +143,7 @@ func newTopicStreamReader(
 func newTopicStreamReaderStopped(
 	client TopicClient,
 	readerID int64,
-	stream RawTopicReaderStream,
+	stream topicreadercommon.RawTopicReaderStream,
 	cfg topicStreamReaderConfig, //nolint:gocritic
 ) *topicStreamReaderImpl {
 	labeledContext := pprof.WithLabels(cfg.BaseContext, pprof.Labels("base-context", "topic-stream-reader"))
@@ -161,7 +159,7 @@ func newTopicStreamReaderStopped(
 		ctx:                   stopPump,
 		topicClient:           client,
 		freeBytes:             make(chan int, 1),
-		stream:                &syncedStream{stream: stream},
+		stream:                topicreadercommon.NewSyncedStream(stream),
 		cancel:                cancel,
 		batcher:               newBatcher(),
 		readConnectionID:      "preinitID-" + readerConnectionID.String(),
@@ -171,7 +169,7 @@ func newTopicStreamReaderStopped(
 
 	res.backgroundWorkers = *background.NewWorker(stopPump, "topic-reader-stream-background")
 
-	res.committer = newCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
+	res.committer = topicreadercommon.NewCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
 	res.committer.BufferTimeLagTrigger = cfg.CommitterBatchTimeLag
 	res.committer.BufferCountTrigger = cfg.CommitterBatchCounterTrigger
 	res.freeBytes <- cfg.BufferSizeProtoBytes
@@ -517,7 +515,10 @@ func (r *topicStreamReaderImpl) onUpdateTokenResponse(m *rawtopicreader.UpdateTo
 
 func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) (err error) {
 	defer func() {
-		if errors.Is(err, PublicErrCommitSessionToExpiredSession) && r.cfg.CommitMode == CommitModeAsync {
+		if errors.Is(
+			err,
+			topicreadercommon.PublicErrCommitSessionToExpiredSession,
+		) && r.cfg.CommitMode == topicreadercommon.CommitModeAsync {
 			err = nil
 		}
 	}()
@@ -548,8 +549,8 @@ func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange topicrea
 }
 
 func (r *topicStreamReaderImpl) checkCommitRange(commitRange topicreadercommon.CommitRange) error {
-	if r.cfg.CommitMode == CommitModeNone {
-		return ErrCommitDisabled
+	if r.cfg.CommitMode == topicreadercommon.CommitModeNone {
+		return topicreadercommon.ErrCommitDisabled
 	}
 	session := commitRange.PartitionSession
 
@@ -558,15 +559,15 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange topicreadercommon.C
 	}
 
 	if session.Context().Err() != nil {
-		return xerrors.WithStackTrace(PublicErrCommitSessionToExpiredSession)
+		return xerrors.WithStackTrace(topicreadercommon.PublicErrCommitSessionToExpiredSession)
 	}
 
 	ownSession, err := r.sessionController.Get(session.StreamPartitionSessionID)
 	if err != nil || session != ownSession {
-		return xerrors.WithStackTrace(PublicErrCommitSessionToExpiredSession)
+		return xerrors.WithStackTrace(topicreadercommon.PublicErrCommitSessionToExpiredSession)
 	}
-	if session.CommittedOffset() != commitRange.CommitOffsetStart && r.cfg.CommitMode == CommitModeSync {
-		return ErrWrongCommitOrderInSyncMode
+	if session.CommittedOffset() != commitRange.CommitOffsetStart && r.cfg.CommitMode == topicreadercommon.CommitModeSync {
+		return topicreadercommon.ErrWrongCommitOrderInSyncMode
 	}
 
 	return nil
@@ -958,7 +959,7 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequestFromBuffer(
 	}
 
 	respMessage.ReadOffset.FromInt64Pointer(forceOffset)
-	if r.cfg.CommitMode.commitsEnabled() {
+	if r.cfg.CommitMode.CommitsEnabled() {
 		commitOffset = forceOffset
 		respMessage.CommitOffset.FromInt64Pointer(commitOffset)
 	}

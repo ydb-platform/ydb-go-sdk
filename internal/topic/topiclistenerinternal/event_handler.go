@@ -2,10 +2,10 @@ package topiclistenerinternal
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
 //go:generate mockgen -source event_handler.go -destination event_handler_mock_test.go --typed -package topiclistenerinternal -write_package_comment=false
@@ -40,7 +40,41 @@ type EventHandler interface {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type PublicReadMessages struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
-	Batch            *topicreader.Batch
+	Batch            *topicreadercommon.PublicBatch
+	listener         *streamListener
+	committed        atomic.Bool
+}
+
+func NewPublicReadMessages(
+	session topicreadercommon.PublicPartitionSession,
+	batch *topicreadercommon.PublicBatch,
+	listener *streamListener,
+) *PublicReadMessages {
+	return &PublicReadMessages{
+		PartitionSession: session,
+		Batch:            batch,
+		listener:         listener,
+	}
+}
+
+// Confirm of the process messages from the batch.
+// Send commit message the server in background. The method returns fast, without wait commits ack.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (e *PublicReadMessages) Confirm() {
+	if e.committed.Swap(true) {
+		return
+	}
+
+	_ = e.listener.sendCommit(e.Batch)
+}
+
+// ConfirmWithAck commit the batch and wait ack from the server. The method will be blocked until
+// receive ack, error or expire ctx.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
+	return e.listener.syncCommitter.Commit(ctx, topicreadercommon.GetCommitRange(e.Batch))
 }
 
 // PublicEventStartPartitionSession

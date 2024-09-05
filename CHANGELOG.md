@@ -1,3 +1,4 @@
+* Added commit messages for topic listener
 * EOF error in RecvMsg is no longer logged
 
 ## v3.78.0
