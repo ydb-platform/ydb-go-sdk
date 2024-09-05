@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
@@ -18,10 +19,12 @@ type TopicListenerReconnector struct {
 
 	background background.Worker
 
-	streamListener      *streamListener
 	connectionResult    error
 	connectionCompleted empty.Chan
 	connectionIDCounter atomic.Int64
+
+	m              sync.Mutex
+	streamListener *streamListener
 }
 
 func NewTopicListenerReconnector(
@@ -46,8 +49,12 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 	err := lr.background.Close(ctx, reason)
 	closeErrors = append(closeErrors, err)
 
-	if lr.streamListener != nil {
-		err = lr.streamListener.Close(ctx, reason)
+	lr.m.Lock()
+	sl := lr.streamListener
+	lr.m.Unlock()
+
+	if sl != nil {
+		err = sl.Close(ctx, reason)
 		if !errors.Is(err, context.Canceled) {
 			closeErrors = append(closeErrors, err)
 		}
@@ -57,13 +64,19 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 }
 
 func (lr *TopicListenerReconnector) connect(connectionCtx context.Context) {
-	lr.streamListener, lr.connectionResult = newStreamListener(
+
+	sl, connRes := newStreamListener(
 		connectionCtx,
 		lr.client,
 		lr.handler,
 		lr.streamConfig,
 		&lr.connectionIDCounter,
 	)
+	lr.m.Lock()
+	lr.streamListener = sl
+	lr.connectionResult = connRes
+	lr.m.Unlock()
+
 	close(lr.connectionCompleted)
 }
 

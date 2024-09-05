@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -93,6 +94,7 @@ func TestTopicListenerCommit(t *testing.T) {
 				close(readed)
 
 				event.Confirm()
+				time.Sleep(time.Second / 10) // time for send the commit over tcp channel
 				return nil
 			},
 		}
@@ -115,8 +117,8 @@ func TestTopicListenerCommit(t *testing.T) {
 			onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
 				defer close(confirmed)
 
-				close(readed)
 				messData = string(xtest.Must(io.ReadAll(event.Batch.Messages[0])))
+				close(readed)
 
 				event.Confirm()
 				return nil
@@ -168,8 +170,8 @@ func TestTopicListenerCommit(t *testing.T) {
 		readed = make(empty.Chan)
 		handler = &TestTopicListener_Handler{
 			onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
-				close(readed)
 				savedEvent = event
+				close(readed)
 
 				return event.ConfirmWithAck(ctx)
 			},
