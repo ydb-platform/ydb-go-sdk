@@ -42,7 +42,7 @@ func TestMap(t *testing.T) {
 		2: "two",
 		3: "three",
 	}
-	require.Equal(t, 2, m.Size())
+	require.Equal(t, 2, m.Len())
 	var unexp map[int]string
 	m.Range(func(key int, value string) bool {
 		if v, ok := exp[key]; ok && v == value {
@@ -56,7 +56,7 @@ func TestMap(t *testing.T) {
 	require.Empty(t, exp)
 	require.Empty(t, unexp)
 	m.Clear()
-	require.Zero(t, m.Size())
+	require.Zero(t, m.Len())
 	empty := true
 	m.Range(func(key int, value string) bool {
 		empty = false
