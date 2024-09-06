@@ -58,7 +58,7 @@ func (m *Map[K, V]) Delete(key K) bool {
 	return exists
 }
 
-func (m *Map[K, V]) Size() int {
+func (m *Map[K, V]) Len() int {
 	return int(m.size.Load())
 }
 
