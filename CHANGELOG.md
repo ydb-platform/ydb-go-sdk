@@ -1,3 +1,5 @@
+* Enabled by default usage of `internal/pool` in `internal/query.Client`
+
 ## v3.79.1
 * Changed `trace.Table` and `trace.Query` traces
 * Implemented `internal/pool` the same as table client pool from `internal/table.Client`
