@@ -1,4 +1,5 @@
-* Changed `trace.Table` and `trace.Query` traces 
+* Changed `trace.Table` and `trace.Query` traces
+* Implemented `internal/pool` the same as table client pool from `internal/table.Client`
 
 ## v3.79.0
 * Added commit messages for topic listener
