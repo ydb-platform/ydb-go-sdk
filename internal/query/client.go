@@ -589,50 +589,50 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 
 func poolTrace(t *trace.Query) *pool.Trace {
 	return &pool.Trace{
-		OnNew: func(info *pool.NewStartInfo) func(*pool.NewDoneInfo) {
-			onDone := trace.QueryOnPoolNew(t, info.Context, info.Call)
+		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
+			onDone := trace.QueryOnPoolNew(t, ctx, call)
 
-			return func(info *pool.NewDoneInfo) {
-				onDone(info.Limit)
+			return func(limit int) {
+				onDone(limit)
 			}
 		},
-		OnClose: func(info *pool.CloseStartInfo) func(*pool.CloseDoneInfo) {
-			onDone := trace.QueryOnClose(t, info.Context, info.Call)
+		OnClose: func(ctx *context.Context, call stack.Caller) func(err error) {
+			onDone := trace.QueryOnClose(t, ctx, call)
 
-			return func(info *pool.CloseDoneInfo) {
-				onDone(info.Error)
+			return func(err error) {
+				onDone(err)
 			}
 		},
-		OnTry: func(info *pool.TryStartInfo) func(*pool.TryDoneInfo) {
-			onDone := trace.QueryOnPoolTry(t, info.Context, info.Call)
+		OnTry: func(ctx *context.Context, call stack.Caller) func(err error) {
+			onDone := trace.QueryOnPoolTry(t, ctx, call)
 
-			return func(info *pool.TryDoneInfo) {
-				onDone(info.Error)
+			return func(err error) {
+				onDone(err)
 			}
 		},
-		OnWith: func(info *pool.WithStartInfo) func(*pool.WithDoneInfo) {
-			onDone := trace.QueryOnPoolWith(t, info.Context, info.Call)
+		OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
+			onDone := trace.QueryOnPoolWith(t, ctx, call)
 
-			return func(info *pool.WithDoneInfo) {
-				onDone(info.Error, info.Attempts)
+			return func(attempts int, err error) {
+				onDone(attempts, err)
 			}
 		},
-		OnPut: func(info *pool.PutStartInfo) func(*pool.PutDoneInfo) {
-			onDone := trace.QueryOnPoolPut(t, info.Context, info.Call)
+		OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
+			onDone := trace.QueryOnPoolPut(t, ctx, call, item.(*Session)) //nolint:forcetypeassert
 
-			return func(info *pool.PutDoneInfo) {
-				onDone(info.Error)
+			return func(err error) {
+				onDone(err)
 			}
 		},
-		OnGet: func(info *pool.GetStartInfo) func(*pool.GetDoneInfo) {
-			onDone := trace.QueryOnPoolGet(t, info.Context, info.Call)
+		OnGet: func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
+			onDone := trace.QueryOnPoolGet(t, ctx, call)
 
-			return func(info *pool.GetDoneInfo) {
-				onDone(info.Error)
+			return func(item any, attempts int, err error) {
+				onDone(item.(*Session), attempts, err) //nolint:forcetypeassert
 			}
 		},
-		OnChange: func(info pool.ChangeInfo) {
-			trace.QueryOnPoolChange(t, info.Limit, info.Idle)
+		OnChange: func(stats pool.Stats) {
+			trace.QueryOnPoolChange(t, stats.Limit, stats.Index, stats.Idle, stats.Wait, stats.CreateInProgress)
 		},
 	}
 }
