@@ -1,3 +1,4 @@
+## v3.80.0
 * Replaced internal table client pool entities to `internal/pool`
 
 ## v3.79.2
