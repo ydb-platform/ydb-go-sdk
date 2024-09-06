@@ -30,7 +30,6 @@ import (
 
 var (
 	_ query.Client = (*Client)(nil)
-	_ sessionPool  = (*poolStub)(nil)
 	_ sessionPool  = (*pool.Pool[*Session, Session])(nil)
 )
 
@@ -40,9 +39,6 @@ type (
 
 		Stats() pool.Stats
 		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
-	}
-	poolStub struct {
-		createSession func(ctx context.Context) (*Session, error)
 	}
 	Client struct {
 		config             *config.Config
@@ -185,43 +181,6 @@ func (c *Client) ExecuteScript(
 	}
 
 	return op, nil
-}
-
-func (p *poolStub) Close(context.Context) error {
-	return nil
-}
-
-func (p *poolStub) Stats() pool.Stats {
-	return pool.Stats{
-		Limit: -1,
-		Idle:  0,
-	}
-}
-
-func (p *poolStub) With(
-	ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option,
-) error {
-	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
-		s, err := p.createSession(ctx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-		defer func() {
-			_ = s.Close(ctx)
-		}()
-
-		err = f(ctx, s)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return nil
-	}, opts...)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	return nil
 }
 
 func (c *Client) Close(ctx context.Context) error {
