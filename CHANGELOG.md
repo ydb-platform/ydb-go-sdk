@@ -1,3 +1,4 @@
+## v3.79.2
 * Enabled by default usage of `internal/pool` in `internal/query.Client`
 
 ## v3.79.1
