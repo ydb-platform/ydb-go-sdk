@@ -1,3 +1,5 @@
+* Replaced internal table client pool entities to `internal/pool`
+
 ## v3.79.2
 * Enabled by default usage of `internal/pool` in `internal/query.Client`
 

@@ -64,9 +64,11 @@ func WithCreateItemFunc[PT Item[T], T any](f func(ctx context.Context) (PT, erro
 	}
 }
 
-func withCloseItemFunc[PT Item[T], T any](f func(ctx context.Context, item PT)) option[PT, T] {
+func WithSyncCloseItem[PT Item[T], T any]() option[PT, T] {
 	return func(c *Config[PT, T]) {
-		c.closeItem = f
+		c.closeItem = func(ctx context.Context, item PT) {
+			_ = item.Close(ctx)
+		}
 	}
 }
 
