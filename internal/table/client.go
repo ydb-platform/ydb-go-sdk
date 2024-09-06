@@ -84,8 +84,8 @@ type Client struct {
 	index             map[*session]sessionInfo
 	createInProgress  int // KIKIMR-9163: in-create-process counter
 	limit             int // Upper bound for Client size.
-	idle              *xlist.List[*session]
-	waitQ             *xlist.List[*chan *session]
+	idle              xlist.List[*session]
+	waitQ             xlist.List[*chan *session]
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
 	wg                sync.WaitGroup
