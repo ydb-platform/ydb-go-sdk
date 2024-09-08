@@ -1,3 +1,4 @@
+## v3.80.1
 * Added `lastErr` from previous attempt in `retry.RetryWithResult`
 
 ## v3.80.0
