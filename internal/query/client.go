@@ -227,7 +227,8 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 	defer cancel()
 
 	var (
-		onDone = trace.QueryOnDo(c.config.Trace(), &ctx,
+		settings = options.ParseDoOpts(c.config.Trace(), opts...)
+		onDone   = trace.QueryOnDo(settings.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Do"),
 		)
 		attempts = 0
@@ -238,8 +239,6 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 
 	err := do(ctx, c.pool,
 		func(ctx context.Context, s *Session) error {
-			attempts++
-
 			return op(ctx, s)
 		},
 		append([]retry.Option{
@@ -250,7 +249,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 					}
 				},
 			}),
-		}, options.ParseDoOpts(c.config.Trace(), opts...).RetryOpts()...)...,
+		}, settings.RetryOpts()...)...,
 	)
 
 	return err
@@ -481,23 +480,18 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	defer cancel()
 
 	var (
-		onDone = trace.QueryOnDoTx(c.config.Trace(), &ctx,
+		settings = options.ParseDoTxOpts(c.config.Trace(), opts...)
+		onDone   = trace.QueryOnDoTx(settings.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).DoTx"),
 		)
-		doTxOpts = options.ParseDoTxOpts(opts...)
 		attempts = 0
 	)
 	defer func() {
 		onDone(attempts, finalErr)
 	}()
 
-	err := doTx(ctx, c.pool,
-		func(ctx context.Context, tx query.TxActor) error {
-			attempts++
-
-			return op(ctx, tx)
-		},
-		doTxOpts.TxSettings(),
+	err := doTx(ctx, c.pool, op,
+		settings.TxSettings(),
 		append(
 			[]retry.Option{
 				retry.WithTrace(&trace.Retry{
@@ -508,7 +502,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 					},
 				}),
 			},
-			doTxOpts.RetryOpts()...,
+			settings.RetryOpts()...,
 		)...,
 	)
 	if err != nil {
