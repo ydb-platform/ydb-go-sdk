@@ -1,3 +1,5 @@
+* Added `lastErr` from previous attempt in `retry.RetryWithResult`
+
 ## v3.80.0
 * Replaced internal table client pool entities to `internal/pool`
 

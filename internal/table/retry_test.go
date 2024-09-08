@@ -132,26 +132,29 @@ func TestDoBadSession(t *testing.T) {
 }
 
 func TestDoCreateSessionError(t *testing.T) {
-	ctx, cancel := xcontext.WithTimeout(xtest.Context(t), time.Second)
-	defer cancel()
-	p := pool.New[*session, session](ctx,
-		pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
-			return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
-		}),
-		pool.WithSyncCloseItem[*session, session](),
-	)
-	err := do(ctx, p, config.New(),
-		func(ctx context.Context, s table.Session) error {
-			return nil
-		},
-		nil,
-	)
-	if !xerrors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if !xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE) {
-		t.Errorf("unexpected error: %v", err)
-	}
+	rootCtx := xtest.Context(t)
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx, cancel := xcontext.WithTimeout(rootCtx, 30*time.Millisecond)
+		defer cancel()
+		p := pool.New[*session, session](ctx,
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+				return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
+			}),
+			pool.WithSyncCloseItem[*session, session](),
+		)
+		err := do(ctx, p, config.New(),
+			func(ctx context.Context, s table.Session) error {
+				return nil
+			},
+			nil,
+		)
+		if !xerrors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE) {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestDoImmediateReturn(t *testing.T) {

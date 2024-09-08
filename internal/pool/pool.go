@@ -348,6 +348,7 @@ func (p *Pool[PT, T]) With(
 	opts ...retry.Option,
 ) (finalErr error) {
 	var attempts int
+
 	if onWith := p.config.trace.OnWith; onWith != nil {
 		onDone := onWith(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).With"),
@@ -608,25 +609,27 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			}
 		}
 
-		item, createItemErr := p.createItem(ctx)
+		item, err := p.createItem(ctx)
 		if item != nil {
 			return item, nil
 		}
 
-		if !isRetriable(createItemErr) {
-			return nil, xerrors.WithStackTrace(createItemErr)
+		if !isRetriable(err) {
+			return nil, xerrors.WithStackTrace(xerrors.Join(err, lastErr))
 		}
 
-		item, waitFromChErr := p.waitFromCh(ctx)
+		lastErr = err
+
+		item, err = p.waitFromCh(ctx)
 		if item != nil {
 			return item, nil
 		}
 
-		if waitFromChErr != nil && !isRetriable(waitFromChErr) {
-			return nil, xerrors.WithStackTrace(waitFromChErr)
+		if err != nil && !isRetriable(err) {
+			return nil, xerrors.WithStackTrace(xerrors.Join(err, lastErr))
 		}
 
-		lastErr = xerrors.WithStackTrace(xerrors.Join(createItemErr, waitFromChErr))
+		lastErr = err
 	}
 
 	p.mu.RLock()
