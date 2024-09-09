@@ -5,6 +5,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -91,6 +92,28 @@ func TestQueryExecute(t *testing.T) {
 			_, ok := s.NextPhase()
 			require.True(t, ok)
 		})
+	})
+	t.Run("Explain", func(t *testing.T) {
+		var (
+			ast  string
+			plan map[string]any
+		)
+		err := db.Query().Exec(ctx,
+			`SELECT CAST(42 AS Uint32);`,
+			query.WithExecMode(query.ExecModeExplain),
+			query.WithStatsMode(query.StatsModeNone, func(stats query.Stats) {
+				ast = stats.QueryAST()
+				err := json.Unmarshal([]byte(stats.QueryPlan()), &plan)
+				require.NoError(t, err)
+			}),
+			query.WithIdempotent(),
+		)
+		require.NoError(t, err)
+		for _, key := range []string{"Plan", "tables", "meta"} {
+			_, has := plan[key]
+			require.True(t, has, key)
+		}
+		require.NotEmpty(t, ast)
 	})
 	t.Run("Scan", func(t *testing.T) {
 		var (
