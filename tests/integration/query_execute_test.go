@@ -113,7 +113,7 @@ func TestQueryExecute(t *testing.T) {
 			_, has := plan[key]
 			require.True(t, has, key)
 		}
-		require.NotEmpty(t, ast)
+		require.Contains(t, ast, "return")
 	})
 	t.Run("Scan", func(t *testing.T) {
 		var (
