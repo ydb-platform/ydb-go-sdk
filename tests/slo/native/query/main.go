@@ -37,6 +37,11 @@ func main() {
 	ctx, cancel = context.WithTimeout(ctx, time.Duration(cfg.Time)*time.Second)
 	defer cancel()
 
+	go func() {
+		<-ctx.Done()
+		log.Println("exiting...")
+	}()
+
 	s, err := NewStorage(ctx, cfg, cfg.ReadRPS+cfg.WriteRPS, label)
 	if err != nil {
 		panic(fmt.Errorf("create storage failed: %w", err))
