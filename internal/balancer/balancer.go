@@ -111,7 +111,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	if b.config.DetectLocalDC {
+	if b.config.DetectNearestDC {
 		localDC, err = b.localDCDetector(ctx, endpoints)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -129,7 +129,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			b.config.DetectLocalDC,
+			b.config.DetectNearestDC,
 		)
 		previous = b.connections().All()
 	)
