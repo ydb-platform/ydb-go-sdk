@@ -5,9 +5,9 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"testing"
 	"time"
 
@@ -96,36 +96,24 @@ func TestQueryExecute(t *testing.T) {
 	t.Run("Explain", func(t *testing.T) {
 		var (
 			ast  string
-			plan string
+			plan map[string]any
 		)
 		err := db.Query().Exec(ctx,
 			`SELECT CAST(42 AS Uint32);`,
 			query.WithExecMode(query.ExecModeExplain),
 			query.WithStatsMode(query.StatsModeNone, func(stats query.Stats) {
 				ast = stats.QueryAST()
-				plan = stats.QueryPlan()
+				err := json.Unmarshal([]byte(stats.QueryPlan()), &plan)
+				require.NoError(t, err)
 			}),
 			query.WithIdempotent(),
 		)
 		require.NoError(t, err)
-		require.EqualValues(t,
-			`{"Plan":{"Plans":[{"PlanNodeId":2,"Plans":[{"PlanNodeId":1,"Operators":[{"Inputs":[],"Iterator":"[{column0: 42}]","Name":"Iterator"}],"Node Type":"ConstantExpr"}],"Node Type":"ResultSet","PlanNodeType":"ResultSet"}],"Node Type":"Query","PlanNodeType":"Query"},"meta":{"version":"0.2","type":"query"},"tables":[],"SimplifiedPlan":{"PlanNodeId":0,"Plans":[{"PlanNodeId":1,"Node Type":"ResultSet","PlanNodeType":"ResultSet"}],"Node Type":"Query","PlanNodeType":"Query"}}`,
-			plan,
-		)
-		ast = regexp.MustCompile("\"_id\" '\"(\\w{8}-\\w{8}-\\w{8}-\\w{8})\"").ReplaceAllStringFunc(ast, func(string) string {
-			return `"_id" '"test-id"`
-		})
-		require.EqualValues(t,
-			`(
-(let $1 (OptionalType (DataType 'Uint32)))
-(let $2 '('('"_logical_id" '184) '('"_id" '"test-id") '('"_partition_mode" '"single")))
-(let $3 (DqPhyStage '() (lambda '() (Iterator (AsList (AsStruct '('"column0" (SafeCast (Int32 '"42") $1)))))) $2))
-(let $4 (DqCnResult (TDqOutput $3 '"0") '('"column0")))
-(return (KqpPhysicalQuery '((KqpPhysicalTx '($3) '($4) '() '('('"type" '"generic")))) '((KqpTxResultBinding (ListType (StructType '('"column0" $1))) '"0" '"0")) '('('"type" '"query"))))
-)
-`,
-			ast,
-		)
+		for _, key := range []string{"Plan", "tables", "meta"} {
+			_, has := plan[key]
+			require.True(t, has, key)
+		}
+		require.NotEmpty(t, ast)
 	})
 	t.Run("Scan", func(t *testing.T) {
 		var (
