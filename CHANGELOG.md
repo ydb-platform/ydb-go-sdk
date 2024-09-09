@@ -1,3 +1,6 @@
+* Added `balancers.PreferNearestDC[WithFallback]` balancers
+* Marked as deprecated `balancers.PreferLocalDC[WithFallback]` balancers because `local` word is ambiguous for balancer idea
+
 ## v3.80.1
 * Added `lastErr` from previous attempt in `retry.RetryWithResult`
 

@@ -20,8 +20,13 @@ const (
 type preferType string
 
 const (
-	preferTypeLocalDC   = preferType("local_dc")
+	preferTypeNearestDC = preferType("nearest_dc")
 	preferTypeLocations = preferType("locations")
+
+	// Deprecated
+	// Will be removed after March 2025.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	preferTypeLocalDC = preferType("local_dc")
 )
 
 type balancersConfig struct {
@@ -90,10 +95,16 @@ func CreateFromConfig(s string) (*balancerConfig.Config, error) {
 	switch c.Prefer {
 	case preferTypeLocalDC:
 		if c.Fallback {
-			return PreferLocalDCWithFallBack(b), nil
+			return PreferNearestDCWithFallBack(b), nil
 		}
 
-		return PreferLocalDC(b), nil
+		return PreferNearestDC(b), nil
+	case preferTypeNearestDC:
+		if c.Fallback {
+			return PreferNearestDCWithFallBack(b), nil
+		}
+
+		return PreferNearestDC(b), nil
 	case preferTypeLocations:
 		if len(c.Locations) == 0 {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("empty locations list in balancer '%s' config", c.Type))

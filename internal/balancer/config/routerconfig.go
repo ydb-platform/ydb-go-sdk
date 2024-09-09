@@ -10,10 +10,10 @@ import (
 // Dedicated package need for prevent cyclo dependencies config -> balancer -> config
 
 type Config struct {
-	Filter        Filter
-	AllowFallback bool
-	SingleConn    bool
-	DetectLocalDC bool
+	Filter          Filter
+	AllowFallback   bool
+	SingleConn      bool
+	DetectNearestDC bool
 }
 
 func (c Config) String() string {
@@ -26,8 +26,8 @@ func (c Config) String() string {
 
 	buffer.WriteString("RandomChoice{")
 
-	buffer.WriteString("DetectLocalDC=")
-	fmt.Fprintf(buffer, "%t", c.DetectLocalDC)
+	buffer.WriteString("DetectNearestDC=")
+	fmt.Fprintf(buffer, "%t", c.DetectNearestDC)
 
 	buffer.WriteString(",AllowFallback=")
 	fmt.Fprintf(buffer, "%t", c.AllowFallback)
