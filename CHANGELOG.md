@@ -1,3 +1,4 @@
+## v3.80.2
 * Added `balancers.PreferNearestDC[WithFallback]` balancers
 * Marked as deprecated `balancers.PreferLocalDC[WithFallback]` balancers because `local` word is ambiguous for balancer idea
 
