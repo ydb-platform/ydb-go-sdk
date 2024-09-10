@@ -44,7 +44,7 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages...)
 }
 
-func (w *Writer) WriteTx(ctx context.Context, transaction tx.Identifier, messages ...Message) error {
+func (w *Writer) WriteWithTx(ctx context.Context, transaction tx.Identifier, messages ...Message) error {
 	panic("not impl")
 }
 

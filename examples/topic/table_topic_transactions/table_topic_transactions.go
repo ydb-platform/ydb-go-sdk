@@ -61,7 +61,7 @@ func pumpFromTableToTopic(ctx context.Context, db *ydb.Driver, topic string) err
 	}
 
 	return db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		rs, err := tx.QueryResultSet(ctx, `SELECT id, val FROM table`)
+		rs, err := tx.QueryResultSet(ctx, `SELECT id, val FROM table;`)
 		for row, err := range rs.Rows(ctx) {
 			if err != nil {
 				return err
@@ -74,7 +74,7 @@ func pumpFromTableToTopic(ctx context.Context, db *ydb.Driver, topic string) err
 			if err != nil {
 				return err
 			}
-			err = writer.WriteTx(ctx, tx, topicwriter.Message{
+			err = writer.WriteWithTx(ctx, tx, topicwriter.Message{
 				Data: bytes.NewReader(content),
 			})
 			if err != nil {
