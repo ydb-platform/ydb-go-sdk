@@ -190,12 +190,7 @@ func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
 }
 
 func DecimalValueFromString(str string, precision, scale uint32) (Value, error) {
-	bigI, err := decimal.Parse(str, precision, scale)
-	if err != nil {
-		return nil, err
-	}
-
-	return value.DecimalValueFromBigInt(bigI, precision, scale), nil
+	return value.DecimalValueFromString(str, precision, scale)
 }
 
 func TupleValue(vs ...Value) Value {
@@ -314,6 +309,14 @@ func NullableDateValue(v *uint32) Value {
 
 func NullableDateValueFromTime(v *time.Time) Value {
 	return value.NullableDateValueFromTime(v)
+}
+
+func NullableDecimalValue(v *[16]byte, precision, scale uint32) Value {
+	return value.NullableDecimalValue(v, precision, scale)
+}
+
+func NullableDecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
+	return value.NullableDecimalValueFromBigInt(v, precision, scale)
 }
 
 func NullableDatetimeValue(v *uint32) Value {

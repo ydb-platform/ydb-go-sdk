@@ -25,37 +25,49 @@ func TestOptional(t *testing.T) {
 	}{
 		{
 			method: "Uint64",
-			args:   []any{uint64(123)},
+			args:   []any{p(uint64(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64},
+					Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64},
+					}}},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123,
+					Value: &Ydb.Value_NestedValue{
+						NestedValue: &Ydb.Value{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 123,
+							},
+						},
 					},
 				},
 			},
 		},
 		{
 			method: "Int64",
-			args:   []any{int64(123)},
+			args:   []any{p(int64(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64},
+					Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64},
+					}}},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int64Value{
-						Int64Value: 123,
+					Value: &Ydb.Value_NestedValue{
+						NestedValue: &Ydb.Value{
+							Value: &Ydb.Value_Int64Value{
+								Int64Value: 123,
+							},
+						},
 					},
 				},
 			},
 		},
 		{
 			method: "Uint32",
-			args:   []any{uint32(123)},
+			args:   []any{p(uint32(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -70,7 +82,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Int32",
-			args:   []any{int32(123)},
+			args:   []any{p(int32(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -85,7 +97,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Uint16",
-			args:   []any{uint16(123)},
+			args:   []any{p(uint16(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -100,7 +112,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Int16",
-			args:   []any{int16(123)},
+			args:   []any{p(int16(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -115,7 +127,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Uint8",
-			args:   []any{uint8(123)},
+			args:   []any{p(uint8(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -130,7 +142,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Int8",
-			args:   []any{int8(123)},
+			args:   []any{p(int8(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -145,7 +157,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Bool",
-			args:   []any{true},
+			args:   []any{p(true)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -160,7 +172,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Text",
-			args:   []any{"test"},
+			args:   []any{p("test")},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -175,7 +187,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Bytes",
-			args:   []any{[]byte("test")},
+			args:   []any{p([]byte("test"))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -190,7 +202,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Float",
-			args:   []any{float32(123)},
+			args:   []any{p(float32(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -205,7 +217,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Double",
-			args:   []any{float64(123)},
+			args:   []any{p(float64(123))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -220,7 +232,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Interval",
-			args:   []any{time.Second},
+			args:   []any{p(time.Second)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -235,7 +247,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Datetime",
-			args:   []any{time.Unix(123456789, 456)},
+			args:   []any{p(time.Unix(123456789, 456))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -250,7 +262,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Date",
-			args:   []any{time.Unix(123456789, 456)},
+			args:   []any{p(time.Unix(123456789, 456))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -265,7 +277,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Timestamp",
-			args:   []any{time.Unix(123456789, 456)},
+			args:   []any{p(time.Unix(123456789, 456))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -280,7 +292,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Decimal",
-			args:   []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, uint32(22), uint32(9)},
+			args:   []any{p([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}), uint32(22), uint32(9)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -301,7 +313,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "JSON",
-			args:   []any{`{"a": 1,"b": "B"}`},
+			args:   []any{p(`{"a": 1,"b": "B"}`)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -316,7 +328,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "JSONDocument",
-			args:   []any{`{"a": 1,"b": "B"}`},
+			args:   []any{p(`{"a": 1,"b": "B"}`)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -331,7 +343,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "YSON",
-			args:   []any{[]byte(`{"a": 1,"b": "B"}`)},
+			args:   []any{p([]byte(`{"a": 1,"b": "B"}`))},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -346,7 +358,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "UUID",
-			args:   []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
+			args:   []any{p([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -362,7 +374,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "TzDatetime",
-			args:   []any{time.Unix(123456789, 456).UTC()},
+			args:   []any{p(time.Unix(123456789, 456).UTC())},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -377,7 +389,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "TzDate",
-			args:   []any{time.Unix(123456789, 456).UTC()},
+			args:   []any{p(time.Unix(123456789, 456).UTC())},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -392,7 +404,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "TzTimestamp",
-			args:   []any{time.Unix(123456789, 456).UTC()},
+			args:   []any{p(time.Unix(123456789, 456).UTC())},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -433,4 +445,8 @@ func TestOptional(t *testing.T) {
 				}), xtest.ToJSON(params))
 		})
 	}
+}
+
+func p[T any](v T) *T {
+	return &v
 }
