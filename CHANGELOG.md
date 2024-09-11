@@ -1,3 +1,4 @@
+* Fixed metadata for operation service connection
 * Fixed composing query traces in call `db.Query.Do[Tx]` using option `query.WithTrace`
 
 ## v3.80.2

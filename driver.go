@@ -519,7 +519,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 
 	d.operation = xsync.OnceValue(func() (*operation.Client, error) {
 		return operation.New(xcontext.ValueOnly(ctx),
-			d.pool.Get(endpoint.New(d.config.Endpoint())),
+			d.balancer,
 		), nil
 	})
 
