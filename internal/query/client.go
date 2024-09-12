@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -41,9 +42,9 @@ type (
 		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
 	}
 	Client struct {
-		config             *config.Config
-		queryServiceClient Ydb_Query_V1.QueryServiceClient
-		pool               sessionPool
+		config *config.Config
+		client Ydb_Query_V1.QueryServiceClient
+		pool   sessionPool
 
 		done chan struct{}
 	}
@@ -100,7 +101,7 @@ func (c *Client) FetchScriptResults(ctx context.Context,
 	opID string, opts ...options.FetchScriptOption,
 ) (*options.FetchScriptResult, error) {
 	r, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.FetchScriptResult, error) {
-		r, err := fetchScriptResults(ctx, c.queryServiceClient, opID,
+		r, err := fetchScriptResults(ctx, c.client, opID,
 			append(opts, func(request *options.FetchScriptResultsRequest) {
 				request.Trace = c.config.Trace()
 			})...,
@@ -175,7 +176,7 @@ func (c *Client) ExecuteScript(
 
 	request, grpcOpts := executeQueryScriptRequest(a, q, settings)
 
-	op, err = executeScript(ctx, c.queryServiceClient, request, grpcOpts...)
+	op, err = executeScript(ctx, c.client, request, grpcOpts...)
 	if err != nil {
 		return op, xerrors.WithStackTrace(err)
 	}
@@ -200,18 +201,18 @@ func do(
 	opts ...retry.Option,
 ) (finalErr error) {
 	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
-		s.setStatus(statusInUse)
+		s.SetStatus(session.StatusInUse)
 
 		err := op(ctx, s)
 		if err != nil {
 			if xerrors.IsOperationError(err) {
-				s.setStatus(statusClosed)
+				s.SetStatus(session.StatusClosed)
 			}
 
 			return xerrors.WithStackTrace(err)
 		}
 
-		s.setStatus(statusIdle)
+		s.SetStatus(session.StatusIdle)
 
 		return nil
 	}, opts...)
@@ -337,7 +338,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, withTrace(s.cfg.Trace()))
+		_, r, err := execute(ctx, s.ID(), s.client, q, settings, withTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -381,8 +382,8 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		_, streamResult, err := execute(ctx, s.id, s.queryServiceClient, q,
-			options.ExecuteSettings(opts...), withTrace(s.cfg.Trace()),
+		_, streamResult, err := execute(ctx, s.ID(), s.client, q,
+			options.ExecuteSettings(opts...), withTrace(s.trace),
 		)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -433,7 +434,7 @@ func clientQueryResultSet(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
 ) (rs result.ClosableResultSet, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
-		_, r, err := execute(ctx, s.id, s.queryServiceClient, q, settings, resultOpts...)
+		_, r, err := execute(ctx, s.ID(), s.client, q, settings, resultOpts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -512,18 +513,18 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
-func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
 	defer onDone()
 
-	grpcClient := Ydb_Query_V1.NewQueryServiceClient(balancer)
+	client := Ydb_Query_V1.NewQueryServiceClient(cc)
 
-	client := &Client{
-		config:             cfg,
-		queryServiceClient: grpcClient,
-		done:               make(chan struct{}),
+	return &Client{
+		config: cfg,
+		client: client,
+		done:   make(chan struct{}),
 		pool: pool.New(ctx,
 			pool.WithLimit[*Session, Session](cfg.PoolLimit()),
 			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
@@ -541,7 +542,11 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 				}
 				defer cancelCreate()
 
-				s, err := createSession(createCtx, grpcClient, cfg)
+				s, err := createSession(createCtx, client,
+					session.WithConn(cc),
+					session.WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+					session.WithTrace(cfg.Trace()),
+				)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
@@ -550,8 +555,6 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 			}),
 		),
 	}
-
-	return client
 }
 
 func poolTrace(t *trace.Query) *pool.Trace {

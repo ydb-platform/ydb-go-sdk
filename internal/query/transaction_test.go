@@ -45,7 +45,7 @@ func TestBegin(t *testing.T) {
 			},
 		}, nil)
 		t.Log("begin")
-		tx, err := begin(ctx, client, &Session{id: "123"}, query.TxSettings())
+		tx, err := begin(ctx, client, &Session{Core: &sessionControllerMock{id: "123"}}, query.TxSettings())
 		require.NoError(t, err)
 		require.Equal(t, "123", tx.ID())
 	})
@@ -55,7 +55,7 @@ func TestBegin(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 		t.Log("begin")
-		_, err := begin(ctx, client, &Session{id: "123"}, query.TxSettings())
+		_, err := begin(ctx, client, &Session{Core: &sessionControllerMock{id: "123"}}, query.TxSettings())
 		require.Error(t, err)
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 	})
@@ -67,7 +67,7 @@ func TestBegin(t *testing.T) {
 			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 		)
 		t.Log("begin")
-		_, err := begin(ctx, client, &Session{id: "123"}, query.TxSettings())
+		_, err := begin(ctx, client, &Session{Core: &sessionControllerMock{id: "123"}}, query.TxSettings())
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 	})

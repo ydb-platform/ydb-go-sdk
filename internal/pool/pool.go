@@ -17,12 +17,15 @@ import (
 )
 
 type (
-	Item[T any] interface {
-		*T
+	Item interface {
 		IsAlive() bool
 		Close(ctx context.Context) error
 	}
-	Config[PT Item[T], T any] struct {
+	ItemConstraint[T any] interface {
+		*T
+		Item
+	}
+	Config[PT ItemConstraint[T], T any] struct {
 		trace         *Trace
 		clock         clockwork.Clock
 		limit         int
@@ -32,15 +35,15 @@ type (
 		closeItem     func(ctx context.Context, item PT)
 		idleThreshold time.Duration
 	}
-	itemInfo[PT Item[T], T any] struct {
+	itemInfo[PT ItemConstraint[T], T any] struct {
 		idle    *xlist.Element[PT]
 		touched time.Time
 	}
-	waitChPool[PT Item[T], T any] interface {
+	waitChPool[PT ItemConstraint[T], T any] interface {
 		GetOrNew() *chan PT
 		Put(t *chan PT)
 	}
-	Pool[PT Item[T], T any] struct {
+	Pool[PT ItemConstraint[T], T any] struct {
 		config Config[PT, T]
 
 		createItem func(ctx context.Context) (PT, error)
@@ -55,16 +58,16 @@ type (
 
 		done chan struct{}
 	}
-	option[PT Item[T], T any] func(c *Config[PT, T])
+	Option[PT ItemConstraint[T], T any] func(c *Config[PT, T])
 )
 
-func WithCreateItemFunc[PT Item[T], T any](f func(ctx context.Context) (PT, error)) option[PT, T] {
+func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(ctx context.Context) (PT, error)) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.createItem = f
 	}
 }
 
-func WithSyncCloseItem[PT Item[T], T any]() option[PT, T] {
+func WithSyncCloseItem[PT ItemConstraint[T], T any]() Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.closeItem = func(ctx context.Context, item PT) {
 			_ = item.Close(ctx)
@@ -72,45 +75,45 @@ func WithSyncCloseItem[PT Item[T], T any]() option[PT, T] {
 	}
 }
 
-func WithCreateItemTimeout[PT Item[T], T any](t time.Duration) option[PT, T] {
+func WithCreateItemTimeout[PT ItemConstraint[T], T any](t time.Duration) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.createTimeout = t
 	}
 }
 
-func WithCloseItemTimeout[PT Item[T], T any](t time.Duration) option[PT, T] {
+func WithCloseItemTimeout[PT ItemConstraint[T], T any](t time.Duration) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.closeTimeout = t
 	}
 }
 
-func WithLimit[PT Item[T], T any](size int) option[PT, T] {
+func WithLimit[PT ItemConstraint[T], T any](size int) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.limit = size
 	}
 }
 
-func WithTrace[PT Item[T], T any](t *Trace) option[PT, T] {
+func WithTrace[PT ItemConstraint[T], T any](t *Trace) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.trace = t
 	}
 }
 
-func WithIdleThreshold[PT Item[T], T any](idleThreshold time.Duration) option[PT, T] {
+func WithIdleThreshold[PT ItemConstraint[T], T any](idleThreshold time.Duration) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.idleThreshold = idleThreshold
 	}
 }
 
-func WithClock[PT Item[T], T any](clock clockwork.Clock) option[PT, T] {
+func WithClock[PT ItemConstraint[T], T any](clock clockwork.Clock) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.clock = clock
 	}
 }
 
-func New[PT Item[T], T any](
+func New[PT ItemConstraint[T], T any](
 	ctx context.Context,
-	opts ...option[PT, T],
+	opts ...Option[PT, T],
 ) *Pool[PT, T] {
 	p := &Pool[PT, T]{
 		config: Config[PT, T]{
@@ -162,14 +165,14 @@ func New[PT Item[T], T any](
 }
 
 // defaultCreateItem returns a new item
-func defaultCreateItem[T any, PT Item[T]](context.Context) (PT, error) {
+func defaultCreateItem[T any, PT ItemConstraint[T]](context.Context) (PT, error) {
 	var item T
 
 	return &item, nil
 }
 
 // makeAsyncCreateItemFunc wraps the createItem function with timeout handling
-func makeAsyncCreateItemFunc[PT Item[T], T any]( //nolint:funlen
+func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	p *Pool[PT, T],
 ) func(ctx context.Context) (PT, error) {
 	return func(ctx context.Context) (PT, error) {
@@ -277,7 +280,7 @@ func (p *Pool[PT, T]) Stats() Stats {
 	return p.stats()
 }
 
-func makeAsyncCloseItemFunc[PT Item[T], T any](
+func makeAsyncCloseItemFunc[PT ItemConstraint[T], T any](
 	p *Pool[PT, T],
 ) func(ctx context.Context, item PT) {
 	return func(ctx context.Context, item PT) {

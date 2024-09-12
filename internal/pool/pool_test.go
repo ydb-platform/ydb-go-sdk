@@ -135,7 +135,7 @@ func caller() string {
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
 }
 
-func mustGetItem[PT Item[T], T any](t testing.TB, p *Pool[PT, T]) PT {
+func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T]) PT {
 	s, err := p.getItem(context.Background())
 	if err != nil {
 		t.Helper()
@@ -145,7 +145,7 @@ func mustGetItem[PT Item[T], T any](t testing.TB, p *Pool[PT, T]) PT {
 	return s
 }
 
-func mustPutItem[PT Item[T], T any](t testing.TB, p *Pool[PT, T], item PT) {
+func mustPutItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T], item PT) {
 	if err := p.putItem(context.Background(), item); err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
