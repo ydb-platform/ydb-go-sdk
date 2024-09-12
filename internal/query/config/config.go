@@ -19,8 +19,9 @@ type Config struct {
 
 	poolLimit int
 
-	sessionCreateTimeout time.Duration
-	sessionDeleteTimeout time.Duration
+	sessionCreateTimeout   time.Duration
+	sessionDeleteTimeout   time.Duration
+	sessionIddleTimeToLive time.Duration
 
 	trace *trace.Query
 }
@@ -67,4 +68,10 @@ func (c *Config) SessionCreateTimeout() time.Duration {
 // If SessionDeleteTimeout is less than or equal to zero then the DefaultSessionDeleteTimeout is used.
 func (c *Config) SessionDeleteTimeout() time.Duration {
 	return c.sessionDeleteTimeout
+}
+
+// SessionIdleTimeToLive limits maximum time to live of idle session
+// If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
+func (c *Config) SessionIdleTimeToLive() time.Duration {
+	return c.sessionIddleTimeToLive
 }

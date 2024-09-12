@@ -113,7 +113,7 @@ func (tx *Transaction) QueryResultSet(
 	}
 
 	if settings.TxControl().Commit {
-		if txID != nil {
+		if txID != nil && tx.Identifier != nil {
 			return nil, xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
 		}
 		tx.completed = true
@@ -193,7 +193,7 @@ func (tx *Transaction) txControl() *queryTx.Control {
 
 func (tx *Transaction) ID() string {
 	if tx.Identifier == nil {
-		return "LAZY_TX"
+		return LazyTxID
 	}
 
 	return tx.Identifier.ID()
@@ -236,7 +236,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	}
 
 	if settings.TxControl().Commit {
-		if txID != nil {
+		if txID != nil && tx.Identifier != nil {
 			return xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
 		}
 		tx.completed = true
@@ -322,7 +322,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	}
 
 	if settings.TxControl().Commit {
-		if txID != nil {
+		if txID != nil && tx.Identifier != nil {
 			return nil, xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
 		}
 		tx.completed = true
@@ -350,17 +350,21 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
-	defer func() {
-		tx.notifyOnCompleted(err)
-		tx.completed = true
-	}()
-
+func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 	if tx.Identifier == nil {
 		return nil
 	}
 
-	err = commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
+	if tx.completed {
+		return nil
+	}
+
+	defer func() {
+		tx.notifyOnCompleted(finalErr)
+		tx.completed = true
+	}()
+
+	err := commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
 			tx.s.SetStatus(session.StatusClosed)
@@ -384,8 +388,12 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx *Transaction) Rollback(ctx context.Context) error {
+func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 	if tx.Identifier == nil {
+		return nil
+	}
+
+	if tx.completed {
 		return nil
 	}
 

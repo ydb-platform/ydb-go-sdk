@@ -205,9 +205,7 @@ func do(
 
 		err := op(ctx, s)
 		if err != nil {
-			if xerrors.IsOperationError(err) {
-				s.SetStatus(session.StatusClosed)
-			}
+			s.SetStatus(session.StatusError)
 
 			return xerrors.WithStackTrace(err)
 		}
@@ -263,27 +261,27 @@ func doTx(
 	txSettings tx.Settings,
 	opts ...retry.Option,
 ) (finalErr error) {
-	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
+	err := do(ctx, pool, func(ctx context.Context, s *Session) (opErr error) {
 		tx, err := s.Begin(ctx, txSettings)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
+		defer func() {
+			_ = tx.Rollback(ctx)
+
+			if opErr != nil {
+				s.SetStatus(session.StatusError)
+			}
+		}()
+
 		err = op(ctx, tx)
 		if err != nil {
-			errRollback := tx.Rollback(ctx)
-			if errRollback != nil {
-				return xerrors.WithStackTrace(xerrors.Join(err, errRollback))
-			}
-
 			return xerrors.WithStackTrace(err)
 		}
+
 		err = tx.CommitTx(ctx)
 		if err != nil {
-			errRollback := tx.Rollback(ctx)
-			if errRollback != nil {
-				return xerrors.WithStackTrace(xerrors.Join(err, errRollback))
-			}
-
 			return xerrors.WithStackTrace(err)
 		}
 
@@ -530,6 +528,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
 			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
+			pool.WithIdleTimeToLive[*Session, Session](cfg.SessionIdleTimeToLive()),
 			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 				var (
 					createCtx    context.Context

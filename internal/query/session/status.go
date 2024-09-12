@@ -12,6 +12,7 @@ const (
 	StatusInUse
 	StatusClosing
 	StatusClosed
+	StatusError
 )
 
 func (s Status) String() string {
@@ -26,6 +27,8 @@ func (s Status) String() string {
 		return "Closing"
 	case StatusClosed:
 		return "Closed"
+	case StatusError:
+		return "Error"
 	default:
 		return fmt.Sprintf("Unknown%d", s)
 	}

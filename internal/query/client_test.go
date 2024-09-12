@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -278,6 +280,284 @@ func TestClient(t *testing.T) {
 			}, tx.NewSettings(tx.WithDefaultTxMode()))
 			require.NoError(t, err)
 			require.Equal(t, 10, counter)
+		})
+		t.Run("TxLeak", func(t *testing.T) {
+			t.Run("OnExec", func(t *testing.T) {
+				t.Run("WithExplicitCommit", func(t *testing.T) {
+					xtest.TestManyTimes(t, func(t testing.TB) {
+						txInFlight := 0
+						ctrl := gomock.NewController(t)
+						err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+							client := NewMockQueryServiceClient(ctrl)
+							client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
+									Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+								) {
+									if rand.Int31n(100) < 50 {
+										return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+									}
+
+									stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+										txInFlight++
+
+										stream.EXPECT().Recv().Return(nil, io.EOF)
+
+										client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
+											func(ctx context.Context, request *Ydb_Query.CommitTransactionRequest, option ...grpc.CallOption) (
+												*Ydb_Query.CommitTransactionResponse, error,
+											) {
+												txInFlight--
+
+												return &Ydb_Query.CommitTransactionResponse{
+													Status: Ydb.StatusIds_SUCCESS,
+												}, nil
+											})
+
+										return &Ydb_Query.ExecuteQueryResponsePart{
+											Status: Ydb.StatusIds_SUCCESS,
+											TxMeta: &Ydb_Query.TransactionMeta{
+												Id: "456",
+											},
+											ExecStats: &Ydb_TableStats.QueryStats{},
+										}, nil
+									})
+
+									return stream, nil
+								})
+
+							return newTestSessionWithClient("123", client), nil
+						}), func(ctx context.Context, tx query.TxActor) error {
+							return tx.Exec(ctx, "")
+						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						require.NoError(t, err)
+						require.Zero(t, txInFlight)
+					})
+				})
+				t.Run("WithLazyCommit", func(t *testing.T) {
+					xtest.TestManyTimes(t, func(t testing.TB) {
+						ctrl := gomock.NewController(t)
+						txInFlight := 0
+						err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+							client := NewMockQueryServiceClient(ctrl)
+							client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
+									Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+								) {
+									require.True(t, request.GetTxControl().GetCommitTx())
+
+									if rand.Int31n(100) < 50 {
+										return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+									}
+
+									stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+										if rand.Int31n(100) < 50 {
+											return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+										}
+
+										txInFlight++
+
+										stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+											txInFlight--
+
+											return nil, io.EOF
+										})
+
+										return &Ydb_Query.ExecuteQueryResponsePart{
+											Status: Ydb.StatusIds_SUCCESS,
+											TxMeta: &Ydb_Query.TransactionMeta{
+												Id: "456",
+											},
+											ExecStats: &Ydb_TableStats.QueryStats{},
+										}, nil
+									})
+
+									return stream, nil
+								})
+
+							return newTestSessionWithClient("123", client), nil
+						}), func(ctx context.Context, tx query.TxActor) error {
+							return tx.Exec(ctx, "", options.WithCommit())
+						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						require.NoError(t, err)
+						require.Zero(t, txInFlight)
+					})
+				})
+			})
+			t.Run("OnSecondExec", func(t *testing.T) {
+				t.Run("WithExplicitCommit", func(t *testing.T) {
+					xtest.TestManyTimes(t, func(t testing.TB) {
+						ctrl := gomock.NewController(t)
+						txInFlight := 0
+						err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+							client := NewMockQueryServiceClient(ctrl)
+							client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
+									Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+								) {
+									if rand.Int31n(100) < 50 {
+										return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+									}
+
+									firstStream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+										txInFlight++
+
+										firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+											client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+												func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
+													Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+												) {
+													if rand.Int31n(100) < 50 {
+														client.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
+															func(ctx context.Context,
+																request *Ydb_Query.RollbackTransactionRequest,
+																option ...grpc.CallOption,
+															) (*Ydb_Query.RollbackTransactionResponse, error) {
+																txInFlight--
+
+																return &Ydb_Query.RollbackTransactionResponse{}, nil
+															})
+
+														return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+													}
+
+													secondStream := NewMockQueryService_ExecuteQueryClient(ctrl)
+													secondStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+														secondStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+															client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
+																func(ctx context.Context, request *Ydb_Query.CommitTransactionRequest, option ...grpc.CallOption) (
+																	*Ydb_Query.CommitTransactionResponse, error,
+																) {
+																	txInFlight--
+
+																	return &Ydb_Query.CommitTransactionResponse{
+																		Status: Ydb.StatusIds_SUCCESS,
+																	}, nil
+																})
+
+															return nil, io.EOF
+														})
+
+														return &Ydb_Query.ExecuteQueryResponsePart{
+															Status:    Ydb.StatusIds_SUCCESS,
+															TxMeta:    &Ydb_Query.TransactionMeta{},
+															ExecStats: &Ydb_TableStats.QueryStats{},
+														}, nil
+													})
+
+													return secondStream, nil
+												})
+
+											return nil, io.EOF
+										})
+
+										return &Ydb_Query.ExecuteQueryResponsePart{
+											Status: Ydb.StatusIds_SUCCESS,
+											TxMeta: &Ydb_Query.TransactionMeta{
+												Id: "456",
+											},
+											ExecStats: &Ydb_TableStats.QueryStats{},
+										}, nil
+									})
+
+									return firstStream, nil
+								})
+
+							return newTestSessionWithClient("123", client), nil
+						}), func(ctx context.Context, tx query.TxActor) error {
+							if err := tx.Exec(ctx, ""); err != nil {
+								return err
+							}
+
+							return tx.Exec(ctx, "")
+						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						require.NoError(t, err)
+					})
+				})
+				t.Run("WithLazyCommit", func(t *testing.T) {
+					xtest.TestManyTimes(t, func(t testing.TB) {
+						ctrl := gomock.NewController(t)
+						txInFlight := 0
+						err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+							client := NewMockQueryServiceClient(ctrl)
+							client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
+									Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+								) {
+									if rand.Int31n(100) < 50 {
+										return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+									}
+
+									firstStream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+										txInFlight++
+
+										firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+											client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+												func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
+													Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+												) {
+													require.True(t, request.GetTxControl().GetCommitTx())
+
+													if rand.Int31n(100) < 50 {
+														client.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
+															func(ctx context.Context,
+																request *Ydb_Query.RollbackTransactionRequest,
+																option ...grpc.CallOption,
+															) (*Ydb_Query.RollbackTransactionResponse, error) {
+																txInFlight--
+
+																return &Ydb_Query.RollbackTransactionResponse{}, nil
+															})
+
+														return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+													}
+
+													secondStream := NewMockQueryService_ExecuteQueryClient(ctrl)
+													secondStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+														secondStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+															return nil, io.EOF
+														})
+
+														return &Ydb_Query.ExecuteQueryResponsePart{
+															Status:    Ydb.StatusIds_SUCCESS,
+															TxMeta:    &Ydb_Query.TransactionMeta{},
+															ExecStats: &Ydb_TableStats.QueryStats{},
+														}, nil
+													})
+
+													return secondStream, nil
+												})
+
+											return nil, io.EOF
+										})
+
+										return &Ydb_Query.ExecuteQueryResponsePart{
+											Status: Ydb.StatusIds_SUCCESS,
+											TxMeta: &Ydb_Query.TransactionMeta{
+												Id: "456",
+											},
+											ExecStats: &Ydb_TableStats.QueryStats{},
+										}, nil
+									})
+
+									return firstStream, nil
+								})
+
+							return newTestSessionWithClient("123", client), nil
+						}), func(ctx context.Context, tx query.TxActor) error {
+							if err := tx.Exec(ctx, ""); err != nil {
+								return err
+							}
+
+							return tx.Exec(ctx, "", options.WithCommit())
+						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						require.NoError(t, err)
+					})
+				})
+			})
 		})
 	})
 	t.Run("Exec", func(t *testing.T) {
@@ -1151,12 +1431,7 @@ type sessionControllerMock struct {
 }
 
 func (s *sessionControllerMock) IsAlive() bool {
-	switch s.status {
-	case session.StatusClosed, session.StatusClosing:
-		return false
-	default:
-		return true
-	}
+	return session.IsAlive(s.status)
 }
 
 func (s *sessionControllerMock) Close(ctx context.Context) error {
@@ -1201,6 +1476,7 @@ func testPool(
 	return pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session, Session](1),
 		pool.WithCreateItemFunc(createSession),
+		pool.WithSyncCloseItem[*Session, Session](),
 	)
 }
 

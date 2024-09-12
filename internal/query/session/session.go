@@ -2,7 +2,7 @@ package session
 
 import (
 	"context"
-	"sync/atomic"
+	"fmt"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -50,11 +50,26 @@ func (c *core) NodeID() uint32 {
 }
 
 func (c *core) statusCode() Status {
-	return Status(atomic.LoadUint32((*uint32)(&c.status)))
+	return c.status
 }
 
 func (c *core) SetStatus(status Status) {
-	atomic.StoreUint32((*uint32)(&c.status), uint32(status))
+	switch c.status {
+	case statusUnknown:
+		c.status = status
+	case StatusIdle:
+		c.status = status
+	case StatusInUse:
+		c.status = status
+	case StatusClosing:
+		c.status = status
+	case StatusClosed:
+		c.status = status
+	case StatusError:
+		c.status = status
+	default:
+		panic(fmt.Sprintf("Unknown%d", c.status))
+	}
 }
 
 func (c *core) Status() string {
@@ -81,7 +96,16 @@ func WithTrace(t *trace.Query) Option {
 	}
 }
 
-func Open( //nolint:funlen
+func IsAlive(status Status) bool {
+	switch status {
+	case StatusClosed, StatusClosing, StatusError:
+		return false
+	default:
+		return true
+	}
+}
+
+func Open(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...Option,
 ) (_ *core, finalErr error) {
 	core := &core{
@@ -90,12 +114,7 @@ func Open( //nolint:funlen
 		status: statusUnknown,
 		checks: []func(s *core) bool{
 			func(s *core) bool {
-				switch s.statusCode() {
-				case StatusClosed, StatusClosing:
-					return false
-				default:
-					return true
-				}
+				return IsAlive(s.status)
 			},
 		},
 	}

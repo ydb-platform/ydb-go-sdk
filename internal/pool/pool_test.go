@@ -394,7 +394,7 @@ func TestPool(t *testing.T) {
 					// replace default async closer for sync testing
 					WithSyncCloseItem[*testItem, testItem](),
 					WithClock[*testItem, testItem](fakeClock),
-					WithIdleThreshold[*testItem, testItem](idleThreshold),
+					WithIdleTimeToLive[*testItem, testItem](idleThreshold),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
 
@@ -402,14 +402,14 @@ func TestPool(t *testing.T) {
 				s2 := mustGetItem(t, p)
 
 				// Put both items at the absolutely same time.
-				// That is, both items must be updated their touched timestamp.
+				// That is, both items must be updated their lastUsage timestamp.
 				mustPutItem(t, p, s1)
 				mustPutItem(t, p, s2)
 
 				require.Len(t, p.index, 2)
 				require.Equal(t, 2, p.idle.Len())
 
-				// Move clock to longer than idleThreshold
+				// Move clock to longer than idleTimeToLive
 				fakeClock.Advance(idleThreshold + time.Nanosecond)
 
 				// on get item from idle list the pool must check the item idle timestamp
@@ -423,15 +423,15 @@ func TestPool(t *testing.T) {
 					t.Fatal("unexpected number of closed items")
 				}
 
-				// Move time to idleThreshold / 2 - this emulate a "spent" some time working within item.
+				// Move time to idleTimeToLive / 2 - this emulate a "spent" some time working within item.
 				fakeClock.Advance(idleThreshold / 2)
 
 				// Now put that item back
-				// pool must update a touched timestamp of item
+				// pool must update a lastUsage timestamp of item
 				mustPutItem(t, p, s3)
 
-				// Move time to idleThreshold / 2
-				// Total time since last updating touched timestampe is more than idleThreshold
+				// Move time to idleTimeToLive / 2
+				// Total time since last updating lastUsage timestampe is more than idleTimeToLive
 				fakeClock.Advance(idleThreshold/2 + time.Nanosecond)
 
 				require.Len(t, p.index, 1)

@@ -501,6 +501,16 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
+// WithSessionPoolSessionIdleTimeToLive limits maximum time to live of idle session
+// If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
+func WithSessionPoolSessionIdleTimeToLive(idleThreshold time.Duration) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionIdleTimeToLive(idleThreshold))
+
+		return nil
+	}
+}
+
 // WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
