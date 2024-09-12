@@ -18,8 +18,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -29,24 +29,24 @@ import (
 
 func TestClient(t *testing.T) {
 	ctx := xtest.Context(t)
-	t.Run("CreateSession", func(t *testing.T) {
+	t.Run("createSession", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 			attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil).AnyTimes()
-			service := NewMockQueryServiceClient(ctrl)
-			service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 				Status:    Ydb.StatusIds_SUCCESS,
 				SessionId: "test",
 			}, nil)
-			service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-			service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+			client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
+			client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
 			attached := 0
-			s, err := createSession(ctx, service, config.New(config.WithTrace(
+			s, err := createSession(ctx, client, session.WithTrace(
 				&trace.Query{
 					OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {
 						return func(info trace.QuerySessionAttachDoneInfo) {
@@ -61,9 +61,9 @@ func TestClient(t *testing.T) {
 						return nil
 					},
 				},
-			)))
+			))
 			require.NoError(t, err)
-			require.EqualValues(t, "test", s.id)
+			require.EqualValues(t, "test", s.ID())
 			require.EqualValues(t, 1, attached)
 			err = s.Close(ctx)
 			require.NoError(t, err)
@@ -72,22 +72,22 @@ func TestClient(t *testing.T) {
 		t.Run("TransportError", func(t *testing.T) {
 			t.Run("OnCall", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
-				service := NewMockQueryServiceClient(ctrl)
-				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-				_, err := createSession(ctx, service, config.New())
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
+				_, err := createSession(ctx, client)
 				require.Error(t, err)
 				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			})
 			t.Run("OnAttach", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
-				service := NewMockQueryServiceClient(ctrl)
-				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 					Status:    Ydb.StatusIds_SUCCESS,
 					SessionId: "test",
 				}, nil)
-				service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-				_, err := createSession(ctx, service, config.New())
+				client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
+				client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
+				_, err := createSession(ctx, client)
 				require.Error(t, err)
 				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			})
@@ -95,16 +95,16 @@ func TestClient(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 				attachStream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, "")).AnyTimes()
-				service := NewMockQueryServiceClient(ctrl)
-				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 					Status:    Ydb.StatusIds_SUCCESS,
 					SessionId: "test",
 				}, nil)
-				service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+				client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
+				client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 					Status: Ydb.StatusIds_SUCCESS,
 				}, nil)
-				_, err := createSession(ctx, service, config.New())
+				_, err := createSession(ctx, client)
 				require.Error(t, err)
 				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			})
@@ -112,11 +112,11 @@ func TestClient(t *testing.T) {
 		t.Run("OperationError", func(t *testing.T) {
 			t.Run("OnCall", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
-				service := NewMockQueryServiceClient(ctrl)
-				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
 					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 				)
-				_, err := createSession(ctx, service, config.New())
+				_, err := createSession(ctx, client)
 				require.Error(t, err)
 				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 			})
@@ -126,16 +126,16 @@ func TestClient(t *testing.T) {
 				attachStream.EXPECT().Recv().Return(nil,
 					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 				)
-				service := NewMockQueryServiceClient(ctrl)
-				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 					Status:    Ydb.StatusIds_SUCCESS,
 					SessionId: "test",
 				}, nil)
-				service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+				client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
+				client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 					Status: Ydb.StatusIds_SUCCESS,
 				}, nil)
-				_, err := createSession(ctx, service, config.New())
+				_, err := createSession(ctx, client)
 				require.Error(t, err)
 				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 			})
@@ -1145,20 +1145,52 @@ func TestClient(t *testing.T) {
 	})
 }
 
+type sessionControllerMock struct {
+	id     string
+	status session.Status
+}
+
+func (s *sessionControllerMock) IsAlive() bool {
+	switch s.status {
+	case session.StatusClosed, session.StatusClosing:
+		return false
+	default:
+		return true
+	}
+}
+
+func (s *sessionControllerMock) Close(ctx context.Context) error {
+	return nil
+}
+
+func (s *sessionControllerMock) SetStatus(status session.Status) {
+	s.status = status
+}
+
+func (s *sessionControllerMock) ID() string {
+	return s.id
+}
+
+func (s *sessionControllerMock) NodeID() uint32 {
+	return 0
+}
+
+func (s sessionControllerMock) Status() string {
+	return s.status.String()
+}
+
 func newTestSession(id string) *Session {
 	return &Session{
-		id:         id,
-		statusCode: statusIdle,
-		cfg:        config.New(),
+		Core:  &sessionControllerMock{id: id},
+		trace: &trace.Query{},
 	}
 }
 
 func newTestSessionWithClient(id string, client Ydb_Query_V1.QueryServiceClient) *Session {
 	return &Session{
-		id:                 id,
-		queryServiceClient: client,
-		statusCode:         statusIdle,
-		cfg:                config.New(),
+		Core:   &sessionControllerMock{id: id},
+		client: client,
+		trace:  &trace.Query{},
 	}
 }
 
@@ -1176,8 +1208,8 @@ func TestQueryScript(t *testing.T) {
 	ctx := xtest.Context(t)
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().ExecuteScript(gomock.Any(), gomock.Any()).Return(&Ydb_Operations.Operation{
+		client := NewMockQueryServiceClient(ctrl)
+		client.EXPECT().ExecuteScript(gomock.Any(), gomock.Any()).Return(&Ydb_Operations.Operation{
 			Id:     "123",
 			Ready:  true,
 			Status: Ydb.StatusIds_SUCCESS,
@@ -1219,7 +1251,7 @@ func TestQueryScript(t *testing.T) {
 			})),
 			CostInfo: nil,
 		}, nil)
-		service.EXPECT().FetchScriptResults(gomock.Any(), gomock.Any()).Return(&Ydb_Query.FetchScriptResultsResponse{
+		client.EXPECT().FetchScriptResults(gomock.Any(), gomock.Any()).Return(&Ydb_Query.FetchScriptResultsResponse{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
 			ResultSet: &Ydb.ResultSet{
@@ -1259,10 +1291,10 @@ func TestQueryScript(t *testing.T) {
 			},
 			NextFetchToken: "456",
 		}, nil)
-		op, err := executeScript(ctx, service, &Ydb_Query.ExecuteScriptRequest{})
+		op, err := executeScript(ctx, client, &Ydb_Query.ExecuteScriptRequest{})
 		require.NoError(t, err)
 		require.EqualValues(t, "123", op.ID)
-		r, err := fetchScriptResults(ctx, service, op.ID)
+		r, err := fetchScriptResults(ctx, client, op.ID)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, r.ResultSetIndex)
 		require.Equal(t, "456", r.NextToken)

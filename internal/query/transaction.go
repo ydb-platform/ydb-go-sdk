@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	queryTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -52,7 +53,7 @@ func begin(
 	defer a.Free()
 	response, err := client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
-			SessionId:  s.id,
+			SessionId:  s.ID(),
 			TxSettings: txSettings.ToYDB(a),
 		},
 	)
@@ -68,7 +69,7 @@ func (tx *Transaction) UnLazy(ctx context.Context) (err error) {
 		return nil
 	}
 
-	tx.Identifier, err = begin(ctx, tx.s.queryServiceClient, tx.s, tx.txSettings)
+	tx.Identifier, err = begin(ctx, tx.s.client, tx.s, tx.txSettings)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -79,7 +80,7 @@ func (tx *Transaction) UnLazy(ctx context.Context) (err error) {
 func (tx *Transaction) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
 ) (rs result.ClosableResultSet, finalErr error) {
-	onDone := trace.QueryOnTxQueryResultSet(tx.s.cfg.Trace(), &ctx,
+	onDone := trace.QueryOnTxQueryResultSet(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"), tx, q)
 	defer func() {
 		onDone(finalErr)
@@ -95,7 +96,7 @@ func (tx *Transaction) QueryResultSet(
 	}
 
 	resultOpts := []resultOption{
-		withTrace(tx.s.cfg.Trace()),
+		withTrace(tx.s.trace),
 	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
@@ -106,7 +107,7 @@ func (tx *Transaction) QueryResultSet(
 			}),
 		)
 	}
-	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
+	txID, r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -134,7 +135,7 @@ func (tx *Transaction) QueryResultSet(
 func (tx *Transaction) QueryRow(
 	ctx context.Context, q string, opts ...options.Execute,
 ) (row query.Row, finalErr error) {
-	onDone := trace.QueryOnTxQueryRow(tx.s.cfg.Trace(), &ctx,
+	onDone := trace.QueryOnTxQueryRow(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryRow"), tx, q)
 	defer func() {
 		onDone(finalErr)
@@ -148,7 +149,7 @@ func (tx *Transaction) QueryRow(
 	)
 
 	resultOpts := []resultOption{
-		withTrace(tx.s.cfg.Trace()),
+		withTrace(tx.s.trace),
 	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
@@ -159,7 +160,7 @@ func (tx *Transaction) QueryRow(
 			}),
 		)
 	}
-	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
+	txID, r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -201,7 +202,7 @@ func (tx *Transaction) ID() string {
 func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execute) (
 	finalErr error,
 ) {
-	onDone := trace.QueryOnTxExec(tx.s.cfg.Trace(), &ctx,
+	onDone := trace.QueryOnTxExec(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Exec"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
@@ -217,7 +218,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	}
 
 	resultOpts := []resultOption{
-		withTrace(tx.s.cfg.Trace()),
+		withTrace(tx.s.trace),
 	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
@@ -229,7 +230,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		)
 	}
 
-	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
+	txID, r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -288,7 +289,7 @@ func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettin
 func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Execute) (
 	_ query.Result, finalErr error,
 ) {
-	onDone := trace.QueryOnTxQuery(tx.s.cfg.Trace(), &ctx,
+	onDone := trace.QueryOnTxQuery(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
@@ -304,7 +305,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	}
 
 	resultOpts := []resultOption{
-		withTrace(tx.s.cfg.Trace()),
+		withTrace(tx.s.trace),
 	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
@@ -315,7 +316,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			}),
 		)
 	}
-	txID, r, err := execute(ctx, tx.s.id, tx.s.queryServiceClient, q, settings, resultOpts...)
+	txID, r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -359,10 +360,10 @@ func (tx *Transaction) CommitTx(ctx context.Context) (err error) {
 		return nil
 	}
 
-	err = commitTx(ctx, tx.s.queryServiceClient, tx.s.id, tx.ID())
+	err = commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
-			tx.s.setStatus(statusClosed)
+			tx.s.SetStatus(session.StatusClosed)
 		}
 
 		return xerrors.WithStackTrace(err)
@@ -392,10 +393,10 @@ func (tx *Transaction) Rollback(ctx context.Context) error {
 
 	tx.notifyOnCompleted(ErrTransactionRollingBack)
 
-	err := rollback(ctx, tx.s.queryServiceClient, tx.s.id, tx.ID())
+	err := rollback(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
-			tx.s.setStatus(statusClosed)
+			tx.s.SetStatus(session.StatusClosed)
 		}
 
 		return xerrors.WithStackTrace(err)
