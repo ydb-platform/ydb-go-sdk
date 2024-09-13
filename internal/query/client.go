@@ -336,12 +336,12 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		_, r, err := execute(ctx, s.ID(), s.client, q, settings, withTrace(s.trace))
+		streamResult, err := execute(ctx, s.ID(), s.client, q, settings, withTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 
-		err = readAll(ctx, r)
+		err = readAll(ctx, streamResult)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -380,7 +380,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		_, streamResult, err := execute(ctx, s.ID(), s.client, q,
+		streamResult, err := execute(ctx, s.ID(), s.client, q,
 			options.ExecuteSettings(opts...), withTrace(s.trace),
 		)
 		if err != nil {
@@ -432,12 +432,12 @@ func clientQueryResultSet(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
 ) (rs result.ClosableResultSet, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
-		_, r, err := execute(ctx, s.ID(), s.client, q, settings, resultOpts...)
+		streamResult, err := execute(ctx, s.ID(), s.client, q, settings, resultOpts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 
-		rs, err = readMaterializedResultSet(ctx, r)
+		rs, err = readMaterializedResultSet(ctx, streamResult)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}

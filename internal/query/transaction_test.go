@@ -23,7 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -31,7 +31,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-var _ tx.Transaction = &Transaction{}
+var _ baseTx.Transaction = &Transaction{}
 
 func TestBegin(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
@@ -45,9 +45,9 @@ func TestBegin(t *testing.T) {
 			},
 		}, nil)
 		t.Log("begin")
-		tx, err := begin(ctx, client, &Session{Core: &sessionControllerMock{id: "123"}}, query.TxSettings())
+		txID, err := begin(ctx, client, "123", query.TxSettings())
 		require.NoError(t, err)
-		require.Equal(t, "123", tx.ID())
+		require.Equal(t, "123", txID)
 	})
 	t.Run("TransportError", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -55,7 +55,7 @@ func TestBegin(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 		t.Log("begin")
-		_, err := begin(ctx, client, &Session{Core: &sessionControllerMock{id: "123"}}, query.TxSettings())
+		_, err := begin(ctx, client, "123", query.TxSettings())
 		require.Error(t, err)
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 	})
@@ -67,7 +67,7 @@ func TestBegin(t *testing.T) {
 			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 		)
 		t.Log("begin")
-		_, err := begin(ctx, client, &Session{Core: &sessionControllerMock{id: "123"}}, query.TxSettings())
+		_, err := begin(ctx, client, "123", query.TxSettings())
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 	})

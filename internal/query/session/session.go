@@ -2,7 +2,7 @@ package session
 
 import (
 	"context"
-	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -35,7 +35,7 @@ type (
 		deleteTimeout time.Duration
 		id            string
 		nodeID        uint32
-		status        Status
+		status        atomic.Uint32
 		closeOnce     func(ctx context.Context) error
 		checks        []func(s *core) bool
 	}
@@ -50,25 +50,15 @@ func (c *core) NodeID() uint32 {
 }
 
 func (c *core) statusCode() Status {
-	return c.status
+	return Status(c.status.Load())
 }
 
 func (c *core) SetStatus(status Status) {
-	switch c.status {
-	case statusUnknown:
-		c.status = status
-	case StatusIdle:
-		c.status = status
-	case StatusInUse:
-		c.status = status
-	case StatusClosing:
-		c.status = status
-	case StatusClosed:
-		c.status = status
-	case StatusError:
-		c.status = status
+	switch Status(c.status.Load()) {
+	case StatusClosed, StatusError:
+		// nop
 	default:
-		panic(fmt.Sprintf("Unknown%d", c.status))
+		c.status.Store(uint32(status))
 	}
 }
 
@@ -111,10 +101,9 @@ func Open(
 	core := &core{
 		Client: client,
 		Trace:  &trace.Query{},
-		status: statusUnknown,
 		checks: []func(s *core) bool{
 			func(s *core) bool {
-				return IsAlive(s.status)
+				return IsAlive(Status(s.status.Load()))
 			},
 		},
 	}
@@ -199,11 +188,10 @@ func (c *core) attach(ctx context.Context) (finalErr error) {
 			_ = c.closeOnce(xcontext.ValueOnly(ctx))
 		}()
 
-		for func() bool {
-			_, recvErr := attach.Recv()
-
-			return recvErr == nil
-		}() {
+		for c.IsAlive() {
+			if _, recvErr := attach.Recv(); recvErr != nil {
+				return
+			}
 		}
 	}()
 

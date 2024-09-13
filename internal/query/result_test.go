@@ -351,7 +351,7 @@ func TestResultNextResultSet(t *testing.T) {
 			},
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		{
@@ -518,7 +518,7 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		{
@@ -833,7 +833,7 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		{
@@ -937,7 +937,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 			},
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
@@ -1005,7 +1005,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
@@ -1057,7 +1057,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		}, nil)
 		testErr := errors.New("test-err")
 		stream.EXPECT().Recv().Return(nil, testErr)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
@@ -1147,7 +1147,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneResultSetFromResult(ctx, r)
@@ -1199,7 +1199,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		}, nil)
 		testErr := errors.New("test-err")
 		stream.EXPECT().Recv().Return(nil, testErr)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
@@ -1265,7 +1265,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 			},
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		rs, err := exactlyOneResultSetFromResult(ctx, r)
@@ -1375,7 +1375,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 				},
 			},
 		}, nil)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		rs, err := exactlyOneResultSetFromResult(ctx, r)
@@ -1427,7 +1427,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 		}, nil)
 		testErr := errors.New("test-err")
 		stream.EXPECT().Recv().Return(nil, testErr)
-		r, _, err := newResult(ctx, stream, nil)
+		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 
 		rs, err := exactlyOneResultSetFromResult(ctx, r)
@@ -1544,7 +1544,7 @@ func TestCloseResultOnCloseClosableResultSet(t *testing.T) {
 	}, nil)
 	stream.EXPECT().Recv().Return(nil, io.EOF)
 	var closed bool
-	r, _, err := newResult(ctx, stream, withTrace(&trace.Query{
+	r, err := newResult(ctx, stream, withTrace(&trace.Query{
 		OnResultClose: func(info trace.QueryResultCloseStartInfo) func(info trace.QueryResultCloseDoneInfo) {
 			require.False(t, closed)
 			closed = true
@@ -1915,7 +1915,7 @@ func TestResultStats(t *testing.T) {
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
 			var s stats.QueryStats
-			result, _, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -2276,7 +2276,7 @@ func TestResultStats(t *testing.T) {
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
 			var s stats.QueryStats
-			result, _, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -2638,7 +2638,7 @@ func TestResultStats(t *testing.T) {
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
 			var s stats.QueryStats
-			result, _, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -2975,7 +2975,7 @@ func TestResultStats(t *testing.T) {
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
 			var s stats.QueryStats
-			result, _, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -3009,7 +3009,7 @@ func TestMaterializedResultStats(t *testing.T) {
 		stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 		opts ...resultOption,
 	) (query.Result, error) {
-		r, _, err := newResult(ctx, stream, opts...)
+		r, err := newResult(ctx, stream, opts...)
 		if err != nil {
 			return nil, err
 		}

@@ -6,11 +6,17 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"math/rand"
 	"os"
+	"path"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -18,6 +24,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -285,5 +292,120 @@ func TestQueryExecute(t *testing.T) {
 			return tx.CommitTx(ctx)
 		}, query.WithIdempotent())
 		require.NoError(t, err)
+	})
+}
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1456
+func TestIssue1456TooManyUnknownTransactions(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
+		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
+	}
+
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+	)
+	require.NoError(t, err)
+
+	const (
+		tableSize = 10000
+		queries   = 1000
+		chSize    = 50
+	)
+
+	tableName := path.Join(db.Name(), t.Name(), "test")
+
+	err = db.Query().Exec(ctx, "DROP TABLE IF EXISTS `"+tableName+"`;")
+	require.NoError(t, err)
+
+	err = db.Query().Exec(ctx, `CREATE TABLE `+"`"+tableName+"`"+` (
+			id Utf8,
+			value Uint64,
+			PRIMARY KEY(id)
+			)`,
+	)
+	require.NoError(t, err)
+
+	var vals []types.Value
+	for i := 0; i < tableSize; i++ {
+		vals = append(vals, types.StructValue(
+			types.StructFieldValue("id", types.UTF8Value(uuid.NewString())),
+			types.StructFieldValue("value", types.Uint64Value(rand.Uint64())),
+		))
+	}
+	err = db.Query().Do(context.Background(), func(ctx context.Context, s query.Session) error {
+		return s.Exec(ctx, `
+				PRAGMA AnsiInForEmptyOrNullableItemsCollections;
+				DECLARE $vals AS List<Struct<
+					id: Utf8,
+					value: Uint64
+				>>;
+				
+				INSERT INTO `+"`"+tableName+"`"+` 
+				SELECT id, value FROM AS_TABLE($vals);`,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$vals").BeginList().AddItems(vals...).EndList().Build(),
+			),
+		)
+	})
+	require.NoError(t, err)
+
+	t.Run("Query", func(t *testing.T) {
+		wg := sync.WaitGroup{}
+		wg.Add(queries)
+		ch := make(chan struct{}, chSize)
+		for i := 0; i < queries; i++ {
+			ch <- struct{}{}
+			go func() {
+				defer func() { <-ch }()
+				defer wg.Done()
+
+				err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+					var (
+						id string
+						v  uint64
+					)
+
+					res, err := tx.Query(ctx, `SELECT id, value FROM `+"`"+tableName+"`")
+					if err != nil {
+						return err
+					}
+
+					for {
+						set, err := res.NextResultSet(ctx)
+						if err != nil {
+							if errors.Is(err, io.EOF) {
+								break
+							}
+
+							return err
+						}
+
+						for {
+							row, err := set.NextRow(ctx)
+							if err != nil {
+								if errors.Is(err, io.EOF) {
+									break
+								}
+
+								return err
+							}
+
+							err = row.Scan(&id, &v)
+							if err != nil {
+								return err
+							}
+						}
+					}
+					return res.Close(ctx)
+				}, query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
+				require.NoError(t, err)
+			}()
+		}
+		wg.Wait()
 	})
 }

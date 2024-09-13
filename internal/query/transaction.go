@@ -26,13 +26,9 @@ var (
 	_ baseTx.Transaction = (*Transaction)(nil)
 )
 
-const (
-	LazyTxID = "LAZY_TX"
-)
-
 type (
 	Transaction struct {
-		baseTx.Identifier
+		baseTx.LazyID
 
 		s          *Session
 		txSettings query.TransactionSettings
@@ -46,33 +42,35 @@ type (
 func begin(
 	ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
-	s *Session,
+	sessionID string,
 	txSettings query.TransactionSettings,
-) (baseTx.Identifier, error) {
+) (txID string, _ error) {
 	a := allocator.New()
 	defer a.Free()
 	response, err := client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
-			SessionId:  s.ID(),
+			SessionId:  sessionID,
 			TxSettings: txSettings.ToYDB(a),
 		},
 	)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return "", xerrors.WithStackTrace(err)
 	}
 
-	return baseTx.NewID(response.GetTxMeta().GetId()), nil
+	return response.GetTxMeta().GetId(), nil
 }
 
-func (tx *Transaction) UnLazy(ctx context.Context) (err error) {
-	if tx.Identifier != nil {
+func (tx *Transaction) UnLazy(ctx context.Context) error {
+	if tx.ID() != baseTx.LazyTxID {
 		return nil
 	}
 
-	tx.Identifier, err = begin(ctx, tx.s.client, tx.s, tx.txSettings)
+	txID, err := begin(ctx, tx.s.client, tx.s.ID(), tx.txSettings)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
+	tx.SetTxID(txID)
 
 	return nil
 }
@@ -97,6 +95,9 @@ func (tx *Transaction) QueryResultSet(
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+			tx.SetTxID(txMeta.GetId())
+		}),
 	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
@@ -107,21 +108,9 @@ func (tx *Transaction) QueryResultSet(
 			}),
 		)
 	}
-	txID, r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
+	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
-	}
-
-	if settings.TxControl().Commit {
-		if txID != nil && tx.Identifier != nil {
-			return nil, xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
-		}
-		tx.completed = true
-	} else if tx.Identifier == nil {
-		if txID == nil {
-			return nil, xerrors.WithStackTrace(errExpectedTxID)
-		}
-		tx.Identifier = txID
 	}
 
 	rs, err = readResultSet(ctx, r)
@@ -150,6 +139,9 @@ func (tx *Transaction) QueryRow(
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+			tx.SetTxID(txMeta.GetId())
+		}),
 	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
@@ -160,13 +152,9 @@ func (tx *Transaction) QueryRow(
 			}),
 		)
 	}
-	txID, r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
+	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
-	}
-
-	if tx.Identifier == nil {
-		tx.Identifier = txID
 	}
 
 	row, err = readRow(ctx, r)
@@ -182,21 +170,13 @@ func (tx *Transaction) SessionID() string {
 }
 
 func (tx *Transaction) txControl() *queryTx.Control {
-	if tx.Identifier != nil {
-		return queryTx.NewControl(queryTx.WithTxID(tx.Identifier.ID()))
+	if tx.ID() != baseTx.LazyTxID {
+		return queryTx.NewControl(queryTx.WithTxID(tx.ID()))
 	}
 
 	return queryTx.NewControl(
 		queryTx.BeginTx(tx.txSettings...),
 	)
-}
-
-func (tx *Transaction) ID() string {
-	if tx.Identifier == nil {
-		return LazyTxID
-	}
-
-	return tx.Identifier.ID()
 }
 
 func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execute) (
@@ -219,6 +199,9 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+			tx.SetTxID(txMeta.GetId())
+		}),
 	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
@@ -230,21 +213,9 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		)
 	}
 
-	txID, r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
+	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
-	}
-
-	if settings.TxControl().Commit {
-		if txID != nil && tx.Identifier != nil {
-			return xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
-		}
-		tx.completed = true
-	} else if tx.Identifier == nil {
-		if txID == nil {
-			return xerrors.WithStackTrace(errExpectedTxID)
-		}
-		tx.Identifier = txID
 	}
 
 	err = readAll(ctx, r)
@@ -255,10 +226,10 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	return nil
 }
 
-func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettings, _ error) {
+func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettings, finalErr error) {
 	for _, opt := range opts {
 		if opt == nil {
-			return nil, xerrors.WithStackTrace(errExpectedTxID)
+			return nil, xerrors.WithStackTrace(errNilOption)
 		}
 		if _, has := opt.(options.ExecuteNoTx); has {
 			return nil, xerrors.WithStackTrace(
@@ -267,22 +238,8 @@ func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettin
 		}
 	}
 
-	if tx.Identifier != nil {
-		return options.ExecuteSettings(append([]options.Execute{
-			options.WithTxControl(
-				queryTx.NewControl(
-					queryTx.WithTxID(tx.Identifier.ID()),
-				),
-			),
-		}, opts...)...), nil
-	}
-
 	return options.ExecuteSettings(append([]options.Execute{
-		options.WithTxControl(
-			queryTx.NewControl(
-				queryTx.BeginTx(tx.txSettings...),
-			),
-		),
+		options.WithTxControl(tx.txControl()),
 	}, opts...)...), nil
 }
 
@@ -306,6 +263,9 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+			tx.SetTxID(txMeta.GetId())
+		}),
 	}
 	if settings.TxControl().Commit {
 		// notification about complete transaction must be sended for any error or for successfully read all result if
@@ -316,23 +276,9 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			}),
 		)
 	}
-	txID, r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
+	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
-	}
-
-	if settings.TxControl().Commit {
-		if txID != nil && tx.Identifier != nil {
-			return nil, xerrors.WithStackTrace(errUnexpectedTxIDOnCommitFlag)
-		}
-		tx.completed = true
-
-		return r, nil
-	} else if tx.Identifier == nil {
-		if txID == nil {
-			return nil, xerrors.WithStackTrace(errExpectedTxID)
-		}
-		tx.Identifier = txID
 	}
 
 	return r, nil
@@ -351,7 +297,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
-	if tx.Identifier == nil {
+	if tx.ID() == baseTx.LazyTxID {
 		return nil
 	}
 
@@ -389,8 +335,9 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
-	if tx.Identifier == nil {
-		return nil
+	if tx.ID() == baseTx.LazyTxID {
+		// https://github.com/ydb-platform/ydb-go-sdk/issues/1456
+		return tx.s.Close(ctx)
 	}
 
 	if tx.completed {
@@ -418,6 +365,8 @@ func (tx *Transaction) OnCompleted(f baseTx.OnTransactionCompletedFunc) {
 }
 
 func (tx *Transaction) notifyOnCompleted(err error) {
+	tx.completed = true
+
 	tx.onCompleted.Range(func(f *baseTx.OnTransactionCompletedFunc) bool {
 		(*f)(err)
 

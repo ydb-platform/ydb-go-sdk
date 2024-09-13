@@ -175,76 +175,80 @@ func TestClient(t *testing.T) {
 	t.Run("DoTx", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			client := NewMockQueryServiceClient(ctrl)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-				Status: Ydb.StatusIds_SUCCESS,
-				TxMeta: &Ydb_Query.TransactionMeta{
-					Id: "456",
-				},
-				ResultSetIndex: 0,
-				ResultSet: &Ydb.ResultSet{
-					Columns: []*Ydb.Column{
-						{
-							Name: "a",
-							Type: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{
-									TypeId: Ydb.Type_UINT64,
-								},
-							},
-						},
-						{
-							Name: "b",
-							Type: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{
-									TypeId: Ydb.Type_UTF8,
-								},
-							},
-						},
-					},
-					Rows: []*Ydb.Value{
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 1,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "1",
-								},
-							}},
-						},
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 2,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "2",
-								},
-							}},
-						},
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 3,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "3",
-								},
-							}},
-						},
-					},
-				},
-			}, nil)
-			stream.EXPECT().Recv().Return(nil, io.EOF)
-			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
-			client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
-				Status: Ydb.StatusIds_SUCCESS,
-			}, nil)
 			err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+				client := NewMockQueryServiceClient(ctrl)
+				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+					client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
+						Status: Ydb.StatusIds_SUCCESS,
+					}, nil)
+
+					return &Ydb_Query.ExecuteQueryResponsePart{
+						Status: Ydb.StatusIds_SUCCESS,
+						TxMeta: &Ydb_Query.TransactionMeta{
+							Id: "456",
+						},
+						ResultSetIndex: 0,
+						ResultSet: &Ydb.ResultSet{
+							Columns: []*Ydb.Column{
+								{
+									Name: "a",
+									Type: &Ydb.Type{
+										Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										},
+									},
+								},
+								{
+									Name: "b",
+									Type: &Ydb.Type{
+										Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UTF8,
+										},
+									},
+								},
+							},
+							Rows: []*Ydb.Value{
+								{
+									Items: []*Ydb.Value{{
+										Value: &Ydb.Value_Uint64Value{
+											Uint64Value: 1,
+										},
+									}, {
+										Value: &Ydb.Value_TextValue{
+											TextValue: "1",
+										},
+									}},
+								},
+								{
+									Items: []*Ydb.Value{{
+										Value: &Ydb.Value_Uint64Value{
+											Uint64Value: 2,
+										},
+									}, {
+										Value: &Ydb.Value_TextValue{
+											TextValue: "2",
+										},
+									}},
+								},
+								{
+									Items: []*Ydb.Value{{
+										Value: &Ydb.Value_Uint64Value{
+											Uint64Value: 3,
+										},
+									}, {
+										Value: &Ydb.Value_TextValue{
+											TextValue: "3",
+										},
+									}},
+								},
+							},
+						},
+					}, nil
+				})
+				stream.EXPECT().Recv().Return(nil, io.EOF)
+				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
 				return newTestSessionWithClient("123", client), nil
 			}), func(ctx context.Context, tx query.TxActor) error {
 				defer func() {
@@ -283,7 +287,7 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("TxLeak", func(t *testing.T) {
 			t.Run("OnExec", func(t *testing.T) {
-				t.Run("WithExplicitCommit", func(t *testing.T) {
+				t.Run("WithoutCommit", func(t *testing.T) {
 					xtest.TestManyTimes(t, func(t testing.TB) {
 						txInFlight := 0
 						ctrl := gomock.NewController(t)
@@ -297,12 +301,11 @@ func TestClient(t *testing.T) {
 										return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 									}
 
+									txInFlight++
+
 									stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-										txInFlight++
-
 										stream.EXPECT().Recv().Return(nil, io.EOF)
-
 										client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
 											func(ctx context.Context, request *Ydb_Query.CommitTransactionRequest, option ...grpc.CallOption) (
 												*Ydb_Query.CommitTransactionResponse, error,
@@ -334,7 +337,7 @@ func TestClient(t *testing.T) {
 						require.Zero(t, txInFlight)
 					})
 				})
-				t.Run("WithLazyCommit", func(t *testing.T) {
+				t.Run("WithCommit", func(t *testing.T) {
 					xtest.TestManyTimes(t, func(t testing.TB) {
 						ctrl := gomock.NewController(t)
 						txInFlight := 0
@@ -350,13 +353,15 @@ func TestClient(t *testing.T) {
 										return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 									}
 
+									txInFlight++
+
 									stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 										if rand.Int31n(100) < 50 {
+											txInFlight--
+
 											return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 										}
-
-										txInFlight++
 
 										stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 											txInFlight--
@@ -386,7 +391,7 @@ func TestClient(t *testing.T) {
 				})
 			})
 			t.Run("OnSecondExec", func(t *testing.T) {
-				t.Run("WithExplicitCommit", func(t *testing.T) {
+				t.Run("WithoutCommit", func(t *testing.T) {
 					xtest.TestManyTimes(t, func(t testing.TB) {
 						ctrl := gomock.NewController(t)
 						txInFlight := 0
@@ -400,10 +405,10 @@ func TestClient(t *testing.T) {
 										return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 									}
 
+									txInFlight++
+
 									firstStream := NewMockQueryService_ExecuteQueryClient(ctrl)
 									firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-										txInFlight++
-
 										firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 											client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 												func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
@@ -476,7 +481,7 @@ func TestClient(t *testing.T) {
 						require.NoError(t, err)
 					})
 				})
-				t.Run("WithLazyCommit", func(t *testing.T) {
+				t.Run("WithCommit", func(t *testing.T) {
 					xtest.TestManyTimes(t, func(t testing.TB) {
 						ctrl := gomock.NewController(t)
 						txInFlight := 0
@@ -490,10 +495,10 @@ func TestClient(t *testing.T) {
 										return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 									}
 
+									txInFlight++
+
 									firstStream := NewMockQueryService_ExecuteQueryClient(ctrl)
 									firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-										txInFlight++
-
 										firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 											client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 												func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
