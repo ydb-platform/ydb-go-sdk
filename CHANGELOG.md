@@ -1,3 +1,4 @@
+* Changed `ydb_go_sdk_ydb_driver_conn_requests` metrics splitted to `ydb_go_sdk_ydb_driver_conn_request_statuses` and `ydb_go_sdk_ydb_driver_conn_request_methods`
 * Fixed metadata for operation service connection
 * Fixed composing query traces in call `db.Query.Do[Tx]` using option `query.WithTrace`
 
