@@ -1,3 +1,4 @@
+## v3.80.3
 * Added option `ydb.WithSessionPoolSessionIdleTimeToLive` for restrict idle time of query sessions
 * Fixed bug with leak of query transactions
 * Changed `ydb_go_sdk_ydb_driver_conn_requests` metrics splitted to `ydb_go_sdk_ydb_driver_conn_request_statuses` and `ydb_go_sdk_ydb_driver_conn_request_methods`
