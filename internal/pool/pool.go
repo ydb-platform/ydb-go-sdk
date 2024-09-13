@@ -26,18 +26,18 @@ type (
 		Item
 	}
 	Config[PT ItemConstraint[T], T any] struct {
-		trace         *Trace
-		clock         clockwork.Clock
-		limit         int
-		createTimeout time.Duration
-		createItem    func(ctx context.Context) (PT, error)
-		closeTimeout  time.Duration
-		closeItem     func(ctx context.Context, item PT)
-		idleThreshold time.Duration
+		trace          *Trace
+		clock          clockwork.Clock
+		limit          int
+		createTimeout  time.Duration
+		createItem     func(ctx context.Context) (PT, error)
+		closeTimeout   time.Duration
+		closeItem      func(ctx context.Context, item PT)
+		idleTimeToLive time.Duration
 	}
 	itemInfo[PT ItemConstraint[T], T any] struct {
-		idle    *xlist.Element[PT]
-		touched time.Time
+		idle      *xlist.Element[PT]
+		lastUsage time.Time
 	}
 	waitChPool[PT ItemConstraint[T], T any] interface {
 		GetOrNew() *chan PT
@@ -99,9 +99,9 @@ func WithTrace[PT ItemConstraint[T], T any](t *Trace) Option[PT, T] {
 	}
 }
 
-func WithIdleThreshold[PT ItemConstraint[T], T any](idleThreshold time.Duration) Option[PT, T] {
+func WithIdleTimeToLive[PT ItemConstraint[T], T any](idleTTL time.Duration) Option[PT, T] {
 	return func(c *Config[PT, T]) {
-		c.idleThreshold = idleThreshold
+		c.idleTimeToLive = idleTTL
 	}
 }
 
@@ -218,7 +218,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 			if newItem != nil {
 				p.mu.WithLock(func() {
 					p.index[newItem] = itemInfo[PT, T]{
-						touched: p.config.clock.Now(),
+						lastUsage: p.config.clock.Now(),
 					}
 				})
 			}
@@ -461,7 +461,7 @@ func (p *Pool[PT, T]) peekFirstIdle() (item PT, touched time.Time) {
 		panic(fmt.Sprintf("inconsistent index: (%v, %+v, %+v)", has, el, info.idle))
 	}
 
-	return item, info.touched
+	return item, info.lastUsage
 }
 
 // removes first session from idle and resets the keepAliveCount
@@ -547,7 +547,7 @@ func (p *Pool[PT, T]) pushIdle(item PT, now time.Time) {
 	}
 
 	p.changeState(func() Stats {
-		info.touched = now
+		info.lastUsage = now
 		info.idle = p.idle.PushBack(item)
 		p.index[item] = info
 
@@ -595,7 +595,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 					return info
 				})
 
-				if p.config.idleThreshold > 0 && p.config.clock.Since(info.touched) > p.config.idleThreshold {
+				if p.config.idleTimeToLive > 0 && p.config.clock.Since(info.lastUsage) > p.config.idleTimeToLive {
 					p.closeItem(ctx, item)
 					p.mu.WithLock(func() {
 						p.changeState(func() Stats {

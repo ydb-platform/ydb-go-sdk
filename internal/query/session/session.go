@@ -35,7 +35,7 @@ type (
 		deleteTimeout time.Duration
 		id            string
 		nodeID        uint32
-		status        Status
+		status        atomic.Uint32
 		closeOnce     func(ctx context.Context) error
 		checks        []func(s *core) bool
 	}
@@ -50,11 +50,16 @@ func (c *core) NodeID() uint32 {
 }
 
 func (c *core) statusCode() Status {
-	return Status(atomic.LoadUint32((*uint32)(&c.status)))
+	return Status(c.status.Load())
 }
 
 func (c *core) SetStatus(status Status) {
-	atomic.StoreUint32((*uint32)(&c.status), uint32(status))
+	switch Status(c.status.Load()) {
+	case StatusClosed, StatusError:
+		// nop
+	default:
+		c.status.Store(uint32(status))
+	}
 }
 
 func (c *core) Status() string {
@@ -81,21 +86,24 @@ func WithTrace(t *trace.Query) Option {
 	}
 }
 
-func Open( //nolint:funlen
+func IsAlive(status Status) bool {
+	switch status {
+	case StatusClosed, StatusClosing, StatusError:
+		return false
+	default:
+		return true
+	}
+}
+
+func Open(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...Option,
 ) (_ *core, finalErr error) {
 	core := &core{
 		Client: client,
 		Trace:  &trace.Query{},
-		status: statusUnknown,
 		checks: []func(s *core) bool{
 			func(s *core) bool {
-				switch s.statusCode() {
-				case StatusClosed, StatusClosing:
-					return false
-				default:
-					return true
-				}
+				return IsAlive(Status(s.status.Load()))
 			},
 		},
 	}
@@ -180,11 +188,10 @@ func (c *core) attach(ctx context.Context) (finalErr error) {
 			_ = c.closeOnce(xcontext.ValueOnly(ctx))
 		}()
 
-		for func() bool {
-			_, recvErr := attach.Recv()
-
-			return recvErr == nil
-		}() {
+		for c.IsAlive() {
+			if _, recvErr := attach.Recv(); recvErr != nil {
+				return
+			}
 		}
 	}()
 

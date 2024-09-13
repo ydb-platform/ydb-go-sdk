@@ -33,7 +33,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		},
 		pool: pool.New[*session, session](ctx,
 			pool.WithLimit[*session, session](config.SizeLimit()),
-			pool.WithIdleThreshold[*session, session](config.IdleThreshold()),
+			pool.WithIdleTimeToLive[*session, session](config.IdleThreshold()),
 			pool.WithCreateItemTimeout[*session, session](config.CreateSessionTimeout()),
 			pool.WithCloseItemTimeout[*session, session](config.DeleteTimeout()),
 			pool.WithClock[*session, session](config.Clock()),
