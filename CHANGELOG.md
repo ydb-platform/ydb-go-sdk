@@ -1,3 +1,4 @@
+## v3.80.5
 * Fixed connections pool leak on failed `ydb.Open` call
 
 ## v3.80.4
