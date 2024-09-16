@@ -274,6 +274,8 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 	}()
 
 	if err = d.connect(ctx); err != nil {
+		_ = d.pool.Release(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
