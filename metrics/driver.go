@@ -65,6 +65,10 @@ func driver(config Config) (t trace.Driver) {
 			if config.Details()&trace.DriverConnStreamEvents != 0 {
 				requestStatuses.With(map[string]string{
 					"status":   errorBrief(info.Error),
+					"endpoint": endpoint,
+					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
+				}).Inc()
+				requestMethods.With(map[string]string{
 					"method":   string(method),
 					"endpoint": endpoint,
 					"node_id":  strconv.FormatUint(uint64(nodeID), 10),

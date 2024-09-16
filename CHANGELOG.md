@@ -1,3 +1,5 @@
+* Fixed panic on usage metrics package from prometheus adapter on `trace.Driver.OnNewStream` callback
+
 ## v3.80.3
 * Added option `ydb.WithSessionPoolSessionIdleTimeToLive` for restrict idle time of query sessions
 * Fixed bug with leak of query transactions
