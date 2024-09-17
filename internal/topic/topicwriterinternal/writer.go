@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
 //go:generate mockgen -destination raw_topic_writer_stream_mock_test.go --typed -package topicwriterinternal -write_package_comment=false github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal RawTopicWriterStream
@@ -46,6 +47,11 @@ func (w *Writer) Write(ctx context.Context, messages ...PublicMessage) error {
 	}
 
 	return w.streamWriter.Write(ctx, messages)
+}
+
+func (w *Writer) WriteWithTx(ctx context.Context, tx tx.Transaction, messages ...PublicMessage) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (w *Writer) WaitInit(ctx context.Context) (info InitialInfo, err error) {

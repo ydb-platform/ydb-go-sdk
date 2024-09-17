@@ -2,7 +2,10 @@ package topicwriter
 
 import (
 	"context"
+	"errors"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
@@ -11,7 +14,10 @@ type (
 	Message = topicwriterinternal.PublicMessage
 )
 
-var ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
+var (
+	ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
+	errBadTxId          = xerrors.Wrap(errors.New("ydb: bad transaction type, supported transactions from query service only"))
+)
 
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages
@@ -45,11 +51,12 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 }
 
 func (w *Writer) WriteWithTx(ctx context.Context, transaction tx.Identifier, messages ...Message) error {
-	panic("not impl")
-}
+	internalTx, ok := transaction.(tx.Transaction)
+	if !ok {
+		return xerrors.WithStackTrace(errBadTxId)
+	}
 
-func (w *Writer) WriteOpts(ctx context.Context, messages []Message, opts ...WriteOption) error {
-	panic("not impl")
+	return w.inner.WriteWithTx(ctx, internalTx, messages...)
 }
 
 // WaitInit waits until the reader is initialized
