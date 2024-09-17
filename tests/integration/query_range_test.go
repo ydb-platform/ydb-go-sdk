@@ -1,5 +1,5 @@
-//go:build integration && go1.22 && goexperiment.rangefunc
-// +build integration,go1.22,goexperiment.rangefunc
+//go:build integration && go1.23
+// +build integration,go1.23
 
 package integration
 
@@ -51,19 +51,19 @@ func TestQueryRange(t *testing.T) {
 				},
 			)
 		}
-		r, err := db.Query().Execute(ctx, `
-				DECLARE $values AS List<Struct<p1:Text,p2:Uint64,p3:Interval>>;
-				SELECT p1, p2, p3 FROM AS_TABLE($values);
-			`,
+		r, err := db.Query().Query(ctx, `
+			DECLARE $values AS List<Struct<p1:Text,p2:Uint64,p3:Interval>>;
+			SELECT p1, p2, p3 FROM AS_TABLE($values);`,
 			query.WithParameters(
 				ydb.ParamsBuilder().Param("$values").BeginList().AddItems(listItems...).EndList().Build(),
 			),
+			query.WithIdempotent(),
 		)
 		require.NoError(t, err)
 		count := 0
-		for rs, err := range r.Range(ctx) {
+		for rs, err := range r.ResultSets(ctx) {
 			require.NoError(t, err)
-			for row, err := range rs.Range(ctx) {
+			for row, err := range rs.Rows(ctx) {
 				require.NoError(t, err)
 
 				var (
@@ -91,7 +91,7 @@ func TestQueryRange(t *testing.T) {
 			p3 time.Duration
 		)
 		err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-			_, r, err := s.Execute(ctx, `
+			r, err := s.Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
@@ -109,11 +109,11 @@ func TestQueryRange(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			for rs, err := range r.Range(ctx) {
+			for rs, err := range r.ResultSets(ctx) {
 				if err != nil {
 					return err
 				}
-				for row, err := range rs.Range(ctx) {
+				for row, err := range rs.Rows(ctx) {
 					if err != nil {
 						return err
 					}
@@ -133,7 +133,7 @@ func TestQueryRange(t *testing.T) {
 					}
 				}
 			}
-			return r.Err()
+			return nil
 		}, query.WithIdempotent())
 		require.NoError(t, err)
 	})
@@ -144,7 +144,7 @@ func TestQueryRange(t *testing.T) {
 			p3 time.Duration
 		)
 		err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-			r, err := tx.Execute(ctx, `
+			r, err := tx.Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
@@ -162,11 +162,11 @@ func TestQueryRange(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			for rs, err := range r.Range(ctx) {
+			for rs, err := range r.ResultSets(ctx) {
 				if err != nil {
 					return err
 				}
-				for row, err := range rs.Range(ctx) {
+				for row, err := range rs.Rows(ctx) {
 					if err != nil {
 						return err
 					}
@@ -186,7 +186,7 @@ func TestQueryRange(t *testing.T) {
 					}
 				}
 			}
-			return r.Err()
+			return nil
 		}, query.WithIdempotent())
 		require.NoError(t, err)
 	})

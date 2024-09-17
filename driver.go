@@ -38,6 +38,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -66,6 +67,8 @@ type Driver struct {
 
 	discovery        *xsync.Once[*internalDiscovery.Client]
 	discoveryOptions []discoveryConfig.Option
+
+	operation *xsync.Once[*operation.Client]
 
 	table        *xsync.Once[*internalTable.Client]
 	tableOptions []tableConfig.Option
@@ -115,7 +118,7 @@ func (d *Driver) trace() *trace.Driver {
 //nolint:nonamedreturns
 func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	onDone := trace.DriverOnClose(d.trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.(*Driver).Close"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.(*Driver).Close"),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -148,8 +151,10 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.scheme.Close,
 		d.scripting.Close,
 		d.table.Close,
+		d.operation.Close,
 		d.query.Close,
 		d.topic.Close,
+		d.discovery.Close,
 		d.balancer.Close,
 		d.pool.Release,
 	)
@@ -215,6 +220,13 @@ func (d *Driver) Discovery() discovery.Client {
 	return d.discovery.Must()
 }
 
+// Operation returns operation client
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (d *Driver) Operation() *operation.Client {
+	return d.operation.Must()
+}
+
 // Scripting returns scripting client
 func (d *Driver) Scripting() scripting.Client {
 	return d.scripting.Must()
@@ -254,7 +266,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 
 	onDone := trace.DriverOnInit(
 		d.trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.Open"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.Open"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {
@@ -292,7 +304,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 
 	onDone := trace.DriverOnInit(
 		d.trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.New"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.New"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {
@@ -502,6 +514,12 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 					d.discoveryOptions...,
 				)...,
 			),
+		), nil
+	})
+
+	d.operation = xsync.OnceValue(func() (*operation.Client, error) {
+		return operation.New(xcontext.ValueOnly(ctx),
+			d.pool.Get(endpoint.New(d.config.Endpoint())),
 		), nil
 	})
 

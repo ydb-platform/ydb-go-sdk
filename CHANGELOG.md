@@ -1,3 +1,53 @@
+## v3.79.0
+* Added commit messages for topic listener
+* EOF error in RecvMsg is no longer logged
+
+## v3.78.0
+* Changed result type of method `query.Executor.QueryResultSet` from `query.ResultSet` to `query.ClosableResultSet`
+* Added `table/types.DecimalValueFromString` decimal type constructor
+
+## v3.77.1
+* Added log topic writer ack
+* Replaced `operation.Client.List` to five methods for listing operations `operation.List{BuildIndex,ImportFromS3,ExportToS3,ExportToYT,ExecuteQuery}`
+
+## v3.77.0
+* Changed log message about send topic message
+* Added experimental support for executing scripts over query service client (`query.Client.ExecuteScript` and `query.CLient.FetchScriptResults`)
+* Removed tx result from `query.Session.Execute` (tx can be obtained from `query.Session.Begin`)
+* Changed behaviour of `query.Session.Begin` to `noop` for lazy initialization with first call `query.TxActor.Execute`
+* Splitted experimental method `query.Client.Execute` to methods `query.Client.Exec` without result and `query.Client.Query` with result
+* Splitted experimental method `query.TxActor.Execute` to methods `query.TxActor.Exec` without result and `query.TxActor.Query` with result
+* Renamed experimental method `query.Client.ReadResultSet` to `query.Client.QueryResultSet`
+* Renamed experimental method `query.Client.ReadRow` to `query.Client.QueryRow`
+* Removed experimental methods `query.Session.ReadResultSet` and  `query.Session.ReadRows`
+* Removed experimental methods `query.TxActor.ReadResultSet` and  `query.TxActor.ReadRows`
+* Removed experimental method `query.Client.Stats`
+* Option `query.WithIdempotent()` allowed for `query.Client.{Exec,Query,QueryResultSet,QueryRow}` methods now
+* Added experimental support for operation service client through `db.Operation()` method (supports methods `Get`, `List`, `Cancel` and `Forget`)
+
+## v3.76.6
+* Replaced requirements from go1.22 + experimantal flag to go1.23 for experimental range-over interface
+
+## v3.76.5
+* Fixed out of index item creation in `internal/pool.Pool`
+* Fixed tracing of `(*grpcClientStream).finish` event
+
+## v3.76.4
+* Added traces and logs for read messages from topic within transaction
+* Changed result type of `query.Session.NodeID()` from `int64` to `uint32` for compatibility with table session and discovery
+* Removed experimental method `query.Result.Err()`
+* Added the finishing reading the grpc stream on `query.Result.Close()` call
+* Renamed experimental method `query.Result.Range()` to `query.Result.ResultSets()`
+* Renamed experimental method `query.ResultSet.Range()` to `query.ResultSet.Rows()`
+* Removed support of `go1.20`
+* Added PopMessages from topic within transaction
+
+## v3.76.3
+* Changed interface `table.TransactionIdentifier` (added private method) for prohibition of any implementations outside ydb-go-sdk
+
+## v3.76.2
+* Fixed bug with nil pointer dereference on trace callback from `query.createSession`
+* Fixed test message builder, now all method return itself pointer
 * Fixed handle reconnection timeout error
 * Fixed experimental topic listener handle stop partition event
 

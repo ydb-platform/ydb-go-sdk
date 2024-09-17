@@ -2,13 +2,13 @@ package version
 
 const (
 	Major = "3"
-	Minor = "76"
-	Patch = "1"
+	Minor = "79"
+	Patch = "0"
 
-	Prefix = "ydb-go-sdk"
+	Package = "ydb-go-sdk"
 )
 
 const (
 	Version     = Major + "." + Minor + "." + Patch
-	FullVersion = Prefix + "/" + Version
+	FullVersion = Package + "/" + Version
 )

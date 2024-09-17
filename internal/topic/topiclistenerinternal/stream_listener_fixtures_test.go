@@ -1,6 +1,7 @@
 package topiclistenerinternal
 
 import (
+	"errors"
 	"sync/atomic"
 
 	"github.com/rekby/fixenv"
@@ -9,22 +10,51 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreadermock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func StreamListener(e fixenv.Env) *streamListener {
-	f := func() (*fixenv.GenericResult[*streamListener], error) {
-		l := &streamListener{}
-		l.initVars(&atomic.Int64{})
-		l.stream = StreamMock(e)
-		l.streamClose = func(cause error) {
-		}
-		l.handler = EventHandlerMock(e)
-		l.sessions = PartitionStorage(e)
+	return listenerAndHandler(e).listener
+}
 
-		return fixenv.NewGenericResult(l), nil
+func EventHandlerMock(e fixenv.Env) *MockEventHandler {
+	return listenerAndHandler(e).handlerMock
+}
+
+func listenerAndHandler(e fixenv.Env) listenerAndHandlerPair {
+	f := func() (*fixenv.GenericResult[listenerAndHandlerPair], error) {
+		handler := NewMockEventHandler(MockController(e))
+
+		listener := &streamListener{}
+		listener.initVars(&atomic.Int64{})
+		listener.stream = StreamMock(e)
+		listener.streamClose = func(cause error) {}
+		listener.handler = handler
+		listener.sessions = PartitionStorage(e)
+		listener.syncCommitter = topicreadercommon.NewCommitterStopped(
+			&trace.Topic{},
+			sf.Context(e),
+			topicreadercommon.CommitModeSync,
+			listener.stream.Send,
+		)
+		listener.syncCommitter.Start()
+
+		stop := func() {
+			_ = listener.syncCommitter.Close(sf.Context(e), errors.New("test finished"))
+		}
+
+		return fixenv.NewGenericResultWithCleanup(listenerAndHandlerPair{
+			handlerMock: handler,
+			listener:    listener,
+		}, stop), nil
 	}
 
 	return fixenv.CacheResult(e, f)
+}
+
+type listenerAndHandlerPair struct {
+	handlerMock *MockEventHandler
+	listener    *streamListener
 }
 
 func PartitionStorage(e fixenv.Env) *topicreadercommon.PartitionSessionStorage {
@@ -70,16 +100,6 @@ func MockController(e fixenv.Env) *gomock.Controller {
 func StreamMock(e fixenv.Env) *rawtopicreadermock.MockTopicReaderStreamInterface {
 	f := func() (*fixenv.GenericResult[*rawtopicreadermock.MockTopicReaderStreamInterface], error) {
 		m := rawtopicreadermock.NewMockTopicReaderStreamInterface(MockController(e))
-
-		return fixenv.NewGenericResult(m), nil
-	}
-
-	return fixenv.CacheResult(e, f)
-}
-
-func EventHandlerMock(e fixenv.Env) *MockEventHandler {
-	f := func() (*fixenv.GenericResult[*MockEventHandler], error) {
-		m := NewMockEventHandler(MockController(e))
 
 		return fixenv.NewGenericResult(m), nil
 	}

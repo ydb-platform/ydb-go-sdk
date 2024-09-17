@@ -108,8 +108,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				wait = make(chan struct{})
 				got  = make(chan error)
 			)
-			p := newClientWithStubBuilder(
-				t,
+			p := newClientWithStubBuilder(t,
 				testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
@@ -119,15 +118,13 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				})),
 				1,
 				config.WithSizeLimit(1),
-				config.WithTrace(
-					&trace.Table{
-						OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
-							wait <- struct{}{}
+				config.WithTrace(&trace.Table{
+					OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
+						wait <- struct{}{}
 
-							return nil
-						},
+						return nil
 					},
-				),
+				}),
 			)
 			defer func() {
 				_ = p.Close(context.Background())
@@ -174,7 +171,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			case err := <-got:
 				if !xerrors.Is(err, errClosedClient) {
 					t.Fatalf(
-						"unexpected error: %v; want %v",
+						"unexpected error: %q; want %q'",
 						err, errClosedClient,
 					)
 				}
@@ -646,7 +643,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 					testutil.TableDeleteSession: func(interface{}) (proto.Message, error) {
 						deleted++
 
-						return nil, nil
+						return nil, nil //nolint:nilnil
 					},
 				},
 			),

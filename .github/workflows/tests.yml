@@ -13,12 +13,12 @@ on:
 jobs:
   unit:
     concurrency:
-      group: unit-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      group: unit-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.20.x, 1.21.x, 1.22.x]
+        go-version: [1.21.x, 1.22.x, 1.23.x]
         os: [ubuntu, windows, macOS]
     env:
       OS: ${{ matrix.os }}-latest
@@ -44,14 +44,15 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
     concurrency:
-      group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
+      group: integration-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}-latest
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.20.x, 1.21.x, 1.22.x]
+        go-version: [1.21.x, 1.22.x, 1.23.x]
         ydb-version: [23.3, 24.1]
+        os: [ubuntu]
     services:
       ydb:
         image: ydbplatform/local-ydb:${{ matrix.ydb-version }}
@@ -95,14 +96,15 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   experiment:
     concurrency:
-      group: experiment-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
+      group: experiment-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}-latest
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.22.x]
-        ydb-version: [24.1]
+        go-version: [1.23.x]
+        ydb-version: [nightly]
+        os: [ubuntu]
     services:
       ydb:
         image: ydbplatform/local-ydb:${{ matrix.ydb-version }}
@@ -116,6 +118,7 @@ jobs:
           YDB_LOCAL_SURVIVE_RESTART: true
           YDB_USE_IN_MEMORY_PDISKS: true
           YDB_TABLE_ENABLE_PREPARED_DDL: true
+          YDB_FEATURE_FLAGS: enable_topic_service_tx
         options: '-h localhost'
     env:
       OS: ubuntu-latest
@@ -126,7 +129,6 @@ jobs:
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
       HIDE_APPLICATION_OUTPUT: 1
-      GOEXPERIMENT: rangefunc
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

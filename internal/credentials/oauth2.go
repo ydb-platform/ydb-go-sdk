@@ -451,7 +451,6 @@ func GetSupportedOauth2TokenExchangeJwtAlgorithms() []string {
 	return algs
 }
 
-//nolint:musttag
 type stringOrArrayConfig struct {
 	Values []string
 }

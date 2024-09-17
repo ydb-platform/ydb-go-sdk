@@ -4,6 +4,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
 var (
@@ -22,11 +23,7 @@ type (
 	}
 	Control struct {
 		selector Selector
-		commit   bool
-	}
-	Identifier interface {
-		ID() string
-		isYdbTx()
+		Commit   bool
 	}
 )
 
@@ -37,9 +34,13 @@ func (ctrl *Control) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl
 
 	txControl := a.QueryTransactionControl()
 	ctrl.selector.applyTxSelector(a, txControl)
-	txControl.CommitTx = ctrl.commit
+	txControl.CommitTx = ctrl.Commit
 
 	return txControl
+}
+
+func (ctrl *Control) Selector() Selector {
+	return ctrl.selector
 }
 
 var (
@@ -86,7 +87,7 @@ func (id txIDTxControlOption) applyTxSelector(a *allocator.Allocator, txControl 
 	txControl.TxSelector = selector
 }
 
-func WithTx(t Identifier) txIDTxControlOption {
+func WithTx(t tx.Identifier) txIDTxControlOption {
 	return txIDTxControlOption(t.ID())
 }
 
@@ -97,7 +98,7 @@ func WithTxID(txID string) txIDTxControlOption {
 type commitTxOption struct{}
 
 func (c commitTxOption) applyTxControlOption(txControl *Control) {
-	txControl.commit = true
+	txControl.Commit = true
 }
 
 // CommitTx returns commit transaction control option
@@ -109,7 +110,7 @@ func CommitTx() ControlOption {
 func NewControl(opts ...ControlOption) *Control {
 	txControl := &Control{
 		selector: BeginTx(WithSerializableReadWrite()),
-		commit:   false,
+		Commit:   false,
 	}
 	for _, opt := range opts {
 		if opt != nil {

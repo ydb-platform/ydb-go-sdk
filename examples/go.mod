@@ -1,6 +1,6 @@
 module examples
 
-go 1.21
+go 1.23
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.5.0

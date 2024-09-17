@@ -102,3 +102,37 @@ func TestRWMutex(t *testing.T) {
 		require.Equal(t, int64(0), badSummCount)
 	})
 }
+
+func TestWithLock(t *testing.T) {
+	t.Run("sync.Mutex", func(t *testing.T) {
+		mtx := sync.Mutex{}
+		v := WithLock(&mtx, func() int {
+			return 123
+		})
+		require.Equal(t, 123, v)
+	})
+	t.Run("xsync.Mutex", func(t *testing.T) {
+		mtx := Mutex{}
+		v := WithLock(&mtx, func() int {
+			return 123
+		})
+		require.Equal(t, 123, v)
+	})
+}
+
+func TestWithRLock(t *testing.T) {
+	t.Run("sync.RWMutex", func(t *testing.T) {
+		mtx := sync.RWMutex{}
+		v := WithRLock(&mtx, func() int {
+			return 123
+		})
+		require.Equal(t, 123, v)
+	})
+	t.Run("xsync.RWMutex", func(t *testing.T) {
+		mtx := RWMutex{}
+		v := WithRLock(&mtx, func() int {
+			return 123
+		})
+		require.Equal(t, 123, v)
+	})
+}

@@ -2183,7 +2183,7 @@ func (v *variantValue) Yql() string {
 	case *types.VariantStruct:
 		fmt.Fprintf(buffer, "%q", t.Field(int(v.idx)).Name)
 	case *types.VariantTuple:
-		fmt.Fprintf(buffer, "\""+strconv.FormatUint(uint64(v.idx), 10)+"\"")
+		fmt.Fprint(buffer, "\""+strconv.FormatUint(uint64(v.idx), 10)+"\"")
 	}
 	buffer.WriteByte(',')
 	buffer.WriteString(v.Type().Yql())

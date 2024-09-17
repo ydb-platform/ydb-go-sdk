@@ -3,13 +3,15 @@ package xsync
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 )
 
 type Map[K comparable, V any] struct {
-	m sync.Map
+	m    sync.Map
+	size atomic.Int32
 }
 
-func (m *Map[K, V]) Load(key K) (value V, ok bool) {
+func (m *Map[K, V]) Get(key K) (value V, ok bool) {
 	v, ok := m.m.Load(key)
 	if !ok {
 		return value, false
@@ -38,21 +40,35 @@ func (m *Map[K, V]) Has(key K) bool {
 	return ok
 }
 
-func (m *Map[K, V]) Store(key K, value V) {
-	m.m.Store(key, value)
+func (m *Map[K, V]) Set(key K, value V) {
+	_, exists := m.m.LoadOrStore(key, value)
+
+	if !exists {
+		m.size.Add(1)
+	}
 }
 
-func (m *Map[K, V]) Delete(key K) (ok bool) {
-	_, ok = m.LoadAndDelete(key)
+func (m *Map[K, V]) Delete(key K) bool {
+	_, exists := m.Extract(key)
 
-	return ok
+	if !exists {
+		m.size.Add(-1)
+	}
+
+	return exists
 }
 
-func (m *Map[K, V]) LoadAndDelete(key K) (value V, ok bool) {
-	v, ok := m.m.LoadAndDelete(key)
-	if !ok {
+func (m *Map[K, V]) Size() int {
+	return int(m.size.Load())
+}
+
+func (m *Map[K, V]) Extract(key K) (value V, ok bool) {
+	v, exists := m.m.LoadAndDelete(key)
+	if !exists {
 		return value, false
 	}
+
+	m.size.Add(-1)
 
 	value, ok = v.(V)
 
@@ -65,10 +81,16 @@ func (m *Map[K, V]) Range(f func(key K, value V) bool) {
 	})
 }
 
-func (m *Map[K, V]) Clear() {
+func (m *Map[K, V]) Clear() (removed int) {
 	m.m.Range(func(k, v any) bool {
+		removed++
+
 		m.m.Delete(k)
 
 		return true
 	})
+
+	m.size.Add(int32(-removed))
+
+	return removed
 }

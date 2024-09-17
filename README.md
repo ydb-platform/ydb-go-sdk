@@ -13,7 +13,7 @@
 [![WebSite](https://img.shields.io/badge/website-ydb.tech-blue.svg)](https://ydb.tech)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ydb-platform/ydb-go-sdk/blob/master/CONTRIBUTING.md)
 
-Supports `table`, `query`, `discovery`, `coordination`, `ratelimiter`, `scheme`, `scripting` and `topic` clients for [YDB](https://ydb.tech).
+Supports `discovery`, `operation`, `table`, `query`, `coordination`, `ratelimiter`, `scheme`, `scripting` and `topic` clients for [YDB](https://ydb.tech).
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and [ACID](https://en.wikipedia.org/wiki/ACID) transactions.
 `YDB` was created primarily for [OLTP](https://en.wikipedia.org/wiki/Online_transaction_processing) workloads and supports some [OLAP](https://en.wikipedia.org/wiki/Online_analytical_processing) scenarious.
 
@@ -78,27 +78,17 @@ if err != nil {
 err := db.Query().Do( // Do retry operation on errors with best effort
 	ctx, // context manage exiting from Do
 	func(ctx context.Context, s query.Session) (err error) { // retry operation
-		_, res, err := s.Execute(ctx, `SELECT 42 as id, "myStr" as myStr;`))
+		streamResult, err := s.Query(ctx, `SELECT 42 as id, "myStr" as myStr;`))
 		if err != nil {
 			return err // for auto-retry with driver
 		}
-		defer func() { _ = res.Close(ctx) }() // cleanup resources
-		for {                                 // iterate over result sets
-			rs, err := res.NextResultSet(ctx)
+		defer func() { _ = streamResult.Close(ctx) }() // cleanup resources
+		for s, err := range streamResult.ResultSets(ctx) {
 			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
-
 				return err
 			}
-			for { // iterate over rows
-				row, err := rs.NextRow(ctx)
+			for row, err := range rs.Rows(ctx) {
 				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
 					return err
 				}
 				type myStruct struct {
@@ -112,7 +102,7 @@ err := db.Query().Do( // Do retry operation on errors with best effort
 			}
 		}
 
-		return res.Err() // return finally result error for auto-retry with driver
+		return nil
 	},
 	query.WithIdempotent(),
 )

@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -77,9 +78,55 @@ func newReaderReconnector(
 	return res
 }
 
+func (r *readerReconnector) PopBatchTx(
+	ctx context.Context,
+	tx tx.Transaction,
+	opts ReadMessageBatchOptions,
+) (
+	*topicreadercommon.PublicBatch,
+	error,
+) {
+	return r.readWithReconnections(
+		ctx,
+		func(
+			ctx context.Context,
+			stream batchedStreamReader,
+		) (
+			*topicreadercommon.PublicBatch,
+			error,
+		) {
+			return stream.PopBatchTx(ctx, tx, opts)
+		},
+	)
+}
+
 func (r *readerReconnector) ReadMessageBatch(
 	ctx context.Context,
 	opts ReadMessageBatchOptions,
+) (
+	*topicreadercommon.PublicBatch,
+	error,
+) {
+	return r.readWithReconnections(
+		ctx,
+		func(
+			ctx context.Context,
+			stream batchedStreamReader,
+		) (
+			*topicreadercommon.PublicBatch,
+			error,
+		) {
+			return stream.ReadMessageBatch(ctx, opts)
+		},
+	)
+}
+
+func (r *readerReconnector) readWithReconnections(
+	ctx context.Context,
+	read func(
+		ctx context.Context,
+		stream batchedStreamReader,
+	) (*topicreadercommon.PublicBatch, error),
 ) (
 	*topicreadercommon.PublicBatch,
 	error,
@@ -121,7 +168,7 @@ func (r *readerReconnector) ReadMessageBatch(
 			// pass
 		}
 
-		res, err := stream.ReadMessageBatch(ctx, opts)
+		res, err := read(ctx, stream)
 		if r.isRetriableError(err) {
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()

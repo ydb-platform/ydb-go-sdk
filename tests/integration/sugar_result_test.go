@@ -78,7 +78,7 @@ func TestSugarResult(t *testing.T) {
 				p3 time.Duration
 			)
 			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-				_, r, err := s.Execute(ctx, `
+				r, err := s.Query(ctx, `
 					DECLARE $p1 AS Text;
 					DECLARE $p2 AS Uint64;
 					DECLARE $p3 AS Interval;
@@ -161,7 +161,7 @@ func TestSugarResult(t *testing.T) {
 				p3 time.Duration
 			)
 			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-				_, r, err := s.Execute(ctx, `
+				r, err := s.Query(ctx, `
 					DECLARE $p1 AS Text;
 					DECLARE $p2 AS Uint64;
 					DECLARE $p3 AS Interval;
@@ -208,7 +208,7 @@ func TestSugarResult(t *testing.T) {
 				P4 *string       `sql:"p4"`
 			}
 			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-				_, r, err := s.Execute(ctx, `
+				r, err := s.Query(ctx, `
 					DECLARE $p1 AS Text;
 					DECLARE $p2 AS Uint64;
 					DECLARE $p3 AS Interval;

@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-//go:generate mockgen -destination grpc_client_mock_test.go -package discovery -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1 DiscoveryServiceClient
+//go:generate mockgen -destination grpc_client_mock_test.go --typed -package discovery -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1 DiscoveryServiceClient
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	return &Client{
@@ -93,7 +93,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, f
 	var (
 		onDone = trace.DiscoveryOnDiscover(
 			c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/discovery.(*Client).Discover"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery.(*Client).Discover"),
 			c.config.Endpoint(), c.config.Database(),
 		)
 		location string
@@ -122,7 +122,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, f
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
 		onDone = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/discovery.(*Client).WhoAmI"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery.(*Client).WhoAmI"),
 		)
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse

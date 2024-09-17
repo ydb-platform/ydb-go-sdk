@@ -1,9 +1,10 @@
+//go:build go1.23
+
 package ydb_test
 
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -28,61 +29,45 @@ func Example_query() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	defer db.Close(ctx) // cleanup resources
 
-	err = db.Query().Do( // Do retry operation on errors with best effort
+	materializedResult, err := db.Query().Query( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
-		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx,
-				`SELECT $id as myId, $str as myStr`,
-				query.WithParameters(
-					ydb.ParamsBuilder().
-						Param("$id").Uint64(42).
-						Param("$str").Text("my string").
-						Build(),
-				),
-			)
-			if err != nil {
-				return err // for auto-retry with driver
-			}
-			defer func() { _ = res.Close(ctx) }() // cleanup resources
-			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
-					return err
-				}
-				for { // iterate over rows
-					row, err := rs.NextRow(ctx)
-					if err != nil {
-						if errors.Is(err, io.EOF) {
-							break
-						}
-
-						return err
-					}
-					type myStruct struct {
-						ID  uint64 `sql:"id"`
-						Str string `sql:"myStr"`
-					}
-					var s myStruct
-					if err = row.ScanStruct(&s); err != nil {
-						return err // generally scan error not retryable, return it for driver check error
-					}
-				}
-			}
-
-			return res.Err() // return finally result error for auto-retry with driver
-		},
+		`SELECT $id as myId, $str as myStr`,
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$id").Uint64(42).
+				Param("$str").Text("my string").
+				Build(),
+		),
 		query.WithIdempotent(),
 	)
 	if err != nil {
-		log.Printf("unexpected error: %v", err)
+		panic(err)
+	}
+	defer func() { _ = materializedResult.Close(ctx) }() // cleanup resources
+	for rs, err := range materializedResult.ResultSets(ctx) {
+		if err != nil {
+			panic(err)
+		}
+		for row, err := range rs.Rows(ctx) {
+			if err != nil {
+				panic(err)
+			}
+			type myStruct struct {
+				ID  uint64 `sql:"id"`
+				Str string `sql:"myStr"`
+			}
+			var s myStruct
+			if err = row.ScanStruct(&s); err != nil {
+				panic(err)
+			}
+		}
+	}
+	if err != nil {
+		panic(err)
 	}
 }
 

@@ -3,7 +3,6 @@ package pool
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -57,7 +56,7 @@ func TestPool(t *testing.T) {
 		})
 		t.Run("WithLimit", func(t *testing.T) {
 			p := New[*testItem, testItem](rootCtx, WithLimit[*testItem, testItem](1))
-			require.EqualValues(t, 1, p.limit)
+			require.EqualValues(t, 1, p.config.limit)
 		})
 		t.Run("WithCreateFunc", func(t *testing.T) {
 			var newCounter int64
@@ -74,7 +73,7 @@ func TestPool(t *testing.T) {
 				return nil
 			})
 			require.NoError(t, err)
-			require.EqualValues(t, p.limit, atomic.LoadInt64(&newCounter))
+			require.EqualValues(t, p.config.limit, atomic.LoadInt64(&newCounter))
 		})
 	})
 	t.Run("Retry", func(t *testing.T) {
@@ -248,6 +247,9 @@ func TestPool(t *testing.T) {
 						return v, nil
 					}),
 				)
+				p.closeItem = func(ctx context.Context, item *testItem) {
+					_ = item.Close(ctx)
+				}
 				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					if atomic.LoadInt64(&newItems) < 10 {
 						return expErr
@@ -266,7 +268,11 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("Stress", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
-			p := New[*testItem, testItem](rootCtx)
+			trace := *defaultTrace
+			trace.OnChange = func(info ChangeInfo) {
+				require.GreaterOrEqual(t, info.Limit, info.Idle)
+			}
+			p := New[*testItem, testItem](rootCtx, WithTrace[*testItem, testItem](&trace))
 			var wg sync.WaitGroup
 			wg.Add(DefaultLimit*2 + 1)
 			for range make([]struct{}, DefaultLimit*2) {
@@ -287,34 +293,33 @@ func TestPool(t *testing.T) {
 				require.NoError(t, err)
 			}()
 			wg.Wait()
-		}, xtest.StopAfter(42*time.Second))
+		}, xtest.StopAfter(14*time.Second))
 	})
-}
-
-func TestSafeStatsRace(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		var (
-			wg sync.WaitGroup
-			s  = &safeStats{}
-		)
-		wg.Add(1000)
-		for range make([]struct{}, 1000) {
-			go func() {
-				defer wg.Done()
-				require.NotPanics(t, func() {
-					switch rand.Int31n(4) { //nolint:gosec
-					case 0:
-						s.Index().Inc()
-					case 1:
-						s.InUse().Inc()
-					case 2:
-						s.Idle().Inc()
-					default:
-						s.Get()
+	t.Run("ParallelCreation", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			trace := *defaultTrace
+			trace.OnChange = func(info ChangeInfo) {
+				require.Equal(t, DefaultLimit, info.Limit)
+				require.LessOrEqual(t, info.Idle, DefaultLimit)
+			}
+			p := New[*testItem, testItem](rootCtx, WithTrace[*testItem, testItem](&trace))
+			var wg sync.WaitGroup
+			for range make([]struct{}, DefaultLimit*10) {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+						return nil
+					})
+					if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
+						t.Failed()
 					}
-				})
-			}()
-		}
-		wg.Wait()
-	}, xtest.StopAfter(5*time.Second))
+					stats := p.Stats()
+					require.LessOrEqual(t, stats.Idle, DefaultLimit)
+				}()
+			}
+
+			wg.Wait()
+		}, xtest.StopAfter(14*time.Second))
+	})
 }

@@ -18,7 +18,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 )
 
 func TestDatabaseSqlStaticCredentials(t *testing.T) {
@@ -37,11 +36,7 @@ func TestDatabaseSqlStaticCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if version.Gte(os.Getenv("YDB_VERSION"), "23.3") {
-		u.User = url.UserPassword("root", "1234")
-	} else {
-		u.User = url.User("root")
-	}
+	u.User = url.UserPassword("root", "1234")
 
 	t.Run("sql.Open", func(t *testing.T) {
 		var db *sql.DB

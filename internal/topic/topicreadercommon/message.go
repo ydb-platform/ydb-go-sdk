@@ -66,6 +66,9 @@ func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 // Read implements io.Reader
 // Read uncompressed message content
 // return topicreader.UnexpectedCodec if message compressed with unknown codec
+//
+// Content of the message released from the memory after first read error
+// including io.EOF.
 func (m *PublicMessage) Read(p []byte) (n int, err error) {
 	m.dataConsumed = true
 
@@ -165,6 +168,8 @@ func (pmb *PublicMessageBuilder) WriteSessionMetadata(writeSessionMetadata map[s
 // Offset set message Offset
 func (pmb *PublicMessageBuilder) Offset(offset int64) *PublicMessageBuilder {
 	pmb.mess.Offset = offset
+	pmb.mess.commitRange.CommitOffsetStart = rawtopiccommon.Offset(offset)
+	pmb.mess.commitRange.CommitOffsetEnd = rawtopiccommon.Offset(offset + 1)
 
 	return pmb
 }
@@ -209,18 +214,30 @@ func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicM
 }
 
 // Context set message Context
-func (pmb *PublicMessageBuilder) Context(ctx context.Context) {
+func (pmb *PublicMessageBuilder) Context(ctx context.Context) *PublicMessageBuilder {
 	pmb.mess.commitRange.PartitionSession.SetContext(ctx)
+
+	return pmb
 }
 
 // Topic set message Topic
-func (pmb *PublicMessageBuilder) Topic(topic string) {
+func (pmb *PublicMessageBuilder) Topic(topic string) *PublicMessageBuilder {
 	pmb.mess.commitRange.PartitionSession.Topic = topic
+
+	return pmb
 }
 
 // PartitionID set message PartitionID
-func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) {
+func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) *PublicMessageBuilder {
 	pmb.mess.commitRange.PartitionSession.PartitionID = partitionID
+
+	return pmb
+}
+
+func (pmb *PublicMessageBuilder) PartitionSession(session *PartitionSession) *PublicMessageBuilder {
+	pmb.mess.commitRange.PartitionSession = session
+
+	return pmb
 }
 
 func (pmb *PublicMessageBuilder) RawDataLen(val int) *PublicMessageBuilder {

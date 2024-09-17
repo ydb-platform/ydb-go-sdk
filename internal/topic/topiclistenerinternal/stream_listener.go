@@ -18,12 +18,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type streamListener struct {
 	cfg *StreamListenerConfig
 
-	stream      rawtopicreader.TopicReaderStreamInterface
+	stream      topicreadercommon.RawTopicReaderStream
 	streamClose context.CancelCauseFunc
 	handler     EventHandler
 	sessionID   string
@@ -33,6 +34,7 @@ type streamListener struct {
 	sessionIDCounter *atomic.Int64
 
 	hasNewMessagesToSend empty.Chan
+	syncCommitter        *topicreadercommon.Committer
 
 	m              xsync.Mutex
 	messagesToSend []rawtopicreader.ClientMessage
@@ -51,12 +53,20 @@ func newStreamListener(
 		background:       *background.NewWorker(xcontext.ValueOnly(connectionCtx), "topic reader stream listener"),
 		sessionIDCounter: sessionIDCounter,
 	}
+
 	res.initVars(sessionIDCounter)
 	if err := res.initStream(connectionCtx, client); err != nil {
 		res.closeWithTimeout(connectionCtx, err)
 
 		return nil, err
 	}
+
+	res.syncCommitter = topicreadercommon.NewCommitterStopped(
+		&trace.Topic{},
+		res.background.Context(),
+		topicreadercommon.CommitModeSync,
+		res.stream.Send,
+	)
 
 	res.startBackground()
 	res.sendDataRequest(config.BufferSize)
@@ -69,6 +79,10 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 
 	if l.stream != nil {
 		l.streamClose(reason)
+	}
+
+	if err := l.syncCommitter.Close(ctx, reason); err != nil {
+		resErrors = append(resErrors, err)
 	}
 
 	if err := l.background.Close(ctx, reason); err != nil {
@@ -106,6 +120,7 @@ func (l *streamListener) closeWithTimeout(ctx context.Context, reason error) {
 func (l *streamListener) startBackground() {
 	l.background.Start("stream listener send loop", l.sendMessagesLoop)
 	l.background.Start("stream listener receiver", l.receiveMessagesLoop)
+	l.syncCommitter.Start()
 }
 
 func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
@@ -144,7 +159,7 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 			err,
 		)))
 	}
-	l.stream = stream
+	l.stream = topicreadercommon.NewSyncedStream(stream)
 
 	initMessage := topicreadercommon.CreateInitMessage(l.cfg.Consumer, l.cfg.Selectors)
 	err = stream.Send(initMessage)
@@ -241,6 +256,11 @@ func (l *streamListener) onReceiveServerMessage(ctx context.Context, mess rawtop
 		err = l.onStopPartitionRequest(ctx, m)
 	case *rawtopicreader.ReadResponse:
 		err = l.onReadResponse(m)
+	case *rawtopicreader.CommitOffsetResponse:
+		err = l.onCommitOffsetResponse(m)
+	default:
+		//nolint:godox
+		// todo log
 	}
 	if err != nil {
 		l.closeWithTimeout(ctx, err)
@@ -292,11 +312,11 @@ func (l *streamListener) onStartPartitionRequest(
 	}
 
 	if userResp.readOffset != nil {
-		resp.ReadOffset.Offset = rawtopicreader.NewOffset(*userResp.readOffset)
+		resp.ReadOffset.Offset.FromInt64(*userResp.readOffset)
 		resp.ReadOffset.HasValue = true
 	}
 	if userResp.CommitOffset != nil {
-		resp.CommitOffset.Offset = rawtopicreader.NewOffset(*userResp.CommitOffset)
+		resp.CommitOffset.Offset.FromInt64(*userResp.CommitOffset)
 		resp.CommitOffset.HasValue = true
 	}
 
@@ -370,16 +390,25 @@ func (l *streamListener) onReadResponse(m *rawtopicreader.ReadResponse) error {
 	}
 
 	for _, batch := range batches {
-		if err = l.handler.OnReadMessages(batch.Context(), &PublicReadMessages{
-			PartitionSession: topicreadercommon.BatchGetPartitionSession(batch).ToPublic(),
-			Batch:            batch,
-		}); err != nil {
+		if err = l.handler.OnReadMessages(batch.Context(), NewPublicReadMessages(
+			topicreadercommon.BatchGetPartitionSession(batch).ToPublic(),
+			batch,
+			l,
+		)); err != nil {
 			return err
 		}
 	}
 	l.sendDataRequest(m.BytesSize)
 
 	return nil
+}
+
+func (l *streamListener) sendCommit(b *topicreadercommon.PublicBatch) error {
+	commitRanges := topicreadercommon.CommitRanges{
+		Ranges: []topicreadercommon.CommitRange{topicreadercommon.GetCommitRange(b)},
+	}
+
+	return l.stream.Send(commitRanges.ToRawMessage())
 }
 
 func (l *streamListener) sendDataRequest(bytesCount int) {
@@ -395,6 +424,19 @@ func (l *streamListener) sendMessage(m rawtopicreader.ClientMessage) {
 	case l.hasNewMessagesToSend <- empty.Struct{}:
 	default:
 	}
+}
+
+func (l *streamListener) onCommitOffsetResponse(m *rawtopicreader.CommitOffsetResponse) error {
+	for _, partOffset := range m.PartitionsCommittedOffsets {
+		session, err := l.sessions.Get(partOffset.PartitionSessionID)
+		if err != nil {
+			return err
+		}
+
+		l.syncCommitter.OnCommitNotify(session, partOffset.CommittedOffset)
+	}
+
+	return nil
 }
 
 type confirmStorage[T any] struct {

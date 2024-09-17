@@ -58,7 +58,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -143,7 +143,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -302,7 +302,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -440,7 +440,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -543,7 +543,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(childCtx)
@@ -623,7 +623,7 @@ func TestResultSetNext(t *testing.T) {
 			recv, err := stream.Recv()
 			require.NoError(t, err)
 			rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-				part, err := nextPart(ctx, stream, nil)
+				part, err := nextPart(stream)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
@@ -635,7 +635,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -722,7 +722,7 @@ func TestResultSetNext(t *testing.T) {
 			recv, err := stream.Recv()
 			require.NoError(t, err)
 			rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-				part, err := nextPart(ctx, stream, nil)
+				part, err := nextPart(stream)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
@@ -734,7 +734,7 @@ func TestResultSetNext(t *testing.T) {
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -879,13 +879,13 @@ func TestResultSetNext(t *testing.T) {
 			recv, err := stream.Recv()
 			require.NoError(t, err)
 			rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-				part, err := nextPart(ctx, stream, nil)
+				part, err := nextPart(stream)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
 
 				return part, nil
-			}, recv, nil)
+			}, recv)
 			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
@@ -947,7 +947,7 @@ func TestResultSetNext(t *testing.T) {
 		}
 
 		return part, nil
-	}, recv, nil)
+	}, recv)
 	require.EqualValues(t, 0, rs.Index())
 	t.Run("Columns", func(t *testing.T) {
 		require.EqualValues(t, []string{"a", "b"}, rs.Columns())

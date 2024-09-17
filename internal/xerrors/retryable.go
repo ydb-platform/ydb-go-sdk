@@ -97,6 +97,9 @@ func InvalidObject() invalidObjectOption {
 }
 
 func Retryable(err error, opts ...RetryableErrorOption) error {
+	if err == nil {
+		return nil
+	}
 	var (
 		e  Error
 		re = &retryableError{

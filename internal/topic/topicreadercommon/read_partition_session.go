@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
@@ -32,7 +33,7 @@ func NewPartitionSession(
 	connectionID string,
 	partitionSessionID rawtopicreader.PartitionSessionID,
 	clientPartitionSessionID int64,
-	committedOffset rawtopicreader.Offset,
+	committedOffset rawtopiccommon.Offset,
 ) *PartitionSession {
 	partitionContext, cancel := xcontext.WithCancel(partitionContext)
 
@@ -64,29 +65,40 @@ func (s *PartitionSession) Close() {
 	s.ctxCancel()
 }
 
-func (s *PartitionSession) CommittedOffset() rawtopicreader.Offset {
+func (s *PartitionSession) CommittedOffset() rawtopiccommon.Offset {
 	v := s.committedOffsetVal.Load()
 
-	var res rawtopicreader.Offset
+	var res rawtopiccommon.Offset
 	res.FromInt64(v)
 
 	return res
 }
 
-func (s *PartitionSession) SetCommittedOffset(v rawtopicreader.Offset) {
-	s.committedOffsetVal.Store(v.ToInt64())
+// SetCommittedOffsetForward set new offset if new offset greater, then old
+func (s *PartitionSession) SetCommittedOffsetForward(v rawtopiccommon.Offset) {
+	newVal := int64(v)
+	for {
+		old := s.committedOffsetVal.Load()
+		if newVal <= old {
+			return
+		}
+
+		if s.committedOffsetVal.CompareAndSwap(old, newVal) {
+			return
+		}
+	}
 }
 
-func (s *PartitionSession) LastReceivedMessageOffset() rawtopicreader.Offset {
+func (s *PartitionSession) LastReceivedMessageOffset() rawtopiccommon.Offset {
 	v := s.lastReceivedOffsetEndVal.Load()
 
-	var res rawtopicreader.Offset
+	var res rawtopiccommon.Offset
 	res.FromInt64(v)
 
 	return res
 }
 
-func (s *PartitionSession) SetLastReceivedMessageOffset(v rawtopicreader.Offset) {
+func (s *PartitionSession) SetLastReceivedMessageOffset(v rawtopiccommon.Offset) {
 	s.lastReceivedOffsetEndVal.Store(v.ToInt64())
 }
 

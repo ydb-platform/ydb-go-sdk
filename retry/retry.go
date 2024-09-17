@@ -292,7 +292,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 	var (
 		zeroValue T
 		options   = &retryOptions{
-			call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.RetryWithResult"),
+			call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/retry.RetryWithResult"),
 			trace:       &trace.Retry{},
 			budget:      budget.Limited(-1),
 			fastBackoff: backoff.Fast,

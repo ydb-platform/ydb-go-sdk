@@ -35,7 +35,7 @@ func TestSugarUnmarshallResultSet(t *testing.T) {
 			Str string `sql:"myStr"`
 		}
 
-		rows, err := db.Query().ReadResultSet(ctx, `
+		rows, err := db.Query().QueryResultSet(ctx, `
 			SELECT 42 as id, "myStr42" as myStr
 			UNION
 			SELECT 43 as id, "myStr43" as myStr
@@ -59,7 +59,7 @@ func TestSugarUnmarshallResultSet(t *testing.T) {
 			Str string `sql:"myStr"`
 		}
 
-		rows, err := db.Query().ReadResultSet(ctx, `
+		rows, err := db.Query().QueryResultSet(ctx, `
 			SELECT 42 as id, "myStr42" as myStr, 123 as unexpected_column
 			UNION
 			SELECT 43 as id, "myStr43" as myStr, 123 as unexpected_column
@@ -78,7 +78,7 @@ func TestSugarUnmarshallResultSet(t *testing.T) {
 			UnexpectedField int    `sql:"unexpected_column"`
 		}
 
-		rows, err := db.Query().ReadResultSet(ctx, `
+		rows, err := db.Query().QueryResultSet(ctx, `
 			SELECT 42 as id, "myStr42" as myStr
 			UNION
 			SELECT 43 as id, "myStr43" as myStr

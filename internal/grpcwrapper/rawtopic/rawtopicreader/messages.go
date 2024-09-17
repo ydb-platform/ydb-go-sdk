@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	errUnexpectedNilStreamReadMessageReadResponse     = xerrors.Wrap(errors.New("ydb: unexpected nil Ydb_Topic.StreamReadMessage_ReadResponse")) //nolint:lll
-	errNilPartitionData                               = xerrors.Wrap(errors.New("ydb: unexpected nil partition data"))
-	errUnexpectedNilBatchInPartitionData              = xerrors.Wrap(errors.New("ydb: unexpected nil batch in partition data"))   //nolint:lll
-	errUnexpectedMessageNilInPartitionData            = xerrors.Wrap(errors.New("ydb: unexpected message nil in partition data")) //nolint:lll
-	errUnexpectedProtobufInOffsets                    = xerrors.Wrap(errors.New("ydb: unexpected protobuf nil offsets"))
+	errUnexpectedNilStreamReadMessageReadResponse = xerrors.Wrap(errors.New("ydb: unexpected nil Ydb_Topic.StreamReadMessage_ReadResponse")) //nolint:lll
+	errNilPartitionData                           = xerrors.Wrap(errors.New("ydb: unexpected nil partition data"))
+	errUnexpectedNilBatchInPartitionData          = xerrors.Wrap(errors.New("ydb: unexpected nil batch in partition data"))   //nolint:lll
+	errUnexpectedMessageNilInPartitionData        = xerrors.Wrap(errors.New("ydb: unexpected message nil in partition data")) //nolint:lll
+
 	errUnexpectedProtoNilStartPartitionSessionRequest = xerrors.Wrap(errors.New("ydb: unexpected proto nil start partition session request"))                      //nolint:lll
 	errUnexpectedNilPartitionSession                  = xerrors.Wrap(errors.New("ydb: unexpected proto nil partition session in start partition session request")) //nolint:lll
 	errUnexpectedGrpcNilStopPartitionSessionRequest   = xerrors.Wrap(errors.New("ydb: unexpected grpc nil stop partition session request"))                        //nolint:lll
@@ -32,22 +32,8 @@ func (id PartitionSessionID) ToInt64() int64 {
 	return int64(id)
 }
 
-type Offset int64
-
-func NewOffset(v int64) Offset {
-	return Offset(v)
-}
-
-func (offset *Offset) FromInt64(v int64) {
-	*offset = Offset(v)
-}
-
-func (offset Offset) ToInt64() int64 {
-	return int64(offset)
-}
-
 type OptionalOffset struct {
-	Offset   Offset
+	Offset   rawtopiccommon.Offset
 	HasValue bool
 }
 
@@ -286,7 +272,7 @@ type Batch struct {
 }
 
 type MessageData struct {
-	Offset           Offset
+	Offset           rawtopiccommon.Offset
 	SeqNo            int64
 	CreatedAt        time.Time
 	Data             []byte
@@ -330,30 +316,7 @@ func (r *CommitOffsetRequest) toProto() *Ydb_Topic.StreamReadMessage_CommitOffse
 
 type PartitionCommitOffset struct {
 	PartitionSessionID PartitionSessionID
-	Offsets            []OffsetRange
-}
-
-type OffsetRange struct {
-	Start Offset
-	End   Offset
-}
-
-func (r *OffsetRange) FromProto(p *Ydb_Topic.OffsetsRange) error {
-	if p == nil {
-		return xerrors.WithStackTrace(errUnexpectedProtobufInOffsets)
-	}
-
-	r.Start.FromInt64(p.GetStart())
-	r.End.FromInt64(p.GetEnd())
-
-	return nil
-}
-
-func (r *OffsetRange) ToProto() *Ydb_Topic.OffsetsRange {
-	return &Ydb_Topic.OffsetsRange{
-		Start: r.Start.ToInt64(),
-		End:   r.End.ToInt64(),
-	}
+	Offsets            []rawtopiccommon.OffsetRange
 }
 
 type CommitOffsetResponse struct {
@@ -382,7 +345,7 @@ func (r *CommitOffsetResponse) fromProto(proto *Ydb_Topic.StreamReadMessage_Comm
 
 type PartitionCommittedOffset struct {
 	PartitionSessionID PartitionSessionID
-	CommittedOffset    Offset
+	CommittedOffset    rawtopiccommon.Offset
 }
 
 //
@@ -407,7 +370,7 @@ type PartitionSessionStatusResponse struct {
 	rawtopiccommon.ServerMessageMetadata
 
 	PartitionSessionID     PartitionSessionID
-	PartitionOffsets       OffsetRange
+	PartitionOffsets       rawtopiccommon.OffsetRange
 	WriteTimeHighWatermark time.Time
 }
 
@@ -433,8 +396,8 @@ type StartPartitionSessionRequest struct {
 	rawtopiccommon.ServerMessageMetadata
 
 	PartitionSession PartitionSession
-	CommittedOffset  Offset
-	PartitionOffsets OffsetRange
+	CommittedOffset  rawtopiccommon.Offset
+	PartitionOffsets rawtopiccommon.OffsetRange
 }
 
 func (r *StartPartitionSessionRequest) fromProto(p *Ydb_Topic.StreamReadMessage_StartPartitionSessionRequest) error {
@@ -489,7 +452,7 @@ type StopPartitionSessionRequest struct {
 
 	PartitionSessionID PartitionSessionID
 	Graceful           bool
-	CommittedOffset    Offset
+	CommittedOffset    rawtopiccommon.Offset
 }
 
 func (r *StopPartitionSessionRequest) fromProto(proto *Ydb_Topic.StreamReadMessage_StopPartitionSessionRequest) error {

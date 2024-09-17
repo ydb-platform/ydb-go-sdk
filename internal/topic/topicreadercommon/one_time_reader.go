@@ -21,7 +21,6 @@ func (s *oneTimeReader) Read(p []byte) (n int, err error) {
 	}
 
 	n, err = s.reader.Read(p)
-
 	if err != nil {
 		s.err = err
 		s.reader = nil

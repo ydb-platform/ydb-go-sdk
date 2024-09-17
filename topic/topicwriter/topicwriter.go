@@ -2,6 +2,7 @@ package topicwriter
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
@@ -41,6 +42,14 @@ func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 // if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages...)
+}
+
+func (w *Writer) WriteWithTx(ctx context.Context, transaction tx.Identifier, messages ...Message) error {
+	panic("not impl")
+}
+
+func (w *Writer) WriteOpts(ctx context.Context, messages []Message, opts ...WriteOption) error {
+	panic("not impl")
 }
 
 // WaitInit waits until the reader is initialized

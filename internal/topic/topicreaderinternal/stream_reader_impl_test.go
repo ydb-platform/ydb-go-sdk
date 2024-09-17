@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -113,8 +115,12 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 
 		// request new data portion
 		readRequestReceived := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
+		e.stream.EXPECT().Send(
+			&rawtopicreader.ReadRequest{BytesSize: dataSize * 2},
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(readRequestReceived)
+
+			return nil
 		})
 
 		commitReceived := make(empty.Chan)
@@ -124,7 +130,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 				CommitOffsets: []rawtopicreader.PartitionCommitOffset{
 					{
 						PartitionSessionID: e.partitionSessionID,
-						Offsets: []rawtopicreader.OffsetRange{
+						Offsets: []rawtopiccommon.OffsetRange{
 							{
 								Start: lastOffset + 1,
 								End:   lastOffset + 16,
@@ -133,8 +139,10 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 					},
 				},
 			},
-		).Do(func(req *rawtopicreader.CommitOffsetRequest) {
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(commitReceived)
+
+			return nil
 		})
 
 		// send message with stole offsets
@@ -189,15 +197,19 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 	})
 	xtest.TestManyTimesWithName(t, "WrongOrderCommitWithSyncMode", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
-		e.reader.cfg.CommitMode = CommitModeSync
+		e.reader.cfg.CommitMode = topicreadercommon.CommitModeSync
 		e.Start()
 
 		lastOffset := e.partitionSession.LastReceivedMessageOffset()
 		const dataSize = 4
 		// request new data portion
 		readRequestReceived := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
+		e.stream.EXPECT().Send(
+			&rawtopicreader.ReadRequest{BytesSize: dataSize * 2},
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(readRequestReceived)
+
+			return nil
 		})
 
 		e.SendFromServer(&rawtopicreader.ReadResponse{
@@ -247,7 +259,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		require.ErrorIs(t, e.reader.Commit(
 			e.ctx,
 			topicreadercommon.GetCommitRange(batch.Messages[1]),
-		), ErrWrongCommitOrderInSyncMode)
+		), topicreadercommon.ErrWrongCommitOrderInSyncMode)
 		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
 
@@ -259,22 +271,26 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		e.stream.EXPECT().Send(&rawtopicreader.CommitOffsetRequest{CommitOffsets: []rawtopicreader.PartitionCommitOffset{
 			{
 				PartitionSessionID: e.partitionSessionID,
-				Offsets: []rawtopicreader.OffsetRange{
+				Offsets: []rawtopiccommon.OffsetRange{
 					{
 						Start: committed,
 						End:   committed + 1,
 					},
 				},
 			},
-		}}).Do(func(_ interface{}) {
+		}}).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(commitReceived)
-		}).Return(nil)
+
+			return nil
+		})
 
 		stopPartitionResponseSent := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: e.partitionSessionID}).
-			Do(func(_ interface{}) {
+			DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 				close(stopPartitionResponseSent)
-			}).Return(nil)
+
+				return nil
+			})
 
 		e.Start()
 
@@ -338,7 +354,7 @@ func TestTopicStreamReaderImpl_Create(t *testing.T) {
 		}, nil)
 		stream.EXPECT().CloseSend().Return(nil)
 
-		reader, err := newTopicStreamReader(topicreadercommon.NextReaderID(), stream, newTopicStreamReaderConfig())
+		reader, err := newTopicStreamReader(nil, topicreadercommon.NextReaderID(), stream, newTopicStreamReaderConfig())
 		require.Error(t, err)
 		require.Nil(t, reader)
 	})
@@ -404,14 +420,16 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		stopPartitionResponseSent := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: e.partitionSessionID,
-		}).Return(nil).Do(func(_ interface{}) {
+		}).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(stopPartitionResponseSent)
+
+			return nil
 		})
 
 		e.SendFromServer(&rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: e.partitionSessionID,
 			Graceful:           true,
-			CommittedOffset:    rawtopicreader.NewOffset(committedOffset),
+			CommittedOffset:    rawtopiccommon.NewOffset(committedOffset),
 		})
 
 		_, err := e.reader.ReadMessageBatch(readMessagesCtx, newReadMessageBatchOptions())
@@ -448,7 +466,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.SendFromServer(&rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: e.partitionSessionID,
 			Graceful:           false,
-			CommittedOffset:    rawtopicreader.NewOffset(committedOffset),
+			CommittedOffset:    rawtopiccommon.NewOffset(committedOffset),
 		})
 
 		_, err := e.reader.ReadMessageBatch(readMessagesCtx, newReadMessageBatchOptions())
@@ -532,9 +550,13 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			e := newTopicReaderTestEnv(t)
 
 			dataRequested := make(empty.Chan)
-			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)}).
-				Do(func(_ interface{}) {
+			e.stream.EXPECT().Send(
+				&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)},
+			).
+				DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 					close(dataRequested)
+
+					return nil
 				})
 
 			e.Start()
@@ -591,8 +613,12 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 
 		sendDataRequestCompleted := make(empty.Chan)
 		dataSize := 6
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize}).Do(func(_ interface{}) {
+		e.stream.EXPECT().Send(
+			&rawtopicreader.ReadRequest{BytesSize: dataSize},
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(sendDataRequestCompleted)
+
+			return nil
 		})
 		e.SendFromServer(&rawtopicreader.ReadResponse{
 			BytesSize: dataSize,
@@ -818,8 +844,12 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *testing.T) {
 	sendMessageWithFullBuffer := func(e *streamEnv) empty.Chan {
 		nextDataRequested := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)}).Do(func(_ interface{}) {
+		e.stream.EXPECT().Send(
+			&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)},
+		).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
 			close(nextDataRequested)
+
+			return nil
 		})
 
 		e.SendFromServer(
@@ -911,7 +941,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 }
 
 func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
-	commitByMode := func(mode PublicCommitMode) error {
+	commitByMode := func(mode topicreadercommon.PublicCommitMode) error {
 		sleep := func() {
 			time.Sleep(time.Second / 10)
 		}
@@ -940,26 +970,36 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 		return commitErr
 	}
 	t.Run("CommitModeNone", func(t *testing.T) {
-		require.ErrorIs(t, commitByMode(CommitModeNone), ErrCommitDisabled)
+		require.ErrorIs(
+			t,
+			commitByMode(topicreadercommon.CommitModeNone),
+			topicreadercommon.ErrCommitDisabled,
+		)
 	})
 	t.Run("CommitModeSync", func(t *testing.T) {
-		require.ErrorIs(t, commitByMode(CommitModeSync), PublicErrCommitSessionToExpiredSession)
+		require.ErrorIs(
+			t,
+			commitByMode(topicreadercommon.CommitModeSync),
+			topicreadercommon.PublicErrCommitSessionToExpiredSession,
+		)
 	})
 	t.Run("CommitModeAsync", func(t *testing.T) {
-		require.NoError(t, commitByMode(CommitModeAsync))
+		require.NoError(t, commitByMode(topicreadercommon.CommitModeAsync))
 	})
 }
 
 type streamEnv struct {
-	ctx                    context.Context //nolint:containedctx
-	t                      testing.TB
-	reader                 *topicStreamReaderImpl
-	stopReadEvents         empty.Chan
-	stream                 *MockRawTopicReaderStream
-	partitionSessionID     partitionSessionID
-	mc                     *gomock.Controller
-	partitionSession       *topicreadercommon.PartitionSession
-	initialBufferSizeBytes int64
+	TopicClient             *MockTopicClient
+	ctx                     context.Context //nolint:containedctx
+	t                       testing.TB
+	reader                  *topicStreamReaderImpl
+	stopReadEvents          empty.Chan
+	stopReadEventsCloseOnce sync.Once
+	stream                  *MockRawTopicReaderStream
+	partitionSessionID      partitionSessionID
+	mc                      *gomock.Controller
+	partitionSession        *topicreadercommon.PartitionSession
+	initialBufferSizeBytes  int64
 
 	m                          xsync.Mutex
 	messagesFromServerToClient chan testStreamResult
@@ -987,7 +1027,8 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
 	cfg.CommitterBatchTimeLag = 0
 
-	reader := newTopicStreamReaderStopped(topicreadercommon.NextReaderID(), stream, cfg)
+	topicClientMock := NewMockTopicClient(mc)
+	reader := newTopicStreamReaderStopped(topicClientMock, topicreadercommon.NextReaderID(), stream, cfg)
 	// reader.initSession() - skip stream level initialization
 
 	const testPartitionID = 5
@@ -1008,6 +1049,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	require.NoError(t, reader.sessionController.Add(session))
 
 	env := streamEnv{
+		TopicClient:                topicClientMock,
 		ctx:                        ctx,
 		t:                          t,
 		initialBufferSizeBytes:     initialBufferSizeBytes,
@@ -1029,12 +1071,15 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 0}).AnyTimes()
 
 	streamClosed := make(empty.Chan)
-	stream.EXPECT().CloseSend().Return(nil).Do(func() {
+	stream.EXPECT().CloseSend().Return(nil).DoAndReturn(func() error {
 		close(streamClosed)
+		env.closeStream()
+
+		return nil
 	})
 
 	t.Cleanup(func() {
-		close(env.stopReadEvents)
+		env.closeStream()
 		_ = env.reader.CloseWithError(ctx, errors.New("test finished"))
 		xtest.WaitChannelClosed(t, streamClosed)
 	})
@@ -1057,12 +1102,14 @@ func (e *streamEnv) Start() {
 }
 
 func (e *streamEnv) readerReceiveWaitClose(callback func()) {
-	e.stream.EXPECT().Recv().Do(func() {
+	e.stream.EXPECT().Recv().DoAndReturn(func() (rawtopicreader.ServerMessage, error) {
 		if callback != nil {
 			callback()
 		}
 		<-e.ctx.Done()
-	}).Return(nil, errors.New("test reader closed"))
+
+		return nil, errors.New("test reader closed")
+	})
 }
 
 func (e *streamEnv) SendFromServer(msg rawtopicreader.ServerMessage) {
@@ -1113,4 +1160,95 @@ readMessages:
 			return res.msg, res.err
 		}
 	}
+}
+
+func (e *streamEnv) closeStream() {
+	e.stopReadEventsCloseOnce.Do(func() {
+		close(e.stopReadEvents)
+	})
+}
+
+func TestUpdateCommitInTransaction(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+
+		initialCommitOffset := e.partitionSession.CommittedOffset()
+		txID := "test-tx-id"
+		sessionID := "test-session-id"
+
+		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), &rawtopic.UpdateOffsetsInTransactionRequest{
+			OperationParams: rawydb.OperationParams{
+				OperationMode: rawydb.OperationParamsModeSync,
+			},
+			Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+				ID:      txID,
+				Session: sessionID,
+			},
+			Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
+				{
+					Path: e.partitionSession.Topic,
+					Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
+						{
+							PartitionID: e.partitionSession.PartitionID,
+							PartitionOffsets: []rawtopiccommon.OffsetRange{
+								{
+									Start: initialCommitOffset,
+									End:   initialCommitOffset + 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			Consumer: e.reader.cfg.Consumer,
+		})
+
+		txMock := newMockTransactionWrapper(sessionID, txID)
+
+		batch, err := topicreadercommon.NewBatch(e.partitionSession, []*topicreadercommon.PublicMessage{
+			topicreadercommon.NewPublicMessageBuilder().
+				Offset(e.partitionSession.CommittedOffset().ToInt64()).
+				PartitionSession(e.partitionSession).
+				Build(),
+		})
+		require.NoError(t, err)
+		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.NoError(t, err)
+
+		require.Len(t, txMock.onCompleted, 1)
+		txMock.onCompleted[0](nil)
+		require.True(t, txMock.materialized)
+		require.Equal(t, initialCommitOffset+1, e.partitionSession.CommittedOffset())
+	})
+	t.Run("FailedAddCommitToTransactions", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+
+		txID := "test-tx-id"
+		sessionID := "test-session-id"
+
+		testError := errors.New("test error")
+		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), gomock.Any()).Return(testError)
+
+		txMock := newMockTransactionWrapper(sessionID, txID)
+
+		batch, err := topicreadercommon.NewBatch(e.partitionSession, []*topicreadercommon.PublicMessage{
+			topicreadercommon.NewPublicMessageBuilder().
+				Offset(e.partitionSession.CommittedOffset().ToInt64()).
+				PartitionSession(e.partitionSession).
+				Build(),
+		})
+		require.NoError(t, err)
+		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.ErrorIs(t, err, testError)
+		require.NoError(t, xerrors.RetryableError(err))
+		require.Empty(t, txMock.onCompleted)
+
+		require.True(t, e.reader.closed)
+		require.ErrorIs(t, e.reader.err, testError)
+		require.Error(t, xerrors.RetryableError(e.reader.err))
+		require.True(t, txMock.RolledBack)
+		require.True(t, txMock.materialized)
+	})
 }

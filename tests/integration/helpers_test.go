@@ -145,7 +145,7 @@ func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 }
 
 func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
-	return scope.Cache(nil, nil, func() (res interface{}, err error) {
+	f := func() (*fixenv.GenericResult[*sql.DB], error) {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
 		connector, err := ydb.Connector(driver, opts...)
@@ -160,8 +160,9 @@ func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
 		if err != nil {
 			return nil, err
 		}
-		return db, nil
-	}).(*sql.DB)
+		return fixenv.NewGenericResult(db), nil
+	}
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
@@ -176,28 +177,29 @@ func (scope *scopeT) Folder() string {
 		folderPath := path.Join(driver.Name(), scope.T().Name())
 		scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 
-		scope.Logf("Create folder: %v", folderPath)
+		scope.Logf("Creating folder: %v", folderPath)
 		scope.Require.NoError(driver.Scheme().MakeDirectory(scope.Ctx, folderPath))
 		clean := func() {
 			if !scope.Failed() {
 				scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 			}
 		}
+		scope.Logf("Createing folder done: %v", folderPath)
 		return fixenv.NewGenericResultWithCleanup(folderPath, clean), nil
 	}
 	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) Logger() *testLogger {
-	return scope.Cache(nil, nil, func() (res interface{}, err error) {
-		return newLogger(scope.t), nil
+	return scope.CacheResult(func() (*fixenv.Result, error) {
+		return fixenv.NewResult(newLogger(scope.t)), nil
 	}).(*testLogger)
 }
 
 func (scope *scopeT) LoggerMinLevel(level log.Level) *testLogger {
-	return scope.Cache(level, nil, func() (res interface{}, err error) {
-		return newLoggerWithMinLevel(scope.t, level), nil
-	}).(*testLogger)
+	return scope.CacheResult(func() (res *fixenv.Result, err error) {
+		return fixenv.NewResult(newLoggerWithMinLevel(scope.t, level)), nil
+	}, fixenv.CacheOptions{CacheKey: level}).(*testLogger)
 }
 
 func (scope *scopeT) TopicConsumerName() string {
@@ -217,11 +219,19 @@ func (scope *scopeT) TopicPath() string {
 		}
 		cleanup()
 
+		scope.Logf("Drop topic if exists: %q", topicPath)
+		if err := client.Drop(scope.Ctx, topicPath); err != nil && !ydb.IsOperationErrorSchemeError(err) {
+			scope.t.Logf("failed drop previous topic %q: %v", topicPath, err)
+		}
+
+		scope.Logf("Creating topic %q", topicPath)
 		err := client.Create(scope.Ctx, topicPath, topicoptions.CreateWithConsumer(
 			topictypes.Consumer{
 				Name: scope.TopicConsumerName(),
 			},
 		))
+
+		scope.Logf("Topic created: %q", topicPath)
 
 		return fixenv.NewGenericResultWithCleanup(topicPath, cleanup), err
 	}
@@ -229,8 +239,12 @@ func (scope *scopeT) TopicPath() string {
 }
 
 func (scope *scopeT) TopicReader() *topicreader.Reader {
+	return scope.TopicReaderNamed("default-reader")
+}
+
+func (scope *scopeT) TopicReaderNamed(name string) *topicreader.Reader {
 	f := func() (*fixenv.GenericResult[*topicreader.Reader], error) {
-		reader, err := scope.Driver().Topic().StartReader(
+		reader, err := scope.DriverWithGRPCLogging().Topic().StartReader(
 			scope.TopicConsumerName(),
 			topicoptions.ReadTopic(scope.TopicPath()),
 		)
@@ -242,7 +256,7 @@ func (scope *scopeT) TopicReader() *topicreader.Reader {
 		return fixenv.NewGenericResultWithCleanup(reader, cleanup), err
 	}
 
-	return fixenv.CacheResult(scope.Env, f)
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
 }
 
 func (scope *scopeT) TopicWriter() *topicwriter.Writer {
@@ -311,8 +325,19 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 			opt(&params)
 		}
 	}
-	return scope.Cache(params.tableName, nil, func() (res interface{}, err error) {
-		err = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) (err error) {
+
+	f := func() (*fixenv.GenericResult[string], error) {
+		tablePath := path.Join(scope.Folder(), params.tableName)
+
+		// drop previous table if exists
+		err := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+			return s.DropTable(ctx, tablePath)
+		})
+		if err != nil && !ydb.IsOperationErrorSchemeError(err) {
+			return nil, fmt.Errorf("failed to drop previous table: %w", err)
+		}
+
+		createTableErr := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) (err error) {
 			if len(params.createTableOptions) == 0 {
 				tmpl, err := template.New("").Parse(params.createTableQueryTemplate)
 				if err != nil {
@@ -334,10 +359,27 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 				}
 				return s.ExecuteSchemeQuery(ctx, query.String())
 			}
-			return s.CreateTable(ctx, path.Join(scope.Folder(), params.tableName), params.createTableOptions...)
+
+			return s.CreateTable(ctx, tablePath, params.createTableOptions...)
 		})
-		return params.tableName, err
-	}).(string)
+
+		if createTableErr != nil {
+			return nil, err
+		}
+
+		cleanup := func() {
+			// doesn't drop table after fail test - for debugging
+			if !scope.t.Failed() {
+				_ = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+					return s.DropTable(ctx, tablePath)
+				})
+			}
+		}
+
+		return fixenv.NewGenericResultWithCleanup(params.tableName, cleanup), nil
+	}
+
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: params.tableName})
 }
 
 // TablePath return path to example table with struct:

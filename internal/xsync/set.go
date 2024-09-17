@@ -2,38 +2,71 @@ package xsync
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
-type Set[K comparable] struct {
-	m sync.Map
+type Set[T comparable] struct {
+	m    sync.Map
+	size atomic.Int32
 }
 
-func (m *Set[K]) Has(key K) bool {
-	_, ok := m.m.Load(key)
+func (s *Set[T]) Has(key T) bool {
+	_, ok := s.m.Load(key)
 
 	return ok
 }
 
-func (m *Set[K]) Add(key K) bool {
-	_, loaded := m.m.LoadOrStore(key, struct{}{})
+func (s *Set[T]) Add(key T) bool {
+	_, exists := s.m.LoadOrStore(key, struct{}{})
 
-	return !loaded
+	if !exists {
+		s.size.Add(1)
+	}
+
+	return !exists
 }
 
-func (m *Set[K]) Remove(key K) (ok bool) {
-	_, ok = m.m.LoadAndDelete(key)
-
-	return ok
+func (s *Set[T]) Size() int {
+	return int(s.size.Load())
 }
 
-func (m *Set[K]) Clear() (removed int) {
-	m.m.Range(func(k, v any) bool {
-		removed++
+func (s *Set[T]) Range(f func(key T) bool) {
+	s.m.Range(func(k, v any) bool {
+		return f(k.(T)) //nolint:forcetypeassert
+	})
+}
 
-		m.m.Delete(k)
+func (s *Set[T]) Values() []T {
+	values := make([]T, 0, s.size.Load())
+
+	s.m.Range(func(k, v any) bool {
+		values = append(values, k.(T)) //nolint:forcetypeassert
 
 		return true
 	})
+
+	return values
+}
+
+func (s *Set[T]) Remove(key T) bool {
+	_, exists := s.m.LoadAndDelete(key)
+
+	if exists {
+		s.size.Add(-1)
+	}
+
+	return exists
+}
+
+func (s *Set[T]) Clear() (removed int) {
+	s.m.Range(func(k, v any) bool {
+		removed++
+
+		s.m.Delete(k)
+
+		return true
+	})
+	s.size.Add(int32(-removed))
 
 	return removed
 }

@@ -8,41 +8,22 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 )
 
 type (
 	SessionInfo interface {
 		ID() string
-		NodeID() int64
+		NodeID() uint32
 		Status() string
 	}
-
 	Session interface {
 		SessionInfo
-
-		// Execute executes query.
-		//
-		// Execute used by default:
-		// - DefaultTxControl (NoTx)
-		// - flag WithKeepInCache(true) if params is not empty.
-		Execute(ctx context.Context, query string, opts ...options.ExecuteOption) (tx Transaction, r Result, err error)
+		Executor
 
 		Begin(ctx context.Context, txSettings TransactionSettings) (Transaction, error)
-
-		// ReadRow is a helper which read only one row from first result set in result
-		//
-		// ReadRow returns error if result contains more than one result set or more than one row
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		ReadRow(ctx context.Context, query string, opts ...options.ExecuteOption) (Row, error)
-
-		// ReadResultSet is a helper which read all rows from first result set in result
-		//
-		// ReadRow returns error if result contains more than one result set
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		ReadResultSet(ctx context.Context, query string, opts ...options.ExecuteOption) (ResultSet, error)
 	}
+	Stats = stats.QueryStats
 )
 
 const (
@@ -64,11 +45,11 @@ const (
 	StatsModeProfile = options.StatsModeProfile
 )
 
-func WithParameters(parameters *params.Parameters) options.ParametersOption {
+func WithParameters(parameters *params.Parameters) options.Execute {
 	return options.WithParameters(parameters)
 }
 
-func WithTxControl(txControl *tx.Control) options.TxControlOption {
+func WithTxControl(txControl *tx.Control) options.Execute {
 	return options.WithTxControl(txControl)
 }
 
@@ -76,22 +57,22 @@ func WithTxSettings(txSettings tx.Settings) options.DoTxOption {
 	return options.WithTxSettings(txSettings)
 }
 
-func WithCommit() options.TxExecuteOption {
+func WithCommit() options.Execute {
 	return options.WithCommit()
 }
 
-func WithExecMode(mode options.ExecMode) options.ExecModeOption {
+func WithExecMode(mode options.ExecMode) options.Execute {
 	return options.WithExecMode(mode)
 }
 
-func WithSyntax(syntax options.Syntax) options.SyntaxOption {
+func WithSyntax(syntax options.Syntax) options.Execute {
 	return options.WithSyntax(syntax)
 }
 
-func WithStatsMode(mode options.StatsMode) options.StatsModeOption {
-	return options.WithStatsMode(mode)
+func WithStatsMode(mode options.StatsMode, callback func(Stats)) options.Execute {
+	return options.WithStatsMode(mode, callback)
 }
 
-func WithCallOptions(opts ...grpc.CallOption) options.CallOptions {
+func WithCallOptions(opts ...grpc.CallOption) options.Execute {
 	return options.WithCallOptions(opts...)
 }

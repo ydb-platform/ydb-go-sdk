@@ -21,7 +21,7 @@ func Example_unmarshallRow() {
 		Str string `sql:"myStr"`
 	}
 
-	row, err := db.Query().ReadRow(ctx, `SELECT 42 as id, "my string" as myStr`)
+	row, err := db.Query().QueryRow(ctx, `SELECT 42 as id, "my string" as myStr`)
 	if err != nil {
 		panic(err)
 	}
@@ -48,7 +48,7 @@ func Example_unmarshallResultSet() {
 		Str string `sql:"myStr"`
 	}
 
-	rows, err := db.Query().ReadResultSet(ctx, `
+	rows, err := db.Query().QueryResultSet(ctx, `
 		SELECT 42 as id, "myStr42" as myStr
 		UNION
 		SELECT 43 as id, "myStr43" as myStr

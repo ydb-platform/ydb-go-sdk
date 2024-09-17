@@ -21,7 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-//go:generate mockgen -destination grpc_client_conn_interface_mock_test.go -package conn -write_package_comment=false google.golang.org/grpc ClientConnInterface
+//go:generate mockgen -destination grpc_client_conn_interface_mock_test.go --typed -package conn -write_package_comment=false google.golang.org/grpc ClientConnInterface
 
 var _ grpc.ClientConnInterface = (*connMock)(nil)
 

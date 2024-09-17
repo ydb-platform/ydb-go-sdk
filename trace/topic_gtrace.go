@@ -406,6 +406,181 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 		}
 	}
 	{
+		h1 := t.OnReaderPopBatchTx
+		h2 := x.OnReaderPopBatchTx
+		ret.OnReaderPopBatchTx = func(t TopicReaderPopBatchTxStartInfo) func(TopicReaderPopBatchTxDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicReaderPopBatchTxDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicReaderPopBatchTxDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnReaderStreamPopBatchTx
+		h2 := x.OnReaderStreamPopBatchTx
+		ret.OnReaderStreamPopBatchTx = func(t TopicReaderStreamPopBatchTxStartInfo) func(TopicReaderStreamPopBatchTxDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicReaderStreamPopBatchTxDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicReaderStreamPopBatchTxDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnReaderUpdateOffsetsInTransaction
+		h2 := x.OnReaderUpdateOffsetsInTransaction
+		ret.OnReaderUpdateOffsetsInTransaction = func(t TopicReaderOnUpdateOffsetsInTransactionStartInfo) func(TopicReaderOnUpdateOffsetsInTransactionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicReaderOnUpdateOffsetsInTransactionDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicReaderOnUpdateOffsetsInTransactionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnReaderTransactionCompleted
+		h2 := x.OnReaderTransactionCompleted
+		ret.OnReaderTransactionCompleted = func(t TopicReaderTransactionCompletedStartInfo) func(TopicReaderTransactionCompletedDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicReaderTransactionCompletedDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicReaderTransactionCompletedDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnReaderTransactionRollback
+		h2 := x.OnReaderTransactionRollback
+		ret.OnReaderTransactionRollback = func(t TopicReaderTransactionRollbackStartInfo) func(TopicReaderTransactionRollbackDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicReaderTransactionRollbackDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicReaderTransactionRollbackDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnReaderSentDataRequest
 		h2 := x.OnReaderSentDataRequest
 		ret.OnReaderSentDataRequest = func(t TopicReaderSentDataRequestInfo) {
@@ -689,6 +864,25 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 		}
 	}
 	{
+		h1 := t.OnWriterReceiveResult
+		h2 := x.OnWriterReceiveResult
+		ret.OnWriterReceiveResult = func(t TopicWriterResultMessagesInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
 		h1 := t.OnWriterReadUnknownGrpcMessage
 		h2 := x.OnWriterReadUnknownGrpcMessage
 		ret.OnWriterReadUnknownGrpcMessage = func(t TopicOnWriterReadUnknownGrpcMessageInfo) {
@@ -869,6 +1063,81 @@ func (t *Topic) onReaderUpdateToken(o OnReadUpdateTokenStartInfo) func(OnReadUpd
 		return res
 	}
 }
+func (t *Topic) onReaderPopBatchTx(t1 TopicReaderPopBatchTxStartInfo) func(TopicReaderPopBatchTxDoneInfo) {
+	fn := t.OnReaderPopBatchTx
+	if fn == nil {
+		return func(TopicReaderPopBatchTxDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicReaderPopBatchTxDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onReaderStreamPopBatchTx(t1 TopicReaderStreamPopBatchTxStartInfo) func(TopicReaderStreamPopBatchTxDoneInfo) {
+	fn := t.OnReaderStreamPopBatchTx
+	if fn == nil {
+		return func(TopicReaderStreamPopBatchTxDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicReaderStreamPopBatchTxDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onReaderUpdateOffsetsInTransaction(t1 TopicReaderOnUpdateOffsetsInTransactionStartInfo) func(TopicReaderOnUpdateOffsetsInTransactionDoneInfo) {
+	fn := t.OnReaderUpdateOffsetsInTransaction
+	if fn == nil {
+		return func(TopicReaderOnUpdateOffsetsInTransactionDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicReaderOnUpdateOffsetsInTransactionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onReaderTransactionCompleted(t1 TopicReaderTransactionCompletedStartInfo) func(TopicReaderTransactionCompletedDoneInfo) {
+	fn := t.OnReaderTransactionCompleted
+	if fn == nil {
+		return func(TopicReaderTransactionCompletedDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicReaderTransactionCompletedDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onReaderTransactionRollback(t1 TopicReaderTransactionRollbackStartInfo) func(TopicReaderTransactionRollbackDoneInfo) {
+	fn := t.OnReaderTransactionRollback
+	if fn == nil {
+		return func(TopicReaderTransactionRollbackDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicReaderTransactionRollbackDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Topic) onReaderSentDataRequest(t1 TopicReaderSentDataRequestInfo) {
 	fn := t.OnReaderSentDataRequest
 	if fn == nil {
@@ -987,6 +1256,13 @@ func (t *Topic) onWriterSendMessages(t1 TopicWriterSendMessagesStartInfo) func(T
 		}
 	}
 	return res
+}
+func (t *Topic) onWriterReceiveResult(t1 TopicWriterResultMessagesInfo) {
+	fn := t.OnWriterReceiveResult
+	if fn == nil {
+		return
+	}
+	fn(t1)
 }
 func (t *Topic) onWriterReadUnknownGrpcMessage(t1 TopicOnWriterReadUnknownGrpcMessageInfo) {
 	fn := t.OnWriterReadUnknownGrpcMessage
@@ -1142,6 +1418,83 @@ func TopicOnReaderUpdateToken(t *Topic, readerConnectionID string) func(tokenLen
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderPopBatchTx(t *Topic, c *context.Context, readerID int64, transactionSessionID string, tx txInfo) func(startOffset int64, endOffset int64, messagesCount int, _ error) {
+	var p TopicReaderPopBatchTxStartInfo
+	p.Context = c
+	p.ReaderID = readerID
+	p.TransactionSessionID = transactionSessionID
+	p.Tx = tx
+	res := t.onReaderPopBatchTx(p)
+	return func(startOffset int64, endOffset int64, messagesCount int, e error) {
+		var p TopicReaderPopBatchTxDoneInfo
+		p.StartOffset = startOffset
+		p.EndOffset = endOffset
+		p.MessagesCount = messagesCount
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderStreamPopBatchTx(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, tx txInfo) func(error) {
+	var p TopicReaderStreamPopBatchTxStartInfo
+	p.Context = c
+	p.ReaderID = readerID
+	p.ReaderConnectionID = readerConnectionID
+	p.TransactionSessionID = transactionSessionID
+	p.Tx = tx
+	res := t.onReaderStreamPopBatchTx(p)
+	return func(e error) {
+		var p TopicReaderStreamPopBatchTxDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderUpdateOffsetsInTransaction(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, tx txInfo) func(error) {
+	var p TopicReaderOnUpdateOffsetsInTransactionStartInfo
+	p.Context = c
+	p.ReaderID = readerID
+	p.ReaderConnectionID = readerConnectionID
+	p.TransactionSessionID = transactionSessionID
+	p.Tx = tx
+	res := t.onReaderUpdateOffsetsInTransaction(p)
+	return func(e error) {
+		var p TopicReaderOnUpdateOffsetsInTransactionDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderTransactionCompleted(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, tx txInfo, transactionResult error) func() {
+	var p TopicReaderTransactionCompletedStartInfo
+	p.Context = c
+	p.ReaderID = readerID
+	p.ReaderConnectionID = readerConnectionID
+	p.TransactionSessionID = transactionSessionID
+	p.Tx = tx
+	p.TransactionResult = transactionResult
+	res := t.onReaderTransactionCompleted(p)
+	return func() {
+		var p TopicReaderTransactionCompletedDoneInfo
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderTransactionRollback(t *Topic, c *context.Context, readerID int64, readerConnectionID string, transactionSessionID string, tx txInfo) func(rollbackError error) {
+	var p TopicReaderTransactionRollbackStartInfo
+	p.Context = c
+	p.ReaderID = readerID
+	p.ReaderConnectionID = readerConnectionID
+	p.TransactionSessionID = transactionSessionID
+	p.Tx = tx
+	res := t.onReaderTransactionRollback(p)
+	return func(rollbackError error) {
+		var p TopicReaderTransactionRollbackDoneInfo
+		p.RollbackError = rollbackError
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TopicOnReaderSentDataRequest(t *Topic, readerConnectionID string, requestBytes int, localBufferSizeAfterSent int) {
 	var p TopicReaderSentDataRequestInfo
 	p.ReaderConnectionID = readerConnectionID
@@ -1260,6 +1613,15 @@ func TopicOnWriterSendMessages(t *Topic, writerInstanceID string, sessionID stri
 		p.Error = e
 		res(p)
 	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnWriterReceiveResult(t *Topic, writerInstanceID string, sessionID string, partitionID int64, acks TopicWriterResultMessagesInfoAcks) {
+	var p TopicWriterResultMessagesInfo
+	p.WriterInstanceID = writerInstanceID
+	p.SessionID = sessionID
+	p.PartitionID = partitionID
+	p.Acks = acks
+	t.onWriterReceiveResult(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TopicOnWriterReadUnknownGrpcMessage(t *Topic, writerInstanceID string, sessionID string, e error) {

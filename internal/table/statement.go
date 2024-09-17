@@ -62,7 +62,7 @@ func (s *statement) Execute(
 
 	onDone := trace.TableOnSessionQueryExecute(
 		s.session.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*statement).Execute"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*statement).Execute"),
 		s.session, s.query, parameters,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)

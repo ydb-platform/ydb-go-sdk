@@ -8,9 +8,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -24,17 +24,9 @@ var (
 	errCommitSessionFromOtherReader = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 )
 
-//go:generate mockgen -destination raw_topic_reader_stream_mock_test.go -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
-
-type RawTopicReaderStream interface {
-	Recv() (rawtopicreader.ServerMessage, error)
-	Send(msg rawtopicreader.ClientMessage) error
-	CloseSend() error
-}
-
 // TopicSteamReaderConnect connect to grpc stream
 // when connectionCtx closed stream must stop work and return errors for all methods
-type TopicSteamReaderConnect func(connectionCtx context.Context) (RawTopicReaderStream, error)
+type TopicSteamReaderConnect func(connectionCtx context.Context) (topicreadercommon.RawTopicReaderStream, error)
 
 type Reader struct {
 	reader             batchedStreamReader
@@ -71,6 +63,7 @@ func (count readExplicitMessagesCount) Apply(options ReadMessageBatchOptions) Re
 }
 
 func NewReader(
+	client TopicClient,
 	connector TopicSteamReaderConnect,
 	consumer string,
 	readSelectors []topicreadercommon.PublicReadSelector,
@@ -93,7 +86,7 @@ func NewReader(
 			return nil, err
 		}
 
-		return newTopicStreamReader(readerID, stream, cfg.topicStreamReaderConfig)
+		return newTopicStreamReader(client, readerID, stream, cfg.topicStreamReaderConfig)
 	}
 
 	res := Reader{
@@ -128,6 +121,16 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
 
+func (r *Reader) PopBatchTx(
+	ctx context.Context,
+	tx tx.Transaction,
+	opts ...PublicReadBatchOption,
+) (*topicreadercommon.PublicBatch, error) {
+	batchOptions := r.getBatchOptions(opts)
+
+	return r.reader.PopBatchTx(ctx, tx, batchOptions)
+}
+
 // ReadMessage read exactly one message
 func (r *Reader) ReadMessage(ctx context.Context) (*topicreadercommon.PublicMessage, error) {
 	res, err := r.ReadMessageBatch(ctx, readExplicitMessagesCount(1))
@@ -147,20 +150,14 @@ func (r *Reader) ReadMessageBatch(
 	batch *topicreadercommon.PublicBatch,
 	err error,
 ) {
-	readOptions := r.defaultBatchConfig.clone()
-
-	for _, opt := range opts {
-		if opt != nil {
-			readOptions = opt.Apply(readOptions)
-		}
-	}
+	batchOptions := r.getBatchOptions(opts)
 
 	for {
 		if err = ctx.Err(); err != nil {
 			return nil, err
 		}
 
-		batch, err = r.reader.ReadMessageBatch(ctx, readOptions)
+		batch, err = r.reader.ReadMessageBatch(ctx, batchOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -171,6 +168,18 @@ func (r *Reader) ReadMessageBatch(
 			return batch, nil
 		}
 	}
+}
+
+func (r *Reader) getBatchOptions(opts []PublicReadBatchOption) ReadMessageBatchOptions {
+	readOptions := r.defaultBatchConfig.clone()
+
+	for _, opt := range opts {
+		if opt != nil {
+			readOptions = opt.Apply(readOptions)
+		}
+	}
+
+	return readOptions
 }
 
 func (r *Reader) Commit(ctx context.Context, offsets topicreadercommon.PublicCommitRangeGetter) (err error) {

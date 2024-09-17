@@ -15,7 +15,7 @@ func PartitionStopHandled(ctx context.Context, reader *topicreader.Reader) {
 	}
 
 	batchContext := batch.Context() // batch.Context() will cancel when partition revoke by server or connection broke
-	processBatch(batchContext, batch)
+	_, _ = processBatch(batchContext, batch)
 }
 
 // PartitionGracefulStopHandled is example of sdk handle server signal about graceful stop partition
@@ -24,7 +24,7 @@ func PartitionGracefulStopHandled(ctx context.Context, db *ydb.Driver) {
 
 	for {
 		batch, _ := reader.ReadMessagesBatch(ctx) // <- if partition soft stop batch can be less, then 1000
-		processBatch(batch.Context(), batch)
+		_, _ = processBatch(batch.Context(), batch)
 		_ = reader.Commit(batch.Context(), batch)
 	}
 }

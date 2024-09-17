@@ -34,7 +34,11 @@ type ReadMessages = topiclistenerinternal.PublicReadMessages
 
 // BaseHandler implements default behavior for EventHandler interface
 // you must embed the structure to your own implementation of the interface.
-// It allows to extend the interface in the future without broke compatibility
+//
+// # It allows to extend the interface in the future without broke compatibility
+//
+// Temporary restrictions: all method should be work fast, because is it call from main read loop message and block
+// handle messages loop
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type BaseHandler struct{}

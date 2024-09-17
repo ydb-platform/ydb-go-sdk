@@ -1,4 +1,4 @@
-//go:build go1.22 && goexperiment.rangefunc
+//go:build go1.23
 
 package query_test
 
@@ -7,13 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-func Example_readRow() {
+func Example_queryWithMaterializedResult() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
@@ -25,8 +25,89 @@ func Example_readRow() {
 		myStr string // optional value
 	)
 	// Do retry operation on errors with best effort
-	row, err := db.Query().ReadRow(ctx, // context manage exiting from Do
+	materilizedResult, err := db.Query().Query(ctx, // context manage exiting from Do
 		`SELECT 42 as id, "my string" as myStr`,
+		query.WithIdempotent(),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = materilizedResult.Close(ctx)
+	}()
+
+	for rs, err := range materilizedResult.ResultSets(ctx) {
+		if err != nil {
+			panic(err)
+		}
+		for row, err := range rs.Rows(ctx) {
+			if err != nil {
+				panic(err)
+			}
+			err = row.ScanNamed(
+				query.Named("id", &id),
+				query.Named("myStr", &myStr),
+			)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+}
+
+func Example_queryWithMaterializedResultSet() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+	// Do retry operation on errors with best effort
+	materilizedResultSet, err := db.Query().QueryResultSet(ctx, // context manage exiting from Do
+		`SELECT 42 as id, "my string" as myStr`,
+		query.WithIdempotent(),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	for row, err := range materilizedResultSet.Rows(ctx) {
+		if err != nil {
+			panic(err)
+		}
+		err = row.ScanNamed(
+			query.Named("id", &id),
+			query.Named("myStr", &myStr),
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+}
+
+func Example_queryRow() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+	// Do retry operation on errors with best effort
+	row, err := db.Query().QueryRow(ctx, // context manage exiting from Do
+		`SELECT 42 as id, "my string" as myStr`,
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		panic(err)
@@ -43,7 +124,7 @@ func Example_readRow() {
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
 }
 
-func Example_rangeWithLegacyGo() {
+func Example_withoutRangeIterators() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
@@ -54,196 +135,201 @@ func Example_rangeWithLegacyGo() {
 		id    int32  // required value
 		myStr string // optional value
 	)
-	r, err := db.Query().Execute(ctx, `SELECT 42 as id, "my string" as myStr`)
-	if err != nil {
-		panic(err)
-	}
-	r.Range(ctx)(func(rs query.ResultSet, err error) bool {
-		if err != nil {
-			return false
-		}
-		rs.Range(ctx)(func(row query.Row, err error) bool {
-			if err != nil {
-				return false
-			}
-			err = row.ScanNamed(
-				query.Named("id", &id),
-				query.Named("myStr", &myStr),
-			)
-			if err != nil {
-				return false
-			}
-
-			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
-
-			return true
-		})
-
-		return true
-	})
-}
-
-func Example_rangeExperiment() {
-	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close(ctx) // cleanup resources
-	var (
-		id    int32  // required value
-		myStr string // optional value
-	)
-	r, err := db.Query().Execute(ctx, `SELECT 42 as id, "my string" as myStr`)
-	if err != nil {
-		panic(err)
-	}
-	// for loop with Range available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
-	for rs, err := range r.Range(ctx) {
-		if err != nil {
-			panic(err)
-		}
-		// for loop with Range available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
-		for row, err := range rs.Range(ctx) {
-			if err != nil {
-				panic(err)
-			}
-			err = row.ScanNamed(
-				query.Named("id", &id),
-				query.Named("myStr", &myStr),
-			)
-			if err != nil {
-				panic(err)
-			}
-
-			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
-		}
-	}
-}
-
-func Example_selectWithoutParameters() {
-	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close(ctx) // cleanup resources
-	var (
-		id    int32  // required value
-		myStr string // optional value
-	)
-	// Do retry operation on errors with best effort
-	err = db.Query().Do(ctx, // context manage exiting from Do
-		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx,
-				`SELECT 42 as id, "my string" as myStr`,
-			)
-			if err != nil {
-				return err // for auto-retry with driver
-			}
-			defer func() { _ = res.Close(ctx) }() // cleanup resources
-			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
-					return err
-				}
-				for { // iterate over rows
-					row, err := rs.NextRow(ctx)
-					if err != nil {
-						if errors.Is(err, io.EOF) {
-							break
-						}
-
-						return err
-					}
-					if err = row.Scan(&id, &myStr); err != nil {
-						return err // generally scan error not retryable, return it for driver check error
-					}
-				}
-			}
-
-			return res.Err() // return finally result error for auto-retry with driver
-		},
+	materializedResult, err := db.Query().Query(ctx, `SELECT 42 as id, "my string" as myStr`,
 		query.WithIdempotent(),
 	)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
-	// id=42, myStr='my string'
+	for {
+		rs, err := materializedResult.NextResultSet(ctx)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			panic(err)
+		}
+		for {
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				panic(err)
+			}
+			err = row.ScanNamed(
+				query.Named("id", &id),
+				query.Named("myStr", &myStr),
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+		}
+	}
 }
 
 func Example_selectWithParameters() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
-		fmt.Printf("failed connect: %v", err)
-
-		return
+		panic(err)
 	}
 	defer db.Close(ctx) // cleanup resources
 	var (
 		id    int32  // required value
-		myStr string // optional value
+		myStr string // required value
 	)
 	// Do retry operation on errors with best effort
-	err = db.Query().Do(ctx, // context manage exiting from Do
-		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx,
-				`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
-				options.WithParameters(
-					ydb.ParamsBuilder().
-						Param("$id").Uint64(123).
-						Param("$myStr").Text("123").
-						Build(),
-				),
-			)
-			if err != nil {
-				return err // for auto-retry with driver
-			}
-			defer func() { _ = res.Close(ctx) }() // cleanup resources
-			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
-					return err
-				}
-				for { // iterate over rows
-					row, err := rs.NextRow(ctx)
-					if err != nil {
-						if errors.Is(err, io.EOF) {
-							break
-						}
-
-						return err
-					}
-					if err = row.ScanNamed(
-						query.Named("id", &id),
-						query.Named("myStr", &myStr),
-					); err != nil {
-						return err // generally scan error not retryable, return it for driver check error
-					}
-				}
-			}
-
-			return res.Err() // return finally result error for auto-retry with driver
-		},
-		options.WithIdempotent(),
+	row, err := db.Query().QueryRow(ctx, // context manage exiting from Do
+		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$id").Uint64(123).
+				Param("$myStr").Text("123").
+				Build(),
+		),
+		query.WithIdempotent(),
 	)
 	if err != nil {
-		fmt.Printf("unexpected error: %v", err)
+		panic(err)
 	}
+
+	err = row.ScanNamed(
+		query.Named("id", &id),
+		query.Named("myStr", &myStr),
+	)
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
 }
 
-func Example_txSelect() {
+func Example_resultStats() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		id    int32  // required value
+		myStr string // required value
+	)
+	var stats query.Stats
+	// Do retry operation on errors with best effort
+	row, err := db.Query().QueryRow(ctx, // context manage exiting from Do
+		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$id").Uint64(123).
+				Param("$myStr").Text("123").
+				Build(),
+		),
+		query.WithStatsMode(query.StatsModeFull, func(s query.Stats) {
+			stats = s
+		}),
+		query.WithIdempotent(),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	err = row.ScanNamed(
+		query.Named("id", &id),
+		query.Named("myStr", &myStr),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+	fmt.Println("Stats:")
+	fmt.Printf("- Compilation='%v'\n", stats.Compilation())
+	fmt.Printf("- TotalCPUTime='%v'\n", stats.TotalCPUTime())
+	fmt.Printf("- ProcessCPUTime='%v'\n", stats.ProcessCPUTime())
+	fmt.Printf("- QueryAST='%v'\n", stats.QueryAST())
+	fmt.Printf("- QueryPlan='%v'\n", stats.QueryPlan())
+	fmt.Println("- Phases:")
+	for {
+		phase, ok := stats.NextPhase()
+		if !ok {
+			break
+		}
+		fmt.Printf("  - CPUTime='%v'\n", phase.CPUTime())
+		fmt.Printf("  - Duration='%v'\n", phase.Duration())
+		fmt.Printf("  - IsLiteralPhase='%v'\n", phase.IsLiteralPhase())
+		fmt.Printf("  - AffectedShards='%v'\n", phase.AffectedShards())
+		fmt.Println("  - TableAccesses:")
+		for {
+			tableAccess, ok := phase.NextTableAccess()
+			if !ok {
+				break
+			}
+			fmt.Printf("    - %v\n", tableAccess)
+		}
+	}
+}
+
+func Example_retryWithSessions() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		id    int32  // required value
+		myStr string // required value
+	)
+	// Do retry operation on errors with best effort
+	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+		streamResult, err := s.Query(ctx, // context manage exiting from Do
+			`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$id").Uint64(123).
+					Param("$myStr").Text("123").
+					Build(),
+			),
+		)
+		if err != nil {
+			panic(err)
+		}
+		defer func() {
+			_ = streamResult.Close(ctx)
+		}()
+
+		for rs, err := range streamResult.ResultSets(ctx) {
+			if err != nil {
+				return err
+			}
+			for row, err := range rs.Rows(ctx) {
+				if err != nil {
+					return err
+				}
+				err = row.ScanNamed(
+					query.Named("id", &id),
+					query.Named("myStr", &myStr),
+				)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+
+		return nil
+	}, query.WithIdempotent())
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+}
+
+func Example_rertryWithTx() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
@@ -259,29 +345,21 @@ func Example_txSelect() {
 	// Do retry operation on errors with best effort
 	err = db.Query().DoTx(ctx, // context manage exiting from Do
 		func(ctx context.Context, tx query.TxActor) (err error) { // retry operation
-			res, err := tx.Execute(ctx,
+			res, err := tx.Query(ctx,
 				`SELECT 42 as id, "my string" as myStr`,
 			)
 			if err != nil {
 				return err // for auto-retry with driver
 			}
 			defer func() { _ = res.Close(ctx) }() // cleanup resources
-			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
+			// for loop with ResultSets available with Go version 1.23+
+			for rs, err := range res.ResultSets(ctx) {
 				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
 					return err
 				}
-				for { // iterate over rows
-					row, err := rs.NextRow(ctx)
+				// for loop with ResultSets available with Go version 1.23+
+				for row, err := range rs.Rows(ctx) {
 					if err != nil {
-						if errors.Is(err, io.EOF) {
-							break
-						}
-
 						return err
 					}
 					if err = row.ScanNamed(
@@ -293,10 +371,10 @@ func Example_txSelect() {
 				}
 			}
 
-			return res.Err() // return finally result error for auto-retry with driver
+			return nil
 		},
-		options.WithIdempotent(),
-		options.WithTxSettings(query.TxSettings(
+		query.WithIdempotent(),
+		query.WithTxSettings(query.TxSettings(
 			query.WithSnapshotReadOnly(),
 		)),
 	)
@@ -304,4 +382,68 @@ func Example_txSelect() {
 		fmt.Printf("unexpected error: %v", err)
 	}
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+}
+
+func Example_executeScript() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx)                      // cleanup resources
+	op, err := db.Query().ExecuteScript(ctx, // context manage exiting from Do
+		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+		time.Hour,
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$id").Uint64(123).
+				Param("$myStr").Text("123").
+				Build(),
+		),
+		query.WithIdempotent(),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		status, err := db.Operation().Get(ctx, op.ID)
+		if err != nil {
+			panic(err)
+		}
+		if status.Ready {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	var nextToken string
+	for {
+		result, err := db.Query().FetchScriptResults(ctx, op.ID,
+			query.WithResultSetIndex(0),
+			query.WithRowsLimit(1000),
+			query.WithFetchToken(nextToken),
+		)
+		if err != nil {
+			panic(err)
+		}
+		nextToken = result.NextToken
+		for row, err := range result.ResultSet.Rows(ctx) {
+			if err != nil {
+				panic(err)
+			}
+			var (
+				id    int64
+				myStr string
+			)
+			err = row.Scan(&id, &myStr)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+		}
+		if result.NextToken == "" {
+			break
+		}
+	}
 }
