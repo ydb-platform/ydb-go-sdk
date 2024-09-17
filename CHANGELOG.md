@@ -1,3 +1,4 @@
+* Doesn't rollback a the transaction on the operation error
 * Renamed method at experimental API reader.PopBatchTx to reader.PopMessagesBatchTx
 
 ## v3.80.5
