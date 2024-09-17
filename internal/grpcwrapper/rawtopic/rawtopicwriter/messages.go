@@ -145,6 +145,7 @@ type WriteRequest struct {
 
 	Messages []MessageData
 	Codec    rawtopiccommon.Codec
+	Tx       rawtopiccommon.TransactionIdentity
 }
 
 func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest, err error) {
@@ -161,7 +162,12 @@ func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_Wri
 		WriteRequest: &Ydb_Topic.StreamWriteMessage_WriteRequest{
 			Messages: messages,
 			Codec:    int32(r.Codec.ToProto()),
+			Tx:       r.Tx.ToProto(),
 		},
+	}
+
+	if r.Tx.ID != "" || r.Tx.Session != "" {
+		res.WriteRequest.Tx = &Ydb_Topic.TransactionIdentity{}
 	}
 
 	return res, nil

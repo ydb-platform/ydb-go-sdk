@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
@@ -30,6 +31,13 @@ func BeginTx(opts ...TransactionOption) internal.ControlOption {
 
 func WithTx(t tx.Identifier) internal.ControlOption {
 	return internal.WithTx(t)
+}
+
+// WithLazyTx replace default behavior for use lazy transaction or explicit start it before any query.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithLazyTx(allowLazy bool) options.Execute {
+	return options.WithLazyTx(allowLazy)
 }
 
 func WithTxID(txID string) internal.ControlOption {

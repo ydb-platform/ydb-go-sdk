@@ -35,6 +35,7 @@ type (
 		callOptions   []grpc.CallOption
 		txControl     *tx.Control
 		retryOptions  []retry.Option
+		allowLazyTx   bool
 	}
 
 	// Execute is an interface for execute method options
@@ -57,7 +58,14 @@ type (
 		callback func(stats.QueryStats)
 	}
 	execModeOption = ExecMode
+	lazyTxOption   struct {
+		allow bool
+	}
 )
+
+func (s *executeSettings) AllowLazyTx() bool {
+	return s.allowLazyTx
+}
 
 func (s *executeSettings) RetryOpts() []retry.Option {
 	return s.retryOptions
@@ -79,6 +87,10 @@ func (txControl *txControlOption) thisOptionIsNotForExecuteOnTx() {}
 
 func (syntax Syntax) applyExecuteOption(s *executeSettings) {
 	s.syntax = syntax
+}
+
+func (lazyTx lazyTxOption) applyExecuteOption(s *executeSettings) {
+	s.allowLazyTx = lazyTx.allow
 }
 
 const (
@@ -176,6 +188,7 @@ var (
 	_ Execute = StatsMode(0)
 	_ Execute = txCommitOption{}
 	_ Execute = (*txControlOption)(nil)
+	_ Execute = lazyTxOption{}
 )
 
 func WithCommit() txCommitOption {
@@ -188,6 +201,10 @@ func WithExecMode(mode ExecMode) execModeOption {
 
 func WithSyntax(syntax Syntax) syntaxOption {
 	return syntax
+}
+
+func WithLazyTx(allowLazy bool) lazyTxOption {
+	return lazyTxOption{allow: allowLazy}
 }
 
 func (opt statsModeOption) applyExecuteOption(s *executeSettings) {

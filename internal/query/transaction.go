@@ -35,7 +35,8 @@ type (
 
 		completed bool
 
-		onCompleted xsync.Set[*baseTx.OnTransactionCompletedFunc]
+		onBeforeCommit xsync.Set[*baseTx.OnTransactionBeforeCommit]
+		onCompleted    xsync.Set[*baseTx.OnTransactionCompletedFunc]
 	}
 )
 
@@ -88,6 +89,14 @@ func (tx *Transaction) QueryResultSet(
 		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
 	}
 
+	if !options.ExecuteSettings(opts...).AllowLazyTx() {
+		// It needs to execute before create settings because if tx must be not lazy, and it is first query
+		// change txcontrol during unlazy
+		if err := tx.UnLazy(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	settings, err := tx.executeSettings(opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -100,6 +109,11 @@ func (tx *Transaction) QueryResultSet(
 		}),
 	}
 	if settings.TxControl().Commit {
+		err = tx.waitOnBeforeCommit(ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
@@ -130,6 +144,14 @@ func (tx *Transaction) QueryRow(
 		onDone(finalErr)
 	}()
 
+	if !options.ExecuteSettings(opts...).AllowLazyTx() {
+		// It needs to execute before create settings because if tx must be not lazy, and it is first query
+		// change txcontrol during unlazy
+		if err := tx.UnLazy(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	settings := options.ExecuteSettings(
 		append(
 			[]options.Execute{options.WithTxControl(tx.txControl())},
@@ -144,6 +166,11 @@ func (tx *Transaction) QueryRow(
 		}),
 	}
 	if settings.TxControl().Commit {
+		err := tx.waitOnBeforeCommit(ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
@@ -192,6 +219,14 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		return xerrors.WithStackTrace(errExecuteOnCompletedTx)
 	}
 
+	if !options.ExecuteSettings(opts...).AllowLazyTx() {
+		// It needs to execute before create settings because if tx must be not lazy, and it is first query
+		// change txcontrol during unlazy
+		if err := tx.UnLazy(ctx); err != nil {
+			return err
+		}
+	}
+
 	settings, err := tx.executeSettings(opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -204,6 +239,11 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		}),
 	}
 	if settings.TxControl().Commit {
+		err = tx.waitOnBeforeCommit(ctx)
+		if err != nil {
+			return err
+		}
+
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
@@ -256,6 +296,14 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
 	}
 
+	if !options.ExecuteSettings(opts...).AllowLazyTx() {
+		// It needs to execute before create settings because if tx must be not lazy, and it is first query
+		// change txcontrol during unlazy
+		if err := tx.UnLazy(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	settings, err := tx.executeSettings(opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -268,6 +316,11 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 		}),
 	}
 	if settings.TxControl().Commit {
+		err = tx.waitOnBeforeCommit(ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
@@ -310,7 +363,12 @@ func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 		tx.completed = true
 	}()
 
-	err := commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
+	err := tx.waitOnBeforeCommit(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
 		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
 			tx.s.SetStatus(session.StatusClosed)
@@ -360,8 +418,22 @@ func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 	return nil
 }
 
+func (tx *Transaction) OnBeforeCommit(f baseTx.OnTransactionBeforeCommit) {
+	tx.onBeforeCommit.Add(&f)
+}
+
 func (tx *Transaction) OnCompleted(f baseTx.OnTransactionCompletedFunc) {
 	tx.onCompleted.Add(&f)
+}
+
+func (tx *Transaction) waitOnBeforeCommit(ctx context.Context) (resErr error) {
+
+	tx.onBeforeCommit.Range(func(f *baseTx.OnTransactionBeforeCommit) bool {
+		resErr = (*f)(ctx)
+		return resErr == nil
+	})
+
+	return resErr
 }
 
 func (tx *Transaction) notifyOnCompleted(err error) {

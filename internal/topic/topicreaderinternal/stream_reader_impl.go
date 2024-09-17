@@ -318,7 +318,7 @@ func (r *topicStreamReaderImpl) createUpdateOffsetRequest(
 
 	return &rawtopic.UpdateOffsetsInTransactionRequest{
 		OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
-		Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+		Tx: rawtopiccommon.TransactionIdentity{
 			ID:      tx.ID(),
 			Session: tx.SessionID(),
 		},

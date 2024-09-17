@@ -43,11 +43,13 @@ func CopyMessagesBetweenTopics(ctx context.Context, db *ydb.Driver, reader *topi
 			return err
 		}
 
-		sendMessages := make([]topicwriter.Message, len(batch.Messages))
-		for i, mess := range batch.Messages {
-			sendMessages[i] = topicwriter.Message{Data: mess}
+		for _, mess := range batch.Messages {
+
+			if err = writer.WriteWithTx(ctx, tx, topicwriter.Message{Data: mess}); err != nil {
+				return err
+			}
 		}
 
-		return writer.WriteWithTx(ctx, tx, sendMessages...)
+		return nil
 	}, query.WithIdempotent())
 }

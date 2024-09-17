@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -19,7 +20,7 @@ func pumpFromTopicToTable(ctx context.Context, db *ydb.Driver, topic, consumer s
 	}
 
 	return db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		batch, err := reader.PopBatchTx(ctx, tx)
+		batch, err := reader.PopMessagesBatchTx(ctx, tx)
 		if err != nil {
 			return err
 		}

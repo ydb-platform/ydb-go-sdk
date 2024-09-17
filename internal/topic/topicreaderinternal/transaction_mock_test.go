@@ -36,6 +36,9 @@ func (m *mockTransaction) SessionID() string {
 	return m.sessionID
 }
 
+func (m *mockTransaction) OnBeforeCommit(f tx.OnTransactionBeforeCommit) {
+}
+
 func (m *mockTransaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
 	m.onCompleted = append(m.onCompleted, f)
 }
