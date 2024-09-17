@@ -15,7 +15,7 @@ func CommitMessagesToTransaction(ctx context.Context, db *ydb.Driver, reader *to
 		}
 
 		err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-			batch, err := reader.PopBatchTx(ctx, tx) // the batch will be committed with commit the tx
+			batch, err := reader.PopMessagesBatchTx(ctx, tx) // the batch will be committed with commit the tx
 			if err != nil {
 				return err
 			}
@@ -51,7 +51,7 @@ func PopWithTransaction(ctx context.Context, db *ydb.Driver, reader *topicreader
 		}
 
 		err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-			batch, err := reader.PopBatchTx(ctx, tx)
+			batch, err := reader.PopMessagesBatchTx(ctx, tx)
 			if err != nil {
 				return err
 			}
@@ -102,7 +102,7 @@ func PopWithTransactionRecreateReader(
 				return err
 			}
 
-			batch, err := reader.PopBatchTx(ctx, tx)
+			batch, err := reader.PopMessagesBatchTx(ctx, tx)
 			if err != nil {
 				return err
 			}
