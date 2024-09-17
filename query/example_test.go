@@ -124,6 +124,33 @@ func Example_queryRow() {
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
 }
 
+func Example_explain() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		ast  string
+		plan string
+	)
+	err = db.Query().Exec(ctx,
+		`SELECT CAST(42 AS Uint32);`,
+		query.WithExecMode(query.ExecModeExplain),
+		query.WithStatsMode(query.StatsModeNone, func(stats query.Stats) {
+			ast = stats.QueryAST()
+			plan = stats.QueryPlan()
+		}),
+		query.WithIdempotent(),
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(plan)
+	fmt.Println(ast)
+}
+
 func Example_withoutRangeIterators() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")

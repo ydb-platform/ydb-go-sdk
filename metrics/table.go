@@ -1,8 +1,6 @@
 package metrics
 
 import (
-	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -15,11 +13,13 @@ func table(config Config) (t trace.Table) {
 	session := config.WithSystem("session")
 	config = config.WithSystem("pool")
 	limit := config.GaugeVec("limit")
-	size := config.GaugeVec("size")
-	inflight := config.GaugeVec("inflight")
-	inflightLatency := config.WithSystem("inflight").TimerVec("latency")
+	index := config.GaugeVec("index")
+	idle := config.GaugeVec("idle")
 	wait := config.GaugeVec("wait")
-	waitLatency := config.WithSystem("wait").TimerVec("latency")
+	createInProgress := config.GaugeVec("createInProgress")
+	get := config.CounterVec("get")
+	put := config.CounterVec("put")
+	with := config.GaugeVec("with")
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
 			limit.With(nil).Set(float64(info.Limit))
@@ -43,45 +43,37 @@ func table(config Config) (t trace.Table) {
 
 		return nil
 	}
-	t.OnPoolSessionAdd = func(info trace.TablePoolSessionAddInfo) {
+	t.OnPoolWith = func(info trace.TablePoolWithStartInfo) func(trace.TablePoolWithDoneInfo) {
 		if config.Details()&trace.TablePoolEvents != 0 {
-			size.With(nil).Add(1)
+			with.With(nil).Add(1)
 		}
-	}
-	t.OnPoolSessionRemove = func(info trace.TablePoolSessionRemoveInfo) {
-		if config.Details()&trace.TablePoolEvents != 0 {
-			size.With(nil).Add(-1)
-		}
-	}
-	var inflightStarts sync.Map
-	t.OnPoolGet = func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
-		wait.With(nil).Add(1)
-		start := time.Now()
 
+		return func(info trace.TablePoolWithDoneInfo) {
+			if config.Details()&trace.TablePoolEvents != 0 {
+				with.With(nil).Add(-1)
+			}
+		}
+	}
+	t.OnPoolGet = func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 		return func(info trace.TablePoolGetDoneInfo) {
-			wait.With(nil).Add(-1)
 			if info.Error == nil && config.Details()&trace.TablePoolEvents != 0 {
-				inflight.With(nil).Add(1)
-				inflightStarts.Store(info.Session.ID(), time.Now())
-				waitLatency.With(nil).Record(time.Since(start))
+				get.With(nil).Inc()
 			}
 		}
 	}
 	t.OnPoolPut = func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
 		if config.Details()&trace.TablePoolEvents != 0 {
-			inflight.With(nil).Add(-1)
-			start, ok := inflightStarts.LoadAndDelete(info.Session.ID())
-			if !ok {
-				panic(fmt.Sprintf("unknown session '%s'", info.Session.ID()))
-			}
-			val, ok := start.(time.Time)
-			if !ok {
-				panic(fmt.Sprintf("unsupported type conversion from %T to time.Time", val))
-			}
-			inflightLatency.With(nil).Record(time.Since(val))
+			put.With(nil).Inc()
 		}
 
 		return nil
+	}
+	t.OnPoolStateChange = func(info trace.TablePoolStateChangeInfo) {
+		limit.With(nil).Set(float64(info.Limit))
+		index.With(nil).Set(float64(info.Index))
+		idle.With(nil).Set(float64(info.Idle))
+		wait.With(nil).Set(float64(info.Wait))
+		createInProgress.With(nil).Set(float64(info.CreateInProgress))
 	}
 	{
 		latency := session.WithSystem("query").TimerVec("latency")

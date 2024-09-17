@@ -2,7 +2,7 @@ package xlist
 
 import "testing"
 
-func checkListLen[T comparable](t *testing.T, l *List[T], expectedLen int) bool {
+func checkListLen[T comparable](t *testing.T, l List[T], expectedLen int) bool {
 	if n := l.Len(); n != expectedLen {
 		t.Errorf("l.Len() = %d, want %d", n, expectedLen)
 
@@ -12,8 +12,8 @@ func checkListLen[T comparable](t *testing.T, l *List[T], expectedLen int) bool 
 	return true
 }
 
-func checkListPointers[T comparable](t *testing.T, l *List[T], es []*Element[T]) {
-	root := &l.root
+func checkListPointers[T comparable](t *testing.T, l List[T], es []*Element[T]) {
+	root := &l.(*list[T]).root
 
 	if !checkListLen(t, l, len(es)) {
 		return
@@ -21,8 +21,10 @@ func checkListPointers[T comparable](t *testing.T, l *List[T], es []*Element[T])
 
 	// zero length lists must be the zero value or properly initialized (sentinel circle)
 	if len(es) == 0 {
-		if l.root.next != nil && l.root.next != root || l.root.prev != nil && l.root.prev != root {
-			t.Errorf("l.root.next = %p, l.root.prev = %p; both should both be nil or %p", l.root.next, l.root.prev, root)
+		if l.(*list[T]).root.next != nil && l.(*list[T]).root.next != root ||
+			l.(*list[T]).root.prev != nil && l.(*list[T]).root.prev != root {
+			t.Errorf("l.root.next = %p, l.root.prev = %p; both should both be nil or %p",
+				l.(*list[T]).root.next, l.(*list[T]).root.prev, root)
 		}
 
 		return
@@ -145,7 +147,7 @@ func TestList(t *testing.T) {
 	})
 }
 
-func checkList[T comparable](t *testing.T, l *List[T], es []any) {
+func checkList[T comparable](t *testing.T, l List[T], es []any) {
 	if !checkListLen(t, l, len(es)) {
 		return
 	}
@@ -289,66 +291,39 @@ func TestMove(t *testing.T) {
 	checkListPointers(t, l, []*Element[int]{e1, e3, e2, e4})
 }
 
-// Test PushFront, PushBack, PushFrontList, PushBackList with uninitialized List[T]
-func TestZeroList(t *testing.T) {
-	t.Run("PushFront", func(t *testing.T) {
-		l1 := new(List[int])
-		l1.PushFront(1)
-		checkList(t, l1, []any{1})
-
-		t.Run("PushFrontList", func(t *testing.T) {
-			l3 := new(List[int])
-			l3.PushFrontList(l1)
-			checkList(t, l3, []any{1})
-		})
-	})
-
-	t.Run("PushBack", func(t *testing.T) {
-		l2 := new(List[int])
-		l2.PushBack(1)
-		checkList(t, l2, []any{1})
-
-		t.Run("PushBackList", func(t *testing.T) {
-			l4 := new(List[int])
-			l4.PushBackList(l2)
-			checkList(t, l4, []any{1})
-		})
-	})
-}
-
 // Test that a list l is not modified when calling InsertBefore with a mark that is not an element of l.
 func TestInsertBeforeUnknownMark(t *testing.T) {
-	var l List[int]
+	l := New[int]()
 	l.PushBack(1)
 	l.PushBack(2)
 	l.PushBack(3)
 	l.InsertBefore(1, new(Element[int]))
-	checkList(t, &l, []any{1, 2, 3})
+	checkList(t, l, []any{1, 2, 3})
 }
 
 // Test that a list l is not modified when calling InsertAfter with a mark that is not an element of l.
 func TestInsertAfterUnknownMark(t *testing.T) {
-	var l List[int]
+	l := New[int]()
 	l.PushBack(1)
 	l.PushBack(2)
 	l.PushBack(3)
 	l.InsertAfter(1, new(Element[int]))
-	checkList(t, &l, []any{1, 2, 3})
+	checkList(t, l, []any{1, 2, 3})
 }
 
 // Test that a list l is not modified when calling MoveAfter or MoveBefore with a mark that is not an element of l.
 func TestMoveUnknownMark(t *testing.T) {
-	var l1 List[int]
+	l1 := New[int]()
 	e1 := l1.PushBack(1)
 
-	var l2 List[int]
+	l2 := New[int]()
 	e2 := l2.PushBack(2)
 
 	l1.MoveAfter(e1, e2)
-	checkList(t, &l1, []any{1})
-	checkList(t, &l2, []any{2})
+	checkList(t, l1, []any{1})
+	checkList(t, l2, []any{2})
 
 	l1.MoveBefore(e1, e2)
-	checkList(t, &l1, []any{1})
-	checkList(t, &l2, []any{2})
+	checkList(t, l1, []any{1})
+	checkList(t, l2, []any{2})
 }

@@ -319,6 +319,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 	var (
 		i        int
 		attempts int
+		lastErr  error
 
 		code   = int64(0)
 		onDone = trace.RetryOnRetry(options.trace, &ctx,
@@ -333,9 +334,10 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 		attempts++
 		select {
 		case <-ctx.Done():
-			return zeroValue, xerrors.WithStackTrace(
+			return zeroValue, xerrors.WithStackTrace(xerrors.Join(
 				fmt.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()),
-			)
+				lastErr,
+			))
 
 		default:
 			v, err := opWithRecover(ctx, options, op)
@@ -353,10 +355,11 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 			code = m.StatusCode()
 
 			if !m.MustRetry(options.idempotent) {
-				return zeroValue, xerrors.WithStackTrace(
+				return zeroValue, xerrors.WithStackTrace(xerrors.Join(
 					fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
 						attempts, options.idempotent, err),
-				)
+					lastErr,
+				))
 			}
 
 			t := time.NewTimer(backoff.Delay(m.BackoffType(), i,
@@ -372,6 +375,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 					xerrors.Join(
 						fmt.Errorf("attempt No.%d: %w", attempts, ctx.Err()),
 						err,
+						lastErr,
 					),
 				)
 			case <-t.C:
@@ -383,10 +387,13 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 							fmt.Errorf("attempt No.%d: %w", attempts, budget.ErrNoQuota),
 							acquireErr,
 							err,
+							lastErr,
 						),
 					)
 				}
 			}
+
+			lastErr = err
 		}
 	}
 }

@@ -38,6 +38,7 @@ type (
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
 		onNextPartErr  []func(err error)
+		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 	}
 	resultOption func(s *streamResult)
 )
@@ -101,11 +102,17 @@ func onNextPartErr(callback func(err error)) resultOption {
 	}
 }
 
+func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
+	return func(s *streamResult) {
+		s.onTxMeta = append(s.onTxMeta, callback)
+	}
+}
+
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	opts ...resultOption,
-) (_ *streamResult, txID string, finalErr error) {
+) (_ *streamResult, finalErr error) {
 	r := streamResult{
 		stream:         stream,
 		closed:         make(chan struct{}),
@@ -133,11 +140,11 @@ func newResult(
 
 	select {
 	case <-ctx.Done():
-		return nil, txID, xerrors.WithStackTrace(ctx.Err())
+		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
 		part, err := r.nextPart(ctx)
 		if err != nil {
-			return nil, txID, xerrors.WithStackTrace(err)
+			return nil, xerrors.WithStackTrace(err)
 		}
 
 		r.lastPart = part
@@ -146,7 +153,7 @@ func newResult(
 			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 		}
 
-		return &r, part.GetTxMeta().GetId(), nil
+		return &r, nil
 	}
 }
 
@@ -175,6 +182,12 @@ func (r *streamResult) nextPart(ctx context.Context) (
 			}
 
 			return nil, xerrors.WithStackTrace(err)
+		}
+
+		if txMeta := part.GetTxMeta(); txMeta != nil {
+			for _, f := range r.onTxMeta {
+				f(txMeta)
+			}
 		}
 
 		return part, nil

@@ -356,10 +356,15 @@ func TestExecute(t *testing.T) {
 		stream.EXPECT().Recv().Return(nil, io.EOF)
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
-		tx, r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		var txID string
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
+			onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+				txID = txMeta.GetId()
+			}),
+		)
 		require.NoError(t, err)
 		defer r.Close(ctx)
-		require.EqualValues(t, "456", tx.ID())
+		require.EqualValues(t, "456", txID)
 		require.EqualValues(t, -1, r.resultSetIndex)
 		{
 			t.Log("nextResultSet")
@@ -466,7 +471,7 @@ func TestExecute(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 			t.Log("execute")
-			_, _, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
 			require.Error(t, err)
 			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 		})
@@ -570,10 +575,15 @@ func TestExecute(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			tx, r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			var txID string
+			r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
+				onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+					txID = txMeta.GetId()
+				}),
+			)
 			require.NoError(t, err)
 			defer r.Close(ctx)
-			require.EqualValues(t, "456", tx.ID())
+			require.EqualValues(t, "456", txID)
 			require.EqualValues(t, -1, r.resultSetIndex)
 			{
 				t.Log("nextResultSet")
@@ -630,7 +640,7 @@ func TestExecute(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			_, _, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
 			require.Error(t, err)
 			require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 		})
@@ -706,10 +716,15 @@ func TestExecute(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			tx, r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			var txID string
+			r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
+				onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+					txID = txMeta.GetId()
+				}),
+			)
 			require.NoError(t, err)
 			defer r.Close(ctx)
-			require.EqualValues(t, "456", tx.ID())
+			require.EqualValues(t, "456", txID)
 			require.EqualValues(t, -1, r.resultSetIndex)
 			{
 				t.Log("nextResultSet")

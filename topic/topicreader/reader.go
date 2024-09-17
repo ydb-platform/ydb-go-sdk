@@ -74,7 +74,7 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 	return r.reader.Commit(ctx, obj)
 }
 
-// PopBatchTx read messages batch and commit them within tx.
+// PopMessagesBatchTx read messages batch and commit them within tx.
 // If tx failed - the batch will be received again.
 //
 // Now it means reconnect to the server and re-read messages from the server to the readers buffer.
@@ -83,7 +83,7 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 // The reconnect is implementation detail and may be changed in the future.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (r *Reader) PopBatchTx(
+func (r *Reader) PopMessagesBatchTx(
 	ctx context.Context,
 	transaction tx.Identifier,
 	opts ...ReadBatchOption,

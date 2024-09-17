@@ -514,9 +514,8 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolWithDoneInfo struct {
-		Error error
-
 		Attempts int
+		Error    error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolPutStartInfo struct {
@@ -526,6 +525,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
+		Session sessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolPutDoneInfo struct {
@@ -542,11 +542,16 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolGetDoneInfo struct {
-		Error error
+		Session  sessionInfo
+		Attempts int
+		Error    error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolChange struct {
-		Limit int
-		Idle  int
+		Limit            int
+		Index            int
+		Idle             int
+		Wait             int
+		CreateInProgress int
 	}
 )

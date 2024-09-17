@@ -131,7 +131,7 @@ func TestDetectLocalDC(t *testing.T) {
 func TestLocalDCDiscovery(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New(
-		config.WithBalancer(balancers.PreferLocalDC(balancers.Default())),
+		config.WithBalancer(balancers.PreferNearestDC(balancers.Default())),
 	)
 	r := &Balancer{
 		driverConfig: cfg,

@@ -42,37 +42,7 @@ if err != nil {
     log.Fatal(err)
 }
 ```
-* execute `SELECT` query over `Table` service client
- ```go
-// Do retry operation on errors with best effort
-err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-    _, res, err := s.Execute(ctx, table.DefaultTxControl(), 
-		`SELECT 42 as id, "myStr" as myStr;`, 
-		nil, // empty parameters
-	)
-    if err != nil {
-        return err
-    }
-    defer res.Close()
-    if err = res.NextResultSetErr(ctx); err != nil {
-        return err
-    }
-    for res.NextRow() {
-        var id    int32
-        var myStr string
-        err = res.ScanNamed(named.Required("id", &id),named.OptionalWithDefault("myStr", &myStr))
-        if err != nil {
-            log.Fatal(err)
-        }
-        log.Printf("id=%v, myStr='%s'\n", id, myStr)
-    }
-    return res.Err() // for driver retry if not nil
-})
-if err != nil {
-    log.Fatal(err)
-}
-```
-* execute `SELECT` query over `Query` service client
+* execute `SELECT` query with `Query` service client
  ```go
 // Do retry operation on errors with best effort
 err := db.Query().Do( // Do retry operation on errors with best effort
@@ -149,6 +119,7 @@ Driver implements several ways for making credentials for `YDB`:
 - `ydb.WithAnonymousCredentials()` (enabled by default unless otherwise specified)
 - `ydb.WithAccessTokenCredentials("token")`
 - `ydb.WithStaticCredentials("user", "password")`, 
+- `ydb.WithOauth2TokenExchangeCredentials()` and `ydb,WithOauth2TokenExchangeCredentialsFile(configFilePath)`
 - as part of connection string, like as `grpcs://user:password@endpoint/database`
 
 Another variants of `credentials.Credentials` object provides with external packages:
