@@ -1,21 +1,26 @@
+//go:build go1.23
+
 package topicsugar
 
 import (
 	"context"
 	"encoding/json"
+	"slices"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
-// MessageReader is interface for topicreader.Message
+// TopicMessageReader is interface for topicreader.Message
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type TopicMessageReader interface {
 	ReadMessage(ctx context.Context) (*topicreader.Message, error)
 }
 
-// TopicMessagesIterator is typed representation of cdc event
+// TopicMessageIterator iterator wrapper over topic reader
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func TopicMessageIterator(ctx context.Context, r TopicMessageReader) xiter.Seq2[*topicreader.Message, error] {
@@ -33,10 +38,38 @@ func TopicMessageIterator(ctx context.Context, r TopicMessageReader) xiter.Seq2[
 	}
 }
 
-// TopicUnmarshalJSONIterator is typed representation of cdc event
+// BytesIterator produce iterator over topic messages with Data as []byte, []byte is content of the message
+func BytesIterator(
+	ctx context.Context,
+	r TopicMessageReader,
+) xiter.Seq2[*TypedTopicMessage[[]byte], error] {
+	var unmarshalFunc TypedUnmarshalFunc[*[]byte] = func(data []byte, dst *[]byte) error {
+		*dst = slices.Clone(data)
+
+		return nil
+	}
+
+	return IteratorFunc[[]byte](ctx, r, unmarshalFunc)
+}
+
+// StringIterator produce iterator over topic messages with Data is string, created from message content
+func StringIterator(
+	ctx context.Context,
+	r TopicMessageReader,
+) xiter.Seq2[*TypedTopicMessage[string], error] {
+	var unmarshalFunc TypedUnmarshalFunc[*string] = func(data []byte, dst *string) error {
+		*dst = string(data)
+
+		return nil
+	}
+
+	return IteratorFunc[string](ctx, r, unmarshalFunc)
+}
+
+// JSONIterator produce iterator over topic messages with Data is T, created unmarshalled from message
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func TopicUnmarshalJSONIterator[T any](
+func JSONIterator[T any](
 	ctx context.Context,
 	r TopicMessageReader,
 ) xiter.Seq2[*TypedTopicMessage[T], error] {
@@ -44,13 +77,28 @@ func TopicUnmarshalJSONIterator[T any](
 		return json.Unmarshal(data, dst)
 	}
 
-	return TopicUnmarshalJSONFunc[T](ctx, r, unmarshalFunc)
+	return IteratorFunc[T](ctx, r, unmarshalFunc)
 }
 
-// TopicUnmarshalJSONIterator is typed representation of cdc event
+// ProtobufIterator produce iterator over topic messages with Data is T, created unmarshalled from message
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func TopicUnmarshalJSONFunc[T any](
+func ProtobufIterator[T proto.Message](
+	ctx context.Context,
+	r TopicMessageReader,
+) xiter.Seq2[*TypedTopicMessage[T], error] {
+	var unmarshalFunc TypedUnmarshalFunc[*T] = func(data []byte, dst *T) error {
+		return proto.Unmarshal(data, *dst)
+	}
+
+	return IteratorFunc[T](ctx, r, unmarshalFunc)
+}
+
+// IteratorFunc produce iterator over topic messages with Data is T,
+// created unmarshalled from message by custom function
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func IteratorFunc[T any](
 	ctx context.Context,
 	r TopicMessageReader,
 	f TypedUnmarshalFunc[*T],

@@ -87,5 +87,5 @@ func UnmarshalCDCStream[T YDBCDCItem[K], K any](
 		return json.Unmarshal(data, dst)
 	}
 
-	return TopicUnmarshalJSONFunc[YDBCDCMessage[T, K]](ctx, reader, unmarshal)
+	return IteratorFunc[YDBCDCMessage[T, K]](ctx, reader, unmarshal)
 }
