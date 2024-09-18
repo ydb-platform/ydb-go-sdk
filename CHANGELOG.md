@@ -1,3 +1,4 @@
+## v3.80.8
 * Added `ydb.WithLazyTx(bool)` option for create lazy transactions on `query.Session.Begin` call
 * Added initial experimental topic and cdc-helpers, see examples in [tests/integration/topic_helpers_test.go](https://github.com/ydb-platform/ydb-go-sdk/blob/master/tests/integration/topic_helpers_test.go)
 * Added experimental `sugar.UnmarshalRows` for user unmarshaller structs in own code in go 1.23, change example for use the iterator.
