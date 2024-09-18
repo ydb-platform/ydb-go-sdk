@@ -128,7 +128,7 @@ func (r *Reader) PopBatchTx(
 ) (*topicreadercommon.PublicBatch, error) {
 	batchOptions := r.getBatchOptions(opts)
 
-	return r.reader.PopBatchTx(ctx, tx, batchOptions)
+	return r.reader.PopMessagesBatchTx(ctx, tx, batchOptions)
 }
 
 // ReadMessage read exactly one message

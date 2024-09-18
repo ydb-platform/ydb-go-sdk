@@ -14,7 +14,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -100,7 +99,7 @@ func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
 	q string, settings executeSettings, opts ...resultOption,
 ) (
-	_ tx.Identifier, _ *streamResult, finalErr error,
+	_ *streamResult, finalErr error,
 ) {
 	a := allocator.New()
 	defer a.Free()
@@ -111,19 +110,15 @@ func execute(
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
-		return nil, nil, xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, append(opts, withStatsCallback(settings.StatsCallback()))...)
+	r, err := newResult(ctx, stream, append(opts, withStatsCallback(settings.StatsCallback()))...)
 	if err != nil {
-		return nil, nil, xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if txID == "" {
-		return nil, r, nil
-	}
-
-	return tx.ID(txID), r, nil
+	return r, nil
 }
 
 func readAll(ctx context.Context, r *streamResult) error {

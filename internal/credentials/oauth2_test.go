@@ -145,7 +145,7 @@ func TestOauth2TokenExchange(t *testing.T) {
 			Status:            http.StatusForbidden,
 			ExpectedToken:     "",
 			ExpectedError:     errCouldNotExchangeToken,
-			ExpectedErrorPart: "403 Forbidden, description: \"something went bad\", error_uri: my_error_uri",
+			ExpectedErrorPart: "403 Forbidden, description: \\\"something went bad\\\", error_uri: my_error_uri",
 		},
 		{
 			Response:      `{"access_token":"test_token","token_type":"","expires_in":42,"some_other_field":"x"}`,
@@ -170,7 +170,7 @@ func TestOauth2TokenExchange(t *testing.T) {
 			Status:            http.StatusOK,
 			ExpectedToken:     "",
 			ExpectedError:     errDifferentScope,
-			ExpectedErrorPart: "Expected \"test_scope1 test_scope2\", but got \"s\"",
+			ExpectedErrorPart: "Expected \\\"test_scope1 test_scope2\\\", but got \\\"s\\\"",
 		},
 		{
 			Response:      `{"access_token":"","token_type":"Bearer","expires_in":42}`,

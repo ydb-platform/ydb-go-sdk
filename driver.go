@@ -274,6 +274,8 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 	}()
 
 	if err = d.connect(ctx); err != nil {
+		_ = d.pool.Release(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -519,7 +521,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 
 	d.operation = xsync.OnceValue(func() (*operation.Client, error) {
 		return operation.New(xcontext.ValueOnly(ctx),
-			d.pool.Get(endpoint.New(d.config.Endpoint())),
+			d.balancer,
 		), nil
 	})
 

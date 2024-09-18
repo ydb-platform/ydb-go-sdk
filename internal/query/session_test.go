@@ -10,7 +10,7 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -41,9 +41,8 @@ func TestCreateSession(t *testing.T) {
 		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
 			SessionId: "123",
 		}).Return(attachStream, nil)
-		t.Log("createSession")
 		require.NotPanics(t, func() {
-			s, err := createSession(ctx, client, config.New(config.WithTrace(trace)))
+			s, err := createSession(ctx, client, session.WithTrace(trace))
 			require.NoError(t, err)
 			require.NotNil(t, s)
 			require.Equal(t, "123", s.ID())
@@ -57,9 +56,8 @@ func TestCreateSession(t *testing.T) {
 			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
 				xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test")),
 			)
-			t.Log("createSession")
 			require.NotPanics(t, func() {
-				s, err := createSession(ctx, client, config.New(config.WithTrace(trace)))
+				s, err := createSession(ctx, client, session.WithTrace(trace))
 				require.Error(t, err)
 				require.Nil(t, s)
 			})
@@ -80,9 +78,8 @@ func TestCreateSession(t *testing.T) {
 			}).Return(&Ydb_Query.DeleteSessionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
-			t.Log("createSession")
 			require.NotPanics(t, func() {
-				s, err := createSession(ctx, client, config.New(config.WithTrace(trace)))
+				s, err := createSession(ctx, client, session.WithTrace(trace))
 				require.Error(t, err)
 				require.Nil(t, s)
 			})
@@ -96,9 +93,8 @@ func TestCreateSession(t *testing.T) {
 			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
 				xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 			)
-			t.Log("createSession")
 			require.NotPanics(t, func() {
-				s, err := createSession(ctx, client, config.New(config.WithTrace(trace)))
+				s, err := createSession(ctx, client, session.WithTrace(trace))
 				require.Error(t, err)
 				require.Nil(t, s)
 			})
@@ -119,9 +115,8 @@ func TestCreateSession(t *testing.T) {
 			}).Return(&Ydb_Query.DeleteSessionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
-			t.Log("createSession")
 			require.NotPanics(t, func() {
-				s, err := createSession(ctx, client, config.New(config.WithTrace(trace)))
+				s, err := createSession(ctx, client, session.WithTrace(trace))
 				require.Error(t, err)
 				require.Nil(t, s)
 			})

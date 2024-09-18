@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
@@ -20,9 +19,9 @@ type Config struct {
 
 	poolLimit int
 
-	useSessionPool       bool
-	sessionCreateTimeout time.Duration
-	sessionDeleteTimeout time.Duration
+	sessionCreateTimeout   time.Duration
+	sessionDeleteTimeout   time.Duration
+	sessionIddleTimeToLive time.Duration
 
 	trace *trace.Query
 }
@@ -44,7 +43,6 @@ func defaults() *Config {
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
 		trace:                &trace.Query{},
-		useSessionPool:       os.Getenv("YDB_GO_SDK_QUERY_SERVICE_USE_SESSION_POOL") != "",
 	}
 }
 
@@ -72,6 +70,8 @@ func (c *Config) SessionDeleteTimeout() time.Duration {
 	return c.sessionDeleteTimeout
 }
 
-func (c *Config) UseSessionPool() bool {
-	return c.useSessionPool
+// SessionIdleTimeToLive limits maximum time to live of idle session
+// If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
+func (c *Config) SessionIdleTimeToLive() time.Duration {
+	return c.sessionIddleTimeToLive
 }

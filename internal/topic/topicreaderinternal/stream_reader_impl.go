@@ -185,7 +185,7 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	return nil
 }
 
-func (r *topicStreamReaderImpl) PopBatchTx(
+func (r *topicStreamReaderImpl) PopMessagesBatchTx(
 	ctx context.Context,
 	tx tx.Transaction,
 	opts ReadMessageBatchOptions,

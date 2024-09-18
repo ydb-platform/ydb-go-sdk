@@ -121,20 +121,10 @@ func (m *Metrics) Start(name SpanName) Span {
 	return j
 }
 
-func (j Span) Stop(err error, attempts int) {
+func (j Span) Finish(err error, attempts int) {
 	j.m.inflight.WithLabelValues(j.name).Sub(1)
 
 	latency := time.Since(j.start)
-
-	if attempts > 1 {
-		fmt.Printf("more than 1 attempt for request (request_type: %q, attempts: %d, start: %s, latency: %s, err: %v)\n",
-			j.name,
-			attempts,
-			j.start.Format(time.DateTime),
-			latency.String(),
-			err,
-		)
-	}
 
 	var (
 		successLabel   = JobStatusOK

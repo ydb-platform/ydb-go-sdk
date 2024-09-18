@@ -2,13 +2,12 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"sync"
-	"time"
 
 	"golang.org/x/time/rate"
 
+	"slo/internal/log"
 	"slo/internal/metrics"
 )
 
@@ -24,20 +23,17 @@ func (w *Workers) Read(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter
 	}
 }
 
-func (w *Workers) read(ctx context.Context) (err error) {
+func (w *Workers) read(ctx context.Context) error {
 	id := uint64(rand.Intn(int(w.cfg.InitialDataCount))) //nolint:gosec // speed more important
 
-	var attempts int
-
 	m := w.m.Start(metrics.JobRead)
-	defer func() {
-		m.Stop(err, attempts)
-		if err != nil {
-			fmt.Printf("[%s] get entry error: %v\n", time.Now().Format(time.RFC3339), err)
-		}
-	}()
 
-	_, attempts, err = w.s.Read(ctx, id)
+	_, attempts, err := w.s.Read(ctx, id)
+	if err != nil {
+		log.Printf("read failed with %d attempts: %v", attempts, err)
+	}
+
+	m.Finish(err, attempts)
 
 	return err
 }

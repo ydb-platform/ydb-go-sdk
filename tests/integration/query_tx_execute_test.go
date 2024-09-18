@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -30,14 +31,14 @@ func TestQueryTxExecute(t *testing.T) {
 	)
 	t.Run("Default", func(t *testing.T) {
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-			if tx.ID() != internalQuery.LazyTxID {
+			if tx.ID() != baseTx.LazyTxID {
 				return errors.New("transaction is not lazy")
 			}
 			res, err := tx.Query(ctx, "SELECT 1 AS col1")
 			if err != nil {
 				return err
 			}
-			if tx.ID() == internalQuery.LazyTxID {
+			if tx.ID() == baseTx.LazyTxID {
 				return errors.New("transaction is lazy yet")
 			}
 			rs, err := res.NextResultSet(ctx)
@@ -71,14 +72,14 @@ func TestQueryTxExecute(t *testing.T) {
 	})
 	t.Run("SerializableReadWrite", func(t *testing.T) {
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-			if tx.ID() != internalQuery.LazyTxID {
+			if tx.ID() != baseTx.LazyTxID {
 				return errors.New("transaction is not lazy")
 			}
 			res, err := tx.Query(ctx, "SELECT 1 AS col1")
 			if err != nil {
 				return err
 			}
-			if tx.ID() == internalQuery.LazyTxID {
+			if tx.ID() == baseTx.LazyTxID {
 				return errors.New("transaction is lazy yet")
 			}
 			rs, err := res.NextResultSet(ctx)
@@ -107,14 +108,14 @@ func TestQueryTxExecute(t *testing.T) {
 	})
 	t.Run("SnapshotReadOnly", func(t *testing.T) {
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-			if tx.ID() != internalQuery.LazyTxID {
+			if tx.ID() != baseTx.LazyTxID {
 				return errors.New("transaction is not lazy")
 			}
 			res, err := tx.Query(ctx, "SELECT 1 AS col1")
 			if err != nil {
 				return err
 			}
-			if tx.ID() == internalQuery.LazyTxID {
+			if tx.ID() == baseTx.LazyTxID {
 				return errors.New("transaction is lazy yet")
 			}
 			rs, err := res.NextResultSet(ctx)
@@ -143,14 +144,14 @@ func TestQueryTxExecute(t *testing.T) {
 	})
 	t.Run("OnlineReadOnly", func(t *testing.T) {
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-			if tx.ID() != internalQuery.LazyTxID {
+			if tx.ID() != baseTx.LazyTxID {
 				return errors.New("transaction is not lazy")
 			}
 			res, err := tx.Query(ctx, "SELECT 1 AS col1")
 			if err != nil {
 				return err
 			}
-			if tx.ID() == internalQuery.LazyTxID {
+			if tx.ID() == baseTx.LazyTxID {
 				return errors.New("transaction is lazy yet")
 			}
 			rs, err := res.NextResultSet(ctx)
@@ -177,14 +178,14 @@ func TestQueryTxExecute(t *testing.T) {
 	})
 	t.Run("StaleReadOnly", func(t *testing.T) {
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-			if tx.ID() != internalQuery.LazyTxID {
+			if tx.ID() != baseTx.LazyTxID {
 				return errors.New("transaction is not lazy")
 			}
 			res, err := tx.Query(ctx, "SELECT 1 AS col1")
 			if err != nil {
 				return err
 			}
-			if tx.ID() == internalQuery.LazyTxID {
+			if tx.ID() == baseTx.LazyTxID {
 				return errors.New("transaction is lazy yet")
 			}
 			rs, err := res.NextResultSet(ctx)
@@ -211,7 +212,7 @@ func TestQueryTxExecute(t *testing.T) {
 	})
 	t.Run("ErrOptionNotForTxExecute", func(t *testing.T) {
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-			if tx.ID() != internalQuery.LazyTxID {
+			if tx.ID() != baseTx.LazyTxID {
 				return errors.New("transaction is not lazy")
 			}
 			err = tx.Exec(ctx, "SELECT 1 AS col1",

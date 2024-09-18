@@ -78,7 +78,7 @@ func newReaderReconnector(
 	return res
 }
 
-func (r *readerReconnector) PopBatchTx(
+func (r *readerReconnector) PopMessagesBatchTx(
 	ctx context.Context,
 	tx tx.Transaction,
 	opts ReadMessageBatchOptions,
@@ -95,7 +95,7 @@ func (r *readerReconnector) PopBatchTx(
 			*topicreadercommon.PublicBatch,
 			error,
 		) {
-			return stream.PopBatchTx(ctx, tx, opts)
+			return stream.PopMessagesBatchTx(ctx, tx, opts)
 		},
 	)
 }

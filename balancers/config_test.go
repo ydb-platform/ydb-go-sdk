@@ -70,7 +70,21 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "local_dc"
 			}`,
 			res: balancerConfig.Config{
-				DetectLocalDC: true,
+				DetectNearestDC: true,
+				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
+					// some non nil func
+					return false
+				}),
+			},
+		},
+		{
+			name: "prefer_nearest_dc",
+			config: `{
+				"type": "random_choice",
+				"prefer": "nearest_dc"
+			}`,
+			res: balancerConfig.Config{
+				DetectNearestDC: true,
 				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
 					return false
@@ -93,8 +107,24 @@ func TestFromConfig(t *testing.T) {
 				"fallback": true
 			}`,
 			res: balancerConfig.Config{
-				AllowFallback: true,
-				DetectLocalDC: true,
+				AllowFallback:   true,
+				DetectNearestDC: true,
+				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
+					// some non nil func
+					return false
+				}),
+			},
+		},
+		{
+			name: "prefer_nearest_dc_with_fallback",
+			config: `{
+				"type": "random_choice",
+				"prefer": "nearest_dc",
+				"fallback": true
+			}`,
+			res: balancerConfig.Config{
+				AllowFallback:   true,
+				DetectNearestDC: true,
 				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
 					return false
