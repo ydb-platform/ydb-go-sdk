@@ -1,3 +1,4 @@
+## v3.80.7
 * Doesn't rollback a the transaction on the operation error in table service
 
 ## v3.80.6
