@@ -1,11 +1,12 @@
 * Added experimental `sugar.UnmarshalRows` for user unmarshaller structs in own code in go 1.23, change example for use the iterator.
+* Added `ydb_go_sdk_ydb_query_pool_size_limit` metrics
 
 ## v3.80.7
 * Doesn't rollback a the transaction on the operation error in table service
 
 ## v3.80.6
 * Fixed concurrent map writes in metrics
-* Renamed method at experimental API reader.PopBatchTx to reader.PopMessagesBatchTx
+* Renamed method at experimental API `reader.PopBatchTx` to `reader.PopMessagesBatchTx`
 
 ## v3.80.5
 * Fixed connections pool leak on failed `ydb.Open` call
