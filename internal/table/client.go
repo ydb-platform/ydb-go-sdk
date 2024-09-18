@@ -238,7 +238,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		}
 
 		defer func() {
-			if err != nil {
+			if err != nil && !xerrors.IsOperationError(err) {
 				_ = tx.Rollback(ctx)
 			}
 		}()
