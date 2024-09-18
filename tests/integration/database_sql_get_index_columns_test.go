@@ -43,7 +43,6 @@ func TestDatabaseSqlGetIndexColumns(t *testing.T) {
 				)
 			)`,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -82,7 +81,6 @@ func TestDatabaseSqlGetIndexColumns(t *testing.T) {
 					columns, err = q.GetIndexColumns(ctx, "./seasons", test.IndexName)
 					return err
 				})
-
 				if err != nil {
 					return err
 				}

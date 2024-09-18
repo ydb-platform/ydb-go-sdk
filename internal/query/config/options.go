@@ -55,3 +55,19 @@ func WithSessionDeleteTimeout(deleteTimeout time.Duration) Option {
 		}
 	}
 }
+
+// WithSessionIdleTimeToLive limits maximum time to live of idle session
+// If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
+func WithSessionIdleTimeToLive(idleTimeToLive time.Duration) Option {
+	return func(c *Config) {
+		if idleTimeToLive > 0 {
+			c.sessionIddleTimeToLive = idleTimeToLive
+		}
+	}
+}
+
+func WithLazyTx(lazyTx bool) Option {
+	return func(c *Config) {
+		c.lazyTx = lazyTx
+	}
+}

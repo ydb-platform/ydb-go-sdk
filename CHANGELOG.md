@@ -1,3 +1,46 @@
+## v3.80.8
+* Added `ydb.WithLazyTx(bool)` option for create lazy transactions on `query.Session.Begin` call
+* Added initial experimental topic and cdc-helpers, see examples in [tests/integration/topic_helpers_test.go](https://github.com/ydb-platform/ydb-go-sdk/blob/master/tests/integration/topic_helpers_test.go)
+* Added experimental `sugar.UnmarshalRows` for user unmarshaller structs in own code in go 1.23, change example for use the iterator.
+* Added `ydb_go_sdk_ydb_query_pool_size_index` metrics
+
+## v3.80.7
+* Fixed bug with doesn't rollback the transaction on the operation error in table service
+
+## v3.80.6
+* Fixed concurrent map writes in metrics
+* Renamed method at experimental API `reader.PopBatchTx` to `reader.PopMessagesBatchTx`
+
+## v3.80.5
+* Fixed connections pool leak on failed `ydb.Open` call
+
+## v3.80.4
+* Fixed panic on usage metrics package from prometheus adapter on `trace.Driver.OnNewStream` callback
+
+## v3.80.3
+* Added option `ydb.WithSessionPoolSessionIdleTimeToLive` for restrict idle time of query sessions
+* Fixed bug with leak of query transactions
+* Changed `ydb_go_sdk_ydb_driver_conn_requests` metrics splitted to `ydb_go_sdk_ydb_driver_conn_request_statuses` and `ydb_go_sdk_ydb_driver_conn_request_methods`
+* Fixed metadata for operation service connection
+* Fixed composing query traces in call `db.Query.Do[Tx]` using option `query.WithTrace`
+
+## v3.80.2
+* Added `balancers.PreferNearestDC[WithFallback]` balancers
+* Marked as deprecated `balancers.PreferLocalDC[WithFallback]` balancers because `local` word is ambiguous for balancer idea
+
+## v3.80.1
+* Added `lastErr` from previous attempt in `retry.RetryWithResult`
+
+## v3.80.0
+* Replaced internal table client pool entities to `internal/pool`
+
+## v3.79.2
+* Enabled by default usage of `internal/pool` in `internal/query.Client`
+
+## v3.79.1
+* Changed `trace.Table` and `trace.Query` traces
+* Implemented `internal/pool` the same as table client pool from `internal/table.Client`
+
 ## v3.79.0
 * Added commit messages for topic listener
 * EOF error in RecvMsg is no longer logged

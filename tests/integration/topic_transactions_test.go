@@ -30,7 +30,7 @@ func TestTopicReadInTransaction(t *testing.T) {
 	require.NoError(t, scope.Driver().Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 		reader := scope.TopicReaderNamed("first")
 		scope.Logf("trying to pop a batch")
-		batch, err := reader.PopBatchTx(ctx, tx)
+		batch, err := reader.PopMessagesBatchTx(ctx, tx)
 		scope.Logf("pop a batch result: %v", err)
 		if err != nil {
 			return err
@@ -55,7 +55,7 @@ func TestTopicReadInTransaction(t *testing.T) {
 		}
 
 		scope.Logf("trying second pop batch")
-		batch, err := reader.PopBatchTx(ctx, tx)
+		batch, err := reader.PopMessagesBatchTx(ctx, tx)
 		scope.Logf("second pop batch result: %v", err)
 		if err != nil {
 			return err

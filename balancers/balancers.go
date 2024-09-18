@@ -37,21 +37,41 @@ func (filterLocalDC) String() string {
 	return "LocalDC"
 }
 
-// PreferLocalDC creates balancer which use endpoints only in location such as initial endpoint location
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-// PreferLocalDC balancer try to autodetect local DC from client side.
+// Deprecated: use PreferNearestDC instead
+// Will be removed after March 2025.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func PreferLocalDC(balancer *balancerConfig.Config) *balancerConfig.Config {
 	balancer.Filter = filterLocalDC{}
-	balancer.DetectLocalDC = true
+	balancer.DetectNearestDC = true
 
 	return balancer
 }
 
-// PreferLocalDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
+// PreferNearestDC creates balancer which use endpoints only in location such as initial endpoint location
+// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
+// PreferNearestDC balancer try to autodetect local DC from client side.
+func PreferNearestDC(balancer *balancerConfig.Config) *balancerConfig.Config {
+	balancer.Filter = filterLocalDC{}
+	balancer.DetectNearestDC = true
+
+	return balancer
+}
+
+// Deprecated: use PreferNearestDCWithFallBack instead
+// Will be removed after March 2025.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func PreferLocalDCWithFallBack(balancer *balancerConfig.Config) *balancerConfig.Config {
+	balancer = PreferNearestDC(balancer)
+	balancer.AllowFallback = true
+
+	return balancer
+}
+
+// PreferNearestDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocalDCWithFallBack(balancer *balancerConfig.Config) *balancerConfig.Config {
-	balancer = PreferLocalDC(balancer)
+func PreferNearestDCWithFallBack(balancer *balancerConfig.Config) *balancerConfig.Config {
+	balancer = PreferNearestDC(balancer)
 	balancer.AllowFallback = true
 
 	return balancer

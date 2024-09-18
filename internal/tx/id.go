@@ -1,23 +1,35 @@
 package tx
 
-var _ Identifier = (*ID)(nil)
+var _ Identifier = LazyID{}
+
+const (
+	LazyTxID = "LAZY_TX"
+)
 
 type (
 	Identifier interface {
 		ID() string
 		isYdbTx()
 	}
-	ID string
+	LazyID struct {
+		v *string
+	}
 )
 
-var Lazy = ID("")
+func (id LazyID) ID() string {
+	if id.v == nil {
+		return LazyTxID
+	}
 
-func NewID(id string) ID {
-	return ID(id)
+	return *id.v
 }
 
-func (id ID) ID() string {
-	return string(id)
+func (id *LazyID) SetTxID(txID string) {
+	id.v = &txID
 }
 
-func (id ID) isYdbTx() {}
+func (id LazyID) isYdbTx() {}
+
+func ID(id string) LazyID {
+	return LazyID{v: &id}
+}

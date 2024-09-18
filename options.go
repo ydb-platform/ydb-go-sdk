@@ -480,9 +480,17 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 
 // WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
-	return func(ctx context.Context, c *Driver) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
-		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+
+		return nil
+	}
+}
+
+func WithLazyTx(lazyTx bool) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.queryOptions = append(d.queryOptions, queryConfig.WithLazyTx(lazyTx))
 
 		return nil
 	}
@@ -496,6 +504,16 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 			c.databaseSQLOptions,
 			xsql.WithIdleThreshold(idleThreshold),
 		)
+
+		return nil
+	}
+}
+
+// WithSessionPoolSessionIdleTimeToLive limits maximum time to live of idle session
+// If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
+func WithSessionPoolSessionIdleTimeToLive(idleThreshold time.Duration) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionIdleTimeToLive(idleThreshold))
 
 		return nil
 	}

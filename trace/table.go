@@ -64,15 +64,6 @@ type (
 		)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnTxRollback func(TableTxRollbackStartInfo) func(TableTxRollbackDoneInfo)
-		// Pool state event
-		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnPoolStateChange func(TablePoolStateChangeInfo)
-
-		// Pool session lifecycle events
-		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnPoolSessionAdd func(info TablePoolSessionAddInfo)
-		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnPoolSessionRemove func(info TablePoolSessionRemoveInfo)
 
 		// Pool common API events
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -80,6 +71,21 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnPoolGet func(TablePoolGetStartInfo) func(TablePoolGetDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnPoolWith func(TablePoolWithStartInfo) func(TablePoolWithDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnPoolStateChange func(TablePoolStateChangeInfo)
+
+		// Deprecated
+		// Will be removed after March 2025.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		OnPoolSessionAdd func(info TablePoolSessionAddInfo)
+		// Deprecated
+		// Will be removed after March 2025.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		OnPoolSessionRemove func(info TablePoolSessionRemoveInfo)
+		// Deprecated
+		// Will be removed after March 2025.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 		OnPoolWait func(TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo)
 	}
 )
@@ -335,8 +341,16 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolStateChangeInfo struct {
-		Size  int
-		Event string
+		Limit            int
+		Index            int
+		Idle             int
+		Wait             int
+		CreateInProgress int
+
+		// Deprecated: use Index field instead.
+		// Will be removed after March 2025.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		Size int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewStartInfo struct {
@@ -367,7 +381,9 @@ type (
 		Attempts int
 		Error    error
 	}
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	// Deprecated
+	// Will be removed after March 2025.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolWaitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -376,13 +392,26 @@ type (
 		Context *context.Context
 		Call    call
 	}
-	// TablePoolWaitDoneInfo means a wait iteration inside Get call is done
-	// Warning: Session and Error may be nil at the same time. This means
-	// that a wait iteration donned without any significant tableResultErr
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	// Deprecated
+	// Will be removed after March 2025.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolWaitDoneInfo struct {
 		Session sessionInfo
 		Error   error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TablePoolWithStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TablePoolWithDoneInfo struct {
+		Attempts int
+		Error    error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolPutStartInfo struct {
@@ -410,11 +439,15 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionCloseDoneInfo struct{}
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	// Deprecated
+	// Will be removed after March 2025.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolSessionAddInfo struct {
 		Session sessionInfo
 	}
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	// Deprecated
+	// Will be removed after March 2025.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolSessionRemoveInfo struct {
 		Session sessionInfo
 	}

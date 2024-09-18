@@ -149,7 +149,7 @@ func newResultSet(
 	}
 }
 
-func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
+func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 	rs.rowIndex++
 	for {
 		select {

@@ -344,7 +344,7 @@ func TestResultRangeResultSets(t *testing.T) {
 		},
 	}, nil)
 	stream.EXPECT().Recv().Return(nil, io.EOF)
-	r, _, err := newResult(ctx, stream, nil)
+	r, err := newResult(ctx, stream, nil)
 	require.NoError(t, err)
 	defer r.Close(ctx)
 	rsCount := 0

@@ -14,5 +14,5 @@ type batchedStreamReader interface {
 	ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)
 	Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error
 	CloseWithError(ctx context.Context, err error) error
-	PopBatchTx(ctx context.Context, tx tx.Transaction, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) //nolint:lll
+	PopMessagesBatchTx(ctx context.Context, tx tx.Transaction, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) //nolint:lll
 }

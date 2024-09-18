@@ -13,6 +13,7 @@ import (
 
 	"slo/internal/config"
 	"slo/internal/generator"
+	"slo/internal/log"
 	"slo/internal/workers"
 )
 
@@ -30,8 +31,8 @@ func main() {
 		panic(fmt.Errorf("create config failed: %w", err))
 	}
 
-	fmt.Println("program started")
-	defer fmt.Println("program finished")
+	log.Println("program started")
+	defer log.Println("program finished")
 
 	ctx, cancel = context.WithTimeout(ctx, time.Duration(cfg.Time)*time.Second)
 	defer cancel()
@@ -48,7 +49,7 @@ func main() {
 		_ = s.close(shutdownCtx)
 	}()
 
-	fmt.Println("db init ok")
+	log.Println("db init ok")
 
 	switch cfg.Mode {
 	case config.CreateMode:
@@ -56,7 +57,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
-		fmt.Println("create table ok")
+		log.Println("create table ok")
 
 		gen := generator.New(0)
 
@@ -83,14 +84,14 @@ func main() {
 			panic(err)
 		}
 
-		fmt.Println("entries write ok")
+		log.Println("entries write ok")
 	case config.CleanupMode:
 		err = s.dropTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("drop table failed: %w", err))
 		}
 
-		fmt.Println("cleanup table ok")
+		log.Println("cleanup table ok")
 	case config.RunMode:
 		gen := generator.New(cfg.InitialDataCount)
 
@@ -103,7 +104,7 @@ func main() {
 			if err != nil {
 				panic(fmt.Errorf("workers close failed: %w", err))
 			}
-			fmt.Println("workers close ok")
+			log.Println("workers close ok")
 		}()
 
 		wg := sync.WaitGroup{}

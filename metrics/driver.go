@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"strconv"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -18,13 +19,15 @@ func driver(config Config) (t trace.Driver) {
 	balancerUpdates := config.WithSystem("balancer").CounterVec("updates", "cause")
 	conns := config.GaugeVec("conns", "endpoint", "node_id")
 	banned := config.WithSystem("conn").GaugeVec("banned", "endpoint", "node_id", "cause")
-	requests := config.WithSystem("conn").CounterVec("requests", "status", "method", "endpoint", "node_id")
+	requestStatuses := config.WithSystem("conn").CounterVec("request_statuses", "status", "endpoint", "node_id")
+	requestMethods := config.WithSystem("conn").CounterVec("request_methods", "method", "endpoint", "node_id")
 	tli := config.CounterVec("transaction_locks_invalidated")
 
 	type endpointKey struct {
 		az string
 	}
 	knownEndpoints := make(map[endpointKey]struct{})
+	endpointsMu := sync.RWMutex{}
 
 	t.OnConnInvoke = func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
 		var (
@@ -35,8 +38,12 @@ func driver(config Config) (t trace.Driver) {
 
 		return func(info trace.DriverConnInvokeDoneInfo) {
 			if config.Details()&trace.DriverConnEvents != 0 {
-				requests.With(map[string]string{
+				requestStatuses.With(map[string]string{
 					"status":   errorBrief(info.Error),
+					"endpoint": endpoint,
+					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
+				}).Inc()
+				requestMethods.With(map[string]string{
 					"method":   string(method),
 					"endpoint": endpoint,
 					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
@@ -58,8 +65,12 @@ func driver(config Config) (t trace.Driver) {
 
 		return func(info trace.DriverConnNewStreamDoneInfo) {
 			if config.Details()&trace.DriverConnStreamEvents != 0 {
-				requests.With(map[string]string{
+				requestStatuses.With(map[string]string{
 					"status":   errorBrief(info.Error),
+					"endpoint": endpoint,
+					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
+				}).Inc()
+				requestMethods.With(map[string]string{
 					"method":   string(method),
 					"endpoint": endpoint,
 					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
@@ -95,6 +106,8 @@ func driver(config Config) (t trace.Driver) {
 
 		return func(info trace.DriverBalancerUpdateDoneInfo) {
 			if config.Details()&trace.DriverBalancerEvents != 0 {
+				endpointsMu.Lock()
+				defer endpointsMu.Unlock()
 				balancerUpdates.With(map[string]string{
 					"cause": eventType,
 				}).Inc()
