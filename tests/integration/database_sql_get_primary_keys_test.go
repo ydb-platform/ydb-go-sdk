@@ -65,7 +65,6 @@ func TestDatabaseSqlGetPrimaryKeys(t *testing.T) {
 				pkCols, err = q.GetPrimaryKeys(ctx, "episodes")
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
