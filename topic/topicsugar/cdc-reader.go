@@ -1,6 +1,9 @@
+//go:build go1.23
+
 package topicsugar
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -14,16 +17,14 @@ import (
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type YDBCDCItem[K any] interface {
 	comparable
-	ParseCDCKey([]json.RawMessage) (K, error)
-	SetPrimaryKey(K)
+	ParseCDCKey(keyFields []json.RawMessage) (K, error)
+	SetPrimaryKey(key K)
 }
 
 // YDBCDCMessage is typed representation of cdc event
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-type YDBCDCMessage[T interface {
-	YDBCDCItem[Key]
-}, Key any] struct {
+type YDBCDCMessage[T YDBCDCItem[Key], Key any] struct {
 	Update   T
 	NewImage T
 	OldImage T
@@ -39,12 +40,12 @@ func (c *YDBCDCMessage[T, Key]) IsErase() bool {
 
 func (c *YDBCDCMessage[T, Key]) UnmarshalJSON(bytes []byte) error {
 	var rawItem struct {
-		Update   T
-		NewImage T
-		OldImage T
-		Key      []json.RawMessage
-		Erase    *struct{}
-		TS       []uint64
+		Update   T                 `json:"update"`
+		NewImage T                 `json:"newImage"`
+		OldImage T                 `json:"oldImage"`
+		Key      []json.RawMessage `json:"key"`
+		Erase    *struct{}         `json:"erase"`
+		TS       []uint64          `json:"ts"`
 	}
 
 	err := json.Unmarshal(bytes, &rawItem)
@@ -78,4 +79,13 @@ func (c *YDBCDCMessage[T, Key]) UnmarshalJSON(bytes []byte) error {
 	return nil
 }
 
-func UnmarsharCDCStream[K any]() xiter.Seq2[YDB]
+func UnmarshalCDCStream[T YDBCDCItem[K], K any](
+	ctx context.Context,
+	reader TopicMessageReader,
+) xiter.Seq2[*TypedTopicMessage[YDBCDCMessage[T, K]], error] {
+	var unmarshal TypedUnmarshalFunc[*YDBCDCMessage[T, K]] = func(data []byte, dst *YDBCDCMessage[T, K]) error {
+		return json.Unmarshal(data, dst)
+	}
+
+	return TopicUnmarshalJSONFunc[YDBCDCMessage[T, K]](ctx, reader, unmarshal)
+}

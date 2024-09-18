@@ -1,3 +1,5 @@
+* Added initial experimental topic and cdc-helpers, see examples in https://github.com/ydb-platform/ydb-go-sdk/blob/master/tests/integration/topic_helpers_test.go
+
 ## v3.80.7
 * Doesn't rollback a the transaction on the operation error in table service
 
