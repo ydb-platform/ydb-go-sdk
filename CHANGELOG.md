@@ -1,5 +1,5 @@
 * Added experimental `sugar.UnmarshalRows` for user unmarshaller structs in own code in go 1.23, change example for use the iterator.
-* Added `ydb_go_sdk_ydb_query_pool_size_limit` metrics
+* Added `ydb_go_sdk_ydb_query_pool_size_index` metrics
 
 ## v3.80.7
 * Doesn't rollback a the transaction on the operation error in table service
