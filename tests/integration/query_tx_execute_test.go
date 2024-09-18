@@ -200,11 +200,7 @@ func TestQueryTxExecute(t *testing.T) {
 			}
 			return nil
 		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithOnlineReadOnly())))
-		if version.Lt(os.Getenv("YDB_VERSION"), "24.3") {
-			require.NoError(t, err)
-		} else {
-			require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
-		}
+		require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
 	})
 	t.Run("StaleReadOnly", func(t *testing.T) {
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
@@ -227,11 +223,7 @@ func TestQueryTxExecute(t *testing.T) {
 			}
 			return nil
 		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithStaleReadOnly())))
-		if version.Lt(os.Getenv("YDB_VERSION"), "24.3") {
-			require.NoError(t, err)
-		} else {
-			require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
-		}
+		require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
 	})
 	t.Run("ErrOptionNotForTxExecute", func(t *testing.T) {
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
