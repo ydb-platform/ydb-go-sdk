@@ -1,9 +1,10 @@
+* Added `ydb.WithLazyTx()` option for create lazy transactions on `query.Session.Begin` call
 * Added initial experimental topic and cdc-helpers, see examples in [tests/integration/topic_helpers_test.go](https://github.com/ydb-platform/ydb-go-sdk/blob/master/tests/integration/topic_helpers_test.go)
 * Added experimental `sugar.UnmarshalRows` for user unmarshaller structs in own code in go 1.23, change example for use the iterator.
-* Added `ydb_go_sdk_ydb_query_pool_size_limit` metrics
+* Added `ydb_go_sdk_ydb_query_pool_size_index` metrics
 
 ## v3.80.7
-* Doesn't rollback a the transaction on the operation error in table service
+* Fixed bug with doesn't rollback the transaction on the operation error in table service
 
 ## v3.80.6
 * Fixed concurrent map writes in metrics

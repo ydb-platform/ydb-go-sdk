@@ -88,7 +88,7 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 
 func (scope *scopeT) DriverWithLogs(opts ...ydb.Option) *ydb.Driver {
 	return scope.driverNamed("logged",
-		ydb.WithTraceQuery(
+		append(opts, ydb.WithTraceQuery(
 			log.Query(
 				log.Default(os.Stdout,
 					log.WithLogQuery(),
@@ -96,7 +96,7 @@ func (scope *scopeT) DriverWithLogs(opts ...ydb.Option) *ydb.Driver {
 				),
 				trace.QueryEvents,
 			),
-		),
+		))...,
 	)
 }
 

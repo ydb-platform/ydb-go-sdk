@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -356,7 +357,7 @@ func Example_retryWithSessions() {
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
 }
 
-func Example_rertryWithTx() {
+func Example_retryWithTx() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
@@ -378,6 +379,64 @@ func Example_rertryWithTx() {
 			if err != nil {
 				return err // for auto-retry with driver
 			}
+			defer func() { _ = res.Close(ctx) }() // cleanup resources
+			// for loop with ResultSets available with Go version 1.23+
+			for rs, err := range res.ResultSets(ctx) {
+				if err != nil {
+					return err
+				}
+				// for loop with ResultSets available with Go version 1.23+
+				for row, err := range rs.Rows(ctx) {
+					if err != nil {
+						return err
+					}
+					if err = row.ScanNamed(
+						query.Named("id", &id),
+						query.Named("myStr", &myStr),
+					); err != nil {
+						return err // generally scan error not retryable, return it for driver check error
+					}
+				}
+			}
+
+			return nil
+		},
+		query.WithIdempotent(),
+		query.WithTxSettings(query.TxSettings(
+			query.WithSnapshotReadOnly(),
+		)),
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+}
+
+func Example_retryWithLazyTx() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local",
+		ydb.WithLazyTx(),
+	)
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+	// Do retry operation on errors with best effort
+	err = db.Query().DoTx(ctx, // context manage exiting from Do
+		func(ctx context.Context, tx query.TxActor) (err error) { // retry operation
+			res, err := tx.Query(ctx,
+				`SELECT 42 as id, "my string" as myStr`,
+			)
+			if err != nil {
+				return err // for auto-retry with driver
+			}
+			fmt.Printf("txID: expected %q, actual %q", baseTx.LazyTxID, tx.ID())
 			defer func() { _ = res.Close(ctx) }() // cleanup resources
 			// for loop with ResultSets available with Go version 1.23+
 			for rs, err := range res.ResultSets(ctx) {

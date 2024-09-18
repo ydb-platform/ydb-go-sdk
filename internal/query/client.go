@@ -550,6 +550,8 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 					return nil, xerrors.WithStackTrace(err)
 				}
 
+				s.laztTx = cfg.LazyTx()
+
 				return s, nil
 			}),
 		),

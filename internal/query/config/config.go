@@ -23,6 +23,8 @@ type Config struct {
 	sessionDeleteTimeout   time.Duration
 	sessionIddleTimeToLive time.Duration
 
+	lazyTx bool
+
 	trace *trace.Query
 }
 
@@ -74,4 +76,8 @@ func (c *Config) SessionDeleteTimeout() time.Duration {
 // If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
 func (c *Config) SessionIdleTimeToLive() time.Duration {
 	return c.sessionIddleTimeToLive
+}
+
+func (c *Config) LazyTx() bool {
+	return c.lazyTx
 }
