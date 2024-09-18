@@ -11,6 +11,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
 func read(ctx context.Context, c query.Client, prefix string) error {
@@ -43,26 +44,18 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 
 					return err
 				}
-				for {
-					row, err := resultSet.NextRow(ctx)
-					if err != nil {
-						if errors.Is(err, io.EOF) {
-							break
-						}
-
-						return err
-					}
-
-					var info struct {
-						SeriesID    string    `sql:"series_id"`
-						Title       string    `sql:"title"`
-						ReleaseDate time.Time `sql:"release_date"`
-					}
-					err = row.ScanStruct(&info)
+				type info struct {
+					SeriesID    string    `sql:"series_id"`
+					Title       string    `sql:"title"`
+					ReleaseDate time.Time `sql:"release_date"`
+				}
+				for row, err := range sugar.UnmarshalRows[info](resultSet.Rows(ctx)) {
 					if err != nil {
 						return err
 					}
-					log.Printf("%+v", info)
+
+					log.Printf("id: %v, title: %v, release: %v",
+						row.SeriesID, row.Title, row.ReleaseDate)
 				}
 			}
 

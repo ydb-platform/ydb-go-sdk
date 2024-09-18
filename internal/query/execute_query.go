@@ -193,7 +193,7 @@ func readMaterializedResultSet(ctx context.Context, r *streamResult) (_ *materia
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
-func readRow(ctx context.Context, r *streamResult) (_ *row, finalErr error) {
+func readRow(ctx context.Context, r *streamResult) (_ *Row, finalErr error) {
 	defer func() {
 		_ = r.Close(ctx)
 	}()

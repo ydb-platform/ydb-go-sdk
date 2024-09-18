@@ -7,32 +7,32 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-var _ query.Row = (*row)(nil)
+var _ query.Row = (*Row)(nil)
 
-type row struct {
+type Row struct {
 	indexedScanner scanner.IndexedScanner
 	namedScanner   scanner.NamedScanner
 	structScanner  scanner.StructScanner
 }
 
-func NewRow(columns []*Ydb.Column, v *Ydb.Value) *row {
+func NewRow(columns []*Ydb.Column, v *Ydb.Value) *Row {
 	data := scanner.Data(columns, v.GetItems())
 
-	return &row{
+	return &Row{
 		indexedScanner: scanner.Indexed(data),
 		namedScanner:   scanner.Named(data),
 		structScanner:  scanner.Struct(data),
 	}
 }
 
-func (r row) Scan(dst ...interface{}) (err error) {
+func (r Row) Scan(dst ...interface{}) (err error) {
 	return r.indexedScanner.Scan(dst...)
 }
 
-func (r row) ScanNamed(dst ...scanner.NamedDestination) (err error) {
+func (r Row) ScanNamed(dst ...scanner.NamedDestination) (err error) {
 	return r.namedScanner.ScanNamed(dst...)
 }
 
-func (r row) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) (err error) {
+func (r Row) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) (err error) {
 	return r.structScanner.ScanStruct(dst, opts...)
 }

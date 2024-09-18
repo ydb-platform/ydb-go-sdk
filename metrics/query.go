@@ -42,7 +42,7 @@ func query(config Config) (t trace.Query) {
 			sizeConfig := poolConfig.WithSystem("size")
 			limit := sizeConfig.GaugeVec("limit")
 			idle := sizeConfig.GaugeVec("idle")
-
+			index := sizeConfig.GaugeVec("index")
 			t.OnPoolChange = func(stats trace.QueryPoolChange) {
 				if sizeConfig.Details()&trace.QueryPoolEvents == 0 {
 					return
@@ -50,6 +50,7 @@ func query(config Config) (t trace.Query) {
 
 				limit.With(nil).Set(float64(stats.Limit))
 				idle.With(nil).Set(float64(stats.Idle))
+				index.With(nil).Set(float64(stats.Index))
 			}
 		}
 	}
