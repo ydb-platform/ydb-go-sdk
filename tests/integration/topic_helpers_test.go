@@ -104,7 +104,7 @@ ADD CHANGEFEED cdc WITH (
 )
 `, scope.Folder(), scope.TableName())
 
-	err := scope.Driver().Query().Exec(ctx, query)
+	_, err := scope.Driver().Scripting().Execute(ctx, query, nil)
 	require.NoError(t, err)
 
 	query = fmt.Sprintf(`
