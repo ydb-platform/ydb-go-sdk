@@ -3,6 +3,7 @@ package topic
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
@@ -47,4 +48,7 @@ type Client interface {
 	// StartWriter start write session to topic
 	// it is fast non block call, connection starts in background
 	StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
+
+	// StartTransactionalWriter
+	StartWransactionalWriter(ctx context.Context, tx tx.Identifier, topicpath string, opts ...topicoptions.WriterOption) (*topicwriter.TxWriter, error)
 }

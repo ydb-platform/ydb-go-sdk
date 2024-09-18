@@ -92,3 +92,10 @@ func (w *Writer) Close(ctx context.Context) error {
 func (w *Writer) Flush(ctx context.Context) error {
 	return w.inner.Flush(ctx)
 }
+
+type TxWriter struct{}
+
+func (w *TxWriter) Write(ctx context.Context, messages ...Message) error {
+	//TODO implement me
+	panic("implement me")
+}
