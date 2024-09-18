@@ -66,8 +66,8 @@ func WithSessionIdleTimeToLive(idleTimeToLive time.Duration) Option {
 	}
 }
 
-func WithLazyTx() Option {
+func WithLazyTx(lazyTx bool) Option {
 	return func(c *Config) {
-		c.lazyTx = true
+		c.lazyTx = lazyTx
 	}
 }

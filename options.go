@@ -488,9 +488,9 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	}
 }
 
-func WithLazyTx() Option {
+func WithLazyTx(lazyTx bool) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.queryOptions = append(d.queryOptions, queryConfig.WithLazyTx())
+		d.queryOptions = append(d.queryOptions, queryConfig.WithLazyTx(lazyTx))
 
 		return nil
 	}

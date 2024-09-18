@@ -71,7 +71,7 @@ func TestQueryTxExecute(t *testing.T) {
 			columnNames []string
 			columnTypes []string
 		)
-		err := scope.Driver(ydb.WithLazyTx()).Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+		err := scope.Driver(ydb.WithLazyTx(true)).Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
 			if tx.ID() != baseTx.LazyTxID {
 				return errors.New("transaction is not lazy")
 			}
@@ -262,7 +262,7 @@ func TestQueryLazyTxExecute(t *testing.T) {
 		columnTypes []string
 	)
 	t.Run("Default", func(t *testing.T) {
-		err := scope.DriverWithLogs(ydb.WithLazyTx()).Query().DoTx(
+		err := scope.DriverWithLogs(ydb.WithLazyTx(true)).Query().DoTx(
 			scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
 				if tx.ID() != baseTx.LazyTxID {
 					return errors.New("transaction is not lazy")

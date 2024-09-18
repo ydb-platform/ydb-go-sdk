@@ -415,7 +415,7 @@ func Example_retryWithTx() {
 func Example_retryWithLazyTx() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local",
-		ydb.WithLazyTx(),
+		ydb.WithLazyTx(true),
 	)
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
