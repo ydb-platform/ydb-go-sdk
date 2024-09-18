@@ -39,12 +39,14 @@ func UnmarshalRows[T any](seq xiter.Seq2[query.Row, error], opts ...scanner.Scan
 			var val T
 			if err != nil {
 				yield(val, err)
+
 				return false
 			}
 
 			err = row.ScanStruct(&val, opts...)
 			if err != nil {
 				yield(val, err)
+
 				return false
 			}
 
