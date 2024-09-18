@@ -1,3 +1,4 @@
+* Added experimental `sugar.UnmarshalRows` for user unmarshaller structs in own code in go 1.23, change example for use the iterator.
 * Added `ydb_go_sdk_ydb_query_pool_size_limit` metrics
 
 ## v3.80.7
