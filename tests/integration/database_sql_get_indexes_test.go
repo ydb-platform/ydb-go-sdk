@@ -43,7 +43,6 @@ func TestDatabaseSqlGetIndexes(t *testing.T) {
 				)
 			)`,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -69,7 +68,6 @@ func TestDatabaseSqlGetIndexes(t *testing.T) {
 				indexes, err = q.GetIndexes(ctx, "./seasons")
 				return err
 			})
-
 			if err != nil {
 				return err
 			}

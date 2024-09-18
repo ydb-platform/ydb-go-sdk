@@ -55,7 +55,6 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				)
 			)`,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -74,7 +73,6 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				)
 			);`,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -93,7 +91,6 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				)
 			)`,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -119,7 +116,6 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				tables, err = q.GetTables(ctx, ".", false, true)
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
@@ -148,7 +144,6 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				tables, err = q.GetTables(ctx, "./subdir", false, true)
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
@@ -177,7 +172,6 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				tables, err = q.GetTables(ctx, "./subdir/seasons", false, true)
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
@@ -229,7 +223,6 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				)
 			)`,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -248,7 +241,6 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				)
 			);`,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -267,7 +259,6 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				)
 			)`,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -293,7 +284,6 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				tables, err = q.GetTables(ctx, ".", true, true)
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
@@ -324,7 +314,6 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				tables, err = q.GetTables(ctx, "./subdir", true, true)
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
@@ -355,7 +344,6 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				tables, err = q.GetTables(ctx, "./subdir/seasons", true, true)
 				return err
 			})
-
 			if err != nil {
 				return err
 			}

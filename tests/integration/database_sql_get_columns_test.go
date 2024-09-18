@@ -65,7 +65,6 @@ func TestDatabaseSqlGetColumns(t *testing.T) {
 				columns, err = q.GetColumns(ctx, "episodes")
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
