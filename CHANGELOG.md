@@ -1,3 +1,5 @@
+* Fixed bug in experimental api: `ydb.ParamsBuilder().Param().Optional()` receive pointer and really produce optional value.
+
 ## v3.80.8
 * Added `ydb.WithLazyTx(bool)` option for create lazy transactions on `query.Session.Begin` call
 * Added initial experimental topic and cdc-helpers, see examples in [tests/integration/topic_helpers_test.go](https://github.com/ydb-platform/ydb-go-sdk/blob/master/tests/integration/topic_helpers_test.go)

@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -126,6 +127,22 @@ func NullableDatetimeValueFromTime(v *time.Time) Value {
 	}
 
 	return OptionalValue(DatetimeValueFromTime(*v))
+}
+
+func NullableDecimalValue(v *[16]byte, precision, scale uint32) Value {
+	if v == nil {
+		return NullValue(types.NewDecimal(precision, scale))
+	}
+
+	return OptionalValue(DecimalValue(*v, precision, scale))
+}
+
+func NullableDecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
+	if v == nil {
+		return NullValue(types.NewDecimal(precision, scale))
+	}
+
+	return OptionalValue(DecimalValueFromBigInt(v, precision, scale))
 }
 
 func NullableTzDateValue(v *string) Value {
