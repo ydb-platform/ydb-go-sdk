@@ -132,17 +132,17 @@ func NullableDatetimeValueFromTime(v *time.Time) Value {
 func NullableDecimalValue(v *[16]byte, precision, scale uint32) Value {
 	if v == nil {
 		return NullValue(types.NewDecimal(precision, scale))
-	} else {
-		return OptionalValue(DecimalValue(*v, precision, scale))
 	}
+
+	return OptionalValue(DecimalValue(*v, precision, scale))
 }
 
 func NullableDecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
 	if v == nil {
 		return NullValue(types.NewDecimal(precision, scale))
-	} else {
-		return OptionalValue(DecimalValueFromBigInt(v, precision, scale))
 	}
+
+	return OptionalValue(DecimalValueFromBigInt(v, precision, scale))
 }
 
 func NullableTzDateValue(v *string) Value {
