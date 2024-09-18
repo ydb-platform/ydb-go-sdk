@@ -46,6 +46,29 @@ func TestMessageReaderIterator(t *testing.T) {
 	require.Equal(t, []string{"asd", "ddd", "ggg"}, results)
 }
 
+func TestStringReaderIterator(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	err := scope.TopicWriter().Write(ctx,
+		topicwriter.Message{Data: strings.NewReader("asd")},
+		topicwriter.Message{Data: strings.NewReader("ddd")},
+		topicwriter.Message{Data: strings.NewReader("ggg")},
+	)
+	require.NoError(t, err)
+
+	var results []string
+	for mess, err := range topicsugar.StringIterator(ctx, scope.TopicReader()) {
+		require.NoError(t, err)
+
+		results = append(results, mess.Data)
+		if len(results) == 3 {
+			break
+		}
+	}
+	require.Equal(t, []string{"asd", "ddd", "ggg"}, results)
+}
+
 func TestMessageJsonUnmarshalIterator(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
@@ -71,7 +94,7 @@ func TestMessageJsonUnmarshalIterator(t *testing.T) {
 	var results []testStruct
 	expectedSeqno := int64(1)
 	expectedOffset := int64(0)
-	for mess, err := range topicsugar.TopicUnmarshalJSONIterator[testStruct](ctx, scope.TopicReader()) {
+	for mess, err := range topicsugar.JSONIterator[testStruct](ctx, scope.TopicReader()) {
 		require.NoError(t, err)
 		require.Equal(t, expectedSeqno, mess.SeqNo)
 		require.Equal(t, expectedOffset, mess.Offset)
