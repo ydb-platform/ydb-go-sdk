@@ -3,7 +3,7 @@
 
 ## v3.80.6
 * Fixed concurrent map writes in metrics
-* Renamed method at experimental API reader.PopBatchTx to reader.PopMessagesBatchTx
+* Renamed method at experimental API `reader.PopBatchTx` to `reader.PopMessagesBatchTx`
 
 ## v3.80.5
 * Fixed connections pool leak on failed `ydb.Open` call
