@@ -64,7 +64,6 @@ func TestDatabaseSqlIsColumnExists(t *testing.T) {
 					exists, err = q.IsColumnExists(ctx, "series", column)
 					return err
 				})
-
 				if err != nil {
 					return err
 				}

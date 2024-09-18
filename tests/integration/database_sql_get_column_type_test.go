@@ -111,7 +111,6 @@ func TestDatabaseSqlGetColumnType(t *testing.T) {
 					})
 					return err
 				})
-
 				if err != nil {
 					return err
 				}

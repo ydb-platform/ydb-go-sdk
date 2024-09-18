@@ -66,7 +66,6 @@ func TestDatabaseSqlIsPrimaryKey(t *testing.T) {
 					isPk, err = q.IsPrimaryKey(ctx, "episodes", pk)
 					return err
 				})
-
 				if err != nil {
 					return err
 				}
@@ -95,7 +94,6 @@ func TestDatabaseSqlIsPrimaryKey(t *testing.T) {
 					isPk, err = q.IsPrimaryKey(ctx, "episodes", pk)
 					return err
 				})
-
 				if err != nil {
 					return err
 				}
