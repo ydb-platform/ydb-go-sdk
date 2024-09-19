@@ -1,3 +1,4 @@
+## v3.80.10
 * Added `ydb.WithSessionPoolSessionUsageLimit()` option for limitation max count of session usage  
 * Refactored experimental topic iterators in `topicsugar` package
 
