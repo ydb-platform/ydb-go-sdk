@@ -297,8 +297,6 @@ func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
 		defer onDone()
 
 		ctx = traceCtx
-		//nolint:godox
-		// TODO: trace
 		if transactionResult == nil {
 			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
 		} else {

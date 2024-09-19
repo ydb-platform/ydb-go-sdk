@@ -49,6 +49,8 @@ type Client interface {
 	// it is fast non block call, connection starts in background
 	StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
 
-	// StartTransactionalWriter
-	StartWransactionalWriter(ctx context.Context, tx tx.Identifier, topicpath string, opts ...topicoptions.WriterOption) (*topicwriter.TxWriter, error)
+	// StartTransactionalWriter start writer for write messages within transaction
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	StartTransactionalWriter(tx tx.Identifier, topicpath string, opts ...topicoptions.WriterOption) (*topicwriter.TxWriter, error)
 }

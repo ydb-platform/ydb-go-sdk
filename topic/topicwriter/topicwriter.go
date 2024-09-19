@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -22,7 +21,7 @@ var (
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages
 type Writer struct {
-	inner *topicwriterinternal.Writer
+	inner *topicwriterinternal.WriterReconnector
 }
 
 // PublicInitialInfo is an information about writer after initialize
@@ -31,7 +30,7 @@ type PublicInitialInfo struct {
 }
 
 // NewWriter create new writer from internal type. Used internally only.
-func NewWriter(writer *topicwriterinternal.Writer) *Writer {
+func NewWriter(writer *topicwriterinternal.WriterReconnector) *Writer {
 	return &Writer{
 		inner: writer,
 	}
@@ -47,16 +46,7 @@ func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 // It returns ErrQueueLimitExceed (must be checked by errors.Is)
 // if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
-	return w.inner.Write(ctx, messages...)
-}
-
-func (w *Writer) WriteWithTx(ctx context.Context, transaction tx.Identifier, messages ...Message) error {
-	internalTx, ok := transaction.(tx.Transaction)
-	if !ok {
-		return xerrors.WithStackTrace(errBadTxId)
-	}
-
-	return w.inner.WriteWithTx(ctx, internalTx, messages...)
+	return w.inner.Write(ctx, messages)
 }
 
 // WaitInit waits until the reader is initialized
@@ -93,9 +83,50 @@ func (w *Writer) Flush(ctx context.Context) error {
 	return w.inner.Flush(ctx)
 }
 
-type TxWriter struct{}
+// TxWriter used for send messages to the transaction
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+type TxWriter struct {
+	inner *topicwriterinternal.WriterWithTransaction
+}
 
+func NewTxWriterInternal(w *topicwriterinternal.WriterWithTransaction) *TxWriter {
+	return &TxWriter{inner: w}
+}
+
+// Write messages to the transaction
+//
+// It has not retries. If fails - needs to retry full transaction, as with any other
+// error with table.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (w *TxWriter) Write(ctx context.Context, messages ...Message) error {
-	//TODO implement me
-	panic("implement me")
+	return w.inner.Write(ctx, messages...)
+}
+
+// WaitInit waits until the reader is initialized
+// or an error occurs, return PublicInitialInfo and err
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (w *TxWriter) WaitInit(ctx context.Context) (err error) {
+	_, err = w.inner.WaitInit(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// WaitInitInfo waits until the reader is initialized
+// or an error occurs, return PublicInitialInfo and err
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func (w *TxWriter) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
+	privateInfo, err := w.inner.WaitInit(ctx)
+	if err != nil {
+		return PublicInitialInfo{}, err
+	}
+	publicInfo := PublicInitialInfo{LastSeqNum: privateInfo.LastSeqNum}
+
+	return publicInfo, nil
 }

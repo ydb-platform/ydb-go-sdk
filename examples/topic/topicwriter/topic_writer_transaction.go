@@ -56,7 +56,7 @@ func CopyMessagesBetweenTopics(ctx context.Context, db *ydb.Driver, reader *topi
 
 func CopyMessagesBetweenTopicsTxWriter(ctx context.Context, db *ydb.Driver, reader *topicreader.Reader, topic string) error {
 	return db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		writer, err := db.Topic().StartWransactionalWriter(ctx, tx, topic)
+		writer, err := db.Topic().StartTransactionalWriter(ctx, tx, topic)
 		if err != nil {
 			return err
 		}

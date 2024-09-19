@@ -126,10 +126,6 @@ func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 		driver, err := ydb.Open(connectionContext, connectionString,
 			append(opts,
 				ydb.WithAccessTokenCredentials(token),
-				ydb.WithLogger(
-					scope.LoggerMinLevel(log.WARN),
-					trace.DetailsAll,
-				),
 			)...,
 		)
 		clean := func() {
@@ -244,7 +240,7 @@ func (scope *scopeT) TopicReader() *topicreader.Reader {
 
 func (scope *scopeT) TopicReaderNamed(name string) *topicreader.Reader {
 	f := func() (*fixenv.GenericResult[*topicreader.Reader], error) {
-		reader, err := scope.DriverWithGRPCLogging().Topic().StartReader(
+		reader, err := scope.Driver().Topic().StartReader(
 			scope.TopicConsumerName(),
 			topicoptions.ReadTopic(scope.TopicPath()),
 		)

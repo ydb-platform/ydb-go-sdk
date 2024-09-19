@@ -166,10 +166,6 @@ func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_Wri
 		},
 	}
 
-	if r.Tx.ID != "" || r.Tx.Session != "" {
-		res.WriteRequest.Tx = &Ydb_Topic.TransactionIdentity{}
-	}
-
 	return res, nil
 }
 

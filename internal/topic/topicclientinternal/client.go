@@ -2,6 +2,7 @@ package topicclientinternal
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
@@ -14,6 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -21,6 +24,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+)
+
+var (
+	errUnsupportedTransactionType = xerrors.Wrap(errors.New("ydb: unsuppotred transaction type. Use transaction from Driver().Query().DoTx(...)"))
 )
 
 type Client struct {
@@ -269,6 +276,32 @@ func (c *Client) StartReader(
 
 // StartWriter create new topic writer wrapper
 func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
+	cfg := c.createWriterConfig(topicPath, opts)
+	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return topicwriter.NewWriter(writer), nil
+}
+
+func (c *Client) StartTransactionalWriter(transaction tx.Identifier, topicpath string, opts ...topicoptions.WriterOption) (*topicwriter.TxWriter, error) {
+	internalTx, ok := transaction.(tx.Transaction)
+	if !ok {
+		return nil, xerrors.WithStackTrace(errUnsupportedTransactionType)
+	}
+
+	cfg := c.createWriterConfig(topicpath, opts)
+	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	txWriter := topicwriterinternal.NewTopicWriterTransaction(writer, internalTx, cfg.Tracer)
+	return topicwriter.NewTxWriterInternal(txWriter), nil
+}
+
+func (c *Client) createWriterConfig(topicPath string, opts []topicoptions.WriterOption) topicwriterinternal.WriterReconnectorConfig {
 	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (
 		topicwriterinternal.RawTopicWriterStream,
 		error,
@@ -281,14 +314,9 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 		topicwriterinternal.WithTopic(topicPath),
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
 		topicwriterinternal.WithTrace(c.cfg.Trace),
+		topicwriterinternal.WithCredentials(c.cred),
 	}
 
 	options = append(options, opts...)
-
-	writer, err := topicwriterinternal.NewWriter(c.cred, options)
-	if err != nil {
-		return nil, err
-	}
-
-	return topicwriter.NewWriter(writer), nil
+	return topicwriterinternal.NewWriterReconnectorConfig(options...)
 }
