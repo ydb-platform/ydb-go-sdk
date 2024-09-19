@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -23,6 +23,7 @@ type (
 
 		client Ydb_Query_V1.QueryServiceClient
 		trace  *trace.Query
+		laztTx bool
 	}
 )
 
@@ -98,17 +99,33 @@ func (s *Session) Begin(
 	ctx context.Context,
 	txSettings query.TransactionSettings,
 ) (
-	_ query.Transaction, err error,
+	tx query.Transaction, finalErr error,
 ) {
 	onDone := trace.QueryOnSessionBegin(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
 	defer func() {
-		onDone(err, tx.ID("lazy"))
+		if finalErr != nil {
+			onDone(finalErr, nil)
+		} else {
+			onDone(nil, tx)
+		}
 	}()
 
+	if s.laztTx {
+		return &Transaction{
+			s:          s,
+			txSettings: txSettings,
+		}, nil
+	}
+
+	txID, err := begin(ctx, s.client, s.ID(), txSettings)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
 	return &Transaction{
-		s:          s,
-		txSettings: txSettings,
+		LazyID: baseTx.ID(txID),
+		s:      s,
 	}, nil
 }
 

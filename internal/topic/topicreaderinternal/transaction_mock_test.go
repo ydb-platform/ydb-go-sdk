@@ -9,8 +9,8 @@ import (
 
 func newMockTransactionWrapper(sessionID, transactinID string) *mockTransaction {
 	return &mockTransaction{
-		Identifier:     tx.NewID("lazy-id"),
-		materializedID: tx.NewID(transactinID),
+		Identifier:     tx.ID("lazy-id"),
+		materializedID: tx.ID(transactinID),
 		sessionID:      sessionID,
 		onCompleted:    nil,
 	}

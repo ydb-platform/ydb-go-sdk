@@ -62,6 +62,12 @@ func WithSizeLimit(sizeLimit int) Option {
 	}
 }
 
+func WithPoolSessionUsageLimit(sessionUsageLimit uint64) Option {
+	return func(c *Config) {
+		c.sessionUsageLimit = sessionUsageLimit
+	}
+}
+
 // WithKeepAliveMinSize defines lower bound for sessions in the pool. If there are more sessions open, then
 // the excess idle ones will be closed and removed after IdleKeepAliveThreshold is reached for each of them.
 // If keepAliveMinSize is less than zero, then no sessions will be preserved
@@ -159,7 +165,8 @@ func WithClock(clock clockwork.Clock) Option {
 type Config struct {
 	config.Common
 
-	sizeLimit int
+	sizeLimit         int
+	sessionUsageLimit uint64
 
 	createSessionTimeout time.Duration
 	deleteTimeout        time.Duration
@@ -187,6 +194,10 @@ func (c *Config) Clock() clockwork.Clock {
 // DefaultSessionPoolSizeLimit variable is used as a limit.
 func (c *Config) SizeLimit() int {
 	return c.sizeLimit
+}
+
+func (c *Config) SessionUsageLimit() uint64 {
+	return c.sessionUsageLimit
 }
 
 // KeepAliveMinSize is a lower bound for sessions in the pool. If there are more sessions open, then

@@ -480,9 +480,27 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 
 // WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
-	return func(ctx context.Context, c *Driver) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
-		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+
+		return nil
+	}
+}
+
+// WithSessionPoolSessionUsageLimit set max count for use session
+func WithSessionPoolSessionUsageLimit(sessionUsageLimit uint64) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithPoolSessionUsageLimit(sessionUsageLimit))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithPoolSessionUsageLimit(sessionUsageLimit))
+
+		return nil
+	}
+}
+
+func WithLazyTx(lazyTx bool) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.queryOptions = append(d.queryOptions, queryConfig.WithLazyTx(lazyTx))
 
 		return nil
 	}

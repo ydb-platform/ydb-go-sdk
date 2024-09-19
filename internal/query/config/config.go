@@ -17,11 +17,14 @@ const (
 type Config struct {
 	config.Common
 
-	poolLimit int
+	poolLimit             int
+	poolSessionUsageLimit uint64
 
 	sessionCreateTimeout   time.Duration
 	sessionDeleteTimeout   time.Duration
 	sessionIddleTimeToLive time.Duration
+
+	lazyTx bool
 
 	trace *trace.Query
 }
@@ -58,6 +61,10 @@ func (c *Config) PoolLimit() int {
 	return c.poolLimit
 }
 
+func (c *Config) PoolSessionUsageLimit() uint64 {
+	return c.poolSessionUsageLimit
+}
+
 // SessionCreateTimeout limits maximum time spent on Create session request
 func (c *Config) SessionCreateTimeout() time.Duration {
 	return c.sessionCreateTimeout
@@ -74,4 +81,8 @@ func (c *Config) SessionDeleteTimeout() time.Duration {
 // If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
 func (c *Config) SessionIdleTimeToLive() time.Duration {
 	return c.sessionIddleTimeToLive
+}
+
+func (c *Config) LazyTx() bool {
+	return c.lazyTx
 }

@@ -1,4 +1,22 @@
-* Renamed method at experimental API reader.PopBatchTx to reader.PopMessagesBatchTx
+## v3.80.10
+* Added `ydb.WithSessionPoolSessionUsageLimit()` option for limitation max count of session usage  
+* Refactored experimental topic iterators in `topicsugar` package
+
+## v3.80.9
+* Fixed bug in experimental api: `ydb.ParamsBuilder().Param().Optional()` receive pointer and really produce optional value.
+
+## v3.80.8
+* Added `ydb.WithLazyTx(bool)` option for create lazy transactions on `query.Session.Begin` call
+* Added initial experimental topic and cdc-helpers, see examples in [tests/integration/topic_helpers_test.go](https://github.com/ydb-platform/ydb-go-sdk/blob/master/tests/integration/topic_helpers_test.go)
+* Added experimental `sugar.UnmarshalRows` for user unmarshaller structs in own code in go 1.23, change example for use the iterator.
+* Added `ydb_go_sdk_ydb_query_pool_size_index` metrics
+
+## v3.80.7
+* Fixed bug with doesn't rollback the transaction on the operation error in table service
+
+## v3.80.6
+* Fixed concurrent map writes in metrics
+* Renamed method at experimental API `reader.PopBatchTx` to `reader.PopMessagesBatchTx`
 
 ## v3.80.5
 * Fixed connections pool leak on failed `ydb.Open` call

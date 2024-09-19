@@ -545,6 +545,15 @@ func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) *decimalValue {
 	return DecimalValue(b, precision, scale)
 }
 
+func DecimalValueFromString(str string, precision, scale uint32) (Value, error) {
+	bigI, err := decimal.Parse(str, precision, scale)
+	if err != nil {
+		return nil, err
+	}
+
+	return DecimalValueFromBigInt(bigI, precision, scale), nil
+}
+
 func DecimalValue(v [16]byte, precision, scale uint32) *decimalValue {
 	return &decimalValue{
 		value: v,

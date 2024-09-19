@@ -1,9 +1,6 @@
 package tx
 
-var (
-	_ Identifier = (*ID)(nil)
-	_ Identifier = (*LazyID)(nil)
-)
+var _ Identifier = LazyID{}
 
 const (
 	LazyTxID = "LAZY_TX"
@@ -14,13 +11,12 @@ type (
 		ID() string
 		isYdbTx()
 	}
-	ID     string
 	LazyID struct {
 		v *string
 	}
 )
 
-func (id *LazyID) ID() string {
+func (id LazyID) ID() string {
 	if id.v == nil {
 		return LazyTxID
 	}
@@ -32,14 +28,8 @@ func (id *LazyID) SetTxID(txID string) {
 	id.v = &txID
 }
 
-func (id *LazyID) isYdbTx() {}
+func (id LazyID) isYdbTx() {}
 
-func NewID(id string) ID {
-	return ID(id)
+func ID(id string) LazyID {
+	return LazyID{v: &id}
 }
-
-func (id ID) ID() string {
-	return string(id)
-}
-
-func (id ID) isYdbTx() {}

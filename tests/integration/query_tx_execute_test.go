@@ -11,7 +11,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
@@ -25,12 +27,51 @@ func TestQueryTxExecute(t *testing.T) {
 
 	scope := newScope(t)
 
-	var (
-		columnNames []string
-		columnTypes []string
-	)
 	t.Run("Default", func(t *testing.T) {
+		var (
+			columnNames []string
+			columnTypes []string
+		)
 		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			columnNames = rs.Columns()
+			for _, t := range rs.ColumnTypes() {
+				columnTypes = append(columnTypes, t.Yql())
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			err = tx.Exec(ctx, "SELECT 1")
+			if err != nil {
+				return err
+			}
+			_ = res.Close(ctx)
+
+			return nil
+		}, query.WithIdempotent())
+		require.NoError(t, err)
+		require.Equal(t, []string{"col1"}, columnNames)
+		require.Equal(t, []string{"Int32"}, columnTypes)
+	})
+	t.Run("WithLazyTx", func(t *testing.T) {
+		var (
+			columnNames []string
+			columnTypes []string
+		)
+		err := scope.Driver(ydb.WithLazyTx(true)).Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
 			if tx.ID() != baseTx.LazyTxID {
 				return errors.New("transaction is not lazy")
 			}
@@ -66,6 +107,191 @@ func TestQueryTxExecute(t *testing.T) {
 
 			return nil
 		}, query.WithIdempotent())
+		require.NoError(t, err)
+		require.Equal(t, []string{"col1"}, columnNames)
+		require.Equal(t, []string{"Int32"}, columnTypes)
+	})
+	t.Run("SerializableReadWrite", func(t *testing.T) {
+		var (
+			columnNames []string
+			columnTypes []string
+		)
+		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			columnNames = rs.Columns()
+			columnTypes = columnTypes[:0]
+			for _, t := range rs.ColumnTypes() {
+				columnTypes = append(columnTypes, t.Yql())
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			return nil
+		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
+		require.NoError(t, err)
+		require.Equal(t, []string{"col1"}, columnNames)
+		require.Equal(t, []string{"Int32"}, columnTypes)
+	})
+	t.Run("SnapshotReadOnly", func(t *testing.T) {
+		var (
+			columnNames []string
+			columnTypes []string
+		)
+		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			columnNames = rs.Columns()
+			columnTypes = columnTypes[:0]
+			for _, t := range rs.ColumnTypes() {
+				columnTypes = append(columnTypes, t.Yql())
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			return nil
+		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSnapshotReadOnly())))
+		require.NoError(t, err)
+		require.Equal(t, []string{"col1"}, columnNames)
+		require.Equal(t, []string{"Int32"}, columnTypes)
+	})
+	t.Run("OnlineReadOnly", func(t *testing.T) {
+		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			return nil
+		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithOnlineReadOnly())))
+		require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
+	})
+	t.Run("StaleReadOnly", func(t *testing.T) {
+		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			return nil
+		}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithStaleReadOnly())))
+		require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
+	})
+	t.Run("ErrOptionNotForTxExecute", func(t *testing.T) {
+		err := scope.DriverWithLogs().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			err = tx.Exec(ctx, "SELECT 1 AS col1",
+				query.WithTxControl(query.TxControl(query.BeginTx(query.WithOnlineReadOnly()))),
+			)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}, query.WithIdempotent())
+		require.Error(t, err)
+		t.Logf("err: %s", err.Error())
+		require.ErrorIs(t, err, internalQuery.ErrOptionNotForTxExecute)
+	})
+}
+
+func TestQueryLazyTxExecute(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
+		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
+	}
+
+	scope := newScope(t)
+
+	var (
+		columnNames []string
+		columnTypes []string
+	)
+	t.Run("Default", func(t *testing.T) {
+		err := scope.DriverWithLogs(ydb.WithLazyTx(true)).Query().DoTx(
+			scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+				if tx.ID() != baseTx.LazyTxID {
+					return errors.New("transaction is not lazy")
+				}
+				res, err := tx.Query(ctx, "SELECT 1 AS col1")
+				if err != nil {
+					return err
+				}
+				if tx.ID() == baseTx.LazyTxID {
+					return errors.New("transaction is lazy yet")
+				}
+				rs, err := res.NextResultSet(ctx)
+				if err != nil {
+					return err
+				}
+				columnNames = rs.Columns()
+				for _, t := range rs.ColumnTypes() {
+					columnTypes = append(columnTypes, t.Yql())
+				}
+				row, err := rs.NextRow(ctx)
+				if err != nil {
+					return err
+				}
+				var col1 int
+				err = row.ScanNamed(query.Named("col1", &col1))
+				if err != nil {
+					return err
+				}
+				err = tx.Exec(ctx, "SELECT 1")
+				if err != nil {
+					return err
+				}
+				_ = res.Close(ctx)
+
+				return nil
+			}, query.WithIdempotent(),
+		)
 		require.NoError(t, err)
 		require.Equal(t, []string{"col1"}, columnNames)
 		require.Equal(t, []string{"Int32"}, columnTypes)

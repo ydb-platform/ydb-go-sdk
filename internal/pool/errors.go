@@ -23,7 +23,7 @@ func isRetriable(err error) bool {
 
 	switch {
 	case
-		xerrors.Is(err, errPoolIsOverflow),
+		xerrors.Is(err, errPoolIsOverflow, errItemIsNotAlive, errNoProgress),
 		xerrors.IsRetryableError(err),
 		xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED),
 		xerrors.IsTransportError(

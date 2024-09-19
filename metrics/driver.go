@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"strconv"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -26,6 +27,7 @@ func driver(config Config) (t trace.Driver) {
 		az string
 	}
 	knownEndpoints := make(map[endpointKey]struct{})
+	endpointsMu := sync.RWMutex{}
 
 	t.OnConnInvoke = func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
 		var (
@@ -104,6 +106,8 @@ func driver(config Config) (t trace.Driver) {
 
 		return func(info trace.DriverBalancerUpdateDoneInfo) {
 			if config.Details()&trace.DriverBalancerEvents != 0 {
+				endpointsMu.Lock()
+				defer endpointsMu.Unlock()
 				balancerUpdates.With(map[string]string{
 					"cause": eventType,
 				}).Inc()

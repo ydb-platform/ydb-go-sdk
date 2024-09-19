@@ -525,6 +525,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 		done:   make(chan struct{}),
 		pool: pool.New(ctx,
 			pool.WithLimit[*Session, Session](cfg.PoolLimit()),
+			pool.WithItemUsageLimit[*Session, Session](cfg.PoolSessionUsageLimit()),
 			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
 			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
@@ -549,6 +550,8 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
+
+				s.laztTx = cfg.LazyTx()
 
 				return s, nil
 			}),
