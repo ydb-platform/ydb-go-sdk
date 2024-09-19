@@ -498,6 +498,12 @@ func WithSessionPoolSessionUsageLimit(sessionUsageLimit uint64) Option {
 	}
 }
 
+// WithLazyTx enables lazy transactions in query service client
+//
+// Lazy transaction means that begin call will be noop and first execute creates interactive transaction with given
+// transaction settings
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithLazyTx(lazyTx bool) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.queryOptions = append(d.queryOptions, queryConfig.WithLazyTx(lazyTx))
