@@ -159,7 +159,7 @@ func mustClose(t testing.TB, pool closer.Closer) {
 	}
 }
 
-func TestPool(t *testing.T) {
+func TestPool(t *testing.T) { //nolint:gocyclo
 	rootCtx := xtest.Context(t)
 	t.Run("New", func(t *testing.T) {
 		t.Run("Default", func(t *testing.T) {
@@ -176,6 +176,33 @@ func TestPool(t *testing.T) {
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
 			require.EqualValues(t, 1, p.config.limit)
+		})
+		t.Run("WithItemUsageLimit", func(t *testing.T) {
+			var newCounter int64
+			p := New[*testItem, testItem](rootCtx,
+				WithLimit[*testItem, testItem](1),
+				WithItemUsageLimit[*testItem, testItem](5),
+				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
+				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					atomic.AddInt64(&newCounter, 1)
+
+					var v testItem
+
+					return &v, nil
+				}),
+			)
+			require.EqualValues(t, 1, p.config.limit)
+			var lambdaCounter int64
+			err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
+				if atomic.AddInt64(&lambdaCounter, 1) < 10 {
+					return xerrors.Retryable(errors.New("test"))
+				}
+
+				return nil
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, 2, newCounter)
 		})
 		t.Run("WithCreateItemFunc", func(t *testing.T) {
 			var newCounter int64

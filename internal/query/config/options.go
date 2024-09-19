@@ -34,6 +34,12 @@ func WithPoolLimit(size int) Option {
 	}
 }
 
+func WithPoolSessionUsageLimit(sessionUsageLimit uint64) Option {
+	return func(c *Config) {
+		c.poolSessionUsageLimit = sessionUsageLimit
+	}
+}
+
 // WithSessionCreateTimeout limits maximum time spent on Create session request
 // If sessionCreateTimeout is less than or equal to zero then no used timeout on create session request
 func WithSessionCreateTimeout(createSessionTimeout time.Duration) Option {

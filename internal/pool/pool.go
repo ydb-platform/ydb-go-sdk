@@ -34,10 +34,12 @@ type (
 		closeTimeout   time.Duration
 		closeItem      func(ctx context.Context, item PT)
 		idleTimeToLive time.Duration
+		itemUsageLimit uint64
 	}
 	itemInfo[PT ItemConstraint[T], T any] struct {
-		idle      *xlist.Element[PT]
-		lastUsage time.Time
+		idle       *xlist.Element[PT]
+		lastUsage  time.Time
+		useCounter *uint64
 	}
 	waitChPool[PT ItemConstraint[T], T any] interface {
 		GetOrNew() *chan PT
@@ -90,6 +92,12 @@ func WithCloseItemTimeout[PT ItemConstraint[T], T any](t time.Duration) Option[P
 func WithLimit[PT ItemConstraint[T], T any](size int) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.limit = size
+	}
+}
+
+func WithItemUsageLimit[PT ItemConstraint[T], T any](itemUsageLimit uint64) Option[PT, T] {
+	return func(c *Config[PT, T]) {
+		c.itemUsageLimit = itemUsageLimit
 	}
 }
 
@@ -217,8 +225,10 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 			newItem, err := p.config.createItem(createCtx)
 			if newItem != nil {
 				p.mu.WithLock(func() {
+					var useCounter uint64
 					p.index[newItem] = itemInfo[PT, T]{
-						lastUsage: p.config.clock.Now(),
+						lastUsage:  p.config.clock.Now(),
+						useCounter: &useCounter,
 					}
 				})
 			}
@@ -592,10 +602,13 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 						panic("no index for item")
 					}
 
+					*info.useCounter++
+
 					return info
 				})
 
-				if p.config.idleTimeToLive > 0 && p.config.clock.Since(info.lastUsage) > p.config.idleTimeToLive {
+				if (p.config.itemUsageLimit > 0 && *info.useCounter > p.config.itemUsageLimit) ||
+					(p.config.idleTimeToLive > 0 && p.config.clock.Since(info.lastUsage) > p.config.idleTimeToLive) {
 					p.closeItem(ctx, item)
 					p.mu.WithLock(func() {
 						p.changeState(func() Stats {
