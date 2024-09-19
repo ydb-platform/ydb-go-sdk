@@ -1,4 +1,5 @@
-* refactored experimental topic iterators in topicsugar package
+* Added `ydb.WithSessionPoolSessionUsageLimit()` option for limitation max count of session usage  
+* Refactored experimental topic iterators in `topicsugar` package
 
 ## v3.80.9
 * Fixed bug in experimental api: `ydb.ParamsBuilder().Param().Optional()` receive pointer and really produce optional value.

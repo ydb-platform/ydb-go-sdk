@@ -17,7 +17,8 @@ const (
 type Config struct {
 	config.Common
 
-	poolLimit int
+	poolLimit             int
+	poolSessionUsageLimit uint64
 
 	sessionCreateTimeout   time.Duration
 	sessionDeleteTimeout   time.Duration
@@ -58,6 +59,10 @@ func (c *Config) Trace() *trace.Query {
 // DefaultPoolMaxSize variable is used as a pool limit.
 func (c *Config) PoolLimit() int {
 	return c.poolLimit
+}
+
+func (c *Config) PoolSessionUsageLimit() uint64 {
+	return c.poolSessionUsageLimit
 }
 
 // SessionCreateTimeout limits maximum time spent on Create session request

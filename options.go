@@ -488,6 +488,16 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	}
 }
 
+// WithSessionPoolSessionUsageLimit set max count for use session
+func WithSessionPoolSessionUsageLimit(sessionUsageLimit uint64) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithPoolSessionUsageLimit(sessionUsageLimit))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithPoolSessionUsageLimit(sessionUsageLimit))
+
+		return nil
+	}
+}
+
 func WithLazyTx(lazyTx bool) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.queryOptions = append(d.queryOptions, queryConfig.WithLazyTx(lazyTx))
