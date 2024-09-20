@@ -89,14 +89,6 @@ func (tx *Transaction) QueryResultSet(
 		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
 	}
 
-	if !options.ExecuteSettings(opts...).AllowLazyTx() {
-		// It needs to execute before create settings because if tx must be not lazy, and it is first query
-		// change txcontrol during unlazy
-		if err := tx.UnLazy(ctx); err != nil {
-			return nil, err
-		}
-	}
-
 	settings, err := tx.executeSettings(opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -143,14 +135,6 @@ func (tx *Transaction) QueryRow(
 	defer func() {
 		onDone(finalErr)
 	}()
-
-	if !options.ExecuteSettings(opts...).AllowLazyTx() {
-		// It needs to execute before create settings because if tx must be not lazy, and it is first query
-		// change txcontrol during unlazy
-		if err := tx.UnLazy(ctx); err != nil {
-			return nil, err
-		}
-	}
 
 	settings := options.ExecuteSettings(
 		append(
@@ -217,14 +201,6 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 
 	if tx.completed {
 		return xerrors.WithStackTrace(errExecuteOnCompletedTx)
-	}
-
-	if !options.ExecuteSettings(opts...).AllowLazyTx() {
-		// It needs to execute before create settings because if tx must be not lazy, and it is first query
-		// change txcontrol during unlazy
-		if err := tx.UnLazy(ctx); err != nil {
-			return err
-		}
 	}
 
 	settings, err := tx.executeSettings(opts...)
@@ -294,14 +270,6 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 
 	if tx.completed {
 		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
-	}
-
-	if !options.ExecuteSettings(opts...).AllowLazyTx() {
-		// It needs to execute before create settings because if tx must be not lazy, and it is first query
-		// change txcontrol during unlazy
-		if err := tx.UnLazy(ctx); err != nil {
-			return nil, err
-		}
 	}
 
 	settings, err := tx.executeSettings(opts...)

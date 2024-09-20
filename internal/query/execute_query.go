@@ -30,7 +30,6 @@ type executeSettings interface {
 	Params() *params.Parameters
 	CallOptions() []grpc.CallOption
 	RetryOpts() []retry.Option
-	AllowLazyTx() bool
 }
 
 type executeScriptConfig interface {
