@@ -2,9 +2,6 @@ package topicwriter
 
 import (
 	"context"
-	"errors"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
@@ -13,10 +10,7 @@ type (
 	Message = topicwriterinternal.PublicMessage
 )
 
-var (
-	ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
-	errBadTxId          = xerrors.Wrap(errors.New("ydb: bad transaction type, supported transactions from query service only"))
-)
+var ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
 
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages

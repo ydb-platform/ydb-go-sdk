@@ -2,7 +2,7 @@ package rawtopiccommon
 
 import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
-type TransactionIdentity struct { //nolint:revive,stylecheck
+type TransactionIdentity struct {
 	ID      string
 	Session string
 }

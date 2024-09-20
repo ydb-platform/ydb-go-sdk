@@ -26,9 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var (
-	errUnsupportedTransactionType = xerrors.Wrap(errors.New("ydb: unsuppotred transaction type. Use transaction from Driver().Query().DoTx(...)"))
-)
+var errUnsupportedTransactionType = xerrors.Wrap(errors.New("ydb: unsuppotred transaction type. Use transaction from Driver().Query().DoTx(...)")) //nolint:lll
 
 type Client struct {
 	cfg                    topic.Config
@@ -285,7 +283,11 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	return topicwriter.NewWriter(writer), nil
 }
 
-func (c *Client) StartTransactionalWriter(transaction tx.Identifier, topicpath string, opts ...topicoptions.WriterOption) (*topicwriter.TxWriter, error) {
+func (c *Client) StartTransactionalWriter(
+	transaction tx.Identifier,
+	topicpath string,
+	opts ...topicoptions.WriterOption,
+) (*topicwriter.TxWriter, error) {
 	internalTx, ok := transaction.(tx.Transaction)
 	if !ok {
 		return nil, xerrors.WithStackTrace(errUnsupportedTransactionType)
@@ -298,10 +300,14 @@ func (c *Client) StartTransactionalWriter(transaction tx.Identifier, topicpath s
 	}
 
 	txWriter := topicwriterinternal.NewTopicWriterTransaction(writer, internalTx, cfg.Tracer)
+
 	return topicwriter.NewTxWriterInternal(txWriter), nil
 }
 
-func (c *Client) createWriterConfig(topicPath string, opts []topicoptions.WriterOption) topicwriterinternal.WriterReconnectorConfig {
+func (c *Client) createWriterConfig(
+	topicPath string,
+	opts []topicoptions.WriterOption,
+) topicwriterinternal.WriterReconnectorConfig {
 	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (
 		topicwriterinternal.RawTopicWriterStream,
 		error,
@@ -318,5 +324,6 @@ func (c *Client) createWriterConfig(topicPath string, opts []topicoptions.Writer
 	}
 
 	options = append(options, opts...)
+
 	return topicwriterinternal.NewWriterReconnectorConfig(options...)
 }

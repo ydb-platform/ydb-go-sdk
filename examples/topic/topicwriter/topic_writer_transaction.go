@@ -27,9 +27,7 @@ func CopyMessagesBetweenTopicsTxWriter(
 		if err != nil {
 			return err
 		}
-
 		for _, mess := range batch.Messages {
-
 			if err = writer.Write(ctx, topicwriter.Message{Data: mess}); err != nil {
 				return err
 			}
@@ -69,7 +67,6 @@ func TableAndTopicWithinTransaction(
 		err = writer.Write(ctx, topicwriter.Message{
 			Data: strings.NewReader(fmt.Sprintf("val: %v processed", val)),
 		})
-
 		if err != nil {
 			return err
 		}

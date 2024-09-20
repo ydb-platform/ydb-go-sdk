@@ -709,12 +709,15 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			}
 		}
 	}
-	t.OnWriterBeforeCommitTransaction = func(info trace.TopicOnWriterBeforeCommitTransactionStartInfo) func(trace.TopicOnWriterBeforeCommitTransactionDoneInfo) {
+	t.OnWriterBeforeCommitTransaction = func(
+		info trace.TopicOnWriterBeforeCommitTransactionStartInfo,
+	) func(trace.TopicOnWriterBeforeCommitTransactionDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
 
 		start := time.Now()
+
 		return func(doneInfo trace.TopicOnWriterBeforeCommitTransactionDoneInfo) {
 			ctx := with(*info.Ctx, TRACE, "ydb", "topic", "writer", "beforecommit")
 			l.Log(ctx, "wait of flush messages before commit transaction",
@@ -726,8 +729,11 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			)
 		}
 	}
-	t.OnWriterAfterFinishTransaction = func(info trace.TopicOnWriterAfterFinishTransactionStartInfo) func(trace.TopicOnWriterAfterFinishTransactionDoneInfo) {
+	t.OnWriterAfterFinishTransaction = func(
+		info trace.TopicOnWriterAfterFinishTransactionStartInfo,
+	) func(trace.TopicOnWriterAfterFinishTransactionDoneInfo) {
 		start := time.Now()
+
 		return func(doneInfo trace.TopicOnWriterAfterFinishTransactionDoneInfo) {
 			ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "beforecommit")
 			l.Log(ctx, "close writer after transaction finished",

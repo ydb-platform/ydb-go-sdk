@@ -13,14 +13,16 @@ type Transaction interface {
 	SessionID() string
 
 	// OnBeforeCommit add callback, which will be called before commit transaction
-	// the method will be not call the method if some error happen and transaction will not be commited
+	// the method will be not call the method if some error happen and transaction will not be committed
 	OnBeforeCommit(f OnTransactionBeforeCommit)
 	OnCompleted(f OnTransactionCompletedFunc)
 	Rollback(ctx context.Context) error
 }
 
-type OnTransactionBeforeCommit func(ctx context.Context) error
-type OnTransactionCompletedFunc func(transactionResult error)
+type (
+	OnTransactionBeforeCommit  func(ctx context.Context) error
+	OnTransactionCompletedFunc func(transactionResult error)
+)
 
 func AsTransaction(id Identifier) (Transaction, error) {
 	if t, ok := id.(Transaction); ok {

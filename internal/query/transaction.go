@@ -395,9 +395,9 @@ func (tx *Transaction) OnCompleted(f baseTx.OnTransactionCompletedFunc) {
 }
 
 func (tx *Transaction) waitOnBeforeCommit(ctx context.Context) (resErr error) {
-
 	tx.onBeforeCommit.Range(func(f *baseTx.OnTransactionBeforeCommit) bool {
 		resErr = (*f)(ctx)
+
 		return resErr == nil
 	})
 

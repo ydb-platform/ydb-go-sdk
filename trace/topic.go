@@ -113,10 +113,16 @@ type (
 		OnWriterInitStream func(TopicWriterInitStreamStartInfo) func(TopicWriterInitStreamDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterClose func(TopicWriterCloseStartInfo) func(TopicWriterCloseDoneInfo)
+
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnWriterBeforeCommitTransaction func(TopicOnWriterBeforeCommitTransactionStartInfo) func(TopicOnWriterBeforeCommitTransactionDoneInfo)
+		OnWriterBeforeCommitTransaction func(
+			TopicOnWriterBeforeCommitTransactionStartInfo,
+		) func(TopicOnWriterBeforeCommitTransactionDoneInfo)
+
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnWriterAfterFinishTransaction func(TopicOnWriterAfterFinishTransactionStartInfo) func(TopicOnWriterAfterFinishTransactionDoneInfo)
+		OnWriterAfterFinishTransaction func(
+			TopicOnWriterAfterFinishTransactionStartInfo,
+		) func(TopicOnWriterAfterFinishTransactionDoneInfo)
 
 		// TopicWriterStreamEvents
 

@@ -38,7 +38,7 @@ var (
 	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
 	PublicErrQueueIsFull     = xerrors.Wrap(errors.New("ydb: queue is full"))
-	errDiffetentTransactions = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+"))
+	errDiffetentTransactions = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 
 	// errProducerIDNotEqualMessageGroupID is temporary
 	// WithMessageGroupID is optional parameter because it allowed to be skipped by protocol.
@@ -634,6 +634,7 @@ func (w *WriterReconnector) GetSessionID() (sessionID string) {
 	w.m.WithLock(func() {
 		sessionID = w.sessionID
 	})
+
 	return sessionID
 }
 

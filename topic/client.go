@@ -52,5 +52,9 @@ type Client interface {
 	// StartTransactionalWriter start writer for write messages within transaction
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	StartTransactionalWriter(tx tx.Identifier, topicpath string, opts ...topicoptions.WriterOption) (*topicwriter.TxWriter, error)
+	StartTransactionalWriter(
+		tx tx.Identifier,
+		topicpath string,
+		opts ...topicoptions.WriterOption,
+	) (*topicwriter.TxWriter, error)
 }
