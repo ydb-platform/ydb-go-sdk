@@ -702,7 +702,7 @@ func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopicc
 		}
 	}
 
-	if len(messages) > 0 {
+	if len(messages) > 0 && messages[0].tx != nil {
 		res.Tx.ID = messages[0].tx.ID()
 		res.Tx.Session = messages[0].tx.SessionID()
 	}

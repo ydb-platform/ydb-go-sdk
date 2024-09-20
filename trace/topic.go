@@ -493,6 +493,7 @@ type (
 			WrittenOffsetMin int64
 			WrittenOffsetMax int64
 			WrittenCount     int
+			WrittenInTxCount int
 			SkipCount        int
 		}
 	}

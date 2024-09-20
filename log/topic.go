@@ -863,6 +863,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			Int64("written_offset_min", acks.WrittenOffsetMin),
 			Int64("written_offset_max", acks.WrittenOffsetMax),
 			Int("written_offset_count", acks.WrittenCount),
+			Int("written_in_tx_count", acks.WrittenInTxCount),
 			Int("skip_count", acks.SkipCount),
 			versionField(),
 		)
