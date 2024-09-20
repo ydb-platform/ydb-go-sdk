@@ -114,6 +114,16 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterClose func(TopicWriterCloseStartInfo) func(TopicWriterCloseDoneInfo)
 
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnWriterBeforeCommitTransaction func(
+			TopicOnWriterBeforeCommitTransactionStartInfo,
+		) func(TopicOnWriterBeforeCommitTransactionDoneInfo)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnWriterAfterFinishTransaction func(
+			TopicOnWriterAfterFinishTransactionStartInfo,
+		) func(TopicOnWriterAfterFinishTransactionDoneInfo)
+
 		// TopicWriterStreamEvents
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -489,8 +499,35 @@ type (
 			WrittenOffsetMin int64
 			WrittenOffsetMax int64
 			WrittenCount     int
+			WrittenInTxCount int
 			SkipCount        int
 		}
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicOnWriterBeforeCommitTransactionStartInfo struct {
+		Ctx            *context.Context
+		KqpSessionID   string
+		TopicSessionID string
+		TransactionID  string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicOnWriterBeforeCommitTransactionDoneInfo struct {
+		Error          error
+		TopicSessionID string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicOnWriterAfterFinishTransactionStartInfo struct {
+		Error         error
+		SessionID     string
+		TransactionID string
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicOnWriterAfterFinishTransactionDoneInfo struct {
+		CloseError error
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

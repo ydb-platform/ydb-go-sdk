@@ -125,7 +125,7 @@ func (w *SingleStreamWriter) start() {
 }
 
 func (w *SingleStreamWriter) initStream() (err error) {
-	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.tracer, w.cfg.reconnectorInstanceID, w.cfg.topic, w.cfg.producerID)
+	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.Tracer, w.cfg.reconnectorInstanceID, w.cfg.topic, w.cfg.producerID)
 	defer traceOnDone(w.SessionID, err)
 
 	req := w.createInitRequest()
@@ -152,7 +152,7 @@ func (w *SingleStreamWriter) initStream() (err error) {
 		w.cfg.encodersMap,
 		w.allowedCodecs,
 		w.cfg.compressorCount,
-		w.cfg.tracer,
+		w.cfg.Tracer,
 		w.cfg.reconnectorInstanceID,
 		w.SessionID,
 	)
@@ -204,7 +204,7 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 			// pass
 		default:
 			trace.TopicOnWriterReadUnknownGrpcMessage(
-				w.cfg.tracer,
+				w.cfg.Tracer,
 				w.cfg.reconnectorInstanceID,
 				w.SessionID,
 				xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
@@ -233,7 +233,7 @@ func (w *SingleStreamWriter) sendMessagesFromQueueToStreamLoop(ctx context.Conte
 		}
 
 		onSentComplete := trace.TopicOnWriterSendMessages(
-			w.cfg.tracer,
+			w.cfg.Tracer,
 			w.cfg.reconnectorInstanceID,
 			w.SessionID,
 			targetCodec.ToInt32(),
@@ -287,4 +287,12 @@ func (w *SingleStreamWriter) sendUpdateToken(ctx context.Context) (err error) {
 	req.Token = token
 
 	return stream.Send(req)
+}
+
+//go:generate mockgen -destination raw_topic_writer_stream_mock_test.go --typed -package topicwriterinternal -write_package_comment=false github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal RawTopicWriterStream
+
+type RawTopicWriterStream interface {
+	Recv() (rawtopicwriter.ServerMessage, error)
+	Send(mess rawtopicwriter.ClientMessage) error
+	CloseSend() error
 }

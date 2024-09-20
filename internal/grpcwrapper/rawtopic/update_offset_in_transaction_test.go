@@ -27,7 +27,7 @@ func TestUpdateOffsetsInTransactionRequestToProto(t *testing.T) {
 				HasValue: true,
 			},
 		},
-		Tx: UpdateOffsetsInTransactionRequest_TransactionIdentity{
+		Tx: rawtopiccommon.TransactionIdentity{
 			ID:      "tx-id",
 			Session: "session-id",
 		},

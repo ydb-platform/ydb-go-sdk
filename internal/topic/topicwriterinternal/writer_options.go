@@ -145,7 +145,7 @@ func WithWaitAckOnWrite(val bool) PublicWriterOption {
 
 func WithTrace(tracer *trace.Topic) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
-		cfg.tracer = cfg.tracer.Compose(tracer)
+		cfg.Tracer = cfg.Tracer.Compose(tracer)
 	}
 }
 

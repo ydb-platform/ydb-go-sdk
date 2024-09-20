@@ -31,7 +31,7 @@ var testCommonEncoders = NewEncoderMap()
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := newWriterReconnectorStopped(newWriterReconnectorConfig(
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(
 			WithAutoSetSeqNo(true),
 			WithAutosetCreatedTime(false),
 		))
@@ -63,7 +63,7 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("PredefinedSeqNo", func(t *testing.T) {
 		ctx := xtest.Context(t)
 
-		w := newWriterReconnectorStopped(newWriterReconnectorConfig(WithAutoSetSeqNo(true)))
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(WithAutoSetSeqNo(true)))
 		w.firstConnectionHandled.Store(true)
 		require.Error(t, w.Write(ctx, newTestMessages(1)))
 	})
@@ -72,7 +72,7 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 func TestWriterImpl_CheckMessages(t *testing.T) {
 	t.Run("MessageSize", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := newWriterReconnectorStopped(newWriterReconnectorConfig())
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig())
 		w.firstConnectionHandled.Store(true)
 
 		maxSize := 5
@@ -282,7 +282,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := xtest.Context(t)
-		w := newWriterReconnectorStopped(newWriterReconnectorConfig(
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(
 			WithAutoSetSeqNo(false),
 			WithMaxQueueLen(2),
 		))
@@ -994,7 +994,7 @@ func newTestMessagesWithContent(numbers ...int) []messageWithDataContent {
 
 func newTestWriterStopped(opts ...PublicWriterOption) *WriterReconnector {
 	cfgOptions := append(defaultTestWriterOptions(), opts...)
-	cfg := newWriterReconnectorConfig(cfgOptions...)
+	cfg := NewWriterReconnectorConfig(cfgOptions...)
 	res := newWriterReconnectorStopped(cfg)
 
 	if cfg.AdditionalEncoders == nil {
@@ -1074,7 +1074,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	}))
 	writerOptions = append(writerOptions, options.writerOptions...)
 
-	res.writer = newWriterReconnectorStopped(newWriterReconnectorConfig(writerOptions...))
+	res.writer = newWriterReconnectorStopped(NewWriterReconnectorConfig(writerOptions...))
 
 	res.stream.EXPECT().Recv().DoAndReturn(res.receiveMessageHandler).AnyTimes()
 

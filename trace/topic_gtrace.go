@@ -794,6 +794,76 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 		}
 	}
 	{
+		h1 := t.OnWriterBeforeCommitTransaction
+		h2 := x.OnWriterBeforeCommitTransaction
+		ret.OnWriterBeforeCommitTransaction = func(t TopicOnWriterBeforeCommitTransactionStartInfo) func(TopicOnWriterBeforeCommitTransactionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicOnWriterBeforeCommitTransactionDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicOnWriterBeforeCommitTransactionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnWriterAfterFinishTransaction
+		h2 := x.OnWriterAfterFinishTransaction
+		ret.OnWriterAfterFinishTransaction = func(t TopicOnWriterAfterFinishTransactionStartInfo) func(TopicOnWriterAfterFinishTransactionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicOnWriterAfterFinishTransactionDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicOnWriterAfterFinishTransactionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnWriterCompressMessages
 		h2 := x.OnWriterCompressMessages
 		ret.OnWriterCompressMessages = func(t TopicWriterCompressMessagesStartInfo) func(TopicWriterCompressMessagesDoneInfo) {
@@ -1227,6 +1297,36 @@ func (t *Topic) onWriterClose(t1 TopicWriterCloseStartInfo) func(TopicWriterClos
 	}
 	return res
 }
+func (t *Topic) onWriterBeforeCommitTransaction(t1 TopicOnWriterBeforeCommitTransactionStartInfo) func(TopicOnWriterBeforeCommitTransactionDoneInfo) {
+	fn := t.OnWriterBeforeCommitTransaction
+	if fn == nil {
+		return func(TopicOnWriterBeforeCommitTransactionDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicOnWriterBeforeCommitTransactionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onWriterAfterFinishTransaction(t1 TopicOnWriterAfterFinishTransactionStartInfo) func(TopicOnWriterAfterFinishTransactionDoneInfo) {
+	fn := t.OnWriterAfterFinishTransaction
+	if fn == nil {
+		return func(TopicOnWriterAfterFinishTransactionDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicOnWriterAfterFinishTransactionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Topic) onWriterCompressMessages(t1 TopicWriterCompressMessagesStartInfo) func(TopicWriterCompressMessagesDoneInfo) {
 	fn := t.OnWriterCompressMessages
 	if fn == nil {
@@ -1580,6 +1680,34 @@ func TopicOnWriterClose(t *Topic, writerInstanceID string, reason error) func(er
 	return func(e error) {
 		var p TopicWriterCloseDoneInfo
 		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnWriterBeforeCommitTransaction(t *Topic, ctx *context.Context, kqpSessionID string, topicSessionID string, transactionID string) func(_ error, topicSessionID string) {
+	var p TopicOnWriterBeforeCommitTransactionStartInfo
+	p.Ctx = ctx
+	p.KqpSessionID = kqpSessionID
+	p.TopicSessionID = topicSessionID
+	p.TransactionID = transactionID
+	res := t.onWriterBeforeCommitTransaction(p)
+	return func(e error, topicSessionID string) {
+		var p TopicOnWriterBeforeCommitTransactionDoneInfo
+		p.Error = e
+		p.TopicSessionID = topicSessionID
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnWriterAfterFinishTransaction(t *Topic, e error, sessionID string, transactionID string) func(closeError error) {
+	var p TopicOnWriterAfterFinishTransactionStartInfo
+	p.Error = e
+	p.SessionID = sessionID
+	p.TransactionID = transactionID
+	res := t.onWriterAfterFinishTransaction(p)
+	return func(closeError error) {
+		var p TopicOnWriterAfterFinishTransactionDoneInfo
+		p.CloseError = closeError
 		res(p)
 	}
 }
