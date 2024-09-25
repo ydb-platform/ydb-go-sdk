@@ -16,6 +16,7 @@ type (
 		Location() string
 		LastUpdated() time.Time
 		LoadFactor() float32
+		OverrideHost() string
 
 		// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
 		// It work good only if connection url always point to local dc.
@@ -38,6 +39,9 @@ type endpoint struct { //nolint:maligned
 	address  string
 	location string
 	services []string
+	ipv4     []string
+	ipv6     []string
+	sslNameOverride string
 
 	loadFactor  float32
 	lastUpdated time.Time
@@ -50,13 +54,16 @@ func (e *endpoint) Copy() Endpoint {
 	defer e.mu.RUnlock()
 
 	return &endpoint{
-		id:          e.id,
-		address:     e.address,
-		location:    e.location,
-		services:    append(make([]string, 0, len(e.services)), e.services...),
-		loadFactor:  e.loadFactor,
-		local:       e.local,
-		lastUpdated: e.lastUpdated,
+		id:              e.id,
+		address:         e.address,
+		location:        e.location,
+		services:        append(make([]string, 0, len(e.services)), e.services...),
+		ipv4:            append(make([]string, 0, len(e.ipv4)), e.ipv4...),
+		ipv6:            append(make([]string, 0, len(e.ipv6)), e.ipv6...),
+		sslNameOverride: e.sslNameOverride,
+		loadFactor:      e.loadFactor,
+		local:           e.local,
+		lastUpdated:     e.lastUpdated,
 	}
 }
 
@@ -81,11 +88,45 @@ func (e *endpoint) NodeID() uint32 {
 	return e.id
 }
 
+func getResolvedAddr(e *endpoint, useV6 bool) string {
+	var ip string;
+	if useV6 {
+		ip = "[" + e.ipv6[0] + "]"
+	} else {
+		ip = e.ipv4[0]
+	}
+
+	end := len(e.address)
+
+	for i := end - 1; i >=0; i-- {
+		if e.address[i] == ':' {
+			return ip + e.address[i:]
+		}
+	}
+
+	return e.address;
+}
+
 func (e *endpoint) Address() (address string) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
+	if len(e.ipv4) != 0 {
+		return getResolvedAddr(e, false);
+	}
+
+	if len(e.ipv6) != 0 {
+		return getResolvedAddr(e, true);
+	}
+
 	return e.address
+}
+
+func (e *endpoint) OverrideHost() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return e.sslNameOverride
 }
 
 func (e *endpoint) Location() string {
@@ -165,6 +206,24 @@ func WithServices(services []string) Option {
 func WithLastUpdated(ts time.Time) Option {
 	return func(e *endpoint) {
 		e.lastUpdated = ts
+	}
+}
+
+func WithIpV4(ipv4 []string) Option {
+	return func(e *endpoint) {
+		e.ipv4 = append(e.ipv4, ipv4...)
+	}
+}
+
+func WithIpV6(ipv6 []string) Option {
+	return func(e *endpoint) {
+		e.ipv6 = append(e.ipv6, ipv6...)
+	}
+}
+
+func WithSslTargetNameOverride(nameOverride string) Option {
+	return func(e *endpoint) {
+		e.sslNameOverride = nameOverride
 	}
 }
 
