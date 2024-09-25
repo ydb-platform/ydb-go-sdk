@@ -1,3 +1,4 @@
+* Fixed error on TopicListener.Close
 * Added error ErrMessagesPutToInternalQueueBeforeError to topic writer
 * Added write to topics within transactions
 
