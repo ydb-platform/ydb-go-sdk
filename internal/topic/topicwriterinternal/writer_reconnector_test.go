@@ -306,9 +306,8 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 			ctxNoQueueSpaceCancel()
 		}()
 		err = w.Write(ctxNoQueueSpace, newTestMessages(3))
-		if !errors.Is(err, PublicErrQueueIsFull) {
-			require.ErrorIs(t, err, PublicErrQueueIsFull)
-		}
+		require.Error(t, err)
+		require.NotErrorIs(t, err, PublicErrMessagesPutToInternalQueueBeforeError)
 
 		go func() {
 			waitStartQueueWait(1)
@@ -323,6 +322,24 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		err = w.Write(ctx, newTestMessages(3))
 		require.NoError(t, err)
 	})
+}
+
+func TestMessagesPutToInternalQueueBeforeError(t *testing.T) {
+	ctx := xtest.Context(t)
+	w := newWriterReconnectorStopped(NewWriterReconnectorConfig(
+		WithAutoSetSeqNo(false),
+		WithMaxQueueLen(2),
+		WithWaitAckOnWrite(true),
+	))
+	w.firstConnectionHandled.Store(true)
+
+	ctxCancel, cancel := context.WithCancel(ctx)
+	go func() {
+		<-w.queue.hasNewMessages
+		cancel()
+	}()
+	err := w.Write(ctxCancel, newTestMessages(1))
+	require.ErrorIs(t, err, PublicErrMessagesPutToInternalQueueBeforeError)
 }
 
 func TestEnv(t *testing.T) {

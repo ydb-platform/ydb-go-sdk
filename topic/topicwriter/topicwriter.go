@@ -10,7 +10,7 @@ type (
 	Message = topicwriterinternal.PublicMessage
 )
 
-var ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
+var ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.PublicErrMessagesPutToInternalQueueBeforeError
 
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages
@@ -38,7 +38,9 @@ func NewWriter(writer *topicwriterinternal.WriterReconnector) *Writer {
 // especially when connection has problems.
 //
 // It returns ErrQueueLimitExceed (must be checked by errors.Is)
-// if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue
+// if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue.
+// If err != nil you can check errors.Is(err, ErrMessagesPutToInternalQueueBeforeError) for check if the messages
+// put to buffer before error. It means that it is messages can be delivered to the server.
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages)
 }
