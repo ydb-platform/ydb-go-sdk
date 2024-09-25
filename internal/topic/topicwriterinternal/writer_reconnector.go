@@ -31,14 +31,14 @@ import (
 )
 
 var (
-	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
-	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	errNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
-	errNonZeroCreatedAt      = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
-	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
-	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
-	PublicErrQueueIsFull     = xerrors.Wrap(errors.New("ydb: queue is full"))
-	errDiffetentTransactions = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
+	errConnTimeout                                 = xerrors.Wrap(errors.New("ydb: connection timeout"))
+	errStopWriterReconnector                       = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
+	errNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
+	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
+	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
+	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
+	PublicErrMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))
+	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 
 	// errProducerIDNotEqualMessageGroupID is temporary
 	// WithMessageGroupID is optional parameter because it allowed to be skipped by protocol.
@@ -209,7 +209,7 @@ func (w *WriterReconnector) start() {
 	w.background.Start(name+", sendloop", w.connectionLoop)
 }
 
-func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) error {
+func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) (resErr error) {
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
@@ -223,18 +223,16 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	semaphoreWeight := int64(len(messages))
 	if semaphoreWeight > int64(w.cfg.MaxQueueLen) {
 		return xerrors.WithStackTrace(fmt.Errorf(
-			"ydb: add more messages, then max queue limit. max queue: %v, try to add: %v: %w",
+			"ydb: add more messages, then max queue limit. max queue: %v, try to add: %v",
 			w.cfg.MaxQueueLen,
 			semaphoreWeight,
-			PublicErrQueueIsFull,
 		))
 	}
 	if err := w.semaphore.Acquire(ctx, semaphoreWeight); err != nil {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v: %w",
+			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v",
 				semaphoreWeight,
 				w.cfg.MaxQueueLen,
-				PublicErrQueueIsFull,
 			))
 	}
 	defer func() {
@@ -254,10 +252,15 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		return err
 	}
 
-	waiter, err := w.processMessagesWithLock(messagesSlice, &semaphoreWeight)
+	waiter, err := w.addMessageToInternalQueueWithLock(messagesSlice, &semaphoreWeight)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if resErr != nil {
+			resErr = xerrors.Join(resErr, PublicErrMessagesPutToInternalQueueBeforeError)
+		}
+	}()
 
 	if !w.cfg.WaitServerAck {
 		return nil
@@ -266,7 +269,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	return w.queue.Wait(ctx, waiter)
 }
 
-func (w *WriterReconnector) processMessagesWithLock(
+func (w *WriterReconnector) addMessageToInternalQueueWithLock(
 	messagesSlice []messageWithDataContent,
 	semaphoreWeight *int64,
 ) (MessageQueueAckWaiter, error) {
