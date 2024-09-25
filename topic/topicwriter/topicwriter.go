@@ -38,7 +38,10 @@ func NewWriter(writer *topicwriterinternal.WriterReconnector) *Writer {
 // especially when connection has problems.
 //
 // It returns ErrQueueLimitExceed (must be checked by errors.Is)
-// if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue
+// if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue.
+//
+// Write will return error, inherited from ErrQueueLimitExceed if write cancelled by context and will be NOT
+// written to internal buffer. The error guarantee that the messages WILL NOT send to the server.
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages)
 }
