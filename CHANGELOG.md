@@ -1,3 +1,4 @@
+* Added error ErrMessagesPutToInternalQueueBeforeError to topic writer
 * Added write to topics within transactions
 
 ## v3.80.10
