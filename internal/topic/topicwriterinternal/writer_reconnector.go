@@ -33,11 +33,11 @@ import (
 var (
 	errConnTimeout                                 = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector                       = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	errNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
+	errNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
 	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
 	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
-	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
-	PublicErrMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))
+	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
+	PublicErrMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 
 	// errProducerIDNotEqualMessageGroupID is temporary
