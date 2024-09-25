@@ -77,15 +77,16 @@ func newStreamListener(
 func (l *streamListener) Close(ctx context.Context, reason error) error {
 	var resErrors []error
 
+	// should be first for prevent race between main close process and error handling in streams
+	if err := l.background.Close(ctx, reason); err != nil {
+		resErrors = append(resErrors, err)
+	}
+
 	if l.stream != nil {
 		l.streamClose(reason)
 	}
 
 	if err := l.syncCommitter.Close(ctx, reason); err != nil {
-		resErrors = append(resErrors, err)
-	}
-
-	if err := l.background.Close(ctx, reason); err != nil {
 		resErrors = append(resErrors, err)
 	}
 
