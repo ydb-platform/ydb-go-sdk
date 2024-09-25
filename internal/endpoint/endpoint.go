@@ -209,13 +209,13 @@ func WithLastUpdated(ts time.Time) Option {
 	}
 }
 
-func WithIpV4(ipv4 []string) Option {
+func WithIPV4(ipv4 []string) Option {
 	return func(e *endpoint) {
 		e.ipv4 = append(e.ipv4, ipv4...)
 	}
 }
 
-func WithIpV6(ipv6 []string) Option {
+func WithIPV6(ipv6 []string) Option {
 	return func(e *endpoint) {
 		e.ipv6 = append(e.ipv6, ipv6...)
 	}

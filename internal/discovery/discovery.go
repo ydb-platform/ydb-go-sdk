@@ -81,8 +81,8 @@ func discover(
 				endpoint.WithLocalDC(e.GetLocation() == location),
 				endpoint.WithServices(e.GetService()),
 				endpoint.WithLastUpdated(config.Clock().Now()),
-				endpoint.WithIpV4(e.GetIpV4()),
-				endpoint.WithIpV6(e.GetIpV6()),
+				endpoint.WithIPV4(e.GetIpV4()),
+				endpoint.WithIPV6(e.GetIpV6()),
 				endpoint.WithSslTargetNameOverride(e.GetSslTargetNameOverride()),
 			))
 		}

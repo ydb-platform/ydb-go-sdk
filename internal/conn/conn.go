@@ -177,6 +177,17 @@ func (c *conn) GetState() (s State) {
 	return State(c.state.Load())
 }
 
+func makeDialOption(overrideHost string) []grpc.DialOption {
+	dialOption := []grpc.DialOption{
+		grpc.WithStatsHandler(statsHandler{}),
+	}
+
+	if len(overrideHost) != 0 {
+		dialOption = append(dialOption, grpc.WithAuthority(overrideHost))
+	}
+	return dialOption
+}
+
 func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedConnection)
@@ -207,15 +218,8 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
-	overrideHost := c.endpoint.OverrideHost()
 
-	dialOption := []grpc.DialOption{
-		grpc.WithStatsHandler(statsHandler{}),
-	}
-
-	if len(overrideHost) != 0 {
-		dialOption = append(dialOption, grpc.WithAuthority(overrideHost))
-	}
+	dialOption := makeDialOption(c.endpoint.OverrideHost())
 
 	cc, err = grpc.DialContext(ctx, address, append( //nolint:staticcheck,nolintlint
 		dialOption,
