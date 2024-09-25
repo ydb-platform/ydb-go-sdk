@@ -185,6 +185,7 @@ func makeDialOption(overrideHost string) []grpc.DialOption {
 	if len(overrideHost) != 0 {
 		dialOption = append(dialOption, grpc.WithAuthority(overrideHost))
 	}
+
 	return dialOption
 }
 
