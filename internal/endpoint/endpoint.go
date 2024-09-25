@@ -34,13 +34,13 @@ type (
 )
 
 type endpoint struct { //nolint:maligned
-	mu       sync.RWMutex
-	id       uint32
-	address  string
-	location string
-	services []string
-	ipv4     []string
-	ipv6     []string
+	mu              sync.RWMutex
+	id              uint32
+	address         string
+	location        string
+	services        []string
+	ipv4            []string
+	ipv6            []string
 	sslNameOverride string
 
 	loadFactor  float32
@@ -89,7 +89,7 @@ func (e *endpoint) NodeID() uint32 {
 }
 
 func getResolvedAddr(e *endpoint, useV6 bool) string {
-	var ip string;
+	var ip string
 	if useV6 {
 		ip = "[" + e.ipv6[0] + "]"
 	} else {
@@ -98,13 +98,13 @@ func getResolvedAddr(e *endpoint, useV6 bool) string {
 
 	end := len(e.address)
 
-	for i := end - 1; i >=0; i-- {
+	for i := end - 1; i >= 0; i-- {
 		if e.address[i] == ':' {
 			return ip + e.address[i:]
 		}
 	}
 
-	return e.address;
+	return e.address
 }
 
 func (e *endpoint) Address() (address string) {
@@ -112,11 +112,11 @@ func (e *endpoint) Address() (address string) {
 	defer e.mu.RUnlock()
 
 	if len(e.ipv4) != 0 {
-		return getResolvedAddr(e, false);
+		return getResolvedAddr(e, false)
 	}
 
 	if len(e.ipv6) != 0 {
-		return getResolvedAddr(e, true);
+		return getResolvedAddr(e, true)
 	}
 
 	return e.address
