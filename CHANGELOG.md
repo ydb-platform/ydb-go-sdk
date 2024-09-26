@@ -1,3 +1,5 @@
+*  Support for ip discovery. Server can show own ip address and target hostname in the ListEndpoint message. These fields are used to bypass DNS resolving.
+
 ## v3.80.10
 * Added `ydb.WithSessionPoolSessionUsageLimit()` option for limitation max count of session usage  
 * Refactored experimental topic iterators in `topicsugar` package
