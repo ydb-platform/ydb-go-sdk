@@ -1,4 +1,8 @@
-*  Support for ip discovery. Server can show own ip address and target hostname in the ListEndpoint message. These fields are used to bypass DNS resolving.
+*  Added ip discovery. Server can show own ip address and target hostname in the ListEndpoint message. These fields are used to bypass DNS resolving.
+
+## v3.81.0
+* Added error ErrMessagesPutToInternalQueueBeforeError to topic writer
+* Added write to topics within transactions
 
 ## v3.80.10
 * Added `ydb.WithSessionPoolSessionUsageLimit()` option for limitation max count of session usage  

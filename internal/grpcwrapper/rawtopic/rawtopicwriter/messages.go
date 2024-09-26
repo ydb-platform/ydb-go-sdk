@@ -145,6 +145,7 @@ type WriteRequest struct {
 
 	Messages []MessageData
 	Codec    rawtopiccommon.Codec
+	Tx       rawtopiccommon.TransactionIdentity
 }
 
 func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest, err error) {
@@ -161,6 +162,7 @@ func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_Wri
 		WriteRequest: &Ydb_Topic.StreamWriteMessage_WriteRequest{
 			Messages: messages,
 			Codec:    int32(r.Codec.ToProto()),
+			Tx:       r.Tx.ToProto(),
 		},
 	}
 
@@ -231,11 +233,13 @@ func (r *WriteResult) GetAcks() (res traceAck) {
 	}
 	for i := range r.Acks {
 		ack := &r.Acks[i]
-		if ack.MessageWriteStatus.Type == WriteStatusTypeWritten {
+		switch ack.MessageWriteStatus.Type {
+		case WriteStatusTypeWritten:
 			res.WrittenCount++
-		}
-		if ack.MessageWriteStatus.Type == WriteStatusTypeSkipped {
+		case WriteStatusTypeSkipped:
 			res.SkipCount++
+		case WriteStatusTypeWrittenInTx:
+			res.WrittenInTxCount++
 		}
 
 		if ack.SeqNo < res.SeqNoMin {
@@ -261,6 +265,7 @@ type traceAck = struct {
 	WrittenOffsetMin int64
 	WrittenOffsetMax int64
 	WrittenCount     int
+	WrittenInTxCount int
 	SkipCount        int
 }
 
@@ -299,6 +304,12 @@ func (s *MessageWriteStatus) fromProto(status interface{}) error {
 		s.SkippedReason = WriteStatusSkipReason(v.Skipped.GetReason())
 
 		return nil
+
+	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_WrittenInTx_:
+		s.Type = WriteStatusTypeWrittenInTx
+
+		return nil
+
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected write status type: %v", reflect.TypeOf(v))))
 	}
@@ -307,19 +318,19 @@ func (s *MessageWriteStatus) fromProto(status interface{}) error {
 type WriteStatusType int
 
 const (
-	WriteStatusTypeUnknown WriteStatusType = iota
-	WriteStatusTypeWritten
+	WriteStatusTypeWritten WriteStatusType = iota + 1
 	WriteStatusTypeSkipped
+	WriteStatusTypeWrittenInTx
 )
 
 func (t WriteStatusType) String() string {
 	switch t {
-	case WriteStatusTypeUnknown:
-		return "Unknown"
 	case WriteStatusTypeSkipped:
 		return "Skipped"
 	case WriteStatusTypeWritten:
 		return "Written"
+	case WriteStatusTypeWrittenInTx:
+		return "WrittenInTx"
 	default:
 		return strconv.Itoa(int(t))
 	}

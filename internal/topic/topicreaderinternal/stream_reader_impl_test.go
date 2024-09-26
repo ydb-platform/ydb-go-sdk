@@ -1181,7 +1181,7 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 			OperationParams: rawydb.OperationParams{
 				OperationMode: rawydb.OperationParamsModeSync,
 			},
-			Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+			Tx: rawtopiccommon.TransactionIdentity{
 				ID:      txID,
 				Session: sessionID,
 			},

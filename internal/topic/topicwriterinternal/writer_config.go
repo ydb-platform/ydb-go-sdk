@@ -18,7 +18,7 @@ type WritersCommonConfig struct {
 	defaultPartitioning rawtopicwriter.Partitioning
 	compressorCount     int
 
-	tracer             *trace.Topic
+	Tracer             *trace.Topic
 	cred               credentials.Credentials
 	credUpdateInterval time.Duration
 	clock              clockwork.Clock

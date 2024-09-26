@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -19,6 +20,8 @@ type PublicMessage struct {
 	CreatedAt time.Time
 	Data      io.Reader
 	Metadata  map[string][]byte
+
+	tx tx.Transaction
 
 	// partitioning at level message available by protocol, but doesn't available by current server implementation
 	// the field hidden from public access for prevent runtime errors.

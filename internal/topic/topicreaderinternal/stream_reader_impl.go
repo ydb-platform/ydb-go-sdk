@@ -297,8 +297,6 @@ func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
 		defer onDone()
 
 		ctx = traceCtx
-		//nolint:godox
-		// TODO: trace
 		if transactionResult == nil {
 			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
 		} else {
@@ -318,7 +316,7 @@ func (r *topicStreamReaderImpl) createUpdateOffsetRequest(
 
 	return &rawtopic.UpdateOffsetsInTransactionRequest{
 		OperationParams: rawydb.NewRawOperationParamsFromProto(operation.Params(ctx, 0, 0, operation.ModeSync)),
-		Tx: rawtopic.UpdateOffsetsInTransactionRequest_TransactionIdentity{
+		Tx: rawtopiccommon.TransactionIdentity{
 			ID:      tx.ID(),
 			Session: tx.SessionID(),
 		},

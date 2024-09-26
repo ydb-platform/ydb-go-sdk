@@ -31,13 +31,14 @@ import (
 )
 
 var (
-	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
-	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	errNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
-	errNonZeroCreatedAt      = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
-	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
-	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
-	PublicErrQueueIsFull     = xerrors.Wrap(errors.New("ydb: queue is full"))
+	errConnTimeout                                 = xerrors.Wrap(errors.New("ydb: connection timeout"))
+	errStopWriterReconnector                       = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
+	errNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
+	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
+	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
+	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
+	PublicErrMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
+	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 
 	// errProducerIDNotEqualMessageGroupID is temporary
 	// WithMessageGroupID is optional parameter because it allowed to be skipped by protocol.
@@ -73,14 +74,14 @@ func (cfg *WriterReconnectorConfig) validate() error {
 	return nil
 }
 
-func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
+func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
 	cfg := WriterReconnectorConfig{
 		WritersCommonConfig: WritersCommonConfig{
 			cred:               credentials.NewAnonymousCredentials(),
 			credUpdateInterval: time.Hour,
 			clock:              clockwork.NewRealClock(),
 			compressorCount:    runtime.NumCPU(),
-			tracer:             &trace.Topic{},
+			Tracer:             &trace.Topic{},
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
@@ -119,7 +120,6 @@ type WriterReconnector struct {
 	background                     background.Worker
 	retrySettings                  topic.RetrySettings
 	writerInstanceID               string
-	sessionID                      string
 	semaphore                      *semaphore.Weighted
 	firstInitResponseProcessedChan empty.Chan
 	lastSeqNo                      int64
@@ -127,17 +127,22 @@ type WriterReconnector struct {
 	initDoneCh                     empty.Chan
 	initInfo                       InitialInfo
 	m                              xsync.RWMutex
+	sessionID                      string
 	firstConnectionHandled         atomic.Bool
 	initDone                       bool
 }
 
-func newWriterReconnector(
-	cfg WriterReconnectorConfig, //nolint:gocritic
-) *WriterReconnector {
+func NewWriterReconnector(
+	cfg WriterReconnectorConfig,
+) (*WriterReconnector, error) {
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+
 	res := newWriterReconnectorStopped(cfg)
 	res.start()
 
-	return res
+	return res, nil
 }
 
 func newWriterReconnectorStopped(
@@ -204,7 +209,7 @@ func (w *WriterReconnector) start() {
 	w.background.Start(name+", sendloop", w.connectionLoop)
 }
 
-func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) error {
+func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) (resErr error) {
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
@@ -218,18 +223,16 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	semaphoreWeight := int64(len(messages))
 	if semaphoreWeight > int64(w.cfg.MaxQueueLen) {
 		return xerrors.WithStackTrace(fmt.Errorf(
-			"ydb: add more messages, then max queue limit. max queue: %v, try to add: %v: %w",
+			"ydb: add more messages, then max queue limit. max queue: %v, try to add: %v",
 			w.cfg.MaxQueueLen,
 			semaphoreWeight,
-			PublicErrQueueIsFull,
 		))
 	}
 	if err := w.semaphore.Acquire(ctx, semaphoreWeight); err != nil {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v: %w",
+			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v",
 				semaphoreWeight,
 				w.cfg.MaxQueueLen,
-				PublicErrQueueIsFull,
 			))
 	}
 	defer func() {
@@ -249,10 +252,15 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		return err
 	}
 
-	waiter, err := w.processMessagesWithLock(messagesSlice, &semaphoreWeight)
+	waiter, err := w.addMessageToInternalQueueWithLock(messagesSlice, &semaphoreWeight)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if resErr != nil {
+			resErr = xerrors.Join(resErr, PublicErrMessagesPutToInternalQueueBeforeError)
+		}
+	}()
 
 	if !w.cfg.WaitServerAck {
 		return nil
@@ -261,7 +269,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	return w.queue.Wait(ctx, waiter)
 }
 
-func (w *WriterReconnector) processMessagesWithLock(
+func (w *WriterReconnector) addMessageToInternalQueueWithLock(
 	messagesSlice []messageWithDataContent,
 	semaphoreWeight *int64,
 ) (MessageQueueAckWaiter, error) {
@@ -313,7 +321,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 		sessionID = w.sessionID
 	})
 	onCompressDone := trace.TopicOnWriterCompressMessages(
-		w.cfg.tracer,
+		w.cfg.Tracer,
 		w.writerInstanceID,
 		sessionID,
 		w.cfg.forceCodec.ToInt32(),
@@ -354,7 +362,7 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 }
 
 func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
-	onDone := trace.TopicOnWriterClose(w.cfg.tracer, w.writerInstanceID, reason)
+	onDone := trace.TopicOnWriterClose(w.cfg.Tracer, w.writerInstanceID, reason)
 	defer func() {
 		onDone(resErr)
 	}()
@@ -461,7 +469,7 @@ func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, att
 	err error,
 ) {
 	traceOnDone := trace.TopicOnWriterReconnect(
-		w.cfg.tracer,
+		w.cfg.Tracer,
 		w.writerInstanceID,
 		w.cfg.topic,
 		w.cfg.producerID,
@@ -625,6 +633,14 @@ func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream
 	return cfg
 }
 
+func (w *WriterReconnector) GetSessionID() (sessionID string) {
+	w.m.WithLock(func() {
+		sessionID = w.sessionID
+	})
+
+	return sessionID
+}
+
 func sendMessagesToStream(
 	stream RawTopicWriterStream,
 	targetCodec rawtopiccommon.Codec,
@@ -684,6 +700,17 @@ func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopicc
 	res rawtopicwriter.WriteRequest,
 	err error,
 ) {
+	for i := 1; i < len(messages); i++ {
+		if messages[i-1].tx != messages[i].tx {
+			return res, xerrors.WithStackTrace(errDiffetentTransactions)
+		}
+	}
+
+	if len(messages) > 0 && messages[0].tx != nil {
+		res.Tx.ID = messages[0].tx.ID()
+		res.Tx.Session = messages[0].tx.SessionID()
+	}
+
 	res.Codec = targetCodec
 	res.Messages = make([]rawtopicwriter.MessageData, len(messages))
 	for i := range messages {

@@ -9,7 +9,7 @@ import (
 
 type UpdateOffsetsInTransactionRequest struct {
 	OperationParams rawydb.OperationParams
-	Tx              UpdateOffsetsInTransactionRequest_TransactionIdentity
+	Tx              rawtopiccommon.TransactionIdentity
 	Topics          []UpdateOffsetsInTransactionRequest_TopicOffsets
 	Consumer        string
 }
@@ -17,11 +17,8 @@ type UpdateOffsetsInTransactionRequest struct {
 func (r *UpdateOffsetsInTransactionRequest) ToProto() *Ydb_Topic.UpdateOffsetsInTransactionRequest {
 	req := &Ydb_Topic.UpdateOffsetsInTransactionRequest{
 		OperationParams: r.OperationParams.ToProto(),
-		Tx: &Ydb_Topic.TransactionIdentity{
-			Id:      r.Tx.ID,
-			Session: r.Tx.Session,
-		},
-		Consumer: r.Consumer,
+		Tx:              r.Tx.ToProto(),
+		Consumer:        r.Consumer,
 	}
 
 	req.Topics = make([]*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets, len(r.Topics))
@@ -54,11 +51,6 @@ func (r *UpdateOffsetsInTransactionRequest) ToProto() *Ydb_Topic.UpdateOffsetsIn
 	}
 
 	return req
-}
-
-type UpdateOffsetsInTransactionRequest_TransactionIdentity struct { //nolint:revive,stylecheck
-	ID      string
-	Session string
 }
 
 type UpdateOffsetsInTransactionRequest_TopicOffsets struct { //nolint:revive,stylecheck
