@@ -1,3 +1,5 @@
+* Allowed skip column for `ScanStruct` by tag `-` 
+
 ## v3.81.1
 * Fixed nil pointer dereference panic on failed `ydb.Open` 
 * Added ip discovery. Server can show own ip address and target hostname in the ListEndpoint message. These fields are used to bypass DNS resolving.
