@@ -194,8 +194,6 @@ func (d *Driver) Table() table.Client {
 }
 
 // Query returns query client
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (d *Driver) Query() *internalQuery.Client {
 	return d.query.Must()
 }
