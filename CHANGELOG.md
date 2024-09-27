@@ -1,4 +1,10 @@
-* Fixed error on TopicListener.Close
+* Fixed error on experimental TopicListener.Close
+
+## v3.81.1
+* Fixed nil pointer dereference panic on failed `ydb.Open` 
+* Added ip discovery. Server can show own ip address and target hostname in the ListEndpoint message. These fields are used to bypass DNS resolving.
+
+## v3.81.0
 * Added error ErrMessagesPutToInternalQueueBeforeError to topic writer
 * Added write to topics within transactions
 

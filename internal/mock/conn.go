@@ -115,6 +115,10 @@ func (e *Endpoint) LoadFactor() float32 {
 	panic("not implemented in mock")
 }
 
+func (e *Endpoint) OverrideHost() string {
+	panic("not implemented in mock")
+}
+
 func (e *Endpoint) String() string {
 	panic("not implemented in mock")
 }
