@@ -12,8 +12,6 @@ import (
 
 type (
 	// Executor is an interface for execute queries
-	//
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Executor interface {
 		// Exec execute query without result
 		//
@@ -40,8 +38,6 @@ type (
 		QueryRow(ctx context.Context, query string, opts ...options.Execute) (Row, error)
 	}
 	// Client defines API of query client
-	//
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Client interface {
 		Executor
 
@@ -85,15 +81,11 @@ type (
 		// QueryResultSet is a helper which read all rows from first result set in result
 		//
 		// Warning: the large result set from query will be materialized and can happened to "OOM killed" problem
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 		QueryResultSet(ctx context.Context, query string, opts ...options.Execute) (ClosableResultSet, error)
 
 		// QueryRow is a helper which read only one row from first result set in result
 		//
 		// ReadRow returns error if result contains more than one result set or more than one row
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 		QueryRow(ctx context.Context, query string, opts ...options.Execute) (Row, error)
 
 		// ExecuteScript starts long executing script with polling results later
@@ -157,8 +149,6 @@ func WithLabel(lbl string) options.RetryOptionsOption {
 }
 
 // WithRetryBudget creates option with external budget
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithRetryBudget(b budget.Budget) options.RetryOptionsOption {
 	return options.WithRetryBudget(b)
 }
