@@ -22,7 +22,9 @@ func table(config Config) (t trace.Table) {
 	with := config.GaugeVec("with")
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
-			limit.With(nil).Set(float64(info.Limit))
+			if config.Details()&trace.TableEvents != 0 {
+				limit.With(nil).Set(float64(info.Limit))
+			}
 		}
 	}
 	t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
@@ -69,11 +71,13 @@ func table(config Config) (t trace.Table) {
 		return nil
 	}
 	t.OnPoolStateChange = func(info trace.TablePoolStateChangeInfo) {
-		limit.With(nil).Set(float64(info.Limit))
-		index.With(nil).Set(float64(info.Index))
-		idle.With(nil).Set(float64(info.Idle))
-		wait.With(nil).Set(float64(info.Wait))
-		createInProgress.With(nil).Set(float64(info.CreateInProgress))
+		if config.Details()&trace.TablePoolEvents != 0 {
+			limit.With(nil).Set(float64(info.Limit))
+			index.With(nil).Set(float64(info.Index))
+			idle.With(nil).Set(float64(info.Idle))
+			wait.With(nil).Set(float64(info.Wait))
+			createInProgress.With(nil).Set(float64(info.CreateInProgress))
+		}
 	}
 	{
 		latency := session.WithSystem("query").TimerVec("latency")

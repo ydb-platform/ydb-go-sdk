@@ -95,10 +95,12 @@ func driver(config Config) (t trace.Driver) {
 		eventType := repeater.EventType(*info.Context)
 
 		return func(info trace.DriverBalancerClusterDiscoveryAttemptDoneInfo) {
-			balancersDiscoveries.With(map[string]string{
-				"status": errorBrief(info.Error),
-				"cause":  eventType,
-			}).Inc()
+			if config.Details()&trace.DriverBalancerEvents != 0 {
+				balancersDiscoveries.With(map[string]string{
+					"status": errorBrief(info.Error),
+					"cause":  eventType,
+				}).Inc()
+			}
 		}
 	}
 	t.OnBalancerUpdate = func(info trace.DriverBalancerUpdateStartInfo) func(trace.DriverBalancerUpdateDoneInfo) {
