@@ -1,3 +1,5 @@
+* Fixed tracing details check for some metrics
+
 ## v3.81.2
 * Removed `experimantal` comment for query service client
 
