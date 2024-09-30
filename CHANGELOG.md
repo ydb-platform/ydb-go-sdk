@@ -1,3 +1,4 @@
+## v3.81.3
 * Fixed tracing details check for some metrics
 
 ## v3.81.2
