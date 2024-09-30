@@ -1,3 +1,4 @@
+## v3.81.2
 * Removed `experimantal` comment for query service client
 
 ## v3.81.1
