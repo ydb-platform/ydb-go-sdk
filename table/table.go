@@ -731,6 +731,13 @@ func (data BulkUpsertArrow) ApplyBulkUpsertRequest(req *BulkUpsertRequest) error
 	return err
 }
 
+func NewBulkUpsertArrow(data []byte, opts ...ArrowFormatOption) BulkUpsertArrow {
+	return BulkUpsertArrow{
+		Data:    data,
+		Options: opts,
+	}
+}
+
 func ensureArrowDataFormatSettings(req *BulkUpsertRequest) (format *Ydb_Formats.ArrowBatchSettings) {
 	if settings, ok := req.DataFormat.(*Ydb_Table.BulkUpsertRequest_ArrowBatchSettings); ok {
 		if settings.ArrowBatchSettings == nil {

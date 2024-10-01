@@ -174,3 +174,25 @@ id,val
 	assertIdValue(scope.Ctx, t, tablePath, 42, "123")
 	assertIdValue(scope.Ctx, t, tablePath, 43, "456")
 }
+
+func TestTableArrowBulkUpsert(t *testing.T) {
+	scope := newScope(t)
+	driver := scope.Driver()
+	tablePath := scope.TablePath()
+
+	// data & schema generated with make_test_arrow.py script
+	data, err := os.ReadFile("testdata/bulk_upsert_test_data.arrow")
+	scope.Require.NoError(err)
+
+	schema, err := os.ReadFile("testdata/bulk_upsert_test_schema.arrow")
+	scope.Require.NoError(err)
+
+	err = driver.Table().BulkUpsert(scope.Ctx, tablePath, table.NewBulkUpsertArrow(
+		[]byte(data),
+		table.WithArrowSchema(schema),
+	))
+	scope.Require.NoError(err)
+
+	assertIdValue(scope.Ctx, t, tablePath, 123, "data1")
+	assertIdValue(scope.Ctx, t, tablePath, 234, "data2")
+}
