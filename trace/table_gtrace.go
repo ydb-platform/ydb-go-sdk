@@ -957,6 +957,21 @@ func (t *Table) onDoTx(t1 TableDoTxStartInfo) func(TableDoTxDoneInfo) {
 	}
 	return res
 }
+func (t *Table) onBulkUpsert(t1 TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo) {
+	fn := t.OnBulkUpsert
+	if fn == nil {
+		return func(TableBulkUpsertDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableBulkUpsertDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Table) onCreateSession(t1 TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo) {
 	fn := t.OnCreateSession
 	if fn == nil {
@@ -1314,6 +1329,19 @@ func TableOnDoTx(t *Table, c *context.Context, call call, label string, idempote
 	res := t.onDoTx(p)
 	return func(attempts int, e error) {
 		var p TableDoTxDoneInfo
+		p.Attempts = attempts
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnBulkUpsert(t *Table, c *context.Context, call call, label string) func(attempts int, _ error) {
+	var p TableBulkUpsertStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onBulkUpsert(p)
+	return func(attempts int, e error) {
+		var p TableBulkUpsertDoneInfo
 		p.Attempts = attempts
 		p.Error = e
 		res(p)

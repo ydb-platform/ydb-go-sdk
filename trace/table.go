@@ -23,6 +23,8 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnDoTx func(TableDoTxStartInfo) func(TableDoTxDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnBulkUpsert func(TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnCreateSession func(TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo)
 		// Session events
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -146,7 +148,8 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableBulkUpsertDoneInfo struct {
-		Error error
+		Error    error
+		Attempts int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionDeleteStartInfo struct {

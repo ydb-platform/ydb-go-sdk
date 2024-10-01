@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -68,6 +70,12 @@ type Client interface {
 	// If op TxOperation return non nil - transaction will be rollback
 	// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
 	DoTx(ctx context.Context, op TxOperation, opts ...Option) error
+
+	// BulkUpsert upserts a batch of rows non-transactionally.
+	//
+	// Returns success only when all rows were successfully upserted. In case of an error some rows might
+	// be upserted and some might not.
+	BulkUpsert(ctx context.Context, table string, data BulkUpsertData, opts ...Option) error
 }
 
 type SessionStatus = string
@@ -179,6 +187,7 @@ type Session interface {
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)
 
+	// Deprecated: use Client instance instead.
 	BulkUpsert(
 		ctx context.Context,
 		table string,
@@ -203,17 +212,7 @@ type Session interface {
 	) error
 }
 
-type TransactionSettings struct {
-	settings Ydb_Table.TransactionSettings
-}
-
-func (t *TransactionSettings) Settings() *Ydb_Table.TransactionSettings {
-	if t == nil {
-		return nil
-	}
-
-	return &t.settings
-}
+type TransactionSettings = options.TransactionSettings
 
 // Explanation is a result of Explain calls.
 type Explanation struct {
@@ -306,7 +305,7 @@ func TxSettings(opts ...TxOption) *TransactionSettings {
 	s := new(TransactionSettings)
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*txDesc)(&s.settings))
+			opt((*txDesc)(s.Settings()))
 		}
 	}
 
@@ -318,7 +317,7 @@ func BeginTx(opts ...TxOption) TxControlOption {
 	return func(d *txControlDesc) {
 		s := TxSettings(opts...)
 		d.TxSelector = &Ydb_Table.TransactionControl_BeginTx{
-			BeginTx: &s.settings,
+			BeginTx: s.Settings(),
 		}
 	}
 }
@@ -489,14 +488,7 @@ func ValueParam(name string, v value.Value) ParameterOption {
 	return params.Named(name, v)
 }
 
-type Options struct {
-	Label           string
-	Idempotent      bool
-	TxSettings      *TransactionSettings
-	TxCommitOptions []options.CommitTransactionOption
-	RetryOptions    []retry.Option
-	Trace           *trace.Table
-}
+type Options = options.TableOptions
 
 type Option interface {
 	ApplyTableOption(opts *Options)
@@ -577,4 +569,199 @@ func (opt traceOption) ApplyTableOption(opts *Options) {
 
 func WithTrace(t trace.Table) traceOption { //nolint:gocritic
 	return traceOption{t: &t}
+}
+
+type (
+	BulkUpsertRequest Ydb_Table.BulkUpsertRequest
+)
+
+type BulkUpsertData interface {
+	ApplyBulkUpsertRequest(req *BulkUpsertRequest) error
+}
+
+type BulkUpsertRows struct {
+	Rows value.Value
+}
+
+func (data BulkUpsertRows) ApplyBulkUpsertRequest(req *BulkUpsertRequest) error {
+	a := allocator.New()
+
+	defer func() {
+		defer a.Free()
+	}()
+
+	req.Rows = value.ToYDB(data.Rows, a)
+
+	return nil
+}
+
+type BulkUpsertCsv struct {
+	Data    []byte
+	Options []CsvFormatOption
+}
+
+type CsvFormatOption interface {
+	ApplyCsvFormatOption(req *BulkUpsertRequest) (err error)
+}
+
+func (data BulkUpsertCsv) ApplyBulkUpsertRequest(req *BulkUpsertRequest) error {
+	req.Data = data.Data
+
+	var err error
+	for _, opt := range data.Options {
+		if opt != nil {
+			err = opt.ApplyCsvFormatOption(req)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return err
+}
+
+func NewBulkUpsertCsv(data []byte, opts ...CsvFormatOption) BulkUpsertCsv {
+	return BulkUpsertCsv{
+		Data:    data,
+		Options: opts,
+	}
+}
+
+func ensureCsvDataFormatSettings(req *BulkUpsertRequest) (format *Ydb_Formats.CsvSettings) {
+	if settings, ok := req.DataFormat.(*Ydb_Table.BulkUpsertRequest_CsvSettings); ok {
+		if settings.CsvSettings == nil {
+			settings.CsvSettings = &Ydb_Formats.CsvSettings{}
+		}
+
+		return settings.CsvSettings
+	}
+
+	req.DataFormat = &Ydb_Table.BulkUpsertRequest_CsvSettings{
+		CsvSettings: &Ydb_Formats.CsvSettings{},
+	}
+
+	settings, ok := req.DataFormat.(*Ydb_Table.BulkUpsertRequest_CsvSettings)
+	if !ok {
+		return nil
+	}
+
+	return settings.CsvSettings
+}
+
+type csvHeaderOption struct{}
+
+func (opt *csvHeaderOption) ApplyCsvFormatOption(req *BulkUpsertRequest) error {
+	ensureCsvDataFormatSettings(req).Header = true
+
+	return nil
+}
+
+// First not skipped line is a CSV header (list of column names).
+func WithCsvHeader() CsvFormatOption {
+	return &csvHeaderOption{}
+}
+
+type csvNullValueOption struct {
+	Value []byte
+}
+
+func (opt *csvNullValueOption) ApplyCsvFormatOption(req *BulkUpsertRequest) error {
+	ensureCsvDataFormatSettings(req).NullValue = opt.Value
+
+	return nil
+}
+
+// String value that would be interpreted as NULL.
+func WithCsvNullValue(value []byte) CsvFormatOption {
+	return &csvNullValueOption{value}
+}
+
+type csvDelimiterOption struct {
+	Value []byte
+}
+
+func (opt *csvDelimiterOption) ApplyCsvFormatOption(req *BulkUpsertRequest) error {
+	ensureCsvDataFormatSettings(req).Delimiter = opt.Value
+
+	return nil
+}
+
+// Fields delimiter in CSV file. It's "," if not set.
+func WithCsvDelimiter(value []byte) CsvFormatOption {
+	return &csvDelimiterOption{value}
+}
+
+type csvSkipRowsOption struct {
+	Count uint32
+}
+
+func (opt *csvSkipRowsOption) ApplyCsvFormatOption(req *BulkUpsertRequest) error {
+	ensureCsvDataFormatSettings(req).SkipRows = opt.Count
+
+	return nil
+}
+
+// Number of rows to skip before CSV data. It should be present only in the first upsert of CSV file.
+func WithCsvSkipRows(count uint32) CsvFormatOption {
+	return &csvSkipRowsOption{count}
+}
+
+type BulkUpsertArrow struct {
+	Data    []byte
+	Options []ArrowFormatOption
+}
+
+type ArrowFormatOption interface {
+	ApplyArrowFormatOption(req *BulkUpsertRequest) (err error)
+}
+
+func (data BulkUpsertArrow) ApplyBulkUpsertRequest(req *BulkUpsertRequest) error {
+	req.Data = data.Data
+
+	var err error
+	for _, opt := range data.Options {
+		if opt != nil {
+			err = opt.ApplyArrowFormatOption(req)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return err
+}
+
+func ensureArrowDataFormatSettings(req *BulkUpsertRequest) (format *Ydb_Formats.ArrowBatchSettings) {
+	if settings, ok := req.DataFormat.(*Ydb_Table.BulkUpsertRequest_ArrowBatchSettings); ok {
+		if settings.ArrowBatchSettings == nil {
+			settings.ArrowBatchSettings = &Ydb_Formats.ArrowBatchSettings{}
+		}
+
+		return settings.ArrowBatchSettings
+	}
+
+	req.DataFormat = &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{
+		ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{},
+	}
+
+	settings, ok := req.DataFormat.(*Ydb_Table.BulkUpsertRequest_ArrowBatchSettings)
+	if !ok {
+		return nil
+	}
+
+	return settings.ArrowBatchSettings
+}
+
+type arrowSchemaOption struct {
+	Schema []byte
+}
+
+func (opt *arrowSchemaOption) ApplyArrowFormatOption(req *BulkUpsertRequest) error {
+	ensureArrowDataFormatSettings(req).Schema = opt.Schema
+
+	return nil
+}
+
+func WithArrowSchema(schema []byte) ArrowFormatOption {
+	return &arrowSchemaOption{schema}
 }

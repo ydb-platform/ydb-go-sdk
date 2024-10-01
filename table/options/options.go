@@ -8,6 +8,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func WithShardKeyBounds() DescribeTableOption {
@@ -869,6 +871,28 @@ func WithKeepInCache(keepInCache bool) ExecuteDataQueryOption {
 	)
 }
 
+type TableOptions struct {
+	Label           string
+	Idempotent      bool
+	TxSettings      *TransactionSettings
+	TxCommitOptions []CommitTransactionOption
+	RetryOptions    []retry.Option
+	Trace           *trace.Table
+	CallOptions     []grpc.CallOption
+}
+
+type TransactionSettings struct {
+	settings Ydb_Table.TransactionSettings
+}
+
+func (t *TransactionSettings) Settings() *Ydb_Table.TransactionSettings {
+	if t == nil {
+		return nil
+	}
+
+	return &t.settings
+}
+
 type withCallOptions []grpc.CallOption
 
 func (opts withCallOptions) ApplyExecuteScanQueryOption(d *ExecuteScanQueryDesc) []grpc.CallOption {
@@ -883,6 +907,10 @@ func (opts withCallOptions) ApplyExecuteDataQueryOption(
 	d *ExecuteDataQueryDesc, a *allocator.Allocator,
 ) []grpc.CallOption {
 	return opts
+}
+
+func (opts withCallOptions) ApplyTableOption(tableOpts *TableOptions) {
+	tableOpts.CallOptions = append(tableOpts.CallOptions, opts...)
 }
 
 // WithCallOptions appends flag of commit transaction with executing query

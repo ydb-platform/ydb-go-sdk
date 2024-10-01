@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/jonboulle/clockwork"
-	"google.golang.org/grpc"
-
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"google.golang.org/grpc"
 )
 
 // sessionBuilder is the interface that holds logic of creating sessions.
@@ -25,9 +26,10 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 	)
 
 	return &Client{
-		clock:  config.Clock(),
-		config: config,
-		cc:     cc,
+		clock:   config.Clock(),
+		config:  config,
+		service: Ydb_Table_V1.NewTableServiceClient(cc),
+		cc:      cc,
 		build: func(ctx context.Context) (s *session, err error) {
 			return newSession(ctx, cc, config)
 		},
@@ -85,12 +87,13 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 // A Client is safe for use by multiple goroutines simultaneously.
 type Client struct {
 	// read-only fields
-	config *config.Config
-	build  sessionBuilder
-	cc     grpc.ClientConnInterface
-	clock  clockwork.Clock
-	pool   sessionPool
-	done   chan struct{}
+	config  *config.Config
+	service Ydb_Table_V1.TableServiceClient
+	build   sessionBuilder
+	cc      grpc.ClientConnInterface
+	clock   clockwork.Clock
+	pool    sessionPool
+	done    chan struct{}
 }
 
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
@@ -254,6 +257,47 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		}
 
 		return nil
+	}, config.RetryOptions...)
+}
+
+func (c *Client) BulkUpsert(
+	ctx context.Context,
+	tableName string,
+	data table.BulkUpsertData,
+	opts ...table.Option,
+) (finalErr error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+
+	if c.isClosed() {
+		return xerrors.WithStackTrace(errClosedClient)
+	}
+
+	config := c.retryOptions(opts...)
+
+	attempts, onDone := 0, trace.TableOnBulkUpsert(config.Trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
+		config.Label,
+	)
+	defer func() {
+		onDone(attempts, finalErr)
+	}()
+
+	return retryBackoff(ctx, c.pool, func(ctx context.Context, s table.Session) (err error) {
+		attempts++
+
+		req := Ydb_Table.BulkUpsertRequest{
+			Table: tableName,
+		}
+		err = data.ApplyBulkUpsertRequest((*table.BulkUpsertRequest)(&req))
+		if err != nil {
+			return err
+		}
+
+		_, err = c.service.BulkUpsert(ctx, &req, config.CallOptions...)
+
+		return err
 	}, config.RetryOptions...)
 }
 

@@ -48,6 +48,7 @@ import (
 type session struct {
 	onClose      []func(s *session)
 	id           string
+	cc           grpc.ClientConnInterface
 	tableService Ydb_Table_V1.TableServiceClient
 	status       table.SessionStatus
 	config       *config.Config
@@ -150,6 +151,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 		id:     result.GetSessionId(),
 		config: config,
 		status: table.SessionReady,
+		cc:     cc,
 	}
 	s.lastUsage.Store(time.Now().Unix())
 
@@ -1251,48 +1253,32 @@ func (s *session) StreamExecuteScanQuery(
 	)
 }
 
+type bulkUpsertOptionToTableOption struct {
+	opt []options.BulkUpsertOption
+}
+
+func (opt bulkUpsertOptionToTableOption) ApplyTableOption(tableOpts *options.TableOptions) {
+	var callOpts []grpc.CallOption
+	for _, o := range opt.opt {
+		callOpts = append(callOpts, o.ApplyBulkUpsertOption()...)
+	}
+	tableOpts.CallOptions = append(tableOpts.CallOptions, callOpts...)
+}
+
 // BulkUpsert uploads given list of ydb struct values to the table.
-func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value,
+func (s *session) BulkUpsert(ctx context.Context, tableName string, rows value.Value,
 	opts ...options.BulkUpsertOption,
 ) (err error) {
-	var (
-		a           = allocator.New()
-		callOptions []grpc.CallOption
-		onDone      = trace.TableOnSessionBulkUpsert(
-			s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*session).BulkUpsert"),
-			s,
-		)
-	)
-	defer func() {
-		defer a.Free()
-		onDone(err)
-	}()
+	client := New(ctx, s.cc, config.New())
 
-	for _, opt := range opts {
-		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyBulkUpsertOption()...)
-		}
-	}
-
-	_, err = s.tableService.BulkUpsert(ctx,
-		&Ydb_Table.BulkUpsertRequest{
-			Table: table,
-			Rows:  value.ToYDB(rows, a),
-			OperationParams: operation.Params(
-				ctx,
-				s.config.OperationTimeout(),
-				s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
+	return client.BulkUpsert(
+		ctx,
+		tableName,
+		table.BulkUpsertRows{
+			Rows: rows,
 		},
-		callOptions...,
+		bulkUpsertOptionToTableOption{opts},
 	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	return nil
 }
 
 // BeginTransaction begins new transaction within given session with given settings.
