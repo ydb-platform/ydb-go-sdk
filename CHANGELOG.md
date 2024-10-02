@@ -1,4 +1,15 @@
 * Fixed error on experimental TopicListener.Close
+* Disabled reporting of `ydb_go_sdk_ydb_query_session_create_latency histogram metrics` when metrics are disabled
+* Allowed skip column for `ScanStruct` by tag `-` 
+
+## v3.81.4
+* Returned `topicwriter.ErrQueueLimitExceed`, accidental removed at `v3.81.0`
+
+## v3.81.3
+* Fixed tracing details check for some metrics
+
+## v3.81.2
+* Removed `experimantal` comment for query service client
 
 ## v3.81.1
 * Fixed nil pointer dereference panic on failed `ydb.Open` 

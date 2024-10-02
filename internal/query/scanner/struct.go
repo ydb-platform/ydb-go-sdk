@@ -56,6 +56,10 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 	existingFields := make(map[string]struct{}, tt.NumField())
 	for i := 0; i < tt.NumField(); i++ {
 		name := fieldName(tt.Field(i), settings.TagName)
+		if name == "-" {
+			continue
+		}
+
 		v, err := s.data.seekByName(name)
 		if err != nil {
 			missingColumns = append(missingColumns, name)
