@@ -1,3 +1,4 @@
+## v3.81.4
 * Returned `topicwriter.ErrQueueLimitExceed`, accidental removed at `v3.81.0`
 
 ## v3.81.3
