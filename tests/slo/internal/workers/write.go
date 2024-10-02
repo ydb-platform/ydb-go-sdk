@@ -14,12 +14,22 @@ import (
 func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter, gen *generator.Generator) {
 	defer wg.Done()
 	for {
-		err := rl.Wait(ctx)
-		if err != nil {
+		select {
+		case <-ctx.Done():
 			return
-		}
+		default:
+			err := rl.Wait(ctx)
+			if err != nil {
+				return
+			}
 
-		_ = w.write(ctx, gen)
+			err = w.write(ctx, gen)
+			if err != nil {
+				if ctxErr := ctx.Err(); ctxErr == nil {
+					log.Printf("write failed: %v", err)
+				}
+			}
+		}
 	}
 }
 
@@ -34,9 +44,6 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) error {
 	m := w.m.Start(metrics.JobWrite)
 
 	attempts, err := w.s.Write(ctx, row)
-	if err != nil {
-		log.Printf("write failed with %d attempts: %v", attempts, err)
-	}
 
 	m.Finish(err, attempts)
 
