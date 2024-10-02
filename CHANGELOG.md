@@ -1,3 +1,5 @@
+* Allowed skip column for `ScanStruct` by tag `-` 
+
 ## v3.81.4
 * Returned `topicwriter.ErrQueueLimitExceed`, accidental removed at `v3.81.0`
 

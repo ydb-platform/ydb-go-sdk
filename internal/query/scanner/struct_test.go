@@ -618,6 +618,37 @@ func TestStructNotFoundColumns(t *testing.T) {
 	require.ErrorIs(t, err, ErrColumnsNotFoundInRow)
 }
 
+func TestStructSkippedColumns(t *testing.T) {
+	scanner := Struct(Data(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test-a",
+				},
+			},
+		},
+	))
+
+	var row struct {
+		A string
+		C string `sql:"-"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, "test-a", row.A)
+	require.Empty(t, row.C)
+}
+
 func TestStructWithAllowMissingColumnsFromSelect(t *testing.T) {
 	scanner := Struct(Data(
 		[]*Ydb.Column{
