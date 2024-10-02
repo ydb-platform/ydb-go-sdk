@@ -124,8 +124,8 @@ func query(config Config) (t trace.Query) {
 						errs.With(map[string]string{
 							"status": errorBrief(info.Error),
 						}).Inc()
+						latency.With(nil).Record(time.Since(start))
 					}
-					latency.With(nil).Record(time.Since(start))
 				}
 			}
 		}

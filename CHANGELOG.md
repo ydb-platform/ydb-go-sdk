@@ -1,3 +1,4 @@
+* Disabled reporting of `ydb_go_sdk_ydb_query_session_create_latency histogram metrics` when metrics are disabled
 * Allowed skip column for `ScanStruct` by tag `-` 
 
 ## v3.81.4
