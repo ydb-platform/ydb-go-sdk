@@ -1,3 +1,5 @@
+* Returned `topicwriter.ErrQueueLimitExceed`, accidental removed at `v3.81.0`
+
 ## v3.81.3
 * Fixed tracing details check for some metrics
 

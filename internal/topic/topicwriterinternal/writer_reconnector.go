@@ -36,7 +36,8 @@ var (
 	errNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
 	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
 	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
-	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
+	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit")) //nolint:lll
+	PublicErrQueueIsFull                           = xerrors.Wrap(errors.New("ydb: queue is full"))
 	PublicErrMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 
@@ -223,16 +224,18 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	semaphoreWeight := int64(len(messages))
 	if semaphoreWeight > int64(w.cfg.MaxQueueLen) {
 		return xerrors.WithStackTrace(fmt.Errorf(
-			"ydb: add more messages, then max queue limit. max queue: %v, try to add: %v",
+			"ydb: add more messages, then max queue limit. max queue: %v, try to add: %v: %w",
 			w.cfg.MaxQueueLen,
 			semaphoreWeight,
+			PublicErrQueueIsFull,
 		))
 	}
 	if err := w.semaphore.Acquire(ctx, semaphoreWeight); err != nil {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v",
+			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v: %w",
 				semaphoreWeight,
 				w.cfg.MaxQueueLen,
+				PublicErrQueueIsFull,
 			))
 	}
 	defer func() {
