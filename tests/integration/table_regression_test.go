@@ -6,6 +6,8 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"strconv"
 	"strings"
 	"testing"
@@ -112,4 +114,35 @@ func TestRegressionIssue1227RetryBadSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 100, cnt)
+}
+
+func TestOptionalWithParamBuilder(t *testing.T) {
+	t.Run("Nil", func(t *testing.T) {
+		scope := newScope(t)
+		row, err := scope.Driver().Query().QueryRow(scope.Ctx, `
+DECLARE $val AS Int64?;
+
+SELECT $val
+`, query.WithParameters(ydb.ParamsBuilder().Param("$val").BeginOptional().Int64(nil).EndOptional().Build()))
+		require.NoError(t, err)
+		var val *int64
+		err = row.Scan(&val)
+		require.NoError(t, err)
+		require.Nil(t, val)
+	})
+	t.Run("Val", func(t *testing.T) {
+		scope := newScope(t)
+		param := int64(123)
+		row, err := scope.Driver().Query().QueryRow(scope.Ctx, `
+DECLARE $val AS Int64?;
+
+SELECT $val
+`, query.WithParameters(ydb.ParamsBuilder().Param("$val").BeginOptional().Int64(&param).EndOptional().Build()))
+		require.NoError(t, err)
+		var val *int64
+		err = row.Scan(&val)
+		require.NoError(t, err)
+		require.Equal(t, param, *val)
+	})
+
 }

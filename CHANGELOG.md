@@ -16,6 +16,7 @@
 ## v3.81.0
 * Added error ErrMessagesPutToInternalQueueBeforeError to topic writer
 * Added write to topics within transactions
+* Fixed marshal optional parameter of ydb.ParamBuilder to protobuf 
 
 ## v3.80.10
 * Added `ydb.WithSessionPoolSessionUsageLimit()` option for limitation max count of session usage  
