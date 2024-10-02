@@ -135,7 +135,7 @@ func main() {
 		for i := 0; i < cfg.WriteRPS; i++ {
 			go w.Write(ctx, &wg, writeRL, gen)
 		}
-		log.Println("started " + strconv.Itoa(cfg.ReadRPS) + " write workers")
+		log.Println("started " + strconv.Itoa(cfg.WriteRPS) + " write workers")
 
 		metricsRL := rate.NewLimiter(rate.Every(time.Duration(cfg.ReportPeriod)*time.Millisecond), 1)
 		wg.Add(1)
