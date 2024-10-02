@@ -1,5 +1,14 @@
 * Allowed skip column for `ScanStruct` by tag `-` 
 
+## v3.81.4
+* Returned `topicwriter.ErrQueueLimitExceed`, accidental removed at `v3.81.0`
+
+## v3.81.3
+* Fixed tracing details check for some metrics
+
+## v3.81.2
+* Removed `experimantal` comment for query service client
+
 ## v3.81.1
 * Fixed nil pointer dereference panic on failed `ydb.Open` 
 * Added ip discovery. Server can show own ip address and target hostname in the ListEndpoint message. These fields are used to bypass DNS resolving.

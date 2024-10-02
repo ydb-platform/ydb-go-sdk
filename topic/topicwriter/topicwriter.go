@@ -10,7 +10,10 @@ type (
 	Message = topicwriterinternal.PublicMessage
 )
 
-var ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.PublicErrMessagesPutToInternalQueueBeforeError
+var (
+	ErrQueueLimitExceed                      = topicwriterinternal.PublicErrQueueIsFull
+	ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.PublicErrMessagesPutToInternalQueueBeforeError
+)
 
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages

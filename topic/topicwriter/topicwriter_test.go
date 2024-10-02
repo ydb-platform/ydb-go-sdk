@@ -28,7 +28,7 @@ func ExampleWriter_Write() {
 		topicwriter.Message{Data: strings.NewReader("2")},
 		topicwriter.Message{Data: strings.NewReader("3")},
 	)
-	if err == nil {
+	if err != nil {
 		fmt.Println("OK")
 	} else {
 		log.Fatalf("failed write to stream")
