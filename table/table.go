@@ -576,20 +576,14 @@ type (
 )
 
 type BulkUpsertData interface {
-	ApplyBulkUpsertRequest(req *BulkUpsertRequest) error
+	ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error
 }
 
 type BulkUpsertRows struct {
 	Rows value.Value
 }
 
-func (data BulkUpsertRows) ApplyBulkUpsertRequest(req *BulkUpsertRequest) error {
-	a := allocator.New()
-
-	defer func() {
-		defer a.Free()
-	}()
-
+func (data BulkUpsertRows) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
 	req.Rows = value.ToYDB(data.Rows, a)
 
 	return nil
@@ -604,7 +598,7 @@ type CsvFormatOption interface {
 	ApplyCsvFormatOption(req *BulkUpsertRequest) (err error)
 }
 
-func (data BulkUpsertCsv) ApplyBulkUpsertRequest(req *BulkUpsertRequest) error {
+func (data BulkUpsertCsv) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
 	req.Data = data.Data
 
 	var err error
@@ -715,7 +709,7 @@ type ArrowFormatOption interface {
 	ApplyArrowFormatOption(req *BulkUpsertRequest) (err error)
 }
 
-func (data BulkUpsertArrow) ApplyBulkUpsertRequest(req *BulkUpsertRequest) error {
+func (data BulkUpsertArrow) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
 	req.Data = data.Data
 
 	var err error

@@ -18,9 +18,11 @@ import (
 )
 
 func TestTableBulkUpsert(t *testing.T) {
-	scope := newScope(t)
-	driver := scope.Driver()
-	tablePath := scope.TablePath()
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver()
+		tablePath = scope.TablePath()
+	)
 
 	// upsert
 	var rows []types.Value
@@ -92,9 +94,11 @@ func assertIdValueNil(ctx context.Context, t *testing.T, tableName string, id in
 }
 
 func TestTableCsvBulkUpsert(t *testing.T) {
-	scope := newScope(t)
-	driver := scope.Driver()
-	tablePath := scope.TablePath()
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver()
+		tablePath = scope.TablePath()
+	)
 
 	csv := `id,val
 42,"text42"
@@ -111,9 +115,11 @@ func TestTableCsvBulkUpsert(t *testing.T) {
 }
 
 func TestTableCsvBulkUpsertDelimiter(t *testing.T) {
-	scope := newScope(t)
-	driver := scope.Driver()
-	tablePath := scope.TablePath()
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver()
+		tablePath = scope.TablePath()
+	)
 
 	csv := `id:val
 42:"text42"
@@ -131,9 +137,11 @@ func TestTableCsvBulkUpsertDelimiter(t *testing.T) {
 }
 
 func TestTableCsvBulkUpsertNullValue(t *testing.T) {
-	scope := newScope(t)
-	driver := scope.Driver()
-	tablePath := scope.TablePath()
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver()
+		tablePath = scope.TablePath()
+	)
 
 	csv := `id,val
 42,hello
@@ -151,9 +159,11 @@ func TestTableCsvBulkUpsertNullValue(t *testing.T) {
 }
 
 func TestTableCsvBulkUpsertSkipRows(t *testing.T) {
-	scope := newScope(t)
-	driver := scope.Driver()
-	tablePath := scope.TablePath()
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver()
+		tablePath = scope.TablePath()
+	)
 
 	// Empty row are OK after skipped rows
 	csv := `First skip row
@@ -177,9 +187,11 @@ id,val
 }
 
 func TestTableArrowBulkUpsert(t *testing.T) {
-	scope := newScope(t)
-	driver := scope.Driver()
-	tablePath := scope.TablePath()
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver()
+		tablePath = scope.TablePath()
+	)
 
 	// data & schema generated with make_test_arrow.py script
 	data, err := os.ReadFile("testdata/bulk_upsert_test_data.arrow")

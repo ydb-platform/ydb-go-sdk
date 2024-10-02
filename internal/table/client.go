@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -275,14 +276,17 @@ func (c *Client) BulkUpsert(
 		return xerrors.WithStackTrace(errClosedClient)
 	}
 
+	a := allocator.New()
+	defer a.Free()
+
 	config := c.retryOptions(opts...)
+	config.RetryOptions = append(config.RetryOptions, retry.WithIdempotent(true))
 
 	attempts, onDone := 0, trace.TableOnBulkUpsert(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
-		config.Label,
 	)
 	defer func() {
-		onDone(attempts, finalErr)
+		onDone(finalErr, attempts)
 	}()
 
 	return retryBackoff(ctx, c.pool, func(ctx context.Context, s table.Session) (err error) {
@@ -291,7 +295,7 @@ func (c *Client) BulkUpsert(
 		req := Ydb_Table.BulkUpsertRequest{
 			Table: tableName,
 		}
-		err = data.ApplyBulkUpsertRequest((*table.BulkUpsertRequest)(&req))
+		err = data.ApplyBulkUpsertRequest(a, (*table.BulkUpsertRequest)(&req))
 		if err != nil {
 			return err
 		}
