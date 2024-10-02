@@ -14,12 +14,24 @@ import (
 func (w *Workers) Read(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter) {
 	defer wg.Done()
 	for {
-		err := rl.Wait(ctx)
-		if err != nil {
+		select {
+		case <-ctx.Done():
 			return
-		}
+		default:
+			err := rl.Wait(ctx)
+			if err != nil {
+				return
+			}
 
-		_ = w.read(ctx)
+			err = w.read(ctx)
+			if err != nil {
+				if ctxErr := ctx.Err(); ctxErr == nil {
+					log.Printf("read failed: %v", err)
+				}
+
+				return
+			}
+		}
 	}
 }
 
@@ -29,9 +41,6 @@ func (w *Workers) read(ctx context.Context) error {
 	m := w.m.Start(metrics.JobRead)
 
 	_, attempts, err := w.s.Read(ctx, id)
-	if err != nil {
-		log.Printf("read failed with %d attempts: %v", attempts, err)
-	}
 
 	m.Finish(err, attempts)
 
