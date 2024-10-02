@@ -105,9 +105,8 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
-	var s *session
 	createSession := func(ctx context.Context) (*session, error) {
-		s, err = c.build(ctx)
+		s, err := c.build(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -115,41 +114,49 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		return s, nil
 	}
 	if !c.config.AutoRetry() {
-		s, err = createSession(ctx)
+		s, err := createSession(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
 		return s, nil
 	}
-	err = retry.Retry(ctx,
-		func(ctx context.Context) (err error) {
-			s, err = createSession(ctx)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
 
-			return nil
-		},
+	var (
+		onDone = trace.TableOnCreateSession(c.config.Trace(), &ctx,
+			stack.FunctionID(
+				"github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"),
+		)
+		attempts = 0
+		s        *session
+	)
+	defer func() {
+		if s != nil {
+			onDone(s, attempts, err)
+		} else {
+			onDone(nil, attempts, err)
+		}
+	}()
+
+	s, err = retry.RetryWithResult(ctx, createSession,
 		append(
 			[]retry.Option{
 				retry.WithIdempotent(true),
 				retry.WithTrace(&trace.Retry{
 					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-						onDone := trace.TableOnCreateSession(c.config.Trace(), info.Context,
-							stack.FunctionID(
-								"github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"))
-
 						return func(info trace.RetryLoopDoneInfo) {
-							onDone(s, info.Attempts, info.Error)
+							attempts = info.Attempts
 						}
 					},
 				}),
 			}, c.retryOptions(opts...).RetryOptions...,
 		)...,
 	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
-	return s, xerrors.WithStackTrace(err)
+	return s, nil
 }
 
 func (c *Client) isClosed() bool {
