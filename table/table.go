@@ -596,17 +596,23 @@ type BulkUpsertData interface {
 	ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error
 }
 
-type BulkUpsertRows struct {
+type bulkUpsertRows struct {
 	Rows value.Value
 }
 
-func (data BulkUpsertRows) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
+func (data bulkUpsertRows) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
 	req.Rows = value.ToYDB(data.Rows, a)
 
 	return nil
 }
 
-type BulkUpsertCsv struct {
+func NewBulkUpsertRows(rows value.Value) bulkUpsertRows {
+	return bulkUpsertRows{
+		Rows: rows,
+	}
+}
+
+type bulkUpsertCsv struct {
 	Data    []byte
 	Options []CsvFormatOption
 }
@@ -615,7 +621,7 @@ type CsvFormatOption interface {
 	ApplyCsvFormatOption(req *BulkUpsertRequest) (err error)
 }
 
-func (data BulkUpsertCsv) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
+func (data bulkUpsertCsv) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
 	req.Data = data.Data
 
 	var err error
@@ -631,8 +637,8 @@ func (data BulkUpsertCsv) ApplyBulkUpsertRequest(a *allocator.Allocator, req *Bu
 	return err
 }
 
-func NewBulkUpsertCsv(data []byte, opts ...CsvFormatOption) BulkUpsertCsv {
-	return BulkUpsertCsv{
+func NewBulkUpsertCsv(data []byte, opts ...CsvFormatOption) bulkUpsertCsv {
+	return bulkUpsertCsv{
 		Data:    data,
 		Options: opts,
 	}
@@ -717,7 +723,7 @@ func WithCsvSkipRows(count uint32) CsvFormatOption {
 	return &csvSkipRowsOption{count}
 }
 
-type BulkUpsertArrow struct {
+type bulkUpsertArrow struct {
 	Data    []byte
 	Options []ArrowFormatOption
 }
@@ -726,7 +732,7 @@ type ArrowFormatOption interface {
 	ApplyArrowFormatOption(req *BulkUpsertRequest) (err error)
 }
 
-func (data BulkUpsertArrow) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
+func (data bulkUpsertArrow) ApplyBulkUpsertRequest(a *allocator.Allocator, req *BulkUpsertRequest) error {
 	req.Data = data.Data
 
 	var err error
@@ -742,8 +748,8 @@ func (data BulkUpsertArrow) ApplyBulkUpsertRequest(a *allocator.Allocator, req *
 	return err
 }
 
-func NewBulkUpsertArrow(data []byte, opts ...ArrowFormatOption) BulkUpsertArrow {
-	return BulkUpsertArrow{
+func NewBulkUpsertArrow(data []byte, opts ...ArrowFormatOption) bulkUpsertArrow {
+	return bulkUpsertArrow{
 		Data:    data,
 		Options: opts,
 	}

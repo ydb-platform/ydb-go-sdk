@@ -17,7 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func TestTableBulkUpsert(t *testing.T) {
+func TestTableBulkUpsertSession(t *testing.T) {
 	var (
 		scope     = newScope(t)
 		driver    = scope.Driver()
@@ -39,58 +39,40 @@ func TestTableBulkUpsert(t *testing.T) {
 		return s.BulkUpsert(ctx, tablePath, types.ListValue(rows...))
 	})
 	scope.Require.NoError(err)
+
+	for i := int64(0); i < 10; i++ {
+		val := fmt.Sprintf("value for %v", i)
+		assertIdValue(scope.Ctx, t, tablePath, i, val)
+	}
 }
 
-func assertIdValueImpl(ctx context.Context, t *testing.T, tableName string, id int64, val *string) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db, err := ydb.Open(ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		// ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+func TestTableBulkUpsert(t *testing.T) {
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver()
+		tablePath = scope.TablePath()
 	)
-	require.NoError(t, err)
-	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
-		res, err := tx.Execute(ctx, fmt.Sprintf("SELECT val FROM `%s` WHERE id = %d", tableName, id), nil)
-		if err != nil {
-			return err
-		}
-		err = res.NextResultSetErr(ctx)
-		if err != nil {
-			return err
-		}
-		require.EqualValues(t, 1, res.ResultSetCount())
-		if !res.NextRow() {
-			if err = res.Err(); err != nil {
-				return err
-			}
-			return fmt.Errorf("unexpected empty result set")
-		}
-		var resultVal *string
-		err = res.ScanNamed(
-			named.Optional("val", &resultVal),
-		)
-		if err != nil {
-			return err
-		}
-		if val != nil {
-			require.NotEmpty(t, resultVal)
-			require.EqualValues(t, *val, *resultVal)
-		} else {
-			require.Nil(t, resultVal)
-		}
 
-		return res.Err()
-	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())), table.WithIdempotent())
-	require.NoError(t, err)
-}
+	// upsert
+	var rows []types.Value
 
-func assertIdValue(ctx context.Context, t *testing.T, tableName string, id int64, val string) {
-	assertIdValueImpl(ctx, t, tableName, id, &val)
-}
+	for i := int64(0); i < 10; i++ {
+		val := fmt.Sprintf("value for %v", i)
+		rows = append(rows, types.StructValue(
+			types.StructFieldValue("id", types.Int64Value(i)),
+			types.StructFieldValue("val", types.TextValue(val)),
+		))
+	}
 
-func assertIdValueNil(ctx context.Context, t *testing.T, tableName string, id int64) {
-	assertIdValueImpl(ctx, t, tableName, id, nil)
+	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.NewBulkUpsertRows(
+		types.ListValue(rows...),
+	))
+	scope.Require.NoError(err)
+
+	for i := int64(0); i < 10; i++ {
+		val := fmt.Sprintf("value for %v", i)
+		assertIdValue(scope.Ctx, t, tablePath, i, val)
+	}
 }
 
 func TestTableCsvBulkUpsert(t *testing.T) {
@@ -208,4 +190,56 @@ func TestTableArrowBulkUpsert(t *testing.T) {
 
 	assertIdValue(scope.Ctx, t, tablePath, 123, "data1")
 	assertIdValue(scope.Ctx, t, tablePath, 234, "data2")
+}
+
+func assertIdValueImpl(ctx context.Context, t *testing.T, tableName string, id int64, val *string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		// ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+	)
+	require.NoError(t, err)
+	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
+		res, err := tx.Execute(ctx, fmt.Sprintf("SELECT val FROM `%s` WHERE id = %d", tableName, id), nil)
+		if err != nil {
+			return err
+		}
+		err = res.NextResultSetErr(ctx)
+		if err != nil {
+			return err
+		}
+		require.EqualValues(t, 1, res.ResultSetCount())
+		if !res.NextRow() {
+			if err = res.Err(); err != nil {
+				return err
+			}
+			return fmt.Errorf("unexpected empty result set")
+		}
+		var resultVal *string
+		err = res.ScanNamed(
+			named.Optional("val", &resultVal),
+		)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			require.NotEmpty(t, resultVal)
+			require.EqualValues(t, *val, *resultVal)
+		} else {
+			require.Nil(t, resultVal)
+		}
+
+		return res.Err()
+	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())), table.WithIdempotent())
+	require.NoError(t, err)
+}
+
+func assertIdValue(ctx context.Context, t *testing.T, tableName string, id int64, val string) {
+	assertIdValueImpl(ctx, t, tableName, id, &val)
+}
+
+func assertIdValueNil(ctx context.Context, t *testing.T, tableName string, id int64) {
+	assertIdValueImpl(ctx, t, tableName, id, nil)
 }
