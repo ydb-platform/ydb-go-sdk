@@ -21,10 +21,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var (
-	errTopicListenerStreamClosed = xerrors.Wrap(errors.New("ydb: the topic listener stream closed already"))
-)
-
 type streamListener struct {
 	cfg *StreamListenerConfig
 
