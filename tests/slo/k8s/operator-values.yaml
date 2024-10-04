@@ -1,0 +1,10 @@
+image:
+  repository: kind/ydb-operator
+  tag: current
+  pullPolicy: Never
+
+webhook:
+  enabled: true
+
+  patch:
+    enabled: true
