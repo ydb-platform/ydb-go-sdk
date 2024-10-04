@@ -1,3 +1,4 @@
+* Fixed error on experimental TopicListener.Close
 * Disabled reporting of `ydb_go_sdk_query_session_count` when metrics are disabled
 * Disabled reporting of `ydb_go_sdk_ydb_query_session_create_latency` histogram metrics when metrics are disabled
 * Allowed skip column for `ScanStruct` by tag `-` 

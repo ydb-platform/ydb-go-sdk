@@ -10,7 +10,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 )
 
-var ErrUserCloseTopic = errors.New("ydb: user closed topic listener")
+var (
+	ErrUserCloseTopic      = errors.New("ydb: user closed topic listener")
+	errTopicListenerClosed = errors.New("ydb: the topic listener already closed")
+)
 
 type TopicListenerReconnector struct {
 	streamConfig *StreamListenerConfig
@@ -22,6 +25,7 @@ type TopicListenerReconnector struct {
 	connectionResult    error
 	connectionCompleted empty.Chan
 	connectionIDCounter atomic.Int64
+	closing             atomic.Bool
 
 	m              sync.Mutex
 	streamListener *streamListener
@@ -45,6 +49,9 @@ func NewTopicListenerReconnector(
 }
 
 func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) error {
+	if !lr.closing.CompareAndSwap(false, true) {
+		return errTopicListenerClosed
+	}
 	var closeErrors []error
 	err := lr.background.Close(ctx, reason)
 	closeErrors = append(closeErrors, err)
