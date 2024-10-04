@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -127,12 +128,14 @@ func main() {
 		for i := 0; i < cfg.ReadRPS; i++ {
 			go w.Read(ctx, &wg, readRL)
 		}
+		log.Println("started " + strconv.Itoa(cfg.ReadRPS) + " read workers")
 
 		writeRL := rate.NewLimiter(rate.Limit(cfg.WriteRPS), 1)
 		wg.Add(cfg.WriteRPS)
 		for i := 0; i < cfg.WriteRPS; i++ {
 			go w.Write(ctx, &wg, writeRL, gen)
 		}
+		log.Println("started " + strconv.Itoa(cfg.WriteRPS) + " write workers")
 
 		metricsRL := rate.NewLimiter(rate.Every(time.Duration(cfg.ReportPeriod)*time.Millisecond), 1)
 		wg.Add(1)

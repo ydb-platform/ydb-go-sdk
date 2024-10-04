@@ -134,12 +134,11 @@ func query(config Config) (t trace.Query) {
 			errs := deleteConfig.CounterVec("errs", "status")
 			latency := deleteConfig.TimerVec("latency")
 			t.OnSessionDelete = func(info trace.QuerySessionDeleteStartInfo) func(info trace.QuerySessionDeleteDoneInfo) {
-				count.With(nil).Add(-1)
-
 				start := time.Now()
 
 				return func(info trace.QuerySessionDeleteDoneInfo) {
 					if deleteConfig.Details()&trace.QuerySessionEvents != 0 {
+						count.With(nil).Add(-1)
 						errs.With(map[string]string{
 							"status": errorBrief(info.Error),
 						}).Inc()
