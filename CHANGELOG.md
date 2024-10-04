@@ -1,6 +1,7 @@
 * Support bulk upsert from scv, arrow and ydb internal formats in table client
-* Fixed reporting of `ydb_go_sdk_ydb_query_session_create_latency` and `ydb_go_sdk_query_session_count` metrics depends on details
-* Allowed skip column for `ScanStruct` by tag `-` 
+* Disabled reporting of `ydb_go_sdk_query_session_count` when metrics are disabled
+* Disabled reporting of `ydb_go_sdk_ydb_query_session_create_latency` histogram metrics when metrics are disabled
+* Allowed skip column for `ScanStruct` by tag `-`
 
 ## v3.81.4
 * Returned `topicwriter.ErrQueueLimitExceed`, accidental removed at `v3.81.0`
