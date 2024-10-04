@@ -21,6 +21,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var (
+	errTopicListenerStreamClosed = xerrors.Wrap(errors.New("ydb: the topic listener stream closed already"))
+)
+
 type streamListener struct {
 	cfg *StreamListenerConfig
 
@@ -35,6 +39,8 @@ type streamListener struct {
 
 	hasNewMessagesToSend empty.Chan
 	syncCommitter        *topicreadercommon.Committer
+
+	closing atomic.Bool
 
 	m              xsync.Mutex
 	messagesToSend []rawtopicreader.ClientMessage
@@ -56,7 +62,7 @@ func newStreamListener(
 
 	res.initVars(sessionIDCounter)
 	if err := res.initStream(connectionCtx, client); err != nil {
-		res.closeWithTimeout(connectionCtx, err)
+		res.goClose(connectionCtx, err)
 
 		return nil, err
 	}
@@ -75,15 +81,19 @@ func newStreamListener(
 }
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
-	var resErrors []error
-
-	// should be first for prevent race between main close process and error handling in streams
-	if err := l.background.Close(ctx, reason); err != nil {
-		resErrors = append(resErrors, err)
+	if !l.closing.CompareAndSwap(false, true) {
+		return errTopicListenerClosed
 	}
 
+	var resErrors []error
+
+	// should be first because background wait stop of steams
 	if l.stream != nil {
 		l.streamClose(reason)
+	}
+
+	if err := l.background.Close(ctx, reason); err != nil {
+		resErrors = append(resErrors, err)
 	}
 
 	if err := l.syncCommitter.Close(ctx, reason); err != nil {
@@ -110,10 +120,12 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 	return errors.Join(resErrors...)
 }
 
-func (l *streamListener) closeWithTimeout(ctx context.Context, reason error) {
+func (l *streamListener) goClose(ctx context.Context, reason error) {
 	ctx, cancel := context.WithTimeout(xcontext.ValueOnly(ctx), time.Second)
 	l.streamClose(reason)
-	_ = l.background.Close(ctx, reason)
+	go func() {
+		_ = l.background.Close(ctx, reason)
+	}()
 
 	cancel()
 }
@@ -146,7 +158,7 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 			err := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 				"ydb: topic listener stream init timeout: %w", ctx.Err(),
 			)))
-			l.closeWithTimeout(ctx, err)
+			l.goClose(ctx, err)
 			l.streamClose(err)
 		case <-initDone:
 			// pass
@@ -217,7 +229,7 @@ func (l *streamListener) sendMessagesLoop(ctx context.Context) {
 
 			for _, m := range messages {
 				if err := l.stream.Send(m); err != nil {
-					l.closeWithTimeout(ctx, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+					l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 						"ydb: failed send message by grpc to topic reader stream from listener: %w",
 						err,
 					))))
@@ -237,7 +249,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		mess, err := l.stream.Recv()
 		if err != nil {
-			l.closeWithTimeout(ctx, xerrors.WithStackTrace(
+			l.goClose(ctx, xerrors.WithStackTrace(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
 			))
 
@@ -264,7 +276,7 @@ func (l *streamListener) onReceiveServerMessage(ctx context.Context, mess rawtop
 		// todo log
 	}
 	if err != nil {
-		l.closeWithTimeout(ctx, err)
+		l.goClose(ctx, err)
 	}
 }
 
