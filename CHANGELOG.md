@@ -1,4 +1,4 @@
-* Support bulk upsert from scv, arrow and ydb internal formats in table client
+* Supported `db.Table().BulkUpsert()` from scv, arrow and ydb rows formats
 
 ## v3.82.0
 * Fixed error on experimental `TopicListener.Close`
