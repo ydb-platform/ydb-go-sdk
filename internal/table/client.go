@@ -4,8 +4,11 @@ import (
 	"context"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -27,6 +30,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 	return &Client{
 		clock:  config.Clock(),
 		config: config,
+		client: Ydb_Table_V1.NewTableServiceClient(cc),
 		cc:     cc,
 		build: func(ctx context.Context) (s *session, err error) {
 			return newSession(ctx, cc, config)
@@ -86,6 +90,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 type Client struct {
 	// read-only fields
 	config *config.Config
+	client Ydb_Table_V1.TableServiceClient
 	build  sessionBuilder
 	cc     grpc.ClientConnInterface
 	clock  clockwork.Clock
@@ -262,6 +267,54 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 		return nil
 	}, config.RetryOptions...)
+}
+
+func (c *Client) BulkUpsert(
+	ctx context.Context,
+	tableName string,
+	data table.BulkUpsertData,
+	opts ...table.Option,
+) (finalErr error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+
+	if c.isClosed() {
+		return xerrors.WithStackTrace(errClosedClient)
+	}
+
+	a := allocator.New()
+	defer a.Free()
+
+	config := c.retryOptions(opts...)
+	config.RetryOptions = append(config.RetryOptions, retry.WithIdempotent(true))
+
+	attempts, onDone := 0, trace.TableOnBulkUpsert(config.Trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
+	)
+	defer func() {
+		onDone(finalErr, attempts)
+	}()
+
+	request := Ydb_Table.BulkUpsertRequest{
+		Table: tableName,
+	}
+	finalErr = data.ApplyBulkUpsertRequest(a, (*table.BulkUpsertRequest)(&request))
+	if finalErr != nil {
+		return finalErr
+	}
+
+	finalErr = retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			attempts++
+			_, err = c.client.BulkUpsert(ctx, &request)
+
+			return err
+		},
+		config.RetryOptions...,
+	)
+
+	return xerrors.WithStackTrace(finalErr)
 }
 
 func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx table.Transaction) (err error) {

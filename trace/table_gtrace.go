@@ -174,6 +174,41 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 		}
 	}
 	{
+		h1 := t.OnBulkUpsert
+		h2 := x.OnBulkUpsert
+		ret.OnBulkUpsert = func(t TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TableBulkUpsertDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableBulkUpsertDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnCreateSession
 		h2 := x.OnCreateSession
 		ret.OnCreateSession = func(t TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo) {
@@ -957,6 +992,21 @@ func (t *Table) onDoTx(t1 TableDoTxStartInfo) func(TableDoTxDoneInfo) {
 	}
 	return res
 }
+func (t *Table) onBulkUpsert(t1 TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo) {
+	fn := t.OnBulkUpsert
+	if fn == nil {
+		return func(TableBulkUpsertDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableBulkUpsertDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Table) onCreateSession(t1 TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo) {
 	fn := t.OnCreateSession
 	if fn == nil {
@@ -1320,6 +1370,19 @@ func TableOnDoTx(t *Table, c *context.Context, call call, label string, idempote
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnBulkUpsert(t *Table, c *context.Context, call call) func(_ error, attempts int) {
+	var p TableBulkUpsertStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onBulkUpsert(p)
+	return func(e error, attempts int) {
+		var p TableBulkUpsertDoneInfo
+		p.Error = e
+		p.Attempts = attempts
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnCreateSession(t *Table, c *context.Context, call call) func(session sessionInfo, attempts int, _ error) {
 	var p TableCreateSessionStartInfo
 	p.Context = c
@@ -1373,15 +1436,15 @@ func TableOnSessionKeepAlive(t *Table, c *context.Context, call call, session se
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call, session sessionInfo) func(error) {
+func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call) func(_ error, attempts int) {
 	var p TableBulkUpsertStartInfo
 	p.Context = c
 	p.Call = call
-	p.Session = session
 	res := t.onSessionBulkUpsert(p)
-	return func(e error) {
+	return func(e error, attempts int) {
 		var p TableBulkUpsertDoneInfo
 		p.Error = e
+		p.Attempts = attempts
 		res(p)
 	}
 }
