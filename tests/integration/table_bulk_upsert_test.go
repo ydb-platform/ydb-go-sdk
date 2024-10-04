@@ -64,7 +64,7 @@ func TestTableBulkUpsert(t *testing.T) {
 		))
 	}
 
-	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.NewBulkUpsertRows(
+	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.BulkUpsertDataRows(
 		types.ListValue(rows...),
 	))
 	scope.Require.NoError(err)
@@ -86,7 +86,7 @@ func TestTableCsvBulkUpsert(t *testing.T) {
 42,"text42"
 43,"text43"`
 
-	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.NewBulkUpsertCsv(
+	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.BulkUpsertDataCsv(
 		[]byte(csv),
 		table.WithCsvHeader(),
 	))
@@ -107,7 +107,7 @@ func TestTableCsvBulkUpsertDelimiter(t *testing.T) {
 42:"text42"
 43:"text43"`
 
-	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.NewBulkUpsertCsv(
+	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.BulkUpsertDataCsv(
 		[]byte(csv),
 		table.WithCsvHeader(),
 		table.WithCsvDelimiter([]byte(":")),
@@ -129,7 +129,7 @@ func TestTableCsvBulkUpsertNullValue(t *testing.T) {
 42,hello
 43,hello world`
 
-	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.NewBulkUpsertCsv(
+	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.BulkUpsertDataCsv(
 		[]byte(csv),
 		table.WithCsvHeader(),
 		table.WithCsvNullValue([]byte("hello")),
@@ -157,7 +157,7 @@ id,val
 
 `
 
-	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.NewBulkUpsertCsv(
+	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.BulkUpsertDataCsv(
 		[]byte(csv),
 		table.WithCsvHeader(),
 		table.WithCsvSkipRows(2),
@@ -182,7 +182,7 @@ func TestTableArrowBulkUpsert(t *testing.T) {
 	schema, err := os.ReadFile("testdata/bulk_upsert_test_schema.arrow")
 	scope.Require.NoError(err)
 
-	err = driver.Table().BulkUpsert(scope.Ctx, tablePath, table.NewBulkUpsertArrow(
+	err = driver.Table().BulkUpsert(scope.Ctx, tablePath, table.BulkUpsertDataArrow(
 		[]byte(data),
 		table.WithArrowSchema(schema),
 	))

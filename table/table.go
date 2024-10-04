@@ -606,7 +606,7 @@ func (data bulkUpsertRows) ApplyBulkUpsertRequest(a *allocator.Allocator, req *B
 	return nil
 }
 
-func NewBulkUpsertRows(rows value.Value) bulkUpsertRows {
+func BulkUpsertDataRows(rows value.Value) bulkUpsertRows {
 	return bulkUpsertRows{
 		Rows: rows,
 	}
@@ -614,10 +614,10 @@ func NewBulkUpsertRows(rows value.Value) bulkUpsertRows {
 
 type bulkUpsertCsv struct {
 	Data    []byte
-	Options []CsvFormatOption
+	Options []csvFormatOption
 }
 
-type CsvFormatOption interface {
+type csvFormatOption interface {
 	ApplyCsvFormatOption(req *BulkUpsertRequest) (err error)
 }
 
@@ -637,7 +637,7 @@ func (data bulkUpsertCsv) ApplyBulkUpsertRequest(a *allocator.Allocator, req *Bu
 	return err
 }
 
-func NewBulkUpsertCsv(data []byte, opts ...CsvFormatOption) bulkUpsertCsv {
+func BulkUpsertDataCsv(data []byte, opts ...csvFormatOption) bulkUpsertCsv {
 	return bulkUpsertCsv{
 		Data:    data,
 		Options: opts,
@@ -674,7 +674,7 @@ func (opt *csvHeaderOption) ApplyCsvFormatOption(req *BulkUpsertRequest) error {
 }
 
 // First not skipped line is a CSV header (list of column names).
-func WithCsvHeader() CsvFormatOption {
+func WithCsvHeader() csvFormatOption {
 	return &csvHeaderOption{}
 }
 
@@ -689,7 +689,7 @@ func (opt *csvNullValueOption) ApplyCsvFormatOption(req *BulkUpsertRequest) erro
 }
 
 // String value that would be interpreted as NULL.
-func WithCsvNullValue(value []byte) CsvFormatOption {
+func WithCsvNullValue(value []byte) csvFormatOption {
 	return &csvNullValueOption{value}
 }
 
@@ -704,7 +704,7 @@ func (opt *csvDelimiterOption) ApplyCsvFormatOption(req *BulkUpsertRequest) erro
 }
 
 // Fields delimiter in CSV file. It's "," if not set.
-func WithCsvDelimiter(value []byte) CsvFormatOption {
+func WithCsvDelimiter(value []byte) csvFormatOption {
 	return &csvDelimiterOption{value}
 }
 
@@ -719,16 +719,16 @@ func (opt *csvSkipRowsOption) ApplyCsvFormatOption(req *BulkUpsertRequest) error
 }
 
 // Number of rows to skip before CSV data. It should be present only in the first upsert of CSV file.
-func WithCsvSkipRows(count uint32) CsvFormatOption {
+func WithCsvSkipRows(count uint32) csvFormatOption {
 	return &csvSkipRowsOption{count}
 }
 
 type bulkUpsertArrow struct {
 	Data    []byte
-	Options []ArrowFormatOption
+	Options []arrowFormatOption
 }
 
-type ArrowFormatOption interface {
+type arrowFormatOption interface {
 	ApplyArrowFormatOption(req *BulkUpsertRequest) (err error)
 }
 
@@ -748,7 +748,7 @@ func (data bulkUpsertArrow) ApplyBulkUpsertRequest(a *allocator.Allocator, req *
 	return err
 }
 
-func NewBulkUpsertArrow(data []byte, opts ...ArrowFormatOption) bulkUpsertArrow {
+func BulkUpsertDataArrow(data []byte, opts ...arrowFormatOption) bulkUpsertArrow {
 	return bulkUpsertArrow{
 		Data:    data,
 		Options: opts,
@@ -786,6 +786,6 @@ func (opt *arrowSchemaOption) ApplyArrowFormatOption(req *BulkUpsertRequest) err
 	return nil
 }
 
-func WithArrowSchema(schema []byte) ArrowFormatOption {
+func WithArrowSchema(schema []byte) arrowFormatOption {
 	return &arrowSchemaOption{schema}
 }
