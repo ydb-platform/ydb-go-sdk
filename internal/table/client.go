@@ -307,7 +307,7 @@ func (c *Client) BulkUpsert(
 	finalErr = retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			attempts++
-			_, err = c.client.BulkUpsert(ctx, &request, config.CallOptions...)
+			_, err = c.client.BulkUpsert(ctx, &request)
 
 			return err
 		},

@@ -212,7 +212,17 @@ type Session interface {
 	) error
 }
 
-type TransactionSettings = options.TransactionSettings
+type TransactionSettings struct {
+	settings Ydb_Table.TransactionSettings
+}
+
+func (t *TransactionSettings) Settings() *Ydb_Table.TransactionSettings {
+	if t == nil {
+		return nil
+	}
+
+	return &t.settings
+}
 
 // Explanation is a result of Explain calls.
 type Explanation struct {
@@ -305,7 +315,7 @@ func TxSettings(opts ...TxOption) *TransactionSettings {
 	s := new(TransactionSettings)
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*txDesc)(s.Settings()))
+			opt((*txDesc)(&s.settings))
 		}
 	}
 
@@ -317,7 +327,7 @@ func BeginTx(opts ...TxOption) TxControlOption {
 	return func(d *txControlDesc) {
 		s := TxSettings(opts...)
 		d.TxSelector = &Ydb_Table.TransactionControl_BeginTx{
-			BeginTx: s.Settings(),
+			BeginTx: &s.settings,
 		}
 	}
 }
@@ -488,7 +498,14 @@ func ValueParam(name string, v value.Value) ParameterOption {
 	return params.Named(name, v)
 }
 
-type Options = options.TableOptions
+type Options struct {
+	Label           string
+	Idempotent      bool
+	TxSettings      *TransactionSettings
+	TxCommitOptions []options.CommitTransactionOption
+	RetryOptions    []retry.Option
+	Trace           *trace.Table
+}
 
 type Option interface {
 	ApplyTableOption(opts *Options)
