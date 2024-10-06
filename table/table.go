@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -68,6 +70,12 @@ type Client interface {
 	// If op TxOperation return non nil - transaction will be rollback
 	// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
 	DoTx(ctx context.Context, op TxOperation, opts ...Option) error
+
+	// BulkUpsert upserts a batch of rows non-transactionally.
+	//
+	// Returns success only when all rows were successfully upserted. In case of an error some rows might
+	// be upserted and some might not.
+	BulkUpsert(ctx context.Context, table string, data BulkUpsertData, opts ...Option) error
 }
 
 type SessionStatus = string
@@ -179,6 +187,7 @@ type Session interface {
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)
 
+	// Deprecated: use Client instance instead.
 	BulkUpsert(
 		ctx context.Context,
 		table string,
@@ -577,4 +586,171 @@ func (opt traceOption) ApplyTableOption(opts *Options) {
 
 func WithTrace(t trace.Table) traceOption { //nolint:gocritic
 	return traceOption{t: &t}
+}
+
+type BulkUpsertData interface {
+	ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error)
+}
+
+type bulkUpsertRows struct {
+	rows value.Value
+}
+
+func (data bulkUpsertRows) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
+	return &Ydb_Table.BulkUpsertRequest{
+		Table: tableName,
+		Rows:  value.ToYDB(data.rows, a),
+	}, nil
+}
+
+func BulkUpsertDataRows(rows value.Value) bulkUpsertRows {
+	return bulkUpsertRows{
+		rows: rows,
+	}
+}
+
+type bulkUpsertCsv struct {
+	data []byte
+	opts []csvFormatOption
+}
+
+type csvFormatOption interface {
+	applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) (err error)
+}
+
+func (data bulkUpsertCsv) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
+	var (
+		request = &Ydb_Table.BulkUpsertRequest{
+			Table: tableName,
+			Data:  data.data,
+		}
+		dataFormat = &Ydb_Table.BulkUpsertRequest_CsvSettings{
+			CsvSettings: &Ydb_Formats.CsvSettings{},
+		}
+	)
+
+	for _, opt := range data.opts {
+		if opt != nil {
+			if err := opt.applyCsvFormatOption(dataFormat); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	request.DataFormat = dataFormat
+
+	return request, nil
+}
+
+func BulkUpsertDataCsv(data []byte, opts ...csvFormatOption) bulkUpsertCsv {
+	return bulkUpsertCsv{
+		data: data,
+		opts: opts,
+	}
+}
+
+type csvHeaderOption struct{}
+
+func (opt *csvHeaderOption) applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) error {
+	dataFormat.CsvSettings.Header = true
+
+	return nil
+}
+
+// First not skipped line is a CSV header (list of column names).
+func WithCsvHeader() csvFormatOption {
+	return &csvHeaderOption{}
+}
+
+type csvNullValueOption []byte
+
+func (nullValue csvNullValueOption) applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) error {
+	dataFormat.CsvSettings.NullValue = nullValue
+
+	return nil
+}
+
+// String value that would be interpreted as NULL.
+func WithCsvNullValue(value []byte) csvFormatOption {
+	return csvNullValueOption(value)
+}
+
+type csvDelimiterOption []byte
+
+func (delimeter csvDelimiterOption) applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) error {
+	dataFormat.CsvSettings.Delimiter = delimeter
+
+	return nil
+}
+
+// Fields delimiter in CSV file. It's "," if not set.
+func WithCsvDelimiter(value []byte) csvFormatOption {
+	return csvDelimiterOption(value)
+}
+
+type csvSkipRowsOption uint32
+
+func (skipRows csvSkipRowsOption) applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) error {
+	dataFormat.CsvSettings.SkipRows = uint32(skipRows)
+
+	return nil
+}
+
+// Number of rows to skip before CSV data. It should be present only in the first upsert of CSV file.
+func WithCsvSkipRows(skipRows uint32) csvFormatOption {
+	return csvSkipRowsOption(skipRows)
+}
+
+type bulkUpsertArrow struct {
+	data []byte
+	opts []arrowFormatOption
+}
+
+type arrowFormatOption interface {
+	applyArrowFormatOption(req *Ydb_Table.BulkUpsertRequest_ArrowBatchSettings) (err error)
+}
+
+func (data bulkUpsertArrow) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
+	var (
+		request = &Ydb_Table.BulkUpsertRequest{
+			Table: tableName,
+			Data:  data.data,
+		}
+		dataFormat = &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{
+			ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{},
+		}
+	)
+
+	for _, opt := range data.opts {
+		if opt != nil {
+			if err := opt.applyArrowFormatOption(dataFormat); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	request.DataFormat = dataFormat
+
+	return request, nil
+}
+
+func BulkUpsertDataArrow(data []byte, opts ...arrowFormatOption) bulkUpsertArrow {
+	return bulkUpsertArrow{
+		data: data,
+		opts: opts,
+	}
+}
+
+type arrowSchemaOption []byte
+
+func (schema arrowSchemaOption) applyArrowFormatOption(
+	dataFormat *Ydb_Table.BulkUpsertRequest_ArrowBatchSettings,
+) error {
+	dataFormat.ArrowBatchSettings.Schema = schema
+
+	return nil
+}
+
+func WithArrowSchema(schema []byte) arrowFormatOption {
+	return arrowSchemaOption(schema)
 }

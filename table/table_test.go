@@ -4,7 +4,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -59,6 +63,147 @@ func TestQueryParameters_String(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.s, tt.p.String())
+		})
+	}
+}
+
+func TestBulkUpsertData(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		data    table.BulkUpsertData
+		request *Ydb_Table.BulkUpsertRequest
+	}{
+		{
+			name: "Rows",
+			data: table.BulkUpsertDataRows(types.ListValue(
+				types.Uint64Value(123),
+				types.Uint64Value(321),
+			)),
+			request: &Ydb_Table.BulkUpsertRequest{
+				Table: "test",
+				Rows: &Ydb.TypedValue{
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_ListType{
+							ListType: &Ydb.ListType{
+								Item: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 123,
+								},
+							},
+							{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 321,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Csv",
+			data: table.BulkUpsertDataCsv([]byte("123")),
+			request: &Ydb_Table.BulkUpsertRequest{
+				Table: "test",
+				Data:  []byte("123"),
+				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
+					CsvSettings: &Ydb_Formats.CsvSettings{},
+				},
+			},
+		},
+		{
+			name: "CsvWithDelimeter",
+			data: table.BulkUpsertDataCsv([]byte("123"), table.WithCsvDelimiter([]byte(";"))),
+			request: &Ydb_Table.BulkUpsertRequest{
+				Table: "test",
+				Data:  []byte("123"),
+				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
+					CsvSettings: &Ydb_Formats.CsvSettings{
+						Delimiter: []byte(";"),
+					},
+				},
+			},
+		},
+		{
+			name: "CsvWithHeader",
+			data: table.BulkUpsertDataCsv([]byte("123"), table.WithCsvHeader()),
+			request: &Ydb_Table.BulkUpsertRequest{
+				Table: "test",
+				Data:  []byte("123"),
+				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
+					CsvSettings: &Ydb_Formats.CsvSettings{
+						Header: true,
+					},
+				},
+			},
+		},
+		{
+			name: "CsvWithNullValue",
+			data: table.BulkUpsertDataCsv([]byte("123"), table.WithCsvNullValue([]byte("null"))),
+			request: &Ydb_Table.BulkUpsertRequest{
+				Table: "test",
+				Data:  []byte("123"),
+				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
+					CsvSettings: &Ydb_Formats.CsvSettings{
+						NullValue: []byte("null"),
+					},
+				},
+			},
+		},
+		{
+			name: "CsvWithNullValue",
+			data: table.BulkUpsertDataCsv([]byte("123"), table.WithCsvSkipRows(30)),
+			request: &Ydb_Table.BulkUpsertRequest{
+				Table: "test",
+				Data:  []byte("123"),
+				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
+					CsvSettings: &Ydb_Formats.CsvSettings{
+						SkipRows: 30,
+					},
+				},
+			},
+		},
+		{
+			name: "Arrow",
+			data: table.BulkUpsertDataArrow([]byte("123")),
+			request: &Ydb_Table.BulkUpsertRequest{
+				Table: "test",
+				Data:  []byte("123"),
+				DataFormat: &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{
+					ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{},
+				},
+			},
+		},
+		{
+			name: "ArrowWithSchema",
+			data: table.BulkUpsertDataArrow([]byte("123"),
+				table.WithArrowSchema([]byte("schema")),
+			),
+			request: &Ydb_Table.BulkUpsertRequest{
+				Table: "test",
+				Data:  []byte("123"),
+				DataFormat: &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{
+					ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{
+						Schema: []byte("schema"),
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			a := allocator.New()
+			request, err := tt.data.ToYDB(a, "test")
+			require.NoError(t, err)
+			require.Equal(t,
+				tt.request.String(),
+				request.String(),
+			)
 		})
 	}
 }

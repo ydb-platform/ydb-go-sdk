@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -262,6 +264,65 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 		return nil
 	}, config.RetryOptions...)
+}
+
+func (c *Client) BulkUpsert(
+	ctx context.Context,
+	tableName string,
+	data table.BulkUpsertData,
+	opts ...table.Option,
+) (finalErr error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+
+	if c.isClosed() {
+		return xerrors.WithStackTrace(errClosedClient)
+	}
+
+	a := allocator.New()
+	defer a.Free()
+
+	attempts, config := 0, c.retryOptions(opts...)
+	config.RetryOptions = append(config.RetryOptions,
+		retry.WithIdempotent(true),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+	)
+
+	onDone := trace.TableOnBulkUpsert(config.Trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
+	)
+	defer func() {
+		onDone(finalErr, attempts)
+	}()
+
+	request, err := data.ToYDB(a, tableName)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+
+	err = retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			attempts++
+			_, err = client.BulkUpsert(ctx, request)
+
+			return err
+		},
+		config.RetryOptions...,
+	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx table.Transaction) (err error) {
