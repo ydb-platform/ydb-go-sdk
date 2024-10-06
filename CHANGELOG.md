@@ -1,3 +1,4 @@
+## v3.83.0
 * Supported `db.Table().BulkUpsert()` from scv, arrow and ydb rows formats
 
 ## v3.82.0
