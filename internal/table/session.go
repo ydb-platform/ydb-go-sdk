@@ -1265,7 +1265,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	)
 	defer func() {
 		defer a.Free()
-		onDone(err, 1)
+		onDone(err)
 	}()
 
 	for _, opt := range opts {

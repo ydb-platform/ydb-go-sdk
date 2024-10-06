@@ -743,7 +743,9 @@ func BulkUpsertDataArrow(data []byte, opts ...arrowFormatOption) bulkUpsertArrow
 
 type arrowSchemaOption []byte
 
-func (schema arrowSchemaOption) applyArrowFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_ArrowBatchSettings) error {
+func (schema arrowSchemaOption) applyArrowFormatOption(
+	dataFormat *Ydb_Table.BulkUpsertRequest_ArrowBatchSettings,
+) error {
 	dataFormat.ArrowBatchSettings.Schema = schema
 
 	return nil

@@ -351,7 +351,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 	{
 		h1 := t.OnSessionBulkUpsert
 		h2 := x.OnSessionBulkUpsert
-		ret.OnSessionBulkUpsert = func(t TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo) {
+		ret.OnSessionBulkUpsert = func(t TableSessionBulkUpsertStartInfo) func(TableSessionBulkUpsertDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -359,14 +359,14 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 					}
 				}()
 			}
-			var r, r1 func(TableBulkUpsertDoneInfo)
+			var r, r1 func(TableSessionBulkUpsertDoneInfo)
 			if h1 != nil {
 				r = h1(t)
 			}
 			if h2 != nil {
 				r1 = h2(t)
 			}
-			return func(t TableBulkUpsertDoneInfo) {
+			return func(t TableSessionBulkUpsertDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -1067,16 +1067,16 @@ func (t *Table) onSessionKeepAlive(t1 TableKeepAliveStartInfo) func(TableKeepAli
 	}
 	return res
 }
-func (t *Table) onSessionBulkUpsert(t1 TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo) {
+func (t *Table) onSessionBulkUpsert(t1 TableSessionBulkUpsertStartInfo) func(TableSessionBulkUpsertDoneInfo) {
 	fn := t.OnSessionBulkUpsert
 	if fn == nil {
-		return func(TableBulkUpsertDoneInfo) {
+		return func(TableSessionBulkUpsertDoneInfo) {
 			return
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableBulkUpsertDoneInfo) {
+		return func(TableSessionBulkUpsertDoneInfo) {
 			return
 		}
 	}
@@ -1436,15 +1436,14 @@ func TableOnSessionKeepAlive(t *Table, c *context.Context, call call, session se
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call) func(_ error, attempts int) {
-	var p TableBulkUpsertStartInfo
+func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call) func(error) {
+	var p TableSessionBulkUpsertStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onSessionBulkUpsert(p)
-	return func(e error, attempts int) {
-		var p TableBulkUpsertDoneInfo
+	return func(e error) {
+		var p TableSessionBulkUpsertDoneInfo
 		p.Error = e
-		p.Attempts = attempts
 		res(p)
 	}
 }

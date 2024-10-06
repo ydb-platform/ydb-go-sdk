@@ -29,7 +29,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 	return &Client{
 		clock:  config.Clock(),
 		config: config,
-		client: Ydb_Table_V1.NewTableServiceClient(cc),
 		cc:     cc,
 		build: func(ctx context.Context) (s *session, err error) {
 			return newSession(ctx, cc, config)
@@ -89,7 +88,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 type Client struct {
 	// read-only fields
 	config *config.Config
-	client Ydb_Table_V1.TableServiceClient
 	build  sessionBuilder
 	cc     grpc.ClientConnInterface
 	clock  clockwork.Clock
@@ -309,10 +307,12 @@ func (c *Client) BulkUpsert(
 		return xerrors.WithStackTrace(err)
 	}
 
+	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+
 	err = retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			attempts++
-			_, err = c.client.BulkUpsert(ctx, request)
+			_, err = client.BulkUpsert(ctx, request)
 
 			return err
 		},
