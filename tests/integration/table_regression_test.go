@@ -10,10 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -112,4 +115,29 @@ func TestRegressionIssue1227RetryBadSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 100, cnt)
+}
+
+func TestBadUUIDSerialization(t *testing.T) {
+	var (
+		scope = newScope(t)
+		ctx   = scope.Ctx
+		db    = scope.Driver()
+	)
+
+	idString := "52F84CBA-B15A-4BF2-9696-161ECA74CB5D"
+	id := uuid.MustParse(idString)
+	row, err := db.Query().QueryRow(ctx, `
+DECLARE $val AS UUID;
+
+SELECT CAST($val AS Utf8)`,
+		query.WithIdempotent(),
+		query.WithParameters(ydb.ParamsBuilder().Param("$val").UUID(id).Build()),
+	)
+
+	require.NoError(t, err)
+
+	var res string
+	err = row.Scan(&res)
+	require.NoError(t, err)
+	require.Equal(t, id.String(), res)
 }
