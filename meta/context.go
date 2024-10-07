@@ -44,3 +44,8 @@ func WithTrailerCallback(
 ) context.Context {
 	return meta.WithTrailerCallback(ctx, callback)
 }
+
+// WithTraceParent returns a copy of parent context with traceparent header
+func WithTraceParent(ctx context.Context, traceparent string) context.Context {
+	return meta.WithTraceParent(ctx, traceparent)
+}
