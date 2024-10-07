@@ -19,7 +19,7 @@ import (
 
 var (
 	ErrCommitDisabled             = xerrors.Wrap(errors.New("ydb: commits disabled"))
-	ErrWrongCommitOrderInSyncMode = xerrors.Wrap(errors.New("ydb: wrong commit order in sync mode"))
+	ErrWrongCommitOrderInSyncMode = xerrors.Wrap(errors.New("ydb: wrong commit order in sync mode. It means you skipped committing some messages. Out-of-order commits are OK for async mode - you can commit the messages later. But im sync mode, it means deadlock: the code waits for a commit ack from the server, but the server waits for the commits of the skipped message. In sync mode, ensure that you commit messages/batches in the same order as you read them"))
 )
 
 type SendMessageToServerFunc func(msg rawtopicreader.ClientMessage) error
