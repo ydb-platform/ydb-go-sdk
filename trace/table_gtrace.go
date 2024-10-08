@@ -1436,10 +1436,11 @@ func TableOnSessionKeepAlive(t *Table, c *context.Context, call call, session se
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call) func(error) {
+func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call, session sessionInfo) func(error) {
 	var p TableSessionBulkUpsertStartInfo
 	p.Context = c
 	p.Call = call
+	p.Session = session
 	res := t.onSessionBulkUpsert(p)
 	return func(e error) {
 		var p TableSessionBulkUpsertDoneInfo
