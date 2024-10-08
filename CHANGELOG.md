@@ -1,3 +1,4 @@
+## v3.84.0
 * Added `meta.WithTraceParent` context modifier for explicit putting traceparent header into grpc calls
 
 ## v3.83.0
