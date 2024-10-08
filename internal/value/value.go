@@ -161,8 +161,7 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 		return BytesValue(v.GetBytesValue()), nil
 
 	case types.UUID:
-		return UUIDValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128())), nil
-
+		return UUIDFromYDBPair(v.GetHigh_128(), v.GetLow_128()), nil
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered primitive type: %T", t))
 	}
@@ -2098,7 +2097,7 @@ func TextValue(v string) textValue {
 }
 
 type uuidValue struct {
-	value [16]byte
+	value uuid.UUID
 }
 
 func (v *uuidValue) castTo(dst interface{}) error {
@@ -2114,6 +2113,9 @@ func (v *uuidValue) castTo(dst interface{}) error {
 	case *[16]byte:
 		*vv = v.value
 
+		return nil
+	case *uuid.UUID:
+		*vv = v.value
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf(
@@ -2143,16 +2145,24 @@ func (*uuidValue) Type() types.Type {
 func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	var bytes [16]byte
 	if v != nil {
-		bytes = v.value
+		bytes = uuidDirectBytesToLe(v.value)
 	}
 	vv := a.Low128()
-	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
+	vv.Low_128 = binary.LittleEndian.Uint64(bytes[0:8])
 
 	vvv := a.Value()
-	vvv.High_128 = binary.BigEndian.Uint64(bytes[0:8])
+	vvv.High_128 = binary.LittleEndian.Uint64(bytes[8:16])
 	vvv.Value = vv
 
 	return vvv
+}
+
+func UUIDFromYDBPair(high uint64, low uint64) *uuidValue {
+	var res uuid.UUID
+	binary.LittleEndian.PutUint64(res[:], low)
+	binary.LittleEndian.PutUint64(res[8:], high)
+	res = uuidLeBytesToDirect(res)
+	return &uuidValue{value: res}
 }
 
 func UUIDValue(v [16]byte) *uuidValue {

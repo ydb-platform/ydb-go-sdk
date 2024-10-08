@@ -220,4 +220,30 @@ SELECT CAST($val AS Utf8)`,
 		require.NoError(t, err)
 		require.Equal(t, id.String(), res)
 	})
+	t.Run("good-receive", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		row, err := db.Query().QueryRow(ctx, `
+SELECT CAST($val AS UUID)`,
+			query.WithIdempotent(),
+			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
+		)
+
+		require.NoError(t, err)
+
+		var res uuid.UUID
+
+		err = row.Scan(&res)
+		require.NoError(t, err)
+
+		resString := strings.ToUpper(res.String())
+		require.Equal(t, idString, resString)
+	})
+
 }
