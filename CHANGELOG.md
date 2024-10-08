@@ -1,3 +1,4 @@
+## v3.84.1
 * Added session info into `trace.TableSessionBulkUpsertStartInfo`
 
 ## v3.84.0
