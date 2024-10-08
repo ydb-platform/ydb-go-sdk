@@ -48,3 +48,8 @@ func WithAllowFeatures(ctx context.Context, features ...string) context.Context 
 
 	return metadata.AppendToOutgoingContext(ctx, kv...)
 }
+
+// WithTraceParent returns a copy of parent context with traceparent header
+func WithTraceParent(ctx context.Context, traceparent string) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, HeaderTraceParent, traceparent)
+}

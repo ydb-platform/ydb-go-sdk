@@ -1,3 +1,5 @@
+* Added `meta.WithTraceParent` context modifier for explicit putting traceparent header into grpc calls
+
 ## v3.83.0
 * Supported `db.Table().BulkUpsert()` from scv, arrow and ydb rows formats
 
