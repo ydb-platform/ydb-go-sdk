@@ -1,3 +1,5 @@
+* Added session info into `trace.TableSessionBulkUpsertStartInfo`
+
 ## v3.84.0
 * Added `meta.WithTraceParent` context modifier for explicit putting traceparent header into grpc calls
 
