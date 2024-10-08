@@ -2159,6 +2159,51 @@ func UUIDValue(v [16]byte) *uuidValue {
 	return &uuidValue{value: v}
 }
 
+func uuidDirectBytesToLe(direct [16]byte) [16]byte {
+	// ordered as uuid bytes le in python
+	// https://docs.python.org/3/library/uuid.html#uuid.UUID.bytes_le
+	var le [16]byte
+	le[0] = direct[3]
+	le[1] = direct[2]
+	le[2] = direct[1]
+	le[3] = direct[0]
+	le[4] = direct[5]
+	le[5] = direct[4]
+	le[6] = direct[7]
+	le[7] = direct[6]
+	le[8] = direct[8]
+	le[9] = direct[9]
+	le[10] = direct[10]
+	le[11] = direct[11]
+	le[12] = direct[12]
+	le[13] = direct[13]
+	le[14] = direct[14]
+	le[15] = direct[15]
+	return le
+}
+func uuidLeBytesToDirect(direct [16]byte) [16]byte {
+	// ordered as uuid bytes le in python
+	// https://docs.python.org/3/library/uuid.html#uuid.UUID.bytes_le
+	var le [16]byte
+	le[3] = direct[0]
+	le[2] = direct[1]
+	le[1] = direct[2]
+	le[0] = direct[3]
+	le[5] = direct[4]
+	le[4] = direct[5]
+	le[7] = direct[6]
+	le[6] = direct[7]
+	le[8] = direct[8]
+	le[9] = direct[9]
+	le[10] = direct[10]
+	le[11] = direct[11]
+	le[12] = direct[12]
+	le[13] = direct[13]
+	le[14] = direct[14]
+	le[15] = direct[15]
+	return le
+}
+
 type variantValue struct {
 	innerType types.Type
 	value     Value
