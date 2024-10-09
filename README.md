@@ -48,7 +48,7 @@ if err != nil {
 err := db.Query().Do( // Do retry operation on errors with best effort
 	ctx, // context manage exiting from Do
 	func(ctx context.Context, s query.Session) (err error) { // retry operation
-		streamResult, err := s.Query(ctx, `SELECT 42 as id, "myStr" as myStr;`))
+		streamResult, err := s.Query(ctx, `SELECT 42 as id, "myStr" as myStr;`)
 		if err != nil {
 			return err // for auto-retry with driver
 		}
