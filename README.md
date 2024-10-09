@@ -53,7 +53,7 @@ err := db.Query().Do( // Do retry operation on errors with best effort
 			return err // for auto-retry with driver
 		}
 		defer func() { _ = streamResult.Close(ctx) }() // cleanup resources
-		for s, err := range streamResult.ResultSets(ctx) {
+		for rs, err := range streamResult.ResultSets(ctx) {
 			if err != nil {
 				return err
 			}
