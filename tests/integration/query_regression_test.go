@@ -86,6 +86,8 @@ SELECT CAST($val AS UUID)`,
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		expectedResultWithBug := []byte{0x8b, 0x49, 0x9e, 0x2d, 0x46, 0xb7, 0xfb, 0x9c, 0x4d, 0x8, 0x4e, 0xde, 0x6e, 0x73, 0xb4, 0x1c}
 		row, err := db.Query().QueryRow(ctx, `
+DECLARE $val AS Text;
+
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
