@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-func TestUUIDSerialization(t *testing.T) {
+func TestUUIDSerializationQueryServiceIssue1501(t *testing.T) {
+	// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 	// test with special uuid - all bytes are different for check any byte swaps
 
 	t.Run("old-send", func(t *testing.T) {
@@ -33,6 +35,7 @@ DECLARE $val AS UUID;
 SELECT CAST($val AS Utf8)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUID(id).Build()),
+			query.WithTxControl(tx.SerializableReadWriteTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -59,6 +62,7 @@ DECLARE $val AS Text;
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
+			query.WithTxControl(tx.SerializableReadWriteTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -85,6 +89,7 @@ SELECT CAST($val AS UUID)`,
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
+			query.WithTxControl(tx.SerializableReadWriteTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -112,6 +117,7 @@ DECLARE $val AS UUID;
 SELECT $val`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUID(id).Build()),
+			query.WithTxControl(tx.SerializableReadWriteTxControl()),
 		)
 
 		require.NoError(t, err)

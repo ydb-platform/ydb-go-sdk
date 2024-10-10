@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -112,4 +113,149 @@ func TestRegressionIssue1227RetryBadSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 100, cnt)
+}
+
+func TestUUIDSerializationTableServiceServiceIssue1501(t *testing.T) {
+	// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+	// test with special uuid - all bytes are different for check any byte swaps
+
+	t.Run("old-send", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		expectedResultWithBug := "2d9e498b-b746-9cfb-084d-de4e1cb4736e"
+		id := uuid.MustParse(idString)
+
+		var idFromDB string
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS UUID;
+
+SELECT CAST($val AS Utf8)
+`, table.NewQueryParameters(table.ValueParam("$val", types.UUIDValue(id))))
+			if err != nil {
+				return err
+			}
+			res.NextResultSet(ctx)
+			res.NextRow()
+
+			err = res.Scan(&idFromDB)
+			return err
+		})
+		require.NoError(t, err)
+		require.Equal(t, expectedResultWithBug, idFromDB)
+	})
+	t.Run("old-receive-to-bytes", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
+		var resultFromDb uuid.UUID
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS Text;
+
+SELECT CAST($val AS UUID)
+`, table.NewQueryParameters(table.ValueParam("$val", types.TextValue(idString))))
+			if err != nil {
+				return err
+			}
+
+			res.NextResultSet(ctx)
+			res.NextRow()
+
+			var resBytes [16]byte
+			err = res.Scan(&resBytes)
+			if err != nil {
+				return err
+			}
+
+			resultFromDb = resBytes
+			return nil
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, expectedResultWithBug, resultFromDb.String())
+	})
+	t.Run("old-receive-to-string", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		expectedResultWithBug := []byte{0x8b, 0x49, 0x9e, 0x2d, 0x46, 0xb7, 0xfb, 0x9c, 0x4d, 0x8, 0x4e, 0xde, 0x6e, 0x73, 0xb4, 0x1c}
+		var resultFromDb string
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS Text;
+
+SELECT CAST($val AS UUID)
+`, table.NewQueryParameters(table.ValueParam("$val", types.TextValue(idString))))
+			if err != nil {
+				return err
+			}
+
+			res.NextResultSet(ctx)
+			res.NextRow()
+
+			err = res.ScanWithDefaults(&resultFromDb)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		require.NoError(t, err)
+		resultBytes := []byte(resultFromDb)
+		require.Equal(t, expectedResultWithBug, resultBytes)
+	})
+	t.Run("old-send-receive", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		id := uuid.MustParse(idString)
+
+		var idFromDB uuid.UUID
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS UUID;
+
+SELECT $val
+`, table.NewQueryParameters(table.ValueParam("$val", types.UUIDValue(id))))
+			if err != nil {
+				return err
+			}
+			res.NextResultSet(ctx)
+			res.NextRow()
+
+			var resBytes [16]byte
+			err = res.Scan(&resBytes)
+			if err != nil {
+				return err
+			}
+			idFromDB = resBytes
+			return nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, id, idFromDB)
+	})
 }
