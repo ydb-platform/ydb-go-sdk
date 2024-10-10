@@ -117,7 +117,7 @@ func TestRegressionIssue1227RetryBadSession(t *testing.T) {
 	require.EqualValues(t, 100, cnt)
 }
 
-func TestBadUUIDSerialization(t *testing.T) {
+func TestUUIDSerialization(t *testing.T) {
 	t.Run("old-send", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
@@ -156,6 +156,8 @@ SELECT CAST($val AS Utf8)`,
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
 		row, err := db.Query().QueryRow(ctx, `
+DECLARE $val AS Text;
+
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
