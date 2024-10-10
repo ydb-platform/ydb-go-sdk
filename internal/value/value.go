@@ -2097,21 +2097,24 @@ func TextValue(v string) textValue {
 }
 
 type uuidValue struct {
-	value uuid.UUID
+	value               uuid.UUID
+	reproduceStorageBug bool
 }
 
 func (v *uuidValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = string(v.value[:])
+		bytes := uuidReorderBytesForReadWithBug(v.value)
+		*vv = string(bytes[:])
 
 		return nil
 	case *[]byte:
-		*vv = v.value[:]
+		bytes := uuidReorderBytesForReadWithBug(v.value)
+		*vv = bytes[:]
 
 		return nil
 	case *[16]byte:
-		*vv = v.value
+		*vv = uuidReorderBytesForReadWithBug(v.value)
 
 		return nil
 	case *uuid.UUID:
@@ -2143,6 +2146,10 @@ func (*uuidValue) Type() types.Type {
 }
 
 func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	if v.reproduceStorageBug {
+		return v.toYDBWithBug(a)
+	}
+
 	var bytes [16]byte
 	if v != nil {
 		bytes = uuidDirectBytesToLe(v.value)
@@ -2157,6 +2164,21 @@ func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
+func (v *uuidValue) toYDBWithBug(a *allocator.Allocator) *Ydb.Value {
+	var bytes [16]byte
+	if v != nil {
+		bytes = v.value
+	}
+	vv := a.Low128()
+	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
+
+	vvv := a.Value()
+	vvv.High_128 = binary.BigEndian.Uint64(bytes[0:8])
+	vvv.Value = vv
+
+	return vvv
+}
+
 func UUIDFromYDBPair(high uint64, low uint64) *uuidValue {
 	var res uuid.UUID
 	binary.LittleEndian.PutUint64(res[:], low)
@@ -2165,8 +2187,12 @@ func UUIDFromYDBPair(high uint64, low uint64) *uuidValue {
 	return &uuidValue{value: res}
 }
 
+func UUIDTyped(val uuid.UUID) *uuidValue {
+	return &uuidValue{value: val}
+}
+
 func UUIDValue(v [16]byte) *uuidValue {
-	return &uuidValue{value: v}
+	return &uuidValue{value: v, reproduceStorageBug: true}
 }
 
 func uuidDirectBytesToLe(direct [16]byte) [16]byte {
@@ -2212,6 +2238,27 @@ func uuidLeBytesToDirect(direct [16]byte) [16]byte {
 	le[14] = direct[14]
 	le[15] = direct[15]
 	return le
+}
+
+func uuidReorderBytesForReadWithBug(val [16]byte) [16]byte {
+	var res [16]byte
+	res[0] = val[15]
+	res[1] = val[14]
+	res[2] = val[13]
+	res[3] = val[12]
+	res[4] = val[11]
+	res[5] = val[10]
+	res[6] = val[9]
+	res[7] = val[8]
+	res[8] = val[6]
+	res[9] = val[7]
+	res[10] = val[4]
+	res[11] = val[5]
+	res[12] = val[0]
+	res[13] = val[1]
+	res[14] = val[2]
+	res[15] = val[3]
+	return res
 }
 
 type variantValue struct {

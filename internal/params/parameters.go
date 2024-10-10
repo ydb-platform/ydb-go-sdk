@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
@@ -300,6 +301,12 @@ func (p *Parameter) UUID(v [16]byte) Builder {
 	p.value = value.UUIDValue(v)
 	p.parent.params = append(p.parent.params, p)
 
+	return p.parent
+}
+
+func (p *Parameter) UUIDTyped(val uuid.UUID) Builder {
+	p.value = value.UUIDTyped(val)
+	p.parent.params = append(p.parent.params, p)
 	return p.parent
 }
 
