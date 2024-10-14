@@ -10,10 +10,16 @@ type Detailer interface {
 	Details() Details
 }
 
+var _ Detailer = (*Details)(nil)
+
 type Details uint64
 
-func (d Details) Details() Details {
-	return d
+func (d *Details) Details() Details {
+	if d == nil {
+		return 0
+	}
+
+	return *d
 }
 
 func (d Details) String() string {
