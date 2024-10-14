@@ -180,7 +180,7 @@ func (scope *scopeT) Folder() string {
 				scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 			}
 		}
-		scope.Logf("Createing folder done: %v", folderPath)
+		scope.Logf("Creating folder done: %v", folderPath)
 		return fixenv.NewGenericResultWithCleanup(folderPath, clean), nil
 	}
 	return fixenv.CacheResult(scope.Env, f)
@@ -310,7 +310,7 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 		createTableQueryTemplate: `
 			PRAGMA TablePathPrefix("{{.TablePathPrefix}}");
 			CREATE TABLE {{.TableName}} (
-				id Int64 NOT NULL, 
+				id Int64 NOT NULL,
 				val Text,
 				PRIMARY KEY (id)
 			)

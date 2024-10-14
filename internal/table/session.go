@@ -1258,10 +1258,8 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	var (
 		a           = allocator.New()
 		callOptions []grpc.CallOption
-		onDone      = trace.TableOnSessionBulkUpsert(
-			s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*session).BulkUpsert"),
-			s,
+		onDone      = trace.TableOnSessionBulkUpsert(s.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*session).BulkUpsert"), s,
 		)
 	)
 	defer func() {

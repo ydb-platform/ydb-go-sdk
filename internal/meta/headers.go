@@ -10,6 +10,7 @@ const (
 	HeaderApplicationName    = "x-ydb-application-name"
 	HeaderClientCapabilities = "x-ydb-client-capabilities"
 	HeaderClientPid          = "x-ydb-client-pid"
+	HeaderTraceParent        = "traceparent"
 
 	// outgoing hints
 	HintSessionBalancer = "session-balancer"

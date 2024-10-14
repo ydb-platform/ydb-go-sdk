@@ -1,8 +1,17 @@
+## v3.84.1
+* Added session info into `trace.TableSessionBulkUpsertStartInfo`
+
+## v3.84.0
+* Added `meta.WithTraceParent` context modifier for explicit putting traceparent header into grpc calls
+
+## v3.83.0
+* Supported `db.Table().BulkUpsert()` from scv, arrow and ydb rows formats
+
 ## v3.82.0
-* Fixed error on experimental TopicListener.Close
+* Fixed error on experimental `TopicListener.Close`
 * Disabled reporting of `ydb_go_sdk_query_session_count` when metrics are disabled
 * Disabled reporting of `ydb_go_sdk_ydb_query_session_create_latency` histogram metrics when metrics are disabled
-* Allowed skip column for `ScanStruct` by tag `-` 
+* Allowed skip column for `ScanStruct` by tag `-`
 
 ## v3.81.4
 * Returned `topicwriter.ErrQueueLimitExceed`, accidental removed at `v3.81.0`
@@ -14,7 +23,7 @@
 * Removed `experimantal` comment for query service client
 
 ## v3.81.1
-* Fixed nil pointer dereference panic on failed `ydb.Open` 
+* Fixed nil pointer dereference panic on failed `ydb.Open`
 * Added ip discovery. Server can show own ip address and target hostname in the ListEndpoint message. These fields are used to bypass DNS resolving.
 
 ## v3.81.0
@@ -22,7 +31,7 @@
 * Added write to topics within transactions
 
 ## v3.80.10
-* Added `ydb.WithSessionPoolSessionUsageLimit()` option for limitation max count of session usage  
+* Added `ydb.WithSessionPoolSessionUsageLimit()` option for limitation max count of session usage
 * Refactored experimental topic iterators in `topicsugar` package
 
 ## v3.80.9

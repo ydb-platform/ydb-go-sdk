@@ -42,6 +42,7 @@ func TestConnection(sourceTest *testing.T) {
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"
+		traceParentID = "test-traceparent-id"
 		checkMetadata = func(ctx context.Context) {
 			md, has := metadata.FromOutgoingContext(ctx)
 			if !has {
@@ -66,10 +67,20 @@ func TestConnection(sourceTest *testing.T) {
 				t.Fatalf("no traceIDs")
 			}
 			if len(traceIDs[0]) == 0 {
-				t.Fatalf("no traceID")
+				t.Fatalf("empty traceID header")
+			}
+			traceParent := md.Get(meta.HeaderTraceParent)
+			if len(traceParent) == 0 {
+				t.Fatalf("no traceparent header")
+			}
+			if len(traceParent[0]) == 0 {
+				t.Fatalf("empty traceparent header")
+			}
+			if traceParent[0] != traceParentID {
+				t.Fatalf("unexpected traceparent header")
 			}
 		}
-		ctx = xtest.Context(t)
+		ctx = meta.WithTraceParent(xtest.Context(t), traceParentID)
 	)
 
 	t.RunSynced("ydb.New", func(t *xtest.SyncedTest) {
