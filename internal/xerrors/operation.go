@@ -28,6 +28,14 @@ func (e *operationError) Code() int32 {
 	return int32(e.code)
 }
 
+func (e *operationError) NodeID() uint32 {
+	return e.nodeID
+}
+
+func (e *operationError) Address() string {
+	return e.address
+}
+
 func (e *operationError) Name() string {
 	return "operation/" + e.code.String()
 }
