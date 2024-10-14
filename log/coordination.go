@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -29,8 +30,8 @@ func internalCoordination(
 
 			return func(info trace.CoordinationNewDoneInfo) {
 				l.Log(WithLevel(ctx, INFO), "done",
-					latencyField(start),
-					versionField(),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		},
@@ -40,19 +41,19 @@ func internalCoordination(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "create")
 			l.Log(ctx, "start",
-				String("path", info.Path),
+				kv.String("path", info.Path),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationCreateNodeDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "fail",
-						latencyField(start),
-						versionField(),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -63,19 +64,19 @@ func internalCoordination(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "alter")
 			l.Log(ctx, "start",
-				String("path", info.Path),
+				kv.String("path", info.Path),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationAlterNodeDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "fail",
-						latencyField(start),
-						versionField(),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -86,19 +87,19 @@ func internalCoordination(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "drop")
 			l.Log(ctx, "start",
-				String("path", info.Path),
+				kv.String("path", info.Path),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationDropNodeDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "fail",
-						latencyField(start),
-						versionField(),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -109,19 +110,19 @@ func internalCoordination(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "describe")
 			l.Log(ctx, "start",
-				String("path", info.Path),
+				kv.String("path", info.Path),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationDescribeNodeDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "fail",
-						latencyField(start),
-						versionField(),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -137,12 +138,12 @@ func internalCoordination(
 			return func(info trace.CoordinationSessionDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "fail",
-						latencyField(start),
-						versionField(),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -158,12 +159,12 @@ func internalCoordination(
 			return func(info trace.CoordinationCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "fail",
-						latencyField(start),
-						versionField(),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -182,9 +183,9 @@ func internalCoordination(
 
 			return func(info trace.CoordinationStreamNewDoneInfo) {
 				l.Log(ctx, "done",
-					latencyField(start),
-					Error(info.Error),
-					versionField(),
+					kv.Latency(start),
+					kv.Error(info.Error),
+					kv.Version(),
 				)
 			}
 		},
@@ -194,8 +195,8 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "started")
 			l.Log(ctx, "",
-				String("sessionID", strconv.FormatUint(info.SessionID, 10)),
-				String("expectedSessionID", strconv.FormatUint(info.SessionID, 10)),
+				kv.String("sessionID", strconv.FormatUint(info.SessionID, 10)),
+				kv.String("expectedSessionID", strconv.FormatUint(info.SessionID, 10)),
 			)
 		},
 		OnSessionStartTimeout: func(info trace.CoordinationSessionStartTimeoutInfo) {
@@ -204,7 +205,7 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "start", "timeout")
 			l.Log(ctx, "",
-				Stringer("timeout", info.Timeout),
+				kv.Stringer("timeout", info.Timeout),
 			)
 		},
 		OnSessionKeepAliveTimeout: func(info trace.CoordinationSessionKeepAliveTimeoutInfo) {
@@ -213,8 +214,8 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "keepAlive", "timeout")
 			l.Log(ctx, "",
-				Stringer("timeout", info.Timeout),
-				Stringer("lastGoodResponseTime", info.LastGoodResponseTime),
+				kv.Stringer("timeout", info.Timeout),
+				kv.Stringer("lastGoodResponseTime", info.LastGoodResponseTime),
 			)
 		},
 		OnSessionStopped: func(info trace.CoordinationSessionStoppedInfo) {
@@ -223,8 +224,8 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "stopped")
 			l.Log(ctx, "",
-				String("sessionID", strconv.FormatUint(info.SessionID, 10)),
-				String("expectedSessionID", strconv.FormatUint(info.SessionID, 10)),
+				kv.String("sessionID", strconv.FormatUint(info.SessionID, 10)),
+				kv.String("expectedSessionID", strconv.FormatUint(info.SessionID, 10)),
 			)
 		},
 		OnSessionStopTimeout: func(info trace.CoordinationSessionStopTimeoutInfo) {
@@ -233,7 +234,7 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "stop", "timeout")
 			l.Log(ctx, "",
-				Stringer("timeout", info.Timeout),
+				kv.Stringer("timeout", info.Timeout),
 			)
 		},
 		OnSessionClientTimeout: func(info trace.CoordinationSessionClientTimeoutInfo) {
@@ -242,8 +243,8 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "client", "timeout")
 			l.Log(ctx, "",
-				Stringer("timeout", info.Timeout),
-				Stringer("lastGoodResponseTime", info.LastGoodResponseTime),
+				kv.Stringer("timeout", info.Timeout),
+				kv.Stringer("lastGoodResponseTime", info.LastGoodResponseTime),
 			)
 		},
 		OnSessionServerExpire: func(info trace.CoordinationSessionServerExpireInfo) {
@@ -252,7 +253,7 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "server", "expire")
 			l.Log(ctx, "",
-				Stringer("failure", info.Failure),
+				kv.Stringer("failure", info.Failure),
 			)
 		},
 		OnSessionServerError: func(info trace.CoordinationSessionServerErrorInfo) {
@@ -261,7 +262,7 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "server", "error")
 			l.Log(ctx, "",
-				Stringer("failure", info.Failure),
+				kv.Stringer("failure", info.Failure),
 			)
 		},
 		OnSessionReceive: func(
@@ -278,10 +279,10 @@ func internalCoordination(
 
 			return func(info trace.CoordinationSessionReceiveDoneInfo) {
 				l.Log(ctx, "done",
-					latencyField(start),
-					Error(info.Error),
-					Stringer("response", info.Response),
-					versionField(),
+					kv.Latency(start),
+					kv.Error(info.Error),
+					kv.Stringer("response", info.Response),
+					kv.Version(),
 				)
 			}
 		},
@@ -291,7 +292,7 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "receive", "unexpected")
 			l.Log(ctx, "",
-				Stringer("response", info.Response),
+				kv.Stringer("response", info.Response),
 			)
 		},
 		OnSessionStop: func(info trace.CoordinationSessionStopInfo) {
@@ -300,7 +301,7 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "stop")
 			l.Log(ctx, "",
-				String("sessionID", strconv.FormatUint(info.SessionID, 10)),
+				kv.String("sessionID", strconv.FormatUint(info.SessionID, 10)),
 			)
 		},
 		OnSessionStart: func(
@@ -317,9 +318,9 @@ func internalCoordination(
 
 			return func(info trace.CoordinationSessionStartDoneInfo) {
 				l.Log(ctx, "done",
-					latencyField(start),
-					Error(info.Error),
-					versionField(),
+					kv.Latency(start),
+					kv.Error(info.Error),
+					kv.Version(),
 				)
 			}
 		},
@@ -333,15 +334,15 @@ func internalCoordination(
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "send")
 			l.Log(ctx, "start",
-				Stringer("request", info.Request),
+				kv.Stringer("request", info.Request),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationSessionSendDoneInfo) {
 				l.Log(ctx, "done",
-					latencyField(start),
-					Error(info.Error),
-					versionField(),
+					kv.Latency(start),
+					kv.Error(info.Error),
+					kv.Version(),
 				)
 			}
 		},

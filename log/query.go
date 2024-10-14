@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -28,7 +29,7 @@ func internalQuery(
 
 			return func(info trace.QueryNewDoneInfo) {
 				l.Log(WithLevel(ctx, INFO), "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			}
 		},
@@ -43,7 +44,7 @@ func internalQuery(
 			return func(info trace.QueryCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -51,9 +52,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -68,8 +69,8 @@ func internalQuery(
 
 			return func(info trace.QueryPoolNewDoneInfo) {
 				l.Log(WithLevel(ctx, INFO), "done",
-					latencyField(start),
-					Int("Limit", info.Limit),
+					kv.Latency(start),
+					kv.Int("Limit", info.Limit),
 				)
 			}
 		},
@@ -84,7 +85,7 @@ func internalQuery(
 			return func(info trace.QueryPoolCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -92,9 +93,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -110,7 +111,7 @@ func internalQuery(
 			return func(info trace.QueryPoolTryDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -118,9 +119,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -136,8 +137,8 @@ func internalQuery(
 			return func(info trace.QueryPoolWithDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						Int("Attempts", info.Attempts),
+						kv.Latency(start),
+						kv.Int("Attempts", info.Attempts),
 					)
 				} else {
 					lvl := ERROR
@@ -145,10 +146,10 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						Int("Attempts", info.Attempts),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Int("Attempts", info.Attempts),
+						kv.Version(),
 					)
 				}
 			}
@@ -164,7 +165,7 @@ func internalQuery(
 			return func(info trace.QueryPoolPutDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -172,9 +173,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -190,7 +191,7 @@ func internalQuery(
 			return func(info trace.QueryPoolGetDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -198,9 +199,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -216,8 +217,8 @@ func internalQuery(
 			return func(info trace.QueryDoDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						Int("attempts", info.Attempts),
+						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
 					)
 				} else {
 					lvl := ERROR
@@ -225,10 +226,10 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						Int("attempts", info.Attempts),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Int("attempts", info.Attempts),
+						kv.Version(),
 					)
 				}
 			}
@@ -244,8 +245,8 @@ func internalQuery(
 			return func(info trace.QueryDoTxDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						Int("attempts", info.Attempts),
+						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
 					)
 				} else {
 					lvl := ERROR
@@ -253,10 +254,10 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						Int("attempts", info.Attempts),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Int("attempts", info.Attempts),
+						kv.Version(),
 					)
 				}
 			}
@@ -272,7 +273,7 @@ func internalQuery(
 			return func(info trace.QueryExecDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := ERROR
@@ -280,9 +281,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -298,7 +299,7 @@ func internalQuery(
 			return func(info trace.QueryQueryDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := ERROR
@@ -306,9 +307,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -324,7 +325,7 @@ func internalQuery(
 			return func(info trace.QueryQueryRowDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := ERROR
@@ -332,9 +333,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -350,7 +351,7 @@ func internalQuery(
 			return func(info trace.QueryQueryResultSetDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := ERROR
@@ -358,9 +359,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -376,9 +377,9 @@ func internalQuery(
 			return func(info trace.QuerySessionCreateDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("session_id", info.Session.ID()),
-						String("session_status", info.Session.Status()),
+						kv.Latency(start),
+						kv.String("session_id", info.Session.ID()),
+						kv.String("session_status", info.Session.Status()),
 					)
 				} else {
 					lvl := WARN
@@ -386,9 +387,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "done",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -399,15 +400,15 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "attach")
 			l.Log(ctx, "start",
-				String("session_id", info.Session.ID()),
-				String("session_status", info.Session.Status()),
+				kv.String("session_id", info.Session.ID()),
+				kv.String("session_status", info.Session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.QuerySessionAttachDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -415,9 +416,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -428,15 +429,15 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "delete")
 			l.Log(ctx, "start",
-				String("session_id", info.Session.ID()),
-				String("session_status", info.Session.Status()),
+				kv.String("session_id", info.Session.ID()),
+				kv.String("session_status", info.Session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.QuerySessionDeleteDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -444,9 +445,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -457,16 +458,16 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "exec")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
-				String("SessionStatus", info.Session.Status()),
-				String("Query", info.Query),
+				kv.String("SessionID", info.Session.ID()),
+				kv.String("SessionStatus", info.Session.Status()),
+				kv.String("Query", info.Query),
 			)
 			start := time.Now()
 
 			return func(info trace.QuerySessionExecDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -474,9 +475,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -487,16 +488,16 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "query")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
-				String("SessionStatus", info.Session.Status()),
-				String("Query", info.Query),
+				kv.String("SessionID", info.Session.ID()),
+				kv.String("SessionStatus", info.Session.Status()),
+				kv.String("Query", info.Query),
 			)
 			start := time.Now()
 
 			return func(info trace.QuerySessionQueryDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -504,9 +505,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -517,16 +518,16 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "begin")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
-				String("SessionStatus", info.Session.Status()),
+				kv.String("SessionID", info.Session.ID()),
+				kv.String("SessionStatus", info.Session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.QuerySessionBeginDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, DEBUG), "done",
-						latencyField(start),
-						String("TransactionID", info.Tx.ID()),
+						kv.Latency(start),
+						kv.String("TransactionID", info.Tx.ID()),
 					)
 				} else {
 					lvl := WARN
@@ -534,9 +535,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -547,16 +548,16 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "exec")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
-				String("TransactionID", info.Tx.ID()),
-				String("SessionStatus", info.Session.Status()),
+				kv.String("SessionID", info.Session.ID()),
+				kv.String("TransactionID", info.Tx.ID()),
+				kv.String("SessionStatus", info.Session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.QueryTxExecDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, DEBUG), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -564,9 +565,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -577,16 +578,16 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "query")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
-				String("TransactionID", info.Tx.ID()),
-				String("SessionStatus", info.Session.Status()),
+				kv.String("SessionID", info.Session.ID()),
+				kv.String("TransactionID", info.Tx.ID()),
+				kv.String("SessionStatus", info.Session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.QueryTxQueryDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, DEBUG), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -594,9 +595,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -612,7 +613,7 @@ func internalQuery(
 			return func(info trace.QueryResultNewDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -620,9 +621,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -638,8 +639,8 @@ func internalQuery(
 			return func(info trace.QueryResultNextPartDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("stats", info.Stats),
-						latencyField(start),
+						kv.Stringer("stats", info.Stats),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -647,9 +648,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -669,7 +670,7 @@ func internalQuery(
 			return func(info trace.QueryResultNextResultSetDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -677,9 +678,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -695,7 +696,7 @@ func internalQuery(
 			return func(info trace.QueryResultCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -703,9 +704,9 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -30,15 +31,15 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
 			if info.Error == nil {
 				l.Log(WithLevel(ctx, DEBUG), "connected",
-					latencyField(start),
-					String("session_id", info.Session.ID()),
-					String("session_status", info.Session.Status()),
+					kv.Latency(start),
+					kv.String("session_id", info.Session.ID()),
+					kv.String("session_status", info.Session.Status()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -55,13 +56,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnPingDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -77,13 +78,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -99,13 +100,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -117,7 +118,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "prepare", "stmt")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
-				String("query", info.Query),
+				kv.String("query", info.Query),
 			)...,
 		)
 		query := info.Query
@@ -126,15 +127,15 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnPrepareDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					appendFieldByCondition(l.logQuery,
-						String("query", query),
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.String("query", query),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)...,
 				)
 			}
@@ -147,7 +148,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "exec")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
-				String("query", info.Query),
+				kv.String("query", info.Query),
 			)...,
 		)
 		query := info.Query
@@ -157,19 +158,19 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnExecDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				m := retry.Check(info.Error)
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					appendFieldByCondition(l.logQuery,
-						String("query", query),
-						Bool("retryable", m.MustRetry(idempotent)),
-						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.IsRetryObjectValid()),
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.String("query", query),
+						kv.Bool("retryable", m.MustRetry(idempotent)),
+						kv.Int64("code", m.StatusCode()),
+						kv.Bool("deleteSession", m.IsRetryObjectValid()),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)...,
 				)
 			}
@@ -182,7 +183,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "query")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
-				String("query", info.Query),
+				kv.String("query", info.Query),
 			)...,
 		)
 		query := info.Query
@@ -192,19 +193,19 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnQueryDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				m := retry.Check(info.Error)
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					appendFieldByCondition(l.logQuery,
-						String("query", query),
-						Bool("retryable", m.MustRetry(idempotent)),
-						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.IsRetryObjectValid()),
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.String("query", query),
+						kv.Bool("retryable", m.MustRetry(idempotent)),
+						kv.Int64("code", m.StatusCode()),
+						kv.Bool("deleteSession", m.IsRetryObjectValid()),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)...,
 				)
 			}
@@ -221,13 +222,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "committed",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -243,13 +244,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -265,13 +266,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "closed",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "close failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -283,7 +284,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "stmt", "exec")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
-				String("query", info.Query),
+				kv.String("query", info.Query),
 			)...,
 		)
 		query := info.Query
@@ -292,16 +293,16 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLStmtExecDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					Error(info.Error),
-					latencyField(start),
+					kv.Error(info.Error),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					appendFieldByCondition(l.logQuery,
-						String("query", query),
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.String("query", query),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)...,
 				)
 			}
@@ -314,7 +315,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "stmt", "query")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
-				String("query", info.Query),
+				kv.String("query", info.Query),
 			)...,
 		)
 		query := info.Query
@@ -323,15 +324,15 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					appendFieldByCondition(l.logQuery,
-						String("query", query),
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.String("query", query),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)...,
 				)
 			}

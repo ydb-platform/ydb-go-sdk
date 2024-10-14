@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -18,22 +19,22 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 		}
 		ctx := with(*info.Context, DEBUG, "ydb", "discovery", "list", "endpoints")
 		l.Log(ctx, "start",
-			String("address", info.Address),
-			String("database", info.Database),
+			kv.String("address", info.Address),
+			kv.String("database", info.Database),
 		)
 		start := time.Now()
 
 		return func(info trace.DiscoveryDiscoverDoneInfo) {
 			if info.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "done",
-					latencyField(start),
-					Stringer("endpoints", endpoints(info.Endpoints)),
+					kv.Latency(start),
+					kv.Stringer("endpoints", kv.Endpoints(info.Endpoints)),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -49,15 +50,15 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
-					String("user", info.User),
-					Strings("groups", info.Groups),
+					kv.Latency(start),
+					kv.String("user", info.User),
+					kv.Strings("groups", info.Groups),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
