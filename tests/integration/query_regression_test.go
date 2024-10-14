@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -103,7 +104,7 @@ SELECT CAST($val AS UUID)`,
 
 		require.Equal(t, expectedResultWithBug, []byte(res))
 	})
-	t.Run("send-receive", func(t *testing.T) {
+	t.Run("old-send-receive", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
 			scope = newScope(t)
@@ -131,5 +132,78 @@ SELECT $val`,
 		resUUID := uuid.UUID(resBytes)
 
 		require.Equal(t, id, resUUID)
+	})
+	t.Run("good-send", func(t *testing.T) {
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		id := uuid.MustParse(idString)
+		row, err := db.Query().QueryRow(ctx, `
+DECLARE $val AS UUID;
+
+SELECT CAST($val AS Utf8)`,
+			query.WithIdempotent(),
+			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUIDTyped(id).Build()),
+		)
+
+		require.NoError(t, err)
+
+		var res string
+		err = row.Scan(&res)
+		require.NoError(t, err)
+		require.Equal(t, id.String(), res)
+	})
+	t.Run("good-receive", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		row, err := db.Query().QueryRow(ctx, `
+SELECT CAST($val AS UUID)`,
+			query.WithIdempotent(),
+			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
+		)
+
+		require.NoError(t, err)
+
+		var res uuid.UUID
+
+		err = row.Scan(&res)
+		require.NoError(t, err)
+
+		resString := strings.ToUpper(res.String())
+		require.Equal(t, idString, resString)
+	})
+	t.Run("good-send-receive", func(t *testing.T) {
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		id := uuid.MustParse(idString)
+		row, err := db.Query().QueryRow(ctx, `
+DECLARE $val AS UUID;
+
+SELECT $val`,
+			query.WithIdempotent(),
+			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUIDTyped(id).Build()),
+		)
+
+		require.NoError(t, err)
+
+		var res uuid.UUID
+		err = row.Scan(&res)
+		require.NoError(t, err)
+		require.Equal(t, id.String(), res.String())
 	})
 }

@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
@@ -701,6 +702,27 @@ func (s *valueScanner) uint128() (v [16]byte) {
 	return value.BigEndianUint128(hi, lo)
 }
 
+func (s *valueScanner) uuid() uuid.UUID {
+	c := s.stack.current()
+	if c.isEmpty() {
+		_ = s.errorf(0, "not implemented convert to [16]byte")
+
+		return uuid.UUID{}
+	}
+	lo := s.low128()
+	hi := c.v.GetHigh_128()
+
+	val := value.UUIDFromYDBPair(hi, lo)
+
+	var uuidVal uuid.UUID
+	err := value.CastTo(val, &uuidVal)
+	if err != nil {
+		_ = s.errorf(0, "failed to cast internal uuid type to uuid: %w", err)
+		return uuid.UUID{}
+	}
+	return uuidVal
+}
+
 func (s *valueScanner) null() {
 	x, _ := s.stack.currentValue().(*Ydb.Value_NullFlagValue)
 	if x == nil {
@@ -847,6 +869,8 @@ func (s *valueScanner) scanRequired(v interface{}) {
 		s.setByte(v)
 	case *[16]byte:
 		*v = s.uint128()
+	case *uuid.UUID:
+		*v = s.uuid()
 	case *interface{}:
 		*v = s.any()
 	case *value.Value:

@@ -14,9 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -260,86 +258,6 @@ SELECT $val
 		require.NoError(t, err)
 		require.Equal(t, id, idFromDB)
 	})
-	t.Run("old-send", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "2d9e498b-b746-9cfb-084d-de4e1cb4736e"
-		id := uuid.MustParse(idString)
-		row, err := db.Query().QueryRow(ctx, `
-DECLARE $val AS UUID;
-
-SELECT CAST($val AS Utf8)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUID(id).Build()),
-		)
-
-		require.NoError(t, err)
-
-		var res string
-
-		err = row.Scan(&res)
-		require.NoError(t, err)
-		require.Equal(t, expectedResultWithBug, res)
-	})
-	t.Run("old-receive-to-bytes", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
-		row, err := db.Query().QueryRow(ctx, `
-DECLARE $val AS Text;
-
-SELECT CAST($val AS UUID)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
-		)
-
-		require.NoError(t, err)
-
-		var res [16]byte
-
-		err = row.Scan(&res)
-		require.NoError(t, err)
-
-		resUUID := uuid.UUID(res)
-		require.Equal(t, expectedResultWithBug, resUUID.String())
-	})
-	t.Run("old-receive-to-string", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := []byte{0x8b, 0x49, 0x9e, 0x2d, 0x46, 0xb7, 0xfb, 0x9c, 0x4d, 0x8, 0x4e, 0xde, 0x6e, 0x73, 0xb4, 0x1c}
-		row, err := db.Query().QueryRow(ctx, `
-SELECT CAST($val AS UUID)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
-		)
-
-		require.NoError(t, err)
-
-		var res string
-
-		err = row.Scan(&res)
-		require.NoError(t, err)
-
-		require.Equal(t, expectedResultWithBug, []byte(res))
-	})
 	t.Run("good-send", func(t *testing.T) {
 		var (
 			scope = newScope(t)
@@ -349,20 +267,25 @@ SELECT CAST($val AS UUID)`,
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := uuid.MustParse(idString)
-		row, err := db.Query().QueryRow(ctx, `
+		var resStringId string
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
 DECLARE $val AS UUID;
 
-SELECT CAST($val AS Utf8)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUIDTyped(id).Build()),
-		)
+SELECT CAST($val AS Utf8)
+`, table.NewQueryParameters(table.ValueParam("$val", types.UUIDTypedValue(id))))
 
+			res.NextResultSet(ctx)
+			res.NextRow()
+			err = res.ScanWithDefaults(&resStringId)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 		require.NoError(t, err)
 
-		var res string
-		err = row.Scan(&res)
-		require.NoError(t, err)
-		require.Equal(t, id.String(), res)
+		require.Equal(t, strings.ToUpper(id.String()), strings.ToUpper(resStringId))
 	})
 	t.Run("good-receive", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -373,21 +296,53 @@ SELECT CAST($val AS Utf8)`,
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		row, err := db.Query().QueryRow(ctx, `
-SELECT CAST($val AS UUID)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
+
+		var resID uuid.UUID
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS Text;
+
+SELECT CAST($val AS UUID)
+`, table.NewQueryParameters(table.ValueParam("$val", types.TextValue(idString))))
+			if err != nil {
+				return err
+			}
+			res.NextResultSet(ctx)
+			res.NextRow()
+			return res.ScanWithDefaults(&resID)
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, strings.ToUpper(idString), strings.ToUpper(resID.String()))
+	})
+	t.Run("good-send-receive", func(t *testing.T) {
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
 		)
 
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		id := uuid.MustParse(idString)
+		var resID uuid.UUID
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS UUID;
+
+SELECT $val
+`, table.NewQueryParameters(table.ValueParam("$val", types.UUIDTypedValue(id))))
+
+			res.NextResultSet(ctx)
+			res.NextRow()
+			err = res.ScanWithDefaults(&resID)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 		require.NoError(t, err)
 
-		var res uuid.UUID
-
-		err = row.Scan(&res)
 		require.NoError(t, err)
-
-		resString := strings.ToUpper(res.String())
-		require.Equal(t, idString, resString)
+		require.Equal(t, strings.ToUpper(idString), strings.ToUpper(resID.String()))
 	})
-
 }

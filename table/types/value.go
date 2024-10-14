@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -155,6 +157,10 @@ func JSONValue(v string) Value { return value.JSONValue(v) }
 func JSONValueFromBytes(v []byte) Value { return value.JSONValue(xstring.FromBytes(v)) }
 
 func UUIDValue(v [16]byte) Value { return value.UUIDValue(v) }
+
+func UUIDTypedValue(v uuid.UUID) Value {
+	return value.UUIDTyped(v)
+}
 
 func JSONDocumentValue(v string) Value { return value.JSONDocumentValue(v) }
 
