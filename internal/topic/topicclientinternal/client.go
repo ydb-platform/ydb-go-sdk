@@ -181,6 +181,54 @@ func (c *Client) Describe(
 	return res, nil
 }
 
+// Describe topic consumer
+func (c *Client) DescribeTopicConsumer(
+	ctx context.Context,
+	path string,
+	consumer string,
+	opts ...topicoptions.DescribeConsumerOption,
+) (res topictypes.TopicConsumerDescription, _ error) {
+	req := rawtopic.DescribeConsumerRequest{
+		OperationParams: c.defaultOperationParams,
+		Path:            path,
+		Consumer:        consumer,
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&req)
+		}
+	}
+
+	var rawRes rawtopic.DescribeConsumerResult
+
+	call := func(ctx context.Context) (describeErr error) {
+		rawRes, describeErr = c.rawClient.DescribeConsumer(ctx, req)
+
+		return describeErr
+	}
+
+	var err error
+
+	if c.cfg.AutoRetry() {
+		err = retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+			retry.WithBudget(c.cfg.RetryBudget()),
+		)
+	} else {
+		err = call(ctx)
+	}
+
+	if err != nil {
+		return res, err
+	}
+
+	res.FromRaw(&rawRes)
+
+	return res, nil
+}
+
 // Drop topic
 func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
 	req := rawtopic.DropTopicRequest{}

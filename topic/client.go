@@ -23,6 +23,11 @@ type Client interface {
 	// Describe topic
 	Describe(ctx context.Context, path string, opts ...topicoptions.DescribeOption) (topictypes.TopicDescription, error)
 
+	// Describe topic consumer
+	DescribeTopicConsumer(
+		ctx context.Context, path string, consumer string, opts ...topicoptions.DescribeConsumerOption,
+	) (topictypes.TopicConsumerDescription, error)
+
 	// Drop topic
 	Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error
 
