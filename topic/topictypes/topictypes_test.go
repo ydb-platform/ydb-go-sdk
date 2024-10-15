@@ -153,12 +153,184 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 
 	for _, v := range testData {
 		v := v
-		t.Run(v.testName, func(t *testing.T) {
-			d := TopicDescription{}
-			d.FromRaw(v.rawTopicDescription)
-			if !reflect.DeepEqual(d, v.expectedDescription) {
-				t.Errorf("got\n%+v\nexpected\n %+v", d, v.expectedDescription)
-			}
-		})
+		t.Run(
+			v.testName, func(t *testing.T) {
+				d := TopicDescription{}
+				d.FromRaw(v.rawTopicDescription)
+				if !reflect.DeepEqual(d, v.expectedDescription) {
+					t.Errorf("got\n%+v\nexpected\n %+v", d, v.expectedDescription)
+				}
+			},
+		)
+	}
+}
+
+func TestTopicConsumerDescriptionFromRaw(t *testing.T) {
+	fourPM := time.Date(2024, 0o1, 0o1, 16, 0, 0, 0, time.UTC)
+	hour := time.Hour
+	testData := []struct {
+		testName               string
+		expectedDescription    TopicConsumerDescription
+		rawConsumerDescription *rawtopic.DescribeConsumerResult
+	}{
+		{
+			testName: "empty topic consumer description",
+			expectedDescription: TopicConsumerDescription{
+				Path: "",
+				Consumer: Consumer{
+					SupportedCodecs: make([]Codec, 0),
+				},
+				Partitions: make([]DescribeConsumerPartitionInfo, 0),
+			},
+			rawConsumerDescription: &rawtopic.DescribeConsumerResult{},
+		},
+		{
+			testName: "all fields set",
+			expectedDescription: TopicConsumerDescription{
+				Path: "topic/consumer",
+				Consumer: Consumer{
+					Attributes: map[string]string{
+						"privet": "mir",
+						"hello":  "world",
+					},
+					Name:      "c1",
+					Important: true,
+					SupportedCodecs: []Codec{
+						CodecRaw,
+					},
+					ReadFrom: time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
+				},
+				Partitions: []DescribeConsumerPartitionInfo{
+					{
+						PartitionID: 42,
+						Active:      true,
+						ChildPartitionIDs: []int64{
+							1, 2, 3,
+						},
+						ParentPartitionIDs: []int64{
+							1, 2, 3,
+						},
+						PartitionStats: PartitionStats{
+							PartitionsOffset: OffsetRange{
+								Start: 10,
+								End:   20,
+							},
+							StoreSizeBytes:  1024,
+							LastWriteTime:   &fourPM,
+							MaxWriteTimeLag: &hour,
+							BytesWritten: MultipleWindowsStat{
+								PerMinute: 1,
+								PerHour:   60,
+								PerDay:    1440,
+							},
+						},
+						PartitionConsumerStats: PartitionConsumerStats{
+							LastReadOffset:                 20,
+							CommittedOffset:                10,
+							ReadSessionID:                  "session1",
+							PartitionReadSessionCreateTime: &fourPM,
+							LastReadTime:                   &fourPM,
+							MaxReadTimeLag:                 &hour,
+							MaxWriteTimeLag:                &hour,
+							BytesRead: MultipleWindowsStat{
+								PerMinute: 1,
+								PerHour:   60,
+								PerDay:    1440,
+							},
+							ReaderName: "reader1",
+						},
+					},
+				},
+			},
+			rawConsumerDescription: &rawtopic.DescribeConsumerResult{
+				Self: rawscheme.Entry{
+					Name: "topic/consumer",
+				},
+				Consumer: rawtopic.Consumer{
+					Name:            "c1",
+					Important:       true,
+					SupportedCodecs: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+					ReadFrom: rawoptional.Time{
+						Value:    time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
+						HasValue: true,
+					},
+					Attributes: map[string]string{
+						"privet": "mir",
+						"hello":  "world",
+					},
+				},
+				Partitions: []rawtopic.DescribeConsumerResultPartitionInfo{
+					{
+						PartitionID: 42,
+						Active:      true,
+						ChildPartitionIDs: []int64{
+							1, 2, 3,
+						},
+						ParentPartitionIDs: []int64{
+							1, 2, 3,
+						},
+						PartitionStats: rawtopic.PartitionStats{
+							PartitionsOffset: rawtopiccommon.OffsetRange{
+								Start: 10,
+								End:   20,
+							},
+							StoreSizeBytes: 1024,
+							LastWriteTime: rawoptional.Time{
+								Value:    fourPM,
+								HasValue: true,
+							},
+							MaxWriteTimeLag: rawoptional.Duration{
+								Value:    hour,
+								HasValue: true,
+							},
+							BytesWritten: rawtopic.MultipleWindowsStat{
+								PerMinute: 1,
+								PerHour:   60,
+								PerDay:    1440,
+							},
+						},
+						PartitionConsumerStats: rawtopic.PartitionConsumerStats{
+							LastReadOffset:  20,
+							CommittedOffset: 10,
+							ReadSessionID:   "session1",
+							PartitionReadSessionCreateTime: rawoptional.Time{
+								Value:    fourPM,
+								HasValue: true,
+							},
+							LastReadTime: rawoptional.Time{
+								Value:    fourPM,
+								HasValue: true,
+							},
+							MaxReadTimeLag: rawoptional.Duration{
+								Value:    hour,
+								HasValue: true,
+							},
+							MaxWriteTimeLag: rawoptional.Duration{
+								Value:    hour,
+								HasValue: true,
+							},
+							BytesRead: rawtopic.MultipleWindowsStat{
+								PerMinute: 1,
+								PerHour:   60,
+								PerDay:    1440,
+							},
+							ReaderName: "reader1",
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, v := range testData {
+		v := v
+		t.Run(
+			v.testName, func(t *testing.T) {
+				d := TopicConsumerDescription{}
+				d.FromRaw(v.rawConsumerDescription)
+				if !reflect.DeepEqual(d.Consumer, v.expectedDescription.Consumer) {
+					t.Errorf("got\n%+v\nexpected\n%+v", d, v.expectedDescription)
+				}
+			},
+		)
 	}
 }
