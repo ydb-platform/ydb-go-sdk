@@ -24,20 +24,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run SLO
-        uses: ydb-platform/slo-tests@main
+        uses: ydb-platform/slo-tests@k8s-local
         continue-on-error: true
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KUBECONFIG_B64: ${{ secrets.SLO_KUBE_CONFIG }}
           AWS_CREDENTIALS_B64: ${{ secrets.SLO_AWS_CREDENTIALS }}
           AWS_CONFIG_B64: ${{ secrets.SLO_AWS_CONFIG }}
-          DOCKER_USERNAME: ${{ secrets.SLO_DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.SLO_DOCKER_PASSWORD }}
-          DOCKER_REPO: ${{ secrets.SLO_DOCKER_REPO }}
-          DOCKER_FOLDER: ${{ secrets.SLO_DOCKER_FOLDER }}
           s3_endpoint: ${{ secrets.SLO_S3_ENDPOINT }}
           s3_images_folder: ${{ vars.SLO_S3_IMAGES_FOLDER }}
-          grafana_domain: ${{ vars.SLO_GRAFANA_DOMAIN }}
           grafana_dashboard: ${{ vars.SLO_GRAFANA_DASHBOARD }}
           ydb_version: 'newest'
           timeBetweenPhases: 30
@@ -55,26 +49,26 @@ jobs:
           workload_build_context1: ../..
           workload_build_options1: -f Dockerfile --build-arg SRC_PATH=database/sql --build-arg JOB_NAME=workload-database-sql
 
-          language_id2: 'gorm'
+          language_id2: 'native-query'
           workload_path2: 'tests/slo'
-          language2: 'Go SDK gorm'
+          language2: 'Native ydb-go-sdk/v3 over query-service'
           workload_build_context2: ../..
-          workload_build_options2: -f Dockerfile --build-arg SRC_PATH=gorm --build-arg JOB_NAME=workload-gorm
+          workload_build_options2: -f Dockerfile --build-arg SRC_PATH=native/query --build-arg JOB_NAME=workload-native-query
 
-          language_id3: 'xorm'
+          language_id3: 'gorm'
           workload_path3: 'tests/slo'
-          language3: 'Go SDK xorm'
+          language3: 'Go SDK gorm'
           workload_build_context3: ../..
-          workload_build_options3: -f Dockerfile --build-arg SRC_PATH=xorm --build-arg JOB_NAME=workload-xorm
+          workload_build_options3: -f Dockerfile --build-arg SRC_PATH=gorm --build-arg JOB_NAME=workload-gorm
 
-          language_id4: 'native-query'
+          language_id4: 'xorm'
           workload_path4: 'tests/slo'
-          language4: 'Native ydb-go-sdk/v3 over query-service'
+          language4: 'Go SDK xorm'
           workload_build_context4: ../..
-          workload_build_options4: -f Dockerfile --build-arg SRC_PATH=native/query --build-arg JOB_NAME=workload-native-query
+          workload_build_options4: -f Dockerfile --build-arg SRC_PATH=xorm --build-arg JOB_NAME=workload-xorm
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: slo-logs
+          name: logs
           path: logs/
