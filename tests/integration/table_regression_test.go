@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -257,6 +258,111 @@ SELECT CAST($val AS UUID)
 		require.NoError(t, err)
 		require.Equal(t, expectedResultWithBug, resultFromDb.String())
 	})
+	t.Run("old-unmarshal-with-bytes", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
+		var resultFromDb customTestUnmarshalUUIDFromFixedBytes
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS Text;
+
+SELECT CAST($val AS UUID)
+`, table.NewQueryParameters(table.ValueParam("$val", types.TextValue(idString))))
+			if err != nil {
+				return err
+			}
+
+			res.NextResultSet(ctx)
+			res.NextRow()
+
+			err = res.Scan(&resultFromDb)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, expectedResultWithBug, resultFromDb.String())
+	})
+	t.Run("old-unmarshal-with-bytes-force-wrapper", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
+		var resultFromDb customTestUnmarshalUUIDWithForceWrapper
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS Text;
+
+SELECT CAST($val AS UUID)
+`, table.NewQueryParameters(table.ValueParam("$val", types.TextValue(idString))))
+			if err != nil {
+				return err
+			}
+
+			res.NextResultSet(ctx)
+			res.NextRow()
+
+			err = res.Scan(&resultFromDb)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, expectedResultWithBug, resultFromDb.String())
+	})
+	t.Run("old-unmarshal-with-bytes-typed", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			ctx   = scope.Ctx
+			db    = scope.Driver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		var resultFromDb customTestUnmarshalUUIDTyoed
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			res, err := tx.Execute(ctx, `
+DECLARE $val AS Text;
+
+SELECT CAST($val AS UUID)
+`, table.NewQueryParameters(table.ValueParam("$val", types.TextValue(idString))))
+			if err != nil {
+				return err
+			}
+
+			res.NextResultSet(ctx)
+			res.NextRow()
+
+			err = res.Scan(&resultFromDb)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, strings.ToUpper(idString), strings.ToUpper(resultFromDb.String()))
+	})
+
 	t.Run("old-receive-to-string", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
@@ -492,4 +598,42 @@ SELECT $val
 		require.NoError(t, err)
 		require.Equal(t, strings.ToUpper(idString), strings.ToUpper(resID.String()))
 	})
+}
+
+type customTestUnmarshalUUIDFromFixedBytes string
+
+func (c *customTestUnmarshalUUIDFromFixedBytes) UnmarshalYDB(raw scanner.RawValue) error {
+	val := raw.UUID()
+	id := uuid.UUID(val)
+	*c = customTestUnmarshalUUIDFromFixedBytes(id.String())
+	return raw.Err()
+}
+
+func (c *customTestUnmarshalUUIDFromFixedBytes) String() string {
+	return string(*c)
+}
+
+type customTestUnmarshalUUIDWithForceWrapper string
+
+func (c *customTestUnmarshalUUIDWithForceWrapper) UnmarshalYDB(raw scanner.RawValue) error {
+	val := raw.UUIDWithIssue1501()
+	id := uuid.UUID(val)
+	*c = customTestUnmarshalUUIDWithForceWrapper(id.String())
+	return raw.Err()
+}
+
+func (c *customTestUnmarshalUUIDWithForceWrapper) String() string {
+	return string(*c)
+}
+
+type customTestUnmarshalUUIDTyoed string
+
+func (c *customTestUnmarshalUUIDTyoed) UnmarshalYDB(raw scanner.RawValue) error {
+	val := raw.UUIDTyped()
+	*c = customTestUnmarshalUUIDTyoed(val.String())
+	return raw.Err()
+}
+
+func (c *customTestUnmarshalUUIDTyoed) String() string {
+	return string(*c)
 }
