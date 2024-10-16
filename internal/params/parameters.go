@@ -298,7 +298,7 @@ func (p *Parameter) YSON(v []byte) Builder {
 }
 
 func (p *Parameter) UUID(v [16]byte) Builder {
-	p.value = value.UUIDValue(v)
+	p.value = value.UUIDWithIssue1501Value(v)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent

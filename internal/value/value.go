@@ -2096,6 +2096,10 @@ func TextValue(v string) textValue {
 	return textValue(v)
 }
 
+type UUIDIssue1501FixedBytesWrapper [16]byte
+type UUIDIssue1501BytesSliceWrapper []byte
+type UUIDIssue1501StringWrapper string
+
 type uuidValue struct {
 	value               uuid.UUID
 	reproduceStorageBug bool
@@ -2108,12 +2112,24 @@ func (v *uuidValue) castTo(dst interface{}) error {
 		*vv = string(bytes[:])
 
 		return nil
+	case *UUIDIssue1501StringWrapper:
+		bytes := uuidReorderBytesForReadWithBug(v.value)
+		*vv = UUIDIssue1501StringWrapper(bytes[:])
+		return nil
 	case *[]byte:
 		bytes := uuidReorderBytesForReadWithBug(v.value)
 		*vv = bytes[:]
 
 		return nil
+	case *UUIDIssue1501BytesSliceWrapper:
+		bytes := uuidReorderBytesForReadWithBug(v.value)
+		*vv = bytes[:]
+		return nil
 	case *[16]byte:
+		*vv = uuidReorderBytesForReadWithBug(v.value)
+
+		return nil
+	case *UUIDIssue1501FixedBytesWrapper:
 		*vv = uuidReorderBytesForReadWithBug(v.value)
 
 		return nil
@@ -2191,7 +2207,7 @@ func UUIDTyped(val uuid.UUID) *uuidValue {
 	return &uuidValue{value: val}
 }
 
-func UUIDValue(v [16]byte) *uuidValue {
+func UUIDWithIssue1501Value(v [16]byte) *uuidValue {
 	return &uuidValue{value: v, reproduceStorageBug: true}
 }
 
@@ -2512,7 +2528,7 @@ func zeroPrimitiveValue(t types.Primitive) Value {
 		return BytesValue([]byte{})
 
 	case types.UUID:
-		return UUIDValue([16]byte{})
+		return UUIDWithIssue1501Value([16]byte{})
 
 	default:
 		panic(fmt.Sprintf("uncovered primitive type '%T'", t))

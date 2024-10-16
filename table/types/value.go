@@ -156,7 +156,15 @@ func JSONValue(v string) Value { return value.JSONValue(v) }
 // (functional will be implements with go1.18 type lists)
 func JSONValueFromBytes(v []byte) Value { return value.JSONValue(xstring.FromBytes(v)) }
 
-func UUIDValue(v [16]byte) Value { return value.UUIDValue(v) }
+func UUIDValue(v [16]byte) Value { return UUIDWithIssue1501Value(v) }
+
+type UUIDBytesWithIssue1501Type = value.UUIDIssue1501FixedBytesWrapper
+type UUIDBytesSliceWithIssue1501Type = value.UUIDIssue1501BytesSliceWrapper
+type UUIDStringWithIssue1501Type = value.UUIDIssue1501StringWrapper
+
+func UUIDWithIssue1501Value(v [16]byte) Value {
+	return value.UUIDWithIssue1501Value(v)
+}
 
 func UUIDTypedValue(v uuid.UUID) Value {
 	return value.UUIDTyped(v)

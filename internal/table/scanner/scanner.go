@@ -23,6 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type valueScanner struct {
@@ -355,20 +356,21 @@ func (s *valueScanner) setColumnIndexes(columns []string) {
 // Any returns any primitive or optional value.
 // Currently, it may return one of these types:
 //
-//	bool
-//	int8
-//	uint8
-//	int16
-//	uint16
-//	int32
-//	uint32
-//	int64
-//	uint64
-//	float32
-//	float64
-//	[]byte
-//	string
-//	[16]byte
+//		bool
+//		int8
+//		uint8
+//		int16
+//		uint16
+//		int32
+//		uint32
+//		int64
+//		uint64
+//		float32
+//		float64
+//		[]byte
+//		string
+//		[16]byte
+//	    uuid
 //
 //nolint:gocyclo,funlen
 func (s *valueScanner) any() interface{} {
@@ -412,7 +414,8 @@ func (s *valueScanner) any() interface{} {
 	case internalTypes.Bytes:
 		return s.bytes()
 	case internalTypes.UUID:
-		return s.uint128()
+		// replace to good uuid on migration
+		return s.uuidBytesWithIssue1501()
 	case internalTypes.Uint32:
 		return s.uint32()
 	case internalTypes.Date:
@@ -690,6 +693,13 @@ func (s *valueScanner) low128() (v uint64) {
 }
 
 func (s *valueScanner) uint128() (v [16]byte) {
+	if s.stack.current().t.GetTypeId() == Ydb.Type_UUID {
+		return s.uuidBytesWithIssue1501()
+	}
+	return s.uint128()
+}
+
+func (s *valueScanner) uuidBytesWithIssue1501() (v types.UUIDBytesWithIssue1501Type) {
 	c := s.stack.current()
 	if c.isEmpty() {
 		_ = s.errorf(0, "not implemented convert to [16]byte")
@@ -764,8 +774,7 @@ func (s *valueScanner) setTime(dst *time.Time) {
 func (s *valueScanner) setString(dst *string) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
-		src := s.uint128()
-		*dst = xstring.FromBytes(src[:])
+		s.setUUIDStringWith1501Issue((*types.UUIDStringWithIssue1501Type)(dst))
 	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = s.text()
 	case Ydb.Type_STRING:
@@ -775,17 +784,36 @@ func (s *valueScanner) setString(dst *string) {
 	}
 }
 
+func (s *valueScanner) setUUIDStringWith1501Issue(dst *types.UUIDStringWithIssue1501Type) {
+	switch t := s.stack.current().t.GetTypeId(); t {
+	case Ydb.Type_UUID:
+		src := s.uuidBytesWithIssue1501()
+		*dst = types.UUIDStringWithIssue1501Type(xstring.FromBytes(src[:]))
+	default:
+		_ = s.errorf(0, "scan row failed: incorrect source types %s", t)
+	}
+}
+
 func (s *valueScanner) setByte(dst *[]byte) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
-		src := s.uint128()
-		*dst = src[:]
+		s.setUUIDWithIssue1501Byte((*value.UUIDIssue1501BytesSliceWrapper)(dst))
 	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = xstring.ToBytes(s.text())
 	case Ydb.Type_STRING:
 		*dst = s.bytes()
 	default:
 		_ = s.errorf(0, "scan row failed: incorrect source types %s", t)
+	}
+}
+
+func (s *valueScanner) setUUIDWithIssue1501Byte(dst *value.UUIDIssue1501BytesSliceWrapper) {
+	switch t := s.stack.current().t.GetTypeId(); t {
+	case Ydb.Type_UUID:
+		src := s.uuidBytesWithIssue1501()
+		*dst = src[:]
+	default:
+		_ = s.errorf(0, "scan row failed: incorrect source type %s", t)
 	}
 }
 
@@ -865,10 +893,16 @@ func (s *valueScanner) scanRequired(v interface{}) {
 		*v = value.IntervalToDuration(s.int64())
 	case *string:
 		s.setString(v)
+	case *types.UUIDStringWithIssue1501Type:
+		s.setUUIDStringWith1501Issue(v)
 	case *[]byte:
 		s.setByte(v)
+	case *types.UUIDBytesSliceWithIssue1501Type:
+		s.setUUIDWithIssue1501Byte(v)
 	case *[16]byte:
 		*v = s.uint128()
+	case *types.UUIDBytesWithIssue1501Type:
+		*v = s.uuidBytesWithIssue1501()
 	case *uuid.UUID:
 		*v = s.uuid()
 	case *interface{}:

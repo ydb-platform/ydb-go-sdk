@@ -368,7 +368,7 @@ func (vti *variantTupleItem) YSON(v []byte) *variantTupleBuilder {
 }
 
 func (vti *variantTupleItem) UUID(v [16]byte) *variantTupleBuilder {
-	vti.tuple.value = value.UUIDValue(v)
+	vti.tuple.value = value.UUIDWithIssue1501Value(v)
 
 	return &variantTupleBuilder{
 		tuple: vti.tuple,

@@ -286,7 +286,7 @@ func NullableUUIDValue(v *[16]byte) Value {
 		return NullValue(types.UUID)
 	}
 
-	return OptionalValue(UUIDValue(*v))
+	return OptionalValue(UUIDWithIssue1501Value(*v))
 }
 
 func NullableJSONDocumentValue(v *string) Value {
