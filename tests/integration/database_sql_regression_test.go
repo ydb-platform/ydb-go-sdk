@@ -212,7 +212,7 @@ SELECT CAST($val AS Utf8)`, sql.Named("val", id),
 DECLARE $val AS UUID;
 
 SELECT CAST($val AS Utf8)`,
-			sql.Named("val", types.UUIDBytesWithIssue1501Type(id)),
+			sql.Named("val", types.NewUUIDBytesWithIssue1501(id)),
 		)
 
 		require.NoError(t, row.Err())
@@ -231,7 +231,6 @@ SELECT CAST($val AS Utf8)`,
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
 		row := db.QueryRow(`
 DECLARE $val AS Text;
 
@@ -244,10 +243,7 @@ SELECT CAST($val AS UUID)`,
 		var res [16]byte
 
 		err := row.Scan(&res)
-		require.NoError(t, err)
-
-		resUUID := uuid.UUID(res)
-		require.Equal(t, expectedResultWithBug, resUUID.String())
+		require.Error(t, err)
 	})
 	t.Run("old-receive-to-bytes-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -272,7 +268,7 @@ SELECT CAST($val AS UUID)`,
 		err := row.Scan(&res)
 		require.NoError(t, err)
 
-		resUUID := uuid.UUID(res)
+		resUUID := uuid.UUID(res.AsBytesArray())
 		require.Equal(t, expectedResultWithBug, resUUID.String())
 	})
 
@@ -319,11 +315,8 @@ SELECT $val`,
 
 		var resBytes [16]byte
 		err := row.Scan(&resBytes)
-		require.NoError(t, err)
+		require.Error(t, err)
 
-		resUUID := uuid.UUID(resBytes)
-
-		require.Equal(t, id, resUUID)
 	})
 	t.Run("old-send-receive-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -347,7 +340,7 @@ SELECT $val`,
 		err := row.Scan(&resBytes)
 		require.NoError(t, err)
 
-		resUUID := uuid.UUID(resBytes)
+		resUUID := uuid.UUID(resBytes.AsBytesArray())
 
 		require.Equal(t, id, resUUID)
 	})

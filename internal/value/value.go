@@ -2096,18 +2096,31 @@ func TextValue(v string) textValue {
 	return textValue(v)
 }
 
-type UUIDIssue1501FixedBytesWrapper [16]byte
+type UUIDIssue1501FixedBytesWrapper struct {
+	val [16]byte
+}
+
+func NewUUIDIssue1501FixedBytesWrapper(val [16]byte) UUIDIssue1501FixedBytesWrapper {
+	return UUIDIssue1501FixedBytesWrapper{val: val}
+}
 
 // PublicRevertReorderForIssue1501 needs for fix uuid when it was good stored in DB,
 // but read as reordered. It may happen within migration period.
 func (w UUIDIssue1501FixedBytesWrapper) PublicRevertReorderForIssue1501() uuid.UUID {
-	return uuid.UUID(uuidFixBytesOrder(w))
+	return uuid.UUID(uuidFixBytesOrder(w.val))
 }
 
-type (
-	UUIDIssue1501BytesSliceWrapper []byte
-	UUIDIssue1501StringWrapper     string
-)
+func (w UUIDIssue1501FixedBytesWrapper) AsBytesArray() [16]byte {
+	return w.val
+}
+
+func (w UUIDIssue1501FixedBytesWrapper) AsBytesSlice() []byte {
+	return w.val[:]
+}
+
+func (w UUIDIssue1501FixedBytesWrapper) AsBrokenString() string {
+	return string(w.val[:])
+}
 
 type uuidValue struct {
 	value               uuid.UUID
@@ -2121,17 +2134,7 @@ func (v *uuidValue) castTo(dst interface{}) error {
 		*vv = string(bytes[:])
 
 		return nil
-	case *UUIDIssue1501StringWrapper:
-		bytes := uuidReorderBytesForReadWithBug(v.value)
-		*vv = UUIDIssue1501StringWrapper(bytes[:])
-
-		return nil
 	case *[]byte:
-		bytes := uuidReorderBytesForReadWithBug(v.value)
-		*vv = bytes[:]
-
-		return nil
-	case *UUIDIssue1501BytesSliceWrapper:
 		bytes := uuidReorderBytesForReadWithBug(v.value)
 		*vv = bytes[:]
 
@@ -2141,7 +2144,7 @@ func (v *uuidValue) castTo(dst interface{}) error {
 
 		return nil
 	case *UUIDIssue1501FixedBytesWrapper:
-		*vv = uuidReorderBytesForReadWithBug(v.value)
+		*vv = NewUUIDIssue1501FixedBytesWrapper(uuidReorderBytesForReadWithBug(v.value))
 
 		return nil
 	case *uuid.UUID:

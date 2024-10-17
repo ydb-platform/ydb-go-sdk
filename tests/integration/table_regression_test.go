@@ -244,12 +244,12 @@ SELECT CAST($val AS UUID)
 			res.NextRow()
 
 			var resBytes [16]byte
-			var bytesWrapper types.UUIDBytesWithIssue1501Type
+			var bytesWrapper *types.UUIDBytesWithIssue1501Type
 			err = res.Scan(&bytesWrapper)
 			if err != nil {
 				return err
 			}
-			resBytes = bytesWrapper
+			resBytes = bytesWrapper.AsBytesArray()
 
 			resultFromDb = resBytes
 			return nil
@@ -423,13 +423,13 @@ SELECT CAST($val AS UUID)
 			res.NextResultSet(ctx)
 			res.NextRow()
 
-			var wrapper types.UUIDStringWithIssue1501Type
+			var wrapper types.UUIDBytesWithIssue1501Type
 			err = res.ScanWithDefaults(&wrapper)
 			if err != nil {
 				return err
 			}
 
-			resultFromDb = string(wrapper)
+			resultFromDb = wrapper.AsBrokenString()
 
 			return nil
 		})
@@ -503,7 +503,7 @@ SELECT $val
 			if err != nil {
 				return err
 			}
-			resBytes = resWrapper
+			resBytes = resWrapper.AsBytesArray()
 
 			idFromDB = resBytes
 			return nil
