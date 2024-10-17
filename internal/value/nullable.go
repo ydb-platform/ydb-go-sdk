@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
@@ -287,6 +289,22 @@ func NullableUUIDValue(v *[16]byte) Value {
 	}
 
 	return OptionalValue(UUIDWithIssue1501Value(*v))
+}
+
+func NullableUUIDValueWithIssue1501(v *[16]byte) Value {
+	if v == nil {
+		return NullValue(types.UUID)
+	}
+
+	return OptionalValue(UUIDWithIssue1501Value(*v))
+}
+
+func NullableUUIDTypedValue(v *uuid.UUID) Value {
+	if v == nil {
+		return NullValue(types.UUID)
+	}
+
+	return OptionalValue(UUIDTyped(*v))
 }
 
 func NullableJSONDocumentValue(v *string) Value {

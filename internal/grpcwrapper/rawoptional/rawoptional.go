@@ -35,6 +35,26 @@ func (v *Duration) ToProto() *durationpb.Duration {
 	return nil
 }
 
+func (v *Duration) MustFromProto(proto *durationpb.Duration) {
+	if proto == nil {
+		v.Value = time.Duration(0)
+		v.HasValue = false
+
+		return
+	}
+
+	v.HasValue = true
+	v.Value = proto.AsDuration()
+}
+
+func (v *Duration) ToDuration() *time.Duration {
+	if v.HasValue {
+		return nil
+	}
+
+	return &v.Value
+}
+
 type Int64 struct {
 	Value    int64
 	HasValue bool
@@ -73,4 +93,12 @@ func (v *Time) MustFromProto(proto *timestamppb.Timestamp) {
 
 	v.HasValue = true
 	v.Value = proto.AsTime()
+}
+
+func (v *Time) ToTime() *time.Time {
+	if v.HasValue {
+		return nil
+	}
+
+	return &v.Value
 }

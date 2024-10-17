@@ -46,9 +46,27 @@ func (c *Client) CreateTopic(
 func (c *Client) DescribeTopic(ctx context.Context, req DescribeTopicRequest) (res DescribeTopicResult, err error) {
 	resp, err := c.service.DescribeTopic(ctx, req.ToProto())
 	if err != nil {
-		return DescribeTopicResult{}, xerrors.WithStackTrace(xerrors.Wrap(
-			fmt.Errorf("ydb: describe topic grpc failed: %w", err),
-		))
+		return DescribeTopicResult{}, xerrors.WithStackTrace(
+			xerrors.Wrap(
+				fmt.Errorf("ydb: describe topic grpc failed: %w", err),
+			),
+		)
+	}
+	err = res.FromProto(resp)
+
+	return res, err
+}
+
+func (c *Client) DescribeConsumer(ctx context.Context, req DescribeConsumerRequest) (
+	res DescribeConsumerResult, err error,
+) {
+	resp, err := c.service.DescribeConsumer(ctx, req.ToProto())
+	if err != nil {
+		return DescribeConsumerResult{}, xerrors.WithStackTrace(
+			xerrors.Wrap(
+				fmt.Errorf("ydb: describe topic consumer grpc failed: %w", err),
+			),
+		)
 	}
 	err = res.FromProto(resp)
 

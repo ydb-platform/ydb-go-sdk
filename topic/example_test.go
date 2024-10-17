@@ -84,11 +84,36 @@ func Example_describeTopic() {
 
 	descResult, err := db.Topic().Describe(ctx, "topic-path")
 	if err != nil {
-		log.Printf("failed drop topic: %v", err)
+		log.Printf("failed describe topic: %v", err)
 
 		return
 	}
 	fmt.Printf("describe: %#v\n", descResult)
+}
+
+func Example_desrcibeTopicConsumer() {
+	ctx := context.TODO()
+	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+	if connectionString == "" {
+		connectionString = "grpc://localhost:2136/local"
+	}
+	db, err := ydb.Open(
+		ctx, connectionString,
+	)
+	if err != nil {
+		log.Printf("failed connect: %v", err)
+
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+
+	descResult, err := db.Topic().DescribeTopicConsumer(ctx, "topic-path", "new-consumer")
+	if err != nil {
+		log.Printf("failed describe topic consumer: %v", err)
+
+		return
+	}
+	fmt.Printf("describe consumer: %#v\n", descResult)
 }
 
 func Example_dropTopic() {
