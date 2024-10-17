@@ -21,7 +21,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -391,36 +390,37 @@ SELECT CAST($val AS UUID)`,
 
 		require.NoError(t, row.Err())
 
-		var res types.UUIDBytesWithIssue1501Type
+		var resFromDB types.UUIDBytesWithIssue1501Type
 
-		err := row.Scan(&res)
+		err := row.Scan(&resFromDB)
 		require.NoError(t, err)
 
-		resString := strings.ToUpper(res.PublicRevertReorderForIssue1501().String())
+		resUUID := resFromDB.PublicRevertReorderForIssue1501()
+
+		resString := strings.ToUpper(resUUID.String())
 		require.Equal(t, idString, resString)
 	})
 	t.Run("good-send-receive", func(t *testing.T) {
 		var (
 			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
+			db    = scope.SQLDriver()
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := uuid.MustParse(idString)
-		row, err := db.Query().QueryRow(ctx, `
-DECLARE $val AS UUID;
+		row := db.QueryRow(`
+DECLARE $val AS Utf8;
 
 SELECT $val`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUIDTyped(id).Build()),
+			sql.Named("val", id),
 		)
 
-		require.NoError(t, err)
+		require.NoError(t, row.Err())
 
 		var res uuid.UUID
-		err = row.Scan(&res)
+		err := row.Scan(&res)
 		require.NoError(t, err)
+
 		require.Equal(t, id.String(), res.String())
 	})
 }
