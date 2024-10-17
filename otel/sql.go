@@ -3,8 +3,6 @@ package otel
 import (
 	"context"
 
-	otelTrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -206,15 +204,16 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 	}
 	t.OnTxExec = func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
 		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
-			if !isStmtCall(*info.Context) {
-				*info.Context = otelTrace.ContextWithSpan(*info.Context, otelTrace.SpanFromContext(info.TxContext))
-			}
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
 				kv.String("transaction_id", safeID(info.Tx)),
 			)
+
+			if !isStmtCall(*info.Context) {
+				start.Relation(cfg.SpanFromContext(info.TxContext))
+			}
 
 			return func(info trace.DatabaseSQLTxExecDoneInfo) {
 				finish(
@@ -228,15 +227,16 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 	}
 	t.OnTxQuery = func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
 		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
-			if !isStmtCall(*info.Context) {
-				*info.Context = otelTrace.ContextWithSpan(*info.Context, otelTrace.SpanFromContext(info.TxContext))
-			}
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
 				kv.String("transaction_id", safeID(info.Tx)),
 			)
+
+			if !isStmtCall(*info.Context) {
+				start.Relation(cfg.SpanFromContext(info.TxContext))
+			}
 
 			return func(info trace.DatabaseSQLTxQueryDoneInfo) {
 				finish(
@@ -250,7 +250,6 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 	}
 	t.OnTxPrepare = func(info trace.DatabaseSQLTxPrepareStartInfo) func(trace.DatabaseSQLTxPrepareDoneInfo) {
 		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
-			*info.Context = otelTrace.ContextWithSpan(*info.Context, otelTrace.SpanFromContext(info.TxContext))
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -270,14 +269,15 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 	}
 	t.OnStmtExec = func(info trace.DatabaseSQLStmtExecStartInfo) func(trace.DatabaseSQLStmtExecDoneInfo) {
 		if cfg.Details()&trace.DatabaseSQLStmtEvents != 0 {
-			*info.Context = markStmtCall(
-				otelTrace.ContextWithSpan(*info.Context, otelTrace.SpanFromContext(info.StmtContext)),
-			)
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
 			)
+
+			start.Relation(cfg.SpanFromContext(info.StmtContext))
+
+			*info.Context = markStmtCall(*info.Context)
 
 			return func(info trace.DatabaseSQLStmtExecDoneInfo) {
 				finish(
@@ -291,14 +291,15 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 	}
 	t.OnStmtQuery = func(info trace.DatabaseSQLStmtQueryStartInfo) func(trace.DatabaseSQLStmtQueryDoneInfo) {
 		if cfg.Details()&trace.DatabaseSQLStmtEvents != 0 {
-			*info.Context = markStmtCall(
-				otelTrace.ContextWithSpan(*info.Context, otelTrace.SpanFromContext(info.StmtContext)),
-			)
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
 			)
+
+			start.Relation(cfg.SpanFromContext(info.StmtContext))
+
+			*info.Context = markStmtCall(*info.Context)
 
 			return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 				finish(
