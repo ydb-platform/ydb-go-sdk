@@ -297,6 +297,11 @@ func (p *Parameter) YSON(v []byte) Builder {
 	return p.parent
 }
 
+// removed for https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+//func (p *Parameter) UUID(v [16]byte) Builder {
+//	return p.UUIDWithIssue1501Value(v)
+//}
+
 // UUIDWithIssue1501Value is field serializer for save data with format bug.
 // For any new code use UUIDTyped
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1501
