@@ -218,6 +218,8 @@ SELECT CAST($val AS Utf8)`,
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		row, err := db.Query().QueryRow(ctx, `
+DECLARE $val AS Utf8;
+
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
