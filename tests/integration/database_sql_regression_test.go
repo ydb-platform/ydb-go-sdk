@@ -182,7 +182,6 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "2d9e498b-b746-9cfb-084d-de4e1cb4736e"
 		id := [16]byte(uuid.MustParse(idString))
 		row := db.QueryRow(`
 DECLARE $val AS UUID;
@@ -190,13 +189,7 @@ DECLARE $val AS UUID;
 SELECT CAST($val AS Utf8)`, sql.Named("val", id),
 		)
 
-		require.NoError(t, row.Err())
-
-		var res string
-
-		err := row.Scan(&res)
-		require.NoError(t, err)
-		require.Equal(t, expectedResultWithBug, res)
+		require.ErrorIs(t, row.Err(), types.ErrIssue1501BadUUID)
 	})
 	t.Run("old-send-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -231,7 +224,6 @@ SELECT CAST($val AS Utf8)`,
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
 		row := db.QueryRow(`
 DECLARE $val AS Text;
 
@@ -244,10 +236,7 @@ SELECT CAST($val AS UUID)`,
 		var res [16]byte
 
 		err := row.Scan(&res)
-		require.NoError(t, err)
-
-		resUUID := uuid.UUID(res)
-		require.Equal(t, expectedResultWithBug, resUUID.String())
+		require.ErrorIs(t, err, types.ErrIssue1501BadUUID)
 	})
 	t.Run("old-receive-to-bytes-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -315,15 +304,7 @@ SELECT $val`,
 			sql.Named("val", idParam),
 		)
 
-		require.NoError(t, row.Err())
-
-		var resBytes [16]byte
-		err := row.Scan(&resBytes)
-		require.NoError(t, err)
-
-		resUUID := uuid.UUID(resBytes)
-
-		require.Equal(t, id, resUUID)
+		require.ErrorIs(t, row.Err(), types.ErrIssue1501BadUUID)
 	})
 	t.Run("old-send-receive-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version

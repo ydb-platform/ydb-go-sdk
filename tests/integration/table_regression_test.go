@@ -160,8 +160,6 @@ SELECT CAST($val AS Utf8)
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
-		var resultFromDb uuid.UUID
 		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			res, err := tx.Execute(ctx, `
 DECLARE $val AS Text;
@@ -181,12 +179,10 @@ SELECT CAST($val AS UUID)
 				return err
 			}
 
-			resultFromDb = resBytes
 			return nil
 		})
 
-		require.NoError(t, err)
-		require.Equal(t, expectedResultWithBug, resultFromDb.String())
+		require.ErrorIs(t, err, types.ErrIssue1501BadUUID)
 	})
 	t.Run("old-receive-to-bytes-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
