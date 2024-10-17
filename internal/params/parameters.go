@@ -297,7 +297,18 @@ func (p *Parameter) YSON(v []byte) Builder {
 	return p.parent
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use UUIDTyped (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (p *Parameter) UUID(v [16]byte) Builder {
+	return p.UUIDWithIssue1501Value(v)
+}
+
+// UUIDWithIssue1501Value is field serializer for save data with format bug.
+// For any new code use UUIDTyped
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
 	p.value = value.UUIDWithIssue1501Value(v)
 	p.parent.params = append(p.parent.params, p)
 
