@@ -1,4 +1,5 @@
 * Added `db.Topic().DescribeTopicConsumer()` method for displaying consumer information
+* Marked as deprecated options `ydb.WithDatabase(database)` and `ydb.WithEndpoint(endpoint)`
 
 ## v3.84.1
 * Added session info into `trace.TableSessionBulkUpsertStartInfo`
