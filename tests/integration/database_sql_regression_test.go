@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -300,34 +299,6 @@ SELECT CAST($val AS UUID)`,
 		err := row.Scan(&res)
 		require.Error(t, err)
 	})
-	t.Run("old-receive-to-string-with-force-wrapper", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := []byte{0x8b, 0x49, 0x9e, 0x2d, 0x46, 0xb7, 0xfb, 0x9c, 0x4d, 0x8, 0x4e, 0xde, 0x6e, 0x73, 0xb4, 0x1c}
-		row, err := db.Query().QueryRow(ctx, `
-DECLARE $val AS Text;
-
-SELECT CAST($val AS UUID)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
-		)
-
-		require.NoError(t, err)
-
-		var res types.UUIDStringWithIssue1501Type
-
-		err = row.Scan(&res)
-		require.NoError(t, err)
-
-		require.Equal(t, expectedResultWithBug, []byte(res))
-	})
 	t.Run("old-send-receive", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
@@ -359,25 +330,22 @@ SELECT $val`,
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
 			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
+			db    = scope.SQLDriver()
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := uuid.MustParse(idString)
-		row, err := db.Query().QueryRow(ctx, `
+		row := db.QueryRow(`
 DECLARE $val AS UUID;
 
 SELECT $val`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUIDWithIssue1501Value(id).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
+			sql.Named("val", types.UUIDWithIssue1501Value(id)),
 		)
 
-		require.NoError(t, err)
+		require.NoError(t, row.Err())
 
 		var resBytes types.UUIDBytesWithIssue1501Type
-		err = row.Scan(&resBytes)
+		err := row.Scan(&resBytes)
 		require.NoError(t, err)
 
 		resUUID := uuid.UUID(resBytes)
@@ -387,24 +355,22 @@ SELECT $val`,
 	t.Run("good-send", func(t *testing.T) {
 		var (
 			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
+			db    = scope.SQLDriver()
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := uuid.MustParse(idString)
-		row, err := db.Query().QueryRow(ctx, `
-DECLARE $val AS UUID;
+		row := db.QueryRow(`
+DECLARE $val AS Utf8;
 
-SELECT CAST($val AS Utf8)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUIDTyped(id).Build()),
+SELECT $val`,
+			sql.Named("val", id), // send as string because uuid implements Value() (driver.Value, error)
 		)
 
-		require.NoError(t, err)
+		require.NoError(t, row.Err())
 
 		var res string
-		err = row.Scan(&res)
+		err := row.Scan(&res)
 		require.NoError(t, err)
 		require.Equal(t, id.String(), res)
 	})
@@ -412,22 +378,22 @@ SELECT CAST($val AS Utf8)`,
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
 			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
+			db    = scope.SQLDriver()
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		row, err := db.Query().QueryRow(ctx, `
+		row := db.QueryRow(`
+DECLARE $val AS Utf8;
+
 SELECT CAST($val AS UUID)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
+			sql.Named("val", idString),
 		)
 
-		require.NoError(t, err)
+		require.NoError(t, row.Err())
 
 		var res uuid.UUID
 
-		err = row.Scan(&res)
+		err := row.Scan(&res)
 		require.NoError(t, err)
 
 		resString := strings.ToUpper(res.String())
