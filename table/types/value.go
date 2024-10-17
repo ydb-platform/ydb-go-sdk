@@ -455,6 +455,14 @@ func NullableUUIDValue(v *[16]byte) Value {
 	return value.NullableUUIDValue(v)
 }
 
+func NullableUUIDValueWithIssue1501(v *[16]byte) Value {
+	return value.NullableUUIDValueWithIssue1501(v)
+}
+
+func NullableUUIDTypedValue(v *uuid.UUID) Value {
+	return value.NullableUUIDTypedValue(v)
+}
+
 func NullableJSONDocumentValue(v *string) Value {
 	return value.NullableJSONDocumentValue(v)
 }
