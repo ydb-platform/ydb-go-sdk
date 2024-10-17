@@ -4,6 +4,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -36,7 +38,14 @@ type RawValue interface {
 	UTF8() (v string)
 	YSON() (v []byte)
 	JSON() (v []byte)
+
+	// UUID has data corruption bug and will be removed in next version.
+	//
+	// Deprecated: Use UUIDTyped (prefer) or UUIDWithIssue1501 (for save old behavior) instead.
+	// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 	UUID() (v [16]byte)
+	UUIDTyped() (v uuid.UUID)
+	UUIDWithIssue1501() (v [16]byte)
 	JSONDocument() (v []byte)
 	DyNumber() (v string)
 	Value() value.Value
@@ -58,6 +67,7 @@ type RawValue interface {
 	//   []byte
 	//   string
 	//   [16]byte
+	//   uuid
 	//
 	Any() interface{}
 

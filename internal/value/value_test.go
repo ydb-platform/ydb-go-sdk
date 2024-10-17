@@ -47,7 +47,7 @@ func BenchmarkMemory(b *testing.B) {
 		TzDatetimeValue("1"),
 		TzTimestampValue("1"),
 		TextValue("1"),
-		UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
+		UUIDWithIssue1501Value([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
 		YSONValue([]byte("{}")),
 		ListValue(
 			Int64Value(1),
@@ -126,7 +126,7 @@ func TestToYDBFromYDB(t *testing.T) {
 		TzDatetimeValue("1"),
 		TzTimestampValue("1"),
 		TextValue("1"),
-		UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
+		UUIDWithIssue1501Value([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
 		YSONValue([]byte("{}")),
 		TupleValue(
 			Int64Value(1),
@@ -895,7 +895,7 @@ func TestNullable(t *testing.T) {
 			name: "uuid",
 			t:    types.UUID,
 			v:    func(v [16]byte) *[16]byte { return &v }([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
-			exp:  OptionalValue(UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})),
+			exp:  OptionalValue(UUIDWithIssue1501Value([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})),
 		},
 		{
 			name: "jsonDocument",

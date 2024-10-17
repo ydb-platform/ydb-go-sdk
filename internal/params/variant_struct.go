@@ -445,7 +445,7 @@ func (vsi *variantStructItem) YSON(v []byte) *variantStructBuilder {
 }
 
 func (vsi *variantStructItem) UUID(v [16]byte) *variantStructBuilder {
-	vsi.parent.value = value.UUIDValue(v)
+	vsi.parent.value = value.UUIDWithIssue1501Value(v)
 
 	return &variantStructBuilder{
 		parent: vsi.parent,

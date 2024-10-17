@@ -167,7 +167,7 @@ func (s *setItem) YSON(v []byte) *set {
 }
 
 func (s *setItem) UUID(v [16]byte) *set {
-	s.parent.values = append(s.parent.values, value.UUIDValue(v))
+	s.parent.values = append(s.parent.values, value.UUIDWithIssue1501Value(v))
 
 	return s.parent
 }

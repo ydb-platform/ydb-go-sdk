@@ -202,7 +202,7 @@ func (d *dictPair) YSON(v []byte) *dictValue {
 }
 
 func (d *dictPair) UUID(v [16]byte) *dictValue {
-	d.keyValue = value.UUIDValue(v)
+	d.keyValue = value.UUIDWithIssue1501Value(v)
 
 	return &dictValue{
 		pair: d,
@@ -425,7 +425,7 @@ func (d *dictValue) YSON(v []byte) *dict {
 func (d *dictValue) UUID(v [16]byte) *dict {
 	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
 		K: d.pair.keyValue,
-		V: value.UUIDValue(v),
+		V: value.UUIDWithIssue1501Value(v),
 	})
 
 	return d.pair.parent

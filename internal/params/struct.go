@@ -234,7 +234,7 @@ func (s *structValue) YSON(v []byte) *structure {
 func (s *structValue) UUID(v [16]byte) *structure {
 	s.parent.values = append(s.parent.values, value.StructValueField{
 		Name: s.name,
-		V:    value.UUIDValue(v),
+		V:    value.UUIDWithIssue1501Value(v),
 	})
 
 	return s.parent

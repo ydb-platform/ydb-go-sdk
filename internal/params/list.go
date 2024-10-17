@@ -166,7 +166,7 @@ func (l *listItem) YSON(v []byte) *list {
 }
 
 func (l *listItem) UUID(v [16]byte) *list {
-	l.parent.values = append(l.parent.values, value.UUIDValue(v))
+	l.parent.values = append(l.parent.values, value.UUIDWithIssue1501Value(v))
 
 	return l.parent
 }
