@@ -2097,6 +2097,13 @@ func TextValue(v string) textValue {
 }
 
 type UUIDIssue1501FixedBytesWrapper [16]byte
+
+// PublicRevertReorderForIssue1501 needs for fix uuid when it was good stored in DB,
+// but read as reordered. It may happen within migration period.
+func (w UUIDIssue1501FixedBytesWrapper) PublicRevertReorderForIssue1501() uuid.UUID {
+	return uuid.UUID(uuidFixBytesOrder(w))
+}
+
 type UUIDIssue1501BytesSliceWrapper []byte
 type UUIDIssue1501StringWrapper string
 
@@ -2274,6 +2281,28 @@ func uuidReorderBytesForReadWithBug(val [16]byte) [16]byte {
 	res[13] = val[1]
 	res[14] = val[2]
 	res[15] = val[3]
+	return res
+}
+
+// uuidFixBytesOrder is reverse for uuidReorderBytesForReadWithBug
+func uuidFixBytesOrder(val [16]byte) [16]byte {
+	var res [16]byte
+	res[0] = val[12]
+	res[1] = val[13]
+	res[2] = val[14]
+	res[3] = val[15]
+	res[4] = val[10]
+	res[5] = val[11]
+	res[6] = val[8]
+	res[7] = val[9]
+	res[8] = val[7]
+	res[9] = val[6]
+	res[10] = val[5]
+	res[11] = val[4]
+	res[12] = val[3]
+	res[13] = val[2]
+	res[14] = val[1]
+	res[15] = val[0]
 	return res
 }
 

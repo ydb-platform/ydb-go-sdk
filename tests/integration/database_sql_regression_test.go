@@ -391,12 +391,12 @@ SELECT CAST($val AS UUID)`,
 
 		require.NoError(t, row.Err())
 
-		var res uuid.UUID
+		var res types.UUIDBytesWithIssue1501Type
 
 		err := row.Scan(&res)
 		require.NoError(t, err)
 
-		resString := strings.ToUpper(res.String())
+		resString := strings.ToUpper(res.PublicRevertReorderForIssue1501().String())
 		require.Equal(t, idString, resString)
 	})
 	t.Run("good-send-receive", func(t *testing.T) {
