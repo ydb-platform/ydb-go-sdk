@@ -1,4 +1,7 @@
+* Add workaround for bug in uuid send/receive from server. It is migration version. All native code and most database sql code worked with uuid continue to work.
+
 * Added `db.Topic().DescribeTopicConsumer()` method for displaying consumer information
+* Marked as deprecated options `ydb.WithDatabase(database)` and `ydb.WithEndpoint(endpoint)`
 
 ## v3.84.1
 * Added session info into `trace.TableSessionBulkUpsertStartInfo`
