@@ -297,13 +297,14 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			src: uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-			dst: value.TextValue("01020304-0506-0708-090a-0b0c0d0e0f10"), //nolint:staticcheck
+			dst: value.TextValue("01020304-0506-0708-090a-0b0c0d0e0f10"),
 			err: nil,
 		},
 		{
 			src: func(v uuid.UUID) *uuid.UUID { return &v }(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
 			// uuid implemented driver.Valuer and doesn't set optional wrapper
-			dst: types.TextValue("01020304-0506-0708-090a-0b0c0d0e0f10"), //nolint:staticcheck,lll
+			dst: types.TextValue("01020304-0506-0708-090a-0b0c0d0e0f10"),
+
 			err: nil,
 		},
 		// https://github.com/ydb-platform/ydb-go-sdk/issues/1515
