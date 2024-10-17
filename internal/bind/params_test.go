@@ -279,21 +279,20 @@ func TestToValue(t *testing.T) {
 			dst: types.ListValue(types.TextValue("test")),
 			err: nil,
 		},
-
 		{
 			src: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-			dst: types.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}), //nolint:staticcheck
-			err: nil,
+			dst: nil,
+			err: types.ErrIssue1501BadUUID,
 		},
 		{
 			src: func() *[16]byte { return nil }(),
-			dst: types.NullValue(types.TypeUUID),
-			err: nil,
+			dst: nil,
+			err: types.ErrIssue1501BadUUID,
 		},
 		{
 			src: func(v [16]byte) *[16]byte { return &v }([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
-			dst: types.OptionalValue(types.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})), //nolint:staticcheck,lll
-			err: nil,
+			dst: nil,
+			err: types.ErrIssue1501BadUUID,
 		},
 		{
 			src: uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
