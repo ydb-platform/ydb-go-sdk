@@ -694,7 +694,7 @@ func (s *valueScanner) low128() (v uint64) {
 
 func (s *valueScanner) uint128() (v [16]byte) {
 	if s.stack.current().t.GetTypeId() == Ydb.Type_UUID {
-		return s.uuidBytesWithIssue1501()
+		_ = s.errorf(0, "ydb: failed to scan uuid: %w", value.ErrIssue1501BadUUID)
 	}
 	return s.uint128()
 }
@@ -775,6 +775,7 @@ func (s *valueScanner) setString(dst *string) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		s.setUUIDStringWith1501Issue((*types.UUIDStringWithIssue1501Type)(dst))
+		_ = s.errorf(0, "ydb: failed scan uuid: %w", value.ErrIssue1501BadUUID)
 	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = s.text()
 	case Ydb.Type_STRING:
@@ -797,7 +798,7 @@ func (s *valueScanner) setUUIDStringWith1501Issue(dst *types.UUIDStringWithIssue
 func (s *valueScanner) setByte(dst *[]byte) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
-		s.setUUIDWithIssue1501Byte((*value.UUIDIssue1501BytesSliceWrapper)(dst))
+		_ = s.errorf(0, "ydb: failed to scan uuid: %w", value.ErrIssue1501BadUUID)
 	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = xstring.ToBytes(s.text())
 	case Ydb.Type_STRING:

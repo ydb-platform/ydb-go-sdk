@@ -156,12 +156,6 @@ func JSONValue(v string) Value { return value.JSONValue(v) }
 // (functional will be implements with go1.18 type lists)
 func JSONValueFromBytes(v []byte) Value { return value.JSONValue(xstring.FromBytes(v)) }
 
-// UUIDValue has data corruption bug and will be removed in next version.
-//
-// Deprecated: Use UUIDTypedValue (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
-// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
-func UUIDValue(v [16]byte) Value { return UUIDWithIssue1501Value(v) }
-
 // UUIDBytesWithIssue1501Type is type wrapper for scan expected values for values stored with bug
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 type UUIDBytesWithIssue1501Type = value.UUIDIssue1501FixedBytesWrapper

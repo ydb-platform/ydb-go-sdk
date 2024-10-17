@@ -120,37 +120,6 @@ func TestUUIDSerializationTableServiceServiceIssue1501(t *testing.T) {
 	// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 	// test with special uuid - all bytes are different for check any byte swaps
 
-	t.Run("old-send", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "2d9e498b-b746-9cfb-084d-de4e1cb4736e"
-		id := uuid.MustParse(idString)
-
-		var idFromDB string
-		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-			res, err := tx.Execute(ctx, `
-DECLARE $val AS UUID;
-
-SELECT CAST($val AS Utf8)
-`, table.NewQueryParameters(table.ValueParam("$val", types.UUIDValue(id))))
-			if err != nil {
-				return err
-			}
-			res.NextResultSet(ctx)
-			res.NextRow()
-
-			err = res.Scan(&idFromDB)
-			return err
-		})
-		require.NoError(t, err)
-		require.Equal(t, expectedResultWithBug, idFromDB)
-	})
 	t.Run("old-send-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
@@ -437,41 +406,6 @@ SELECT CAST($val AS UUID)
 		require.NoError(t, err)
 		resultBytes := []byte(resultFromDb)
 		require.Equal(t, expectedResultWithBug, resultBytes)
-	})
-	t.Run("old-send-receive", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		id := uuid.MustParse(idString)
-
-		var idFromDB uuid.UUID
-		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-			res, err := tx.Execute(ctx, `
-DECLARE $val AS UUID;
-
-SELECT $val
-`, table.NewQueryParameters(table.ValueParam("$val", types.UUIDValue(id))))
-			if err != nil {
-				return err
-			}
-			res.NextResultSet(ctx)
-			res.NextRow()
-
-			var resBytes [16]byte
-			err = res.Scan(&resBytes)
-			if err != nil {
-				return err
-			}
-			idFromDB = resBytes
-			return nil
-		})
-		require.NoError(t, err)
-		require.Equal(t, id, idFromDB)
 	})
 	t.Run("old-send-receive-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version

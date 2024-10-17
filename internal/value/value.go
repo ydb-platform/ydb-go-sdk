@@ -2108,27 +2108,19 @@ type uuidValue struct {
 func (v *uuidValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		bytes := uuidReorderBytesForReadWithBug(v.value)
-		*vv = string(bytes[:])
-
-		return nil
+		return ErrIssue1501BadUUID
 	case *UUIDIssue1501StringWrapper:
 		bytes := uuidReorderBytesForReadWithBug(v.value)
 		*vv = UUIDIssue1501StringWrapper(bytes[:])
 		return nil
 	case *[]byte:
-		bytes := uuidReorderBytesForReadWithBug(v.value)
-		*vv = bytes[:]
-
-		return nil
+		return ErrIssue1501BadUUID
 	case *UUIDIssue1501BytesSliceWrapper:
 		bytes := uuidReorderBytesForReadWithBug(v.value)
 		*vv = bytes[:]
 		return nil
 	case *[16]byte:
-		*vv = uuidReorderBytesForReadWithBug(v.value)
-
-		return nil
+		return ErrIssue1501BadUUID
 	case *UUIDIssue1501FixedBytesWrapper:
 		*vv = uuidReorderBytesForReadWithBug(v.value)
 
@@ -2150,7 +2142,7 @@ func (v *uuidValue) Yql() string {
 	buffer.WriteString(v.Type().Yql())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
-	buffer.WriteString(uuid.UUID(v.value).String())
+	buffer.WriteString(v.value.String())
 	buffer.WriteByte('"')
 	buffer.WriteByte(')')
 

@@ -20,34 +20,6 @@ func TestUUIDSerializationQueryServiceIssue1501(t *testing.T) {
 	// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 	// test with special uuid - all bytes are different for check any byte swaps
 
-	t.Run("old-send", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "2d9e498b-b746-9cfb-084d-de4e1cb4736e"
-		id := uuid.MustParse(idString)
-		row, err := db.Query().QueryRow(ctx, `
-DECLARE $val AS UUID;
-
-SELECT CAST($val AS Utf8)`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUID(id).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
-		)
-
-		require.NoError(t, err)
-
-		var res string
-
-		err = row.Scan(&res)
-		require.NoError(t, err)
-		require.Equal(t, expectedResultWithBug, res)
-	})
 	t.Run("old-send-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
@@ -189,35 +161,6 @@ SELECT CAST($val AS UUID)`,
 		require.NoError(t, err)
 
 		require.Equal(t, expectedResultWithBug, []byte(res))
-	})
-	t.Run("old-send-receive", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		id := uuid.MustParse(idString)
-		row, err := db.Query().QueryRow(ctx, `
-DECLARE $val AS UUID;
-
-SELECT $val`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUID(id).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
-		)
-
-		require.NoError(t, err)
-
-		var resBytes [16]byte
-		err = row.Scan(&resBytes)
-		require.NoError(t, err)
-
-		resUUID := uuid.UUID(resBytes)
-
-		require.Equal(t, id, resUUID)
 	})
 	t.Run("old-send-receive-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
