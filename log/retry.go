@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -22,17 +23,17 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 		label := info.Label
 		idempotent := info.Idempotent
 		l.Log(ctx, "start",
-			String("label", label),
-			Bool("idempotent", idempotent),
+			kv.String("label", label),
+			kv.Bool("idempotent", idempotent),
 		)
 		start := time.Now()
 
 		return func(info trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					String("label", label),
-					latencyField(start),
-					Int("attempts", info.Attempts),
+					kv.String("label", label),
+					kv.Latency(start),
+					kv.Int("attempts", info.Attempts),
 				)
 			} else {
 				lvl := ERROR
@@ -41,14 +42,14 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 				}
 				m := retry.Check(info.Error)
 				l.Log(WithLevel(ctx, lvl), "failed",
-					Error(info.Error),
-					String("label", label),
-					latencyField(start),
-					Int("attempts", info.Attempts),
-					Bool("retryable", m.MustRetry(idempotent)),
-					Int64("code", m.StatusCode()),
-					Bool("deleteSession", m.IsRetryObjectValid()),
-					versionField(),
+					kv.Error(info.Error),
+					kv.String("label", label),
+					kv.Latency(start),
+					kv.Int("attempts", info.Attempts),
+					kv.Bool("retryable", m.MustRetry(idempotent)),
+					kv.Int64("code", m.StatusCode()),
+					kv.Bool("deleteSession", m.IsRetryObjectValid()),
+					kv.Version(),
 				)
 			}
 		}

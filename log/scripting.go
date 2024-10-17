@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -24,15 +25,15 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		return func(info trace.ScriptingExecuteDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
-					Int("resultSetCount", info.Result.ResultSetCount()),
-					NamedError("resultSetError", info.Result.Err()),
+					kv.Latency(start),
+					kv.Int("resultSetCount", info.Result.ResultSetCount()),
+					kv.NamedError("resultSetError", info.Result.Err()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -48,14 +49,14 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		return func(info trace.ScriptingExplainDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
-					String("plan", info.Plan),
+					kv.Latency(start),
+					kv.String("plan", info.Plan),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}
@@ -74,7 +75,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		query := info.Query
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
-				String("query", query),
+				kv.String("query", query),
 			)...,
 		)
 		start := time.Now()
@@ -88,8 +89,8 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 				l.Log(ctx, "intermediate")
 			} else {
 				l.Log(WithLevel(ctx, WARN), "intermediate failed",
-					Error(info.Error),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Version(),
 				)
 			}
 
@@ -97,17 +98,17 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						appendFieldByCondition(l.logQuery,
-							String("query", query),
-							latencyField(start),
+							kv.String("query", query),
+							kv.Latency(start),
 						)...,
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
 						appendFieldByCondition(l.logQuery,
-							String("query", query),
-							Error(info.Error),
-							latencyField(start),
-							versionField(),
+							kv.String("query", query),
+							kv.Error(info.Error),
+							kv.Latency(start),
+							kv.Version(),
 						)...,
 					)
 				}
@@ -125,13 +126,13 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		return func(info trace.ScriptingCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					Error(info.Error),
-					latencyField(start),
-					versionField(),
+					kv.Error(info.Error),
+					kv.Latency(start),
+					kv.Version(),
 				)
 			}
 		}

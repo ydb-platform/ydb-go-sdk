@@ -1,4 +1,4 @@
-package log
+package kv
 
 import (
 	"errors"
@@ -16,7 +16,7 @@ func (s stringerTest) String() string {
 
 func TestField_String(t *testing.T) {
 	for _, tt := range []struct {
-		f     Field
+		f     KeyValue
 		want  string
 		panic bool
 		fail  bool
@@ -42,7 +42,7 @@ func TestField_String(t *testing.T) {
 		{f: Any("any_string_ptr", func(v string) *string { return &v }("string pointer")), want: "*string(string pointer)"}, //nolint:lll
 		{f: Any("any_string_nil", (*string)(nil)), want: "<nil>"},
 		{f: Stringer("stringer", stringerTest("stringerTest")), want: "stringerTest"},
-		{f: Field{ftype: InvalidType, key: "invalid"}, want: "", panic: true},
+		{f: KeyValue{ftype: InvalidType, key: "invalid"}, want: "", panic: true},
 	} {
 		t.Run(tt.f.key, func(t *testing.T) {
 			// Known fieldType, but String() panics with it.
@@ -65,7 +65,7 @@ func TestField_String(t *testing.T) {
 func TestField_AnyValue(t *testing.T) {
 	for _, tt := range []struct {
 		name string
-		f    Field
+		f    KeyValue
 		want interface{}
 	}{
 		{name: "int", f: Int("any", 1), want: 1},
