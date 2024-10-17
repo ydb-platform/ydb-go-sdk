@@ -903,6 +903,8 @@ func (s *valueScanner) scanRequired(v interface{}) {
 		*v = value.IntervalToDuration(s.int64())
 	case *string:
 		s.setString(v)
+	case *[]byte:
+		s.setByte(v)
 	case *[16]byte:
 		*v = s.uint128()
 	case *types.UUIDBytesWithIssue1501Type:
