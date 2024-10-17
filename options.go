@@ -199,6 +199,8 @@ func WithConnectionTTL(ttl time.Duration) Option {
 // Warning: use ydb.Open with required Driver string parameter instead
 //
 // For making Driver string from endpoint+database+secure - use sugar.DSN()
+//
+// Deprecated: use dsn parameter in Open method
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithEndpoint(endpoint))
@@ -212,6 +214,8 @@ func WithEndpoint(endpoint string) Option {
 // Warning: use ydb.Open with required Driver string parameter instead
 //
 // For making Driver string from endpoint+database+secure - use sugar.DSN()
+//
+// Deprecated: use dsn parameter in Open method
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithDatabase(database))

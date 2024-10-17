@@ -294,6 +294,28 @@ SELECT CAST($val AS UUID)`,
 		err := row.Scan(&res)
 		require.Error(t, err)
 	})
+	t.Run("old-receive-to-uuid", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			db    = scope.SQLDriver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		row := db.QueryRow(`
+DECLARE $val AS Text;
+
+SELECT CAST($val AS UUID)`,
+			sql.Named("val", idString),
+		)
+
+		require.NoError(t, row.Err())
+
+		var res uuid.UUID
+
+		err := row.Scan(&res)
+		require.Error(t, err)
+	})
 	t.Run("old-send-receive", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
