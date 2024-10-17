@@ -10,6 +10,8 @@ type Detailer interface {
 	Details() Details
 }
 
+var _ Detailer = Details(0)
+
 type Details uint64
 
 func (d Details) Details() Details {

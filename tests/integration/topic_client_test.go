@@ -91,7 +91,7 @@ func TestTopicDescribe(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	res, err := db.Topic().Describe(ctx, topicName)
+	topicDesc, err := db.Topic().Describe(ctx, topicName)
 	require.NoError(t, err)
 
 	expected := topictypes.TopicDescription{
@@ -131,13 +131,128 @@ func TestTopicDescribe(t *testing.T) {
 		*subset = nil
 	}
 
-	requireAndCleanSubset(&res.Attributes, &expected.Attributes)
+	requireAndCleanSubset(&topicDesc.Attributes, &expected.Attributes)
 
 	for i := range expected.Consumers {
-		requireAndCleanSubset(&res.Consumers[i].Attributes, &expected.Consumers[i].Attributes)
+		requireAndCleanSubset(&topicDesc.Consumers[i].Attributes, &expected.Consumers[i].Attributes)
 	}
 
-	require.Equal(t, expected, res)
+	require.Equal(t, expected, topicDesc)
+}
+
+func TestDescribeTopicConsumer(t *testing.T) {
+	ctx := xtest.Context(t)
+	db := connect(t)
+	topicName := "test-topic-" + t.Name()
+	setImportant := true
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "24.1.1") {
+		setImportant = false
+	}
+	var (
+		supportedCodecs     = []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip}
+		minActivePartitions = int64(2)
+		consumers           = []topictypes.Consumer{
+			{
+				Name:            "c1",
+				Important:       setImportant,
+				SupportedCodecs: []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip},
+				ReadFrom:        time.Date(2022, 9, 11, 10, 1, 2, 0, time.UTC),
+			},
+			{
+				Name:            "c2",
+				Important:       false,
+				SupportedCodecs: []topictypes.Codec{},
+				ReadFrom:        time.Date(2021, 1, 2, 3, 4, 5, 0, time.UTC),
+			},
+		}
+	)
+
+	_ = db.Topic().Drop(ctx, topicName)
+	err := db.Topic().Create(ctx, topicName,
+		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
+		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
+		topicoptions.CreateWithConsumer(consumers...),
+	)
+	require.NoError(t, err)
+
+	consumer, err := db.Topic().DescribeTopicConsumer(ctx, topicName, "c1", topicoptions.IncludeConsumerStats())
+	require.NoError(t, err)
+
+	zeroTime := time.Time{}
+	zeroDuration := time.Duration(0)
+	expectedConsumerDesc := topictypes.TopicConsumerDescription{
+		Path: path.Join(topicName, "c1"),
+		Consumer: topictypes.Consumer{
+			Name:            "c1",
+			Important:       setImportant,
+			SupportedCodecs: []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip},
+			ReadFrom:        time.Date(2022, 9, 11, 10, 1, 2, 0, time.UTC),
+			Attributes: map[string]string{
+				"_service_type": "data-streams",
+			},
+		},
+		Partitions: []topictypes.DescribeConsumerPartitionInfo{
+			{
+				PartitionID: 0,
+				Active:      true,
+				PartitionStats: topictypes.PartitionStats{
+					PartitionsOffset: topictypes.OffsetRange{},
+					StoreSizeBytes:   0,
+					LastWriteTime:    nil,
+					MaxWriteTimeLag:  &zeroDuration,
+					BytesWritten:     topictypes.MultipleWindowsStat{},
+				},
+				PartitionConsumerStats: topictypes.PartitionConsumerStats{
+					LastReadOffset:                 0,
+					CommittedOffset:                0,
+					ReadSessionID:                  "",
+					PartitionReadSessionCreateTime: &zeroTime,
+					LastReadTime:                   &zeroTime,
+					MaxReadTimeLag:                 &zeroDuration,
+					MaxWriteTimeLag:                &zeroDuration,
+					BytesRead:                      topictypes.MultipleWindowsStat{},
+					ReaderName:                     "",
+				},
+			},
+			{
+				PartitionID: 1,
+				Active:      true,
+				PartitionStats: topictypes.PartitionStats{
+					PartitionsOffset: topictypes.OffsetRange{},
+					StoreSizeBytes:   0,
+					LastWriteTime:    nil,
+					MaxWriteTimeLag:  &zeroDuration,
+					BytesWritten:     topictypes.MultipleWindowsStat{},
+				},
+				PartitionConsumerStats: topictypes.PartitionConsumerStats{
+					LastReadOffset:                 0,
+					CommittedOffset:                0,
+					ReadSessionID:                  "",
+					PartitionReadSessionCreateTime: &zeroTime,
+					LastReadTime:                   &zeroTime,
+					MaxReadTimeLag:                 &zeroDuration,
+					MaxWriteTimeLag:                &zeroDuration,
+					BytesRead:                      topictypes.MultipleWindowsStat{},
+					ReaderName:                     "",
+				},
+			},
+		},
+	}
+
+	requireAndCleanSubset := func(checked *map[string]string, subset *map[string]string) {
+		t.Helper()
+		for k, subValue := range *subset {
+			checkedValue, ok := (*checked)[k]
+			require.True(t, ok, k)
+			require.Equal(t, subValue, checkedValue)
+		}
+		*checked = nil
+		*subset = nil
+	}
+
+	requireAndCleanSubset(&consumer.Consumer.Attributes, &expectedConsumerDesc.Consumer.Attributes)
+
+	require.Equal(t, expectedConsumerDesc, consumer)
 }
 
 func TestSchemeList(t *testing.T) {

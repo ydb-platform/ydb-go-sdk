@@ -277,6 +277,7 @@ SELECT CAST($val AS UUID)`,
 		resUUID := uuid.UUID(res)
 		require.Equal(t, expectedResultWithBug, resUUID.String())
 	})
+
 	t.Run("old-receive-to-string", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
@@ -285,7 +286,6 @@ SELECT CAST($val AS UUID)`,
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := []byte{0x8b, 0x49, 0x9e, 0x2d, 0x46, 0xb7, 0xfb, 0x9c, 0x4d, 0x8, 0x4e, 0xde, 0x6e, 0x73, 0xb4, 0x1c}
 		row := db.QueryRow(`
 DECLARE $val AS Text;
 
@@ -298,9 +298,7 @@ SELECT CAST($val AS UUID)`,
 		var res string
 
 		err := row.Scan(&res)
-		require.NoError(t, err)
-
-		require.Equal(t, expectedResultWithBug, []byte(res))
+		require.Error(t, err)
 	})
 	t.Run("old-receive-to-string-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -334,25 +332,23 @@ SELECT CAST($val AS UUID)`,
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
 			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
+			db    = scope.SQLDriver()
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := uuid.MustParse(idString)
-		row, err := db.Query().QueryRow(ctx, `
+		idParam := [16]byte(id)
+		row := db.QueryRow(`
 DECLARE $val AS UUID;
 
 SELECT $val`,
-			query.WithIdempotent(),
-			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUID(id).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
+			sql.Named("val", idParam),
 		)
 
-		require.NoError(t, err)
+		require.NoError(t, row.Err())
 
 		var resBytes [16]byte
-		err = row.Scan(&resBytes)
+		err := row.Scan(&resBytes)
 		require.NoError(t, err)
 
 		resUUID := uuid.UUID(resBytes)

@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 )
 
 // Codec code for use in topics
@@ -177,4 +178,95 @@ func (p *PartitionInfo) FromRaw(raw *rawtopic.PartitionInfo) {
 
 	p.ChildPartitionIDs = clone.Int64Slice(raw.ChildPartitionIDs)
 	p.ParentPartitionIDs = clone.Int64Slice(raw.ParentPartitionIDs)
+}
+
+type MultipleWindowsStat struct {
+	PerMinute int64
+	PerHour   int64
+	PerDay    int64
+}
+
+func (m *MultipleWindowsStat) FromRaw(raw *rawtopic.MultipleWindowsStat) {
+	if raw != nil {
+		m.PerMinute = raw.PerMinute
+		m.PerHour = raw.PerHour
+		m.PerDay = raw.PerDay
+	}
+}
+
+type OffsetRange topiclistenerinternal.PublicOffsetsRange
+
+type PartitionStats struct {
+	PartitionsOffset OffsetRange
+	StoreSizeBytes   int64
+	LastWriteTime    *time.Time
+	MaxWriteTimeLag  *time.Duration
+	BytesWritten     MultipleWindowsStat
+}
+
+func (p *PartitionStats) FromRaw(raw *rawtopic.PartitionStats) {
+	p.PartitionsOffset.Start = raw.PartitionsOffset.Start.ToInt64()
+	p.PartitionsOffset.End = raw.PartitionsOffset.End.ToInt64()
+	p.StoreSizeBytes = raw.StoreSizeBytes
+	p.LastWriteTime = raw.LastWriteTime.ToTime()
+	p.MaxWriteTimeLag = raw.MaxWriteTimeLag.ToDuration()
+	p.BytesWritten.FromRaw(&raw.BytesWritten)
+}
+
+type PartitionConsumerStats struct {
+	LastReadOffset                 int64
+	CommittedOffset                int64
+	ReadSessionID                  string
+	PartitionReadSessionCreateTime *time.Time
+	LastReadTime                   *time.Time
+	MaxReadTimeLag                 *time.Duration
+	MaxWriteTimeLag                *time.Duration
+	BytesRead                      MultipleWindowsStat
+	ReaderName                     string
+}
+
+func (s *PartitionConsumerStats) FromRaw(raw *rawtopic.PartitionConsumerStats) {
+	s.LastReadOffset = raw.LastReadOffset
+	s.CommittedOffset = raw.CommittedOffset
+	s.ReadSessionID = raw.ReadSessionID
+	s.PartitionReadSessionCreateTime = raw.PartitionReadSessionCreateTime.ToTime()
+	s.LastReadTime = raw.LastReadTime.ToTime()
+	s.MaxReadTimeLag = raw.MaxReadTimeLag.ToDuration()
+	s.MaxWriteTimeLag = raw.MaxWriteTimeLag.ToDuration()
+	s.BytesRead.FromRaw(&raw.BytesRead)
+	s.ReaderName = raw.ReaderName
+}
+
+type DescribeConsumerPartitionInfo struct {
+	PartitionID            int64
+	Active                 bool
+	ChildPartitionIDs      []int64
+	ParentPartitionIDs     []int64
+	PartitionStats         PartitionStats
+	PartitionConsumerStats PartitionConsumerStats
+}
+
+func (p *DescribeConsumerPartitionInfo) FromRaw(raw *rawtopic.DescribeConsumerResultPartitionInfo) {
+	p.PartitionID = raw.PartitionID
+	p.Active = raw.Active
+	p.ChildPartitionIDs = clone.Int64Slice(raw.ChildPartitionIDs)
+	p.ParentPartitionIDs = clone.Int64Slice(raw.ParentPartitionIDs)
+	p.PartitionStats.FromRaw(&raw.PartitionStats)
+	p.PartitionConsumerStats.FromRaw(&raw.PartitionConsumerStats)
+}
+
+type TopicConsumerDescription struct {
+	Path       string
+	Consumer   Consumer
+	Partitions []DescribeConsumerPartitionInfo
+}
+
+func (d *TopicConsumerDescription) FromRaw(raw *rawtopic.DescribeConsumerResult) {
+	d.Path = raw.Self.Name
+	d.Consumer.FromRaw(&raw.Consumer)
+
+	d.Partitions = make([]DescribeConsumerPartitionInfo, len(raw.Partitions))
+	for i := range raw.Partitions {
+		d.Partitions[i].FromRaw(&raw.Partitions[i])
+	}
 }
