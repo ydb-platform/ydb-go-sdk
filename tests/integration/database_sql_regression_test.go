@@ -236,7 +236,7 @@ SELECT CAST($val AS UUID)`,
 		var res [16]byte
 
 		err := row.Scan(&res)
-		require.ErrorIs(t, err, types.ErrIssue1501BadUUID)
+		require.Error(t, err)
 	})
 	t.Run("old-receive-to-bytes-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version

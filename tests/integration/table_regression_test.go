@@ -267,7 +267,6 @@ SELECT CAST($val AS UUID)
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
 		var resultFromDb customTestUnmarshalUUIDWithForceWrapper
 		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			res, err := tx.Execute(ctx, `
@@ -290,8 +289,7 @@ SELECT CAST($val AS UUID)
 			return nil
 		})
 
-		require.NoError(t, err)
-		require.Equal(t, expectedResultWithBug, resultFromDb.String())
+		require.ErrorIs(t, err, types.ErrIssue1501BadUUID)
 	})
 	t.Run("old-unmarshal-with-bytes-typed", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -337,7 +335,6 @@ SELECT CAST($val AS UUID)
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := []byte{0x8b, 0x49, 0x9e, 0x2d, 0x46, 0xb7, 0xfb, 0x9c, 0x4d, 0x8, 0x4e, 0xde, 0x6e, 0x73, 0xb4, 0x1c}
 		var resultFromDb string
 		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			res, err := tx.Execute(ctx, `
@@ -360,9 +357,7 @@ SELECT CAST($val AS UUID)
 			return nil
 		})
 
-		require.NoError(t, err)
-		resultBytes := []byte(resultFromDb)
-		require.Equal(t, expectedResultWithBug, resultBytes)
+		require.ErrorIs(t, err, types.ErrIssue1501BadUUID)
 	})
 	t.Run("old-receive-to-string-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
