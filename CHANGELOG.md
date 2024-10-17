@@ -1,3 +1,6 @@
+* BREAK OLD STYLE WORK WITH UUID. See https://github.com/ydb-platform/ydb-go-sdk/issues/1501 for details.
+At the version you must explicit choose way for work with uuid: old with bug or new (fixed).
+
 * Add workaround for bug in uuid send/receive from server. It is migration version. All native code and most database sql code worked with uuid continue to work.
 
 * Added `db.Topic().DescribeTopicConsumer()` method for displaying consumer information
