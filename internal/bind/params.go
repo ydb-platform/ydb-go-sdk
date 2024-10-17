@@ -125,6 +125,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 			return types.NullableUUIDValueWithIssue1501(nil), nil
 		}
 		val := x.AsBytesArray()
+
 		return types.NullableUUIDValueWithIssue1501(&val), nil
 	case uuid.UUID:
 		return types.UUIDTypedValue(x), nil
