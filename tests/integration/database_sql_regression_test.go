@@ -338,7 +338,6 @@ SELECT $val`,
 		var resBytes [16]byte
 		err := row.Scan(&resBytes)
 		require.Error(t, err)
-
 	})
 	t.Run("old-send-receive-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
