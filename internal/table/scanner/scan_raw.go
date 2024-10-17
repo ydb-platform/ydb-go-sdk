@@ -281,6 +281,7 @@ func (s *rawConverter) UUIDTyped() (v uuid.UUID) {
 		return
 	}
 	s.unwrap()
+
 	return s.uuid()
 }
 
