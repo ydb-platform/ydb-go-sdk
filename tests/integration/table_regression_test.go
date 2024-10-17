@@ -337,7 +337,7 @@ SELECT CAST($val AS UUID)
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		var resultFromDb customTestUnmarshalUUIDTyoed
+		var resultFromDb customTestUnmarshalUUIDTyped
 		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			res, err := tx.Execute(ctx, `
 DECLARE $val AS Text;
@@ -626,14 +626,14 @@ func (c *customTestUnmarshalUUIDWithForceWrapper) String() string {
 	return string(*c)
 }
 
-type customTestUnmarshalUUIDTyoed string
+type customTestUnmarshalUUIDTyped string
 
-func (c *customTestUnmarshalUUIDTyoed) UnmarshalYDB(raw scanner.RawValue) error {
+func (c *customTestUnmarshalUUIDTyped) UnmarshalYDB(raw scanner.RawValue) error {
 	val := raw.UUIDTyped()
-	*c = customTestUnmarshalUUIDTyoed(val.String())
+	*c = customTestUnmarshalUUIDTyped(val.String())
 	return raw.Err()
 }
 
-func (c *customTestUnmarshalUUIDTyoed) String() string {
+func (c *customTestUnmarshalUUIDTyped) String() string {
 	return string(*c)
 }
