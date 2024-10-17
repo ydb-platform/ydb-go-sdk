@@ -14,6 +14,8 @@ type (
 	Span     interface {
 		TraceID() string
 
+		Relation(span Span)
+
 		Msg(msg string, attributes ...KeyValue)
 
 		End(attributes ...KeyValue)

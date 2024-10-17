@@ -16,6 +16,8 @@ type (
 	noopSpan   struct{}
 )
 
+func (noopSpan) Relation(Span) {}
+
 func (noopSpan) TraceID() string {
 	return ""
 }
