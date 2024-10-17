@@ -57,7 +57,6 @@ SELECT CAST($val AS Utf8)`,
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
 		row, err := db.Query().QueryRow(ctx, `
 DECLARE $val AS Text;
 
@@ -72,10 +71,7 @@ SELECT CAST($val AS UUID)`,
 		var res [16]byte
 
 		err = row.Scan(&res)
-		require.NoError(t, err)
-
-		resUUID := uuid.UUID(res)
-		require.Equal(t, expectedResultWithBug, resUUID.String())
+		require.Error(t, err)
 	})
 	t.Run("old-receive-to-bytes-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -115,7 +111,6 @@ SELECT CAST($val AS UUID)`,
 		)
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := []byte{0x8b, 0x49, 0x9e, 0x2d, 0x46, 0xb7, 0xfb, 0x9c, 0x4d, 0x8, 0x4e, 0xde, 0x6e, 0x73, 0xb4, 0x1c}
 		row, err := db.Query().QueryRow(ctx, `
 DECLARE $val AS Text;
 
@@ -130,9 +125,7 @@ SELECT CAST($val AS UUID)`,
 		var res string
 
 		err = row.Scan(&res)
-		require.NoError(t, err)
-
-		require.Equal(t, expectedResultWithBug, []byte(res))
+		require.Error(t, err)
 	})
 	t.Run("old-receive-to-string-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
