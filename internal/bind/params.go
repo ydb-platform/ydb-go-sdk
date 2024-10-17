@@ -119,9 +119,13 @@ func toValue(v interface{}) (_ types.Value, err error) {
 	case *[16]byte:
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case types.UUIDBytesWithIssue1501Type:
-		return types.UUIDWithIssue1501Value(x), nil
+		return types.UUIDWithIssue1501Value(x.AsBytesArray()), nil
 	case *types.UUIDBytesWithIssue1501Type:
-		return types.NullableUUIDValueWithIssue1501((*[16]byte)(x)), nil
+		if x == nil {
+			return types.NullableUUIDValueWithIssue1501(nil), nil
+		}
+		val := x.AsBytesArray()
+		return types.NullableUUIDValueWithIssue1501(&val), nil
 	case uuid.UUID:
 		return types.UUIDTypedValue(x), nil
 	case *uuid.UUID:

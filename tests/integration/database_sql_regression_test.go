@@ -205,7 +205,7 @@ SELECT CAST($val AS Utf8)`, sql.Named("val", id),
 DECLARE $val AS UUID;
 
 SELECT CAST($val AS Utf8)`,
-			sql.Named("val", types.UUIDBytesWithIssue1501Type(id)),
+			sql.Named("val", types.NewUUIDBytesWithIssue1501(id)),
 		)
 
 		require.NoError(t, row.Err())
@@ -261,7 +261,7 @@ SELECT CAST($val AS UUID)`,
 		err := row.Scan(&res)
 		require.NoError(t, err)
 
-		resUUID := uuid.UUID(res)
+		resUUID := uuid.UUID(res.AsBytesArray())
 		require.Equal(t, expectedResultWithBug, resUUID.String())
 	})
 
@@ -328,7 +328,7 @@ SELECT $val`,
 		err := row.Scan(&resBytes)
 		require.NoError(t, err)
 
-		resUUID := uuid.UUID(resBytes)
+		resUUID := uuid.UUID(resBytes.AsBytesArray())
 
 		require.Equal(t, id, resUUID)
 	})

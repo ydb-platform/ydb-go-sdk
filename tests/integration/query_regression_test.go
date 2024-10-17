@@ -99,7 +99,7 @@ SELECT CAST($val AS UUID)`,
 		err = row.Scan(&res)
 		require.NoError(t, err)
 
-		resUUID := uuid.UUID(res)
+		resUUID := uuid.UUID(res.AsBytesArray())
 		require.Equal(t, expectedResultWithBug, resUUID.String())
 	})
 	t.Run("old-receive-to-string", func(t *testing.T) {
@@ -148,11 +148,12 @@ SELECT CAST($val AS UUID)`,
 
 		require.NoError(t, err)
 
-		var res types.UUIDStringWithIssue1501Type
+		var resFromDB types.UUIDBytesWithIssue1501Type
 
-		err = row.Scan(&res)
+		err = row.Scan(&resFromDB)
 		require.NoError(t, err)
 
+		res := resFromDB.AsBrokenString()
 		require.Equal(t, expectedResultWithBug, []byte(res))
 	})
 	t.Run("old-send-receive-with-force-wrapper", func(t *testing.T) {
@@ -176,11 +177,11 @@ SELECT $val`,
 
 		require.NoError(t, err)
 
-		var resBytes types.UUIDBytesWithIssue1501Type
-		err = row.Scan(&resBytes)
+		var resWrapper types.UUIDBytesWithIssue1501Type
+		err = row.Scan(&resWrapper)
 		require.NoError(t, err)
 
-		resUUID := uuid.UUID(resBytes)
+		resUUID := uuid.UUID(resWrapper.AsBytesArray())
 
 		require.Equal(t, id, resUUID)
 	})

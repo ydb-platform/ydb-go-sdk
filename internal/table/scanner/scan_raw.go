@@ -264,7 +264,7 @@ func (s *rawConverter) JSONDocument() (v []byte) {
 }
 
 func (s *rawConverter) UUID() (v [16]byte) {
-	return s.uuidBytesWithIssue1501()
+	return s.uuidBytesWithIssue1501().AsBytesArray()
 }
 
 func (s *rawConverter) UUIDWithIssue1501() (v [16]byte) {
