@@ -696,6 +696,7 @@ func (s *valueScanner) uint128() (v [16]byte) {
 	if s.stack.current().t.GetTypeId() == Ydb.Type_UUID {
 		return s.uuidBytesWithIssue1501()
 	}
+
 	return s.uint128()
 }
 
@@ -728,8 +729,10 @@ func (s *valueScanner) uuid() uuid.UUID {
 	err := value.CastTo(val, &uuidVal)
 	if err != nil {
 		_ = s.errorf(0, "failed to cast internal uuid type to uuid: %w", err)
+
 		return uuid.UUID{}
 	}
+
 	return uuidVal
 }
 

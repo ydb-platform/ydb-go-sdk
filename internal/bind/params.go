@@ -115,7 +115,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 
 		return types.ListValue(items...), nil
 	case [16]byte:
-		return types.UUIDValue(x), nil
+		return types.UUIDValue(x), nil //nolint:staticcheck
 	case *[16]byte:
 		return types.NullableUUIDValue(x), nil
 	case types.UUIDBytesWithIssue1501Type:

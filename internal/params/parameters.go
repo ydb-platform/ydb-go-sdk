@@ -318,6 +318,7 @@ func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
 func (p *Parameter) UUIDTyped(val uuid.UUID) Builder {
 	p.value = value.UUIDTyped(val)
 	p.parent.params = append(p.parent.params, p)
+
 	return p.parent
 }
 

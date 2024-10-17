@@ -2104,8 +2104,10 @@ func (w UUIDIssue1501FixedBytesWrapper) PublicRevertReorderForIssue1501() uuid.U
 	return uuid.UUID(uuidFixBytesOrder(w))
 }
 
-type UUIDIssue1501BytesSliceWrapper []byte
-type UUIDIssue1501StringWrapper string
+type (
+	UUIDIssue1501BytesSliceWrapper []byte
+	UUIDIssue1501StringWrapper     string
+)
 
 type uuidValue struct {
 	value               uuid.UUID
@@ -2122,6 +2124,7 @@ func (v *uuidValue) castTo(dst interface{}) error {
 	case *UUIDIssue1501StringWrapper:
 		bytes := uuidReorderBytesForReadWithBug(v.value)
 		*vv = UUIDIssue1501StringWrapper(bytes[:])
+
 		return nil
 	case *[]byte:
 		bytes := uuidReorderBytesForReadWithBug(v.value)
@@ -2131,6 +2134,7 @@ func (v *uuidValue) castTo(dst interface{}) error {
 	case *UUIDIssue1501BytesSliceWrapper:
 		bytes := uuidReorderBytesForReadWithBug(v.value)
 		*vv = bytes[:]
+
 		return nil
 	case *[16]byte:
 		*vv = uuidReorderBytesForReadWithBug(v.value)
@@ -2142,6 +2146,7 @@ func (v *uuidValue) castTo(dst interface{}) error {
 		return nil
 	case *uuid.UUID:
 		*vv = v.value
+
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf(
@@ -2157,7 +2162,7 @@ func (v *uuidValue) Yql() string {
 	buffer.WriteString(v.Type().Yql())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
-	buffer.WriteString(uuid.UUID(v.value).String())
+	buffer.WriteString(v.value.String())
 	buffer.WriteByte('"')
 	buffer.WriteByte(')')
 
@@ -2207,6 +2212,7 @@ func UUIDFromYDBPair(high uint64, low uint64) *uuidValue {
 	binary.LittleEndian.PutUint64(res[:], low)
 	binary.LittleEndian.PutUint64(res[8:], high)
 	res = uuidLeBytesToDirect(res)
+
 	return &uuidValue{value: res}
 }
 
@@ -2238,8 +2244,10 @@ func uuidDirectBytesToLe(direct [16]byte) [16]byte {
 	le[13] = direct[13]
 	le[14] = direct[14]
 	le[15] = direct[15]
+
 	return le
 }
+
 func uuidLeBytesToDirect(direct [16]byte) [16]byte {
 	// ordered as uuid bytes le in python
 	// https://docs.python.org/3/library/uuid.html#uuid.UUID.bytes_le
@@ -2260,6 +2268,7 @@ func uuidLeBytesToDirect(direct [16]byte) [16]byte {
 	le[13] = direct[13]
 	le[14] = direct[14]
 	le[15] = direct[15]
+
 	return le
 }
 
@@ -2281,6 +2290,7 @@ func uuidReorderBytesForReadWithBug(val [16]byte) [16]byte {
 	res[13] = val[1]
 	res[14] = val[2]
 	res[15] = val[3]
+
 	return res
 }
 
@@ -2303,6 +2313,7 @@ func uuidFixBytesOrder(val [16]byte) [16]byte {
 	res[13] = val[2]
 	res[14] = val[1]
 	res[15] = val[0]
+
 	return res
 }
 
