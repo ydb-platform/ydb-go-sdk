@@ -38,8 +38,8 @@ type RawValue interface {
 	UTF8() (v string)
 	YSON() (v []byte)
 	JSON() (v []byte)
-	UUID() (v [16]byte)
 	UUIDTyped() (v uuid.UUID)
+	// UUID() (v [16]byte) removed for https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 	UUIDWithIssue1501() (v [16]byte)
 	JSONDocument() (v []byte)
 	DyNumber() (v string)

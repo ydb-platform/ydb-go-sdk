@@ -223,41 +223,6 @@ SELECT CAST($val AS UUID)
 		require.NoError(t, err)
 		require.Equal(t, expectedResultWithBug, resultFromDb.String())
 	})
-	t.Run("old-unmarshal-with-bytes", func(t *testing.T) {
-		// test old behavior - for test way of safe work with data, written with bagged API version
-		var (
-			scope = newScope(t)
-			ctx   = scope.Ctx
-			db    = scope.Driver()
-		)
-
-		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
-		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
-		var resultFromDb customTestUnmarshalUUIDFromFixedBytes
-		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-			res, err := tx.Execute(ctx, `
-DECLARE $val AS Text;
-
-SELECT CAST($val AS UUID)
-`, table.NewQueryParameters(table.ValueParam("$val", types.TextValue(idString))))
-			if err != nil {
-				return err
-			}
-
-			res.NextResultSet(ctx)
-			res.NextRow()
-
-			err = res.Scan(&resultFromDb)
-			if err != nil {
-				return err
-			}
-
-			return nil
-		})
-
-		require.NoError(t, err)
-		require.Equal(t, expectedResultWithBug, resultFromDb.String())
-	})
 	t.Run("old-unmarshal-with-bytes-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
 		var (
@@ -523,19 +488,6 @@ SELECT $val
 		require.NoError(t, err)
 		require.Equal(t, strings.ToUpper(idString), strings.ToUpper(resID.String()))
 	})
-}
-
-type customTestUnmarshalUUIDFromFixedBytes string
-
-func (c *customTestUnmarshalUUIDFromFixedBytes) UnmarshalYDB(raw scanner.RawValue) error {
-	val := raw.UUID()
-	id := uuid.UUID(val)
-	*c = customTestUnmarshalUUIDFromFixedBytes(id.String())
-	return raw.Err()
-}
-
-func (c *customTestUnmarshalUUIDFromFixedBytes) String() string {
-	return string(*c)
 }
 
 type customTestUnmarshalUUIDWithForceWrapper string
