@@ -459,8 +459,8 @@ func TestIssue1506TypedNullPushdown(t *testing.T) {
 		paramsBuilder := ydb.ParamsBuilder()
 		paramsBuilder = paramsBuilder.Param("$p0").BeginOptional().Int32((*int32)(nil)).EndOptional()
 
-		result, err := s.Query(ctx, fmt.Sprintf(queryText, tableName), query.WithParameters(paramsBuilder.Build()))
-		require.NoError(t, err, err.Error())
+		result, err := s.Query(ctx, queryText, query.WithParameters(paramsBuilder.Build()))
+		require.NoError(t, err)
 		require.NotNil(t, result)
 
 		// TODO: check result emptyness; no lines should be returned.
