@@ -8,8 +8,13 @@ import (
 )
 
 type (
+	// KeyValue is key-value attribute for attaching into span
 	KeyValue = kv.KeyValue
-	Span     interface {
+
+	// Span is an interface of spans in specific tracing system
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	Span interface {
 		TraceID() (_ string, valid bool)
 
 		Link(link Span, attributes ...KeyValue)
@@ -20,6 +25,10 @@ type (
 
 		End(attributes ...KeyValue)
 	}
+
+	// Adapter is interface of specific tracing system adapters
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Adapter interface {
 		trace.Detailer
 
