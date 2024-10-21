@@ -1551,11 +1551,12 @@ func DriverOnBalancerChooseEndpoint(t *Driver, c *context.Context, call call) fu
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call call, address string) func(error) {
+func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call call, address string, database string) func(error) {
 	var p DriverBalancerClusterDiscoveryAttemptStartInfo
 	p.Context = c
 	p.Call = call
 	p.Address = address
+	p.Database = database
 	res := t.onBalancerClusterDiscoveryAttempt(p)
 	return func(e error) {
 		var p DriverBalancerClusterDiscoveryAttemptDoneInfo
@@ -1564,11 +1565,12 @@ func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalDC bool) func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string) {
+func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalDC bool, database string) func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string) {
 	var p DriverBalancerUpdateStartInfo
 	p.Context = c
 	p.Call = call
 	p.NeedLocalDC = needLocalDC
+	p.Database = database
 	res := t.onBalancerUpdate(p)
 	return func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string) {
 		var p DriverBalancerUpdateDoneInfo

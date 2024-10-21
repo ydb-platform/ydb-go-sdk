@@ -88,8 +88,10 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).clusterDiscoveryAttempt"),
+				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).clusterDiscoveryAttempt",
+			),
 			address,
+			b.driverConfig.Database(),
 		)
 		endpoints []endpoint.Endpoint
 		localDC   string
@@ -130,6 +132,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
 			b.config.DetectNearestDC,
+			b.driverConfig.Database(),
 		)
 		previous = b.connections().All()
 	)
