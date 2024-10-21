@@ -298,11 +298,11 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				for i, e := range info.Dropped {
 					dropped[i] = e.String()
 				}
+				start.Log(fmt.Sprintf("endpoints=%v", endpoints))
+				start.Log(fmt.Sprintf("added=%v", added))
+				start.Log(fmt.Sprintf("dropped=%v", dropped))
 				start.End(
 					kv.String("local_dc", info.LocalDC),
-					kv.Strings("endpoints", endpoints),
-					kv.Strings("added", added),
-					kv.Strings("dropped", dropped),
 				)
 			}
 		},

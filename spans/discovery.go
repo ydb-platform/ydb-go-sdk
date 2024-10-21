@@ -1,6 +1,8 @@
 package spans
 
 import (
+	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -17,15 +19,16 @@ func discovery(adapter Adapter) (t trace.Discovery) {
 			)
 
 			return func(info trace.DiscoveryDiscoverDoneInfo) {
-				endpoints := make([]string, len(info.Endpoints))
-				for i, e := range info.Endpoints {
-					endpoints[i] = e.String()
+				if info.Error != nil {
+					start.Error(info.Error)
+				} else {
+					endpoints := make([]string, len(info.Endpoints))
+					for i, e := range info.Endpoints {
+						endpoints[i] = e.String()
+					}
+					start.Log(fmt.Sprintf("endpoints=%v", endpoints))
 				}
-				finish(
-					start,
-					info.Error,
-					kv.Strings("endpoints", endpoints),
-				)
+				start.End()
 			}
 		}
 

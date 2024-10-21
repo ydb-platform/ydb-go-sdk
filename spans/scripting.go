@@ -14,7 +14,6 @@ func scripting(adapter Adapter) (t trace.Scripting) {
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
-				kv.String("params", safeStringer(info.Parameters)),
 			)
 
 			return func(info trace.ScriptingExecuteDoneInfo) {
@@ -47,7 +46,6 @@ func scripting(adapter Adapter) (t trace.Scripting) {
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
-				kv.String("params", safeStringer(info.Parameters)),
 			)
 
 			return func(
