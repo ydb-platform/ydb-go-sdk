@@ -1,4 +1,4 @@
-package otel
+package spans
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
@@ -6,11 +6,11 @@ import (
 )
 
 //nolint:funlen
-func scripting(cfg Config) (t trace.Scripting) {
+func scripting(adapter Adapter) (t trace.Scripting) {
 	t.OnExecute = func(info trace.ScriptingExecuteStartInfo) func(trace.ScriptingExecuteDoneInfo) {
-		if cfg.Details()&trace.ScriptingEvents != 0 {
+		if adapter.Details()&trace.ScriptingEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
@@ -41,9 +41,9 @@ func scripting(cfg Config) (t trace.Scripting) {
 	) func(
 		trace.ScriptingStreamExecuteDoneInfo,
 	) {
-		if cfg.Details()&trace.ScriptingEvents != 0 {
+		if adapter.Details()&trace.ScriptingEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
@@ -71,9 +71,9 @@ func scripting(cfg Config) (t trace.Scripting) {
 		return nil
 	}
 	t.OnExplain = func(info trace.ScriptingExplainStartInfo) func(trace.ScriptingExplainDoneInfo) {
-		if cfg.Details()&trace.ScriptingEvents != 0 {
+		if adapter.Details()&trace.ScriptingEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
@@ -87,9 +87,9 @@ func scripting(cfg Config) (t trace.Scripting) {
 		return nil
 	}
 	t.OnClose = func(info trace.ScriptingCloseStartInfo) func(trace.ScriptingCloseDoneInfo) {
-		if cfg.Details()&trace.ScriptingEvents != 0 {
+		if adapter.Details()&trace.ScriptingEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)

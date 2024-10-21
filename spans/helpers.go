@@ -1,4 +1,4 @@
-package otel
+package spans
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 )
 
 func childSpanWithReplaceCtx(
-	cfg Config,
+	cfg Adapter,
 	ctx *context.Context,
 	operationName string,
 	fields ...KeyValue,
@@ -20,7 +20,7 @@ func childSpanWithReplaceCtx(
 }
 
 func childSpan(
-	cfg Config,
+	cfg Adapter,
 	ctx context.Context, //nolint:revive
 	operationName string,
 	fields ...KeyValue,
@@ -58,7 +58,7 @@ func logError(
 }
 
 func logToParentSpan(
-	cfg Config,
+	cfg Adapter,
 	ctx context.Context, //nolint:revive
 	msg string,
 	fields ...KeyValue, //nolint:unparam
@@ -68,7 +68,7 @@ func logToParentSpan(
 }
 
 func logToParentSpanError(
-	cfg Config,
+	cfg Adapter,
 	ctx context.Context, //nolint:revive
 	err error,
 	fields ...KeyValue, //nolint:unparam

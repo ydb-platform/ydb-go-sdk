@@ -4,7 +4,7 @@
 # below in your own codecov.yml in your repository.
 #
 ignore:
-  - otel
+  - spans
   - trace
   - testutil
   - examples

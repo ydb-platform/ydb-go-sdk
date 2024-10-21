@@ -1,15 +1,15 @@
-package otel
+package spans
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func discovery(cfg Config) (t trace.Discovery) {
+func discovery(adapter Adapter) (t trace.Discovery) {
 	t.OnDiscover = func(info trace.DiscoveryDiscoverStartInfo) func(discovery trace.DiscoveryDiscoverDoneInfo) {
-		if cfg.Details()&trace.DiscoveryEvents != 0 {
+		if adapter.Details()&trace.DiscoveryEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("address", info.Address),

@@ -1,4 +1,4 @@
-package otel
+package spans
 
 import (
 	"context"
@@ -58,9 +58,9 @@ func fieldsFromStore(ctx context.Context) []kv.KeyValue {
 	return nil
 }
 
-func retry(cfg Config) (t trace.Retry) {
+func retry(adapter Adapter) (t trace.Retry) {
 	t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-		if cfg.Details()&trace.RetryEvents != 0 && isTraceRetry(*info.Context) { //nolint:nestif
+		if adapter.Details()&trace.RetryEvents != 0 && isTraceRetry(*info.Context) { //nolint:nestif
 			operationName := info.Label
 			if operationName == "" {
 				operationName = info.Call.FunctionID()
@@ -69,7 +69,7 @@ func retry(cfg Config) (t trace.Retry) {
 				operationName = functionID
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				operationName,
 				kv.Bool("idempotent", info.Idempotent),

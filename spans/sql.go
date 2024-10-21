@@ -1,4 +1,4 @@
-package otel
+package spans
 
 import (
 	"context"
@@ -24,20 +24,20 @@ func isStmtCall(ctx context.Context) bool {
 // databaseSQL makes trace.DatabaseSQL with logging events from details
 //
 //nolint:funlen
-func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
+func databaseSQL(adapter Adapter) (t trace.DatabaseSQL) {
 	childSpanWithReplaceCtx := func(
 		ctx *context.Context,
 		operationName string,
 		fields ...kv.KeyValue,
 	) (s Span) {
-		return childSpanWithReplaceCtx(cfg, ctx, operationName, fields...)
+		return childSpanWithReplaceCtx(adapter, ctx, operationName, fields...)
 	}
 	t.OnConnectorConnect = func(
 		info trace.DatabaseSQLConnectorConnectStartInfo,
 	) func(
 		trace.DatabaseSQLConnectorConnectDoneInfo,
 	) {
-		if cfg.Details()&trace.DatabaseSQLConnectorEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLConnectorEvents != 0 {
 			start := childSpanWithReplaceCtx(info.Context,
 				info.Call.FunctionID(),
 			)
@@ -53,7 +53,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnConnPing = func(info trace.DatabaseSQLConnPingStartInfo) func(trace.DatabaseSQLConnPingDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLConnEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLConnEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -70,7 +70,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnConnPrepare = func(info trace.DatabaseSQLConnPrepareStartInfo) func(trace.DatabaseSQLConnPrepareDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLConnEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLConnEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -88,7 +88,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnConnExec = func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLConnEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLConnEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -108,7 +108,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnConnQuery = func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLConnEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLConnEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -130,7 +130,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 	t.OnConnIsTableExists = func(info trace.DatabaseSQLConnIsTableExistsStartInfo) func(
 		trace.DatabaseSQLConnIsTableExistsDoneInfo,
 	) {
-		if cfg.Details()&trace.DatabaseSQLConnEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLConnEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -149,7 +149,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnConnBegin = func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLTxEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -167,7 +167,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnTxRollback = func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLTxEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -185,7 +185,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnTxCommit = func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLTxEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -203,7 +203,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnTxExec = func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLTxEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -212,7 +212,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 			)
 
 			if !isStmtCall(*info.Context) {
-				start.Link(cfg.SpanFromContext(info.TxContext))
+				start.Link(adapter.SpanFromContext(info.TxContext))
 			}
 
 			return func(info trace.DatabaseSQLTxExecDoneInfo) {
@@ -226,7 +226,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnTxQuery = func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLTxEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -235,7 +235,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 			)
 
 			if !isStmtCall(*info.Context) {
-				start.Link(cfg.SpanFromContext(info.TxContext))
+				start.Link(adapter.SpanFromContext(info.TxContext))
 			}
 
 			return func(info trace.DatabaseSQLTxQueryDoneInfo) {
@@ -249,7 +249,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnTxPrepare = func(info trace.DatabaseSQLTxPrepareStartInfo) func(trace.DatabaseSQLTxPrepareDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLTxEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLTxEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
@@ -268,14 +268,14 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnStmtExec = func(info trace.DatabaseSQLStmtExecStartInfo) func(trace.DatabaseSQLStmtExecDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLStmtEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLStmtEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
 			)
 
-			start.Link(cfg.SpanFromContext(info.StmtContext))
+			start.Link(adapter.SpanFromContext(info.StmtContext))
 
 			*info.Context = markStmtCall(*info.Context)
 
@@ -290,14 +290,14 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnStmtQuery = func(info trace.DatabaseSQLStmtQueryStartInfo) func(trace.DatabaseSQLStmtQueryDoneInfo) {
-		if cfg.Details()&trace.DatabaseSQLStmtEvents != 0 {
+		if adapter.Details()&trace.DatabaseSQLStmtEvents != 0 {
 			start := childSpanWithReplaceCtx(
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
 			)
 
-			start.Link(cfg.SpanFromContext(info.StmtContext))
+			start.Link(adapter.SpanFromContext(info.StmtContext))
 
 			*info.Context = markStmtCall(*info.Context)
 

@@ -1,4 +1,4 @@
-package otel
+package spans
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 )
 
 //nolint:funlen,gocyclo
-func query(cfg Config) trace.Query {
+func query(adapter Adapter) trace.Query {
 	nodeID := func(session interface{ NodeID() uint32 }) int64 {
 		if session != nil {
 			return int64(session.NodeID())
@@ -21,11 +21,11 @@ func query(cfg Config) trace.Query {
 
 	return trace.Query{
 		OnNew: func(info trace.QueryNewStartInfo) func(info trace.QueryNewDoneInfo) {
-			if cfg.Details()&trace.QueryEvents == 0 {
+			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -35,11 +35,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnClose: func(info trace.QueryCloseStartInfo) func(info trace.QueryCloseDoneInfo) {
-			if cfg.Details()&trace.QueryEvents == 0 {
+			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -52,11 +52,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnPoolNew: func(info trace.QueryPoolNewStartInfo) func(trace.QueryPoolNewDoneInfo) {
-			if cfg.Details()&trace.QueryPoolEvents == 0 {
+			if adapter.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -68,11 +68,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnPoolClose: func(info trace.QueryPoolCloseStartInfo) func(trace.QueryPoolCloseDoneInfo) {
-			if cfg.Details()&trace.QueryPoolEvents == 0 {
+			if adapter.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -85,11 +85,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnPoolTry: func(info trace.QueryPoolTryStartInfo) func(trace.QueryPoolTryDoneInfo) {
-			if cfg.Details()&trace.QueryPoolEvents == 0 {
+			if adapter.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -102,11 +102,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnPoolWith: func(info trace.QueryPoolWithStartInfo) func(trace.QueryPoolWithDoneInfo) {
-			if cfg.Details()&trace.QueryPoolEvents == 0 {
+			if adapter.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -120,11 +120,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnPoolPut: func(info trace.QueryPoolPutStartInfo) func(trace.QueryPoolPutDoneInfo) {
-			if cfg.Details()&trace.QueryPoolEvents == 0 {
+			if adapter.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -137,11 +137,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnPoolGet: func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
-			if cfg.Details()&trace.QueryPoolEvents == 0 {
+			if adapter.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -154,11 +154,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnDo: func(info trace.QueryDoStartInfo) func(trace.QueryDoDoneInfo) {
-			if cfg.Details()&trace.QueryEvents == 0 {
+			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -172,11 +172,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnDoTx: func(info trace.QueryDoTxStartInfo) func(trace.QueryDoTxDoneInfo) {
-			if cfg.Details()&trace.QueryEvents == 0 {
+			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -190,11 +190,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnExec: func(info trace.QueryExecStartInfo) func(info trace.QueryExecDoneInfo) {
-			if cfg.Details()&trace.QueryEvents == 0 {
+			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -208,11 +208,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnQuery: func(info trace.QueryQueryStartInfo) func(info trace.QueryQueryDoneInfo) {
-			if cfg.Details()&trace.QueryEvents == 0 {
+			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -226,11 +226,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnQueryResultSet: func(info trace.QueryQueryResultSetStartInfo) func(info trace.QueryQueryResultSetDoneInfo) {
-			if cfg.Details()&trace.QueryEvents == 0 {
+			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -244,11 +244,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnQueryRow: func(info trace.QueryQueryRowStartInfo) func(info trace.QueryQueryRowDoneInfo) {
-			if cfg.Details()&trace.QueryEvents == 0 {
+			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -262,11 +262,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(info trace.QuerySessionCreateDoneInfo) {
-			if cfg.Details()&trace.QuerySessionEvents == 0 {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -282,7 +282,7 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {
-			if cfg.Details()&trace.QuerySessionEvents == 0 {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
 
@@ -291,20 +291,20 @@ func query(cfg Config) trace.Query {
 
 			return func(info trace.QuerySessionAttachDoneInfo) {
 				if info.Error == nil {
-					logToParentSpan(cfg, ctx, call)
+					logToParentSpan(adapter, ctx, call)
 				} else if errors.Is(info.Error, io.EOF) {
-					logToParentSpan(cfg, ctx, call+" => io.EOF")
+					logToParentSpan(adapter, ctx, call+" => io.EOF")
 				} else {
-					logToParentSpanError(cfg, ctx, info.Error)
+					logToParentSpanError(adapter, ctx, info.Error)
 				}
 			}
 		},
 		OnSessionDelete: func(info trace.QuerySessionDeleteStartInfo) func(info trace.QuerySessionDeleteDoneInfo) {
-			if cfg.Details()&trace.QuerySessionEvents == 0 {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -317,11 +317,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnSessionExec: func(info trace.QuerySessionExecStartInfo) func(info trace.QuerySessionExecDoneInfo) {
-			if cfg.Details()&trace.QuerySessionEvents == 0 {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -335,11 +335,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnSessionQuery: func(info trace.QuerySessionQueryStartInfo) func(info trace.QuerySessionQueryDoneInfo) {
-			if cfg.Details()&trace.QuerySessionEvents == 0 {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -355,11 +355,11 @@ func query(cfg Config) trace.Query {
 		OnSessionQueryResultSet: func(
 			info trace.QuerySessionQueryResultSetStartInfo,
 		) func(info trace.QuerySessionQueryResultSetDoneInfo) {
-			if cfg.Details()&trace.QuerySessionEvents == 0 {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -373,11 +373,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnSessionQueryRow: func(info trace.QuerySessionQueryRowStartInfo) func(info trace.QuerySessionQueryRowDoneInfo) {
-			if cfg.Details()&trace.QuerySessionEvents == 0 {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -391,11 +391,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(info trace.QuerySessionBeginDoneInfo) {
-			if cfg.Details()&trace.QuerySessionEvents == 0 {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -409,7 +409,7 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnResultNew: func(info trace.QueryResultNewStartInfo) func(info trace.QueryResultNewDoneInfo) {
-			if cfg.Details()&trace.QueryResultEvents == 0 {
+			if adapter.Details()&trace.QueryResultEvents == 0 {
 				return nil
 			}
 
@@ -418,14 +418,14 @@ func query(cfg Config) trace.Query {
 
 			return func(info trace.QueryResultNewDoneInfo) {
 				if info.Error == nil {
-					logToParentSpan(cfg, ctx, call)
+					logToParentSpan(adapter, ctx, call)
 				} else {
-					logToParentSpanError(cfg, ctx, info.Error)
+					logToParentSpanError(adapter, ctx, info.Error)
 				}
 			}
 		},
 		OnResultNextPart: func(info trace.QueryResultNextPartStartInfo) func(info trace.QueryResultNextPartDoneInfo) {
-			if cfg.Details()&trace.QueryResultEvents == 0 {
+			if adapter.Details()&trace.QueryResultEvents == 0 {
 				return nil
 			}
 
@@ -434,17 +434,17 @@ func query(cfg Config) trace.Query {
 
 			return func(info trace.QueryResultNextPartDoneInfo) {
 				if info.Error == nil {
-					logToParentSpan(cfg, ctx, call)
+					logToParentSpan(adapter, ctx, call)
 				} else if errors.Is(info.Error, io.EOF) {
-					logToParentSpan(cfg, ctx, call+" => io.EOF")
+					logToParentSpan(adapter, ctx, call+" => io.EOF")
 				} else {
-					logToParentSpanError(cfg, ctx, info.Error)
+					logToParentSpanError(adapter, ctx, info.Error)
 				}
 			}
 		},
 		OnResultNextResultSet: func(info trace.QueryResultNextResultSetStartInfo) func(
 			info trace.QueryResultNextResultSetDoneInfo) {
-			if cfg.Details()&trace.QueryResultEvents == 0 {
+			if adapter.Details()&trace.QueryResultEvents == 0 {
 				return nil
 			}
 
@@ -453,16 +453,16 @@ func query(cfg Config) trace.Query {
 
 			return func(info trace.QueryResultNextResultSetDoneInfo) {
 				if info.Error == nil {
-					logToParentSpan(cfg, ctx, call)
+					logToParentSpan(adapter, ctx, call)
 				} else if errors.Is(info.Error, io.EOF) {
-					logToParentSpan(cfg, ctx, call+" => io.EOF")
+					logToParentSpan(adapter, ctx, call+" => io.EOF")
 				} else {
-					logToParentSpanError(cfg, ctx, info.Error)
+					logToParentSpanError(adapter, ctx, info.Error)
 				}
 			}
 		},
 		OnResultClose: func(info trace.QueryResultCloseStartInfo) func(info trace.QueryResultCloseDoneInfo) {
-			if cfg.Details()&trace.QueryResultEvents == 0 {
+			if adapter.Details()&trace.QueryResultEvents == 0 {
 				return nil
 			}
 
@@ -471,18 +471,18 @@ func query(cfg Config) trace.Query {
 
 			return func(info trace.QueryResultCloseDoneInfo) {
 				if info.Error == nil {
-					logToParentSpan(cfg, ctx, call)
+					logToParentSpan(adapter, ctx, call)
 				} else {
-					logToParentSpanError(cfg, ctx, info.Error)
+					logToParentSpanError(adapter, ctx, info.Error)
 				}
 			}
 		},
 		OnTxExec: func(info trace.QueryTxExecStartInfo) func(info trace.QueryTxExecDoneInfo) {
-			if cfg.Details()&trace.QueryTransactionEvents == 0 {
+			if adapter.Details()&trace.QueryTransactionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -496,11 +496,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnTxQuery: func(info trace.QueryTxQueryStartInfo) func(info trace.QueryTxQueryDoneInfo) {
-			if cfg.Details()&trace.QueryTransactionEvents == 0 {
+			if adapter.Details()&trace.QueryTransactionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -514,11 +514,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnTxQueryResultSet: func(info trace.QueryTxQueryResultSetStartInfo) func(info trace.QueryTxQueryResultSetDoneInfo) {
-			if cfg.Details()&trace.QueryTransactionEvents == 0 {
+			if adapter.Details()&trace.QueryTransactionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
@@ -532,11 +532,11 @@ func query(cfg Config) trace.Query {
 			}
 		},
 		OnTxQueryRow: func(info trace.QueryTxQueryRowStartInfo) func(info trace.QueryTxQueryRowDoneInfo) {
-			if cfg.Details()&trace.QueryTransactionEvents == 0 {
+			if adapter.Details()&trace.QueryTransactionEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("Query", strings.TrimSpace(info.Query)),

@@ -1,4 +1,4 @@
-package otel
+package spans
 
 import (
 	"net/url"
@@ -10,7 +10,7 @@ import (
 // table makes table.ClientTrace with solomon metrics publishing
 //
 //nolint:funlen
-func table(cfg Config) (t trace.Table) { //nolint:gocyclo
+func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 	nodeID := func(sessionID string) string {
 		u, err := url.Parse(sessionID)
 		if err != nil {
@@ -20,7 +20,7 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return u.Query().Get("node_id")
 	}
 	t.OnCreateSession = func(info trace.TableCreateSessionStartInfo) func(trace.TableCreateSessionDoneInfo) {
-		if cfg.Details()&trace.TableEvents != 0 {
+		if adapter.Details()&trace.TableEvents != 0 {
 			fieldsStore := fieldsStoreFromContext(info.Context)
 			*info.Context = withFunctionID(*info.Context, info.Call.FunctionID())
 
@@ -38,14 +38,14 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnDo = func(info trace.TableDoStartInfo) func(trace.TableDoDoneInfo) {
-		if cfg.Details()&trace.TableEvents != 0 {
+		if adapter.Details()&trace.TableEvents != 0 {
 			*info.Context = noTraceRetry(*info.Context)
 			operationName := info.Label
 			if operationName == "" {
 				operationName = info.Call.FunctionID()
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				operationName,
 				kv.Bool("idempotent", info.Idempotent),
@@ -68,14 +68,14 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnDoTx = func(info trace.TableDoTxStartInfo) func(trace.TableDoTxDoneInfo) {
-		if cfg.Details()&trace.TableEvents != 0 {
+		if adapter.Details()&trace.TableEvents != 0 {
 			*info.Context = noTraceRetry(*info.Context)
 			operationName := info.Label
 			if operationName == "" {
 				operationName = info.Call.FunctionID()
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				operationName,
 				kv.Bool("idempotent", info.Idempotent),
@@ -98,9 +98,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
-		if cfg.Details()&trace.TableSessionLifeCycleEvents != 0 {
+		if adapter.Details()&trace.TableSessionLifeCycleEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -119,9 +119,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnSessionDelete = func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
-		if cfg.Details()&trace.TableSessionLifeCycleEvents != 0 {
+		if adapter.Details()&trace.TableSessionLifeCycleEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -136,9 +136,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnSessionKeepAlive = func(info trace.TableKeepAliveStartInfo) func(trace.TableKeepAliveDoneInfo) {
-		if cfg.Details()&trace.TableSessionLifeCycleEvents != 0 {
+		if adapter.Details()&trace.TableSessionLifeCycleEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -153,9 +153,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnSessionBulkUpsert = func(info trace.TableSessionBulkUpsertStartInfo) func(trace.TableSessionBulkUpsertDoneInfo) {
-		if cfg.Details()&trace.TableSessionQueryEvents != 0 {
+		if adapter.Details()&trace.TableSessionQueryEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -174,9 +174,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 	) func(
 		trace.TablePrepareDataQueryDoneInfo,
 	) {
-		if cfg.Details()&trace.TableSessionQueryInvokeEvents != 0 {
+		if adapter.Details()&trace.TableSessionQueryInvokeEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", info.Query),
@@ -200,9 +200,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 	) func(
 		trace.TableExecuteDataQueryDoneInfo,
 	) {
-		if cfg.Details()&trace.TableSessionQueryInvokeEvents != 0 {
+		if adapter.Details()&trace.TableSessionQueryInvokeEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -235,9 +235,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 	) func(
 		trace.TableSessionQueryStreamExecuteDoneInfo,
 	) {
-		if cfg.Details()&trace.TableSessionQueryStreamEvents != 0 {
+		if adapter.Details()&trace.TableSessionQueryStreamEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("query", safeStringer(info.Query)),
@@ -260,9 +260,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 	) func(
 		trace.TableSessionQueryStreamReadDoneInfo,
 	) {
-		if cfg.Details()&trace.TableSessionQueryStreamEvents != 0 {
+		if adapter.Details()&trace.TableSessionQueryStreamEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -281,9 +281,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnTxBegin = func(info trace.TableTxBeginStartInfo) func(trace.TableTxBeginDoneInfo) {
-		if cfg.Details()&trace.TableSessionTransactionEvents != 0 {
+		if adapter.Details()&trace.TableSessionTransactionEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -302,9 +302,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnTxCommit = func(info trace.TableTxCommitStartInfo) func(trace.TableTxCommitDoneInfo) {
-		if cfg.Details()&trace.TableSessionTransactionEvents != 0 {
+		if adapter.Details()&trace.TableSessionTransactionEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -320,9 +320,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnTxRollback = func(info trace.TableTxRollbackStartInfo) func(trace.TableTxRollbackDoneInfo) {
-		if cfg.Details()&trace.TableSessionTransactionEvents != 0 {
+		if adapter.Details()&trace.TableSessionTransactionEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -338,9 +338,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnTxExecute = func(info trace.TableTransactionExecuteStartInfo) func(trace.TableTransactionExecuteDoneInfo) {
-		if cfg.Details()&trace.TableSessionTransactionEvents != 0 {
+		if adapter.Details()&trace.TableSessionTransactionEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -361,9 +361,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 	) func(
 		info trace.TableTransactionExecuteStatementDoneInfo,
 	) {
-		if cfg.Details()&trace.TableSessionTransactionEvents != 0 {
+		if adapter.Details()&trace.TableSessionTransactionEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -380,9 +380,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
-		if cfg.Details()&trace.TableEvents != 0 {
+		if adapter.Details()&trace.TableEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -399,9 +399,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnClose = func(info trace.TableCloseStartInfo) func(trace.TableCloseDoneInfo) {
-		if cfg.Details()&trace.TableEvents != 0 {
+		if adapter.Details()&trace.TableEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -414,9 +414,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnPoolPut = func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
-		if cfg.Details()&trace.TablePoolAPIEvents != 0 {
+		if adapter.Details()&trace.TablePoolAPIEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
@@ -431,9 +431,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 		return nil
 	}
 	t.OnPoolGet = func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
-		if cfg.Details()&trace.TablePoolAPIEvents != 0 {
+		if adapter.Details()&trace.TablePoolAPIEvents != 0 {
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)

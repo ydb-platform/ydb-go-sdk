@@ -1,4 +1,4 @@
-package otel
+package spans
 
 import (
 	"bytes"
@@ -13,14 +13,14 @@ import (
 )
 
 // driver makes driver with publishing traces
-func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
+func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 	return trace.Driver{
 		OnRepeaterWakeUp: func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
-			if cfg.Details()&trace.DriverRepeaterEvents == 0 {
+			if adapter.Details()&trace.DriverRepeaterEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -33,14 +33,14 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnDial: func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
-			if cfg.Details()&trace.DriverConnEvents == 0 {
+			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			*info.Context = meta.WithTraceParent(*info.Context,
-				cfg.SpanFromContext(*info.Context).TraceID(),
-			)
+			if traceID, valid := adapter.SpanFromContext(*info.Context).TraceID(); valid {
+				*info.Context = meta.WithTraceParent(*info.Context, traceID)
+			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -53,14 +53,14 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnInvoke: func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
-			if cfg.Details()&trace.DriverConnEvents == 0 {
+			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			*info.Context = meta.WithTraceParent(*info.Context,
-				cfg.SpanFromContext(*info.Context).TraceID(),
-			)
+			if traceID, valid := adapter.SpanFromContext(*info.Context).TraceID(); valid {
+				*info.Context = meta.WithTraceParent(*info.Context, traceID)
+			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("address", safeAddress(info.Endpoint)),
@@ -89,20 +89,21 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnNewStream: func(info trace.DriverConnNewStreamStartInfo) func(trace.DriverConnNewStreamDoneInfo) {
-			if cfg.Details()&trace.DriverConnStreamEvents == 0 {
+			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
 			*info.Context = withGrpcStreamMsgCounters(*info.Context)
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("address", safeAddress(info.Endpoint)),
 				kv.String("method", string(info.Method)),
 			)
-			*info.Context = meta.WithTraceParent(*info.Context,
-				start.TraceID(),
-			)
+
+			if traceID, valid := start.TraceID(); valid {
+				*info.Context = meta.WithTraceParent(*info.Context, traceID)
+			}
 
 			return func(info trace.DriverConnNewStreamDoneInfo) {
 				finish(start, info.Error,
@@ -111,10 +112,10 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnStreamRecvMsg: func(info trace.DriverConnStreamRecvMsgStartInfo) func(trace.DriverConnStreamRecvMsgDoneInfo) {
-			if cfg.Details()&trace.DriverConnStreamEvents == 0 {
+			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			start := cfg.SpanFromContext(*info.Context)
+			start := adapter.SpanFromContext(*info.Context)
 			counters := grpcStreamMsgCountersFromContext(*info.Context)
 			if counters != nil {
 				counters.updateReceivedMessages()
@@ -127,10 +128,10 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnStreamSendMsg: func(info trace.DriverConnStreamSendMsgStartInfo) func(trace.DriverConnStreamSendMsgDoneInfo) {
-			if cfg.Details()&trace.DriverConnStreamEvents == 0 {
+			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			start := cfg.SpanFromContext(*info.Context)
+			start := adapter.SpanFromContext(*info.Context)
 			counters := grpcStreamMsgCountersFromContext(*info.Context)
 			if counters != nil {
 				counters.updateSentMessages()
@@ -145,11 +146,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 		OnConnStreamCloseSend: func(info trace.DriverConnStreamCloseSendStartInfo) func(
 			trace.DriverConnStreamCloseSendDoneInfo,
 		) {
-			if cfg.Details()&trace.DriverConnStreamEvents == 0 {
+			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -159,11 +160,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnStreamFinish: func(info trace.DriverConnStreamFinishInfo) {
-			if cfg.Details()&trace.DriverConnStreamEvents == 0 {
+			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				&info.Context,
 				info.Call.FunctionID(),
 			)
@@ -179,11 +180,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			finish(start, info.Error, attributes...)
 		},
 		OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
-			if cfg.Details()&trace.DriverConnEvents == 0 {
+			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("address", safeAddress(info.Endpoint)),
@@ -197,11 +198,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnClose: func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
-			if cfg.Details()&trace.DriverConnEvents == 0 {
+			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("address", safeAddress(info.Endpoint)),
@@ -215,10 +216,10 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnBan: func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {
-			if cfg.Details()&trace.DriverConnEvents == 0 {
+			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			s := cfg.SpanFromContext(*info.Context)
+			s := adapter.SpanFromContext(*info.Context)
 			s.Log(info.Call.FunctionID(),
 				kv.String("cause", safeError(info.Cause)),
 			)
@@ -226,10 +227,10 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			return nil
 		},
 		OnConnStateChange: func(info trace.DriverConnStateChangeStartInfo) func(trace.DriverConnStateChangeDoneInfo) {
-			if cfg.Details()&trace.DriverConnEvents == 0 {
+			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			s := cfg.SpanFromContext(*info.Context)
+			s := adapter.SpanFromContext(*info.Context)
 			oldState := safeStringer(info.State)
 			functionID := info.Call.FunctionID()
 
@@ -241,11 +242,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnBalancerInit: func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
-			if cfg.Details()&trace.DriverBalancerEvents == 0 {
+			if adapter.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("name", info.Name),
@@ -258,11 +259,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 		OnBalancerClusterDiscoveryAttempt: func(info trace.DriverBalancerClusterDiscoveryAttemptStartInfo) func(
 			trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
 		) {
-			if cfg.Details()&trace.DriverBalancerEvents == 0 {
+			if adapter.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("address", info.Address),
@@ -273,10 +274,10 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnBalancerUpdate: func(info trace.DriverBalancerUpdateStartInfo) func(trace.DriverBalancerUpdateDoneInfo) {
-			if cfg.Details()&trace.DriverBalancerEvents == 0 {
+			if adapter.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			start := childSpanWithReplaceCtx(cfg, info.Context,
+			start := childSpanWithReplaceCtx(adapter, info.Context,
 				info.Call.FunctionID(),
 				kv.String("database", info.Database),
 				kv.Bool("need_local_dc", info.NeedLocalDC),
@@ -310,10 +311,10 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 		) func(
 			trace.DriverBalancerChooseEndpointDoneInfo,
 		) {
-			if cfg.Details()&trace.DriverBalancerEvents == 0 {
+			if adapter.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			parent := cfg.SpanFromContext(*info.Context)
+			parent := adapter.SpanFromContext(*info.Context)
 			functionID := info.Call.FunctionID()
 
 			return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
@@ -328,10 +329,10 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnGetCredentials: func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
-			if cfg.Details()&trace.DriverCredentialsEvents == 0 {
+			if adapter.Details()&trace.DriverCredentialsEvents == 0 {
 				return nil
 			}
-			parent := cfg.SpanFromContext(*info.Context)
+			parent := adapter.SpanFromContext(*info.Context)
 			functionID := info.Call.FunctionID()
 
 			return func(info trace.DriverGetCredentialsDoneInfo) {
@@ -354,11 +355,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnInit: func(info trace.DriverInitStartInfo) func(trace.DriverInitDoneInfo) {
-			if cfg.Details()&trace.DriverEvents == 0 {
+			if adapter.Details()&trace.DriverEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 				kv.String("endpoint", info.Endpoint),
@@ -371,11 +372,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnClose: func(info trace.DriverCloseStartInfo) func(trace.DriverCloseDoneInfo) {
-			if cfg.Details()&trace.DriverEvents == 0 {
+			if adapter.Details()&trace.DriverEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)
@@ -385,11 +386,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnPoolNew: func(info trace.DriverConnPoolNewStartInfo) func(trace.DriverConnPoolNewDoneInfo) {
-			if cfg.Details()&trace.DriverEvents == 0 {
+			if adapter.Details()&trace.DriverEvents == 0 {
 				return nil
 			}
 			start := childSpanWithReplaceCtx(
-				cfg,
+				adapter,
 				info.Context,
 				info.Call.FunctionID(),
 			)

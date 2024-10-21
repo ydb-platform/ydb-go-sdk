@@ -1,4 +1,4 @@
-package otel
+package spans
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 type (
 	KeyValue = kv.KeyValue
 	Span     interface {
-		TraceID() string
+		TraceID() (_ string, valid bool)
 
 		Link(link Span, attributes ...KeyValue)
 
@@ -20,7 +20,7 @@ type (
 
 		End(attributes ...KeyValue)
 	}
-	Config interface {
+	Adapter interface {
 		trace.Detailer
 
 		SpanFromContext(ctx context.Context) Span

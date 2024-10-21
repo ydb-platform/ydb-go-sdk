@@ -1,10 +1,10 @@
-package otel
+package spans
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func scheme(_ Config) (t trace.Scheme) {
+func scheme(_ Adapter) (t trace.Scheme) {
 	t.OnListDirectory = func(info trace.SchemeListDirectoryStartInfo) func(trace.SchemeListDirectoryDoneInfo) {
 		*info.Context = withFunctionID(*info.Context, info.Call.FunctionID())
 
