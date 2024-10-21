@@ -464,6 +464,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "update")
 			l.Log(ctx, "start",
 				kv.Bool("needLocalDC", info.NeedLocalDC),
+				kv.String("database", info.Database),
 			)
 			start := time.Now()
 

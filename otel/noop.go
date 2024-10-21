@@ -16,16 +16,6 @@ type (
 	noopSpan   struct{}
 )
 
-func (noopSpan) Relation(Span) {}
-
-func (noopSpan) TraceID() string {
-	return ""
-}
-
-func (n noopSpan) Msg(string, ...KeyValue) {}
-
-func (n noopSpan) End(...KeyValue) {}
-
 func (noopConfig) Details() trace.Details {
 	return 0
 }
@@ -37,3 +27,13 @@ func (noopConfig) SpanFromContext(context.Context) Span {
 func (noopConfig) Start(ctx context.Context, _ string, _ ...KeyValue) (context.Context, Span) {
 	return ctx, noopSpan{}
 }
+
+func (noopSpan) Relation(Span) {}
+
+func (noopSpan) TraceID() string {
+	return ""
+}
+
+func (n noopSpan) Msg(string, ...KeyValue) {}
+
+func (n noopSpan) End(...KeyValue) {}

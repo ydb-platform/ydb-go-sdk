@@ -265,6 +265,7 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 				cfg,
 				info.Context,
 				info.Call.FunctionID(),
+				kv.String("address", info.Address),
 			)
 
 			return func(info trace.DriverBalancerClusterDiscoveryAttemptDoneInfo) {
@@ -275,9 +276,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			if cfg.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			needLocalDC := info.NeedLocalDC
-			functionID := info.Call.FunctionID()
-			s := cfg.SpanFromContext(*info.Context)
+			start := childSpanWithReplaceCtx(cfg, info.Context,
+				info.Call.FunctionID(),
+				kv.String("database", info.Database),
+				kv.Bool("need_local_dc", info.NeedLocalDC),
+			)
 
 			return func(info trace.DriverBalancerUpdateDoneInfo) {
 				var (
@@ -294,12 +297,11 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 				for i, e := range info.Dropped {
 					dropped[i] = e.String()
 				}
-				s.Msg(functionID,
+				start.End(
 					kv.String("local_dc", info.LocalDC),
 					kv.Strings("endpoints", endpoints),
 					kv.Strings("added", added),
 					kv.Strings("dropped", dropped),
-					kv.Bool("need_local_dc", needLocalDC),
 				)
 			}
 		},

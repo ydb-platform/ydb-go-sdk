@@ -139,12 +139,8 @@ func (r *repeater) Force() {
 	}
 }
 
-func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-
-	ctx = WithEvent(ctx, e)
+func (r *repeater) wakeUp(e Event) (err error) {
+	ctx := WithEvent(context.Background(), e)
 
 	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater.(*repeater).wakeUp"),
@@ -203,7 +199,7 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 		if event == EventCancel {
 			return
 		}
-		if err := r.wakeUp(ctx, event); err != nil {
+		if err := r.wakeUp(event); err != nil {
 			forceIndex++
 		} else {
 			forceIndex = 0
