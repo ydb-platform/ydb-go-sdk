@@ -12,9 +12,11 @@ type (
 	Span     interface {
 		TraceID() string
 
-		Relation(span Span)
+		Link(link Span, attributes ...KeyValue)
 
-		Msg(msg string, attributes ...KeyValue)
+		Log(msg string, attributes ...KeyValue)
+		Warn(err error, attributes ...KeyValue)
+		Error(err error, attributes ...KeyValue)
 
 		End(attributes ...KeyValue)
 	}

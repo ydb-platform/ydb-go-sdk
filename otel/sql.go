@@ -212,7 +212,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 			)
 
 			if !isStmtCall(*info.Context) {
-				start.Relation(cfg.SpanFromContext(info.TxContext))
+				start.Link(cfg.SpanFromContext(info.TxContext))
 			}
 
 			return func(info trace.DatabaseSQLTxExecDoneInfo) {
@@ -235,7 +235,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 			)
 
 			if !isStmtCall(*info.Context) {
-				start.Relation(cfg.SpanFromContext(info.TxContext))
+				start.Link(cfg.SpanFromContext(info.TxContext))
 			}
 
 			return func(info trace.DatabaseSQLTxQueryDoneInfo) {
@@ -275,7 +275,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 				kv.String("query", info.Query),
 			)
 
-			start.Relation(cfg.SpanFromContext(info.StmtContext))
+			start.Link(cfg.SpanFromContext(info.StmtContext))
 
 			*info.Context = markStmtCall(*info.Context)
 
@@ -297,7 +297,7 @@ func databaseSQL(cfg Config) (t trace.DatabaseSQL) {
 				kv.String("query", info.Query),
 			)
 
-			start.Relation(cfg.SpanFromContext(info.StmtContext))
+			start.Link(cfg.SpanFromContext(info.StmtContext))
 
 			*info.Context = markStmtCall(*info.Context)
 

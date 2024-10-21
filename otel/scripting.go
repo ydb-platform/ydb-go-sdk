@@ -55,15 +55,15 @@ func scripting(cfg Config) (t trace.Scripting) {
 			) func(
 				trace.ScriptingStreamExecuteDoneInfo,
 			) {
-				start.Msg("", kv.Error(info.Error))
+				if info.Error != nil {
+					start.Warn(info.Error)
+				}
 
 				return func(info trace.ScriptingStreamExecuteDoneInfo) {
-					start.Msg("")
 					if info.Error != nil {
-						start.End(kv.Error(info.Error))
-					} else {
-						start.End()
+						start.Error(info.Error)
 					}
+					start.End()
 				}
 			}
 		}

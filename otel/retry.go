@@ -75,7 +75,7 @@ func retry(cfg Config) (t trace.Retry) {
 				kv.Bool("idempotent", info.Idempotent),
 			)
 			if info.NestedCall {
-				start.Msg("nested call", kv.Error(errNestedCall))
+				start.Warn(errNestedCall)
 			}
 			ctx := *info.Context
 
@@ -87,7 +87,7 @@ func retry(cfg Config) (t trace.Retry) {
 					fields = append(fields, fieldsFromStore...)
 				}
 				if info.Error != nil {
-					fields = append(fields, kv.Error(info.Error))
+					start.Error(info.Error)
 				}
 				start.End(fields...)
 			}

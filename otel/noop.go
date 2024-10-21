@@ -28,12 +28,14 @@ func (noopConfig) Start(ctx context.Context, _ string, _ ...KeyValue) (context.C
 	return ctx, noopSpan{}
 }
 
-func (noopSpan) Relation(Span) {}
+func (noopSpan) Link(Span, ...KeyValue) {}
 
 func (noopSpan) TraceID() string {
 	return ""
 }
 
-func (n noopSpan) Msg(string, ...KeyValue) {}
+func (n noopSpan) Log(string, ...KeyValue)  {}
+func (n noopSpan) Warn(error, ...KeyValue)  {}
+func (n noopSpan) Error(error, ...KeyValue) {}
 
 func (n noopSpan) End(...KeyValue) {}

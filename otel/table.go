@@ -51,7 +51,7 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 				kv.Bool("idempotent", info.Idempotent),
 			)
 			if info.NestedCall {
-				start.Msg("nested call", kv.Error(errNestedCall))
+				start.Warn(errNestedCall)
 			}
 
 			return func(info trace.TableDoDoneInfo) {
@@ -59,7 +59,7 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 					kv.Int("attempts", info.Attempts),
 				}
 				if info.Error != nil {
-					fields = append(fields, kv.Error(info.Error))
+					start.Error(info.Error)
 				}
 				start.End(fields...)
 			}
@@ -81,7 +81,7 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 				kv.Bool("idempotent", info.Idempotent),
 			)
 			if info.NestedCall {
-				start.Msg("nested call", kv.Error(errNestedCall))
+				start.Warn(errNestedCall)
 			}
 
 			return func(info trace.TableDoTxDoneInfo) {
@@ -89,7 +89,7 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 					kv.Int("attempts", info.Attempts),
 				}
 				if info.Error != nil {
-					fields = append(fields, kv.Error(info.Error))
+					start.Error(info.Error)
 				}
 				start.End(fields...)
 			}
@@ -247,10 +247,9 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 
 			return func(info trace.TableSessionQueryStreamExecuteDoneInfo) {
 				if info.Error != nil {
-					start.End(kv.Error(info.Error))
-				} else {
-					start.End()
+					start.Error(info.Error)
 				}
+				start.End()
 			}
 		}
 
@@ -272,7 +271,7 @@ func table(cfg Config) (t trace.Table) { //nolint:gocyclo
 
 			return func(info trace.TableSessionQueryStreamReadDoneInfo) {
 				if info.Error != nil {
-					start.End(kv.Error(info.Error))
+					start.Error(info.Error)
 				} else {
 					start.End()
 				}

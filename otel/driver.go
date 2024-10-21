@@ -219,7 +219,7 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 				return nil
 			}
 			s := cfg.SpanFromContext(*info.Context)
-			s.Msg(info.Call.FunctionID(),
+			s.Log(info.Call.FunctionID(),
 				kv.String("cause", safeError(info.Cause)),
 			)
 
@@ -234,7 +234,7 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 			functionID := info.Call.FunctionID()
 
 			return func(info trace.DriverConnStateChangeDoneInfo) {
-				s.Msg(functionID,
+				s.Log(functionID,
 					kv.String("old state", oldState),
 					kv.String("new state", safeStringer(info.State)),
 				)
@@ -318,11 +318,9 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 
 			return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 				if info.Error != nil {
-					parent.Msg(functionID,
-						kv.Error(info.Error),
-					)
+					parent.Error(info.Error)
 				} else {
-					parent.Msg(functionID,
+					parent.Log(functionID,
 						kv.String("address", safeAddress(info.Endpoint)),
 						kv.String("nodeID", safeNodeID(info.Endpoint)),
 					)
@@ -338,9 +336,7 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 
 			return func(info trace.DriverGetCredentialsDoneInfo) {
 				if info.Error != nil {
-					parent.Msg(functionID,
-						kv.Error(info.Error),
-					)
+					parent.Error(info.Error)
 				} else {
 					var mask bytes.Buffer
 					if len(info.Token) > 16 {
@@ -351,7 +347,7 @@ func driver(cfg Config) trace.Driver { //nolint:gocyclo,funlen
 						mask.WriteString("****")
 					}
 					mask.WriteString(fmt.Sprintf("(CRC-32c: %08X)", crc32.Checksum([]byte(info.Token), crc32.IEEETable)))
-					parent.Msg(functionID,
+					parent.Log(functionID,
 						kv.String("token", mask.String()),
 					)
 				}

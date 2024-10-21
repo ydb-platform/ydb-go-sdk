@@ -37,7 +37,7 @@ func finish(
 	fields ...KeyValue,
 ) {
 	if err != nil {
-		s.Msg(err.Error(), kv.Error(err))
+		s.Error(err)
 	}
 	s.End(fields...)
 }
@@ -50,12 +50,11 @@ func logError(
 	var ydbErr ydb.Error
 	if xerrors.As(err, &ydbErr) {
 		fields = append(fields,
-			kv.Error(err),
 			kv.Int("error.ydb.code", int(ydbErr.Code())),
 			kv.String("error.ydb.name", ydbErr.Name()),
 		)
 	}
-	s.Msg(err.Error(), fields...)
+	s.Error(err, fields...)
 }
 
 func logToParentSpan(
@@ -65,7 +64,7 @@ func logToParentSpan(
 	fields ...KeyValue, //nolint:unparam
 ) {
 	parent := cfg.SpanFromContext(ctx)
-	parent.Msg(msg, fields...)
+	parent.Log(msg, fields...)
 }
 
 func logToParentSpanError(
