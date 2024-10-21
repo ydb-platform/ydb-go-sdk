@@ -1,3 +1,4 @@
+## v3.85.0
 * Added experimental package `spans` with tracing adapter interfaces for OpenTelemetry, OpenTracing, etc.
 * Added `db.Topic().DescribeTopicConsumer()` method for displaying consumer information
 * Marked as deprecated options `ydb.WithDatabase(database)` and `ydb.WithEndpoint(endpoint)`
