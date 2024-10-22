@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -29,22 +30,22 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			target := info.Target
 			addresses := info.Resolved
 			l.Log(ctx, "start",
-				String("target", target),
-				Strings("resolved", addresses),
+				kv.String("target", target),
+				kv.Strings("resolved", addresses),
 			)
 
 			return func(info trace.DriverResolveDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						String("target", target),
-						Strings("resolved", addresses),
+						kv.String("target", target),
+						kv.Strings("resolved", addresses),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						String("target", target),
-						Strings("resolved", addresses),
-						versionField(),
+						kv.Error(info.Error),
+						kv.String("target", target),
+						kv.Strings("resolved", addresses),
+						kv.Version(),
 					)
 				}
 			}
@@ -58,28 +59,28 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			secure := info.Secure
 			ctx := with(*info.Context, DEBUG, "ydb", "driver", "resolver", "init")
 			l.Log(ctx, "start",
-				String("endpoint", endpoint),
-				String("database", database),
-				Bool("secure", secure),
+				kv.String("endpoint", endpoint),
+				kv.String("database", database),
+				kv.Bool("secure", secure),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverInitDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						String("endpoint", endpoint),
-						String("database", database),
-						Bool("secure", secure),
-						latencyField(start),
+						kv.String("endpoint", endpoint),
+						kv.String("database", database),
+						kv.Bool("secure", secure),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						Error(info.Error),
-						String("endpoint", endpoint),
-						String("database", database),
-						Bool("secure", secure),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.String("endpoint", endpoint),
+						kv.String("database", database),
+						kv.Bool("secure", secure),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -95,13 +96,13 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			return func(info trace.DriverCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -113,22 +114,22 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "dial")
 			endpoint := info.Endpoint
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				kv.Stringer("endpoint", endpoint),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnDialDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
-						latencyField(start),
+						kv.Stringer("endpoint", endpoint),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						Stringer("endpoint", endpoint),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Stringer("endpoint", endpoint),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -140,16 +141,16 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			ctx := with(context.Background(), TRACE, "ydb", "driver", "conn", "state", "change")
 			endpoint := info.Endpoint
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
-				Stringer("state", info.State),
+				kv.Stringer("endpoint", endpoint),
+				kv.Stringer("state", info.State),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnStateChangeDoneInfo) {
 				l.Log(ctx, "done",
-					Stringer("endpoint", endpoint),
-					latencyField(start),
-					Stringer("state", info.State),
+					kv.Stringer("endpoint", endpoint),
+					kv.Latency(start),
+					kv.Stringer("state", info.State),
 				)
 			}
 		},
@@ -160,22 +161,22 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "close")
 			endpoint := info.Endpoint
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				kv.Stringer("endpoint", endpoint),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
-						latencyField(start),
+						kv.Stringer("endpoint", endpoint),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						Stringer("endpoint", endpoint),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Stringer("endpoint", endpoint),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -188,27 +189,27 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			endpoint := info.Endpoint
 			method := string(info.Method)
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
-				String("method", method),
+				kv.Stringer("endpoint", endpoint),
+				kv.String("method", method),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnInvokeDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
-						String("method", method),
-						latencyField(start),
-						Stringer("metadata", metadata(info.Metadata)),
+						kv.Stringer("endpoint", endpoint),
+						kv.String("method", method),
+						kv.Latency(start),
+						kv.Stringer("metadata", kv.Metadata(info.Metadata)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						Stringer("endpoint", endpoint),
-						String("method", method),
-						latencyField(start),
-						Stringer("metadata", metadata(info.Metadata)),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Stringer("endpoint", endpoint),
+						kv.String("method", method),
+						kv.Latency(start),
+						kv.Stringer("metadata", kv.Metadata(info.Metadata)),
+						kv.Version(),
 					)
 				}
 			}
@@ -225,25 +226,25 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			endpoint := info.Endpoint
 			method := string(info.Method)
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
-				String("method", method),
+				kv.Stringer("endpoint", endpoint),
+				kv.String("method", method),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnNewStreamDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
-						String("method", method),
-						latencyField(start),
+						kv.Stringer("endpoint", endpoint),
+						kv.String("method", method),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						Stringer("endpoint", endpoint),
-						String("method", method),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Stringer("endpoint", endpoint),
+						kv.String("method", method),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -261,13 +262,13 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			return func(info trace.DriverConnStreamCloseSendDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -283,13 +284,13 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			return func(info trace.DriverConnStreamSendMsgDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -305,13 +306,13 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			return func(info trace.DriverConnStreamRecvMsgDoneInfo) {
 				if xerrors.HideEOF(info.Error) == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -324,18 +325,18 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			endpoint := info.Endpoint
 			cause := info.Cause
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
-				NamedError("cause", cause),
+				kv.Stringer("endpoint", endpoint),
+				kv.NamedError("cause", cause),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnBanDoneInfo) {
 				l.Log(WithLevel(ctx, WARN), "done",
-					Stringer("endpoint", endpoint),
-					latencyField(start),
-					Stringer("state", info.State),
-					NamedError("cause", cause),
-					versionField(),
+					kv.Stringer("endpoint", endpoint),
+					kv.Latency(start),
+					kv.Stringer("state", info.State),
+					kv.NamedError("cause", cause),
+					kv.Version(),
 				)
 			}
 		},
@@ -346,15 +347,15 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "allow")
 			endpoint := info.Endpoint
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				kv.Stringer("endpoint", endpoint),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnAllowDoneInfo) {
 				l.Log(ctx, "done",
-					Stringer("endpoint", endpoint),
-					latencyField(start),
-					Stringer("state", info.State),
+					kv.Stringer("endpoint", endpoint),
+					kv.Latency(start),
+					kv.Stringer("state", info.State),
 				)
 			}
 		},
@@ -366,25 +367,25 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			name := info.Name
 			event := info.Event
 			l.Log(ctx, "start",
-				String("name", name),
-				String("event", event),
+				kv.String("name", name),
+				kv.String("event", event),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverRepeaterWakeUpDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						String("name", name),
-						String("event", event),
-						latencyField(start),
+						kv.String("name", name),
+						kv.String("event", event),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						Error(info.Error),
-						String("name", name),
-						String("event", event),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.String("name", name),
+						kv.String("event", event),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -399,7 +400,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 
 			return func(info trace.DriverBalancerInitDoneInfo) {
 				l.Log(WithLevel(ctx, INFO), "done",
-					latencyField(start),
+					kv.Latency(start),
 				)
 			}
 		},
@@ -414,13 +415,13 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			return func(info trace.DriverBalancerCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -440,14 +441,14 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						Stringer("endpoint", info.Endpoint),
+						kv.Latency(start),
+						kv.Stringer("endpoint", info.Endpoint),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						Error(info.Error),
-						latencyField(start),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.Version(),
 					)
 				}
 			}
@@ -462,17 +463,18 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "update")
 			l.Log(ctx, "start",
-				Bool("needLocalDC", info.NeedLocalDC),
+				kv.Bool("needLocalDC", info.NeedLocalDC),
+				kv.String("database", info.Database),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverBalancerUpdateDoneInfo) {
 				l.Log(ctx, "done",
-					latencyField(start),
-					Stringer("endpoints", endpoints(info.Endpoints)),
-					Stringer("added", endpoints(info.Added)),
-					Stringer("dropped", endpoints(info.Dropped)),
-					String("detectedLocalDC", info.LocalDC),
+					kv.Latency(start),
+					kv.Stringer("endpoints", kv.Endpoints(info.Endpoints)),
+					kv.Stringer("added", kv.Endpoints(info.Added)),
+					kv.Stringer("dropped", kv.Endpoints(info.Dropped)),
+					kv.String("detectedLocalDC", info.LocalDC),
 				)
 			}
 		},
@@ -487,15 +489,15 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			return func(info trace.DriverGetCredentialsDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("token", secret.Token(info.Token)),
+						kv.Latency(start),
+						kv.String("token", secret.Token(info.Token)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "done",
-						Error(info.Error),
-						latencyField(start),
-						String("token", secret.Token(info.Token)),
-						versionField(),
+						kv.Error(info.Error),
+						kv.Latency(start),
+						kv.String("token", secret.Token(info.Token)),
+						kv.Version(),
 					)
 				}
 			}

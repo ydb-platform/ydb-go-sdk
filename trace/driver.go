@@ -189,6 +189,7 @@ type (
 		Context     *context.Context
 		Call        call
 		NeedLocalDC bool
+		Database    string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerUpdateDoneInfo struct {
@@ -203,9 +204,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Call    call
-		Address string
+		Context  *context.Context
+		Call     call
+		Address  string
+		Database string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerClusterDiscoveryAttemptDoneInfo struct {
