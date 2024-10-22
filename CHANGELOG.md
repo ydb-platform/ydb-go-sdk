@@ -1,3 +1,4 @@
+## v3.85.1
 * Added `spans.Retry` constructor of `trace.Retry`
 
 ## v3.85.0
