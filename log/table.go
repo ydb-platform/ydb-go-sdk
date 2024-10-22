@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -27,8 +28,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 
 			return func(info trace.TableInitDoneInfo) {
 				l.Log(WithLevel(ctx, INFO), "done",
-					latencyField(start),
-					Int("size_max", info.Limit),
+					kv.Latency(start),
+					kv.Int("size_max", info.Limit),
 				)
 			}
 		},
@@ -43,13 +44,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			return func(info trace.TableCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
+						kv.Latency(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -66,18 +67,18 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			idempotent := info.Idempotent
 			label := info.Label
 			l.Log(ctx, "start",
-				Bool("idempotent", idempotent),
-				String("label", label),
+				kv.Bool("idempotent", idempotent),
+				kv.String("label", label),
 			)
 			start := time.Now()
 
 			return func(info trace.TableDoDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						Bool("idempotent", idempotent),
-						String("label", label),
-						Int("attempts", info.Attempts),
+						kv.Latency(start),
+						kv.Bool("idempotent", idempotent),
+						kv.String("label", label),
+						kv.Int("attempts", info.Attempts),
 					)
 				} else {
 					lvl := ERROR
@@ -86,15 +87,15 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					}
 					m := retry.Check(info.Error)
 					l.Log(WithLevel(ctx, lvl), "done",
-						latencyField(start),
-						Bool("idempotent", idempotent),
-						String("label", label),
-						Int("attempts", info.Attempts),
-						Error(info.Error),
-						Bool("retryable", m.MustRetry(idempotent)),
-						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.IsRetryObjectValid()),
-						versionField(),
+						kv.Latency(start),
+						kv.Bool("idempotent", idempotent),
+						kv.String("label", label),
+						kv.Int("attempts", info.Attempts),
+						kv.Error(info.Error),
+						kv.Bool("retryable", m.MustRetry(idempotent)),
+						kv.Int64("code", m.StatusCode()),
+						kv.Bool("deleteSession", m.IsRetryObjectValid()),
+						kv.Version(),
 					)
 				}
 			}
@@ -111,18 +112,18 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			idempotent := info.Idempotent
 			label := info.Label
 			l.Log(ctx, "start",
-				Bool("idempotent", idempotent),
-				String("label", label),
+				kv.Bool("idempotent", idempotent),
+				kv.String("label", label),
 			)
 			start := time.Now()
 
 			return func(info trace.TableDoTxDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						Bool("idempotent", idempotent),
-						String("label", label),
-						Int("attempts", info.Attempts),
+						kv.Latency(start),
+						kv.Bool("idempotent", idempotent),
+						kv.String("label", label),
+						kv.Int("attempts", info.Attempts),
 					)
 				} else {
 					lvl := WARN
@@ -131,15 +132,15 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					}
 					m := retry.Check(info.Error)
 					l.Log(WithLevel(ctx, lvl), "done",
-						latencyField(start),
-						Bool("idempotent", idempotent),
-						String("label", label),
-						Int("attempts", info.Attempts),
-						Error(info.Error),
-						Bool("retryable", m.MustRetry(idempotent)),
-						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.IsRetryObjectValid()),
-						versionField(),
+						kv.Latency(start),
+						kv.Bool("idempotent", idempotent),
+						kv.String("label", label),
+						kv.Int("attempts", info.Attempts),
+						kv.Error(info.Error),
+						kv.Bool("retryable", m.MustRetry(idempotent)),
+						kv.Int64("code", m.StatusCode()),
+						kv.Bool("deleteSession", m.IsRetryObjectValid()),
+						kv.Version(),
 					)
 				}
 			}
@@ -159,17 +160,17 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			return func(info trace.TableCreateSessionDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						Int("attempts", info.Attempts),
-						String("session_id", info.Session.ID()),
-						String("session_status", info.Session.Status()),
+						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
+						kv.String("session_id", info.Session.ID()),
+						kv.String("session_status", info.Session.Status()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						latencyField(start),
-						Int("attempts", info.Attempts),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -186,20 +187,20 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					if info.Session != nil {
 						l.Log(ctx, "done",
-							latencyField(start),
-							String("id", info.Session.ID()),
+							kv.Latency(start),
+							kv.String("id", info.Session.ID()),
 						)
 					} else {
 						l.Log(WithLevel(ctx, WARN), "failed",
-							latencyField(start),
-							versionField(),
+							kv.Latency(start),
+							kv.Version(),
 						)
 					}
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -211,25 +212,25 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "delete")
 			session := info.Session
 			l.Log(ctx, "start",
-				String("id", info.Session.ID()),
-				String("status", info.Session.Status()),
+				kv.String("id", info.Session.ID()),
+				kv.String("status", info.Session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.TableSessionDeleteDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -241,25 +242,25 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "keep", "alive")
 			session := info.Session
 			l.Log(ctx, "start",
-				String("id", session.ID()),
-				String("status", session.Status()),
+				kv.String("id", session.ID()),
+				kv.String("status", session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.TableKeepAliveDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -277,9 +278,9 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			query := info.Query
 			l.Log(ctx, "start",
 				appendFieldByCondition(l.logQuery,
-					String("query", info.Query),
-					String("id", session.ID()),
-					String("status", session.Status()),
+					kv.String("query", info.Query),
+					kv.String("id", session.ID()),
+					kv.String("status", session.Status()),
 				)...,
 			)
 			start := time.Now()
@@ -288,24 +289,24 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						appendFieldByCondition(l.logQuery,
-							Stringer("result", info.Result),
+							kv.Stringer("result", info.Result),
 							appendFieldByCondition(l.logQuery,
-								String("query", query),
-								String("id", session.ID()),
-								String("status", session.Status()),
-								latencyField(start),
+								kv.String("query", query),
+								kv.String("id", session.ID()),
+								kv.String("status", session.Status()),
+								kv.Latency(start),
 							)...,
 						)...,
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
 						appendFieldByCondition(l.logQuery,
-							String("query", query),
-							Error(info.Error),
-							String("id", session.ID()),
-							String("status", session.Status()),
-							latencyField(start),
-							versionField(),
+							kv.String("query", query),
+							kv.Error(info.Error),
+							kv.String("id", session.ID()),
+							kv.String("status", session.Status()),
+							kv.Latency(start),
+							kv.Version(),
 						)...,
 					)
 				}
@@ -324,9 +325,9 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			query := info.Query
 			l.Log(ctx, "start",
 				appendFieldByCondition(l.logQuery,
-					Stringer("query", info.Query),
-					String("id", session.ID()),
-					String("status", session.Status()),
+					kv.Stringer("query", info.Query),
+					kv.String("id", session.ID()),
+					kv.String("status", session.Status()),
 				)...,
 			)
 			start := time.Now()
@@ -336,25 +337,25 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					tx := info.Tx
 					l.Log(ctx, "done",
 						appendFieldByCondition(l.logQuery,
-							Stringer("query", query),
-							String("id", session.ID()),
-							String("tx", tx.ID()),
-							String("status", session.Status()),
-							Bool("prepared", info.Prepared),
-							NamedError("result_err", info.Result.Err()),
-							latencyField(start),
+							kv.Stringer("query", query),
+							kv.String("id", session.ID()),
+							kv.String("tx", tx.ID()),
+							kv.String("status", session.Status()),
+							kv.Bool("prepared", info.Prepared),
+							kv.NamedError("result_err", info.Result.Err()),
+							kv.Latency(start),
 						)...,
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
 						appendFieldByCondition(l.logQuery,
-							Stringer("query", query),
-							Error(info.Error),
-							String("id", session.ID()),
-							String("status", session.Status()),
-							Bool("prepared", info.Prepared),
-							latencyField(start),
-							versionField(),
+							kv.Stringer("query", query),
+							kv.Error(info.Error),
+							kv.String("id", session.ID()),
+							kv.String("status", session.Status()),
+							kv.Bool("prepared", info.Prepared),
+							kv.Latency(start),
+							kv.Version(),
 						)...,
 					)
 				}
@@ -373,9 +374,9 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			query := info.Query
 			l.Log(ctx, "start",
 				appendFieldByCondition(l.logQuery,
-					Stringer("query", info.Query),
-					String("id", session.ID()),
-					String("status", session.Status()),
+					kv.Stringer("query", info.Query),
+					kv.String("id", session.ID()),
+					kv.String("status", session.Status()),
 				)...,
 			)
 			start := time.Now()
@@ -384,22 +385,22 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						appendFieldByCondition(l.logQuery,
-							Stringer("query", query),
-							Error(info.Error),
-							String("id", session.ID()),
-							String("status", session.Status()),
-							latencyField(start),
+							kv.Stringer("query", query),
+							kv.Error(info.Error),
+							kv.String("id", session.ID()),
+							kv.String("status", session.Status()),
+							kv.Latency(start),
 						)...,
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
 						appendFieldByCondition(l.logQuery,
-							Stringer("query", query),
-							Error(info.Error),
-							String("id", session.ID()),
-							String("status", session.Status()),
-							latencyField(start),
-							versionField(),
+							kv.Stringer("query", query),
+							kv.Error(info.Error),
+							kv.String("id", session.ID()),
+							kv.String("status", session.Status()),
+							kv.Latency(start),
+							kv.Version(),
 						)...,
 					)
 				}
@@ -416,25 +417,25 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "stream", "read")
 			session := info.Session
 			l.Log(ctx, "start",
-				String("id", session.ID()),
-				String("status", session.Status()),
+				kv.String("id", session.ID()),
+				kv.String("status", session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.TableSessionQueryStreamReadDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -450,26 +451,26 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "tx", "begin")
 			session := info.Session
 			l.Log(ctx, "start",
-				String("id", session.ID()),
-				String("status", session.Status()),
+				kv.String("id", session.ID()),
+				kv.String("status", session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.TableTxBeginDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						String("tx", info.Tx.ID()),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.String("tx", info.Tx.ID()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -482,28 +483,28 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			session := info.Session
 			tx := info.Tx
 			l.Log(ctx, "start",
-				String("id", session.ID()),
-				String("status", session.Status()),
-				String("tx", info.Tx.ID()),
+				kv.String("id", session.ID()),
+				kv.String("status", session.Status()),
+				kv.String("tx", info.Tx.ID()),
 			)
 			start := time.Now()
 
 			return func(info trace.TableTxCommitDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						String("tx", tx.ID()),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.String("tx", tx.ID()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						String("tx", tx.ID()),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.String("tx", tx.ID()),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -520,28 +521,28 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			session := info.Session
 			tx := info.Tx
 			l.Log(ctx, "start",
-				String("id", session.ID()),
-				String("status", session.Status()),
-				String("tx", tx.ID()),
+				kv.String("id", session.ID()),
+				kv.String("status", session.Status()),
+				kv.String("tx", tx.ID()),
 			)
 			start := time.Now()
 
 			return func(info trace.TableTxRollbackDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						String("tx", tx.ID()),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.String("tx", tx.ID()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						String("tx", tx.ID()),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.String("tx", tx.ID()),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -553,25 +554,25 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			ctx := with(*info.Context, TRACE, "ydb", "table", "pool", "put")
 			session := info.Session
 			l.Log(ctx, "start",
-				String("id", session.ID()),
-				String("status", session.Status()),
+				kv.String("id", session.ID()),
+				kv.String("status", session.Status()),
 			)
 			start := time.Now()
 
 			return func(info trace.TablePoolPutDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -588,17 +589,17 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					session := info.Session
 					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", session.ID()),
-						String("status", session.Status()),
-						Int("attempts", info.Attempts),
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
+						kv.Int("attempts", info.Attempts),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						latencyField(start),
-						Int("attempts", info.Attempts),
-						Error(info.Error),
-						versionField(),
+						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
+						kv.Error(info.Error),
+						kv.Version(),
 					)
 				}
 			}
@@ -609,11 +610,11 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "table", "pool", "state", "change")
 			l.Log(WithLevel(ctx, DEBUG), "",
-				Int("limit", info.Limit),
-				Int("index", info.Index),
-				Int("idle", info.Idle),
-				Int("wait", info.Wait),
-				Int("create_in_progress", info.CreateInProgress),
+				kv.Int("limit", info.Limit),
+				kv.Int("index", info.Index),
+				kv.Int("idle", info.Idle),
+				kv.Int("wait", info.Wait),
+				kv.Int("create_in_progress", info.CreateInProgress),
 			)
 		},
 		OnSessionBulkUpsert:   nil,
