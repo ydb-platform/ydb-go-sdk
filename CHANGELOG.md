@@ -1,3 +1,4 @@
+## v3.85.3
 * Renamed `query.WithPoolID()` into `query.WithResourcePool()`
 
 ## v3.85.2
