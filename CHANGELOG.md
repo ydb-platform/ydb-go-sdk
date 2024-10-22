@@ -3,6 +3,8 @@ At the version you must explicit choose way for work with uuid: old with bug or 
 
 * Add workaround for bug in uuid send/receive from server. It is migration version. All native code and most database sql code worked with uuid continue to work.
 
+## v3.85.0
+* Added experimental package `spans` with tracing adapter interfaces for OpenTelemetry, OpenTracing, etc.
 * Added `db.Topic().DescribeTopicConsumer()` method for displaying consumer information
 * Marked as deprecated options `ydb.WithDatabase(database)` and `ydb.WithEndpoint(endpoint)`
 
