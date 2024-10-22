@@ -502,7 +502,12 @@ type testExecuteSettings struct {
 	txControl   *query.TransactionControl
 	syntax      options.Syntax
 	params      *params.Parameters
+	poolID      string
 	callOptions []grpc.CallOption
+}
+
+func (s testExecuteSettings) PoolID() string {
+	return s.poolID
 }
 
 func (s testExecuteSettings) RetryOpts() []retry.Option {
@@ -647,6 +652,19 @@ func TestExecuteSettings(t *testing.T) {
 				params:    nil,
 			},
 		},
+		{
+			name: "WithPoolID",
+			txOpts: []options.Execute{
+				options.WithPoolID("test-pool-id"),
+			},
+			settings: testExecuteSettings{
+				execMode:  options.ExecModeExecute,
+				statsMode: options.StatsModeNone,
+				txControl: query.TxControl(query.WithTxID("")),
+				syntax:    options.SyntaxYQL,
+				poolID:    "test-pool-id",
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
@@ -659,6 +677,7 @@ func TestExecuteSettings(t *testing.T) {
 			require.Equal(t, tt.settings.Syntax(), settings.Syntax())
 			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
+			require.Equal(t, tt.settings.PoolID(), settings.PoolID())
 			require.Equal(t, tt.settings.TxControl().ToYDB(a).String(), settings.TxControl().ToYDB(a).String())
 			require.Equal(t, tt.settings.Params().ToYDB(a), settings.Params().ToYDB(a))
 			require.Equal(t, tt.settings.CallOptions(), settings.CallOptions())
