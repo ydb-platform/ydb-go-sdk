@@ -1,3 +1,5 @@
+* Added `query.WithPoolID()` execute option
+
 ## v3.85.1
 * Added `spans.Retry` constructor of `trace.Retry`
 

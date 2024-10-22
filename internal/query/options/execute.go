@@ -31,6 +31,7 @@ type (
 		params        params.Parameters
 		execMode      ExecMode
 		statsMode     StatsMode
+		poolID        string
 		statsCallback func(queryStats stats.QueryStats)
 		callOptions   []grpc.CallOption
 		txControl     *tx.Control
@@ -49,6 +50,7 @@ type (
 	// execute options
 	callOptionsOption []grpc.CallOption
 	txCommitOption    struct{}
+	poolID            string
 	parametersOption  params.Parameters
 	txControlOption   tx.Control
 	syntaxOption      = Syntax
@@ -58,6 +60,10 @@ type (
 	}
 	execModeOption = ExecMode
 )
+
+func (poolID poolID) applyExecuteOption(s *executeSettings) {
+	s.poolID = string(poolID)
+}
 
 func (s *executeSettings) RetryOpts() []retry.Option {
 	return s.retryOptions
@@ -157,6 +163,10 @@ func (s *executeSettings) StatsMode() StatsMode {
 	return s.statsMode
 }
 
+func (s *executeSettings) PoolID() string {
+	return s.poolID
+}
+
 func (s *executeSettings) Params() *params.Parameters {
 	if len(s.params) == 0 {
 		return nil
@@ -176,10 +186,15 @@ var (
 	_ Execute = StatsMode(0)
 	_ Execute = txCommitOption{}
 	_ Execute = (*txControlOption)(nil)
+	_ Execute = poolID("")
 )
 
 func WithCommit() txCommitOption {
 	return txCommitOption{}
+}
+
+func WithPoolID(id string) poolID {
+	return poolID(id)
 }
 
 func WithExecMode(mode ExecMode) execModeOption {
