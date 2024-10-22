@@ -30,7 +30,7 @@ type executeSettings interface {
 	Params() *params.Parameters
 	CallOptions() []grpc.CallOption
 	RetryOpts() []retry.Option
-	PoolID() string
+	ResourcePool() string
 }
 
 type executeScriptConfig interface {
@@ -57,7 +57,7 @@ func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScri
 		Parameters:    cfg.Params().ToYDB(a),
 		StatsMode:     Ydb_Query.StatsMode(cfg.StatsMode()),
 		ResultsTtl:    durationpb.New(cfg.ResultsTTL()),
-		PoolId:        cfg.PoolID(),
+		PoolId:        cfg.ResourcePool(),
 	}
 
 	return request, cfg.CallOptions()
@@ -76,7 +76,7 @@ func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg execut
 	request.Parameters = cfg.Params().ToYDB(a)
 	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
 	request.ConcurrentResultSets = false
-	request.PoolId = cfg.PoolID()
+	request.PoolId = cfg.ResourcePool()
 
 	return request, cfg.CallOptions()
 }
