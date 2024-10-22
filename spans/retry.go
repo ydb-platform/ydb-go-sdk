@@ -58,7 +58,7 @@ func fieldsFromStore(ctx context.Context) []kv.KeyValue {
 	return nil
 }
 
-func retry(adapter Adapter) (t trace.Retry) {
+func Retry(adapter Adapter) (t trace.Retry) {
 	t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 		if adapter.Details()&trace.RetryEvents != 0 && isTraceRetry(*info.Context) { //nolint:nestif
 			operationName := info.Label
