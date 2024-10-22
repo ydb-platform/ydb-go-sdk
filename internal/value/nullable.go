@@ -299,12 +299,12 @@ func NullableUUIDValueWithIssue1501(v *[16]byte) Value {
 	return OptionalValue(UUIDWithIssue1501Value(*v))
 }
 
-func NullableUUIDTypedValue(v *uuid.UUID) Value {
+func NullableUuidValue(v *uuid.UUID) Value { //nolint:revive,stylecheck
 	if v == nil {
 		return NullValue(types.UUID)
 	}
 
-	return OptionalValue(UUIDTyped(*v))
+	return OptionalValue(Uuid(*v))
 }
 
 func NullableJSONDocumentValue(v *string) Value {

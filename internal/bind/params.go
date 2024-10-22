@@ -128,7 +128,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 
 		return types.NullableUUIDValueWithIssue1501(&val), nil
 	case uuid.UUID:
-		return types.UUIDTypedValue(x), nil
+		return types.UuidValue(x), nil
 	case *uuid.UUID:
 		return types.NullableUUIDTypedValue(x), nil
 	case time.Time:

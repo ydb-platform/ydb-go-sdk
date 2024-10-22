@@ -303,7 +303,7 @@ func (p *Parameter) YSON(v []byte) Builder {
 //}
 
 // UUIDWithIssue1501Value is field serializer for save data with format bug.
-// For any new code use UUIDTyped
+// For any new code use Uuid
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
 	p.value = value.UUIDWithIssue1501Value(v)
@@ -312,8 +312,8 @@ func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
 	return p.parent
 }
 
-func (p *Parameter) UUIDTyped(val uuid.UUID) Builder {
-	p.value = value.UUIDTyped(val)
+func (p *Parameter) Uuid(val uuid.UUID) Builder { //nolint:revive,stylecheck
+	p.value = value.Uuid(val)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent

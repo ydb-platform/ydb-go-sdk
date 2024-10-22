@@ -416,7 +416,7 @@ SELECT $val
 DECLARE $val AS UUID;
 
 SELECT CAST($val AS Utf8)
-`, table.NewQueryParameters(table.ValueParam("$val", types.UUIDTypedValue(id))))
+`, table.NewQueryParameters(table.ValueParam("$val", types.UuidValue(id))))
 
 			res.NextResultSet(ctx)
 			res.NextRow()
@@ -473,7 +473,7 @@ SELECT CAST($val AS UUID)
 DECLARE $val AS UUID;
 
 SELECT $val
-`, table.NewQueryParameters(table.ValueParam("$val", types.UUIDTypedValue(id))))
+`, table.NewQueryParameters(table.ValueParam("$val", types.UuidValue(id))))
 
 			res.NextResultSet(ctx)
 			res.NextRow()

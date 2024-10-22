@@ -3,6 +3,8 @@ package params
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
@@ -153,7 +155,23 @@ func (p *optional) YSON(v *[]byte) *optionalBuilder {
 	return &optionalBuilder{opt: p}
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (p *optional) UUID(v *[16]byte) *optionalBuilder {
+	p.value = value.NullableUUIDValue(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) Uuid(v *uuid.UUID) *optionalBuilder { //nolint:revive,stylecheck
+	p.value = value.NullableUuidValue(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) UUIDWithIssue1501Value(v *[16]byte) *optionalBuilder {
 	p.value = value.NullableUUIDValue(v)
 
 	return &optionalBuilder{opt: p}
