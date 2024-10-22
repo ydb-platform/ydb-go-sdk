@@ -1,3 +1,4 @@
+* Fixed send optional arguments to the server with `ydb.ParamsBuilder`
 * Added `db.Topic().DescribeTopicConsumer()` method for displaying consumer information
 * Marked as deprecated options `ydb.WithDatabase(database)` and `ydb.WithEndpoint(endpoint)`
 
