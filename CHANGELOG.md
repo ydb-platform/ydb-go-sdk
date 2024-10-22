@@ -1,5 +1,7 @@
+* Renamed `query.WithPoolID()` into `query.WithResourcePool()`
+
 ## v3.85.2
-* Added `query.WithPoolID()` execute option
+* Added experimental `query.WithPoolID()` execute option for define resource pool for execute query
 
 ## v3.85.1
 * Added `spans.Retry` constructor of `trace.Retry`

@@ -59,6 +59,9 @@ func WithCallOptions(opts ...grpc.CallOption) options.Execute {
 	return options.WithCallOptions(opts...)
 }
 
-func WithPoolID(id string) options.Execute {
-	return options.WithPoolID(id)
+// WithResourcePool is an option for define resource pool for execute query
+//
+// Read more https://ydb.tech/docs/ru/dev/resource-consumption-management
+func WithResourcePool(id string) options.Execute {
+	return options.WithResourcePool(id)
 }

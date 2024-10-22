@@ -120,16 +120,16 @@ func TestExecuteSettings(t *testing.T) {
 			},
 		},
 		{
-			name: "WithPoolID",
+			name: "WithResourcePool",
 			txOpts: []Execute{
-				WithPoolID("test-pool-id"),
+				WithResourcePool("test-pool-id"),
 			},
 			settings: executeSettings{
-				execMode:  ExecModeExecute,
-				statsMode: StatsModeNone,
-				txControl: internal.NewControl(internal.WithTxID("")),
-				syntax:    SyntaxYQL,
-				poolID:    "test-pool-id",
+				execMode:     ExecModeExecute,
+				statsMode:    StatsModeNone,
+				txControl:    internal.NewControl(internal.WithTxID("")),
+				syntax:       SyntaxYQL,
+				resourcePool: "test-pool-id",
 			},
 		},
 	} {
@@ -144,7 +144,7 @@ func TestExecuteSettings(t *testing.T) {
 			require.Equal(t, tt.settings.Syntax(), settings.Syntax())
 			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
-			require.Equal(t, tt.settings.PoolID(), settings.PoolID())
+			require.Equal(t, tt.settings.ResourcePool(), settings.ResourcePool())
 			require.Equal(t, tt.settings.TxControl().ToYDB(a).String(), settings.TxControl().ToYDB(a).String())
 			require.Equal(t, tt.settings.Params().ToYDB(a), settings.Params().ToYDB(a))
 			require.Equal(t, tt.settings.CallOptions(), settings.CallOptions())
