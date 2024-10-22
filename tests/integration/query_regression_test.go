@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -132,4 +134,40 @@ SELECT $val`,
 
 		require.Equal(t, id, resUUID)
 	})
+}
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1506
+func TestIssue1506TypedNullPushdown(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
+		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
+	}
+
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+
+	val := int64(123)
+	row, err := db.Query().QueryRow(ctx, `
+DECLARE $arg1 AS Int64?;
+DECLARE $arg2 AS Int64?;
+
+SELECT CAST($arg1 AS Utf8) AS v1, CAST($arg2 AS Utf8) AS v2
+`, query.WithParameters(
+		ydb.ParamsBuilder().
+			Param("$arg1").BeginOptional().Int64(nil).EndOptional().
+			Param("$arg2").BeginOptional().Int64(&val).EndOptional().
+			Build(),
+	),
+	)
+	require.NoError(t, err)
+
+	var res struct {
+		V1 *string `sql:"v1"`
+		V2 *string `sql:"v2"`
+	}
+	err = row.ScanStruct(&res)
+	require.NoError(t, err)
+
+	require.Nil(t, res.V1)
+	require.Equal(t, "123", *res.V2)
 }

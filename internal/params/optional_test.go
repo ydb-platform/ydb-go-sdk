@@ -29,21 +29,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Uint64Value{
-								Uint64Value: 123,
-							},
-						},
+					Value: &Ydb.Value_Uint64Value{
+						Uint64Value: 123,
 					},
 				},
 			},
@@ -54,21 +44,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Int64Value{
-								Int64Value: 123,
-							},
-						},
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 123,
 					},
 				},
 			},
@@ -79,21 +59,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Uint32Value{
-								Uint32Value: 123,
-							},
-						},
+					Value: &Ydb.Value_Uint32Value{
+						Uint32Value: 123,
 					},
 				},
 			},
@@ -104,21 +74,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Int32Value{
-								Int32Value: 123,
-							},
-						},
+					Value: &Ydb.Value_Int32Value{
+						Int32Value: 123,
 					},
 				},
 			},
@@ -129,21 +89,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Uint32Value{
-								Uint32Value: 123,
-							},
-						},
+					Value: &Ydb.Value_Uint32Value{
+						Uint32Value: 123,
 					},
 				},
 			},
@@ -154,21 +104,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Int32Value{
-								Int32Value: 123,
-							},
-						},
+					Value: &Ydb.Value_Int32Value{
+						Int32Value: 123,
 					},
 				},
 			},
@@ -179,21 +119,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Uint32Value{
-								Uint32Value: 123,
-							},
-						},
+					Value: &Ydb.Value_Uint32Value{
+						Uint32Value: 123,
 					},
 				},
 			},
@@ -204,21 +134,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Int32Value{
-								Int32Value: 123,
-							},
-						},
+					Value: &Ydb.Value_Int32Value{
+						Int32Value: 123,
 					},
 				},
 			},
@@ -229,21 +149,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_BoolValue{
-								BoolValue: true,
-							},
-						},
+					Value: &Ydb.Value_BoolValue{
+						BoolValue: true,
 					},
 				},
 			},
@@ -254,21 +164,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: "test",
-							},
-						},
+					Value: &Ydb.Value_TextValue{
+						TextValue: "test",
 					},
 				},
 			},
@@ -279,21 +179,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_BytesValue{
-								BytesValue: []byte("test"),
-							},
-						},
+					Value: &Ydb.Value_BytesValue{
+						BytesValue: []byte("test"),
 					},
 				},
 			},
@@ -304,21 +194,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_FloatValue{
-								FloatValue: float32(123),
-							},
-						},
+					Value: &Ydb.Value_FloatValue{
+						FloatValue: float32(123),
 					},
 				},
 			},
@@ -329,21 +209,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_DoubleValue{
-								DoubleValue: float64(123),
-							},
-						},
+					Value: &Ydb.Value_DoubleValue{
+						DoubleValue: float64(123),
 					},
 				},
 			},
@@ -354,21 +224,12 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL},
 				},
+
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Int64Value{
-								Int64Value: 1000000,
-							},
-						},
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 1000000,
 					},
 				},
 			},
@@ -379,21 +240,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Uint32Value{
-								Uint32Value: 123456789,
-							},
-						},
+					Value: &Ydb.Value_Uint32Value{
+						Uint32Value: 123456789,
 					},
 				},
 			},
@@ -404,21 +255,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Uint32Value{
-								Uint32Value: 1428,
-							},
-						},
+					Value: &Ydb.Value_Uint32Value{
+						Uint32Value: 1428,
 					},
 				},
 			},
@@ -429,21 +270,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Uint64Value{
-								Uint64Value: 123456789000000,
-							},
-						},
+					Value: &Ydb.Value_Uint64Value{
+						Uint64Value: 123456789000000,
 					},
 				},
 			},
@@ -454,27 +285,17 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_DecimalType{
-									DecimalType: &Ydb.DecimalType{
-										Precision: 22,
-										Scale:     9,
-									},
-								},
-							},
+					Type: &Ydb.Type_DecimalType{
+						DecimalType: &Ydb.DecimalType{
+							Precision: 22,
+							Scale:     9,
 						},
 					},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							High_128: 72623859790382856,
-							Value: &Ydb.Value_Low_128{
-								Low_128: 648519454493508870,
-							},
-						},
+					High_128: 72623859790382856,
+					Value: &Ydb.Value_Low_128{
+						Low_128: 648519454493508870,
 					},
 				},
 			},
@@ -485,21 +306,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: `{"a": 1,"b": "B"}`,
-							},
-						},
+					Value: &Ydb.Value_TextValue{
+						TextValue: `{"a": 1,"b": "B"}`,
 					},
 				},
 			},
@@ -510,21 +321,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: `{"a": 1,"b": "B"}`,
-							},
-						},
+					Value: &Ydb.Value_TextValue{
+						TextValue: `{"a": 1,"b": "B"}`,
 					},
 				},
 			},
@@ -535,21 +336,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_BytesValue{
-								BytesValue: []byte(`{"a": 1,"b": "B"}`),
-							},
-						},
+					Value: &Ydb.Value_BytesValue{
+						BytesValue: []byte(`{"a": 1,"b": "B"}`),
 					},
 				},
 			},
@@ -560,23 +351,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Low_128{
-								Low_128: 651345242494996240,
-							},
-							High_128: 72623859790382856,
-						},
+					Value: &Ydb.Value_Low_128{
+						Low_128: 651345242494996240,
 					},
+					High_128: 72623859790382856,
 				},
 			},
 		},
@@ -586,21 +367,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: "1973-11-29T21:33:09Z",
-							},
-						},
+					Value: &Ydb.Value_TextValue{
+						TextValue: "1973-11-29T21:33:09Z",
 					},
 				},
 			},
@@ -611,21 +382,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: "1973-11-29",
-							},
-						},
+					Value: &Ydb.Value_TextValue{
+						TextValue: "1973-11-29",
 					},
 				},
 			},
@@ -636,21 +397,11 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: "1973-11-29T21:33:09.000000Z",
-							},
-						},
+					Value: &Ydb.Value_TextValue{
+						TextValue: "1973-11-29T21:33:09.000000Z",
 					},
 				},
 			},
