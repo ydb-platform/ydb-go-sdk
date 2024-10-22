@@ -1,3 +1,4 @@
+## v3.85.2
 * Added `query.WithPoolID()` execute option
 
 ## v3.85.1
