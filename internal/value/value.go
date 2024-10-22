@@ -2219,7 +2219,7 @@ func UUIDFromYDBPair(high uint64, low uint64) *uuidValue {
 	return &uuidValue{value: res}
 }
 
-func UUIDTyped(val uuid.UUID) *uuidValue {
+func Uuid(val uuid.UUID) *uuidValue { //nolint:revive,stylecheck
 	return &uuidValue{value: val}
 }
 

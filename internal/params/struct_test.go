@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -743,6 +744,76 @@ func TestStruct(t *testing.T) {
 									Low_128: 651345242494996240,
 								},
 								High_128: 72623859790382856,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginStruct().Field("col1").
+				UUIDWithIssue1501Value([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).EndStruct(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_StructType{
+							StructType: &Ydb.StructType{
+								Members: []*Ydb.StructMember{
+									{
+										Name: "col1",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_UUID,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_Low_128{
+									Low_128: 651345242494996240,
+								},
+								High_128: 72623859790382856,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginStruct().Field("col1").
+				Uuid(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).EndStruct(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_StructType{
+							StructType: &Ydb.StructType{
+								Members: []*Ydb.StructMember{
+									{
+										Name: "col1",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_UUID,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_Low_128{
+									Low_128: 506660481424032516,
+								},
+								High_128: 1157159078456920585,
 							},
 						},
 					},

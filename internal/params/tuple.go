@@ -3,6 +3,8 @@ package params
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
@@ -165,7 +167,23 @@ func (t *tupleItem) YSON(v []byte) *tuple {
 	return t.parent
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (t *tupleItem) UUID(v [16]byte) *tuple {
+	t.parent.values = append(t.parent.values, value.UUIDWithIssue1501Value(v))
+
+	return t.parent
+}
+
+func (t *tupleItem) Uuid(v uuid.UUID) *tuple { //nolint:revive,stylecheck
+	t.parent.values = append(t.parent.values, value.Uuid(v))
+
+	return t.parent
+}
+
+func (t *tupleItem) UUIDWithIssue1501Value(v [16]byte) *tuple {
 	t.parent.values = append(t.parent.values, value.UUIDWithIssue1501Value(v))
 
 	return t.parent

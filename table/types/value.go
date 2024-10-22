@@ -158,7 +158,7 @@ func JSONValueFromBytes(v []byte) Value { return value.JSONValue(xstring.FromByt
 
 // UUIDValue has data corruption bug and will be removed in next version.
 //
-// Deprecated: Use UUIDTypedValue (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// Deprecated: Use UuidValue (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func UUIDValue(v [16]byte) Value { return UUIDWithIssue1501Value(v) }
 
@@ -173,13 +173,13 @@ func NewUUIDBytesWithIssue1501(val [16]byte) UUIDBytesWithIssue1501Type {
 // UUIDWithIssue1501Value is function for save uuid with old corrupted data format for save old behavior
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 //
-// Use UUIDTypedValue for all new code
+// Use UuidValue for all new code
 func UUIDWithIssue1501Value(v [16]byte) Value {
 	return value.UUIDWithIssue1501Value(v)
 }
 
-func UUIDTypedValue(v uuid.UUID) Value {
-	return value.UUIDTyped(v)
+func UuidValue(v uuid.UUID) Value { //nolint:revive,stylecheck
+	return value.Uuid(v)
 }
 
 func JSONDocumentValue(v string) Value { return value.JSONDocumentValue(v) }
@@ -456,7 +456,7 @@ func NullableUUIDValueWithIssue1501(v *[16]byte) Value {
 }
 
 func NullableUUIDTypedValue(v *uuid.UUID) Value {
-	return value.NullableUUIDTypedValue(v)
+	return value.NullableUuidValue(v)
 }
 
 func NullableJSONDocumentValue(v *string) Value {
