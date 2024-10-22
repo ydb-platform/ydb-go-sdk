@@ -157,7 +157,7 @@ func JSONValue(v string) Value { return value.JSONValue(v) }
 func JSONValueFromBytes(v []byte) Value { return value.JSONValue(xstring.FromBytes(v)) }
 
 // removed for https://github.com/ydb-platform/ydb-go-sdk/issues/1501
-//func UUIDValue(v [16]byte) Value { return UUIDWithIssue1501Value(v) }
+// func UUIDValue(v [16]byte) Value { return UUIDWithIssue1501Value(v) }
 
 // UUIDBytesWithIssue1501Type is type wrapper for scan expected values for values stored with bug
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1501

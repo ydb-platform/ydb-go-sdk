@@ -796,15 +796,6 @@ func (s *valueScanner) setString(dst *string) {
 	}
 }
 
-func (s *valueScanner) setUUIDStringWith1501Issue(dst *string) {
-	switch t := s.stack.current().t.GetTypeId(); t {
-	case Ydb.Type_UUID:
-		*dst = s.uuidBytesWithIssue1501().AsBrokenString()
-	default:
-		_ = s.errorf(0, "scan row failed: incorrect source types %s", t)
-	}
-}
-
 func (s *valueScanner) setByte(dst *[]byte) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
@@ -815,15 +806,6 @@ func (s *valueScanner) setByte(dst *[]byte) {
 		*dst = s.bytes()
 	default:
 		_ = s.errorf(0, "scan row failed: incorrect source types %s", t)
-	}
-}
-
-func (s *valueScanner) setUUIDWithIssue1501Byte(dst *[]byte) {
-	switch t := s.stack.current().t.GetTypeId(); t {
-	case Ydb.Type_UUID:
-		*dst = s.uuidBytesWithIssue1501().AsBytesSlice()
-	default:
-		_ = s.errorf(0, "scan row failed: incorrect source type %s", t)
 	}
 }
 
