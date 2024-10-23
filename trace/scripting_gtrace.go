@@ -26,6 +26,9 @@ func WithScriptingPanicCallback(cb func(e interface{})) ScriptingComposeOption {
 // Compose returns a new Scripting which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scripting {
+	if t == nil {
+		return x
+	}
 	var ret Scripting
 	options := scriptingComposeOptions{}
 	for _, opt := range opts {

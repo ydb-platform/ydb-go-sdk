@@ -26,6 +26,9 @@ func WithDriverPanicCallback(cb func(e interface{})) DriverComposeOption {
 // Compose returns a new Driver which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
+	if t == nil {
+		return x
+	}
 	var ret Driver
 	options := driverComposeOptions{}
 	for _, opt := range opts {

@@ -28,6 +28,9 @@ func WithQueryPanicCallback(cb func(e interface{})) QueryComposeOption {
 // Compose returns a new Query which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
+	if t == nil {
+		return x
+	}
 	var ret Query
 	options := queryComposeOptions{}
 	for _, opt := range opts {

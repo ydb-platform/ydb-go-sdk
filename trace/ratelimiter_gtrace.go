@@ -22,6 +22,9 @@ func WithRatelimiterPanicCallback(cb func(e interface{})) RatelimiterComposeOpti
 // Compose returns a new Ratelimiter which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Ratelimiter) Compose(x *Ratelimiter, opts ...RatelimiterComposeOption) *Ratelimiter {
+	if t == nil {
+		return x
+	}
 	var ret Ratelimiter
 	return &ret
 }

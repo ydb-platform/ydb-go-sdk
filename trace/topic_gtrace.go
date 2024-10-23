@@ -26,6 +26,9 @@ func WithTopicPanicCallback(cb func(e interface{})) TopicComposeOption {
 // Compose returns a new Topic which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
+	if t == nil {
+		return x
+	}
 	var ret Topic
 	options := topicComposeOptions{}
 	for _, opt := range opts {
