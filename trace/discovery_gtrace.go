@@ -26,6 +26,9 @@ func WithDiscoveryPanicCallback(cb func(e interface{})) DiscoveryComposeOption {
 // Compose returns a new Discovery which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Discovery) Compose(x *Discovery, opts ...DiscoveryComposeOption) *Discovery {
+	if t == nil {
+		return x
+	}
 	var ret Discovery
 	options := discoveryComposeOptions{}
 	for _, opt := range opts {

@@ -26,6 +26,9 @@ func WithTablePanicCallback(cb func(e interface{})) TableComposeOption {
 // Compose returns a new Table which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
+	if t == nil {
+		return x
+	}
 	var ret Table
 	options := tableComposeOptions{}
 	for _, opt := range opts {

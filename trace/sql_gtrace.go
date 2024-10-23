@@ -27,6 +27,9 @@ func WithDatabaseSQLPanicCallback(cb func(e interface{})) DatabaseSQLComposeOpti
 // Compose returns a new DatabaseSQL which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) *DatabaseSQL {
+	if t == nil {
+		return x
+	}
 	var ret DatabaseSQL
 	options := databaseSQLComposeOptions{}
 	for _, opt := range opts {

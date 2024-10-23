@@ -29,6 +29,9 @@ func WithCoordinationPanicCallback(cb func(e interface{})) CoordinationComposeOp
 // Compose returns a new Coordination which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOption) *Coordination {
+	if t == nil {
+		return x
+	}
 	var ret Coordination
 	options := coordinationComposeOptions{}
 	for _, opt := range opts {
