@@ -3,6 +3,8 @@ package params
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
@@ -201,8 +203,28 @@ func (d *dictPair) YSON(v []byte) *dictValue {
 	}
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (d *dictPair) UUID(v [16]byte) *dictValue {
-	d.keyValue = value.UUIDValue(v)
+	d.keyValue = value.UUIDWithIssue1501Value(v)
+
+	return &dictValue{
+		pair: d,
+	}
+}
+
+func (d *dictPair) Uuid(v uuid.UUID) *dictValue { //nolint:revive,stylecheck
+	d.keyValue = value.Uuid(v)
+
+	return &dictValue{
+		pair: d,
+	}
+}
+
+func (d *dictPair) UUIDWithIssue1501Value(v [16]byte) *dictValue {
+	d.keyValue = value.UUIDWithIssue1501Value(v)
 
 	return &dictValue{
 		pair: d,
@@ -422,10 +444,32 @@ func (d *dictValue) YSON(v []byte) *dict {
 	return d.pair.parent
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (d *dictValue) UUID(v [16]byte) *dict {
 	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
 		K: d.pair.keyValue,
-		V: value.UUIDValue(v),
+		V: value.UUIDWithIssue1501Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Uuid(v uuid.UUID) *dict { //nolint:revive,stylecheck
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.Uuid(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) UUIDWithIssue1501Value(v [16]byte) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.UUIDWithIssue1501Value(v),
 	})
 
 	return d.pair.parent

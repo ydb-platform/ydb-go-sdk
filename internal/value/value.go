@@ -161,8 +161,7 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 		return BytesValue(v.GetBytesValue()), nil
 
 	case types.UUID:
-		return UUIDValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128())), nil
-
+		return UUIDFromYDBPair(v.GetHigh_128(), v.GetLow_128()), nil
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered primitive type: %T", t))
 	}
@@ -2097,21 +2096,58 @@ func TextValue(v string) textValue {
 	return textValue(v)
 }
 
+type UUIDIssue1501FixedBytesWrapper struct {
+	val [16]byte
+}
+
+func NewUUIDIssue1501FixedBytesWrapper(val [16]byte) UUIDIssue1501FixedBytesWrapper {
+	return UUIDIssue1501FixedBytesWrapper{val: val}
+}
+
+// PublicRevertReorderForIssue1501 needs for fix uuid when it was good stored in DB,
+// but read as reordered. It may happen within migration period.
+func (w UUIDIssue1501FixedBytesWrapper) PublicRevertReorderForIssue1501() uuid.UUID {
+	return uuid.UUID(uuidFixBytesOrder(w.val))
+}
+
+func (w UUIDIssue1501FixedBytesWrapper) AsBytesArray() [16]byte {
+	return w.val
+}
+
+func (w UUIDIssue1501FixedBytesWrapper) AsBytesSlice() []byte {
+	return w.val[:]
+}
+
+func (w UUIDIssue1501FixedBytesWrapper) AsBrokenString() string {
+	return string(w.val[:])
+}
+
 type uuidValue struct {
-	value [16]byte
+	value               uuid.UUID
+	reproduceStorageBug bool
 }
 
 func (v *uuidValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = string(v.value[:])
+		bytes := uuidReorderBytesForReadWithBug(v.value)
+		*vv = string(bytes[:])
 
 		return nil
 	case *[]byte:
-		*vv = v.value[:]
+		bytes := uuidReorderBytesForReadWithBug(v.value)
+		*vv = bytes[:]
 
 		return nil
 	case *[16]byte:
+		*vv = uuidReorderBytesForReadWithBug(v.value)
+
+		return nil
+	case *UUIDIssue1501FixedBytesWrapper:
+		*vv = NewUUIDIssue1501FixedBytesWrapper(uuidReorderBytesForReadWithBug(v.value))
+
+		return nil
+	case *uuid.UUID:
 		*vv = v.value
 
 		return nil
@@ -2129,7 +2165,7 @@ func (v *uuidValue) Yql() string {
 	buffer.WriteString(v.Type().Yql())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
-	buffer.WriteString(uuid.UUID(v.value).String())
+	buffer.WriteString(v.value.String())
 	buffer.WriteByte('"')
 	buffer.WriteByte(')')
 
@@ -2141,6 +2177,25 @@ func (*uuidValue) Type() types.Type {
 }
 
 func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	if v.reproduceStorageBug {
+		return v.toYDBWithBug(a)
+	}
+
+	var bytes [16]byte
+	if v != nil {
+		bytes = uuidDirectBytesToLe(v.value)
+	}
+	vv := a.Low128()
+	vv.Low_128 = binary.LittleEndian.Uint64(bytes[0:8])
+
+	vvv := a.Value()
+	vvv.High_128 = binary.LittleEndian.Uint64(bytes[8:16])
+	vvv.Value = vv
+
+	return vvv
+}
+
+func (v *uuidValue) toYDBWithBug(a *allocator.Allocator) *Ydb.Value {
 	var bytes [16]byte
 	if v != nil {
 		bytes = v.value
@@ -2155,8 +2210,114 @@ func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func UUIDValue(v [16]byte) *uuidValue {
-	return &uuidValue{value: v}
+func UUIDFromYDBPair(high uint64, low uint64) *uuidValue {
+	var res uuid.UUID
+	binary.LittleEndian.PutUint64(res[:], low)
+	binary.LittleEndian.PutUint64(res[8:], high)
+	res = uuidLeBytesToDirect(res)
+
+	return &uuidValue{value: res}
+}
+
+func Uuid(val uuid.UUID) *uuidValue { //nolint:revive,stylecheck
+	return &uuidValue{value: val}
+}
+
+func UUIDWithIssue1501Value(v [16]byte) *uuidValue {
+	return &uuidValue{value: v, reproduceStorageBug: true}
+}
+
+func uuidDirectBytesToLe(direct [16]byte) [16]byte {
+	// ordered as uuid bytes le in python
+	// https://docs.python.org/3/library/uuid.html#uuid.UUID.bytes_le
+	var le [16]byte
+	le[0] = direct[3]
+	le[1] = direct[2]
+	le[2] = direct[1]
+	le[3] = direct[0]
+	le[4] = direct[5]
+	le[5] = direct[4]
+	le[6] = direct[7]
+	le[7] = direct[6]
+	le[8] = direct[8]
+	le[9] = direct[9]
+	le[10] = direct[10]
+	le[11] = direct[11]
+	le[12] = direct[12]
+	le[13] = direct[13]
+	le[14] = direct[14]
+	le[15] = direct[15]
+
+	return le
+}
+
+func uuidLeBytesToDirect(direct [16]byte) [16]byte {
+	// ordered as uuid bytes le in python
+	// https://docs.python.org/3/library/uuid.html#uuid.UUID.bytes_le
+	var le [16]byte
+	le[3] = direct[0]
+	le[2] = direct[1]
+	le[1] = direct[2]
+	le[0] = direct[3]
+	le[5] = direct[4]
+	le[4] = direct[5]
+	le[7] = direct[6]
+	le[6] = direct[7]
+	le[8] = direct[8]
+	le[9] = direct[9]
+	le[10] = direct[10]
+	le[11] = direct[11]
+	le[12] = direct[12]
+	le[13] = direct[13]
+	le[14] = direct[14]
+	le[15] = direct[15]
+
+	return le
+}
+
+func uuidReorderBytesForReadWithBug(val [16]byte) [16]byte {
+	var res [16]byte
+	res[0] = val[15]
+	res[1] = val[14]
+	res[2] = val[13]
+	res[3] = val[12]
+	res[4] = val[11]
+	res[5] = val[10]
+	res[6] = val[9]
+	res[7] = val[8]
+	res[8] = val[6]
+	res[9] = val[7]
+	res[10] = val[4]
+	res[11] = val[5]
+	res[12] = val[0]
+	res[13] = val[1]
+	res[14] = val[2]
+	res[15] = val[3]
+
+	return res
+}
+
+// uuidFixBytesOrder is reverse for uuidReorderBytesForReadWithBug
+func uuidFixBytesOrder(val [16]byte) [16]byte {
+	var res [16]byte
+	res[0] = val[12]
+	res[1] = val[13]
+	res[2] = val[14]
+	res[3] = val[15]
+	res[4] = val[10]
+	res[5] = val[11]
+	res[6] = val[8]
+	res[7] = val[9]
+	res[8] = val[7]
+	res[9] = val[6]
+	res[10] = val[5]
+	res[11] = val[4]
+	res[12] = val[3]
+	res[13] = val[2]
+	res[14] = val[1]
+	res[15] = val[0]
+
+	return res
 }
 
 type variantValue struct {
@@ -2410,7 +2571,7 @@ func zeroPrimitiveValue(t types.Primitive) Value {
 		return BytesValue([]byte{})
 
 	case types.UUID:
-		return UUIDValue([16]byte{})
+		return UUIDWithIssue1501Value([16]byte{})
 
 	default:
 		panic(fmt.Sprintf("uncovered primitive type '%T'", t))

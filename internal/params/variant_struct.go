@@ -3,6 +3,8 @@ package params
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -232,7 +234,29 @@ func (vsf *variantStructField) YSON() *variantStruct {
 	return vsf.parent
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (vsf *variantStructField) UUID() *variantStruct {
+	vsf.parent.fields = append(vsf.parent.fields, types.StructField{
+		Name: vsf.name,
+		T:    types.UUID,
+	})
+
+	return vsf.parent
+}
+
+func (vsf *variantStructField) Uuid() *variantStruct { //nolint:revive,stylecheck
+	vsf.parent.fields = append(vsf.parent.fields, types.StructField{
+		Name: vsf.name,
+		T:    types.UUID,
+	})
+
+	return vsf.parent
+}
+
+func (vsf *variantStructField) UUIDWithIssue1501Value() *variantStruct {
 	vsf.parent.fields = append(vsf.parent.fields, types.StructField{
 		Name: vsf.name,
 		T:    types.UUID,
@@ -444,8 +468,28 @@ func (vsi *variantStructItem) YSON(v []byte) *variantStructBuilder {
 	}
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (vsi *variantStructItem) UUID(v [16]byte) *variantStructBuilder {
-	vsi.parent.value = value.UUIDValue(v)
+	vsi.parent.value = value.UUIDWithIssue1501Value(v)
+
+	return &variantStructBuilder{
+		parent: vsi.parent,
+	}
+}
+
+func (vsi *variantStructItem) Uuid(v uuid.UUID) *variantStructBuilder { //nolint:revive,stylecheck
+	vsi.parent.value = value.Uuid(v)
+
+	return &variantStructBuilder{
+		parent: vsi.parent,
+	}
+}
+
+func (vsi *variantStructItem) UUIDWithIssue1501Value(v [16]byte) *variantStructBuilder {
+	vsi.parent.value = value.UUIDWithIssue1501Value(v)
 
 	return &variantStructBuilder{
 		parent: vsi.parent,

@@ -9,6 +9,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -113,9 +115,22 @@ func toValue(v interface{}) (_ types.Value, err error) {
 
 		return types.ListValue(items...), nil
 	case [16]byte:
-		return types.UUIDValue(x), nil
+		return types.UUIDValue(x), nil //nolint:staticcheck
 	case *[16]byte:
 		return types.NullableUUIDValue(x), nil
+	case types.UUIDBytesWithIssue1501Type:
+		return types.UUIDWithIssue1501Value(x.AsBytesArray()), nil
+	case *types.UUIDBytesWithIssue1501Type:
+		if x == nil {
+			return types.NullableUUIDValueWithIssue1501(nil), nil
+		}
+		val := x.AsBytesArray()
+
+		return types.NullableUUIDValueWithIssue1501(&val), nil
+	case uuid.UUID:
+		return types.UuidValue(x), nil
+	case *uuid.UUID:
+		return types.NullableUUIDTypedValue(x), nil
 	case time.Time:
 		return types.TimestampValueFromTime(x), nil
 	case *time.Time:

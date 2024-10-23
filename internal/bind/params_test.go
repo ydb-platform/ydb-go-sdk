@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -280,12 +282,7 @@ func TestToValue(t *testing.T) {
 
 		{
 			src: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-			dst: types.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
-			err: nil,
-		},
-		{
-			src: func(v [16]byte) *[16]byte { return &v }([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
-			dst: types.OptionalValue(types.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})),
+			dst: types.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}), //nolint:staticcheck
 			err: nil,
 		},
 		{
@@ -293,7 +290,28 @@ func TestToValue(t *testing.T) {
 			dst: types.NullValue(types.TypeUUID),
 			err: nil,
 		},
-
+		{
+			src: func(v [16]byte) *[16]byte { return &v }([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
+			dst: types.OptionalValue(types.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})), //nolint:staticcheck,lll
+			err: nil,
+		},
+		{
+			src: uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+			dst: value.TextValue("01020304-0506-0708-090a-0b0c0d0e0f10"),
+			err: nil,
+		},
+		{
+			src: func(v uuid.UUID) *uuid.UUID { return &v }(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
+			// uuid implemented driver.Valuer and doesn't set optional wrapper
+			dst: types.TextValue("01020304-0506-0708-090a-0b0c0d0e0f10"),
+			err: nil,
+		},
+		// https://github.com/ydb-platform/ydb-go-sdk/issues/1515
+		//{
+		//	src: func() *uuid.UUID { return nil }(),
+		//	dst: nil,
+		//	err: nil,
+		//},
 		{
 			src: time.Unix(42, 43),
 			dst: types.TimestampValueFromTime(time.Unix(42, 43)),

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
@@ -296,8 +297,26 @@ func (p *Parameter) YSON(v []byte) Builder {
 	return p.parent
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (p *Parameter) UUID(v [16]byte) Builder {
-	p.value = value.UUIDValue(v)
+	return p.UUIDWithIssue1501Value(v)
+}
+
+// UUIDWithIssue1501Value is field serializer for save data with format bug.
+// For any new code use Uuid
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
+	p.value = value.UUIDWithIssue1501Value(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) Uuid(val uuid.UUID) Builder { //nolint:revive,stylecheck
+	p.value = value.Uuid(val)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent
