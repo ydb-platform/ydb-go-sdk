@@ -263,9 +263,10 @@ func (s *rawConverter) JSONDocument() (v []byte) {
 	return xstring.ToBytes(s.text())
 }
 
-func (s *rawConverter) UUID() (v [16]byte) {
-	return s.uuidBytesWithIssue1501().AsBytesArray()
-}
+// removed for https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+//func (s *rawConverter) UUID() (v [16]byte) {
+//	return s.uuidBytesWithIssue1501().AsBytesArray()
+//}
 
 func (s *rawConverter) UUIDWithIssue1501() (v [16]byte) {
 	if s.Err() != nil {

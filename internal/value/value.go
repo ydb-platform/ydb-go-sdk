@@ -2130,19 +2130,11 @@ type uuidValue struct {
 func (v *uuidValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		bytes := uuidReorderBytesForReadWithBug(v.value)
-		*vv = string(bytes[:])
-
-		return nil
+		return ErrIssue1501BadUUID
 	case *[]byte:
-		bytes := uuidReorderBytesForReadWithBug(v.value)
-		*vv = bytes[:]
-
-		return nil
+		return ErrIssue1501BadUUID
 	case *[16]byte:
-		*vv = uuidReorderBytesForReadWithBug(v.value)
-
-		return nil
+		return ErrIssue1501BadUUID
 	case *UUIDIssue1501FixedBytesWrapper:
 		*vv = NewUUIDIssue1501FixedBytesWrapper(uuidReorderBytesForReadWithBug(v.value))
 
@@ -2181,18 +2173,26 @@ func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 		return v.toYDBWithBug(a)
 	}
 
-	var bytes [16]byte
+	var low, high uint64
 	if v != nil {
-		bytes = uuidDirectBytesToLe(v.value)
+		low, high = UUIDToHiLoPair(v.value)
 	}
 	vv := a.Low128()
-	vv.Low_128 = binary.LittleEndian.Uint64(bytes[0:8])
+	vv.Low_128 = low
 
 	vvv := a.Value()
-	vvv.High_128 = binary.LittleEndian.Uint64(bytes[8:16])
+	vvv.High_128 = high
 	vvv.Value = vv
 
 	return vvv
+}
+
+func UUIDToHiLoPair(id uuid.UUID) (low, high uint64) {
+	bytes := uuidDirectBytesToLe(id)
+	low = binary.LittleEndian.Uint64(bytes[0:8])
+	high = binary.LittleEndian.Uint64(bytes[8:16])
+
+	return low, high
 }
 
 func (v *uuidValue) toYDBWithBug(a *allocator.Allocator) *Ydb.Value {

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -63,7 +64,7 @@ var scannerData = []struct {
 			name:   "date",
 			typeID: Ydb.Type_DATE,
 		}},
-		values: []indexed.RequiredOrOptional{new([16]byte), new(time.Time)},
+		values: []indexed.RequiredOrOptional{new(uuid.UUID), new(time.Time)},
 	},
 	{
 		name:  "Scan JSON, DOUBLE",
@@ -272,7 +273,7 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_DOUBLE,
 			optional: true,
 		}},
-		values: []indexed.RequiredOrOptional{new(*time.Duration), new(*[16]byte), new(*float64)},
+		values: []indexed.RequiredOrOptional{new(*time.Duration), new(*uuid.UUID), new(*float64)},
 	},
 	{
 		name:  "Scan int64, date, string as ydb.Scanner",
@@ -424,7 +425,7 @@ var scannerData = []struct {
 			optional: true,
 			nilValue: true,
 		}},
-		values: []indexed.RequiredOrOptional{new(*uint8), new(*[]byte), new(*time.Time), new(*[16]byte)},
+		values: []indexed.RequiredOrOptional{new(*uint8), new(*[]byte), new(*time.Time), new(*uuid.UUID)},
 	},
 	{
 		name:  "Scan string as byte array.",
