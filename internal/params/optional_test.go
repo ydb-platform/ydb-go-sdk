@@ -368,23 +368,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Low_128{
-								Low_128: 506660481424032516,
-							},
-							High_128: 1157159078456920585,
-						},
+					Value: &Ydb.Value_Low_128{
+						Low_128: 506660481424032516,
 					},
+					High_128: 1157159078456920585,
 				},
 			},
 		},
@@ -394,23 +384,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_OptionalType{
-						OptionalType: &Ydb.OptionalType{
-							Item: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
-							},
-						},
-					},
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
 				},
 				Value: &Ydb.Value{
-					Value: &Ydb.Value_NestedValue{
-						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_Low_128{
-								Low_128: 651345242494996240,
-							},
-							High_128: 72623859790382856,
-						},
+					Value: &Ydb.Value_Low_128{
+						Low_128: 651345242494996240,
 					},
+					High_128: 72623859790382856,
 				},
 			},
 		},
