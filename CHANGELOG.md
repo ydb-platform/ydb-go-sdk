@@ -1,3 +1,4 @@
+## v3.88.0
 * Removed UUID methods from ydb.ParamsBuilder()
 
 ## v3.87.0
