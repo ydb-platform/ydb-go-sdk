@@ -1083,6 +1083,13 @@ func (s *valueScanner) scanOptional(v interface{}, defaultValueForOptional bool)
 			val := value.NewUUIDIssue1501FixedBytesWrapper(src)
 			*v = &val
 		}
+	case **uuid.UUID:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.uuid()
+			*v = &src
+		}
 	case **interface{}:
 		if s.isNull() {
 			*v = nil

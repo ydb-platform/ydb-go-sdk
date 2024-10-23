@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -454,21 +455,23 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Value: &Ydb.Value_NullFlagValue{},
 			}
 			if c.testDefault {
-				var dv [16]byte
+				var dv uuid.UUID
 
 				return ydbval, &dv
 			}
-			var dv *[16]byte
+			var dv *uuid.UUID
 
 			return ydbval, &dv
 		}
-		v := [16]byte{}
-		binary.BigEndian.PutUint64(v[0:8], uint64(rv))
-		binary.BigEndian.PutUint64(v[8:16], uint64(rv))
+		v := uuid.UUID{}
+
+		binary.LittleEndian.PutUint64(v[0:8], uint64(rv))
+		binary.LittleEndian.PutUint64(v[8:16], uint64(rv))
+		low, high := value.UUIDToHiLoPair(v)
 		ydbval := &Ydb.Value{
-			High_128: binary.BigEndian.Uint64(v[0:8]),
+			High_128: high,
 			Value: &Ydb.Value_Low_128{
-				Low_128: binary.BigEndian.Uint64(v[8:16]),
+				Low_128: low,
 			},
 		}
 		if c.optional && !c.testDefault {
