@@ -301,16 +301,16 @@ func (p *Parameter) YSON(v []byte) Builder {
 ////func (p *Parameter) UUID(v [16]byte) Builder {
 ////	return p.UUIDWithIssue1501Value(v)
 ////}
-//
-//// UUIDWithIssue1501Value is field serializer for save data with format bug.
-//// For any new code use Uuid
-//// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
-//func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
-//	p.value = value.UUIDWithIssue1501Value(v)
-//	p.parent.params = append(p.parent.params, p)
-//
-//	return p.parent
-//}
+
+// UUIDWithIssue1501Value is field serializer for save data with format bug.
+// For any new code use Uuid
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
+	p.value = value.UUIDWithIssue1501Value(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
 
 func (p *Parameter) Uuid(val uuid.UUID) Builder { //nolint:revive,stylecheck
 	p.value = value.Uuid(val)
