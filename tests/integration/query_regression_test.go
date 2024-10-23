@@ -263,6 +263,7 @@ DECLARE $val AS UUID;
 
 SELECT CAST($val AS Utf8)`,
 			query.WithIdempotent(),
+			query.WithTxControl(query.SerializableReadWriteTxControl()),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Uuid(id).Build()),
 		)
 
@@ -288,6 +289,7 @@ DECLARE $val AS Utf8;
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
+			query.WithTxControl(query.SerializableReadWriteTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -315,6 +317,7 @@ DECLARE $val AS UUID;
 SELECT $val`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Uuid(id).Build()),
+			query.WithTxControl(query.SerializableReadWriteTxControl()),
 		)
 
 		require.NoError(t, err)
