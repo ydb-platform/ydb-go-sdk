@@ -1,3 +1,5 @@
+* Fixed scan to optional uuid
+
 ## v3.86.0
 * Add workaround for bug in uuid send/receive from server. It is migration version. All native code and most database sql code worked with uuid continue to work.
 
