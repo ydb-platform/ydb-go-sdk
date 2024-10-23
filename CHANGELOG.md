@@ -1,5 +1,11 @@
 * Add workaround for bug in uuid send/receive from server. It is migration version. All native code and most database sql code worked with uuid continue to work.
 
+## v3.85.3
+* Renamed `query.WithPoolID()` into `query.WithResourcePool()`
+
+## v3.85.2
+* Added experimental `query.WithPoolID()` execute option for define resource pool for execute query
+
 ## v3.85.1
 * Added `spans.Retry` constructor of `trace.Retry`
 
