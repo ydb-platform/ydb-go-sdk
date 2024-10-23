@@ -167,15 +167,15 @@ func (l *listItem) YSON(v []byte) *list {
 	return l.parent
 }
 
-// UUID has data corruption bug and will be removed in next version.
+//// UUID has data corruption bug and will be removed in next version.
+////
+//// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+//// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+//func (l *listItem) UUID(v [16]byte) *list {
+//	l.parent.values = append(l.parent.values, value.UUIDWithIssue1501Value(v))
 //
-// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
-// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
-func (l *listItem) UUID(v [16]byte) *list {
-	l.parent.values = append(l.parent.values, value.UUIDWithIssue1501Value(v))
-
-	return l.parent
-}
+//	return l.parent
+//}
 
 func (l *listItem) Uuid(v uuid.UUID) *list { //nolint:revive,stylecheck
 	l.parent.values = append(l.parent.values, value.Uuid(v))

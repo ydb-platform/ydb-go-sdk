@@ -233,18 +233,18 @@ func (s *structValue) YSON(v []byte) *structure {
 	return s.parent
 }
 
-// UUID has data corruption bug and will be removed in next version.
+//// UUID has data corruption bug and will be removed in next version.
+////
+//// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+//// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+//func (s *structValue) UUID(v [16]byte) *structure {
+//	s.parent.values = append(s.parent.values, value.StructValueField{
+//		Name: s.name,
+//		V:    value.UUIDWithIssue1501Value(v),
+//	})
 //
-// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
-// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
-func (s *structValue) UUID(v [16]byte) *structure {
-	s.parent.values = append(s.parent.values, value.StructValueField{
-		Name: s.name,
-		V:    value.UUIDWithIssue1501Value(v),
-	})
-
-	return s.parent
-}
+//	return s.parent
+//}
 
 func (s *structValue) Uuid(v uuid.UUID) *structure { //nolint:revive,stylecheck
 	s.parent.values = append(s.parent.values, value.StructValueField{
