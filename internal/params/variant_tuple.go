@@ -3,6 +3,8 @@ package params
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -167,7 +169,23 @@ func (vtt *variantTupleTypes) YSON() *variantTupleTypes {
 	return vtt
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (vtt *variantTupleTypes) UUID() *variantTupleTypes {
+	vtt.tuple.types = append(vtt.tuple.types, types.UUID)
+
+	return vtt
+}
+
+func (vtt *variantTupleTypes) Uuid() *variantTupleTypes { //nolint:revive,stylecheck
+	vtt.tuple.types = append(vtt.tuple.types, types.UUID)
+
+	return vtt
+}
+
+func (vtt *variantTupleTypes) UUIDWithIssue1501Value() *variantTupleTypes {
 	vtt.tuple.types = append(vtt.tuple.types, types.UUID)
 
 	return vtt
@@ -367,8 +385,28 @@ func (vti *variantTupleItem) YSON(v []byte) *variantTupleBuilder {
 	}
 }
 
+// UUID has data corruption bug and will be removed in next version.
+//
+// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (vti *variantTupleItem) UUID(v [16]byte) *variantTupleBuilder {
-	vti.tuple.value = value.UUIDValue(v)
+	vti.tuple.value = value.UUIDWithIssue1501Value(v)
+
+	return &variantTupleBuilder{
+		tuple: vti.tuple,
+	}
+}
+
+func (vti *variantTupleItem) Uuid(v uuid.UUID) *variantTupleBuilder { //nolint:revive,stylecheck
+	vti.tuple.value = value.Uuid(v)
+
+	return &variantTupleBuilder{
+		tuple: vti.tuple,
+	}
+}
+
+func (vti *variantTupleItem) UUIDWithIssue1501Value(v [16]byte) *variantTupleBuilder {
+	vti.tuple.value = value.UUIDWithIssue1501Value(v)
 
 	return &variantTupleBuilder{
 		tuple: vti.tuple,

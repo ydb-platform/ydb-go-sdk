@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
@@ -262,13 +263,27 @@ func (s *rawConverter) JSONDocument() (v []byte) {
 	return xstring.ToBytes(s.text())
 }
 
-func (s *rawConverter) UUID() (v [16]byte) {
+// removed for https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+//func (s *rawConverter) UUID() (v [16]byte) {
+//	return s.uuidBytesWithIssue1501().AsBytesArray()
+//}
+
+func (s *rawConverter) UUIDWithIssue1501() (v [16]byte) {
 	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
 
 	return s.uint128()
+}
+
+func (s *rawConverter) UUIDTyped() (v uuid.UUID) {
+	if s.Err() != nil {
+		return
+	}
+	s.unwrap()
+
+	return s.uuid()
 }
 
 func (s *rawConverter) DyNumber() (v string) {

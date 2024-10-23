@@ -312,9 +312,9 @@ func TestDyNumber(t *testing.T) {
 }
 
 func TestUUID(t *testing.T) {
-	l := value.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
-	r := value.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
-	g := value.UUIDValue([16]byte{100, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
+	l := value.UUIDWithIssue1501Value([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+	r := value.UUIDWithIssue1501Value([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
+	g := value.UUIDWithIssue1501Value([16]byte{100, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)

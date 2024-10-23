@@ -19,6 +19,6 @@ func WithTraces(adapter Adapter) ydb.Option {
 		ydb.WithTraceRatelimiter(ratelimiter(adapter)),
 		ydb.WithTraceDiscovery(discovery(adapter)),
 		ydb.WithTraceDatabaseSQL(databaseSQL(adapter)),
-		ydb.WithTraceRetry(retry(adapter)),
+		ydb.WithTraceRetry(Retry(adapter)),
 	)
 }

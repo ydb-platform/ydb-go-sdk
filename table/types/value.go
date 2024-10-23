@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -154,7 +156,28 @@ func JSONValue(v string) Value { return value.JSONValue(v) }
 // (functional will be implements with go1.18 type lists)
 func JSONValueFromBytes(v []byte) Value { return value.JSONValue(xstring.FromBytes(v)) }
 
-func UUIDValue(v [16]byte) Value { return value.UUIDValue(v) }
+// removed for https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+// func UUIDValue(v [16]byte) Value { return UUIDWithIssue1501Value(v) }
+
+// UUIDBytesWithIssue1501Type is type wrapper for scan expected values for values stored with bug
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+type UUIDBytesWithIssue1501Type = value.UUIDIssue1501FixedBytesWrapper
+
+func NewUUIDBytesWithIssue1501(val [16]byte) UUIDBytesWithIssue1501Type {
+	return value.NewUUIDIssue1501FixedBytesWrapper(val)
+}
+
+// UUIDWithIssue1501Value is function for save uuid with old corrupted data format for save old behavior
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+//
+// Use UuidValue for all new code
+func UUIDWithIssue1501Value(v [16]byte) Value {
+	return value.UUIDWithIssue1501Value(v)
+}
+
+func UuidValue(v uuid.UUID) Value { //nolint:revive,stylecheck
+	return value.Uuid(v)
+}
 
 func JSONDocumentValue(v string) Value { return value.JSONDocumentValue(v) }
 
@@ -423,6 +446,14 @@ func NullableJSONValueFromBytes(v *[]byte) Value {
 
 func NullableUUIDValue(v *[16]byte) Value {
 	return value.NullableUUIDValue(v)
+}
+
+func NullableUUIDValueWithIssue1501(v *[16]byte) Value {
+	return value.NullableUUIDValueWithIssue1501(v)
+}
+
+func NullableUUIDTypedValue(v *uuid.UUID) Value {
+	return value.NullableUuidValue(v)
 }
 
 func NullableJSONDocumentValue(v *string) Value {

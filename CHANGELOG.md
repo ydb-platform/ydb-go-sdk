@@ -1,5 +1,24 @@
 * Fixed send optional arguments to the server with `ydb.ParamsBuilder`
 
+## v3.87.0
+* BREAK OLD STYLE WORK WITH UUID. See https://github.com/ydb-platform/ydb-go-sdk/issues/1501 for details.
+  At the version you must explicit choose way for work with uuid: old with bug or new (fixed).
+
+## v3.86.1
+* Fixed scan to optional uuid
+
+## v3.86.0
+* Add workaround for bug in uuid send/receive from server. It is migration version. All native code and most database sql code worked with uuid continue to work.
+Dedicated version for migrate code for workaround/fix uuid bug. See https://github.com/ydb-platform/ydb-go-sdk/issues/1501 for details.
+
+## v3.85.3
+* Renamed `query.WithPoolID()` into `query.WithResourcePool()`
+
+## v3.85.2
+* Added experimental `query.WithPoolID()` execute option for define resource pool for execute query
+
+## v3.85.1
+* Added `spans.Retry` constructor of `trace.Retry`
 
 ## v3.85.0
 * Added experimental package `spans` with tracing adapter interfaces for OpenTelemetry, OpenTracing, etc.
