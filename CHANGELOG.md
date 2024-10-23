@@ -1,3 +1,4 @@
+## v3.86.1
 * Fixed scan to optional uuid
 
 ## v3.86.0
