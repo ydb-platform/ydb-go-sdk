@@ -444,18 +444,18 @@ func (d *dictValue) YSON(v []byte) *dict {
 	return d.pair.parent
 }
 
-// UUID has data corruption bug and will be removed in next version.
+//// UUID has data corruption bug and will be removed in next version.
+////
+//// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
+//// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
+//func (d *dictValue) UUID(v [16]byte) *dict {
+//	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+//		K: d.pair.keyValue,
+//		V: value.UUIDWithIssue1501Value(v),
+//	})
 //
-// Deprecated: Use Uuid (prefer) or UUIDWithIssue1501Value (for save old behavior) instead.
-// https://github.com/ydb-platform/ydb-go-sdk/issues/1501
-func (d *dictValue) UUID(v [16]byte) *dict {
-	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
-		K: d.pair.keyValue,
-		V: value.UUIDWithIssue1501Value(v),
-	})
-
-	return d.pair.parent
-}
+//	return d.pair.parent
+//}
 
 func (d *dictValue) Uuid(v uuid.UUID) *dict { //nolint:revive,stylecheck
 	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
