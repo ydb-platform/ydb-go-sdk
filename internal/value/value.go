@@ -2191,6 +2191,7 @@ func UUIDToHiLoPair(id uuid.UUID) (low, high uint64) {
 	bytes := uuidDirectBytesToLe(id)
 	low = binary.LittleEndian.Uint64(bytes[0:8])
 	high = binary.LittleEndian.Uint64(bytes[8:16])
+
 	return low, high
 }
 
