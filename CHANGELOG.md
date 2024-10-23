@@ -1,7 +1,9 @@
 * BREAK OLD STYLE WORK WITH UUID. See https://github.com/ydb-platform/ydb-go-sdk/issues/1501 for details.
-At the version you must explicit choose way for work with uuid: old with bug or new (fixed).
+  At the version you must explicit choose way for work with uuid: old with bug or new (fixed).
 
+## v3.86.0
 * Add workaround for bug in uuid send/receive from server. It is migration version. All native code and most database sql code worked with uuid continue to work.
+Dedicated version for migrate code for workaround/fix uuid bug. See https://github.com/ydb-platform/ydb-go-sdk/issues/1501 for details.
 
 ## v3.85.3
 * Renamed `query.WithPoolID()` into `query.WithResourcePool()`
