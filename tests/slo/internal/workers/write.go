@@ -41,7 +41,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) error {
 		return err
 	}
 
-	m := w.m.Start(metrics.JobWrite)
+	m := w.m.Start(metrics.OperationTypeWrite)
 
 	attempts, err := w.s.Write(ctx, row)
 

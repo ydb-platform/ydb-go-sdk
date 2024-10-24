@@ -11,11 +11,11 @@ type Span struct {
 type SpanName = string
 
 const (
-	JobRead  SpanName = "read"
-	JobWrite SpanName = "write"
+	OperationTypeRead  SpanName = "read"
+	OperationTypeWrite SpanName = "write"
 )
 
 const (
-	JobStatusOK  = "ok"
-	JobStatusErr = "err"
+	OperationStatusSuccess = "success"
+	OperationStatusFailue  = "failure"
 )
