@@ -1,3 +1,5 @@
+* gRPC connection will be forcefully closed on DNS resolver errors from now on  
+
 ## v3.88.0
 * Removed UUID methods from ydb.ParamsBuilder()
 
