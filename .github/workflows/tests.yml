@@ -12,6 +12,7 @@ on:
 
 jobs:
   unit:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no tests'))
     concurrency:
       group: unit-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
@@ -43,6 +44,7 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no tests'))
     concurrency:
       group: integration-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
@@ -96,6 +98,7 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   experiment:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no tests'))
     concurrency:
       group: experiment-${{ github.event_name }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
