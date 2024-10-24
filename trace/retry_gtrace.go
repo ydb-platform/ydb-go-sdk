@@ -26,6 +26,9 @@ func WithRetryPanicCallback(cb func(e interface{})) RetryComposeOption {
 // Compose returns a new Retry which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Retry) Compose(x *Retry, opts ...RetryComposeOption) *Retry {
+	if t == nil {
+		return x
+	}
 	var ret Retry
 	options := retryComposeOptions{}
 	for _, opt := range opts {

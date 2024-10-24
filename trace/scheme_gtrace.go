@@ -26,6 +26,9 @@ func WithSchemePanicCallback(cb func(e interface{})) SchemeComposeOption {
 // Compose returns a new Scheme which has functional fields composed both from t and x.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Scheme) Compose(x *Scheme, opts ...SchemeComposeOption) *Scheme {
+	if t == nil {
+		return x
+	}
 	var ret Scheme
 	options := schemeComposeOptions{}
 	for _, opt := range opts {

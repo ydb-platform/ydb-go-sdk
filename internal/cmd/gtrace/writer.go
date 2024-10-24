@@ -337,6 +337,11 @@ func (w *Writer) compose(trace *Trace) {
 		w.code(`func (`, t, ` *`, trace.Name, `) Compose(`, x, ` *`, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
 		w.line(`*`, trace.Name, ` {`)
 		w.block(func() {
+			w.line(`if `, t, ` == nil {`)
+			w.block(func() {
+				w.line(`return x`)
+			})
+			w.line(`}`)
 			w.line(`var `, ret, ` `, trace.Name, ``)
 			if len(trace.Hooks) > 0 {
 				w.line(`options := `, unexported(trace.Name), `ComposeOptions{}`)

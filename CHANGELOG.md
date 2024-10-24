@@ -1,5 +1,8 @@
 * Fixed send optional arguments to the server with `ydb.ParamsBuilder`
 
+## v3.88.0
+* Removed UUID methods from ydb.ParamsBuilder()
+
 ## v3.87.0
 * BREAK OLD STYLE WORK WITH UUID. See https://github.com/ydb-platform/ydb-go-sdk/issues/1501 for details.
   At the version you must explicit choose way for work with uuid: old with bug or new (fixed).
