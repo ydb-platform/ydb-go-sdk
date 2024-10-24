@@ -137,17 +137,18 @@ func TestLocalDCDiscovery(t *testing.T) {
 		driverConfig: cfg,
 		config:       *cfg.Balancer(),
 		pool:         conn.NewPool(context.Background(), cfg),
-		discoveryClient: discoveryMock{endpoints: []endpoint.Endpoint{
-			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
-			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
-			&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
-		}},
 		localDCDetector: func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
 			return "b", nil
 		},
 	}
 
-	err := r.clusterDiscoveryAttempt(ctx)
+	err := r.clusterDiscoveryAttempt(ctx, func(settings *discoveryAttemptSettings) {
+		settings.client = discoveryMock{endpoints: []endpoint.Endpoint{
+			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
+			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
+			&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
+		}}
+	})
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {

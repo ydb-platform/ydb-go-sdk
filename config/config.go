@@ -48,7 +48,7 @@ func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 // GrpcDialOptions reports about used grpc dialing options
 func (c *Config) GrpcDialOptions() []grpc.DialOption {
 	return append(
-		defaultGrpcOptions(c.trace, c.secure, c.tlsConfig),
+		defaultGrpcOptions(c.secure, c.tlsConfig),
 		c.grpcOptions...,
 	)
 }

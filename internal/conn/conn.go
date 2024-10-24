@@ -216,13 +216,9 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		onDone(err)
 	}()
 
-	// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
-	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
-	address := "ydb:///" + c.endpoint.Address()
-
 	dialOption := makeDialOption(c.endpoint.OverrideHost())
 
-	cc, err = grpc.DialContext(ctx, address, append( //nolint:staticcheck,nolintlint
+	cc, err = grpc.DialContext(ctx, c.endpoint.Address(), append( //nolint:staticcheck,nolintlint
 		dialOption,
 		c.config.GrpcDialOptions()...,
 	)...)
@@ -602,10 +598,6 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	}
 
 	return c
-}
-
-func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
-	return newConn(e, config, opts...)
 }
 
 var _ stats.Handler = statsHandler{}
