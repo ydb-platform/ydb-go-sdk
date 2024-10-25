@@ -11,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -600,6 +599,15 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 	}
 }
 
+// WithSharedBalancer sets balancer from parent driver to child driver
+func WithSharedBalancer(parent *Driver) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.balancer = parent.balancer
+
+		return nil
+	}
+}
+
 // WithTraceTable appends trace.Table into table traces
 func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
@@ -803,13 +811,5 @@ func withConnPool(pool *conn.Pool) Option {
 		c.pool = pool
 
 		return pool.Take(ctx)
-	}
-}
-
-func WithSharedBalancer(parent *Driver) Option {
-	return func(ctx context.Context, c *Driver) error {
-		c.balancer = parent.balancer
-
-		return nil
 	}
 }
