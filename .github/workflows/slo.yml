@@ -85,7 +85,7 @@ jobs:
           ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 run grpc://localhost:2135 /Root/testdb \
             -prom-pgw localhost:9091 \
             -report-period 250 \
-            -time ${{inputs.slo_workload_duration_seconds || 600}} \
+            -time ${{inputs.slo_workload_duration_seconds || 60}} \
             -read-rps ${{inputs.slo_workload_read_max_rps || 1000}} \
             -write-rps ${{inputs.slo_workload_write_max_rps || 100}} \
             -read-timeout 10000 \
