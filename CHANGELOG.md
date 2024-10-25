@@ -1,3 +1,5 @@
+* Fixed send optional arguments to the server with `ydb.ParamsBuilder`
+
 ## v3.88.0
 * Removed UUID methods from ydb.ParamsBuilder()
 
