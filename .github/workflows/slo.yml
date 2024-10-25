@@ -1,80 +1,88 @@
-name: SLO
+name: slo
+
 on:
   pull_request:
     branches:
       - master
       - release-*
   workflow_dispatch:
+    inputs:
+      github_pull_request_number:
+        required: true
+      slo_workload_duration_seconds:
+        default: '600'
+        required: false
+      slo_workload_read_max_rps:
+        default: '1000'
+        required: false
+      slo_workload_write_max_rps:
+        default: '100'
+        required: false
+
 jobs:
-  test-slo:
-    concurrency:
-      group: slo-${{ github.ref }}
+  ydb-slo-action-init:
     if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
 
+    name: Run YDB SLO Tests
     runs-on: ubuntu-latest
-    name: SLO test
-    permissions:
-      checks: write
-      pull-requests: write
-      contents: read
-      issues: write
+
+    strategy:
+      matrix:
+        sdk:
+          - id: database_sql
+            name: database-sql
+            path: ./database/sql
+            label: database/sql
+          - id: native_query
+            name: native-query
+            path: ./native/query
+            label: native/query
+          - id: native_table
+            name: native-table
+            path: ./native/table
+            label: native/table
+          - id: gorm
+            name: gorm
+            path: ./gorm
+            label: gorm
+          - id: xorm
+            name: xorm
+            path: ./xorm
+            label: xorm
+
+    concurrency:
+      group: slo-${{ github.ref }}-${{matrix.sdk.name}}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run SLO
-        uses: ydb-platform/slo-tests@main
-        continue-on-error: true
+      - name: Install Go
+        uses: actions/setup-go@v5
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KUBECONFIG_B64: ${{ secrets.SLO_KUBE_CONFIG }}
-          AWS_CREDENTIALS_B64: ${{ secrets.SLO_AWS_CREDENTIALS }}
-          AWS_CONFIG_B64: ${{ secrets.SLO_AWS_CONFIG }}
-          DOCKER_USERNAME: ${{ secrets.SLO_DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.SLO_DOCKER_PASSWORD }}
-          DOCKER_REPO: ${{ secrets.SLO_DOCKER_REPO }}
-          DOCKER_FOLDER: ${{ secrets.SLO_DOCKER_FOLDER }}
-          s3_endpoint: ${{ secrets.SLO_S3_ENDPOINT }}
-          s3_images_folder: ${{ vars.SLO_S3_IMAGES_FOLDER }}
-          grafana_domain: ${{ vars.SLO_GRAFANA_DOMAIN }}
-          grafana_dashboard: ${{ vars.SLO_GRAFANA_DASHBOARD }}
-          ydb_version: 'newest'
-          timeBetweenPhases: 30
-          shutdownTime: 30
+          go-version: 1.23.x
+          cache: true
 
-          language_id0: 'native-table'
-          workload_path0: 'tests/slo'
-          language0: 'Native ydb-go-sdk/v3 over table-service'
-          workload_build_context0: ../..
-          workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native/table --build-arg JOB_NAME=workload-native-table
+      - name: Build workload
+        run: |
+          cd ./tests/slo
+          go build -o .bin/${{matrix.sdk.id}}_linux_amd64 -ldflags "-X \"main.ref=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}\" -X \"main.label=${{matrix.sdk.label}}\" -X \"main.jobName=${{matrix.sdk.name}}\"" ${{matrix.sdk.path}}
+          chmod +x .bin/${{matrix.sdk.id}}_linux_amd64
 
-          language_id1: 'database-sql'
-          workload_path1: 'tests/slo'
-          language1: 'Go SDK database/sql'
-          workload_build_context1: ../..
-          workload_build_options1: -f Dockerfile --build-arg SRC_PATH=database/sql --build-arg JOB_NAME=workload-database-sql
-
-          language_id2: 'gorm'
-          workload_path2: 'tests/slo'
-          language2: 'Go SDK gorm'
-          workload_build_context2: ../..
-          workload_build_options2: -f Dockerfile --build-arg SRC_PATH=gorm --build-arg JOB_NAME=workload-gorm
-
-          language_id3: 'xorm'
-          workload_path3: 'tests/slo'
-          language3: 'Go SDK xorm'
-          workload_build_context3: ../..
-          workload_build_options3: -f Dockerfile --build-arg SRC_PATH=xorm --build-arg JOB_NAME=workload-xorm
-
-          language_id4: 'native-query'
-          workload_path4: 'tests/slo'
-          language4: 'Native ydb-go-sdk/v3 over query-service'
-          workload_build_context4: ../..
-          workload_build_options4: -f Dockerfile --build-arg SRC_PATH=native/query --build-arg JOB_NAME=workload-native-query
-
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Inititialize YDB SLO
+        uses: ydb-platform/ydb-slo-action/init@main
         with:
-          name: slo-logs
-          path: logs/
+          github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          sdk_name: ${{ matrix.sdk.name }}
+
+      - name: Run SLO Tests
+        run: |
+          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 create grpc://localhost:2135 /Root/testdb
+          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 run grpc://localhost:2135 /Root/testdb \
+            -prom-pgw localhost:9091 \
+            -report-period 500 \
+            -time ${{inputs.slo_workload_duration_seconds || 600}} \
+            -read-rps ${{inputs.slo_workload_read_max_rps || 1000}} \
+            -write-rps ${{inputs.slo_workload_write_max_rps || 100}}
+          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 cleanup grpc://localhost:2135 /Root/testdb

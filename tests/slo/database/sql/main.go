@@ -18,6 +18,7 @@ import (
 )
 
 var (
+	ref     string
 	label   string
 	jobName string
 )
@@ -95,7 +96,7 @@ func main() {
 	case config.RunMode:
 		gen := generator.New(cfg.InitialDataCount)
 
-		w, err := workers.New(cfg, s, label, jobName)
+		w, err := workers.New(cfg, s, ref, label, jobName)
 		if err != nil {
 			panic(fmt.Errorf("create workers failed: %w", err))
 		}

@@ -16,74 +16,142 @@ const (
 
 type (
 	Metrics struct {
-		oks       *prometheus.GaugeVec
-		notOks    *prometheus.GaugeVec
-		inflight  *prometheus.GaugeVec
-		latencies *prometheus.SummaryVec
-		attempts  *prometheus.HistogramVec
-
-		p *push.Pusher
-
+		p     *push.Pusher
+		ref   string
 		label string
+
+		errorsTotal *prometheus.CounterVec
+
+		operationsTotal         *prometheus.CounterVec
+		operationsSuccessTotal  *prometheus.CounterVec
+		operationsFailureTotal  *prometheus.CounterVec
+		operationLatencySeconds *prometheus.HistogramVec
+
+		retryAttemptsTotal  *prometheus.CounterVec
+		retriesSuccessTotal *prometheus.CounterVec
+		retriesFailureTotal *prometheus.CounterVec
+
+		pendingOperations *prometheus.GaugeVec
+		// TODO:
+		// sdk_cpu_usage_seconds_total *prometheus.CounterVec
+		// sdk_memory_usage_bytes *prometheus.GaugeVec
+		// sdk_connections_open *prometheus.GaugeVec
+		// sdk_load_balancing_decisions_total *prometheus.CounterVec
+		// sdk_requests_by_node_total *prometheus.CounterVec
+		// sdk_timeouts_total *prometheus.CounterVec
+		// sdk_connection_errors_total *prometheus.CounterVec
+		// sdk_circuit_breaker_trips_total *prometheus.CounterVec
+		// sdk_request_queue_size_total *prometheus.CounterVec
+		// sdk_throttling_events_total *prometheus.CounterVec
+		// sdk_current_load_factor *prometheus.GaugeVec
 	}
 )
 
-func New(url, label, jobName string) (*Metrics, error) {
+func New(url, ref, label, jobName string) (*Metrics, error) {
 	m := &Metrics{
+		ref:   ref,
 		label: label,
 	}
 
-	m.oks = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{ //nolint:promlinter
-			Name: "oks",
-			Help: "amount of OK requests",
+	m.errorsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{ //nolint:promlinter
+			Name: "sdk_errors_total",
+			Help: "Total number of errors encountered, categorized by error type.",
 		},
-		[]string{"jobName"},
+		[]string{"error_type"},
 	)
-	m.notOks = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{ //nolint:promlinter
-			Name: "not_oks",
-			Help: "amount of not OK requests",
+
+	m.operationsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{ //nolint:promlinter
+			Name: "sdk_operations_total",
+			Help: "Total number of operations, categorized by type attempted by the SDK.",
 		},
-		[]string{"jobName"},
+		[]string{"operation_type"},
 	)
-	m.inflight = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{ //nolint:promlinter
-			Name: "inflight",
-			Help: "amount of requests in flight",
+
+	m.operationsSuccessTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{ //nolint:promlinter
+			Name: "sdk_operations_success_total",
+			Help: "Total number of successful operations, categorized by type.",
 		},
-		[]string{"jobName"},
+		[]string{"operation_type"},
 	)
-	m.latencies = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{ //nolint:promlinter
-			Name: "latency",
-			Help: "summary of latencies in ms",
-			Objectives: map[float64]float64{
-				0.5:  0,
-				0.99: 0,
-				1.0:  0,
-			},
-			MaxAge: 15 * time.Second, //nolint:gomnd
+
+	m.operationsFailureTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{ //nolint:promlinter
+			Name: "sdk_operations_failure_total",
+			Help: "Total number of failed operations, categorized by type.",
 		},
-		[]string{"status", "jobName"},
+		[]string{"operation_type"},
 	)
-	m.attempts = prometheus.NewHistogramVec(
+
+	m.operationLatencySeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{ //nolint:promlinter
-			Name:    "attempts",
-			Help:    "summary of amount for request",
-			Buckets: prometheus.LinearBuckets(1, 1, 10), //nolint:gomnd
+			Name: "sdk_operation_latency_seconds",
+			Help: "Latency of operations performed by the SDK in seconds, categorized by type and status.",
+			Buckets: []float64{
+				0.001,  // 1 ms
+				0.002,  // 2 ms
+				0.003,  // 3 ms
+				0.004,  // 4 ms
+				0.005,  // 5 ms
+				0.0075, // 7.5 ms
+				0.010,  // 10 ms
+				0.020,  // 20 ms
+				0.050,  // 50 ms
+				0.100,  // 100 ms
+				0.200,  // 200 ms
+				0.500,  // 500 ms
+				1.000,  // 1 s
+			},
 		},
-		[]string{"status", "jobName"},
+		[]string{"operation_type", "operation_status"},
+	)
+
+	m.retryAttemptsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{ //nolint:promlinter
+			Name: "sdk_retry_attempts_total",
+			Help: "Total number of retry attempts, categorized by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+
+	m.retriesSuccessTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{ //nolint:promlinter
+			Name: "sdk_retries_success_total",
+			Help: "Total number of successful retries, categorized by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+
+	m.retriesFailureTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{ //nolint:promlinter
+			Name: "sdk_retries_failure_total",
+			Help: "Total number of failed retries, categorized by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+
+	m.pendingOperations = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{ //nolint:promlinter
+			Name: "sdk_pending_operations",
+			Help: "Current number of pending operations, categorized by type.",
+		},
+		[]string{"operation_type"},
 	)
 
 	m.p = push.New(url, jobName).
+		Grouping("ref", m.ref).
 		Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
-		Grouping("sdkVersion", sdkVersion).
-		Collector(m.oks).
-		Collector(m.notOks).
-		Collector(m.inflight).
-		Collector(m.latencies).
-		Collector(m.attempts)
+		Grouping("sdk_version", sdkVersion).
+		Collector(m.operationsTotal).
+		Collector(m.operationsSuccessTotal).
+		Collector(m.operationsFailureTotal).
+		Collector(m.operationLatencySeconds).
+		Collector(m.retryAttemptsTotal).
+		Collector(m.retriesSuccessTotal).
+		Collector(m.retriesFailureTotal).
+		Collector(m.pendingOperations)
 
 	return m, m.Reset() //nolint:gocritic
 }
@@ -93,18 +161,18 @@ func (m *Metrics) Push() error {
 }
 
 func (m *Metrics) Reset() error {
-	m.oks.WithLabelValues(JobRead).Set(0)
-	m.oks.WithLabelValues(JobWrite).Set(0)
+	m.errorsTotal.Reset()
 
-	m.notOks.WithLabelValues(JobRead).Set(0)
-	m.notOks.WithLabelValues(JobWrite).Set(0)
+	m.operationsTotal.Reset()
+	m.operationsSuccessTotal.Reset()
+	m.operationsFailureTotal.Reset()
+	m.operationLatencySeconds.Reset()
 
-	m.inflight.WithLabelValues(JobRead).Set(0)
-	m.inflight.WithLabelValues(JobWrite).Set(0)
+	m.retryAttemptsTotal.Reset()
+	m.retriesSuccessTotal.Reset()
+	m.retriesFailureTotal.Reset()
 
-	m.latencies.Reset()
-
-	m.attempts.Reset()
+	m.pendingOperations.Reset()
 
 	return m.Push()
 }
@@ -116,27 +184,26 @@ func (m *Metrics) Start(name SpanName) Span {
 		m:     m,
 	}
 
-	m.inflight.WithLabelValues(name).Add(1)
+	m.pendingOperations.WithLabelValues(name).Add(1)
 
 	return j
 }
 
 func (j Span) Finish(err error, attempts int) {
-	j.m.inflight.WithLabelValues(j.name).Sub(1)
-
 	latency := time.Since(j.start)
+	j.m.pendingOperations.WithLabelValues(j.name).Sub(1)
 
-	var (
-		successLabel   = JobStatusOK
-		successCounter = j.m.oks
-	)
+	j.m.operationsTotal.WithLabelValues(j.name).Add(1)
+	j.m.retryAttemptsTotal.WithLabelValues(j.name).Add(float64(attempts))
 
 	if err != nil {
-		successLabel = JobStatusErr
-		successCounter = j.m.notOks
+		j.m.errorsTotal.WithLabelValues(err.Error()).Add(1)
+		// j.m.retriesFailureTotal.WithLabelValues(j.name).Add(1)
+		j.m.operationsFailureTotal.WithLabelValues(j.name).Add(1)
+		j.m.operationLatencySeconds.WithLabelValues(j.name, OperationStatusFailue).Observe(latency.Seconds())
+	} else {
+		j.m.operationsSuccessTotal.WithLabelValues(j.name).Add(1)
+		// j.m.retriesSuccessTotal.WithLabelValues(j.name).Add(1)
+		j.m.operationLatencySeconds.WithLabelValues(j.name, OperationStatusSuccess).Observe(latency.Seconds())
 	}
-
-	j.m.latencies.WithLabelValues(successLabel, j.name).Observe(float64(latency.Milliseconds()))
-	j.m.attempts.WithLabelValues(successLabel, j.name).Observe(float64(attempts))
-	successCounter.WithLabelValues(j.name).Add(1)
 }

@@ -20,8 +20,8 @@ type Workers struct {
 	m   *metrics.Metrics
 }
 
-func New(cfg *config.Config, s ReadWriter, label, jobName string) (*Workers, error) {
-	m, err := metrics.New(cfg.PushGateway, label, jobName)
+func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers, error) {
+	m, err := metrics.New(cfg.PushGateway, ref, label, jobName)
 	if err != nil {
 		log.Printf("create metrics failed: %v", err)
 
