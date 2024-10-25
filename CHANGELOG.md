@@ -1,3 +1,4 @@
+## v3.89.1
 * Added option `ydb.WithSharedBalancer(*Driver)` for child drivers
 
 ## v3.89.0
