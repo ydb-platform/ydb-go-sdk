@@ -1,3 +1,4 @@
+## v3.89.0
 * Fixed send optional arguments to the server with `ydb.ParamsBuilder`
 
 ## v3.88.0
