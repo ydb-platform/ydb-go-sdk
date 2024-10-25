@@ -417,9 +417,9 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	}
 	if d.balancer == nil {
 		d.balancer, err = balancer.New(ctx, d.config, d.pool, d.discoveryOptions...)
-	}
-	if err != nil {
-		return xerrors.WithStackTrace(err)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
 	}
 
 	d.table = xsync.OnceValue(func() (*internalTable.Client, error) {
