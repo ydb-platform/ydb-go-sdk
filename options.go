@@ -599,6 +599,15 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 	}
 }
 
+// WithSharedBalancer sets balancer from parent driver to child driver
+func WithSharedBalancer(parent *Driver) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.balancer = parent.balancer
+
+		return nil
+	}
+}
+
 // WithTraceTable appends trace.Table into table traces
 func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {

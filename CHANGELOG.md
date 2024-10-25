@@ -1,3 +1,5 @@
+* Added option `ydb.WithSharedBalancer(*Driver)` for child drivers
+
 ## v3.89.0
 * Fixed send optional arguments to the server with `ydb.ParamsBuilder`
 
