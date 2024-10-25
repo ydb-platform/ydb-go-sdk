@@ -806,9 +806,9 @@ func withConnPool(pool *conn.Pool) Option {
 	}
 }
 
-func withSharedBalancer(balancer *balancer.Balancer) Option {
+func WithSharedBalancer(parent *Driver) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.balancer = balancer
+		c.balancer = parent.balancer
 
 		return nil
 	}

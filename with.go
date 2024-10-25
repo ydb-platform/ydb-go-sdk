@@ -26,7 +26,7 @@ func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, err
 					delete(d.children, id)
 				}),
 				withConnPool(d.pool),
-				withSharedBalancer(d.balancer),
+				WithSharedBalancer(d),
 			),
 			opts...,
 		)...,
