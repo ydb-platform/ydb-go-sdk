@@ -19,9 +19,6 @@ func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, err
 		append(
 			append(
 				d.opts,
-				WithBalancer(
-					d.config.Balancer(),
-				),
 				withOnClose(func(child *Driver) {
 					d.childrenMtx.Lock()
 					defer d.childrenMtx.Unlock()
@@ -29,6 +26,7 @@ func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, err
 					delete(d.children, id)
 				}),
 				withConnPool(d.pool),
+				withSharedBalancer(d.balancer),
 			),
 			opts...,
 		)...,

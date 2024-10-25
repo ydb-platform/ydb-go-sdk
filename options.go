@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -802,5 +803,13 @@ func withConnPool(pool *conn.Pool) Option {
 		c.pool = pool
 
 		return pool.Take(ctx)
+	}
+}
+
+func withSharedBalancer(balancer *balancer.Balancer) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.balancer = balancer
+
+		return nil
 	}
 }
