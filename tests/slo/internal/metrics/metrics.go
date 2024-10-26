@@ -32,7 +32,6 @@ type (
 		retriesFailureTotal *prometheus.CounterVec
 
 		pendingOperations *prometheus.GaugeVec
-		// TODO:
 		// sdk_cpu_usage_seconds_total *prometheus.CounterVec
 		// sdk_memory_usage_bytes *prometheus.GaugeVec
 		// sdk_connections_open *prometheus.GaugeVec
@@ -54,7 +53,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	}
 
 	m.errorsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{ //nolint:promlinter
+		prometheus.CounterOpts{
 			Name: "sdk_errors_total",
 			Help: "Total number of errors encountered, categorized by error type.",
 		},
@@ -62,7 +61,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	)
 
 	m.operationsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{ //nolint:promlinter
+		prometheus.CounterOpts{
 			Name: "sdk_operations_total",
 			Help: "Total number of operations, categorized by type attempted by the SDK.",
 		},
@@ -70,7 +69,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	)
 
 	m.operationsSuccessTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{ //nolint:promlinter
+		prometheus.CounterOpts{
 			Name: "sdk_operations_success_total",
 			Help: "Total number of successful operations, categorized by type.",
 		},
@@ -78,7 +77,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	)
 
 	m.operationsFailureTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{ //nolint:promlinter
+		prometheus.CounterOpts{
 			Name: "sdk_operations_failure_total",
 			Help: "Total number of failed operations, categorized by type.",
 		},
@@ -86,7 +85,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	)
 
 	m.operationLatencySeconds = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{ //nolint:promlinter
+		prometheus.HistogramOpts{
 			Name: "sdk_operation_latency_seconds",
 			Help: "Latency of operations performed by the SDK in seconds, categorized by type and status.",
 			Buckets: []float64{
@@ -109,7 +108,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	)
 
 	m.retryAttemptsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{ //nolint:promlinter
+		prometheus.CounterOpts{
 			Name: "sdk_retry_attempts_total",
 			Help: "Total number of retry attempts, categorized by operation type.",
 		},
@@ -117,7 +116,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	)
 
 	m.retriesSuccessTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{ //nolint:promlinter
+		prometheus.CounterOpts{
 			Name: "sdk_retries_success_total",
 			Help: "Total number of successful retries, categorized by operation type.",
 		},
@@ -125,7 +124,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	)
 
 	m.retriesFailureTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{ //nolint:promlinter
+		prometheus.CounterOpts{
 			Name: "sdk_retries_failure_total",
 			Help: "Total number of failed retries, categorized by operation type.",
 		},
@@ -133,7 +132,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 	)
 
 	m.pendingOperations = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{ //nolint:promlinter
+		prometheus.GaugeOpts{
 			Name: "sdk_pending_operations",
 			Help: "Current number of pending operations, categorized by type.",
 		},
