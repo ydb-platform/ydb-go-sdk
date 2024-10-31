@@ -30,7 +30,7 @@ var (
 )
 
 type rows struct {
-	conn   *conn
+	conn   *Conn
 	result result.BaseResult
 
 	// nextSet once need for get first result set as default.

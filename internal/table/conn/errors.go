@@ -10,8 +10,8 @@ import (
 var (
 	ErrUnsupported     = driver.ErrSkip
 	errDeprecated      = driver.ErrSkip
-	errConnClosedEarly = xerrors.Retryable(errors.New("conn closed early"), xerrors.InvalidObject())
-	errNotReadyConn    = xerrors.Retryable(errors.New("conn not ready"), xerrors.InvalidObject())
+	errConnClosedEarly = xerrors.Retryable(errors.New("Conn closed early"), xerrors.InvalidObject())
+	errNotReadyConn    = xerrors.Retryable(errors.New("Conn not ready"), xerrors.InvalidObject())
 )
 
 type AlreadyHaveTxError struct {
@@ -19,7 +19,7 @@ type AlreadyHaveTxError struct {
 }
 
 func (err *AlreadyHaveTxError) Error() string {
-	return "conn already have an open currentTx: " + err.currentTx
+	return "Conn already have an open currentTx: " + err.currentTx
 }
 
 func (err *AlreadyHaveTxError) As(target interface{}) bool {

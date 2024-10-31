@@ -18,6 +18,9 @@ type (
 		Option
 		bind.Bind
 	}
+	tablePathPrefixOption struct {
+		bind.TablePathPrefix
+	}
 	tableQueryOptionsOption struct {
 		tableOps  []tableSql.Option
 		queryOpts []querySql.Option
@@ -41,6 +44,13 @@ type (
 	queryProcessorOption queryProcessor
 )
 
+func (t tablePathPrefixOption) Apply(c *Connector) error {
+	c.pathNormalizer = t.TablePathPrefix
+	c.bindings = append(c.bindings, t.TablePathPrefix)
+
+	return nil
+}
+
 func (processor queryProcessorOption) Apply(c *Connector) error {
 	c.queryProcessor = queryProcessor(processor)
 
@@ -48,23 +58,19 @@ func (processor queryProcessorOption) Apply(c *Connector) error {
 }
 
 func (opt bindOption) Apply(c *Connector) error {
-	c.tableOpts = append(c.tableOpts, tableSql.WithQueryBindings(opt.Bind))
-	c.queryOpts = append(c.queryOpts, querySql.WithQueryBindings(opt.Bind))
+	c.bindings = bind.Sort(append(c.bindings, opt.Bind))
 
 	return nil
 }
 
 func (opt retryBudgetOption) Apply(c *Connector) error {
-	c.tableOpts = append(c.tableOpts, tableSql.WithRetryBudget(opt.budget))
-	c.queryOpts = append(c.queryOpts, querySql.WithRetryBudget(opt.budget))
+	c.retryBudget = opt.budget
 
 	return nil
 }
 
 func (opt traceRetryOption) Apply(c *Connector) error {
 	c.traceRetry = c.traceRetry.Compose(opt.t, opt.opts...)
-	c.tableOpts = append(c.tableOpts, tableSql.WithTraceRetry(opt.t, opt.opts...))
-	c.queryOpts = append(c.queryOpts, querySql.WithTraceRetry(opt.t, opt.opts...))
 
 	return nil
 }
@@ -83,15 +89,13 @@ func (disableServerBalancerOption) Apply(c *Connector) error {
 
 func (opt traceDatabaseSQLOption) Apply(c *Connector) error {
 	c.trace = c.trace.Compose(opt.t, opt.opts...)
-	c.tableOpts = append(c.tableOpts, tableSql.WithTrace(opt.t, opt.opts...))
-	c.queryOpts = append(c.queryOpts, querySql.WithTrace(opt.t, opt.opts...))
 
 	return nil
 }
 
 func (opt tableQueryOptionsOption) Apply(c *Connector) error {
-	c.queryOpts = append(c.queryOpts, opt.queryOpts...)
-	c.tableOpts = append(c.tableOpts, opt.tableOps...)
+	c.QueryOpts = append(c.QueryOpts, opt.queryOpts...)
+	c.TableOpts = append(c.TableOpts, opt.tableOps...)
 
 	return nil
 }
@@ -127,6 +131,12 @@ func WithTraceRetry(
 func WithRetryBudget(budget budget.Budget) Option {
 	return retryBudgetOption{
 		budget: budget,
+	}
+}
+
+func WithTablePathPrefix(tablePathPrefix string) QueryBindOption {
+	return tablePathPrefixOption{
+		bind.TablePathPrefix(tablePathPrefix),
 	}
 }
 

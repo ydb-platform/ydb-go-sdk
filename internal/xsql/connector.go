@@ -37,18 +37,20 @@ type (
 
 		queryProcessor queryProcessor
 
-		tableOpts             []tableSql.Option
-		queryOpts             []querySql.Option
+		TableOpts             []tableSql.Option
+		QueryOpts             []querySql.Option
 		disableServerBalancer bool
 		onCLose               []func(*Connector)
 
-		clock         clockwork.Clock
-		idleThreshold time.Duration
-		conns         xsync.Map[uuid.UUID, *connWrapper]
-		done          chan struct{}
-		trace         *trace.DatabaseSQL
-		traceRetry    *trace.Retry
-		retryBudget   budget.Budget
+		clock          clockwork.Clock
+		idleThreshold  time.Duration
+		conns          xsync.Map[uuid.UUID, *connWrapper]
+		done           chan struct{}
+		trace          *trace.DatabaseSQL
+		traceRetry     *trace.Retry
+		retryBudget    budget.Budget
+		pathNormalizer bind.TablePathPrefix
+		bindings       bind.Bindings
 	}
 	ydbDriver interface {
 		Name() string
@@ -58,6 +60,26 @@ type (
 		Scheme() scheme.Client
 	}
 )
+
+func (c *Connector) RetryBudget() budget.Budget {
+	return c.retryBudget
+}
+
+func (c *Connector) Bindings() bind.Bindings {
+	return c.bindings
+}
+
+func (c *Connector) Clock() clockwork.Clock {
+	return c.clock
+}
+
+func (c *Connector) Trace() *trace.DatabaseSQL {
+	return c.trace
+}
+
+func (c *Connector) TraceRetry() *trace.Retry {
+	return c.traceRetry
+}
 
 func (c *Connector) Query() *query.Client {
 	return c.parent.Query()
@@ -91,22 +113,21 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	switch c.queryProcessor {
 	case QUERY_SERVICE:
-		id := uuid.New()
-		cc, err := querySql.New(ctx, c, append(
-			c.queryOpts,
-			querySql.WithClock(c.clock),
-			querySql.WithOnClose(func() {
-				c.conns.Delete(id)
-			}))...,
-		)
+		s, err := query.CreateSession(ctx, c.Query())
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
+		id := uuid.New()
+
 		conn := &connWrapper{
-			conn:           cc,
-			connector:      c,
-			pathNormalizer: bind.TablePathPrefix(c.Name()),
+			conn: querySql.New(ctx, c, s, append(
+				c.QueryOpts,
+				querySql.WithOnClose(func() {
+					c.conns.Delete(id)
+				}))...,
+			),
+			connector: c,
 		}
 
 		c.conns.Set(id, conn)
@@ -114,22 +135,20 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return conn, nil
 
 	case TABLE_SERVICE:
-		id := uuid.New()
-		cc, err := tableSql.New(ctx, c, append(
-			c.tableOpts,
-			tableSql.WithClock(c.clock),
-			tableSql.WithOnClose(func() {
-				c.conns.Delete(id)
-			}))...,
-		)
+		s, err := c.Table().CreateSession(ctx) //nolint:staticcheck
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
+		id := uuid.New()
+
 		conn := &connWrapper{
-			conn:           cc,
-			connector:      c,
-			pathNormalizer: bind.TablePathPrefix(c.Name()),
+			conn: tableSql.New(ctx, c, s, append(c.TableOpts,
+				tableSql.WithOnClose(func() {
+					c.conns.Delete(id)
+				}))...,
+			),
+			connector: c,
 		}
 
 		c.conns.Set(id, conn)
@@ -172,6 +191,7 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 		done:           make(chan struct{}),
 		trace:          &trace.DatabaseSQL{},
 		traceRetry:     &trace.Retry{},
+		pathNormalizer: bind.TablePathPrefix(parent.Name()),
 	}
 
 	for _, opt := range opts {

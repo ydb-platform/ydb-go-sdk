@@ -12,15 +12,13 @@ import (
 )
 
 type stmt struct {
-	conn      *conn
+	conn      *Conn
 	processor interface {
 		driver.ExecerContext
 		driver.QueryerContext
 	}
 	query string
 	ctx   context.Context //nolint:containedctx
-
-	trace *trace.DatabaseSQL
 }
 
 var (
@@ -30,7 +28,7 @@ var (
 )
 
 func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtQuery(stmt.trace, &ctx,
+	onDone := trace.DatabaseSQLOnStmtQuery(stmt.conn.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*stmt).QueryContext"),
 		stmt.ctx, stmt.query,
 	)
@@ -49,7 +47,7 @@ func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 }
 
 func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtExec(stmt.trace, &ctx,
+	onDone := trace.DatabaseSQLOnStmtExec(stmt.conn.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*stmt).ExecContext"),
 		stmt.ctx, stmt.query,
 	)
@@ -74,7 +72,7 @@ func (stmt *stmt) NumInput() int {
 func (stmt *stmt) Close() (finalErr error) {
 	var (
 		ctx    = stmt.ctx
-		onDone = trace.DatabaseSQLOnStmtClose(stmt.trace, &ctx,
+		onDone = trace.DatabaseSQLOnStmtClose(stmt.conn.parent.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*stmt).Close"),
 		)
 	)

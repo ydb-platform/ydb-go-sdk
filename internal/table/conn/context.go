@@ -52,7 +52,7 @@ func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) 
 	return defaultTxControl
 }
 
-func (c *conn) WithScanQueryOptions(ctx context.Context, opts ...options.ExecuteScanQueryOption) context.Context {
+func (c *Conn) WithScanQueryOptions(ctx context.Context, opts ...options.ExecuteScanQueryOption) context.Context {
 	return context.WithValue(ctx,
 		ctxScanQueryOptionsKey{},
 		append(
@@ -62,7 +62,7 @@ func (c *conn) WithScanQueryOptions(ctx context.Context, opts ...options.Execute
 	)
 }
 
-func (c *conn) scanQueryOptions(ctx context.Context) []options.ExecuteScanQueryOption {
+func (c *Conn) scanQueryOptions(ctx context.Context) []options.ExecuteScanQueryOption {
 	if opts, ok := ctx.Value(ctxScanQueryOptionsKey{}).([]options.ExecuteScanQueryOption); ok {
 		return append(c.scanOpts, opts...)
 	}
@@ -70,7 +70,7 @@ func (c *conn) scanQueryOptions(ctx context.Context) []options.ExecuteScanQueryO
 	return c.scanOpts
 }
 
-func (c *conn) WithDataQueryOptions(ctx context.Context, opts ...options.ExecuteDataQueryOption) context.Context {
+func (c *Conn) WithDataQueryOptions(ctx context.Context, opts ...options.ExecuteDataQueryOption) context.Context {
 	return context.WithValue(ctx,
 		ctxDataQueryOptionsKey{},
 		append(
@@ -80,7 +80,7 @@ func (c *conn) WithDataQueryOptions(ctx context.Context, opts ...options.Execute
 	)
 }
 
-func (c *conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
+func (c *Conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
 	if opts, ok := ctx.Value(ctxDataQueryOptionsKey{}).([]options.ExecuteDataQueryOption); ok {
 		return append(c.dataOpts, opts...)
 	}
@@ -88,6 +88,6 @@ func (c *conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryO
 	return c.dataOpts
 }
 
-func (c *conn) withKeepInCache(ctx context.Context) context.Context {
+func (c *Conn) withKeepInCache(ctx context.Context) context.Context {
 	return c.WithDataQueryOptions(ctx, options.WithKeepInCache(true))
 }

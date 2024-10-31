@@ -112,7 +112,7 @@ func WithFakeTx(mode QueryMode) ConnectorOption {
 }
 
 func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
-	return xsql.WithQueryBind(bind.TablePathPrefix(tablePathPrefix))
+	return xsql.WithTablePathPrefix(tablePathPrefix)
 }
 
 func WithAutoDeclare() QueryBindConnectorOption {
@@ -164,7 +164,7 @@ type SQLConnector interface {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	c, err := xsql.Open(parent, parent.balancer,
+	c, err := xsql.Open(parent, parent.metaBalancer,
 		append(
 			append(
 				parent.databaseSQLOptions,

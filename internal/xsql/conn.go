@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
@@ -38,8 +37,7 @@ type (
 	connWrapper struct {
 		conn
 
-		connector      *Connector
-		pathNormalizer bind.TablePathPrefix
+		connector *Connector
 	}
 )
 
@@ -48,7 +46,7 @@ func (c *connWrapper) GetDatabaseName() string {
 }
 
 func (c *connWrapper) normalizePath(tableName string) string {
-	return c.pathNormalizer.NormalizePath(tableName)
+	return c.connector.pathNormalizer.NormalizePath(tableName)
 }
 
 func (c *connWrapper) tableDescription(ctx context.Context, tableName string) (d options.Description, _ error) {

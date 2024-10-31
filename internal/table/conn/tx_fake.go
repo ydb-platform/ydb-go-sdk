@@ -15,12 +15,12 @@ type txFake struct {
 	tx.Identifier
 
 	beginCtx context.Context //nolint:containedctx
-	conn     *conn
+	conn     *Conn
 	ctx      context.Context //nolint:containedctx
 }
 
 func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
-	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
+	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*txFake).PrepareContext"),
 		tx.beginCtx, tx, query,
 	)
@@ -36,7 +36,6 @@ func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.St
 		processor: tx,
 		ctx:       ctx,
 		query:     query,
-		trace:     tx.conn.trace,
 	}, nil
 }
 
@@ -47,18 +46,18 @@ var (
 	_ tx.Identifier         = &txFake{}
 )
 
-func beginTxFake(ctx context.Context, c *conn, _ driver.TxOptions) (currentTx, error) {
+func beginTxFake(ctx context.Context, c *Conn) currentTx {
 	return &txFake{
 		Identifier: tx.ID("FAKE"),
 		conn:       c,
 		ctx:        ctx,
-	}, nil
+	}
 }
 
 func (tx *txFake) Commit() (err error) {
 	var (
 		ctx    = tx.ctx
-		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.trace, &ctx,
+		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.parent.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*txFake).Commit"),
 			tx,
 		)
@@ -79,7 +78,7 @@ func (tx *txFake) Commit() (err error) {
 func (tx *txFake) Rollback() (err error) {
 	var (
 		ctx    = tx.ctx
-		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.trace, &ctx,
+		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.parent.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*txFake).Rollback"),
 			tx,
 		)
@@ -100,8 +99,7 @@ func (tx *txFake) Rollback() (err error) {
 func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (
 	rows driver.Rows, err error,
 ) {
-	onDone := trace.DatabaseSQLOnTxQuery(
-		tx.conn.trace, &ctx,
+	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*txFake).QueryContext"),
 		tx.ctx, tx, query,
 	)
@@ -119,8 +117,7 @@ func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.
 func (tx *txFake) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
 	result driver.Result, err error,
 ) {
-	onDone := trace.DatabaseSQLOnTxExec(
-		tx.conn.trace, &ctx,
+	onDone := trace.DatabaseSQLOnTxExec(tx.conn.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*txFake).ExecContext"),
 		tx.ctx, tx, query,
 	)

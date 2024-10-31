@@ -17,7 +17,7 @@ import (
 type transaction struct {
 	tx.Identifier
 
-	conn *conn
+	conn *Conn
 	ctx  context.Context //nolint:containedctx
 	tx   table.Transaction
 }
@@ -29,7 +29,7 @@ var (
 	_ tx.Identifier         = &transaction{}
 )
 
-func beginTx(ctx context.Context, c *conn, txOptions driver.TxOptions) (currentTx, error) {
+func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (currentTx, error) {
 	txc, err := isolation.ToYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -52,12 +52,12 @@ func (tx *transaction) checkTxState() error {
 		return nil
 	}
 	if tx.conn.currentTx == nil {
-		return fmt.Errorf("broken conn state: tx=%q not related to conn=%q",
+		return fmt.Errorf("broken Conn state: tx=%q not related to Conn=%q",
 			tx.ID(), tx.conn.ID(),
 		)
 	}
 
-	return fmt.Errorf("broken conn state: tx=%s not related to conn=%q (conn have current tx=%q)",
+	return fmt.Errorf("broken Conn state: tx=%s not related to Conn=%q (Conn have current tx=%q)",
 		tx.conn.currentTx.ID(), tx.conn.ID(), tx.ID(),
 	)
 }
@@ -65,7 +65,7 @@ func (tx *transaction) checkTxState() error {
 func (tx *transaction) Commit() (finalErr error) {
 	var (
 		ctx    = tx.ctx
-		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.trace, &ctx,
+		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.parent.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).Commit"),
 			tx,
 		)
@@ -89,7 +89,7 @@ func (tx *transaction) Commit() (finalErr error) {
 func (tx *transaction) Rollback() (finalErr error) {
 	var (
 		ctx    = tx.ctx
-		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.trace, &ctx,
+		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.parent.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).Rollback"),
 			tx,
 		)
@@ -114,7 +114,7 @@ func (tx *transaction) Rollback() (finalErr error) {
 func (tx *transaction) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx,
+	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).QueryContext"),
 		tx.ctx, tx, query,
 	)
@@ -156,7 +156,7 @@ func (tx *transaction) QueryContext(ctx context.Context, query string, args []dr
 func (tx *transaction) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx,
+	onDone := trace.DatabaseSQLOnTxExec(tx.conn.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).ExecContext"),
 		tx.ctx, tx, query,
 	)
@@ -190,7 +190,7 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 }
 
 func (tx *transaction) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
-	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
+	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).PrepareContext"),
 		tx.ctx, tx, query,
 	)
@@ -206,6 +206,5 @@ func (tx *transaction) PrepareContext(ctx context.Context, query string) (_ driv
 		processor: tx,
 		ctx:       ctx,
 		query:     query,
-		trace:     tx.conn.trace,
 	}, nil
 }

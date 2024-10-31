@@ -21,70 +21,70 @@ import (
 type (
 	Parent interface {
 		Query() *query.Client
+		Trace() *trace.DatabaseSQL
+		TraceRetry() *trace.Retry
+		RetryBudget() budget.Budget
+		Bindings() bind.Bindings
+		Clock() clockwork.Clock
 	}
 	currentTx interface {
 		Rollback() error
 	}
-	conn struct {
-		ctx         context.Context //nolint:containedctx
-		parent      Parent
-		trace       *trace.DatabaseSQL
-		traceRetry  *trace.Retry
-		retryBudget budget.Budget
-		bindings    []bind.Bind
-		session     *query.Session
-		clock       clockwork.Clock
-		onClose     []func()
-		closed      atomic.Bool
+	Conn struct {
+		ctx     context.Context //nolint:containedctx
+		parent  Parent
+		session *query.Session
+		onClose []func()
+		closed  atomic.Bool
 		currentTx
 	}
 )
 
-func (c *conn) ID() string {
+func (c *Conn) ID() string {
 	return c.session.ID()
 }
 
-func (c *conn) IsValid() bool {
+func (c *Conn) IsValid() bool {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) CheckNamedValue(value *driver.NamedValue) error {
+func (c *Conn) CheckNamedValue(value *driver.NamedValue) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) Ping(ctx context.Context) error {
+func (c *Conn) Ping(ctx context.Context) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+func (c *Conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) Prepare(query string) (driver.Stmt, error) {
+func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) Close() (finalErr error) {
+func (c *Conn) Close() (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
 		return badconn.Map(xerrors.WithStackTrace(errConnClosedEarly))
 	}
@@ -98,8 +98,8 @@ func (c *conn) Close() (finalErr error) {
 	var (
 		ctx    = c.ctx
 		onDone = trace.DatabaseSQLOnConnClose(
-			c.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*conn).Close"),
+			c.parent.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).Close"),
 		)
 	)
 	defer func() {
@@ -116,28 +116,21 @@ func (c *conn) Close() (finalErr error) {
 	return nil
 }
 
-func (c *conn) Begin() (driver.Tx, error) {
+func (c *Conn) Begin() (driver.Tx, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *conn) LastUsage() time.Time {
+func (c *Conn) LastUsage() time.Time {
 	//TODO implement me
 	panic("implement me")
 }
 
-func New(ctx context.Context, parent Parent, opts ...Option) (*conn, error) {
-	s, err := query.CreateSession(ctx, parent.Query())
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	cc := &conn{
+func New(ctx context.Context, parent Parent, s *query.Session, opts ...Option) *Conn {
+	cc := &Conn{
 		ctx:     ctx,
 		parent:  parent,
 		session: s,
-		clock:   clockwork.NewRealClock(),
-		trace:   &trace.DatabaseSQL{},
 	}
 
 	for _, opt := range opts {
@@ -146,5 +139,5 @@ func New(ctx context.Context, parent Parent, opts ...Option) (*conn, error) {
 		}
 	}
 
-	return cc, nil
+	return cc
 }

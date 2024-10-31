@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -26,20 +27,23 @@ import (
 )
 
 type (
-	beginTxFunc func(ctx context.Context, c *conn, txOptions driver.TxOptions) (currentTx, error)
-	Parent      interface {
+	Parent interface {
 		Table() table.Client
 		Scripting() scripting.Client
+
+		Trace() *trace.DatabaseSQL
+		TraceRetry() *trace.Retry
+		RetryBudget() budget.Budget
+		Bindings() bind.Bindings
+		Clock() clockwork.Clock
 	}
-	conn struct {
+	Conn struct {
 		ctx context.Context //nolint:containedctx
 
-		parent     Parent
-		trace      *trace.DatabaseSQL
-		traceRetry *trace.Retry
-		session    table.ClosableSession // Immutable and r/o usage.
+		parent  Parent
+		session table.ClosableSession // Immutable and r/o usage.
 
-		beginTxFuncs map[QueryMode]beginTxFunc
+		fakeTxModes []QueryMode
 
 		closed           atomic.Bool
 		lastUsage        atomic.Int64
@@ -51,24 +55,21 @@ type (
 		scanOpts []options.ExecuteScanQueryOption
 
 		currentTx     currentTx
-		retryBudget   budget.Budget
-		bindings      bind.Bindings
 		idleThreshold time.Duration
 		onClose       []func()
-		clock         clockwork.Clock
 	}
 )
 
-func (c *conn) LastUsage() time.Time {
+func (c *Conn) LastUsage() time.Time {
 	return time.Unix(c.lastUsage.Load(), 0)
 }
 
-func (c *conn) CheckNamedValue(*driver.NamedValue) error {
+func (c *Conn) CheckNamedValue(*driver.NamedValue) error {
 	// on this stage allows all values
 	return nil
 }
 
-func (c *conn) IsValid() bool {
+func (c *Conn) IsValid() bool {
 	return c.isReady()
 }
 
@@ -86,35 +87,25 @@ func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
 var (
-	_ driver.Conn               = &conn{}
-	_ driver.ConnPrepareContext = &conn{}
-	_ driver.ConnBeginTx        = &conn{}
-	_ driver.ExecerContext      = &conn{}
-	_ driver.QueryerContext     = &conn{}
-	_ driver.Pinger             = &conn{}
-	_ driver.Validator          = &conn{}
-	_ driver.NamedValueChecker  = &conn{}
+	_ driver.Conn               = &Conn{}
+	_ driver.ConnPrepareContext = &Conn{}
+	_ driver.ConnBeginTx        = &Conn{}
+	_ driver.ExecerContext      = &Conn{}
+	_ driver.QueryerContext     = &Conn{}
+	_ driver.Pinger             = &Conn{}
+	_ driver.Validator          = &Conn{}
+	_ driver.NamedValueChecker  = &Conn{}
 
 	_ driver.Result = resultNoRows{}
 )
 
-func New(ctx context.Context, parent Parent, opts ...Option) (*conn, error) {
-	s, err := parent.Table().CreateSession(ctx) //nolint:staticcheck
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	cc := &conn{
+func New(ctx context.Context, parent Parent, s table.ClosableSession, opts ...Option) *Conn {
+	cc := &Conn{
 		ctx:              ctx,
 		parent:           parent,
 		session:          s,
 		defaultQueryMode: DataQueryMode,
 		defaultTxControl: table.DefaultTxControl(),
-		clock:            clockwork.NewRealClock(),
-		trace:            &trace.DatabaseSQL{},
-		beginTxFuncs: map[QueryMode]beginTxFunc{
-			DataQueryMode: beginTx,
-		},
 	}
 
 	for _, opt := range opts {
@@ -123,19 +114,19 @@ func New(ctx context.Context, parent Parent, opts ...Option) (*conn, error) {
 		}
 	}
 
-	return cc, nil
+	return cc
 }
 
-func (c *conn) isReady() bool {
+func (c *Conn) isReady() bool {
 	return c.session.Status() == table.SessionReady
 }
 
-func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
+func (c *Conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
 	if c.currentTx != nil {
 		return c.currentTx.PrepareContext(ctx, query)
 	}
-	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*conn).PrepareContext"),
+	onDone := trace.DatabaseSQLOnConnPrepare(c.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).PrepareContext"),
 		query,
 	)
 	defer func() {
@@ -151,17 +142,16 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 		processor: c,
 		ctx:       ctx,
 		query:     query,
-		trace:     c.trace,
 	}, nil
 }
 
-func (c *conn) execContext(
+func (c *Conn) execContext(
 	ctx context.Context,
 	query string,
 	args []driver.NamedValue,
 ) (_ driver.Result, finalErr error) {
 	defer func() {
-		c.lastUsage.Store(c.clock.Now().Unix())
+		c.lastUsage.Store(c.parent.Clock().Now().Unix())
 	}()
 
 	if !c.isReady() {
@@ -173,10 +163,9 @@ func (c *conn) execContext(
 	}
 
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	onDone := trace.DatabaseSQLOnConnExec(
-		c.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*conn).execContext"),
-		query, m.String(), xcontext.IsIdempotent(ctx), c.clock.Since(c.LastUsage()),
+	onDone := trace.DatabaseSQLOnConnExec(c.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).execContext"),
+		query, m.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -194,7 +183,7 @@ func (c *conn) execContext(
 	}
 }
 
-func (c *conn) executeDataQuery(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func (c *Conn) executeDataQuery(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	normalizedQuery, parameters, err := c.normalize(query, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -219,7 +208,7 @@ func (c *conn) executeDataQuery(ctx context.Context, query string, args []driver
 	return resultNoRows{}, nil
 }
 
-func (c *conn) executeSchemeQuery(ctx context.Context, query string) (driver.Result, error) {
+func (c *Conn) executeSchemeQuery(ctx context.Context, query string) (driver.Result, error) {
 	normalizedQuery, _, err := c.normalize(query)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -232,7 +221,7 @@ func (c *conn) executeSchemeQuery(ctx context.Context, query string) (driver.Res
 	return resultNoRows{}, nil
 }
 
-func (c *conn) executeScriptingQuery(
+func (c *Conn) executeScriptingQuery(
 	ctx context.Context,
 	query string,
 	args []driver.NamedValue,
@@ -258,7 +247,7 @@ func (c *conn) executeScriptingQuery(
 	return resultNoRows{}, nil
 }
 
-func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, _ error) {
+func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, _ error) {
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
@@ -269,7 +258,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	return c.execContext(ctx, query, args)
 }
 
-func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, _ error) {
+func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, _ error) {
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
@@ -280,11 +269,11 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	return c.queryContext(ctx, query, args)
 }
 
-func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (
+func (c *Conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
 	defer func() {
-		c.lastUsage.Store(c.clock.Now().Unix())
+		c.lastUsage.Store(c.parent.Clock().Now().Unix())
 	}()
 
 	if !c.isReady() {
@@ -297,10 +286,9 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 
 	var (
 		queryMode = queryModeFromContext(ctx, c.defaultQueryMode)
-		onDone    = trace.DatabaseSQLOnConnQuery(
-			c.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*conn).queryContext"),
-			query, queryMode.String(), xcontext.IsIdempotent(ctx), c.clock.Since(c.LastUsage()),
+		onDone    = trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).queryContext"),
+			query, queryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 		)
 	)
 	defer func() {
@@ -322,11 +310,11 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	case ScriptingQueryMode:
 		return c.execScriptingQuery(ctx, normalizedQuery, parameters)
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' on conn query", queryMode)
+		return nil, fmt.Errorf("unsupported query mode '%s' on Conn query", queryMode)
 	}
 }
 
-func (c *conn) execDataQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
+func (c *Conn) execDataQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
 	_, res, err := c.session.Execute(ctx,
 		txControl(ctx, c.defaultTxControl),
 		query, &params, c.dataQueryOptions(ctx)...,
@@ -344,7 +332,7 @@ func (c *conn) execDataQuery(ctx context.Context, query string, params params.Pa
 	}, nil
 }
 
-func (c *conn) execScanQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
+func (c *Conn) execScanQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
 	res, err := c.session.StreamExecuteScanQuery(ctx,
 		query, &params, c.scanQueryOptions(ctx)...,
 	)
@@ -361,7 +349,7 @@ func (c *conn) execScanQuery(ctx context.Context, query string, params params.Pa
 	}, nil
 }
 
-func (c *conn) explainQuery(ctx context.Context, query string) (driver.Rows, error) {
+func (c *Conn) explainQuery(ctx context.Context, query string) (driver.Rows, error) {
 	exp, err := c.session.Explain(ctx, query)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -375,7 +363,7 @@ func (c *conn) explainQuery(ctx context.Context, query string) (driver.Rows, err
 	}, nil
 }
 
-func (c *conn) execScriptingQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
+func (c *Conn) execScriptingQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
 	res, err := c.parent.Scripting().StreamExecute(ctx, query, &params)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -390,9 +378,9 @@ func (c *conn) execScriptingQuery(ctx context.Context, query string, params para
 	}, nil
 }
 
-func (c *conn) Ping(ctx context.Context) (finalErr error) {
-	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*conn).Ping"),
+func (c *Conn) Ping(ctx context.Context) (finalErr error) {
+	onDone := trace.DatabaseSQLOnConnPing(c.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).Ping"),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -407,7 +395,7 @@ func (c *conn) Ping(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-func (c *conn) Close() (finalErr error) {
+func (c *Conn) Close() (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
 		return badconn.Map(xerrors.WithStackTrace(errConnClosedEarly))
 	}
@@ -420,9 +408,8 @@ func (c *conn) Close() (finalErr error) {
 
 	var (
 		ctx    = c.ctx
-		onDone = trace.DatabaseSQLOnConnClose(
-			c.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*conn).Close"),
+		onDone = trace.DatabaseSQLOnConnClose(c.parent.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).Close"),
 		)
 	)
 	defer func() {
@@ -439,16 +426,16 @@ func (c *conn) Close() (finalErr error) {
 	return nil
 }
 
-func (c *conn) Prepare(string) (driver.Stmt, error) {
+func (c *Conn) Prepare(string) (driver.Stmt, error) {
 	return nil, errDeprecated
 }
 
-func (c *conn) Begin() (driver.Tx, error) {
+func (c *Conn) Begin() (driver.Tx, error) {
 	return nil, errDeprecated
 }
 
-func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ params.Parameters, _ error) {
-	return c.bindings.RewriteQuery(q, func() (ii []interface{}) {
+func (c *Conn) normalize(q string, args ...driver.NamedValue) (query string, _ params.Parameters, _ error) {
+	return c.parent.Bindings().RewriteQuery(q, func() (ii []interface{}) {
 		for i := range args {
 			ii = append(ii, args[i])
 		}
@@ -457,23 +444,15 @@ func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ p
 	}()...)
 }
 
-func (c *conn) ID() string {
+func (c *Conn) ID() string {
 	return c.session.ID()
 }
 
-func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, finalErr error) {
-	var tx currentTx
-	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*conn).BeginTx"),
-	)
-	defer func() {
-		onDone(tx, finalErr)
-	}()
-
+func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (currentTx, error) {
 	if c.currentTx != nil {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
-				fmt.Errorf("broken conn state: conn=%q already have current tx=%q",
+				fmt.Errorf("broken Conn state: Conn=%q already have current tx=%q",
 					c.ID(), c.currentTx.ID(),
 				),
 			),
@@ -482,24 +461,26 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 
-	beginTx, isKnown := c.beginTxFuncs[m]
-	if !isKnown {
-		return nil, badconn.Map(
-			xerrors.WithStackTrace(
-				xerrors.Retryable(
-					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.InvalidObject(),
-					xerrors.WithName("WRONG_QUERY_MODE"),
-				),
-			),
-		)
+	if slices.Contains(c.fakeTxModes, m) {
+		return beginTxFake(ctx, c), nil
 	}
 
-	var err error
-	tx, err = beginTx(ctx, c, txOptions)
+	tx, err := beginTx(ctx, c, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
+	return tx, nil
+}
+
+func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.Tx, error) {
+	onDone := trace.DatabaseSQLOnConnBegin(c.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).BeginTx"),
+	)
+	tx, err := c.beginTx(ctx, txOptions)
+	defer func() {
+		onDone(tx, err)
+	}()
 
 	c.currentTx = tx
 
