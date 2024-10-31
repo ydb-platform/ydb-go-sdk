@@ -2,6 +2,4 @@ package conn
 
 import "errors"
 
-var (
-	errConnClosedEarly = errors.New("conn closed early")
-)
+var errConnClosedEarly = errors.New("conn closed early")

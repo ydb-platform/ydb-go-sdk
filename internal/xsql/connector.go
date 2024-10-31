@@ -46,7 +46,7 @@ type (
 		idleThreshold time.Duration
 		conns         xsync.Map[uuid.UUID, *connWrapper]
 		done          chan struct{}
-		traceSql      *trace.DatabaseSQL
+		trace         *trace.DatabaseSQL
 		traceRetry    *trace.Retry
 		retryBudget   budget.Budget
 	}
@@ -80,18 +80,17 @@ func (c *Connector) Scheme() scheme.Client {
 }
 
 const (
-	queryProcessor_QueryService = iota + 1
-	queryProcessor_TableService
+	QUERY_SERVICE = iota + 1 //nolint:revive,stylecheck
+	TABLE_SERVICE            //nolint:revive,stylecheck
 )
 
 func (c *Connector) Open(name string) (driver.Conn, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, xerrors.WithStackTrace(driver.ErrSkip)
 }
 
 func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	switch c.queryProcessor {
-	case queryProcessor_QueryService:
+	case QUERY_SERVICE:
 		id := uuid.New()
 		cc, err := querySql.New(ctx, c, append(
 			c.queryOpts,
@@ -114,7 +113,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		return conn, nil
 
-	case queryProcessor_TableService:
+	case TABLE_SERVICE:
 		id := uuid.New()
 		cc, err := tableSql.New(ctx, c, append(
 			c.tableOpts,
@@ -168,10 +167,10 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 	c := &Connector{
 		parent:         parent,
 		balancer:       balancer,
-		queryProcessor: queryProcessor_TableService,
+		queryProcessor: TABLE_SERVICE,
 		clock:          clockwork.NewRealClock(),
 		done:           make(chan struct{}),
-		traceSql:       &trace.DatabaseSQL{},
+		trace:          &trace.DatabaseSQL{},
 		traceRetry:     &trace.Retry{},
 	}
 

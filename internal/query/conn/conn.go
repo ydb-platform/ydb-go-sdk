@@ -26,7 +26,7 @@ type (
 		Rollback() error
 	}
 	conn struct {
-		ctx         context.Context
+		ctx         context.Context //nolint:containedctx
 		parent      Parent
 		trace       *trace.DatabaseSQL
 		traceRetry  *trace.Retry

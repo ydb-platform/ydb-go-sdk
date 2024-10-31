@@ -30,15 +30,6 @@ var (
 )
 
 func beginTx(ctx context.Context, c *conn, txOptions driver.TxOptions) (currentTx, error) {
-	if c.currentTx != nil {
-		return nil, badconn.Map(
-			xerrors.WithStackTrace(
-				fmt.Errorf("broken conn state: conn=%q already have current tx=%q",
-					c.ID(), c.currentTx.ID(),
-				),
-			),
-		)
-	}
 	txc, err := isolation.ToYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -47,14 +38,13 @@ func beginTx(ctx context.Context, c *conn, txOptions driver.TxOptions) (currentT
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return &transaction{
 		Identifier: tx.ID(nativeTx.ID()),
 		conn:       c,
 		ctx:        ctx,
 		tx:         nativeTx,
 	}, nil
-
-	return c.currentTx, nil
 }
 
 func (tx *transaction) checkTxState() error {

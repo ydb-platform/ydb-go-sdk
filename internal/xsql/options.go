@@ -22,7 +22,7 @@ type (
 		tableOps  []tableSql.Option
 		queryOpts []querySql.Option
 	}
-	traceDatabaseSqlOption struct {
+	traceDatabaseSQLOption struct {
 		t    *trace.DatabaseSQL
 		opts []trace.DatabaseSQLComposeOption
 	}
@@ -81,8 +81,8 @@ func (disableServerBalancerOption) Apply(c *Connector) error {
 	return nil
 }
 
-func (opt traceDatabaseSqlOption) Apply(c *Connector) error {
-	c.traceSql = c.traceSql.Compose(opt.t, opt.opts...)
+func (opt traceDatabaseSQLOption) Apply(c *Connector) error {
+	c.trace = c.trace.Compose(opt.t, opt.opts...)
 	c.tableOpts = append(c.tableOpts, tableSql.WithTrace(opt.t, opt.opts...))
 	c.queryOpts = append(c.queryOpts, querySql.WithTrace(opt.t, opt.opts...))
 
@@ -100,7 +100,7 @@ func WithTrace(
 	t *trace.DatabaseSQL, //nolint:gocritic
 	opts ...trace.DatabaseSQLComposeOption,
 ) Option {
-	return traceDatabaseSqlOption{
+	return traceDatabaseSQLOption{
 		t:    t,
 		opts: opts,
 	}
@@ -173,9 +173,9 @@ func WithQueryOptions(opts ...querySql.Option) Option {
 }
 
 func OverQueryService() Option {
-	return queryProcessorOption(queryProcessor_QueryService)
+	return queryProcessorOption(QUERY_SERVICE)
 }
 
 func OverTableService() Option {
-	return queryProcessorOption(queryProcessor_TableService)
+	return queryProcessorOption(TABLE_SERVICE)
 }

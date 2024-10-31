@@ -14,17 +14,17 @@ var (
 	errNotReadyConn    = xerrors.Retryable(errors.New("conn not ready"), xerrors.InvalidObject())
 )
 
-type ConnAlreadyHaveTxError struct {
+type AlreadyHaveTxError struct {
 	currentTx string
 }
 
-func (err *ConnAlreadyHaveTxError) Error() string {
+func (err *AlreadyHaveTxError) Error() string {
 	return "conn already have an open currentTx: " + err.currentTx
 }
 
-func (err *ConnAlreadyHaveTxError) As(target interface{}) bool {
+func (err *AlreadyHaveTxError) As(target interface{}) bool {
 	switch t := target.(type) {
-	case *ConnAlreadyHaveTxError:
+	case *AlreadyHaveTxError:
 		t.currentTx = err.currentTx
 
 		return true

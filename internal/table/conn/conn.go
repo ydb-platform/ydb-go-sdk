@@ -99,7 +99,7 @@ var (
 )
 
 func New(ctx context.Context, parent Parent, opts ...Option) (*conn, error) {
-	s, err := parent.Table().CreateSession(ctx)
+	s, err := parent.Table().CreateSession(ctx) //nolint:staticcheck
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -471,12 +471,11 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	}()
 
 	if c.currentTx != nil {
-		return nil, xerrors.WithStackTrace(
-			xerrors.Retryable(
-				&ConnAlreadyHaveTxError{
-					currentTx: c.currentTx.ID(),
-				},
-				xerrors.InvalidObject(),
+		return nil, badconn.Map(
+			xerrors.WithStackTrace(
+				fmt.Errorf("broken conn state: conn=%q already have current tx=%q",
+					c.ID(), c.currentTx.ID(),
+				),
 			),
 		)
 	}

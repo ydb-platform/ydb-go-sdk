@@ -47,7 +47,7 @@ var (
 	_ tx.Identifier         = &txFake{}
 )
 
-func beginTxFake(ctx context.Context, c *conn, txOptions driver.TxOptions) (currentTx, error) {
+func beginTxFake(ctx context.Context, c *conn, _ driver.TxOptions) (currentTx, error) {
 	return &txFake{
 		Identifier: tx.ID("FAKE"),
 		conn:       c,

@@ -239,7 +239,7 @@ func (c *connWrapper) IsColumnExists(ctx context.Context, tableName, columnName 
 
 func (c *connWrapper) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
-	onDone := trace.DatabaseSQLOnConnIsTableExists(c.connector.traceSql, &ctx,
+	onDone := trace.DatabaseSQLOnConnIsTableExists(c.connector.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*connWrapper).IsTableExists"),
 		tableName,
 	)

@@ -139,7 +139,10 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 	return xsql.WithTableOptions(tableSql.WithScanOpts(opts...))
 }
 
-func overQueryService() ConnectorOption {
+// overQueryService is an option for switch database/sql driver implementation from default to over query service
+//
+// TODO: Make public when ready
+func overQueryService() ConnectorOption { //nolint:unused
 	return xsql.OverQueryService()
 }
 
