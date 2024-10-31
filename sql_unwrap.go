@@ -12,8 +12,6 @@ func Unwrap[T *sql.DB | *sql.Conn](v T) (*Driver, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	d.connectorsMtx.RLock()
-	defer d.connectorsMtx.RUnlock()
 
-	return d.connectors[c], nil
+	return c.Parent().(*Driver), nil //nolint:forcetypeassert
 }

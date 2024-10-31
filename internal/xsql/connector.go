@@ -4,222 +4,177 @@ import (
 	"context"
 	"database/sql/driver"
 	"io"
-	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn"
+	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type ConnectorOption interface {
-	Apply(c *Connector) error
-}
+var (
+	_ io.Closer        = (*Connector)(nil)
+	_ driver.Connector = (*Connector)(nil)
+)
 
-type defaultQueryModeConnectorOption QueryMode
+type (
+	queryProcessor uint8
+	Connector      struct {
+		parent   ydbDriver
+		balancer grpc.ClientConnInterface
 
-func (mode defaultQueryModeConnectorOption) Apply(c *Connector) error {
-	c.defaultQueryMode = QueryMode(mode)
+		queryProcessor queryProcessor
 
-	return nil
-}
+		tableOpts             []tableSql.Option
+		queryOpts             []querySql.Option
+		disableServerBalancer bool
+		onCLose               []func(*Connector)
 
-type QueryBindConnectorOption interface {
-	ConnectorOption
-	bind.Bind
-}
-
-type queryBindConnectorOption struct {
-	bind.Bind
-}
-
-func (o queryBindConnectorOption) Apply(c *Connector) error {
-	c.Bindings = bind.Sort(append(c.Bindings, o.Bind))
-
-	return nil
-}
-
-type tablePathPrefixConnectorOption struct {
-	bind.TablePathPrefix
-}
-
-func (o tablePathPrefixConnectorOption) Apply(c *Connector) error {
-	c.Bindings = bind.Sort(append(c.Bindings, o.TablePathPrefix))
-	c.pathNormalizer = o.TablePathPrefix
-
-	return nil
-}
-
-func WithQueryBind(bind bind.Bind) QueryBindConnectorOption {
-	return queryBindConnectorOption{Bind: bind}
-}
-
-func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
-	return tablePathPrefixConnectorOption{TablePathPrefix: bind.TablePathPrefix(tablePathPrefix)}
-}
-
-func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
-	return defaultQueryModeConnectorOption(mode)
-}
-
-type defaultTxControlOption struct {
-	txControl *table.TransactionControl
-}
-
-func (opt defaultTxControlOption) Apply(c *Connector) error {
-	c.defaultTxControl = opt.txControl
-
-	return nil
-}
-
-func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
-	return defaultTxControlOption{txControl}
-}
-
-type defaultDataQueryOptionsConnectorOption []options.ExecuteDataQueryOption
-
-func (opts defaultDataQueryOptionsConnectorOption) Apply(c *Connector) error {
-	c.defaultDataQueryOpts = append(c.defaultDataQueryOpts, opts...)
-
-	return nil
-}
-
-func WithDefaultDataQueryOptions(opts ...options.ExecuteDataQueryOption) ConnectorOption {
-	return defaultDataQueryOptionsConnectorOption(opts)
-}
-
-type defaultScanQueryOptionsConnectorOption []options.ExecuteScanQueryOption
-
-func (opts defaultScanQueryOptionsConnectorOption) Apply(c *Connector) error {
-	c.defaultScanQueryOpts = append(c.defaultScanQueryOpts, opts...)
-
-	return nil
-}
-
-func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) ConnectorOption {
-	return defaultScanQueryOptionsConnectorOption(opts)
-}
-
-type traceConnectorOption struct {
-	t    *trace.DatabaseSQL
-	opts []trace.DatabaseSQLComposeOption
-}
-
-func (option traceConnectorOption) Apply(c *Connector) error {
-	c.trace = c.trace.Compose(option.t, option.opts...)
-
-	return nil
-}
-
-func WithTrace(t *trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
-	return traceConnectorOption{t, opts}
-}
-
-type disableServerBalancerConnectorOption struct{}
-
-func (d disableServerBalancerConnectorOption) Apply(c *Connector) error {
-	c.disableServerBalancer = true
-
-	return nil
-}
-
-func WithDisableServerBalancer() ConnectorOption {
-	return disableServerBalancerConnectorOption{}
-}
-
-type idleThresholdConnectorOption time.Duration
-
-func (idleThreshold idleThresholdConnectorOption) Apply(c *Connector) error {
-	c.idleThreshold = time.Duration(idleThreshold)
-
-	return nil
-}
-
-func WithIdleThreshold(idleThreshold time.Duration) ConnectorOption {
-	return idleThresholdConnectorOption(idleThreshold)
-}
-
-type onCloseConnectorOption func(connector *Connector)
-
-func (f onCloseConnectorOption) Apply(c *Connector) error {
-	c.onClose = append(c.onClose, f)
-
-	return nil
-}
-
-func WithOnClose(f func(connector *Connector)) ConnectorOption {
-	return onCloseConnectorOption(f)
-}
-
-type traceRetryConnectorOption struct {
-	t *trace.Retry
-}
-
-func (t traceRetryConnectorOption) Apply(c *Connector) error {
-	c.traceRetry = t.t
-
-	return nil
-}
-
-func WithTraceRetry(t *trace.Retry) ConnectorOption {
-	return traceRetryConnectorOption{t: t}
-}
-
-type retryBudgetConnectorOption struct {
-	b budget.Budget
-}
-
-func (l retryBudgetConnectorOption) Apply(c *Connector) error {
-	c.retryBudget = l.b
-
-	return nil
-}
-
-func WithretryBudget(b budget.Budget) ConnectorOption {
-	return retryBudgetConnectorOption{b: b}
-}
-
-type fakeTxConnectorOption QueryMode
-
-func (m fakeTxConnectorOption) Apply(c *Connector) error {
-	c.fakeTxModes = append(c.fakeTxModes, QueryMode(m))
-
-	return nil
-}
-
-// WithFakeTx returns a copy of context with given QueryMode
-func WithFakeTx(m QueryMode) ConnectorOption {
-	return fakeTxConnectorOption(m)
-}
-
-type ydbDriver interface {
-	Name() string
-	Table() table.Client
-	Scripting() scripting.Client
-	Scheme() scheme.Client
-}
-
-func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
-	c := &Connector{
-		parent:           parent,
-		clock:            clockwork.NewRealClock(),
-		conns:            make(map[*conn]struct{}),
-		defaultTxControl: table.DefaultTxControl(),
-		defaultQueryMode: DefaultQueryMode,
-		pathNormalizer:   bind.TablePathPrefix(parent.Name()),
-		trace:            &trace.DatabaseSQL{},
+		clock         clockwork.Clock
+		idleThreshold time.Duration
+		conns         xsync.Map[uuid.UUID, *connWrapper]
+		done          chan struct{}
+		traceSql      *trace.DatabaseSQL
+		traceRetry    *trace.Retry
+		retryBudget   budget.Budget
 	}
+	ydbDriver interface {
+		Name() string
+		Table() table.Client
+		Query() *query.Client
+		Scripting() scripting.Client
+		Scheme() scheme.Client
+	}
+)
+
+func (c *Connector) Query() *query.Client {
+	return c.parent.Query()
+}
+
+func (c *Connector) Name() string {
+	return c.parent.Name()
+}
+
+func (c *Connector) Table() table.Client {
+	return c.parent.Table()
+}
+
+func (c *Connector) Scripting() scripting.Client {
+	return c.parent.Scripting()
+}
+
+func (c *Connector) Scheme() scheme.Client {
+	return c.parent.Scheme()
+}
+
+const (
+	queryProcessor_QueryService = iota + 1
+	queryProcessor_TableService
+)
+
+func (c *Connector) Open(name string) (driver.Conn, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
+	switch c.queryProcessor {
+	case queryProcessor_QueryService:
+		id := uuid.New()
+		cc, err := querySql.New(ctx, c, append(
+			c.queryOpts,
+			querySql.WithClock(c.clock),
+			querySql.WithOnClose(func() {
+				c.conns.Delete(id)
+			}))...,
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		conn := &connWrapper{
+			conn:           cc,
+			connector:      c,
+			pathNormalizer: bind.TablePathPrefix(c.Name()),
+		}
+
+		c.conns.Set(id, conn)
+
+		return conn, nil
+
+	case queryProcessor_TableService:
+		id := uuid.New()
+		cc, err := tableSql.New(ctx, c, append(
+			c.tableOpts,
+			tableSql.WithClock(c.clock),
+			tableSql.WithOnClose(func() {
+				c.conns.Delete(id)
+			}))...,
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		conn := &connWrapper{
+			conn:           cc,
+			connector:      c,
+			pathNormalizer: bind.TablePathPrefix(c.Name()),
+		}
+
+		c.conns.Set(id, conn)
+
+		return conn, nil
+	default:
+		return nil, xerrors.WithStackTrace(errWrongQueryProcessor)
+	}
+}
+
+func (c *Connector) Driver() driver.Driver {
+	return c
+}
+
+func (c *Connector) Parent() ydbDriver {
+	return c.parent
+}
+
+func (c *Connector) Close() error {
+	select {
+	case <-c.done:
+		return xerrors.WithStackTrace(errAlreadyClosed)
+	default:
+		close(c.done)
+
+		for _, onClose := range c.onCLose {
+			onClose(c)
+		}
+
+		return nil
+	}
+}
+
+func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (_ *Connector, err error) {
+	c := &Connector{
+		parent:         parent,
+		balancer:       balancer,
+		queryProcessor: queryProcessor_TableService,
+		clock:          clockwork.NewRealClock(),
+		done:           make(chan struct{}),
+		traceSql:       &trace.DatabaseSQL{},
+		traceRetry:     &trace.Retry{},
+	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			if err = opt.Apply(c); err != nil {
@@ -227,152 +182,31 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 			}
 		}
 	}
+
 	if c.idleThreshold > 0 {
-		c.idleStopper = c.idleCloser()
+		ctx, cancel := xcontext.WithDone(context.Background(), c.done)
+		go func() {
+			defer cancel()
+			for {
+				idleThresholdTimer := c.clock.NewTimer(c.idleThreshold)
+				select {
+				case <-ctx.Done():
+					idleThresholdTimer.Stop()
+
+					return
+				case <-idleThresholdTimer.Chan():
+					idleThresholdTimer.Stop() // no really need, stop for common style only
+					c.conns.Range(func(_ uuid.UUID, cc *connWrapper) bool {
+						if c.clock.Since(cc.LastUsage()) > c.idleThreshold {
+							_ = cc.Close()
+						}
+
+						return true
+					})
+				}
+			}
+		}()
 	}
 
 	return c, nil
-}
-
-type pathNormalizer interface {
-	NormalizePath(folderOrTable string) string
-}
-
-// Connector is a producer of database/sql connections
-type Connector struct {
-	parent ydbDriver
-
-	clock clockwork.Clock
-
-	Bindings       bind.Bindings
-	pathNormalizer pathNormalizer
-
-	fakeTxModes []QueryMode
-
-	onClose []func(connector *Connector)
-
-	conns    map[*conn]struct{}
-	connsMtx sync.RWMutex
-
-	idleStopper func()
-
-	defaultTxControl      *table.TransactionControl
-	defaultQueryMode      QueryMode
-	defaultDataQueryOpts  []options.ExecuteDataQueryOption
-	defaultScanQueryOpts  []options.ExecuteScanQueryOption
-	disableServerBalancer bool
-	idleThreshold         time.Duration
-
-	trace       *trace.DatabaseSQL
-	traceRetry  *trace.Retry
-	retryBudget budget.Budget
-}
-
-var (
-	_ driver.Connector = &Connector{}
-	_ io.Closer        = &Connector{}
-)
-
-func (c *Connector) idleCloser() (idleStopper func()) {
-	var ctx context.Context
-	ctx, idleStopper = xcontext.WithCancel(context.Background())
-	go func() {
-		for {
-			idleThresholdTimer := c.clock.NewTimer(c.idleThreshold)
-			select {
-			case <-ctx.Done():
-				idleThresholdTimer.Stop()
-
-				return
-			case <-idleThresholdTimer.Chan():
-				idleThresholdTimer.Stop() // no really need, stop for common style only
-				c.connsMtx.RLock()
-				conns := make([]*conn, 0, len(c.conns))
-				for cc := range c.conns {
-					conns = append(conns, cc)
-				}
-				c.connsMtx.RUnlock()
-				for _, cc := range conns {
-					if cc.sinceLastUsage() > c.idleThreshold {
-						cc.session.Close(context.Background())
-					}
-				}
-			}
-		}
-	}()
-
-	return idleStopper
-}
-
-func (c *Connector) Close() (err error) {
-	defer func() {
-		for _, onClose := range c.onClose {
-			onClose(c)
-		}
-	}()
-	if c.idleStopper != nil {
-		c.idleStopper()
-	}
-
-	return nil
-}
-
-func (c *Connector) attach(cc *conn) {
-	c.connsMtx.Lock()
-	defer c.connsMtx.Unlock()
-	c.conns[cc] = struct{}{}
-}
-
-func (c *Connector) detach(cc *conn) {
-	c.connsMtx.Lock()
-	defer c.connsMtx.Unlock()
-	delete(c.conns, cc)
-}
-
-func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
-	var (
-		onDone = trace.DatabaseSQLOnConnectorConnect(
-			c.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Connector).Connect"),
-		)
-		session table.ClosableSession
-	)
-	defer func() {
-		onDone(err, session)
-	}()
-	if !c.disableServerBalancer {
-		ctx = meta.WithAllowFeatures(ctx, metaHeaders.HintSessionBalancer)
-	}
-	session, err = c.parent.Table().CreateSession(ctx) //nolint
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return newConn(ctx, c, session, withDefaultTxControl(c.defaultTxControl),
-		withDefaultQueryMode(c.defaultQueryMode),
-		withDataOpts(c.defaultDataQueryOpts...),
-		withScanOpts(c.defaultScanQueryOpts...),
-		withTrace(c.trace),
-		withFakeTxModes(c.fakeTxModes...),
-	), nil
-}
-
-func (c *Connector) Driver() driver.Driver {
-	return &driverWrapper{c: c}
-}
-
-type driverWrapper struct {
-	c *Connector
-}
-
-func (d *driverWrapper) TraceRetry() *trace.Retry {
-	return d.c.traceRetry
-}
-
-func (d *driverWrapper) RetryBudget() budget.Budget {
-	return d.c.retryBudget
-}
-
-func (d *driverWrapper) Open(_ string) (driver.Conn, error) {
-	return nil, ErrUnsupported
 }

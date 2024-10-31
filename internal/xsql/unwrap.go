@@ -4,28 +4,27 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 )
 
-func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, err error) {
+func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, _ error) {
 	switch vv := any(v).(type) {
 	case *sql.DB:
-		d := vv.Driver()
-		if dw, ok := d.(*driverWrapper); ok {
-			return dw.c, nil
+		if c, ok := vv.Driver().(*Connector); ok {
+			return c, nil
 		}
 
-		return nil, xerrors.WithStackTrace(fmt.Errorf("%T is not a *driverWrapper", d))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%T is not a *driverWrapper", v))
 	case *sql.Conn:
-		if err = vv.Raw(func(driverConn interface{}) error {
-			if cc, ok := driverConn.(*conn); ok {
+		if err := vv.Raw(func(driverConn interface{}) error {
+			if cc, ok := driverConn.(*connWrapper); ok {
 				connector = cc.connector
 
 				return nil
 			}
 
-			return xerrors.WithStackTrace(fmt.Errorf("%T is not a *conn", driverConn))
+			return xerrors.WithStackTrace(fmt.Errorf("%T is not a *connWrapper", driverConn))
 		}); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
