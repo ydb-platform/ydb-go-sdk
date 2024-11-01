@@ -41,7 +41,7 @@ type (
 		closer.Closer
 
 		Stats() pool.Stats
-		With(ctx context.Context, f func(ctx context.Context, s *Session) error, preferredNodeId uint32, opts ...retry.Option) error
+		With(ctx context.Context, f func(ctx context.Context, s *Session) error, preferredNodeID uint32, opts ...retry.Option) error
 	}
 	Client struct {
 		config *config.Config
@@ -200,7 +200,7 @@ func do(
 	ctx context.Context,
 	pool sessionPool,
 	op func(ctx context.Context, s *Session) error,
-	preferredNodeId uint32,
+	preferredNodeID uint32,
 	opts ...retry.Option,
 ) (finalErr error) {
 	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
@@ -216,7 +216,7 @@ func do(
 		s.SetStatus(session.StatusIdle)
 
 		return nil
-	}, preferredNodeId, opts...)
+	}, preferredNodeID, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

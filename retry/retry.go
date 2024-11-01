@@ -27,7 +27,7 @@ type retryOptions struct {
 	fastBackoff     backoff.Backoff
 	slowBackoff     backoff.Backoff
 	budget          budget.Budget
-	preferredNodeId uint32
+	preferredNodeID uint32
 
 	panicCallback func(e interface{})
 }

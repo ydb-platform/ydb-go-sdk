@@ -18,7 +18,7 @@ type sessionPool interface {
 	closer.Closer
 
 	Stats() pool.Stats
-	With(ctx context.Context, f func(ctx context.Context, s *session) error, preferredNodeId uint32, opts ...retry.Option) error
+	With(ctx context.Context, f func(ctx context.Context, s *session) error, preferredNodeID uint32, opts ...retry.Option) error
 }
 
 func do(
@@ -27,7 +27,7 @@ func do(
 	config *config.Config,
 	op table.Operation,
 	onAttempt func(err error),
-	preferredNodeId uint32,
+	preferredNodeID uint32,
 	opts ...retry.Option,
 ) (err error) {
 	return retryBackoff(ctx, pool,
@@ -55,7 +55,7 @@ func do(
 
 			return nil
 		},
-		preferredNodeId,
+		preferredNodeID,
 		opts...,
 	)
 }
@@ -64,7 +64,7 @@ func retryBackoff(
 	ctx context.Context,
 	pool sessionPool,
 	op table.Operation,
-	preferredNodeId uint32,
+	preferredNodeID uint32,
 	opts ...retry.Option,
 ) error {
 	return pool.With(ctx, func(ctx context.Context, s *session) error {
@@ -75,7 +75,7 @@ func retryBackoff(
 		}
 
 		return nil
-	}, preferredNodeId, opts...)
+	}, preferredNodeID, opts...)
 }
 
 func (c *Client) retryOptions(opts ...table.Option) *table.Options {

@@ -31,7 +31,7 @@ type (
 		clock          clockwork.Clock
 		limit          int
 		createTimeout  time.Duration
-		createItem     func(ctx context.Context, preferredNodeId uint32) (PT, error)
+		createItem     func(ctx context.Context, preferredNodeID uint32) (PT, error)
 		closeTimeout   time.Duration
 		closeItem      func(ctx context.Context, item PT)
 		idleTimeToLive time.Duration
@@ -49,7 +49,7 @@ type (
 	Pool[PT ItemConstraint[T], T any] struct {
 		config Config[PT, T]
 
-		createItem func(ctx context.Context, preferredNodeId uint32) (PT, error)
+		createItem func(ctx context.Context, preferredNodeID uint32) (PT, error)
 		closeItem  func(ctx context.Context, item PT)
 
 		mu               xsync.RWMutex
@@ -63,11 +63,11 @@ type (
 	}
 	Option[PT ItemConstraint[T], T any] func(c *Config[PT, T])
 	SessionCallOption                   struct {
-		preferredNodeIdOption uint32
+		preferredNodeIDOption uint32
 	}
 )
 
-func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(ctx context.Context, preferredNodeId uint32) (PT, error)) Option[PT, T] {
+func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(context.Context, uint32) (PT, error)) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.createItem = f
 	}
@@ -186,8 +186,8 @@ func defaultCreateItem[T any, PT ItemConstraint[T]](context.Context, uint32) (PT
 // makeAsyncCreateItemFunc wraps the createItem function with timeout handling
 func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	p *Pool[PT, T],
-) func(ctx context.Context, preferredNodeId uint32) (PT, error) {
-	return func(ctx context.Context, preferredNodeId uint32) (PT, error) {
+) func(ctx context.Context, preferredNodeID uint32) (PT, error) {
+	return func(ctx context.Context, preferredNodeID uint32) (PT, error) {
 		if !xsync.WithLock(&p.mu, func() bool {
 			if len(p.index)+p.createInProgress < p.config.limit {
 				p.createInProgress++
@@ -226,7 +226,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 				defer cancelCreate()
 			}
 
-			newItem, err := p.config.createItem(createCtx, preferredNodeId)
+			newItem, err := p.config.createItem(createCtx, preferredNodeID)
 			if newItem != nil {
 				p.mu.WithLock(func() {
 					var useCounter uint64
@@ -318,7 +318,7 @@ func (p *Pool[PT, T]) changeState(changeState func() Stats) {
 	}
 }
 
-func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error, preferredNodeId uint32) (finalErr error) {
+func (p *Pool[PT, T]) try(ctx context.Context, f func(context.Context, PT) error, nodeID uint32) (finalErr error) {
 	if onTry := p.config.trace.OnTry; onTry != nil {
 		onDone := onTry(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).try"),
@@ -338,7 +338,7 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	default:
 	}
 
-	item, err := p.getItem(ctx, preferredNodeId)
+	item, err := p.getItem(ctx, nodeID)
 	if err != nil {
 		if xerrors.IsYdb(err) {
 			return xerrors.WithStackTrace(xerrors.Retryable(err))
@@ -362,7 +362,7 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 func (p *Pool[PT, T]) With(
 	ctx context.Context,
 	f func(ctx context.Context, item PT) error,
-	preferredNodeId uint32,
+	preferredNodeID uint32,
 	opts ...retry.Option,
 ) (finalErr error) {
 	var attempts int
@@ -380,7 +380,7 @@ func (p *Pool[PT, T]) With(
 
 	err := retry.Retry(ctx, func(ctx context.Context) error {
 		attempts++
-		err := p.try(ctx, f, preferredNodeId)
+		err := p.try(ctx, f, preferredNodeID)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -465,10 +465,10 @@ func (p *Pool[PT, T]) putWaitCh(ch *chan PT) { //nolint:gocritic
 }
 
 // p.mu must be held.
-func (p *Pool[PT, T]) peekFirstIdle(preferredNodeId uint32) (item PT, touched time.Time) {
+func (p *Pool[PT, T]) peekFirstIdle(preferredNodeID uint32) (item PT, touched time.Time) {
 	el := p.idle.Front()
-	if preferredNodeId != 0 {
-		for el != nil && el.Value.NodeID() != preferredNodeId {
+	if preferredNodeID != 0 {
+		for el != nil && el.Value.NodeID() != preferredNodeID {
 			el = el.Next()
 		}
 	}
@@ -488,8 +488,8 @@ func (p *Pool[PT, T]) peekFirstIdle(preferredNodeId uint32) (item PT, touched ti
 // to prevent session from dying in the internalPoolGC after it was returned
 // to be used only in outgoing functions that make session busy.
 // p.mu must be held.
-func (p *Pool[PT, T]) removeFirstIdle(preferredNodeId uint32) PT {
-	idle, _ := p.peekFirstIdle(preferredNodeId)
+func (p *Pool[PT, T]) removeFirstIdle(preferredNodeID uint32) PT {
+	idle, _ := p.peekFirstIdle(preferredNodeID)
 	if idle != nil {
 		info := p.removeIdle(idle)
 		p.index[idle] = info
@@ -577,7 +577,7 @@ func (p *Pool[PT, T]) pushIdle(item PT, now time.Time) {
 
 const maxAttempts = 100
 
-func (p *Pool[PT, T]) getItem(ctx context.Context, preferredNodeId uint32) (item PT, finalErr error) { //nolint:funlen
+func (p *Pool[PT, T]) getItem(ctx context.Context, preferredNodeID uint32) (item PT, finalErr error) { //nolint:funlen
 	var (
 		start   = p.config.clock.Now()
 		attempt int
@@ -603,7 +603,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, preferredNodeId uint32) (item
 		}
 
 		if item := xsync.WithLock(&p.mu, func() PT { //nolint:nestif
-			return p.removeFirstIdle(preferredNodeId)
+			return p.removeFirstIdle(preferredNodeID)
 		}); item != nil {
 
 			if item.IsAlive() {
@@ -636,7 +636,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, preferredNodeId uint32) (item
 			}
 		}
 
-		item, err := p.createItem(ctx, preferredNodeId)
+		item, err := p.createItem(ctx, preferredNodeID)
 		if item != nil {
 			return item, nil
 		}

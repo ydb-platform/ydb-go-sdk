@@ -219,7 +219,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 	err := do(ctx, c.pool, c.config, op, func(err error) {
 		attempts++
-	}, config.PreferredNodeId, config.RetryOptions...)
+	}, config.preferredNodeID, config.RetryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -270,7 +270,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		}
 
 		return nil
-	}, config.PreferredNodeId, config.RetryOptions...)
+	}, config.preferredNodeID, config.RetryOptions...)
 }
 
 func (c *Client) BulkUpsert(

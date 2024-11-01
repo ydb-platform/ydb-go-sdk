@@ -505,7 +505,7 @@ type Options struct {
 	TxCommitOptions []options.CommitTransactionOption
 	RetryOptions    []retry.Option
 	Trace           *trace.Table
-	PreferredNodeId uint32
+	preferredNodeID uint32
 }
 
 type Option interface {
@@ -513,11 +513,11 @@ type Option interface {
 }
 
 type SessionOption struct {
-	PreferredNodeId uint32
+	preferredNodeID uint32
 }
 
 func (o SessionOption) ApplyTableOption(opts *Options) {
-	opts.PreferredNodeId = o.PreferredNodeId
+	opts.preferredNodeID = o.preferredNodeID
 }
 
 var _ Option = labelOption("")
@@ -557,8 +557,8 @@ func WithIdempotent() retryOptionsOption {
 	return []retry.Option{retry.WithIdempotent(true)}
 }
 
-func WithPreferredNodeid(nodeId uint32) SessionOption {
-	return SessionOption{PreferredNodeId: nodeId}
+func WithpreferredNodeID(nodeId uint32) SessionOption {
+	return SessionOption{preferredNodeID: nodeId}
 }
 
 var _ Option = txSettingsOption{}

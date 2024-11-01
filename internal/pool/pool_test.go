@@ -516,8 +516,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				p := New[*testItem, testItem](rootCtx,
 					WithLimit[*testItem, testItem](2),
 					WithCreateItemTimeout[*testItem, testItem](0),
-					WithCreateItemFunc[*testItem, testItem](func(ctx context.Context, preferredNodeId uint32) (*testItem, error) {
-						_ = preferredNodeId
+					WithCreateItemFunc[*testItem, testItem](func(ctx context.Context, preferredNodeID uint32) (*testItem, error) {
+						_ = preferredNodeID
 						v := testItem{
 							v: 0,
 							onClose: func() error {
