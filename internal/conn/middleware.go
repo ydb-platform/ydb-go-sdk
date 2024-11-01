@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 
 	"google.golang.org/grpc"
 )
@@ -28,6 +29,16 @@ func (m *middleware) NewStream(
 	ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
 	return m.newStream(ctx, desc, method, opts...)
+}
+
+func ModifyConn(cc grpc.ClientConnInterface, nodeID uint32) grpc.ClientConnInterface {
+	if nodeID != 0 {
+		return WithContextModifier(cc, func(ctx context.Context) context.Context {
+			return balancerContext.WithNodeID(ctx, nodeID)
+		})
+	} else {
+		return cc
+	}
 }
 
 func WithContextModifier(
