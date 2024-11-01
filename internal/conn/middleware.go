@@ -2,9 +2,10 @@ package conn
 
 import (
 	"context"
-	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 
 	"google.golang.org/grpc"
+
+	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
 var _ grpc.ClientConnInterface = (*middleware)(nil)
