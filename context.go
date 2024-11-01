@@ -19,3 +19,8 @@ func WithOperationTimeout(ctx context.Context, operationTimeout time.Duration) c
 func WithOperationCancelAfter(ctx context.Context, operationCancelAfter time.Duration) context.Context {
 	return operation.WithCancelAfter(ctx, operationCancelAfter)
 }
+
+// WithPreferredNodeID allows to set preferred node to get session from
+func WithPreferredNodeID(ctx context.Context, nodeID uint32) context.Context {
+	return operation.WithPreferredNodeID(ctx, nodeID)
+}

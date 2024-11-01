@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -40,8 +41,8 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			pool.WithCreateItemTimeout[*session, session](config.CreateSessionTimeout()),
 			pool.WithCloseItemTimeout[*session, session](config.DeleteTimeout()),
 			pool.WithClock[*session, session](config.Clock()),
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
-				return newSession(ctx, cc, config)
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context, nodeId uint32) (*session, error) {
+				return newSession(ctx, conn.ModifyConn(cc, nodeId), config)
 			}),
 			pool.WithTrace[*session, session](&pool.Trace{
 				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {

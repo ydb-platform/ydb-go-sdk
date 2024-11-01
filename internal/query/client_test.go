@@ -1590,7 +1590,9 @@ func testPool(
 ) *pool.Pool[*Session, Session] {
 	return pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session, Session](1),
-		pool.WithCreateItemFunc(createSession),
+		pool.WithCreateItemFunc(func(ctx context.Context, _ uint32) (*Session, error) {
+			return createSession(ctx)
+		}),
 		pool.WithSyncCloseItem[*Session, Session](),
 	)
 }

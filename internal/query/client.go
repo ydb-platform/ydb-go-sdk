@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -39,7 +40,7 @@ type (
 		closer.Closer
 
 		Stats() pool.Stats
-		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
+		With(ctx context.Context, f func(context.Context, *Session) error, opts ...retry.Option) error
 	}
 	Client struct {
 		config *config.Config
@@ -562,7 +563,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
 			pool.WithIdleTimeToLive[*Session, Session](cfg.SessionIdleTimeToLive()),
-			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
+			pool.WithCreateItemFunc(func(ctx context.Context, nodeID uint32) (_ *Session, err error) {
 				var (
 					createCtx    context.Context
 					cancelCreate context.CancelFunc
@@ -575,7 +576,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 				defer cancelCreate()
 
 				s, err := createSession(createCtx, client,
-					session.WithConn(cc),
+					session.WithConn(conn.ModifyConn(cc, nodeID)),
 					session.WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 					session.WithTrace(cfg.Trace()),
 				)

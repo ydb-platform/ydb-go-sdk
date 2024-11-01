@@ -1,3 +1,5 @@
+* Allow to set preferred node id to execute query
+
 ## v3.90.1
 * Small broken change: added method `ID()` into `spans.Span` interface (need to implement in adapter) 
 * Fixed traceparent header for tracing grpc requests
