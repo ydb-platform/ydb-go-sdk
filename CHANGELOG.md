@@ -1,3 +1,5 @@
+* Allow to set preferred node id to execute query
+
 ## v3.89.2
 * Returned log.XXX methods for create fields, removed from public at v3.85.0
 

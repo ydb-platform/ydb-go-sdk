@@ -2,6 +2,8 @@ package table
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -40,7 +42,12 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			pool.WithCreateItemTimeout[*session, session](config.CreateSessionTimeout()),
 			pool.WithCloseItemTimeout[*session, session](config.DeleteTimeout()),
 			pool.WithClock[*session, session](config.Clock()),
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context, nodeId uint32) (*session, error) {
+				if nodeId != 0 {
+					cc = conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
+						return balancerContext.WithNodeID(ctx, nodeId)
+					})
+				}
 				return newSession(ctx, cc, config)
 			}),
 			pool.WithTrace[*session, session](&pool.Trace{
@@ -212,7 +219,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 	err := do(ctx, c.pool, c.config, op, func(err error) {
 		attempts++
-	}, config.RetryOptions...)
+	}, config.PreferredNodeId, config.RetryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -263,7 +270,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		}
 
 		return nil
-	}, config.RetryOptions...)
+	}, config.PreferredNodeId, config.RetryOptions...)
 }
 
 func (c *Client) BulkUpsert(

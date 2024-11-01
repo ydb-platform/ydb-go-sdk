@@ -48,7 +48,7 @@ func TestDoBackoffRetryCancelation(t *testing.T) {
 					func(ctx context.Context, _ table.Session) error {
 						return testErr
 					},
-					nil,
+					nil, 0,
 					retry.WithFastBackoff(
 						testutil.BackoffFunc(func(n int) <-chan time.Time {
 							ch := make(chan time.Time)
@@ -86,7 +86,7 @@ func TestDoBadSession(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		closed := make(map[table.Session]bool)
 		p := pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context, _ uint32) (*session, error) {
 				s := simpleSession(t)
 				s.onClose = append(s.onClose, func(s *session) {
 					closed[s] = true
@@ -112,7 +112,7 @@ func TestDoBadSession(t *testing.T) {
 
 				return xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 			},
-			func(err error) {},
+			func(err error) {}, 0,
 		)
 		if !xerrors.Is(err, context.Canceled) {
 			t.Errorf("unexpected error: %v", err)
@@ -137,7 +137,7 @@ func TestDoCreateSessionError(t *testing.T) {
 		ctx, cancel := xcontext.WithTimeout(rootCtx, 30*time.Millisecond)
 		defer cancel()
 		p := pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context, _ uint32) (*session, error) {
 				return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 			}),
 			pool.WithSyncCloseItem[*session, session](),
@@ -146,7 +146,7 @@ func TestDoCreateSessionError(t *testing.T) {
 			func(ctx context.Context, s table.Session) error {
 				return nil
 			},
-			nil,
+			nil, 0,
 		)
 		if !xerrors.Is(err, context.DeadlineExceeded) {
 			t.Errorf("unexpected error: %v", err)
@@ -190,6 +190,7 @@ func TestDoImmediateReturn(t *testing.T) {
 					return testErr
 				},
 				nil,
+				0,
 				retry.WithFastBackoff(
 					testutil.BackoffFunc(func(n int) <-chan time.Time {
 						panic("this code will not be called")
@@ -306,7 +307,7 @@ func TestDoContextDeadline(t *testing.T) {
 	}
 	ctx := xtest.Context(t)
 	p := pool.New[*session, session](ctx,
-		pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+		pool.WithCreateItemFunc[*session, session](func(ctx context.Context, _ uint32) (*session, error) {
 			return newSession(ctx, client.cc, config.New())
 		}),
 		pool.WithSyncCloseItem[*session, session](),
@@ -331,7 +332,7 @@ func TestDoContextDeadline(t *testing.T) {
 							return errs[r.Int(len(errs))]
 						}
 					},
-					nil,
+					nil, 0,
 				)
 			})
 		}
@@ -355,7 +356,7 @@ func TestDoWithCustomErrors(t *testing.T) {
 		limit = 10
 		ctx   = context.Background()
 		p     = pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context, _ uint32) (*session, error) {
 				return simpleSession(t), nil
 			}),
 			pool.WithLimit[*session, session](limit),
@@ -435,7 +436,7 @@ func TestDoWithCustomErrors(t *testing.T) {
 
 					return nil
 				},
-				nil,
+				nil, 0,
 			)
 			//nolint:nestif
 			if test.retriable {
@@ -485,7 +486,7 @@ func (s *singleSession) Stats() pool.Stats {
 }
 
 func (s *singleSession) With(ctx context.Context,
-	f func(ctx context.Context, s *session) error, opts ...retry.Option,
+	f func(ctx context.Context, s *session) error, _ uint32, opts ...retry.Option,
 ) error {
 	return retry.Retry(ctx, func(ctx context.Context) error {
 		return f(ctx, s.s)

@@ -38,6 +38,7 @@ type (
 
 		onClose   func() error
 		onIsAlive func() bool
+		onNodeID  func() uint32
 	}
 	testWaitChPool struct {
 		xsync.Pool[chan *testItem]
@@ -113,6 +114,13 @@ func (t *testItem) ID() string {
 	return ""
 }
 
+func (t *testItem) NodeID() uint32 {
+	if t.onNodeID != nil {
+		return t.onNodeID()
+	}
+	return 0
+}
+
 func (t *testItem) Close(context.Context) error {
 	if t.closed.Len() > 0 {
 		debug.PrintStack()
@@ -135,8 +143,8 @@ func caller() string {
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
 }
 
-func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T]) PT {
-	s, err := p.getItem(context.Background())
+func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T], nodeId uint32) PT {
+	s, err := p.getItem(context.Background(), nodeId)
 	if err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
@@ -167,9 +175,112 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
 			err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+				require.EqualValues(t, 0, testItem.NodeID())
 				return nil
-			})
+			}, 0)
 			require.NoError(t, err)
+		})
+		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
+			var nextNodeId uint32
+			nextNodeId = 0
+			var newSessionCalled uint32
+			p := New[*testItem, testItem](rootCtx,
+				WithTrace[*testItem, testItem](defaultTrace),
+				WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
+					newSessionCalled++
+					var (
+						nodeId = nextNodeId
+						v      = testItem{
+							v: 0,
+							onNodeID: func() uint32 {
+								return nodeId
+							},
+						}
+					)
+					return &v, nil
+				}),
+			)
+
+			item := mustGetItem(t, p, 0)
+			require.EqualValues(t, 0, item.NodeID())
+			require.EqualValues(t, true, item.IsAlive())
+			mustPutItem(t, p, item)
+
+			nextNodeId = 32
+
+			item = mustGetItem(t, p, 32)
+			require.EqualValues(t, 32, item.NodeID())
+			mustPutItem(t, p, item)
+
+			nextNodeId = 33
+
+			item = mustGetItem(t, p, 33)
+			require.EqualValues(t, 33, item.NodeID())
+			mustPutItem(t, p, item)
+
+			item = mustGetItem(t, p, 32)
+			require.EqualValues(t, 32, item.NodeID())
+			mustPutItem(t, p, item)
+
+			item = mustGetItem(t, p, 33)
+			require.EqualValues(t, 33, item.NodeID())
+			mustPutItem(t, p, item)
+
+			item = mustGetItem(t, p, 32)
+			item2 := mustGetItem(t, p, 33)
+			require.EqualValues(t, 32, item.NodeID())
+			require.EqualValues(t, 33, item2.NodeID())
+			mustPutItem(t, p, item2)
+			mustPutItem(t, p, item)
+
+			item = mustGetItem(t, p, 32)
+			item2 = mustGetItem(t, p, 33)
+			require.EqualValues(t, 32, item.NodeID())
+			require.EqualValues(t, 33, item2.NodeID())
+			mustPutItem(t, p, item)
+			mustPutItem(t, p, item2)
+
+			item = mustGetItem(t, p, 32)
+			item2 = mustGetItem(t, p, 33)
+			item3 := mustGetItem(t, p, 0)
+			require.EqualValues(t, 32, item.NodeID())
+			require.EqualValues(t, 33, item2.NodeID())
+			require.EqualValues(t, 0, item3.NodeID())
+			mustPutItem(t, p, item)
+			mustPutItem(t, p, item2)
+			mustPutItem(t, p, item3)
+
+			require.EqualValues(t, 3, newSessionCalled)
+		})
+		t.Run("CreateSessionOnGivenNode", func(t *testing.T) {
+			var newSessionCalled uint32
+			p := New[*testItem, testItem](rootCtx,
+				WithTrace[*testItem, testItem](defaultTrace),
+				WithCreateItemFunc(func(ctx context.Context, nodeId uint32) (*testItem, error) {
+					_ = ctx
+					newSessionCalled++
+					var (
+						v = testItem{
+							v: 0,
+							onNodeID: func() uint32 {
+								return nodeId
+							},
+						}
+					)
+					return &v, nil
+				}),
+			)
+
+			item := mustGetItem(t, p, 32)
+			require.EqualValues(t, 32, item.NodeID())
+			require.EqualValues(t, true, item.IsAlive())
+			mustPutItem(t, p, item)
+
+			item = mustGetItem(t, p, 32)
+			require.EqualValues(t, 32, item.NodeID())
+			mustPutItem(t, p, item)
+
+			require.EqualValues(t, 1, newSessionCalled)
 		})
 		t.Run("WithLimit", func(t *testing.T) {
 			p := New[*testItem, testItem](rootCtx, WithLimit[*testItem, testItem](1),
@@ -184,7 +295,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithItemUsageLimit[*testItem, testItem](5),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 					atomic.AddInt64(&newCounter, 1)
 
 					var v testItem
@@ -200,7 +311,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}
 
 				return nil
-			})
+			}, 0)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, newCounter)
 		})
@@ -208,7 +319,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			var newCounter int64
 			p := New(rootCtx,
 				WithLimit[*testItem, testItem](1),
-				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 					atomic.AddInt64(&newCounter, 1)
 					var v testItem
 
@@ -218,7 +329,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			)
 			err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
 				return nil
-			})
+			}, 0)
 			require.NoError(t, err)
 			require.EqualValues(t, p.config.limit, atomic.LoadInt64(&newCounter))
 		})
@@ -242,7 +353,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithLimit[*testItem, testItem](3),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 					var (
 						idx = created.Add(1) - 1
 						v   = testItem{
@@ -270,9 +381,9 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.Zero(t, p.idle.Len())
 
 			var (
-				s1 = mustGetItem(t, p)
-				s2 = mustGetItem(t, p)
-				s3 = mustGetItem(t, p)
+				s1 = mustGetItem(t, p, 0)
+				s2 = mustGetItem(t, p, 0)
+				s3 = mustGetItem(t, p, 0)
 			)
 
 			require.Len(t, p.index, 3)
@@ -347,7 +458,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					// second call getItem from pool with limit === 1 will skip
 					// create item step (because pool have not enough space for
 					// creating new items) and will freeze until wait free item from pool
-					mustGetItem(t, p)
+					mustGetItem(t, p, 0)
 
 					go func() {
 						p.config.trace.OnGet = func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
@@ -356,7 +467,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							return nil
 						}
 
-						_, err := p.getItem(context.Background())
+						_, err := p.getItem(context.Background(), 0)
 						got <- err
 					}()
 
@@ -405,7 +516,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				p := New[*testItem, testItem](rootCtx,
 					WithLimit[*testItem, testItem](2),
 					WithCreateItemTimeout[*testItem, testItem](0),
-					WithCreateItemFunc[*testItem, testItem](func(ctx context.Context) (*testItem, error) {
+					WithCreateItemFunc[*testItem, testItem](func(ctx context.Context, preferredNodeId uint32) (*testItem, error) {
+						_ = preferredNodeId
 						v := testItem{
 							v: 0,
 							onClose: func() error {
@@ -425,8 +537,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
 
-				s1 := mustGetItem(t, p)
-				s2 := mustGetItem(t, p)
+				s1 := mustGetItem(t, p, 0)
+				s2 := mustGetItem(t, p, 0)
 
 				// Put both items at the absolutely same time.
 				// That is, both items must be updated their lastUsage timestamp.
@@ -442,7 +554,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// on get item from idle list the pool must check the item idle timestamp
 				// both existing items must be closed
 				// getItem must create a new item and return it from getItem
-				s3 := mustGetItem(t, p)
+				s3 := mustGetItem(t, p, 0)
 
 				require.Len(t, p.index, 1)
 
@@ -464,7 +576,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				require.Len(t, p.index, 1)
 				require.Equal(t, 1, p.idle.Len())
 
-				s4 := mustGetItem(t, p)
+				s4 := mustGetItem(t, p, 0)
 				require.Equal(t, s3, s4)
 				require.Len(t, p.index, 1)
 				require.Equal(t, 0, p.idle.Len())
@@ -485,7 +597,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					p := New(rootCtx,
 						WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 						WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-						WithCreateItemFunc(func(context.Context) (*testItem, error) {
+						WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 							atomic.AddInt64(&counter, 1)
 
 							if atomic.LoadInt64(&counter) < 10 {
@@ -499,7 +611,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					)
 					err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
 						return nil
-					})
+					}, 0)
 					require.NoError(t, err)
 					require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
 				})
@@ -508,7 +620,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					p := New(rootCtx,
 						WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 						WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-						WithCreateItemFunc(func(context.Context) (*testItem, error) {
+						WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 							atomic.AddInt64(&counter, 1)
 
 							if atomic.LoadInt64(&counter) < 10 {
@@ -522,7 +634,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					)
 					err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
 						return nil
-					})
+					}, 0)
 					require.NoError(t, err)
 					require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
 				})
@@ -532,7 +644,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				p := New(rootCtx,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 						atomic.AddInt64(&counter, 1)
 
 						if atomic.LoadInt64(&counter) < 10 {
@@ -546,7 +658,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				)
 				err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
 					return nil
-				})
+				}, 0)
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
 			})
@@ -555,7 +667,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				p := New(rootCtx,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 						atomic.AddInt64(&counter, 1)
 
 						if atomic.LoadInt64(&counter) < 10 {
@@ -569,7 +681,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				)
 				err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
 					return nil
-				})
+				}, 0)
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
 			})
@@ -597,7 +709,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							time.Duration(r.Int64(int64(time.Second))),
 						)
 						defer childCancel()
-						s, err := p.createItem(childCtx)
+						s, err := p.createItem(childCtx, 0)
 						if s == nil && err == nil {
 							errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
 						}
@@ -625,7 +737,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
 					err := p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 						return nil
-					})
+					}, 0)
 					require.ErrorIs(t, err, context.Canceled)
 				})
 				t.Run("DeadlineExceeded", func(t *testing.T) {
@@ -634,7 +746,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
 					err := p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 						return nil
-					})
+					}, 0)
 					require.ErrorIs(t, err, context.DeadlineExceeded)
 				})
 			})
@@ -661,7 +773,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						err := p.With(ctx,
 							func(ctx context.Context, item *testItem) error {
 								return testErr
-							},
+							}, 0,
 							retry.WithFastBackoff(
 								testutil.BackoffFunc(func(n int) <-chan time.Time {
 									ch := make(chan time.Time)
@@ -703,7 +815,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				)
 				p := New(rootCtx,
 					WithLimit[*testItem, testItem](1),
-					WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 						atomic.AddInt64(&createCounter, 1)
 
 						v := &testItem{
@@ -721,7 +833,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				)
 				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					return nil
-				})
+				}, 0)
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
 				err = p.Close(rootCtx)
@@ -740,7 +852,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithLimit[*testItem, testItem](1),
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 						newItems.Add(1)
 
 						v := &testItem{
@@ -765,7 +877,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					}
 
 					return nil
-				})
+				}, 0)
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, newItems.Load(), int64(9))
 				require.GreaterOrEqual(t, newItems.Load(), deleteItems.Load())
@@ -801,7 +913,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithLimit[*testItem, testItem](1),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				WithCreateItemFunc(func(context.Context, uint32) (*testItem, error) {
 					created.Add(1)
 					v := testItem{
 						v: 0,
@@ -821,20 +933,20 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				_ = p.Close(context.Background())
 			}()
 
-			s := mustGetItem(t, p)
+			s := mustGetItem(t, p, 0)
 			assertCreated(1)
 
 			mustPutItem(t, p, s)
 			assertClosed(0)
 
-			mustGetItem(t, p)
+			mustGetItem(t, p, 0)
 			assertCreated(1)
 
 			p.closeItem(context.Background(), s)
 			delete(p.index, s)
 			assertClosed(1)
 
-			mustGetItem(t, p)
+			mustGetItem(t, p, 0)
 			assertCreated(2)
 		})
 		t.Run("Racy", func(t *testing.T) {
@@ -862,7 +974,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						defer childCancel()
 						err := p.With(childCtx, func(ctx context.Context, testItem *testItem) error {
 							return nil
-						})
+						}, 0)
 						if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
 							t.Failed()
 						}
@@ -897,7 +1009,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						defer wg.Done()
 						err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 							return nil
-						})
+						}, 0)
 						if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
 							t.Failed()
 						}
@@ -917,7 +1029,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// replace default async closer for sync testing
 				WithSyncCloseItem[*testItem, testItem](),
 			)
-			item := mustGetItem(t, p)
+			item := mustGetItem(t, p, 0)
 			if err := p.putItem(context.Background(), item); err != nil {
 				t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
 			}
@@ -934,7 +1046,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// replace default async closer for sync testing
 				WithSyncCloseItem[*testItem, testItem](),
 			)
-			item := mustGetItem(t, p)
+			item := mustGetItem(t, p, 0)
 			mustPutItem(t, p, item)
 
 			require.Panics(t, func() {

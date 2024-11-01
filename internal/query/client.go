@@ -2,6 +2,8 @@ package query
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -39,7 +41,7 @@ type (
 		closer.Closer
 
 		Stats() pool.Stats
-		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
+		With(ctx context.Context, f func(ctx context.Context, s *Session) error, preferredNodeId uint32, opts ...retry.Option) error
 	}
 	Client struct {
 		config *config.Config
@@ -198,6 +200,7 @@ func do(
 	ctx context.Context,
 	pool sessionPool,
 	op func(ctx context.Context, s *Session) error,
+	preferredNodeId uint32,
 	opts ...retry.Option,
 ) (finalErr error) {
 	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
@@ -213,7 +216,7 @@ func do(
 		s.SetStatus(session.StatusIdle)
 
 		return nil
-	}, opts...)
+	}, preferredNodeId, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -239,7 +242,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 	err := do(ctx, c.pool,
 		func(ctx context.Context, s *Session) error {
 			return op(ctx, s)
-		},
+		}, 0,
 		append([]retry.Option{
 			retry.WithTrace(&trace.Retry{
 				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
@@ -286,7 +289,7 @@ func doTx(
 		}
 
 		return nil
-	}, opts...)
+	}, 0, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -304,7 +307,7 @@ func clientQueryRow(
 		}
 
 		return nil
-	}, settings.RetryOpts()...)
+	}, 0, settings.RetryOpts()...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -347,7 +350,7 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 		}
 
 		return nil
-	}, settings.RetryOpts()...)
+	}, 0, settings.RetryOpts()...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -400,7 +403,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 		}
 
 		return nil
-	}, settings.RetryOpts()...)
+	}, 0, settings.RetryOpts()...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -443,7 +446,7 @@ func clientQueryResultSet(
 		}
 
 		return nil
-	}, settings.RetryOpts()...)
+	}, 0, settings.RetryOpts()...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -530,7 +533,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
 			pool.WithIdleTimeToLive[*Session, Session](cfg.SessionIdleTimeToLive()),
-			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
+			pool.WithCreateItemFunc(func(ctx context.Context, nodeId uint32) (_ *Session, err error) {
 				var (
 					createCtx    context.Context
 					cancelCreate context.CancelFunc
@@ -541,6 +544,12 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 					createCtx, cancelCreate = xcontext.WithCancel(ctx)
 				}
 				defer cancelCreate()
+
+				if nodeId != 0 {
+					cc = conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
+						return balancerContext.WithNodeID(ctx, nodeId)
+					})
+				}
 
 				s, err := createSession(createCtx, client,
 					session.WithConn(cc),
