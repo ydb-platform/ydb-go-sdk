@@ -19,15 +19,14 @@ import (
 type retryOperation func(context.Context) (err error)
 
 type retryOptions struct {
-	label           string
-	call            call
-	trace           *trace.Retry
-	idempotent      bool
-	stackTrace      bool
-	fastBackoff     backoff.Backoff
-	slowBackoff     backoff.Backoff
-	budget          budget.Budget
-	preferredNodeID uint32
+	label       string
+	call        call
+	trace       *trace.Retry
+	idempotent  bool
+	stackTrace  bool
+	fastBackoff backoff.Backoff
+	slowBackoff backoff.Backoff
+	budget      budget.Budget
 
 	panicCallback func(e interface{})
 }

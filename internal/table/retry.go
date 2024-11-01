@@ -18,7 +18,7 @@ type sessionPool interface {
 	closer.Closer
 
 	Stats() pool.Stats
-	With(ctx context.Context, f func(ctx context.Context, s *session) error, preferredNodeID uint32, opts ...retry.Option) error
+	With(ctx context.Context, f func(ctx context.Context, s *session) error, nodeID uint32, opts ...retry.Option) error
 }
 
 func do(

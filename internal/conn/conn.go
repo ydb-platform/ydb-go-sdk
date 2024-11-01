@@ -604,6 +604,16 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	return c
 }
 
+func ModifyConn(cc grpc.ClientConnInterface, nodeID uint32) grpc.ClientConnInterface {
+	if nodeID != 0 {
+		return conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
+			return balancerContext.WithNodeID(ctx, nodeID)
+		})
+	} else {
+		return cc
+	}
+}
+
 func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
 	return newConn(e, config, opts...)
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -41,7 +40,7 @@ type (
 		closer.Closer
 
 		Stats() pool.Stats
-		With(ctx context.Context, f func(ctx context.Context, s *Session) error, preferredNodeID uint32, opts ...retry.Option) error
+		With(ctx context.Context, f func(context.Context, *Session) error, nodeID uint32, opts ...retry.Option) error
 	}
 	Client struct {
 		config *config.Config
@@ -514,16 +513,6 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
-func modifyConn(cc grpc.ClientConnInterface, nodeID uint32) grpc.ClientConnInterface {
-	if nodeID != 0 {
-		return conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
-			return balancerContext.WithNodeID(ctx, nodeID)
-		})
-	} else {
-		return cc
-	}
-}
-
 func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
@@ -556,7 +545,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 				defer cancelCreate()
 
 				s, err := createSession(createCtx, client,
-					session.WithConn(modifyConn(cc, nodeID)),
+					session.WithConn(conn.ModifyConn(cc, nodeID)),
 					session.WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 					session.WithTrace(cfg.Trace()),
 				)
