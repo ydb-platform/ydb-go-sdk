@@ -514,6 +514,16 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
+func modifyConn(cc grpc.ClientConnInterface, nodeID uint32) grpc.ClientConnInterface {
+	if nodeID != 0 {
+		return conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
+			return balancerContext.WithNodeID(ctx, nodeID)
+		})
+	} else {
+		return cc
+	}
+}
+
 func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
@@ -533,7 +543,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
 			pool.WithIdleTimeToLive[*Session, Session](cfg.SessionIdleTimeToLive()),
-			pool.WithCreateItemFunc(func(ctx context.Context, nodeId uint32) (_ *Session, err error) {
+			pool.WithCreateItemFunc(func(ctx context.Context, nodeID uint32) (_ *Session, err error) {
 				var (
 					createCtx    context.Context
 					cancelCreate context.CancelFunc
@@ -545,14 +555,8 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 				}
 				defer cancelCreate()
 
-				if nodeId != 0 {
-					cc = conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
-						return balancerContext.WithNodeID(ctx, nodeId)
-					})
-				}
-
 				s, err := createSession(createCtx, client,
-					session.WithConn(cc),
+					session.WithConn(modifyConn(cc, nodeID)),
 					session.WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 					session.WithTrace(cfg.Trace()),
 				)

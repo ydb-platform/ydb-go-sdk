@@ -62,9 +62,6 @@ type (
 		done chan struct{}
 	}
 	Option[PT ItemConstraint[T], T any] func(c *Config[PT, T])
-	SessionCallOption                   struct {
-		preferredNodeIDOption uint32
-	}
 )
 
 func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(context.Context, uint32) (PT, error)) Option[PT, T] {
