@@ -256,17 +256,14 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			var newSessionCalled uint32
 			p := New[*testItem, testItem](rootCtx,
 				WithTrace[*testItem, testItem](defaultTrace),
-				WithCreateItemFunc(func(ctx context.Context, nodeId uint32) (*testItem, error) {
-					_ = ctx
+				WithCreateItemFunc(func(_ context.Context, nodeId uint32) (*testItem, error) {
 					newSessionCalled++
-					var (
-						v = testItem{
-							v: 0,
-							onNodeID: func() uint32 {
-								return nodeId
-							},
-						}
-					)
+					v := testItem{
+						v: 0,
+						onNodeID: func() uint32 {
+							return nodeId
+						},
+					}
 					return &v, nil
 				}),
 			)

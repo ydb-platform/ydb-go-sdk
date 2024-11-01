@@ -605,7 +605,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, preferredNodeID uint32) (item
 		if item := xsync.WithLock(&p.mu, func() PT { //nolint:nestif
 			return p.removeFirstIdle(preferredNodeID)
 		}); item != nil {
-
 			if item.IsAlive() {
 				info := xsync.WithLock(&p.mu, func() itemInfo[PT, T] {
 					info, has := p.index[item]
