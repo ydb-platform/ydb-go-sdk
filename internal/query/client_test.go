@@ -152,7 +152,7 @@ func TestClient(t *testing.T) {
 				visited = true
 
 				return nil
-			})
+			}, 0)
 			require.NoError(t, err)
 			require.True(t, visited)
 		})
@@ -167,7 +167,7 @@ func TestClient(t *testing.T) {
 				}
 
 				return nil
-			})
+			}, 0)
 			require.NoError(t, err)
 			require.Equal(t, 10, counter)
 		})
@@ -1590,7 +1590,9 @@ func testPool(
 ) *pool.Pool[*Session, Session] {
 	return pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session, Session](1),
-		pool.WithCreateItemFunc(createSession),
+		pool.WithCreateItemFunc(func (ctx context.Context, _ uint32) (*Session, error) {
+			return createSession(ctx)
+		}),
 		pool.WithSyncCloseItem[*Session, Session](),
 	)
 }
