@@ -96,7 +96,7 @@ type Driver struct {
 	pool *conn.Pool
 
 	mtx      sync.Mutex
-	balancer *balancer.Balancer
+	balancer *balancerWithMeta
 
 	children    map[uint64]*Driver
 	childrenMtx xsync.Mutex
@@ -416,10 +416,11 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 		d.pool = conn.NewPool(ctx, d.config)
 	}
 	if d.balancer == nil {
-		d.balancer, err = balancer.New(ctx, d.config, d.pool, d.discoveryOptions...)
+		b, err := balancer.New(ctx, d.config, d.pool, d.discoveryOptions...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+		d.balancer = newBalancerWithMeta(b, d.config.Meta())
 	}
 
 	d.table = xsync.OnceValue(func() (*internalTable.Client, error) {
