@@ -6,9 +6,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -81,7 +83,7 @@ type Meta struct {
 	capabilities    []string
 }
 
-func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
+func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) { //nolint:funlen
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		md = metadata.MD{}
@@ -111,17 +113,24 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		md.Append(HeaderClientCapabilities, m.capabilities...)
 	}
 
+	if len(md.Get(HeaderTraceID)) == 0 {
+		traceID, err := uuid.NewRandom()
+		if err != nil {
+			return md, xerrors.WithStackTrace(err)
+		}
+		md.Set(HeaderTraceID, traceID.String())
+	}
+
 	if m.credentials == nil {
 		return md, nil
 	}
 
 	var token string
-
 	done := trace.DriverOnGetCredentials(m.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/meta.(*Meta).meta"),
 	)
 	defer func() {
-		done(token, err)
+		done(secret.Token(token), err)
 	}()
 
 	token, err = m.credentials.Token(ctx)

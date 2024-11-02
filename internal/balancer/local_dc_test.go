@@ -134,14 +134,16 @@ func TestLocalDCDiscovery(t *testing.T) {
 		config.WithBalancer(balancers.PreferNearestDC(balancers.Default())),
 	)
 	r := &Balancer{
-		driverConfig: cfg,
-		config:       *cfg.Balancer(),
-		pool:         conn.NewPool(context.Background(), cfg),
-		discoveryClient: discoveryMock{endpoints: []endpoint.Endpoint{
-			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
-			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
-			&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
-		}},
+		driverConfig:   cfg,
+		balancerConfig: *cfg.Balancer(),
+		pool:           conn.NewPool(context.Background(), cfg),
+		discover: func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error) {
+			return []endpoint.Endpoint{
+				&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
+				&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
+				&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
+			}, "", nil
+		},
 		localDCDetector: func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
 			return "b", nil
 		},

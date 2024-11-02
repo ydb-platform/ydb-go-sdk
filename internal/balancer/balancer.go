@@ -6,11 +6,11 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
@@ -28,22 +28,17 @@ import (
 
 var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
 
-type discoveryClient interface {
-	closer.Closer
-
-	Discover(ctx context.Context) ([]endpoint.Endpoint, error)
-}
-
 type Balancer struct {
 	driverConfig      *config.Config
-	config            balancerConfig.Config
+	balancerConfig    balancerConfig.Config
+	discoveryConfig   *discoveryConfig.Config
 	pool              *conn.Pool
-	discoveryClient   discoveryClient
 	discoveryRepeater repeater.Repeater
-	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
-	connectionsState atomic.Pointer[connectionsState]
+	discover        func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error)
+	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
+	connectionsState           atomic.Pointer[connectionsState]
 	mu                         xsync.RWMutex
 	onApplyDiscoveredEndpoints []func(ctx context.Context, endpoints []endpoint.Info)
 }
@@ -93,34 +88,32 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 			address,
 			b.driverConfig.Database(),
 		)
-		endpoints []endpoint.Endpoint
-		localDC   string
-		cancel    context.CancelFunc
 	)
 	defer func() {
 		onDone(err)
 	}()
 
 	if dialTimeout := b.driverConfig.DialTimeout(); dialTimeout > 0 {
+		var cancel context.CancelFunc
 		ctx, cancel = xcontext.WithTimeout(ctx, dialTimeout)
-	} else {
-		ctx, cancel = xcontext.WithCancel(ctx)
+		defer cancel()
 	}
-	defer cancel()
 
-	endpoints, err = b.discoveryClient.Discover(ctx)
+	endpoints, location, err := b.discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	if b.config.DetectNearestDC {
-		localDC, err = b.localDCDetector(ctx, endpoints)
+	if b.balancerConfig.DetectNearestDC {
+		location, err := b.localDCDetector(ctx, endpoints)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-	}
 
-	b.applyDiscoveredEndpoints(ctx, endpoints, localDC)
+		b.applyDiscoveredEndpoints(ctx, endpoints, location)
+	} else {
+		b.applyDiscoveredEndpoints(ctx, endpoints, location)
+	}
 
 	return nil
 }
@@ -131,7 +124,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			b.config.DetectNearestDC,
+			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
 		previous = b.connections().All()
@@ -155,7 +148,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 	}
 
 	info := balancerConfig.Info{SelfLocation: localDC}
-	state := newConnectionsState(connections, b.config.Filter, info, b.config.AllowFallback)
+	state := newConnectionsState(connections, b.balancerConfig.Filter, info, b.balancerConfig.AllowFallback)
 
 	endpointsInfo := make([]endpoint.Info, len(newest))
 	for i, e := range newest {
@@ -184,32 +177,43 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		b.discoveryRepeater.Stop()
 	}
 
-	if err = b.discoveryClient.Close(ctx); err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
 	return nil
 }
 
-func New(
-	ctx context.Context,
-	driverConfig *config.Config,
-	pool *conn.Pool,
-	opts ...discoveryConfig.Option,
-) (b *Balancer, finalErr error) {
-	var (
-		onDone = trace.DriverOnBalancerInit(
-			driverConfig.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
-			driverConfig.Balancer().String(),
+func makeDiscoveryFunc(
+	driverConfig *config.Config, discoveryConfig *discoveryConfig.Config,
+) func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error) {
+	return func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error) {
+		ctx, err = driverConfig.Meta().Context(ctx)
+		if err != nil {
+			return endpoints, location, xerrors.WithStackTrace(err)
+		}
+
+		cc, err := grpc.NewClient("ydb:///"+driverConfig.Endpoint(), driverConfig.GrpcDialOptions()...)
+		if err != nil {
+			return endpoints, location, xerrors.WithStackTrace(err)
+		}
+		defer func() {
+			_ = cc.Close()
+		}()
+
+		endpoints, location, err = internalDiscovery.Discover(ctx,
+			Ydb_Discovery_V1.NewDiscoveryServiceClient(cc), discoveryConfig,
 		)
-		discoveryConfig = discoveryConfig.New(append(opts,
-			discoveryConfig.With(driverConfig.Common),
-			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
-			discoveryConfig.WithDatabase(driverConfig.Database()),
-			discoveryConfig.WithSecure(driverConfig.Secure()),
-			discoveryConfig.WithMeta(driverConfig.Meta()),
-		)...)
+		if err != nil {
+			return endpoints, location, xerrors.WithStackTrace(err)
+		}
+
+		return endpoints, location, nil
+	}
+}
+
+func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts ...discoveryConfig.Option) (
+	b *Balancer, finalErr error,
+) {
+	onDone := trace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
+		driverConfig.Balancer().String(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -218,19 +222,24 @@ func New(
 	b = &Balancer{
 		driverConfig: driverConfig,
 		pool:         pool,
-		discoveryClient: internalDiscovery.New(ctx, pool.Get(
-			endpoint.New(driverConfig.Endpoint()),
-		), discoveryConfig),
+		discoveryConfig: discoveryConfig.New(append(opts,
+			discoveryConfig.With(driverConfig.Common),
+			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
+			discoveryConfig.WithDatabase(driverConfig.Database()),
+			discoveryConfig.WithSecure(driverConfig.Secure()),
+			discoveryConfig.WithMeta(driverConfig.Meta()),
+		)...),
 		localDCDetector: detectLocalDC,
+		discover:        makeDiscoveryFunc(b.driverConfig, b.discoveryConfig),
 	}
 
 	if config := driverConfig.Balancer(); config == nil {
-		b.config = balancerConfig.Config{}
+		b.balancerConfig = balancerConfig.Config{}
 	} else {
-		b.config = *config
+		b.balancerConfig = *config
 	}
 
-	if b.config.SingleConn {
+	if b.balancerConfig.SingleConn {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 			endpoint.New(driverConfig.Endpoint()),
 		}, "")
@@ -240,7 +249,7 @@ func New(
 			return nil, xerrors.WithStackTrace(err)
 		}
 		// run background discovering
-		if d := discoveryConfig.Interval(); d > 0 {
+		if d := b.discoveryConfig.Interval(); d > 0 {
 			b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
 				d, b.clusterDiscoveryAttempt,
 				repeater.WithName("discovery"),
