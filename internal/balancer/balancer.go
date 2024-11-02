@@ -299,10 +299,6 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 		}
 	}()
 
-	if ctx, err = b.driverConfig.Meta().Context(ctx); err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
 	if err = f(ctx, cc); err != nil {
 		if conn.UseWrapping(ctx) {
 			if credentials.IsAccessError(err) {
