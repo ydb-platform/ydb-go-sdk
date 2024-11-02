@@ -1,3 +1,4 @@
+## v3.89.3
 * Wrapped internal balancer with metadata middleware
 
 ## v3.89.2
