@@ -1,3 +1,5 @@
+* Changed behaviour on re-discovery: always open new grpc connection for discovery request
+
 ## v3.89.3
 * Wrapped internal balancer with metadata middleware
 
