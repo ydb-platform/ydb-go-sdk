@@ -189,7 +189,7 @@ func makeDiscoveryFunc(
 			return endpoints, location, xerrors.WithStackTrace(err)
 		}
 
-		cc, err := grpc.NewClient("ydb:///"+driverConfig.Endpoint(), driverConfig.GrpcDialOptions()...)
+		cc, err := grpc.DialContext(ctx, "ydb:///"+driverConfig.Endpoint(), driverConfig.GrpcDialOptions()...)
 		if err != nil {
 			return endpoints, location, xerrors.WithStackTrace(err)
 		}
