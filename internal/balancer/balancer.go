@@ -230,8 +230,9 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...),
 		localDCDetector: detectLocalDC,
-		discover:        makeDiscoveryFunc(b.driverConfig, b.discoveryConfig),
 	}
+
+	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
 
 	if config := driverConfig.Balancer(); config == nil {
 		b.balancerConfig = balancerConfig.Config{}
