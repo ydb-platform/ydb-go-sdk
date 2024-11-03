@@ -1,3 +1,4 @@
+## v3.89.4
 * Changed behaviour on re-discovery: always open new grpc connection for discovery request
 
 ## v3.89.3
