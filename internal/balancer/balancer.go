@@ -16,6 +16,7 @@ import (
 	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -184,14 +185,29 @@ func makeDiscoveryFunc(
 	driverConfig *config.Config, discoveryConfig *discoveryConfig.Config,
 ) func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error) {
 	return func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error) {
-		ctx, err = driverConfig.Meta().Context(ctx)
+		ctx, traceID, err := meta.TraceID(ctx)
 		if err != nil {
 			return endpoints, location, xerrors.WithStackTrace(err)
 		}
 
-		cc, err := grpc.DialContext(ctx, "ydb:///"+driverConfig.Endpoint(), driverConfig.GrpcDialOptions()...)
+		ctx, err = driverConfig.Meta().Context(ctx)
 		if err != nil {
-			return endpoints, location, xerrors.WithStackTrace(err)
+			return endpoints, location, xerrors.WithStackTrace(
+				fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
+			)
+		}
+
+		cc, err := grpc.DialContext(ctx,
+			"ydb:///"+driverConfig.Endpoint(),
+			append(
+				driverConfig.GrpcDialOptions(),
+				grpc.WithBlock(),
+			)...,
+		)
+		if err != nil {
+			return endpoints, location, xerrors.WithStackTrace(
+				fmt.Errorf("failed to dial %q, traceID %q: %w", driverConfig.Endpoint(), traceID, err),
+			)
 		}
 		defer func() {
 			_ = cc.Close()
@@ -201,7 +217,11 @@ func makeDiscoveryFunc(
 			Ydb_Discovery_V1.NewDiscoveryServiceClient(cc), discoveryConfig,
 		)
 		if err != nil {
-			return endpoints, location, xerrors.WithStackTrace(err)
+			return endpoints, location, xerrors.WithStackTrace(
+				fmt.Errorf("failed to discover database %q, address %q, traceID %q: %w",
+					driverConfig.Database(), driverConfig.Endpoint(), traceID, err,
+				),
+			)
 		}
 
 		return endpoints, location, nil

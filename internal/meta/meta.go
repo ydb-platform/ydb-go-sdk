@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
@@ -83,7 +82,7 @@ type Meta struct {
 	capabilities    []string
 }
 
-func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) { //nolint:funlen
+func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		md = metadata.MD{}
@@ -111,14 +110,6 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) { //nolint:f
 
 	if len(m.capabilities) > 0 {
 		md.Append(HeaderClientCapabilities, m.capabilities...)
-	}
-
-	if len(md.Get(HeaderTraceID)) == 0 {
-		traceID, err := uuid.NewRandom()
-		if err != nil {
-			return md, xerrors.WithStackTrace(err)
-		}
-		md.Set(HeaderTraceID, traceID.String())
 	}
 
 	if m.credentials == nil {
