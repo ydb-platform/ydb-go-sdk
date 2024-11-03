@@ -45,42 +45,34 @@ func (c *Conn) ID() string {
 }
 
 func (c *Conn) IsValid() bool {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *Conn) CheckNamedValue(value *driver.NamedValue) error {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *Conn) Ping(ctx context.Context) error {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *Conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
@@ -117,12 +109,10 @@ func (c *Conn) Close() (finalErr error) {
 }
 
 func (c *Conn) Begin() (driver.Tx, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *Conn) LastUsage() time.Time {
-	//TODO implement me
 	panic("implement me")
 }
 
