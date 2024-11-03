@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -490,13 +489,13 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						kv.Latency(start),
-						kv.String("token", secret.Token(info.Token)),
+						kv.String("token", info.Token),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "done",
 						kv.Error(info.Error),
 						kv.Latency(start),
-						kv.String("token", secret.Token(info.Token)),
+						kv.String("token", info.Token),
 						kv.Version(),
 					)
 				}

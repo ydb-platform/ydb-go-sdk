@@ -17,7 +17,9 @@ func TraceID(ctx context.Context, opts ...func(opts *newTraceIDOpts)) (context.C
 	if id, has := traceID(ctx); has {
 		return ctx, id, nil
 	}
-	options := newTraceIDOpts{newRandom: uuid.NewRandom}
+	options := newTraceIDOpts{
+		newRandom: uuid.NewRandom,
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)
