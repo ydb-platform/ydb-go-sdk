@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -137,15 +137,12 @@ func TestNoEffectsIfForgetCommitTx(t *testing.T) {
 		require.NoError(t, err)
 
 		// check row for NO write
-		var (
-			value                  string
-			connAlreadyHaveTxError *tableSql.AlreadyHaveTxError
-		)
+		var value string
 		err = db.QueryRowContext(ctx, `SELECT val FROM table WHERE id = $1`, id).Scan(&value)
 		require.ErrorIs(t, err, sql.ErrNoRows)
 
 		// second tx on existing conn === session
 		_, err = cc.BeginTx(ctx, &sql.TxOptions{})
-		require.ErrorAs(t, err, &connAlreadyHaveTxError)
+		require.True(t, xerrors.IsAlreadyHasTx(err))
 	})
 }

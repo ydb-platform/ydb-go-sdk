@@ -310,7 +310,7 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	case ScriptingQueryMode:
 		return c.execScriptingQuery(ctx, normalizedQuery, parameters)
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' on Conn query", queryMode)
+		return nil, fmt.Errorf("unsupported query mode '%s' on conn query", queryMode)
 	}
 }
 
@@ -451,11 +451,7 @@ func (c *Conn) ID() string {
 func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (currentTx, error) {
 	if c.currentTx != nil {
 		return nil, badconn.Map(
-			xerrors.WithStackTrace(
-				fmt.Errorf("broken Conn state: Conn=%q already have current tx=%q",
-					c.ID(), c.currentTx.ID(),
-				),
-			),
+			xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID())),
 		)
 	}
 

@@ -52,12 +52,12 @@ func (tx *transaction) checkTxState() error {
 		return nil
 	}
 	if tx.conn.currentTx == nil {
-		return fmt.Errorf("broken Conn state: tx=%q not related to Conn=%q",
+		return fmt.Errorf("broken conn state: tx=%q not related to conn=%q",
 			tx.ID(), tx.conn.ID(),
 		)
 	}
 
-	return fmt.Errorf("broken Conn state: tx=%s not related to Conn=%q (Conn have current tx=%q)",
+	return fmt.Errorf("broken conn state: tx=%s not related to conn=%q (conn have current tx=%q)",
 		tx.conn.currentTx.ID(), tx.conn.ID(), tx.ID(),
 	)
 }
