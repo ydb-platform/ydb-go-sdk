@@ -1,3 +1,4 @@
+## v3.90.0
 * Fixed closing of child driver with shared balancer
 
 ## v3.89.6
