@@ -7,15 +7,16 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
+	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var d = &sqlDriver{connectors: make(map[*xsql.Connector]*Driver)} //nolint:gochecknoglobals
+var d = &sqlDriver{} //nolint:gochecknoglobals
 
 func init() { //nolint:gochecknoinits
 	sql.Register("ydb", d)
@@ -31,8 +32,7 @@ func withConnectorOptions(opts ...ConnectorOption) Option {
 }
 
 type sqlDriver struct {
-	connectors    map[*xsql.Connector]*Driver
-	connectorsMtx xsync.RWMutex
+	connectors xsync.Map[*connector.Connector, *Driver]
 }
 
 var (
@@ -41,16 +41,14 @@ var (
 )
 
 func (d *sqlDriver) Close() error {
-	var connectors map[*xsql.Connector]*Driver
-	d.connectorsMtx.WithRLock(func() {
-		connectors = d.connectors
-	})
 	var errs []error
-	for c := range connectors {
+	d.connectors.Range(func(c *connector.Connector, _ *Driver) bool {
 		if err := c.Close(); err != nil {
 			errs = append(errs, err)
 		}
-	}
+
+		return true
+	})
 	if len(errs) > 0 {
 		return xerrors.NewWithIssues("ydb legacy driver close failed", errs...)
 	}
@@ -60,7 +58,7 @@ func (d *sqlDriver) Close() error {
 
 // Open returns a new Driver to the ydb.
 func (d *sqlDriver) Open(string) (driver.Conn, error) {
-	return nil, xsql.ErrUnsupported
+	return nil, connector.ErrUnsupported
 }
 
 func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, error) {
@@ -72,37 +70,33 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	return Connector(db, db.databaseSQLOptions...)
 }
 
-func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
-	d.connectorsMtx.WithLock(func() {
-		d.connectors[c] = parent
-	})
+func (d *sqlDriver) attach(c *connector.Connector, parent *Driver) {
+	d.connectors.Set(c, parent)
 }
 
-func (d *sqlDriver) detach(c *xsql.Connector) {
-	d.connectorsMtx.WithLock(func() {
-		delete(d.connectors, c)
-	})
+func (d *sqlDriver) detach(c *connector.Connector) {
+	d.connectors.Delete(c)
 }
 
-type QueryMode = xsql.QueryMode
+type QueryMode = tableSql.QueryMode
 
 const (
-	DataQueryMode      = xsql.DataQueryMode
-	ExplainQueryMode   = xsql.ExplainQueryMode
-	ScanQueryMode      = xsql.ScanQueryMode
-	SchemeQueryMode    = xsql.SchemeQueryMode
-	ScriptingQueryMode = xsql.ScriptingQueryMode
+	DataQueryMode      = tableSql.DataQueryMode
+	ExplainQueryMode   = tableSql.ExplainQueryMode
+	ScanQueryMode      = tableSql.ScanQueryMode
+	SchemeQueryMode    = tableSql.SchemeQueryMode
+	ScriptingQueryMode = tableSql.ScriptingQueryMode
 )
 
 func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
-	return xsql.WithQueryMode(ctx, mode)
+	return tableSql.WithQueryMode(ctx, mode)
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
-	return xsql.WithTxControl(ctx, txc)
+	return tableSql.WithTxControl(ctx, txc)
 }
 
-type ConnectorOption = xsql.ConnectorOption
+type ConnectorOption = connector.Option
 
 type QueryBindConnectorOption interface {
 	ConnectorOption
@@ -110,50 +104,50 @@ type QueryBindConnectorOption interface {
 }
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
-	return xsql.WithDefaultQueryMode(mode)
+	return connector.WithTableOptions(tableSql.WithDefaultQueryMode(mode))
 }
 
 func WithFakeTx(mode QueryMode) ConnectorOption {
-	return xsql.WithFakeTx(mode)
+	return connector.WithTableOptions(tableSql.WithFakeTxModes(mode))
 }
 
 func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
-	return xsql.WithTablePathPrefix(tablePathPrefix)
+	return connector.WithTablePathPrefix(tablePathPrefix)
 }
 
 func WithAutoDeclare() QueryBindConnectorOption {
-	return xsql.WithQueryBind(bind.AutoDeclare{})
+	return connector.WithQueryBind(bind.AutoDeclare{})
 }
 
 func WithPositionalArgs() QueryBindConnectorOption {
-	return xsql.WithQueryBind(bind.PositionalArgs{})
+	return connector.WithQueryBind(bind.PositionalArgs{})
 }
 
 func WithNumericArgs() QueryBindConnectorOption {
-	return xsql.WithQueryBind(bind.NumericArgs{})
+	return connector.WithQueryBind(bind.NumericArgs{})
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
-	return xsql.WithDefaultTxControl(txControl)
+	return connector.WithTableOptions(tableSql.WithDefaultTxControl(txControl))
 }
 
 func WithDefaultDataQueryOptions(opts ...options.ExecuteDataQueryOption) ConnectorOption {
-	return xsql.WithDefaultDataQueryOptions(opts...)
+	return connector.WithTableOptions(tableSql.WithDataOpts(opts...))
 }
 
 func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) ConnectorOption {
-	return xsql.WithDefaultScanQueryOptions(opts...)
+	return connector.WithTableOptions(tableSql.WithScanOpts(opts...))
 }
 
 func WithDatabaseSQLTrace(
 	t trace.DatabaseSQL, //nolint:gocritic
 	opts ...trace.DatabaseSQLComposeOption,
 ) ConnectorOption {
-	return xsql.WithTrace(&t, opts...)
+	return connector.WithTrace(&t, opts...)
 }
 
 func WithDisableServerBalancer() ConnectorOption {
-	return xsql.WithDisableServerBalancer()
+	return connector.WithDisableServerBalancer()
 }
 
 type SQLConnector interface {
@@ -163,15 +157,15 @@ type SQLConnector interface {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	c, err := xsql.Open(parent,
+	c, err := connector.Open(parent, parent.metaBalancer,
 		append(
 			append(
 				parent.databaseSQLOptions,
 				opts...,
 			),
-			xsql.WithOnClose(d.detach),
-			xsql.WithTraceRetry(parent.config.TraceRetry()),
-			xsql.WithretryBudget(parent.config.RetryBudget()),
+			connector.WithOnClose(d.detach),
+			connector.WithTraceRetry(parent.config.TraceRetry()),
+			connector.WithRetryBudget(parent.config.RetryBudget()),
 		)...,
 	)
 	if err != nil {

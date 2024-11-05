@@ -1,3 +1,5 @@
+* Refactored `database/sql` driver internals for query-service client support in the future 
+
 ## v3.89.5
 * Fixed nil pointer dereference in metabalancer initialization
 
