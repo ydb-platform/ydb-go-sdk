@@ -14,6 +14,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
@@ -23,7 +24,6 @@ import (
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -521,7 +521,7 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.tableOptions = append(d.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
 		d.databaseSQLOptions = append(d.databaseSQLOptions,
-			xsql.WithIdleThreshold(idleThreshold),
+			connector.WithIdleThreshold(idleThreshold),
 		)
 
 		return nil
@@ -772,7 +772,7 @@ func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //
 func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.databaseSQLOptions = append(d.databaseSQLOptions,
-			xsql.WithTrace(
+			connector.WithTrace(
 				&t,
 				append(
 					[]trace.DatabaseSQLComposeOption{
