@@ -473,6 +473,8 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx curr
 		return nil, xerrors.WithStackTrace(err)
 	}
 
+	c.currentTx = tx
+
 	return tx, nil
 }
 
@@ -481,8 +483,6 @@ func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-
-	c.currentTx = tx
 
 	return tx, nil
 }
