@@ -1,3 +1,4 @@
+## v3.89.5
 * Fixed nil pointer dereference in metabalancer initialization
 
 ## v3.89.4
