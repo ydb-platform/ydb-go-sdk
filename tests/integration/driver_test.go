@@ -36,7 +36,7 @@ import (
 )
 
 //nolint:gocyclo
-func TestConnection(sourceTest *testing.T) {
+func TestDriver(sourceTest *testing.T) {
 	t := xtest.MakeSyncedTest(sourceTest)
 	const sumColumn = "sum"
 	var (
@@ -164,6 +164,19 @@ func TestConnection(sourceTest *testing.T) {
 				t.Fatalf("close failed: %+v", e)
 			}
 		}()
+		t.Run("With", func(t *testing.T) {
+			t.Run("WithSharedBalancer", func(t *testing.T) {
+				child, err := db.With(ctx, ydb.WithSharedBalancer(db))
+				require.NoError(t, err)
+				row, err := child.Query().QueryRow(ctx, `SELECT 1`)
+				require.NoError(t, err)
+				var result int32
+				err = row.Scan(&result)
+				require.NoError(t, err)
+				err = child.Close(ctx)
+				require.NoError(t, err)
+			})
+		})
 		t.Run("discovery.WhoAmI", func(t *testing.T) {
 			if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 				discoveryClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(ydb.GRPCConn(db))

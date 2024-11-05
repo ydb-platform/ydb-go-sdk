@@ -14,7 +14,7 @@ var nextID atomic.Uint64 //nolint:gochecknoglobals
 func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
 	id := nextID.Add(1)
 
-	child, err := newConnectionFromOptions(
+	child, err := driverFromOptions(
 		ctx,
 		append(
 			append(

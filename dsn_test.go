@@ -178,7 +178,7 @@ func TestParse(t *testing.T) {
 				require.ErrorIs(t, err, tt.err)
 			} else {
 				require.NoError(t, err)
-				d, err := newConnectionFromOptions(context.Background(), opts...)
+				d, err := driverFromOptions(context.Background(), opts...)
 				require.NoError(t, err)
 				exp := newConnector(tt.connectorOpts...)
 				act := newConnector(d.databaseSQLOptions...)
