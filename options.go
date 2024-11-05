@@ -602,6 +602,7 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 func WithSharedBalancer(parent *Driver) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.metaBalancer.balancer = parent.metaBalancer.balancer
+		d.metaBalancer.close = func(ctx context.Context) error { return nil }
 
 		return nil
 	}

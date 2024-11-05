@@ -109,6 +109,7 @@ type (
 	balancerWithMeta struct {
 		balancer *balancer.Balancer
 		meta     *meta.Meta
+		close    func(ctx context.Context) error
 	}
 )
 
@@ -132,6 +133,10 @@ func (b *balancerWithMeta) NewStream(ctx context.Context, desc *grpc.StreamDesc,
 	}
 
 	return b.balancer.NewStream(metaCtx, desc, method, opts...)
+}
+
+func (b *balancerWithMeta) Close(ctx context.Context) error {
+	return b.close(ctx)
 }
 
 // Close closes Driver and clear resources
@@ -176,7 +181,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.query.Close,
 		d.topic.Close,
 		d.discovery.Close,
-		d.metaBalancer.balancer.Close,
+		d.metaBalancer.Close,
 		d.pool.Release,
 	)
 
@@ -278,7 +283,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 		}
 	}
 
-	d, err := newConnectionFromOptions(ctx, opts...)
+	d, err := driverFromOptions(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -320,7 +325,7 @@ func MustOpen(ctx context.Context, dsn string, opts ...Option) *Driver {
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:nonamedreturns
-	d, err := newConnectionFromOptions(ctx, opts...)
+	d, err := driverFromOptions(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -342,7 +347,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 }
 
 //nolint:cyclop, nonamedreturns, funlen
-func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
+func driverFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
 		if err != nil {
@@ -444,6 +449,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 			return xerrors.WithStackTrace(err)
 		}
 		d.metaBalancer.balancer = b
+		d.metaBalancer.close = b.Close
 	}
 	d.metaBalancer.meta = d.config.Meta()
 
