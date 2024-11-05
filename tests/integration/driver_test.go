@@ -32,6 +32,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -168,11 +169,14 @@ func TestDriver(sourceTest *testing.T) {
 			t.Run("WithSharedBalancer", func(t *testing.T) {
 				child, err := db.With(ctx, ydb.WithSharedBalancer(db))
 				require.NoError(t, err)
-				row, err := child.Query().QueryRow(ctx, `SELECT 1`)
+				result, err := child.Scripting().Execute(ctx, `SELECT 1`, nil)
 				require.NoError(t, err)
-				var result int32
-				err = row.Scan(&result)
+				require.NoError(t, result.NextResultSetErr(ctx))
+				require.True(t, result.NextRow())
+				var value int32
+				err = result.Scan(indexed.Required(&value))
 				require.NoError(t, err)
+				require.EqualValues(t, 1, value)
 				err = child.Close(ctx)
 				require.NoError(t, err)
 			})
