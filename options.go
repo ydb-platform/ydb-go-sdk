@@ -601,7 +601,7 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 // WithSharedBalancer sets balancer from parent driver to child driver
 func WithSharedBalancer(parent *Driver) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.metaBalancer = &balancerWithMeta{balancer: parent.metaBalancer.balancer, meta: d.config.Meta()}
+		d.metaBalancer.balancer = parent.metaBalancer.balancer
 
 		return nil
 	}
