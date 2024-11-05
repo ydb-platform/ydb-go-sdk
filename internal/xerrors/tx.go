@@ -25,5 +25,6 @@ func AlreadyHasTx(txID string) error {
 
 func IsAlreadyHasTx(err error) bool {
 	var txErr *alreadyHasTxError
+
 	return As(err, &txErr)
 }

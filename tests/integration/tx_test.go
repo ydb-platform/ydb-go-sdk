@@ -143,6 +143,7 @@ func TestNoEffectsIfForgetCommitTx(t *testing.T) {
 
 		// second tx on existing conn === session
 		_, err = cc.BeginTx(ctx, &sql.TxOptions{})
+		require.Error(t, err)
 		require.True(t, xerrors.IsAlreadyHasTx(err))
 	})
 }

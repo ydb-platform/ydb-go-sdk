@@ -448,7 +448,14 @@ func (c *Conn) ID() string {
 	return c.session.ID()
 }
 
-func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (currentTx, error) {
+func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx currentTx, finalErr error) {
+	onDone := trace.DatabaseSQLOnConnBegin(c.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).beginTx"),
+	)
+	defer func() {
+		onDone(tx, finalErr)
+	}()
+
 	if c.currentTx != nil {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID())),
@@ -470,13 +477,10 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (current
 }
 
 func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.Tx, error) {
-	onDone := trace.DatabaseSQLOnConnBegin(c.parent.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).BeginTx"),
-	)
 	tx, err := c.beginTx(ctx, txOptions)
-	defer func() {
-		onDone(tx, err)
-	}()
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	c.currentTx = tx
 
