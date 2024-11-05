@@ -1,3 +1,4 @@
+## v3.89.6
 * Refactored `database/sql` driver internals for query-service client support in the future 
 
 ## v3.89.5
