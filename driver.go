@@ -351,8 +351,9 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 	}()
 
 	d := &Driver{
-		children:  make(map[uint64]*Driver),
-		ctxCancel: driverCtxCancel,
+		children:     make(map[uint64]*Driver),
+		ctxCancel:    driverCtxCancel,
+		metaBalancer: &balancerWithMeta{},
 	}
 
 	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
@@ -436,13 +437,15 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	if d.pool == nil {
 		d.pool = conn.NewPool(ctx, d.config)
 	}
-	if d.metaBalancer == nil {
+
+	if d.metaBalancer.balancer == nil {
 		b, err := balancer.New(ctx, d.config, d.pool, d.discoveryOptions...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		d.metaBalancer = &balancerWithMeta{balancer: b, meta: d.config.Meta()}
+		d.metaBalancer.balancer = b
 	}
+	d.metaBalancer.meta = d.config.Meta()
 
 	d.table = xsync.OnceValue(func() (*internalTable.Client, error) {
 		return internalTable.New(xcontext.ValueOnly(ctx),

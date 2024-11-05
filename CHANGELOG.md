@@ -1,3 +1,5 @@
+* Fixed nil pointer dereference in metabalancer initialization
+
 ## v3.89.4
 * Changed behaviour on re-discovery: always open new grpc connection for discovery request
 
