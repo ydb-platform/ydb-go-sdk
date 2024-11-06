@@ -15,6 +15,7 @@ type (
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Span interface {
+		ID() (_ string, valid bool)
 		TraceID() (_ string, valid bool)
 
 		Link(link Span, attributes ...KeyValue)
