@@ -169,26 +169,28 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.FunctionID(),
+
+			var (
+				call  = info.Call
+				start = adapter.SpanFromContext(*info.Context)
 			)
 
 			return func(info trace.DriverConnStreamCloseSendDoneInfo) {
-				finish(start, info.Error)
+				if info.Error != nil {
+					start.Log(call.FunctionID(), kv.Error(info.Error))
+				}
 			}
 		},
 		OnConnStreamFinish: func(info trace.DriverConnStreamFinishInfo) {
 			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				&info.Context,
-				info.Call.FunctionID(),
+
+			var (
+				call     = info.Call
+				start    = adapter.SpanFromContext(info.Context)
+				counters = grpcStreamMsgCountersFromContext(info.Context)
 			)
-			counters := grpcStreamMsgCountersFromContext(info.Context)
 
 			attributes := make([]kv.KeyValue, 0, 2)
 			if counters != nil {
@@ -197,42 +199,47 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 					kv.Int64("sent_messages", counters.sentMessages()),
 				)
 			}
-			finish(start, info.Error, attributes...)
+
+			if info.Error != nil {
+				attributes = append(attributes, kv.Error(info.Error))
+			}
+
+			start.Log(call.FunctionID(), attributes...)
 		},
 		OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.FunctionID(),
-				kv.String("address", safeAddress(info.Endpoint)),
+
+			var (
+				call  = info.Call
+				start = adapter.SpanFromContext(*info.Context)
 			)
 
 			return func(info trace.DriverConnParkDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
+				if info.Error != nil {
+					start.Log(call.FunctionID(), kv.Error(info.Error))
+				} else {
+					start.Log(call.FunctionID())
+				}
 			}
 		},
 		OnConnClose: func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.FunctionID(),
-				kv.String("address", safeAddress(info.Endpoint)),
+
+			var (
+				call  = info.Call
+				start = adapter.SpanFromContext(*info.Context)
 			)
 
 			return func(info trace.DriverConnCloseDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
+				if info.Error != nil {
+					start.Log(call.FunctionID(), kv.Error(info.Error))
+				} else {
+					start.Log(call.FunctionID())
+				}
 			}
 		},
 		OnConnBan: func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {
