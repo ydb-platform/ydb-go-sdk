@@ -1170,3 +1170,37 @@ func testCreateInitRequest(w *WriterReconnector) rawtopicwriter.InitRequest {
 
 	return req
 }
+
+func TestWriterReconnector_ReconnectionInterval(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx := xtest.Context(t)
+		reconnectionInterval := 2 * time.Second
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(
+			WithReconnectionInterval(reconnectionInterval),
+		))
+		w.firstConnectionHandled.Store(true)
+
+		mc := gomock.NewController(t)
+		strm := NewMockRawTopicWriterStream(mc)
+
+		connectCalled := false
+		connectCalledChan := make(empty.Chan)
+
+		w.cfg.Connect = func(streamCtxArg context.Context) (RawTopicWriterStream, error) {
+			close(connectCalledChan)
+			connectCalled = true
+			require.NotEqual(t, ctx, streamCtxArg)
+
+			return strm, nil
+		}
+
+		initRequest := testCreateInitRequest(w)
+		strm.EXPECT().Send(&initRequest)
+		strm.EXPECT().Recv().Return(nil, nil)
+		strm.EXPECT().CloseSend()
+
+		w.connectionLoop(ctx)
+
+		require.True(t, connectCalled)
+	})
+}

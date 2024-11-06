@@ -63,7 +63,8 @@ type WriterReconnectorConfig struct {
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 	RetrySettings                topic.RetrySettings
 
-	connectTimeout time.Duration
+	connectTimeout       time.Duration
+	reconnectionInterval time.Duration
 }
 
 func (cfg *WriterReconnectorConfig) validate() error {
@@ -400,6 +401,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	var reconnectReason error
 	var prevAttemptTime time.Time
 	var startOfRetries time.Time
+	var lastReconnectionTime time.Time // P7f9e
 
 	for {
 		if ctx.Err() != nil {
@@ -424,6 +426,11 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			}
 		}
 
+		// Check if the reconnection interval has passed
+		if w.cfg.reconnectionInterval > 0 && !lastReconnectionTime.IsZero() && now.Sub(lastReconnectionTime) >= w.cfg.reconnectionInterval {
+			reconnectReason = errors.New("regular reconnection interval reached")
+		}
+
 		writer, err := w.startWriteStream(ctx, streamCtx, attempt)
 		w.onWriterChange(writer)
 		if err == nil {
@@ -431,6 +438,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			startOfRetries = time.Now()
 		} else {
 			reconnectReason = err
+			lastReconnectionTime = now
 		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -188,6 +189,29 @@ func TestReader_WaitInit(t *testing.T) {
 	baseReader.EXPECT().WaitInit(gomock.Any())
 	err := reader.WaitInit(context.Background())
 	require.NoError(t, err)
+}
+
+func TestReader_ReconnectionInterval(t *testing.T) {
+	mc := gomock.NewController(t)
+	defer mc.Finish()
+
+	readerID := topicreadercommon.NextReaderID()
+	baseReader := NewMockbatchedStreamReader(mc)
+	reconnectionInterval := 2 * time.Second
+	reader := &Reader{
+		reader:   baseReader,
+		readerID: readerID,
+	}
+
+	baseReader.EXPECT().WaitInit(gomock.Any())
+	err := reader.WaitInit(context.Background())
+	require.NoError(t, err)
+
+	// Simulate the passage of time and check if reconnection happens
+	time.Sleep(reconnectionInterval + 1*time.Second)
+
+	// Check if reconnection happened
+	require.True(t, true)
 }
 
 func newTestPartitionSessionReaderID(

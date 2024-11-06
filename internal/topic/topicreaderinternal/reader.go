@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
@@ -41,10 +42,6 @@ type ReadMessageBatchOptions struct {
 
 func (o ReadMessageBatchOptions) clone() ReadMessageBatchOptions {
 	return o
-}
-
-func newReadMessageBatchOptions() ReadMessageBatchOptions {
-	return ReadMessageBatchOptions{}
 }
 
 // PublicReadBatchOption для различных пожеланий к батчу вроде WithMaxMessages(int)
@@ -96,6 +93,7 @@ func NewReader(
 			cfg.OperationTimeout(),
 			cfg.RetrySettings,
 			cfg.Trace,
+			cfg.reconnectionInterval,
 		),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Trace,
@@ -238,9 +236,10 @@ func (r *Reader) CommitRanges(ctx context.Context, ranges []topicreadercommon.Pu
 type ReaderConfig struct {
 	config.Common
 
-	RetrySettings      topic.RetrySettings
-	DefaultBatchConfig ReadMessageBatchOptions
+	RetrySettings        topic.RetrySettings
+	DefaultBatchConfig   ReadMessageBatchOptions
 	topicStreamReaderConfig
+	reconnectionInterval time.Duration
 }
 
 type PublicReaderOption func(cfg *ReaderConfig)
@@ -257,6 +256,12 @@ func WithCredentials(cred credentials.Credentials) PublicReaderOption {
 func WithTrace(tracer *trace.Topic) PublicReaderOption {
 	return func(cfg *ReaderConfig) {
 		cfg.Trace = cfg.Trace.Compose(tracer)
+	}
+}
+
+func WithReconnectionInterval(interval time.Duration) PublicReaderOption {
+	return func(cfg *ReaderConfig) {
+		cfg.reconnectionInterval = interval
 	}
 }
 
