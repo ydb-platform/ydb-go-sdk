@@ -81,9 +81,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 
 			if id, valid := start.ID(); valid {
 				if traceID, valid := start.TraceID(); valid {
-					traceparent := traceparent(traceID, id)
-					start.Log("traceparent", kv.String("traceparent", traceparent))
-					*info.Context = meta.WithTraceParent(*info.Context, traceparent)
+					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
 				}
 			}
 
