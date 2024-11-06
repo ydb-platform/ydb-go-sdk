@@ -8,9 +8,23 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func traceparent(traceID string, spanID string) string {
+	b := xstring.Buffer()
+	defer b.Free()
+
+	b.WriteString("00-")
+	b.WriteString(traceID)
+	b.WriteByte('-')
+	b.WriteString(spanID)
+	b.WriteString("-0")
+
+	return b.String()
+}
 
 // driver makes driver with publishing traces
 func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
@@ -56,9 +70,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			if traceID, valid := adapter.SpanFromContext(*info.Context).TraceID(); valid {
-				*info.Context = meta.WithTraceParent(*info.Context, traceID)
-			}
+
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
@@ -66,6 +78,12 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				kv.String("address", safeAddress(info.Endpoint)),
 				kv.String("method", string(info.Method)),
 			)
+
+			if id, valid := start.ID(); valid {
+				if traceID, valid := start.TraceID(); valid {
+					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
+				}
+			}
 
 			return func(info trace.DriverConnInvokeDoneInfo) {
 				fields := []KeyValue{
@@ -101,8 +119,10 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				kv.String("method", string(info.Method)),
 			)
 
-			if traceID, valid := start.TraceID(); valid {
-				*info.Context = meta.WithTraceParent(*info.Context, traceID)
+			if id, valid := start.ID(); valid {
+				if traceID, valid := start.TraceID(); valid {
+					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
+				}
 			}
 
 			return func(info trace.DriverConnNewStreamDoneInfo) {
