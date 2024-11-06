@@ -21,7 +21,7 @@ func traceparent(traceID string, spanID string) string {
 	b.WriteString(traceID)
 	b.WriteByte('-')
 	b.WriteString(spanID)
-	b.WriteString("-0")
+	b.WriteString("-01")
 
 	return b.String()
 }
