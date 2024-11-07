@@ -1,4 +1,4 @@
-* Allow to set preferred node id to execute query
+* Added option to set preferred node id to execute query
 
 ## v3.90.1
 * Small broken change: added method `ID()` into `spans.Span` interface (need to implement in adapter) 
