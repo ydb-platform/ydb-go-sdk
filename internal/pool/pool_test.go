@@ -298,7 +298,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithItemUsageLimit[*testItem, testItem](5),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
 					atomic.AddInt64(&newCounter, 1)
 
 					var v testItem
@@ -322,7 +322,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			var newCounter int64
 			p := New(rootCtx,
 				WithLimit[*testItem, testItem](1),
-				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
 					atomic.AddInt64(&newCounter, 1)
 					var v testItem
 
@@ -356,7 +356,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithLimit[*testItem, testItem](3),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
 					var (
 						idx = created.Add(1) - 1
 						v   = testItem{
@@ -599,7 +599,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					p := New(rootCtx,
 						WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 						WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-						WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+						WithCreateItemFunc(func(context.Context) (*testItem, error) {
 							atomic.AddInt64(&counter, 1)
 
 							if atomic.LoadInt64(&counter) < 10 {
@@ -622,7 +622,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					p := New(rootCtx,
 						WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 						WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-						WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+						WithCreateItemFunc(func(context.Context) (*testItem, error) {
 							atomic.AddInt64(&counter, 1)
 
 							if atomic.LoadInt64(&counter) < 10 {
@@ -646,7 +646,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				p := New(rootCtx,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					WithCreateItemFunc(func(context.Context) (*testItem, error) {
 						atomic.AddInt64(&counter, 1)
 
 						if atomic.LoadInt64(&counter) < 10 {
@@ -669,7 +669,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				p := New(rootCtx,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					WithCreateItemFunc(func(context.Context) (*testItem, error) {
 						atomic.AddInt64(&counter, 1)
 
 						if atomic.LoadInt64(&counter) < 10 {
@@ -817,7 +817,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				)
 				p := New(rootCtx,
 					WithLimit[*testItem, testItem](1),
-					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					WithCreateItemFunc(func(context.Context) (*testItem, error) {
 						atomic.AddInt64(&createCounter, 1)
 
 						v := &testItem{
@@ -854,7 +854,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithLimit[*testItem, testItem](1),
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					WithCreateItemFunc(func(context.Context) (*testItem, error) {
 						newItems.Add(1)
 
 						v := &testItem{
@@ -915,7 +915,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithLimit[*testItem, testItem](1),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
 					created.Add(1)
 					v := testItem{
 						v: 0,
