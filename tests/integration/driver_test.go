@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -165,7 +166,58 @@ func TestDriver(sourceTest *testing.T) {
 				t.Fatalf("close failed: %+v", e)
 			}
 		}()
-		t.Run("With", func(t *testing.T) {
+		t.RunSynced("StaticCredentials", func(t *xtest.SyncedTest) {
+			t.Run("CreateUser", func(t *testing.T) {
+				db, err := ydb.Open(ctx,
+					os.Getenv("YDB_CONNECTION_STRING"),
+					ydb.WithAccessTokenCredentials(
+						os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
+					),
+				)
+				require.NoError(t, err)
+				defer func() {
+					_ = db.Close(ctx)
+				}()
+				err = db.Query().Exec(ctx, `DROP USER IF EXISTS test`)
+				require.NoError(t, err)
+				err = db.Query().Exec(ctx, `CREATE USER test PASSWORD 'password'`)
+				require.NoError(t, err)
+			})
+			t.Run("DSN", func(t *testing.T) {
+				u, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
+				require.NoError(t, err)
+				u.User = url.UserPassword("test", "password")
+				t.Log(u.String())
+				db, err := ydb.Open(ctx,
+					u.String(),
+				)
+				require.NoError(t, err)
+				defer func() {
+					_ = db.Close(ctx)
+				}()
+				row, err := db.Query().QueryRow(ctx, `SELECT 1`)
+				require.NoError(t, err)
+				var v int
+				err = row.Scan(&v)
+				require.NoError(t, err)
+			})
+			t.Run("WithStaticCredentials", func(t *testing.T) {
+				db, err := ydb.Open(ctx,
+					os.Getenv("YDB_CONNECTION_STRING"),
+					ydb.WithStaticCredentials("test", "password"),
+				)
+				require.NoError(t, err)
+				defer func() {
+					_ = db.Close(ctx)
+				}()
+				row, err := db.Query().QueryRow(ctx, `SELECT 1`)
+				require.NoError(t, err)
+				var v int
+				err = row.Scan(&v)
+				require.NoError(t, err)
+			})
+		})
+		t.RunSynced("With", func(t *xtest.SyncedTest) {
 			t.Run("WithSharedBalancer", func(t *testing.T) {
 				child, err := db.With(ctx, ydb.WithSharedBalancer(db))
 				require.NoError(t, err)
