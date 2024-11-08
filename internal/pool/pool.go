@@ -8,7 +8,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -32,7 +32,7 @@ type (
 		clock          clockwork.Clock
 		limit          int
 		createTimeout  time.Duration
-		createItem     func(ctx context.Context, preferredNodeID uint32) (PT, error)
+		createItem     func(ctx context.Context) (PT, error)
 		closeTimeout   time.Duration
 		closeItem      func(ctx context.Context, item PT)
 		idleTimeToLive time.Duration
@@ -65,7 +65,7 @@ type (
 	Option[PT ItemConstraint[T], T any] func(c *Config[PT, T])
 )
 
-func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(context.Context, uint32) (PT, error)) Option[PT, T] {
+func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(context.Context) (PT, error)) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.createItem = f
 	}
@@ -175,7 +175,7 @@ func New[PT ItemConstraint[T], T any](
 }
 
 // defaultCreateItem returns a new item
-func defaultCreateItem[T any, PT ItemConstraint[T]](context.Context, uint32) (PT, error) {
+func defaultCreateItem[T any, PT ItemConstraint[T]](context.Context) (PT, error) {
 	var item T
 
 	return &item, nil
@@ -224,7 +224,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 				defer cancelCreate()
 			}
 
-			newItem, err := p.config.createItem(createCtx, preferredNodeID)
+			newItem, err := p.config.createItem(createCtx)
 			if newItem != nil {
 				p.mu.WithLock(func() {
 					var useCounter uint64
@@ -462,12 +462,25 @@ func (p *Pool[PT, T]) putWaitCh(ch *chan PT) { //nolint:gocritic
 }
 
 // p.mu must be held.
-func (p *Pool[PT, T]) peekFirstIdle(preferredNodeID uint32) (item PT, touched time.Time) {
+func (p *Pool[PT, T]) peekFirstIdle() (item PT, touched time.Time) {
 	el := p.idle.Front()
-	if preferredNodeID != 0 {
-		for el != nil && el.Value.NodeID() != preferredNodeID {
-			el = el.Next()
-		}
+	if el == nil {
+		return
+	}
+	item = el.Value
+	info, has := p.index[item]
+	if !has || el != info.idle {
+		panic(fmt.Sprintf("inconsistent index: (%v, %+v, %+v)", has, el, info.idle))
+	}
+
+	return item, info.lastUsage
+}
+
+// p.mu must be held.
+func (p *Pool[PT, T]) peekFirstIdleByNodeID(nodeID uint32) (item PT, touched time.Time) {
+	el := p.idle.Front()
+	for el != nil && el.Value.NodeID() != nodeID {
+		el = el.Next()
 	}
 	if el == nil {
 		return
@@ -485,8 +498,22 @@ func (p *Pool[PT, T]) peekFirstIdle(preferredNodeID uint32) (item PT, touched ti
 // to prevent session from dying in the internalPoolGC after it was returned
 // to be used only in outgoing functions that make session busy.
 // p.mu must be held.
-func (p *Pool[PT, T]) removeFirstIdle(preferredNodeID uint32) PT {
-	idle, _ := p.peekFirstIdle(preferredNodeID)
+func (p *Pool[PT, T]) removeFirstIdle() PT {
+	idle, _ := p.peekFirstIdle()
+	if idle != nil {
+		info := p.removeIdle(idle)
+		p.index[idle] = info
+	}
+
+	return idle
+}
+
+// removes first session from idle and resets the keepAliveCount
+// to prevent session from dying in the internalPoolGC after it was returned
+// to be used only in outgoing functions that make session busy.
+// p.mu must be held.
+func (p *Pool[PT, T]) removeIdleByNodeID(nodeID uint32) PT {
+	idle, _ := p.peekFirstIdleByNodeID(nodeID)
 	if idle != nil {
 		info := p.removeIdle(idle)
 		p.index[idle] = info
@@ -592,7 +619,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		}
 	}
 
-	preferredNodeID := operation.CtxPreferredNodeID(ctx)
+	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
 	for ; attempt < maxAttempts; attempt++ {
 		select {
@@ -602,7 +629,11 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		}
 
 		if item := xsync.WithLock(&p.mu, func() PT { //nolint:nestif
-			return p.removeFirstIdle(preferredNodeID)
+			if hasPreferredNodeID {
+				return p.removeIdleByNodeID(preferredNodeID)
+			}
+
+			return p.removeFirstIdle()
 		}); item != nil {
 			if item.IsAlive() {
 				info := xsync.WithLock(&p.mu, func() itemInfo[PT, T] {

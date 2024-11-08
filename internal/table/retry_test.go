@@ -86,7 +86,7 @@ func TestDoBadSession(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		closed := make(map[table.Session]bool)
 		p := pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context, _ uint32) (*session, error) {
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
 				s := simpleSession(t)
 				s.onClose = append(s.onClose, func(s *session) {
 					closed[s] = true
@@ -137,7 +137,7 @@ func TestDoCreateSessionError(t *testing.T) {
 		ctx, cancel := xcontext.WithTimeout(rootCtx, 30*time.Millisecond)
 		defer cancel()
 		p := pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context, _ uint32) (*session, error) {
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
 				return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 			}),
 			pool.WithSyncCloseItem[*session, session](),
@@ -306,7 +306,7 @@ func TestDoContextDeadline(t *testing.T) {
 	}
 	ctx := xtest.Context(t)
 	p := pool.New[*session, session](ctx,
-		pool.WithCreateItemFunc[*session, session](func(ctx context.Context, _ uint32) (*session, error) {
+		pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
 			return newSession(ctx, client.cc, config.New())
 		}),
 		pool.WithSyncCloseItem[*session, session](),
@@ -355,7 +355,7 @@ func TestDoWithCustomErrors(t *testing.T) {
 		limit = 10
 		ctx   = context.Background()
 		p     = pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context, _ uint32) (*session, error) {
+			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
 				return simpleSession(t), nil
 			}),
 			pool.WithLimit[*session, session](limit),

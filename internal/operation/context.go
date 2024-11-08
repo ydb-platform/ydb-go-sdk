@@ -8,7 +8,6 @@ import (
 type (
 	ctxOperationTimeoutKey     struct{}
 	ctxOperationCancelAfterKey struct{}
-	ctxWithPreferredNodeIDKey  struct{}
 )
 
 // WithTimeout returns a copy of parent context in which YDB operation timeout
@@ -34,10 +33,6 @@ func WithCancelAfter(ctx context.Context, operationCancelAfter time.Duration) co
 	return context.WithValue(ctx, ctxOperationCancelAfterKey{}, operationCancelAfter)
 }
 
-func WithPreferredNodeID(ctx context.Context, nodeID uint32) context.Context {
-	return context.WithValue(ctx, ctxWithPreferredNodeIDKey{}, nodeID)
-}
-
 // ctxTimeout returns the timeout within given context after which
 // YDB should try to cancel operation and return result regardless of the cancelation.
 func ctxTimeout(ctx context.Context) (d time.Duration, ok bool) {
@@ -61,17 +56,4 @@ func ctxUntilDeadline(ctx context.Context) (time.Duration, bool) {
 	}
 
 	return 0, false
-}
-
-func CtxPreferredNodeID(ctx context.Context) uint32 {
-	x := ctx.Value(ctxWithPreferredNodeIDKey{})
-	if x == nil {
-		return 0
-	}
-	val, ok := x.(uint32)
-	if !ok {
-		return 0
-	}
-
-	return val
 }
