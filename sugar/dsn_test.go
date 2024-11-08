@@ -15,27 +15,27 @@ func TestDSN(t *testing.T) {
 		exp string
 	}{
 		{
-			DSN("localhost:2135", "/local", false),
+			DSN("localhost:2135", "/local"),
 			"grpc://localhost:2135/local",
 		},
 		{
-			DSN("localhost:2135", "/local", false, WithUserPassword("user", "")),
+			DSN("localhost:2135", "/local", WithUserPassword("user", "")),
 			"grpc://user@localhost:2135/local",
 		},
 		{
-			DSN("localhost:2135", "/local", false, WithUserPassword("user", "password")),
+			DSN("localhost:2135", "/local", WithUserPassword("user", "password")),
 			"grpc://user:password@localhost:2135/local",
 		},
 		{
-			DSN("ydb-ru.yandex.net:2135", "/ru/home/gvit/mydb", false),
+			DSN("ydb-ru.yandex.net:2135", "/ru/home/gvit/mydb"),
 			"grpc://ydb-ru.yandex.net:2135/ru/home/gvit/mydb",
 		},
 		{
-			DSN("ydb.serverless.yandexcloud.net:2135", "/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1", true),
+			DSN("ydb.serverless.yandexcloud.net:2135", "/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1", WithSecure(true)), //nolint:lll
 			"grpcs://ydb.serverless.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
 		},
 		{
-			DSN("lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135", "/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv", true), //nolint:lll
+			DSN("lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135", "/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv", WithSecure(true)), //nolint:lll
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 		},
 	} {
