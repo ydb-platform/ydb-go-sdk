@@ -50,7 +50,7 @@ type (
 	Pool[PT ItemConstraint[T], T any] struct {
 		config Config[PT, T]
 
-		createItem func(ctx context.Context, preferredNodeID uint32) (PT, error)
+		createItem func(ctx context.Context) (PT, error)
 		closeItem  func(ctx context.Context, item PT)
 
 		mu               xsync.RWMutex
@@ -184,8 +184,8 @@ func defaultCreateItem[T any, PT ItemConstraint[T]](context.Context) (PT, error)
 // makeAsyncCreateItemFunc wraps the createItem function with timeout handling
 func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	p *Pool[PT, T],
-) func(ctx context.Context, preferredNodeID uint32) (PT, error) {
-	return func(ctx context.Context, preferredNodeID uint32) (PT, error) {
+) func(ctx context.Context) (PT, error) {
+	return func(ctx context.Context) (PT, error) {
 		if !xsync.WithLock(&p.mu, func() bool {
 			if len(p.index)+p.createInProgress < p.config.limit {
 				p.createInProgress++
@@ -665,7 +665,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			}
 		}
 
-		item, err := p.createItem(ctx, preferredNodeID)
+		item, err := p.createItem(ctx)
 		if item != nil {
 			return item, nil
 		}

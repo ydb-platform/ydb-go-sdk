@@ -711,7 +711,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							time.Duration(r.Int64(int64(time.Second))),
 						)
 						defer childCancel()
-						s, err := p.createItem(childCtx, 0)
+						s, err := p.createItem(childCtx)
 						if s == nil && err == nil {
 							errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
 						}
