@@ -30,6 +30,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -167,6 +168,9 @@ func TestDriver(sourceTest *testing.T) {
 			}
 		}()
 		t.RunSynced("StaticCredentials", func(t *xtest.SyncedTest) {
+			if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
+				t.Skip("read rows not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
+			}
 			t.Run("CreateUser", func(t *testing.T) {
 				db, err := ydb.Open(ctx,
 					os.Getenv("YDB_CONNECTION_STRING"),
