@@ -1,3 +1,4 @@
+## v3.91.0
 * Added `ydb.WithPreferredNodeID(ctx, nodeID)` context modifier for trying to execute queries on given nodeID
 
 ## v3.90.2
