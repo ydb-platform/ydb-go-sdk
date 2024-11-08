@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
@@ -18,4 +19,9 @@ func WithOperationTimeout(ctx context.Context, operationTimeout time.Duration) c
 // than d, parent context is returned.
 func WithOperationCancelAfter(ctx context.Context, operationCancelAfter time.Duration) context.Context {
 	return operation.WithCancelAfter(ctx, operationCancelAfter)
+}
+
+// WithPreferredNodeID allows to set preferred node to get session from
+func WithPreferredNodeID(ctx context.Context, nodeID uint32) context.Context {
+	return endpoint.WithNodeID(ctx, nodeID)
 }

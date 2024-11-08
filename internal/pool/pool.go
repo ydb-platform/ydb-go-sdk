@@ -8,6 +8,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -20,6 +21,7 @@ type (
 	Item interface {
 		IsAlive() bool
 		Close(ctx context.Context) error
+		NodeID() uint32
 	}
 	ItemConstraint[T any] interface {
 		*T
@@ -442,7 +444,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	}
 }
 
-// getWaitCh returns pointer to a channel of sessions.
+// getWaitCh returns pointer to a channel of items.
 //
 // Note that returning a pointer reduces allocations on sync.Pool usage –
 // sync.Client.Get() returns empty interface, which leads to allocation for
@@ -474,9 +476,25 @@ func (p *Pool[PT, T]) peekFirstIdle() (item PT, touched time.Time) {
 	return item, info.lastUsage
 }
 
-// removes first session from idle and resets the keepAliveCount
-// to prevent session from dying in the internalPoolGC after it was returned
-// to be used only in outgoing functions that make session busy.
+// p.mu must be held.
+func (p *Pool[PT, T]) peekFirstIdleByNodeID(nodeID uint32) (item PT, touched time.Time) {
+	el := p.idle.Front()
+	for el != nil && el.Value.NodeID() != nodeID {
+		el = el.Next()
+	}
+	if el == nil {
+		return
+	}
+	item = el.Value
+	info, has := p.index[item]
+	if !has || el != info.idle {
+		panic(fmt.Sprintf("inconsistent index: (%v, %+v, %+v)", has, el, info.idle))
+	}
+
+	return item, info.lastUsage
+}
+
+// removes first item from idle to use only in outgoing functions that make item busy.
 // p.mu must be held.
 func (p *Pool[PT, T]) removeFirstIdle() PT {
 	idle, _ := p.peekFirstIdle()
@@ -488,10 +506,22 @@ func (p *Pool[PT, T]) removeFirstIdle() PT {
 	return idle
 }
 
+// removes first item with preferred nodeID from idle to use only in outgoing functions that make item busy.
+// p.mu must be held.
+func (p *Pool[PT, T]) removeIdleByNodeID(nodeID uint32) PT {
+	idle, _ := p.peekFirstIdleByNodeID(nodeID)
+	if idle != nil {
+		info := p.removeIdle(idle)
+		p.index[idle] = info
+	}
+
+	return idle
+}
+
 // p.mu must be held.
 func (p *Pool[PT, T]) notifyAboutIdle(idle PT) (notified bool) {
 	for el := p.waitQ.Front(); el != nil; el = p.waitQ.Front() {
-		// Some goroutine is waiting for a session.
+		// Some goroutine is waiting for a item.
 		//
 		// It could be in this states:
 		//   1) Reached the select code and awaiting for a value in channel.
@@ -532,7 +562,7 @@ func (p *Pool[PT, T]) notifyAboutIdle(idle PT) (notified bool) {
 func (p *Pool[PT, T]) removeIdle(item PT) itemInfo[PT, T] {
 	info, has := p.index[item]
 	if !has || info.idle == nil {
-		panic("inconsistent session client index")
+		panic("inconsistent item client index")
 	}
 
 	p.changeState(func() Stats {
@@ -585,6 +615,8 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		}
 	}
 
+	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
+
 	for ; attempt < maxAttempts; attempt++ {
 		select {
 		case <-p.done:
@@ -593,6 +625,18 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		}
 
 		if item := xsync.WithLock(&p.mu, func() PT { //nolint:nestif
+			if hasPreferredNodeID {
+				item := p.removeIdleByNodeID(preferredNodeID)
+				if item != nil {
+					return item
+				}
+
+				if len(p.index)+p.createInProgress < p.config.limit {
+					// for create item with preferred nodeID
+					return nil
+				}
+			}
+
 			return p.removeFirstIdle()
 		}); item != nil {
 			if item.IsAlive() {
@@ -706,15 +750,15 @@ func (p *Pool[PT, T]) waitFromCh(ctx context.Context) (item PT, finalErr error) 
 
 	case item, ok := <-*ch:
 		// Note that race may occur and some goroutine may try to write
-		// session into channel after it was enqueued but before it being
+		// item into channel after it was enqueued but before it being
 		// read here. In that case we will receive nil here and will retry.
 		//
-		// The same way will work when some session become deleted - the
+		// The same way will work when some item become deleted - the
 		// nil value will be sent into the channel.
 		if ok {
 			// Put only filled and not closed channel back to the Client.
 			// That is, we need to avoid races on filling reused channel
-			// for the next waiter – session could be lost for a long time.
+			// for the next waiter – item could be lost for a long time.
 			p.putWaitCh(ch)
 		}
 

@@ -20,6 +20,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -38,6 +39,7 @@ type (
 
 		onClose   func() error
 		onIsAlive func() bool
+		onNodeID  func() uint32
 	}
 	testWaitChPool struct {
 		xsync.Pool[chan *testItem]
@@ -113,6 +115,14 @@ func (t *testItem) ID() string {
 	return ""
 }
 
+func (t *testItem) NodeID() uint32 {
+	if t.onNodeID != nil {
+		return t.onNodeID()
+	}
+
+	return 0
+}
+
 func (t *testItem) Close(context.Context) error {
 	if t.closed.Len() > 0 {
 		debug.PrintStack()
@@ -167,9 +177,125 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
 			err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+				require.EqualValues(t, 0, testItem.NodeID())
+
 				return nil
 			})
 			require.NoError(t, err)
+		})
+		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
+			nextNodeID := uint32(0)
+			var newSessionCalled uint32
+			p := New[*testItem, testItem](rootCtx,
+				WithTrace[*testItem, testItem](defaultTrace),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					newSessionCalled++
+					var (
+						nodeID = nextNodeID
+						v      = testItem{
+							v: 0,
+							onNodeID: func() uint32 {
+								return nodeID
+							},
+						}
+					)
+
+					return &v, nil
+				}),
+			)
+
+			item := mustGetItem(t, p)
+			require.EqualValues(t, 0, item.NodeID())
+			require.EqualValues(t, true, item.IsAlive())
+			mustPutItem(t, p, item)
+
+			nextNodeID = 32
+
+			item, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			require.EqualValues(t, 32, item.NodeID())
+			mustPutItem(t, p, item)
+
+			nextNodeID = 33
+
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
+			require.EqualValues(t, 33, item.NodeID())
+			mustPutItem(t, p, item)
+
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			require.EqualValues(t, 32, item.NodeID())
+			mustPutItem(t, p, item)
+
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
+			require.EqualValues(t, 33, item.NodeID())
+			mustPutItem(t, p, item)
+
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			item2, err := p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
+			require.EqualValues(t, 32, item.NodeID())
+			require.EqualValues(t, 33, item2.NodeID())
+			mustPutItem(t, p, item2)
+			mustPutItem(t, p, item)
+
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			item2, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
+			require.EqualValues(t, 32, item.NodeID())
+			require.EqualValues(t, 33, item2.NodeID())
+			mustPutItem(t, p, item)
+			mustPutItem(t, p, item2)
+
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			item2, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
+			item3, err := p.getItem(context.Background())
+			require.NoError(t, err)
+			require.EqualValues(t, 32, item.NodeID())
+			require.EqualValues(t, 33, item2.NodeID())
+			require.EqualValues(t, 0, item3.NodeID())
+			mustPutItem(t, p, item)
+			mustPutItem(t, p, item2)
+			mustPutItem(t, p, item3)
+
+			require.EqualValues(t, 3, newSessionCalled)
+		})
+		t.Run("CreateSessionOnGivenNode", func(t *testing.T) {
+			var newSessionCalled uint32
+			p := New[*testItem, testItem](rootCtx,
+				WithTrace[*testItem, testItem](defaultTrace),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					newSessionCalled++
+					v := testItem{
+						v: 0,
+						onNodeID: func() uint32 {
+							nodeID, _ := endpoint.ContextNodeID(ctx)
+
+							return nodeID
+						},
+					}
+
+					return &v, nil
+				}),
+			)
+
+			item, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			require.EqualValues(t, 32, item.NodeID())
+			require.EqualValues(t, true, item.IsAlive())
+			mustPutItem(t, p, item)
+
+			item = mustGetItem(t, p)
+			require.EqualValues(t, 32, item.NodeID())
+			mustPutItem(t, p, item)
+
+			require.EqualValues(t, 1, newSessionCalled)
 		})
 		t.Run("WithLimit", func(t *testing.T) {
 			p := New[*testItem, testItem](rootCtx, WithLimit[*testItem, testItem](1),
