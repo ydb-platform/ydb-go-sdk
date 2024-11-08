@@ -145,8 +145,8 @@ func caller() string {
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
 }
 
-func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T], nodeID uint32) PT {
-	s, err := p.getItem(endpoint.WithNodeID(context.Background(), nodeID))
+func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T]) PT {
+	s, err := p.getItem(context.Background())
 	if err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
@@ -204,48 +204,59 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 			)
 
-			item := mustGetItem(t, p, 0)
+			item := mustGetItem(t, p)
 			require.EqualValues(t, 0, item.NodeID())
 			require.EqualValues(t, true, item.IsAlive())
 			mustPutItem(t, p, item)
 
 			nextNodeID = 32
 
-			item = mustGetItem(t, p, 32)
+			item, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
 			require.EqualValues(t, 32, item.NodeID())
 			mustPutItem(t, p, item)
 
 			nextNodeID = 33
 
-			item = mustGetItem(t, p, 33)
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
 			require.EqualValues(t, 33, item.NodeID())
 			mustPutItem(t, p, item)
 
-			item = mustGetItem(t, p, 32)
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
 			require.EqualValues(t, 32, item.NodeID())
 			mustPutItem(t, p, item)
 
-			item = mustGetItem(t, p, 33)
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
 			require.EqualValues(t, 33, item.NodeID())
 			mustPutItem(t, p, item)
 
-			item = mustGetItem(t, p, 32)
-			item2 := mustGetItem(t, p, 33)
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			item2, err := p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
 			require.EqualValues(t, 32, item.NodeID())
 			require.EqualValues(t, 33, item2.NodeID())
 			mustPutItem(t, p, item2)
 			mustPutItem(t, p, item)
 
-			item = mustGetItem(t, p, 32)
-			item2 = mustGetItem(t, p, 33)
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			item2, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
 			require.EqualValues(t, 32, item.NodeID())
 			require.EqualValues(t, 33, item2.NodeID())
 			mustPutItem(t, p, item)
 			mustPutItem(t, p, item2)
 
-			item = mustGetItem(t, p, 32)
-			item2 = mustGetItem(t, p, 33)
-			item3 := mustGetItem(t, p, 0)
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			item2, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
+			item3, err := p.getItem(context.Background())
+			require.NoError(t, err)
 			require.EqualValues(t, 32, item.NodeID())
 			require.EqualValues(t, 33, item2.NodeID())
 			require.EqualValues(t, 0, item3.NodeID())
@@ -274,12 +285,13 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 			)
 
-			item := mustGetItem(t, p, 32)
+			item, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
 			require.EqualValues(t, 32, item.NodeID())
 			require.EqualValues(t, true, item.IsAlive())
 			mustPutItem(t, p, item)
 
-			item = mustGetItem(t, p, 32)
+			item = mustGetItem(t, p)
 			require.EqualValues(t, 32, item.NodeID())
 			mustPutItem(t, p, item)
 
@@ -384,9 +396,9 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.Zero(t, p.idle.Len())
 
 			var (
-				s1 = mustGetItem(t, p, 0)
-				s2 = mustGetItem(t, p, 0)
-				s3 = mustGetItem(t, p, 0)
+				s1 = mustGetItem(t, p)
+				s2 = mustGetItem(t, p)
+				s3 = mustGetItem(t, p)
 			)
 
 			require.Len(t, p.index, 3)
@@ -461,7 +473,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					// second call getItem from pool with limit === 1 will skip
 					// create item step (because pool have not enough space for
 					// creating new items) and will freeze until wait free item from pool
-					mustGetItem(t, p, 0)
+					mustGetItem(t, p)
 
 					go func() {
 						p.config.trace.OnGet = func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
@@ -539,8 +551,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
 
-				s1 := mustGetItem(t, p, 0)
-				s2 := mustGetItem(t, p, 0)
+				s1 := mustGetItem(t, p)
+				s2 := mustGetItem(t, p)
 
 				// Put both items at the absolutely same time.
 				// That is, both items must be updated their lastUsage timestamp.
@@ -556,7 +568,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// on get item from idle list the pool must check the item idle timestamp
 				// both existing items must be closed
 				// getItem must create a new item and return it from getItem
-				s3 := mustGetItem(t, p, 0)
+				s3 := mustGetItem(t, p)
 
 				require.Len(t, p.index, 1)
 
@@ -578,7 +590,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				require.Len(t, p.index, 1)
 				require.Equal(t, 1, p.idle.Len())
 
-				s4 := mustGetItem(t, p, 0)
+				s4 := mustGetItem(t, p)
 				require.Equal(t, s3, s4)
 				require.Len(t, p.index, 1)
 				require.Equal(t, 0, p.idle.Len())
@@ -935,20 +947,20 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				_ = p.Close(context.Background())
 			}()
 
-			s := mustGetItem(t, p, 0)
+			s := mustGetItem(t, p)
 			assertCreated(1)
 
 			mustPutItem(t, p, s)
 			assertClosed(0)
 
-			mustGetItem(t, p, 0)
+			mustGetItem(t, p)
 			assertCreated(1)
 
 			p.closeItem(context.Background(), s)
 			delete(p.index, s)
 			assertClosed(1)
 
-			mustGetItem(t, p, 0)
+			mustGetItem(t, p)
 			assertCreated(2)
 		})
 		t.Run("Racy", func(t *testing.T) {
@@ -1031,7 +1043,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// replace default async closer for sync testing
 				WithSyncCloseItem[*testItem, testItem](),
 			)
-			item := mustGetItem(t, p, 0)
+			item := mustGetItem(t, p)
 			if err := p.putItem(context.Background(), item); err != nil {
 				t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
 			}
@@ -1048,7 +1060,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// replace default async closer for sync testing
 				WithSyncCloseItem[*testItem, testItem](),
 			)
-			item := mustGetItem(t, p, 0)
+			item := mustGetItem(t, p)
 			mustPutItem(t, p, item)
 
 			require.Panics(t, func() {
