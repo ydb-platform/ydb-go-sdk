@@ -202,6 +202,9 @@ func makeDiscoveryFunc(
 			append(
 				driverConfig.GrpcDialOptions(),
 				grpc.WithBlock(),
+				grpc.WithDefaultServiceConfig(`{
+					"loadBalancingPolicy": "pick_first"
+				}`),
 			)...,
 		)
 		if err != nil {
