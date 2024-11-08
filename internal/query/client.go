@@ -39,7 +39,7 @@ type (
 		closer.Closer
 
 		Stats() pool.Stats
-		With(ctx context.Context, f func(context.Context, *Session) error, opts ...retry.Option) error
+		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
 	}
 	Client struct {
 		config *config.Config
