@@ -1,4 +1,4 @@
-* Setted the `pick_first` balancer for discovery attempts
+* Set the `pick_first` balancer for short-lived grpc connection inside ydb cluster discovery attempt
 
 ## v3.90.1
 * Small broken change: added method `ID()` into `spans.Span` interface (need to implement in adapter) 
