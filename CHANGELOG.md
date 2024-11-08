@@ -1,4 +1,4 @@
-* Added option to set preferred node id to execute query
+* Added `ydb.WithPreferredNodeID(ctx, nodeID)` context modifier for trying to execute queries on given nodeID
 * Set the `pick_first` balancer for short-lived grpc connection inside ydb cluster discovery attempt
 
 ## v3.90.1
