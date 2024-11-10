@@ -8,14 +8,26 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	tableConn "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+)
+
+type resultNoRows struct{}
+
+func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
+func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
+
+var (
+	_ driver.Result = resultNoRows{}
 )
 
 type (
@@ -61,6 +73,15 @@ func (c *Conn) isReady() bool {
 	return c.session.Status() == session.StatusIdle.String()
 }
 
+func (c *Conn) normalize(q string, args ...driver.NamedValue) (query string, _ params.Parameters, _ error) {
+	queryArgs := make([]any, len(args))
+	for i := range args {
+		queryArgs[i] = args[i]
+	}
+
+	return c.parent.Bindings().RewriteQuery(q, queryArgs...)
+}
+
 func (c *Conn) execContext(
 	ctx context.Context,
 	query string,
@@ -79,24 +100,24 @@ func (c *Conn) execContext(
 	// 	return c.currentTx.ExecContext(ctx, query, args)
 	// }
 
-	m := queryModeFromContext(ctx, c.defaultQueryMode)
 	onDone := trace.DatabaseSQLOnConnExec(c.parent.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).execContext"),
-		query, m.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).execContext"),
+		query, tableConn.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	c.session.Exec()
-	// switch m {
-	// case DataQueryMode:
-	// 	return c.executeDataQuery(ctx, query, args)
-	// case SchemeQueryMode:
-	// 	return c.executeSchemeQuery(ctx, query)
-	// case ScriptingQueryMode:
-	// 	return c.executeScriptingQuery(ctx, query, args)
-	// default:
-	// 	return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m)
-	// }
+	normalizedQuery, params, err := c.normalize(query, args...)
+
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	err = c.session.Exec(ctx, normalizedQuery, options.WithParameters(&params))
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	return resultNoRows{}, nil
 }
