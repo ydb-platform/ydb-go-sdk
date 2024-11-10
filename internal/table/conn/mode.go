@@ -1,4 +1,4 @@
-package xsql
+package conn
 
 import "fmt"
 

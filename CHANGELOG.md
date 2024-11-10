@@ -1,3 +1,25 @@
+## v3.91.0
+* Added `ydb.WithPreferredNodeID(ctx, nodeID)` context modifier for trying to execute queries on given nodeID
+
+## v3.90.2
+* Set the `pick_first` balancer for short-lived grpc connection inside ydb cluster discovery attempt
+
+## v3.90.1
+* Small broken change: added method `ID()` into `spans.Span` interface (need to implement in adapter) 
+* Fixed traceparent header for tracing grpc requests
+
+## v3.90.0
+* Fixed closing of child driver with shared balancer
+
+## v3.89.6
+* Refactored `database/sql` driver internals for query-service client support in the future 
+
+## v3.89.5
+* Fixed nil pointer dereference in metabalancer initialization
+
+## v3.89.4
+* Changed behaviour on re-discovery: always open new grpc connection for discovery request
+
 ## v3.89.3
 * Wrapped internal balancer with metadata middleware
 

@@ -8,9 +8,23 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func traceparent(traceID string, spanID string) string {
+	b := xstring.Buffer()
+	defer b.Free()
+
+	b.WriteString("00-")
+	b.WriteString(traceID)
+	b.WriteByte('-')
+	b.WriteString(spanID)
+	b.WriteString("-01")
+
+	return b.String()
+}
 
 // driver makes driver with publishing traces
 func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
@@ -56,9 +70,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			if traceID, valid := adapter.SpanFromContext(*info.Context).TraceID(); valid {
-				*info.Context = meta.WithTraceParent(*info.Context, traceID)
-			}
+
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
@@ -66,6 +78,12 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				kv.String("address", safeAddress(info.Endpoint)),
 				kv.String("method", string(info.Method)),
 			)
+
+			if id, valid := start.ID(); valid {
+				if traceID, valid := start.TraceID(); valid {
+					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
+				}
+			}
 
 			return func(info trace.DriverConnInvokeDoneInfo) {
 				fields := []KeyValue{
@@ -101,8 +119,10 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				kv.String("method", string(info.Method)),
 			)
 
-			if traceID, valid := start.TraceID(); valid {
-				*info.Context = meta.WithTraceParent(*info.Context, traceID)
+			if id, valid := start.ID(); valid {
+				if traceID, valid := start.TraceID(); valid {
+					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
+				}
 			}
 
 			return func(info trace.DriverConnNewStreamDoneInfo) {
@@ -149,26 +169,28 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.FunctionID(),
+
+			var (
+				call  = info.Call
+				start = adapter.SpanFromContext(*info.Context)
 			)
 
 			return func(info trace.DriverConnStreamCloseSendDoneInfo) {
-				finish(start, info.Error)
+				if info.Error != nil {
+					start.Log(call.FunctionID(), kv.Error(info.Error))
+				}
 			}
 		},
 		OnConnStreamFinish: func(info trace.DriverConnStreamFinishInfo) {
 			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				&info.Context,
-				info.Call.FunctionID(),
+
+			var (
+				call     = info.Call
+				start    = adapter.SpanFromContext(info.Context)
+				counters = grpcStreamMsgCountersFromContext(info.Context)
 			)
-			counters := grpcStreamMsgCountersFromContext(info.Context)
 
 			attributes := make([]kv.KeyValue, 0, 2)
 			if counters != nil {
@@ -177,42 +199,47 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 					kv.Int64("sent_messages", counters.sentMessages()),
 				)
 			}
-			finish(start, info.Error, attributes...)
+
+			if info.Error != nil {
+				attributes = append(attributes, kv.Error(info.Error))
+			}
+
+			start.Log(call.FunctionID(), attributes...)
 		},
 		OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.FunctionID(),
-				kv.String("address", safeAddress(info.Endpoint)),
+
+			var (
+				call  = info.Call
+				start = adapter.SpanFromContext(*info.Context)
 			)
 
 			return func(info trace.DriverConnParkDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
+				if info.Error != nil {
+					start.Log(call.FunctionID(), kv.Error(info.Error))
+				} else {
+					start.Log(call.FunctionID())
+				}
 			}
 		},
 		OnConnClose: func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.FunctionID(),
-				kv.String("address", safeAddress(info.Endpoint)),
+
+			var (
+				call  = info.Call
+				start = adapter.SpanFromContext(*info.Context)
 			)
 
 			return func(info trace.DriverConnCloseDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
+				if info.Error != nil {
+					start.Log(call.FunctionID(), kv.Error(info.Error))
+				} else {
+					start.Log(call.FunctionID())
+				}
 			}
 		},
 		OnConnBan: func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {

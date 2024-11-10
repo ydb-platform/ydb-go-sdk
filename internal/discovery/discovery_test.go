@@ -60,7 +60,7 @@ func TestDiscover(t *testing.T) {
 				})),
 			},
 		}, nil)
-		endpoints, location, err := discover(ctx, client, config.New(
+		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 			config.WithSecure(false),
 			config.WithClock(clock),
@@ -86,7 +86,7 @@ func TestDiscover(t *testing.T) {
 		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
 			Database: "test",
 		}).Return(nil, xerrors.Transport(status.Error(grpcCodes.Unavailable, "")))
-		endpoints, location, err := discover(ctx, client, config.New(
+		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 		))
 		require.Error(t, err)
@@ -106,7 +106,7 @@ func TestDiscover(t *testing.T) {
 				Status: Ydb.StatusIds_UNAVAILABLE,
 			},
 		}, nil)
-		endpoints, location, err := discover(ctx, client, config.New(
+		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 		))
 		require.Error(t, err)
@@ -141,7 +141,7 @@ func TestDiscover(t *testing.T) {
 				})),
 			},
 		}, nil)
-		endpoints, location, err := discover(ctx, client, config.New(
+		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 			config.WithAddressMutator(func(address string) string {
 				return "u-" + address

@@ -128,7 +128,7 @@ func TestWithCertificatesCached(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			db, err := newConnectionFromOptions(ctx,
+			db, err := driverFromOptions(ctx,
 				append(
 					test.options,
 					withConnPool(conn.NewPool(context.Background(), config.New())), //nolint:contextcheck

@@ -32,11 +32,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 //nolint:gocyclo
-func TestConnection(sourceTest *testing.T) {
+func TestDriver(sourceTest *testing.T) {
 	t := xtest.MakeSyncedTest(sourceTest)
 	const sumColumn = "sum"
 	var (
@@ -164,6 +165,22 @@ func TestConnection(sourceTest *testing.T) {
 				t.Fatalf("close failed: %+v", e)
 			}
 		}()
+		t.Run("With", func(t *testing.T) {
+			t.Run("WithSharedBalancer", func(t *testing.T) {
+				child, err := db.With(ctx, ydb.WithSharedBalancer(db))
+				require.NoError(t, err)
+				result, err := child.Scripting().Execute(ctx, `SELECT 1`, nil)
+				require.NoError(t, err)
+				require.NoError(t, result.NextResultSetErr(ctx))
+				require.True(t, result.NextRow())
+				var value int32
+				err = result.Scan(indexed.Required(&value))
+				require.NoError(t, err)
+				require.EqualValues(t, 1, value)
+				err = child.Close(ctx)
+				require.NoError(t, err)
+			})
+		})
 		t.Run("discovery.WhoAmI", func(t *testing.T) {
 			if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 				discoveryClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(ydb.GRPCConn(db))

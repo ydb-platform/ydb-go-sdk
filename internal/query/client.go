@@ -511,6 +511,38 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
+func CreateSession(ctx context.Context, c *Client) (*Session, error) {
+	s, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Session, error) {
+		var (
+			createCtx    context.Context
+			cancelCreate context.CancelFunc
+		)
+		if d := c.config.SessionCreateTimeout(); d > 0 {
+			createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
+		} else {
+			createCtx, cancelCreate = xcontext.WithCancel(ctx)
+		}
+		defer cancelCreate()
+
+		s, err := createSession(createCtx, c.client,
+			session.WithDeleteTimeout(c.config.SessionDeleteTimeout()),
+			session.WithTrace(c.config.Trace()),
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		s.laztTx = c.config.LazyTx()
+
+		return s, nil
+	})
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return s, nil
+}
+
 func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),

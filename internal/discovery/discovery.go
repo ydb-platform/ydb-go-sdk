@@ -37,7 +37,7 @@ type Client struct {
 	client Ydb_Discovery_V1.DiscoveryServiceClient
 }
 
-func discover(
+func Discover(
 	ctx context.Context,
 	client Ydb_Discovery_V1.DiscoveryServiceClient,
 	config *config.Config,
@@ -114,7 +114,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, f
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	endpoints, location, err = discover(ctx, c.client, c.config)
+	endpoints, location, err = Discover(ctx, c.client, c.config)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

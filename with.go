@@ -14,7 +14,7 @@ var nextID atomic.Uint64 //nolint:gochecknoglobals
 func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
 	id := nextID.Add(1)
 
-	child, err := newConnectionFromOptions(
+	child, err := driverFromOptions(
 		ctx,
 		append(
 			append(
@@ -48,7 +48,7 @@ func (d *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
 	}
 
 	onDone := trace.DriverOnWith(
-		d.trace(), &ctx,
+		d.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.(*Driver).With"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)

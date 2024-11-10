@@ -9,9 +9,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 )
 
 const tablePathPrefixTransformer = "table_path_prefix"
@@ -59,45 +60,45 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 		opts = append(opts, WithBalancer(balancers.FromConfig(balancer)))
 	}
 	if queryMode := info.Params.Get("go_query_mode"); queryMode != "" {
-		mode := xsql.QueryModeFromString(queryMode)
-		if mode == xsql.UnknownQueryMode {
+		mode := tableSql.QueryModeFromString(queryMode)
+		if mode == tableSql.UnknownQueryMode {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		}
-		opts = append(opts, withConnectorOptions(xsql.WithDefaultQueryMode(mode)))
+		opts = append(opts, withConnectorOptions(connector.WithDefaultQueryMode(mode)))
 	} else if queryMode := info.Params.Get("query_mode"); queryMode != "" {
-		mode := xsql.QueryModeFromString(queryMode)
-		if mode == xsql.UnknownQueryMode {
+		mode := tableSql.QueryModeFromString(queryMode)
+		if mode == tableSql.UnknownQueryMode {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		}
-		opts = append(opts, withConnectorOptions(xsql.WithDefaultQueryMode(mode)))
+		opts = append(opts, withConnectorOptions(connector.WithDefaultQueryMode(mode)))
 	}
 	if fakeTx := info.Params.Get("go_fake_tx"); fakeTx != "" {
 		for _, queryMode := range strings.Split(fakeTx, ",") {
-			mode := xsql.QueryModeFromString(queryMode)
-			if mode == xsql.UnknownQueryMode {
+			mode := tableSql.QueryModeFromString(queryMode)
+			if mode == tableSql.UnknownQueryMode {
 				return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 			}
-			opts = append(opts, withConnectorOptions(xsql.WithFakeTx(mode)))
+			opts = append(opts, withConnectorOptions(connector.WithFakeTx(mode)))
 		}
 	}
 	if info.Params.Has("go_query_bind") {
-		var binders []xsql.ConnectorOption
+		var binders []connector.Option
 		queryTransformers := strings.Split(info.Params.Get("go_query_bind"), ",")
 		for _, transformer := range queryTransformers {
 			switch transformer {
 			case "declare":
-				binders = append(binders, xsql.WithQueryBind(bind.AutoDeclare{}))
+				binders = append(binders, connector.WithQueryBind(bind.AutoDeclare{}))
 			case "positional":
-				binders = append(binders, xsql.WithQueryBind(bind.PositionalArgs{}))
+				binders = append(binders, connector.WithQueryBind(bind.PositionalArgs{}))
 			case "numeric":
-				binders = append(binders, xsql.WithQueryBind(bind.NumericArgs{}))
+				binders = append(binders, connector.WithQueryBind(bind.NumericArgs{}))
 			default:
 				if strings.HasPrefix(transformer, tablePathPrefixTransformer) {
 					prefix, err := extractTablePathPrefixFromBinderName(transformer)
 					if err != nil {
 						return nil, xerrors.WithStackTrace(err)
 					}
-					binders = append(binders, xsql.WithTablePathPrefix(prefix))
+					binders = append(binders, connector.WithQueryBind(bind.TablePathPrefix(prefix)))
 				} else {
 					return nil, xerrors.WithStackTrace(
 						fmt.Errorf("unknown query rewriter: %s", transformer),
