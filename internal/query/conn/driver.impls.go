@@ -53,7 +53,6 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	}
 
 	err := c.session.Exec(ctx, "select 1")
-
 	return err
 }
 
@@ -62,9 +61,13 @@ func (c *Conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	panic("implement me")
 }
 
-func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	//TODO implement me
-	panic("implement me")
+func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.Tx, error) {
+	tx, err := c.beginTx(ctx, txOptions)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return tx, nil
 }
 
 func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {

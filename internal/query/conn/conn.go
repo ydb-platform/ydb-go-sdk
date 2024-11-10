@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	tableConn "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
@@ -39,9 +40,15 @@ type (
 		Bindings() bind.Bindings
 		Clock() clockwork.Clock
 	}
+
 	currentTx interface {
+		tx.Identifier
+		driver.Tx
+		driver.ExecerContext
+		driver.QueryerContext
 		Rollback() error
 	}
+
 	Conn struct {
 		currentTx
 		ctx       context.Context //nolint:containedctx
@@ -80,6 +87,33 @@ func (c *Conn) normalize(q string, args ...driver.NamedValue) (query string, _ p
 	}
 
 	return c.parent.Bindings().RewriteQuery(q, queryArgs...)
+}
+
+func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx currentTx, finalErr error) {
+	onDone := trace.DatabaseSQLOnConnBegin(c.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).beginTx"),
+	)
+	defer func() {
+		onDone(tx, finalErr)
+	}()
+
+	if c.currentTx != nil {
+		return nil, badconn.Map(
+			xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID())),
+		)
+	}
+
+	// TODO: fake tx
+	/* tx, err := beginFakeTx(...) */
+
+	tx, err := beginTx(ctx, c, txOptions)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	c.currentTx = tx
+
+	return tx, nil
 }
 
 func (c *Conn) execContext(
