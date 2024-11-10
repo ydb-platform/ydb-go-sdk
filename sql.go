@@ -171,7 +171,8 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 			),
 			xsql.WithOnClose(d.detach),
 			xsql.WithTraceRetry(parent.config.TraceRetry()),
-			xsql.WithretryBudget(parent.config.RetryBudget()),
+			xsql.WithRetryBudget(parent.config.RetryBudget()),
+			xsql.OverQueryService(),
 		)...,
 	)
 	if err != nil {
