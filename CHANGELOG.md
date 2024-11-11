@@ -1,3 +1,4 @@
+* Added experimental ydb.ParamsFromMap and ydb.MustParamsFromMap for build query parameters
 * Refactored coordination traces
 
 ## v3.91.0

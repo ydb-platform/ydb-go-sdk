@@ -510,3 +510,46 @@ func ExampleOpen_advanced() {
 	defer db.Close(ctx) // cleanup resources
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }
+
+// func ExampleParamsMap
+func ExampleMustParamsFromMap() {
+	ctx := context.TODO()
+	db, err := ydb.Open(
+		ctx,
+		"grpc://localhost:2135/local",
+		ydb.WithAnonymousCredentials(),
+		ydb.WithBalancer(
+			balancers.PreferLocationsWithFallback(
+				balancers.RandomChoice(), "a", "b",
+			),
+		),
+		ydb.WithSessionPoolSizeLimit(100),
+	)
+	if err != nil {
+		fmt.Printf("Driver failed: %v", err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
+
+	res, err := db.Query().QueryRow(ctx, `
+DECLARE $textArg AS Text;
+DECLARE $intArg AS Int64;
+
+SELECT $textArg AS TextField, $intArg AS IntField
+`, query.WithParameters(ydb.MustParamsFromMap(map[string]any{
+		"$textArg": "asd",
+		"$intArg":  int64(123),
+	})))
+	if err != nil {
+		fmt.Printf("query failed")
+	}
+
+	var result struct {
+		TextField string
+		IntField  int64
+	}
+	err = res.ScanStruct(&result)
+	if err != nil {
+		fmt.Printf("scan failed")
+	}
+}
