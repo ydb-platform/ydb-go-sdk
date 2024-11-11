@@ -3,7 +3,6 @@ package coordination
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -35,7 +34,7 @@ type (
 		sessionReconnectDelay   time.Duration
 		trace                   *trace.Coordination
 
-		ctx               context.Context
+		ctx               context.Context //nolint:containedctx
 		cancel            context.CancelFunc
 		sessionClosedChan chan struct{}
 		controller        *conversation.Controller
@@ -54,7 +53,7 @@ type (
 type lease struct {
 	session *session
 	name    string
-	ctx     context.Context
+	ctx     context.Context //nolint:containedctx
 	cancel  context.CancelFunc
 }
 
@@ -131,84 +130,8 @@ func (s *session) updateCancelStream(cancel context.CancelFunc) {
 	s.cancelStream = cancel
 }
 
-type sessionStream struct {
-	sessionID    uint64
-	stream       Ydb_Coordination_V1.CoordinationService_SessionClient
-	cancelStream context.CancelFunc
-}
-
-func newSessionStream(
-	ctx context.Context,
-	client Ydb_Coordination_V1.CoordinationServiceClient,
-	t *trace.Coordination,
-) (
-	_ *sessionStream, finalErr error,
-) {
-	streamCtx, streamCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
-	defer func() {
-		if finalErr != nil {
-			streamCancel()
-		}
-	}()
-
-	onDone := trace.CoordinationOnNewSessionClient(t, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.newSessionStream"),
-	)
-	defer func() {
-		onDone(finalErr)
-	}()
-
-	stream, err := client.Session(streamCtx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	err = stream.Send(&Ydb_Coordination.SessionRequest{
-		Request: &Ydb_Coordination.SessionRequest_SessionStart_{
-			SessionStart: &Ydb_Coordination.SessionRequest_SessionStart{
-				Path:          "/a/b/c",
-				ProtectionKey: protectionKey,
-			},
-		},
-	})
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		switch t := msg.GetResponse().(type) {
-		case *Ydb_Coordination.SessionResponse_SessionStarted_:
-			return &sessionStream{
-				sessionID:    t.SessionStarted.GetSessionId(),
-				stream:       stream,
-				cancelStream: streamCancel,
-			}, nil
-		case *Ydb_Coordination.SessionResponse_Failure_:
-			return nil, xerrors.WithStackTrace(xerrors.FromOperation(t.Failure))
-		case *Ydb_Coordination.SessionResponse_Ping:
-			err := stream.Send(&Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_Pong{
-					Pong: &Ydb_Coordination.SessionRequest_PingPong{
-						Opaque: t.Ping.GetOpaque(),
-					},
-				},
-			})
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-		default:
-			return nil, xerrors.WithStackTrace(fmt.Errorf("unexpected first message: %+v", msg))
-		}
-	}
-}
-
 // Create a new gRPC stream using an independent context.
-func (s *session) newStream(
+func (s *session) newStream( //nolint:funlen
 	streamCtx context.Context,
 	cancelStream context.CancelFunc,
 ) (Ydb_Coordination_V1.CoordinationService_SessionClient, error) {
@@ -230,8 +153,8 @@ func (s *session) newStream(
 				sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient
 				err           error
 			)
-			onDone := trace.CoordinationOnNewSessionClient(s.trace, &streamCtx,
-				stack.FunctionID(""),
+			onDone := trace.CoordinationOnSessionNewStream(s.trace, &streamCtx,
+				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*session).newStream"),
 			)
 			sessionClient, err = s.client.Session(streamCtx)
 			onDone(err)
@@ -294,7 +217,7 @@ func (s *session) newStream(
 	}
 }
 
-func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan chan struct{}) {
+func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan chan struct{}) { //nolint:funlen
 	defer func() {
 		for _, f := range s.onClose {
 			f(s)
@@ -350,8 +273,6 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 				},
 			},
 		}
-
-		fmt.Printf("[SEND]: %+v (%T)\n", startSession.GetRequest(), startSession.GetRequest())
 
 		err = sessionClient.Send(&startSession)
 		if err != nil {
@@ -482,7 +403,7 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 	}
 }
 
-func (s *session) receiveLoop(
+func (s *session) receiveLoop( //nolint:funlen
 	wg *sync.WaitGroup,
 	sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient,
 	cancelStream context.CancelFunc,
@@ -504,8 +425,6 @@ func (s *session) receiveLoop(
 			return
 		}
 		onDone(message, nil)
-
-		fmt.Printf("[RECV]: %+v (%T)\n", message.GetResponse(), message.GetResponse())
 
 		switch message.GetResponse().(type) {
 		case *Ydb_Coordination.SessionResponse_Failure_:
@@ -588,8 +507,6 @@ func (s *session) sendLoop(
 		if err != nil {
 			return
 		}
-
-		fmt.Printf("[SEND]: %+v (%T)\n", message.GetRequest(), message.GetRequest())
 
 		onSendDone := trace.CoordinationOnSessionSend(s.trace, message)
 		err = sessionClient.Send(message)
@@ -861,7 +778,7 @@ func convertSemaphoreSession(
 	return &result
 }
 
-func (s *session) AcquireSemaphore(
+func (s *session) AcquireSemaphore( //nolint:funlen
 	ctx context.Context,
 	name string,
 	count uint64,

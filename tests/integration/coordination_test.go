@@ -30,7 +30,7 @@ func TestCoordinationSemaphore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}
-	defer db.Close(ctx) // cleanup resources
+	defer db.Close(ctx) // cleanup resourcess
 
 	const nodePath = "/local/coordination/node/test"
 
