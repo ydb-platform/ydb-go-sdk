@@ -22,7 +22,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -39,15 +38,7 @@ type Balancer struct {
 	discover        func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error)
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
-	connectionsState           atomic.Pointer[connectionsState]
-	mu                         xsync.RWMutex
-	onApplyDiscoveredEndpoints []func(ctx context.Context, endpoints []endpoint.Info)
-}
-
-func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context, endpoints []endpoint.Info)) {
-	b.mu.WithLock(func() {
-		b.onApplyDiscoveredEndpoints = append(b.onApplyDiscoveredEndpoints, onApplyDiscoveredEndpoints)
-	})
+	connectionsState atomic.Pointer[connectionsState]
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -157,12 +148,6 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 	}
 
 	b.connectionsState.Store(state)
-
-	b.mu.WithLock(func() {
-		for _, onApplyDiscoveredEndpoints := range b.onApplyDiscoveredEndpoints {
-			onApplyDiscoveredEndpoints(ctx, endpointsInfo)
-		}
-	})
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
