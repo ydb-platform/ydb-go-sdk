@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -103,7 +104,7 @@ func AccessError(msg string, err error, opts ...authErrorOption) error {
 	}
 	buffer.WriteString("): %w")
 
-	return xerrors.WithStackTrace(fmt.Errorf(buffer.String(), err), xerrors.WithSkipDepth(1))
+	return xerrors.WithStackTrace(xerrors.Join(errors.New(buffer.String()), err), xerrors.WithSkipDepth(1))
 }
 
 func IsAccessError(err error) bool {
