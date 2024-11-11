@@ -189,66 +189,10 @@ func TestDriver(sourceTest *testing.T) {
 				require.NoError(t, err)
 				err = db.Query().Exec(ctx, `CREATE USER test PASSWORD 'password'`)
 				require.NoError(t, err)
-			})
-			t.RunSynced("DSN", func(t *xtest.SyncedTest) {
-				u, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
-				require.NoError(t, err)
-				u.User = url.UserPassword("test", "password")
-				t.Log(u.String())
-				db, err := ydb.Open(ctx,
-					u.String(),
-				)
-				require.NoError(t, err)
-				defer func() {
-					_ = db.Close(ctx)
-				}()
-				row, err := db.Query().QueryRow(ctx, `SELECT 1`)
-				require.NoError(t, err)
-				var v int
-				err = row.Scan(&v)
-				require.NoError(t, err)
 				tableName := path.Join(db.Name(), t.Name(), "test")
 				t.RunSynced("CreateTable", func(t *xtest.SyncedTest) {
 					err := db.Query().Exec(ctx, fmt.Sprintf(`
-					CREATE TABLE %s (
-						id Uint64,
-						value Utf8,
-						PRIMARY KEY (id)
-					)`, "`"+tableName+"`"),
-					)
-					require.NoError(t, err)
-				})
-				t.RunSynced("DescribeTable", func(t *xtest.SyncedTest) {
-					var d options.Description
-					err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-						d, err = s.DescribeTable(ctx, tableName)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					})
-					require.NoError(t, err)
-					require.Equal(t, "", d.Name)
-					require.Equal(t, 2, len(d.Columns))
-					require.Equal(t, "id", d.Columns[0].Name)
-					require.Equal(t, "value", d.Columns[1].Name)
-					require.Equal(t, []string{"id"}, d.PrimaryKey)
-				})
-			})
-			t.RunSynced("WithStaticCredentials", func(t *xtest.SyncedTest) {
-				db, err := ydb.Open(ctx,
-					os.Getenv("YDB_CONNECTION_STRING"),
-					ydb.WithStaticCredentials("test", "password"),
-				)
-				require.NoError(t, err)
-				defer func() {
-					_ = db.Close(ctx)
-				}()
-				tableName := path.Join(db.Name(), t.Name(), "test")
-				t.RunSynced("CreateTable", func(t *xtest.SyncedTest) {
-					err := db.Query().Exec(ctx, fmt.Sprintf(`
-					CREATE TABLE %s (
+					CREATE TABLE IF NOT EXISTS %s (
 						id Uint64,
 						value Utf8,
 						PRIMARY KEY (id)
@@ -274,7 +218,98 @@ func TestDriver(sourceTest *testing.T) {
 						return nil
 					})
 					require.NoError(t, err)
-					require.Equal(t, "", d.Name)
+					require.Equal(t, "test", d.Name)
+					require.Equal(t, 2, len(d.Columns))
+					require.Equal(t, "id", d.Columns[0].Name)
+					require.Equal(t, "value", d.Columns[1].Name)
+					require.Equal(t, []string{"id"}, d.PrimaryKey)
+				})
+			})
+			t.RunSynced("DSN", func(t *xtest.SyncedTest) {
+				u, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
+				require.NoError(t, err)
+				u.User = url.UserPassword("test", "password")
+				t.Log(u.String())
+				db, err := ydb.Open(ctx,
+					u.String(),
+				)
+				require.NoError(t, err)
+				defer func() {
+					_ = db.Close(ctx)
+				}()
+				row, err := db.Query().QueryRow(ctx, `SELECT 1`)
+				require.NoError(t, err)
+				var v int
+				err = row.Scan(&v)
+				require.NoError(t, err)
+				tableName := path.Join(db.Name(), t.Name(), "test")
+				t.RunSynced("CreateTable", func(t *xtest.SyncedTest) {
+					err := db.Query().Exec(ctx, fmt.Sprintf(`
+					CREATE TABLE IF NOT EXISTS %s (
+						id Uint64,
+						value Utf8,
+						PRIMARY KEY (id)
+					)`, "`"+tableName+"`"),
+					)
+					require.NoError(t, err)
+				})
+				t.RunSynced("DescribeTable", func(t *xtest.SyncedTest) {
+					var d options.Description
+					err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+						d, err = s.DescribeTable(ctx, tableName)
+						if err != nil {
+							return err
+						}
+
+						return nil
+					})
+					require.NoError(t, err)
+					require.Equal(t, "test", d.Name)
+					require.Equal(t, 2, len(d.Columns))
+					require.Equal(t, "id", d.Columns[0].Name)
+					require.Equal(t, "value", d.Columns[1].Name)
+					require.Equal(t, []string{"id"}, d.PrimaryKey)
+				})
+			})
+			t.RunSynced("WithStaticCredentials", func(t *xtest.SyncedTest) {
+				db, err := ydb.Open(ctx,
+					os.Getenv("YDB_CONNECTION_STRING"),
+					ydb.WithStaticCredentials("test", "password"),
+				)
+				require.NoError(t, err)
+				defer func() {
+					_ = db.Close(ctx)
+				}()
+				tableName := path.Join(db.Name(), t.Name(), "test")
+				t.RunSynced("CreateTable", func(t *xtest.SyncedTest) {
+					err := db.Query().Exec(ctx, fmt.Sprintf(`
+					CREATE TABLE IF NOT EXISTS %s (
+						id Uint64,
+						value Utf8,
+						PRIMARY KEY (id)
+					)`, "`"+tableName+"`"),
+					)
+					require.NoError(t, err)
+				})
+				t.RunSynced("Query", func(t *xtest.SyncedTest) {
+					row, err := db.Query().QueryRow(ctx, `SELECT 1`)
+					require.NoError(t, err)
+					var v int
+					err = row.Scan(&v)
+					require.NoError(t, err)
+				})
+				t.RunSynced("DescribeTable", func(t *xtest.SyncedTest) {
+					var d options.Description
+					err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+						d, err = s.DescribeTable(ctx, tableName)
+						if err != nil {
+							return err
+						}
+
+						return nil
+					})
+					require.NoError(t, err)
+					require.Equal(t, "test", d.Name)
 					require.Equal(t, 2, len(d.Columns))
 					require.Equal(t, "id", d.Columns[0].Name)
 					require.Equal(t, "value", d.Columns[1].Name)
