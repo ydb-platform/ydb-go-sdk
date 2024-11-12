@@ -1,3 +1,4 @@
+## v3.92.0
 * Added experimental ydb.ParamsFromMap and ydb.MustParamsFromMap for build query parameters
 * Refactored coordination traces
 * gRPC connection will be forcefully closed on DNS resolver errors from now on
