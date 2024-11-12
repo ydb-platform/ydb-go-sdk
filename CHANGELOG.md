@@ -1,4 +1,5 @@
 * Refactored coordination traces
+* gRPC connection will be forcefully closed on DNS resolver errors from now on
 
 ## v3.91.0
 * Added `ydb.WithPreferredNodeID(ctx, nodeID)` context modifier for trying to execute queries on given nodeID

@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,56 +15,54 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type connsKey struct {
-	address string
-	nodeID  uint32
+type Pool struct {
+	usages      int64
+	config      Config
+	dialOptions []grpc.DialOption
+	conns       xsync.Map[string, *conn]
+	done        chan struct{}
 }
 
-type Pool struct {
-	usages int64
-	config Config
-	mtx    xsync.RWMutex
-	opts   []grpc.DialOption
-	conns  map[connsKey]*conn
-	done   chan struct{}
+func (p *Pool) DialTimeout() time.Duration {
+	return p.config.DialTimeout()
+}
+
+func (p *Pool) Trace() *trace.Driver {
+	return p.config.Trace()
+}
+
+func (p *Pool) GrpcDialOptions() []grpc.DialOption {
+	return p.dialOptions
 }
 
 func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-
 	var (
 		address = endpoint.Address()
 		cc      *conn
 		has     bool
 	)
 
-	key := connsKey{address, endpoint.NodeID()}
-
-	if cc, has = p.conns[key]; has {
+	if cc, has = p.conns.Get(address); has {
 		return cc
 	}
 
-	cc = newConn(
-		endpoint,
-		p.config,
+	cc = newConn(endpoint, p,
 		withOnClose(p.remove),
 		withOnTransportError(p.Ban),
 	)
 
-	p.conns[key] = cc
+	p.conns.Set(address, cc)
 
 	return cc
 }
 
 func (p *Pool) remove(c *conn) {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	delete(p.conns, connsKey{c.Endpoint().Address(), c.Endpoint().NodeID()})
+	p.conns.Delete(c.Address())
 }
 
 func (p *Pool) isClosed() bool {
@@ -104,10 +103,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 
 	e := cc.Endpoint().Copy()
 
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	cc, ok := p.conns[connsKey{e.Address(), e.NodeID()}]
+	cc, ok := p.conns.Get(e.Address())
 	if !ok {
 		return
 	}
@@ -126,10 +122,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 
 	e := cc.Endpoint().Copy()
 
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	cc, ok := p.conns[connsKey{e.Address(), e.NodeID()}]
+	cc, ok := p.conns.Get(e.Address())
 	if !ok {
 		return
 	}
@@ -161,32 +154,26 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 
 	close(p.done)
 
-	var conns []closer.Closer
-	p.mtx.WithRLock(func() {
-		conns = make([]closer.Closer, 0, len(p.conns))
-		for _, c := range p.conns {
-			conns = append(conns, c)
-		}
-	})
-
 	var (
-		errCh = make(chan error, len(conns))
+		errCh = make(chan error, p.conns.Len())
 		wg    sync.WaitGroup
 	)
 
-	wg.Add(len(conns))
-	for _, c := range conns {
+	wg.Add(cap(errCh))
+	p.conns.Range(func(_ string, c *conn) bool {
 		go func(c closer.Closer) {
 			defer wg.Done()
 			if err := c.Close(ctx); err != nil {
 				errCh <- err
 			}
 		}(c)
-	}
+
+		return true
+	})
 	wg.Wait()
 	close(errCh)
 
-	issues := make([]error, 0, len(conns))
+	issues := make([]error, 0, cap(errCh))
 	for err := range errCh {
 		issues = append(issues, err)
 	}
@@ -206,7 +193,7 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 		case <-p.done:
 			return
 		case <-ticker.C:
-			for _, c := range p.collectConns() {
+			p.conns.Range(func(_ string, c *conn) bool {
 				if time.Since(c.LastUsage()) > ttl {
 					switch c.GetState() {
 					case Online, Banned:
@@ -215,20 +202,11 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 						// nop
 					}
 				}
-			}
+
+				return true
+			})
 		}
 	}
-}
-
-func (p *Pool) collectConns() []*conn {
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-	conns := make([]*conn, 0, len(p.conns))
-	for _, c := range p.conns {
-		conns = append(conns, c)
-	}
-
-	return conns
 }
 
 func NewPool(ctx context.Context, config Config) *Pool {
@@ -238,12 +216,35 @@ func NewPool(ctx context.Context, config Config) *Pool {
 	defer onDone()
 
 	p := &Pool{
-		usages: 1,
-		config: config,
-		opts:   config.GrpcDialOptions(),
-		conns:  make(map[connsKey]*conn),
-		done:   make(chan struct{}),
+		usages:      1,
+		config:      config,
+		dialOptions: config.GrpcDialOptions(),
+		done:        make(chan struct{}),
 	}
+
+	p.dialOptions = append(p.dialOptions,
+		grpc.WithResolvers(
+			xresolver.New("", config.Trace().Compose(&trace.Driver{
+				OnResolve: func(info trace.DriverResolveStartInfo) func(trace.DriverResolveDoneInfo) {
+					target := info.Target
+					resolved := info.Resolved
+
+					return func(info trace.DriverResolveDoneInfo) {
+						if info.Error != nil || len(resolved) == 0 {
+							p.conns.Range(func(address string, cc *conn) bool {
+								if u, err := url.Parse(address); err == nil && u.Host == target && cc.grpcConn != nil {
+									_ = cc.grpcConn.Close()
+									_ = p.conns.Delete(address)
+								}
+
+								return true
+							})
+						}
+					}
+				},
+			})),
+		),
+	)
 
 	if ttl := config.ConnectionTTL(); ttl > 0 {
 		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2) //nolint:gomnd
