@@ -75,7 +75,7 @@ func (call callOption) ApplyRetryOption(opts *retryOptions) {
 }
 
 type call interface {
-	FunctionID() string
+	String() string
 }
 
 func withCaller(call call) callOption {

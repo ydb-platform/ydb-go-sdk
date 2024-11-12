@@ -22,7 +22,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 	t.OnCreateSession = func(info trace.TableCreateSessionStartInfo) func(trace.TableCreateSessionDoneInfo) {
 		if adapter.Details()&trace.TableEvents != 0 {
 			fieldsStore := fieldsStoreFromContext(info.Context)
-			*info.Context = withFunctionID(*info.Context, info.Call.FunctionID())
+			*info.Context = withFunctionID(*info.Context, info.Call.String())
 
 			return func(info trace.TableCreateSessionDoneInfo) {
 				if info.Error == nil {
@@ -42,7 +42,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			*info.Context = noTraceRetry(*info.Context)
 			operationName := info.Label
 			if operationName == "" {
-				operationName = info.Call.FunctionID()
+				operationName = info.Call.String()
 			}
 			start := childSpanWithReplaceCtx(
 				adapter,
@@ -72,7 +72,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			*info.Context = noTraceRetry(*info.Context)
 			operationName := info.Label
 			if operationName == "" {
-				operationName = info.Call.FunctionID()
+				operationName = info.Call.String()
 			}
 			start := childSpanWithReplaceCtx(
 				adapter,
@@ -102,7 +102,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.TableSessionNewDoneInfo) {
@@ -123,7 +123,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 			)
@@ -140,7 +140,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 			)
@@ -157,7 +157,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 			)
@@ -178,7 +178,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("query", info.Query),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
@@ -204,7 +204,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 				kv.String("query", safeStringer(info.Query)),
@@ -239,7 +239,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("query", safeStringer(info.Query)),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
@@ -264,7 +264,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 			)
@@ -285,7 +285,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 			)
@@ -306,7 +306,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 				kv.String("transaction_id", safeID(info.Tx)),
@@ -324,7 +324,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 				kv.String("transaction_id", safeID(info.Tx)),
@@ -342,7 +342,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 				kv.String("transaction_id", safeID(info.Tx)),
@@ -365,7 +365,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 				kv.String("transaction_id", safeID(info.Tx)),
@@ -384,7 +384,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.TableInitDoneInfo) {
@@ -403,7 +403,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.TableCloseDoneInfo) {
@@ -418,7 +418,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
 			)
@@ -435,7 +435,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.TablePoolGetDoneInfo) {

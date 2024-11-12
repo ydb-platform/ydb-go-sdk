@@ -13,7 +13,7 @@ func discovery(adapter Adapter) (t trace.Discovery) {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("address", info.Address),
 				kv.String("database", info.Database),
 			)

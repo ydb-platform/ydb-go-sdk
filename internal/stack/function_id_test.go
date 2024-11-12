@@ -13,15 +13,15 @@ type genericType[T any] struct{}
 type starType struct{}
 
 func (t genericType[T]) Call() string {
-	return FunctionID("").FunctionID()
+	return FunctionID("").String()
 }
 
 func staticCall() string {
-	return FunctionID("").FunctionID()
+	return FunctionID("").String()
 }
 
 func (e *starType) starredCall() string {
-	return FunctionID("").FunctionID()
+	return FunctionID("").String()
 }
 
 func anonymousFunctionCall() string {
@@ -30,7 +30,7 @@ func anonymousFunctionCall() string {
 	go func() {
 		mu.Lock()
 		defer mu.Unlock()
-		result = FunctionID("").FunctionID()
+		result = FunctionID("").String()
 	}()
 	time.Sleep(time.Second)
 
