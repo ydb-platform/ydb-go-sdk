@@ -48,19 +48,26 @@ type Conn interface {
 	Unban(ctx context.Context) State
 }
 
-type conn struct {
-	mtx               sync.RWMutex
-	config            Config // ro access
-	grpcConn          *grpc.ClientConn
-	done              chan struct{}
-	endpoint          endpoint.Endpoint // ro access
-	closed            bool
-	state             atomic.Uint32
-	childStreams      *xcontext.CancelsGuard
-	lastUsage         xsync.LastUsage
-	onClose           []func(*conn)
-	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
-}
+type (
+	connConfig interface {
+		Trace() *trace.Driver
+		DialTimeout() time.Duration
+		GrpcDialOptions() []grpc.DialOption
+	}
+	conn struct {
+		mtx               sync.RWMutex
+		config            connConfig // ro access
+		grpcConn          *grpc.ClientConn
+		done              chan struct{}
+		endpoint          endpoint.Endpoint // ro access
+		closed            bool
+		state             atomic.Uint32
+		childStreams      *xcontext.CancelsGuard
+		lastUsage         xsync.LastUsage
+		onClose           []func(*conn)
+		onTransportErrors []func(ctx context.Context, cc Conn, cause error)
+	}
+)
 
 func (c *conn) Address() string {
 	return c.endpoint.Address()
@@ -177,18 +184,6 @@ func (c *conn) GetState() (s State) {
 	return State(c.state.Load())
 }
 
-func makeDialOption(overrideHost string) []grpc.DialOption {
-	dialOption := []grpc.DialOption{
-		grpc.WithStatsHandler(statsHandler{}),
-	}
-
-	if len(overrideHost) != 0 {
-		dialOption = append(dialOption, grpc.WithAuthority(overrideHost))
-	}
-
-	return dialOption
-}
-
 func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedConnection)
@@ -201,31 +196,37 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		return c.grpcConn, nil
 	}
 
-	if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = xcontext.WithTimeout(ctx, dialTimeout)
-		defer cancel()
-	}
+	return c.dial(ctx)
+}
 
+// c.mtx must be locked
+func (c *conn) dial(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	onDone := trace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).realConn"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial"),
 		c.endpoint.Copy(),
 	)
 	defer func() {
 		onDone(err)
 	}()
 
-	// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
-	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
-	address := "ydb:///" + c.endpoint.Address()
+	if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = xcontext.WithTimeout(ctx, dialTimeout)
+		defer cancel()
+	}
 
-	dialOption := makeDialOption(c.endpoint.OverrideHost())
+	address := c.endpoint.Address()
 
-	cc, err = grpc.DialContext(ctx, address, append( //nolint:staticcheck,nolintlint
-		dialOption,
-		c.config.GrpcDialOptions()...,
-	)...)
+	dialOpts := c.config.GrpcDialOptions()
+
+	dialOpts = append(dialOpts, grpc.WithStatsHandler(statsHandler{}))
+
+	if overrideHost := c.endpoint.OverrideHost(); overrideHost != "" {
+		dialOpts = append(dialOpts, grpc.WithAuthority(overrideHost))
+	}
+
+	cc, err = grpc.DialContext(ctx, address, dialOpts...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return nil, xerrors.WithStackTrace(err)
@@ -238,7 +239,9 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		return nil, xerrors.WithStackTrace(
 			xerrors.Retryable(
 				xerrors.Transport(err),
-				xerrors.WithName("realConn"),
+				xerrors.WithName(
+					stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial").FunctionID(),
+				),
 			),
 		)
 	}
@@ -581,7 +584,7 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 	}
 }
 
-func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
+func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 	c := &conn{
 		endpoint:     e,
 		config:       config,
@@ -602,10 +605,6 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	}
 
 	return c
-}
-
-func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
-	return newConn(e, config, opts...)
 }
 
 var _ stats.Handler = statsHandler{}

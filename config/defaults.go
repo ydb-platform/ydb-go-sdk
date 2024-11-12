@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -30,7 +29,7 @@ var (
 	}
 )
 
-func defaultGrpcOptions(t *trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
+func defaultGrpcOptions(secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
 	opts = append(opts,
 		// keep-aliving all connections
 		grpc.WithKeepaliveParams(
@@ -44,15 +43,6 @@ func defaultGrpcOptions(t *trace.Driver, secure bool, tlsConfig *tls.Config) (op
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
 			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
-		),
-		// use proxy-resolvers
-		// 1) for interpret schemas `ydb`, `grpc` and `grpcs` in node URLs as for dns resolver
-		// 2) for observe resolving events
-		grpc.WithResolvers(
-			xresolver.New("", t),
-			xresolver.New("ydb", t),
-			xresolver.New("grpc", t),
-			xresolver.New("grpcs", t),
 		),
 	)
 	if secure {

@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -186,6 +187,9 @@ func makeDiscoveryFunc(
 			"ydb:///"+driverConfig.Endpoint(),
 			append(
 				driverConfig.GrpcDialOptions(),
+				grpc.WithResolvers(
+					xresolver.New("ydb", driverConfig.Trace()),
+				),
 				grpc.WithBlock(),
 				grpc.WithDefaultServiceConfig(`{
 					"loadBalancingPolicy": "pick_first"
