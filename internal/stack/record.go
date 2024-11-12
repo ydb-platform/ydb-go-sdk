@@ -197,7 +197,7 @@ func buildRecordString(
 	return buffer.String()
 }
 
-func (c call) FunctionID() string {
+func (c call) String() string {
 	return c.Record(Lambda(false), FileName(false))
 }
 

@@ -27,7 +27,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryNewDoneInfo) {
@@ -41,7 +41,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryCloseDoneInfo) {
@@ -58,7 +58,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryPoolNewDoneInfo) {
@@ -74,7 +74,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryPoolCloseDoneInfo) {
@@ -91,7 +91,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryPoolTryDoneInfo) {
@@ -108,7 +108,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryPoolWithDoneInfo) {
@@ -126,7 +126,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryPoolPutDoneInfo) {
@@ -143,7 +143,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryPoolGetDoneInfo) {
@@ -160,7 +160,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryDoDoneInfo) {
@@ -178,7 +178,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QueryDoTxDoneInfo) {
@@ -196,7 +196,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -214,7 +214,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -232,7 +232,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -250,7 +250,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -268,7 +268,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
@@ -287,7 +287,7 @@ func query(adapter Adapter) trace.Query {
 			}
 
 			ctx := *info.Context
-			call := info.Call.FunctionID()
+			call := info.Call.String()
 
 			return func(info trace.QuerySessionAttachDoneInfo) {
 				if info.Error == nil {
@@ -306,7 +306,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QuerySessionDeleteDoneInfo) {
@@ -323,7 +323,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -341,7 +341,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -361,7 +361,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -379,7 +379,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -397,7 +397,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.QuerySessionBeginDoneInfo) {
@@ -414,7 +414,7 @@ func query(adapter Adapter) trace.Query {
 			}
 
 			ctx := *info.Context
-			call := info.Call.FunctionID()
+			call := info.Call.String()
 
 			return func(info trace.QueryResultNewDoneInfo) {
 				if info.Error == nil {
@@ -430,7 +430,7 @@ func query(adapter Adapter) trace.Query {
 			}
 
 			ctx := *info.Context
-			call := info.Call.FunctionID()
+			call := info.Call.String()
 
 			return func(info trace.QueryResultNextPartDoneInfo) {
 				if info.Error == nil {
@@ -449,7 +449,7 @@ func query(adapter Adapter) trace.Query {
 			}
 
 			ctx := *info.Context
-			call := info.Call.FunctionID()
+			call := info.Call.String()
 
 			return func(info trace.QueryResultNextResultSetDoneInfo) {
 				if info.Error == nil {
@@ -467,7 +467,7 @@ func query(adapter Adapter) trace.Query {
 			}
 
 			ctx := *info.Context
-			call := info.Call.FunctionID()
+			call := info.Call.String()
 
 			return func(info trace.QueryResultCloseDoneInfo) {
 				if info.Error == nil {
@@ -484,7 +484,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -502,7 +502,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -520,7 +520,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 
@@ -538,7 +538,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
 			)
 

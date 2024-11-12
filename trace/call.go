@@ -1,5 +1,7 @@
 package trace
 
+import "fmt"
+
 type call interface {
-	FunctionID() string
+	fmt.Stringer
 }

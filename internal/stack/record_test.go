@@ -339,6 +339,6 @@ func BenchmarkCallRecord(b *testing.B) {
 func BenchmarkCallFuncionID(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = Call(0).FunctionID()
+		_ = Call(0).String()
 	}
 }
