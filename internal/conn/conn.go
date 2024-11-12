@@ -240,7 +240,7 @@ func (c *conn) dial(ctx context.Context) (cc *grpc.ClientConn, err error) {
 			xerrors.Retryable(
 				xerrors.Transport(err),
 				xerrors.WithName(
-					stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial").FunctionID(),
+					stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial").String(),
 				),
 			),
 		)
