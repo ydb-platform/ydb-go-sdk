@@ -146,14 +146,7 @@ func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose,
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-
-	_, err = r.nextResultSet(ctx)
-	if err == nil {
-		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
-	}
-	if !xerrors.Is(err, io.EOF) {
-		return nil, xerrors.WithStackTrace(err)
-	}
+	rs.mustBeLastResultSet = true
 
 	return &resultSetWithClose{
 		resultSet: rs,

@@ -4,7 +4,11 @@
 package integration
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -15,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -301,4 +306,62 @@ SELECT CAST($arg1 AS Utf8) AS v1, CAST($arg2 AS Utf8) AS v2
 
 	require.Nil(t, res.V1)
 	require.Equal(t, "123", *res.V2)
+}
+
+func TestReadTwoPartsIntoMemoryIssue1559(t *testing.T) {
+	scope := newScope(t)
+
+	// prepare data
+	const targetCount = 100000 // must be more then returned in one part
+	const batchSize = 20000
+	items := make([]types.Value, 0, targetCount)
+	for i := 0; i < targetCount; i++ {
+		item := types.StructValue(
+			types.StructFieldValue("id", types.Int64Value(int64(i))),
+			types.StructFieldValue("val", types.TextValue(strconv.Itoa(i))),
+		)
+		items = append(items, item)
+	}
+
+	t.Log("inserting items to a table")
+	batches := slices.Chunk(items, batchSize)
+	for batch := range batches {
+		err := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+			return s.BulkUpsert(ctx, scope.TablePath(), types.ListValue(batch...))
+		})
+		require.NoError(t, err)
+	}
+
+	q := fmt.Sprintf("SELECT COUNT(*) FROM `%s`", scope.TablePath())
+
+	var count uint64
+	row, err := scope.Driver().Query().QueryRow(scope.Ctx, q)
+	require.NoError(t, err)
+
+	err = row.Scan(&count)
+	require.NoError(t, err)
+
+	require.Equal(t, uint64(targetCount), count)
+
+	q = fmt.Sprintf("SELECT * FROM `%s`", scope.TablePath())
+	var rows []query.Row
+
+	// reproduce the problem
+	scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+		rs, err := tx.QueryResultSet(scope.Ctx, q)
+		if err != nil {
+			return err
+		}
+
+		rows = make([]query.Row, 0, targetCount)
+		for row, err := range rs.Rows(scope.Ctx) {
+			require.NoError(t, err)
+			rows = append(rows, row)
+		}
+
+		return nil
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, targetCount, len(rows))
 }
