@@ -1,3 +1,5 @@
+* Added `options.WithShardNodesInfo()` experimental option to get shard nodeId for describe table call
+
 ## v3.92.1
 * Added `sugar.WithUserPassword(user,password)` option for `sugar.DSN()` helper
 * Added `sugar.WithSecure(bool)` option for `sugar.DSN()` helper
