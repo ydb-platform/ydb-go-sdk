@@ -1,3 +1,4 @@
+## v3.92.1
 * Added `sugar.WithUserPassword(user,password)` option for `sugar.DSN()` helper
 * Added `sugar.WithSecure(bool)` option for `sugar.DSN()` helper
 * Small breaking change: `sugar.DSN` have only two required parameters (endpoint and database) from now on. 
