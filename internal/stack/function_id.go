@@ -1,14 +1,14 @@
 package stack
 
 type Caller interface {
-	FunctionID() string
+	String() string
 }
 
 var _ Caller = functionID("")
 
 type functionID string
 
-func (id functionID) FunctionID() string {
+func (id functionID) String() string {
 	return string(id)
 }
 

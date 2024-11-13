@@ -12,7 +12,7 @@ func scripting(adapter Adapter) (t trace.Scripting) {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("query", info.Query),
 			)
 
@@ -44,7 +44,7 @@ func scripting(adapter Adapter) (t trace.Scripting) {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("query", info.Query),
 			)
 
@@ -73,7 +73,7 @@ func scripting(adapter Adapter) (t trace.Scripting) {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("query", info.Query),
 			)
 
@@ -89,7 +89,7 @@ func scripting(adapter Adapter) (t trace.Scripting) {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.ScriptingCloseDoneInfo) {

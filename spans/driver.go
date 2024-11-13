@@ -36,7 +36,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.DriverRepeaterWakeUpDoneInfo) {
@@ -56,7 +56,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.DriverConnDialDoneInfo) {
@@ -74,7 +74,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("address", safeAddress(info.Endpoint)),
 				kv.String("method", string(info.Method)),
 			)
@@ -114,7 +114,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("address", safeAddress(info.Endpoint)),
 				kv.String("method", string(info.Method)),
 			)
@@ -177,7 +177,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 
 			return func(info trace.DriverConnStreamCloseSendDoneInfo) {
 				if info.Error != nil {
-					start.Log(call.FunctionID(), kv.Error(info.Error))
+					start.Log(call.String(), kv.Error(info.Error))
 				}
 			}
 		},
@@ -204,7 +204,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				attributes = append(attributes, kv.Error(info.Error))
 			}
 
-			start.Log(call.FunctionID(), attributes...)
+			start.Log(call.String(), attributes...)
 		},
 		OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
 			if adapter.Details()&trace.DriverConnEvents == 0 {
@@ -218,9 +218,9 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 
 			return func(info trace.DriverConnParkDoneInfo) {
 				if info.Error != nil {
-					start.Log(call.FunctionID(), kv.Error(info.Error))
+					start.Log(call.String(), kv.Error(info.Error))
 				} else {
-					start.Log(call.FunctionID())
+					start.Log(call.String())
 				}
 			}
 		},
@@ -236,9 +236,9 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 
 			return func(info trace.DriverConnCloseDoneInfo) {
 				if info.Error != nil {
-					start.Log(call.FunctionID(), kv.Error(info.Error))
+					start.Log(call.String(), kv.Error(info.Error))
 				} else {
-					start.Log(call.FunctionID())
+					start.Log(call.String())
 				}
 			}
 		},
@@ -247,7 +247,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				return nil
 			}
 			s := adapter.SpanFromContext(*info.Context)
-			s.Log(info.Call.FunctionID(),
+			s.Log(info.Call.String(),
 				kv.String("cause", safeError(info.Cause)),
 			)
 
@@ -259,7 +259,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			}
 			s := adapter.SpanFromContext(*info.Context)
 			oldState := safeStringer(info.State)
-			functionID := info.Call.FunctionID()
+			functionID := info.Call.String()
 
 			return func(info trace.DriverConnStateChangeDoneInfo) {
 				s.Log(functionID,
@@ -275,7 +275,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("name", info.Name),
 			)
 
@@ -292,7 +292,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("address", info.Address),
 			)
 
@@ -305,7 +305,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				return nil
 			}
 			start := childSpanWithReplaceCtx(adapter, info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("database", info.Database),
 				kv.Bool("need_local_dc", info.NeedLocalDC),
 			)
@@ -342,7 +342,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				return nil
 			}
 			parent := adapter.SpanFromContext(*info.Context)
-			functionID := info.Call.FunctionID()
+			functionID := info.Call.String()
 
 			return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 				if info.Error != nil {
@@ -360,7 +360,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				return nil
 			}
 			parent := adapter.SpanFromContext(*info.Context)
-			functionID := info.Call.FunctionID()
+			functionID := info.Call.String()
 
 			return func(info trace.DriverGetCredentialsDoneInfo) {
 				if info.Error != nil {
@@ -388,7 +388,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 				kv.String("endpoint", info.Endpoint),
 				kv.String("database", info.Database),
 				kv.Bool("secure", info.Secure),
@@ -405,7 +405,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.DriverCloseDoneInfo) {
@@ -419,7 +419,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.FunctionID(),
+				info.Call.String(),
 			)
 
 			return func(info trace.DriverConnPoolNewDoneInfo) {

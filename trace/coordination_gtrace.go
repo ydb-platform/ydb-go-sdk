@@ -285,9 +285,9 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 		}
 	}
 	{
-		h1 := t.OnStreamNew
-		h2 := x.OnStreamNew
-		ret.OnStreamNew = func(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
+		h1 := t.OnSessionNewStream
+		h2 := x.OnSessionNewStream
+		ret.OnSessionNewStream = func(c CoordinationSessionNewStreamStartInfo) func(CoordinationSessionNewStreamDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -295,14 +295,14 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 					}
 				}()
 			}
-			var r, r1 func(CoordinationStreamNewDoneInfo)
+			var r, r1 func(CoordinationSessionNewStreamDoneInfo)
 			if h1 != nil {
 				r = h1(c)
 			}
 			if h2 != nil {
 				r1 = h2(c)
 			}
-			return func(c CoordinationStreamNewDoneInfo) {
+			return func(c CoordinationSessionNewStreamDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -721,16 +721,16 @@ func (t *Coordination) onClose(c CoordinationCloseStartInfo) func(CoordinationCl
 	}
 	return res
 }
-func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
-	fn := t.OnStreamNew
+func (t *Coordination) onSessionNewStream(c CoordinationSessionNewStreamStartInfo) func(CoordinationSessionNewStreamDoneInfo) {
+	fn := t.OnSessionNewStream
 	if fn == nil {
-		return func(CoordinationStreamNewDoneInfo) {
+		return func(CoordinationSessionNewStreamDoneInfo) {
 			return
 		}
 	}
 	res := fn(c)
 	if res == nil {
-		return func(CoordinationStreamNewDoneInfo) {
+		return func(CoordinationSessionNewStreamDoneInfo) {
 			return
 		}
 	}
@@ -940,11 +940,13 @@ func CoordinationOnClose(t *Coordination, c *context.Context, call call) func(er
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func CoordinationOnStreamNew(t *Coordination) func(error) {
-	var p CoordinationStreamNewStartInfo
-	res := t.onStreamNew(p)
+func CoordinationOnSessionNewStream(t *Coordination, c *context.Context, call call) func(error) {
+	var p CoordinationSessionNewStreamStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onSessionNewStream(p)
 	return func(e error) {
-		var p CoordinationStreamNewDoneInfo
+		var p CoordinationSessionNewStreamDoneInfo
 		p.Error = e
 		res(p)
 	}

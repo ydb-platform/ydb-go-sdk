@@ -63,7 +63,7 @@ func Retry(adapter Adapter) (t trace.Retry) {
 		if adapter.Details()&trace.RetryEvents != 0 && isTraceRetry(*info.Context) { //nolint:nestif
 			operationName := info.Label
 			if operationName == "" {
-				operationName = info.Call.FunctionID()
+				operationName = info.Call.String()
 			}
 			if functionID := functionID(*info.Context); functionID != "" {
 				operationName = functionID
