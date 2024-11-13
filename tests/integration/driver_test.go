@@ -170,62 +170,29 @@ func TestDriver(sourceTest *testing.T) {
 				t.Fatalf("close failed: %+v", e)
 			}
 		}()
-		t.RunSynced("StaticCredentials", func(t *xtest.SyncedTest) {
+		t.RunSynced("WithStaticCredentials", func(t *xtest.SyncedTest) {
 			if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
 				t.Skip("read rows not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
 			}
-			t.RunSynced("CreateUser", func(t *xtest.SyncedTest) {
-				db, err := ydb.Open(ctx,
-					os.Getenv("YDB_CONNECTION_STRING"),
-					ydb.WithAccessTokenCredentials(
-						os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
-					),
-				)
+			db, err := ydb.Open(ctx,
+				os.Getenv("YDB_CONNECTION_STRING"),
+				ydb.WithAccessTokenCredentials(
+					os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
+				),
+			)
+			require.NoError(t, err)
+			defer func() {
+				_ = db.Close(ctx)
+			}()
+			err = db.Query().Exec(ctx, `DROP USER IF EXISTS test`)
+			require.NoError(t, err)
+			err = db.Query().Exec(ctx, "CREATE USER test PASSWORD 'password'; ALTER GROUP `ADMINS` ADD USER test;")
+			require.NoError(t, err)
+			defer func() {
+				err = db.Query().Exec(ctx, `DROP USER test`)
 				require.NoError(t, err)
-				defer func() {
-					_ = db.Close(ctx)
-				}()
-				err = db.Query().Exec(ctx, `DROP USER IF EXISTS test`)
-				require.NoError(t, err)
-				err = db.Query().Exec(ctx, `CREATE USER test PASSWORD 'password'`)
-				require.NoError(t, err)
-				tableName := path.Join(db.Name(), t.Name(), "test")
-				t.RunSynced("CreateTable", func(t *xtest.SyncedTest) {
-					err := db.Query().Exec(ctx, fmt.Sprintf(`
-					CREATE TABLE IF NOT EXISTS %s (
-						id Uint64,
-						value Utf8,
-						PRIMARY KEY (id)
-					)`, "`"+tableName+"`"),
-					)
-					require.NoError(t, err)
-				})
-				t.RunSynced("Query", func(t *xtest.SyncedTest) {
-					row, err := db.Query().QueryRow(ctx, `SELECT 1`)
-					require.NoError(t, err)
-					var v int
-					err = row.Scan(&v)
-					require.NoError(t, err)
-				})
-				t.RunSynced("DescribeTable", func(t *xtest.SyncedTest) {
-					var d options.Description
-					err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-						d, err = s.DescribeTable(ctx, tableName)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					})
-					require.NoError(t, err)
-					require.Equal(t, "test", d.Name)
-					require.Equal(t, 2, len(d.Columns))
-					require.Equal(t, "id", d.Columns[0].Name)
-					require.Equal(t, "value", d.Columns[1].Name)
-					require.Equal(t, []string{"id"}, d.PrimaryKey)
-				})
-			})
-			t.RunSynced("DSN", func(t *xtest.SyncedTest) {
+			}()
+			t.RunSynced("UsingConnectionString", func(t *xtest.SyncedTest) {
 				u, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
 				require.NoError(t, err)
 				u.User = url.UserPassword("test", "password")
@@ -271,7 +238,7 @@ func TestDriver(sourceTest *testing.T) {
 					require.Equal(t, []string{"id"}, d.PrimaryKey)
 				})
 			})
-			t.RunSynced("WithStaticCredentials", func(t *xtest.SyncedTest) {
+			t.RunSynced("UsingExplicitStaticCredentials", func(t *xtest.SyncedTest) {
 				db, err := ydb.Open(ctx,
 					os.Getenv("YDB_CONNECTION_STRING"),
 					ydb.WithStaticCredentials("test", "password"),
@@ -316,216 +283,216 @@ func TestDriver(sourceTest *testing.T) {
 					require.Equal(t, []string{"id"}, d.PrimaryKey)
 				})
 			})
-			t.RunSynced("With", func(t *xtest.SyncedTest) {
-				t.Run("WithSharedBalancer", func(t *testing.T) {
-					child, err := db.With(ctx, ydb.WithSharedBalancer(db))
-					require.NoError(t, err)
-					result, err := child.Scripting().Execute(ctx, `SELECT 1`, nil)
-					require.NoError(t, err)
-					require.NoError(t, result.NextResultSetErr(ctx))
-					require.True(t, result.NextRow())
-					var value int32
-					err = result.Scan(indexed.Required(&value))
-					require.NoError(t, err)
-					require.EqualValues(t, 1, value)
-					err = child.Close(ctx)
-					require.NoError(t, err)
-				})
+		})
+		t.RunSynced("With", func(t *xtest.SyncedTest) {
+			t.Run("WithSharedBalancer", func(t *testing.T) {
+				child, err := db.With(ctx, ydb.WithSharedBalancer(db))
+				require.NoError(t, err)
+				result, err := child.Scripting().Execute(ctx, `SELECT 1`, nil)
+				require.NoError(t, err)
+				require.NoError(t, result.NextResultSetErr(ctx))
+				require.True(t, result.NextRow())
+				var value int32
+				err = result.Scan(indexed.Required(&value))
+				require.NoError(t, err)
+				require.EqualValues(t, 1, value)
+				err = child.Close(ctx)
+				require.NoError(t, err)
 			})
-			t.Run("discovery.WhoAmI", func(t *testing.T) {
-				if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-					discoveryClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(ydb.GRPCConn(db))
-					response, err := discoveryClient.WhoAmI(
-						ctx,
-						&Ydb_Discovery.WhoAmIRequest{IncludeGroups: true},
-					)
-					if err != nil {
-						return err
-					}
-					var result Ydb_Discovery.WhoAmIResult
-					err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
-					if err != nil {
-						return
-					}
-					return nil
-				}, retry.WithIdempotent(true)); err != nil {
-					t.Fatalf("Execute failed: %v", err)
-				}
-			})
-			t.Run("scripting.ExecuteYql", func(t *testing.T) {
-				if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-					scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(ydb.GRPCConn(db))
-					response, err := scriptingClient.ExecuteYql(
-						ctx,
-						&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
-					)
-					if err != nil {
-						return err
-					}
-					var result Ydb_Scripting.ExecuteYqlResult
-					err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
-					if err != nil {
-						return
-					}
-					if len(result.GetResultSets()) != 1 {
-						return fmt.Errorf(
-							"unexpected result sets count: %d",
-							len(result.GetResultSets()),
-						)
-					}
-					if len(result.GetResultSets()[0].GetColumns()) != 1 {
-						return fmt.Errorf(
-							"unexpected colums count: %d",
-							len(result.GetResultSets()[0].GetColumns()),
-						)
-					}
-					if result.GetResultSets()[0].GetColumns()[0].GetName() != sumColumn {
-						return fmt.Errorf(
-							"unexpected colum name: %s",
-							result.GetResultSets()[0].GetColumns()[0].GetName(),
-						)
-					}
-					if len(result.GetResultSets()[0].GetRows()) != 1 {
-						return fmt.Errorf(
-							"unexpected rows count: %d",
-							len(result.GetResultSets()[0].GetRows()),
-						)
-					}
-					if result.GetResultSets()[0].GetRows()[0].GetItems()[0].GetInt32Value() != 101 {
-						return fmt.Errorf(
-							"unexpected result of select: %d",
-							result.GetResultSets()[0].GetRows()[0].GetInt64Value(),
-						)
-					}
-					return nil
-				}, retry.WithIdempotent(true)); err != nil {
-					t.Fatalf("Execute failed: %v", err)
-				}
-			})
-			t.Run("scripting.StreamExecuteYql", func(t *testing.T) {
-				if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-					scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(ydb.GRPCConn(db))
-					client, err := scriptingClient.StreamExecuteYql(
-						ctx,
-						&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
-					)
-					if err != nil {
-						return err
-					}
-					response, err := client.Recv()
-					if err != nil {
-						return err
-					}
-					if len(response.GetResult().GetResultSet().GetColumns()) != 1 {
-						return fmt.Errorf(
-							"unexpected colums count: %d",
-							len(response.GetResult().GetResultSet().GetColumns()),
-						)
-					}
-					if response.GetResult().GetResultSet().GetColumns()[0].GetName() != sumColumn {
-						return fmt.Errorf(
-							"unexpected colum name: %s",
-							response.GetResult().GetResultSet().GetColumns()[0].GetName(),
-						)
-					}
-					if len(response.GetResult().GetResultSet().GetRows()) != 1 {
-						return fmt.Errorf(
-							"unexpected rows count: %d",
-							len(response.GetResult().GetResultSet().GetRows()),
-						)
-					}
-					if response.GetResult().GetResultSet().GetRows()[0].GetItems()[0].GetInt32Value() != 101 {
-						return fmt.Errorf(
-							"unexpected result of select: %d",
-							response.GetResult().GetResultSet().GetRows()[0].GetInt64Value(),
-						)
-					}
-					return nil
-				}, retry.WithIdempotent(true)); err != nil {
-					t.Fatalf("Stream execute failed: %v", err)
-				}
-			})
-			t.Run("with.scripting.StreamExecuteYql", func(t *testing.T) {
-				var childDB *ydb.Driver
-				childDB, err = db.With(
+		})
+		t.Run("discovery.WhoAmI", func(t *testing.T) {
+			if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+				discoveryClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(ydb.GRPCConn(db))
+				response, err := discoveryClient.WhoAmI(
 					ctx,
-					ydb.WithDialTimeout(time.Second*5),
+					&Ydb_Discovery.WhoAmIRequest{IncludeGroups: true},
 				)
 				if err != nil {
-					t.Fatalf("failed to open sub-connection: %v", err)
+					return err
 				}
-				defer func() {
-					_ = childDB.Close(ctx)
-				}()
-				if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-					scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(ydb.GRPCConn(childDB))
-					client, err := scriptingClient.StreamExecuteYql(
-						ctx,
-						&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
+				var result Ydb_Discovery.WhoAmIResult
+				err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+				if err != nil {
+					return
+				}
+				return nil
+			}, retry.WithIdempotent(true)); err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+		})
+		t.Run("scripting.ExecuteYql", func(t *testing.T) {
+			if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+				scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(ydb.GRPCConn(db))
+				response, err := scriptingClient.ExecuteYql(
+					ctx,
+					&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
+				)
+				if err != nil {
+					return err
+				}
+				var result Ydb_Scripting.ExecuteYqlResult
+				err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+				if err != nil {
+					return
+				}
+				if len(result.GetResultSets()) != 1 {
+					return fmt.Errorf(
+						"unexpected result sets count: %d",
+						len(result.GetResultSets()),
 					)
-					if err != nil {
-						return err
-					}
-					response, err := client.Recv()
-					if err != nil {
-						return err
-					}
-					if len(response.GetResult().GetResultSet().GetColumns()) != 1 {
-						return fmt.Errorf(
-							"unexpected colums count: %d",
-							len(response.GetResult().GetResultSet().GetColumns()),
-						)
-					}
-					if response.GetResult().GetResultSet().GetColumns()[0].GetName() != sumColumn {
-						return fmt.Errorf(
-							"unexpected colum name: %s",
-							response.GetResult().GetResultSet().GetColumns()[0].GetName(),
-						)
-					}
-					if len(response.GetResult().GetResultSet().GetRows()) != 1 {
-						return fmt.Errorf(
-							"unexpected rows count: %d",
-							len(response.GetResult().GetResultSet().GetRows()),
-						)
-					}
-					if response.GetResult().GetResultSet().GetRows()[0].GetItems()[0].GetInt32Value() != 101 {
-						return fmt.Errorf(
-							"unexpected result of select: %d",
-							response.GetResult().GetResultSet().GetRows()[0].GetInt64Value(),
-						)
-					}
-					return nil
-				}, retry.WithIdempotent(true)); err != nil {
-					t.Fatalf("Stream execute failed: %v", err)
 				}
-			})
-			t.Run("export.ExportToS3", func(t *testing.T) {
-				if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-					exportClient := Ydb_Export_V1.NewExportServiceClient(ydb.GRPCConn(db))
-					response, err := exportClient.ExportToS3(
-						ctx,
-						&Ydb_Export.ExportToS3Request{
-							OperationParams: &Ydb_Operations.OperationParams{
-								OperationTimeout: durationpb.New(time.Second),
-								CancelAfter:      durationpb.New(time.Second),
-							},
-							Settings: &Ydb_Export.ExportToS3Settings{},
+				if len(result.GetResultSets()[0].GetColumns()) != 1 {
+					return fmt.Errorf(
+						"unexpected colums count: %d",
+						len(result.GetResultSets()[0].GetColumns()),
+					)
+				}
+				if result.GetResultSets()[0].GetColumns()[0].GetName() != sumColumn {
+					return fmt.Errorf(
+						"unexpected colum name: %s",
+						result.GetResultSets()[0].GetColumns()[0].GetName(),
+					)
+				}
+				if len(result.GetResultSets()[0].GetRows()) != 1 {
+					return fmt.Errorf(
+						"unexpected rows count: %d",
+						len(result.GetResultSets()[0].GetRows()),
+					)
+				}
+				if result.GetResultSets()[0].GetRows()[0].GetItems()[0].GetInt32Value() != 101 {
+					return fmt.Errorf(
+						"unexpected result of select: %d",
+						result.GetResultSets()[0].GetRows()[0].GetInt64Value(),
+					)
+				}
+				return nil
+			}, retry.WithIdempotent(true)); err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+		})
+		t.Run("scripting.StreamExecuteYql", func(t *testing.T) {
+			if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+				scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(ydb.GRPCConn(db))
+				client, err := scriptingClient.StreamExecuteYql(
+					ctx,
+					&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
+				)
+				if err != nil {
+					return err
+				}
+				response, err := client.Recv()
+				if err != nil {
+					return err
+				}
+				if len(response.GetResult().GetResultSet().GetColumns()) != 1 {
+					return fmt.Errorf(
+						"unexpected colums count: %d",
+						len(response.GetResult().GetResultSet().GetColumns()),
+					)
+				}
+				if response.GetResult().GetResultSet().GetColumns()[0].GetName() != sumColumn {
+					return fmt.Errorf(
+						"unexpected colum name: %s",
+						response.GetResult().GetResultSet().GetColumns()[0].GetName(),
+					)
+				}
+				if len(response.GetResult().GetResultSet().GetRows()) != 1 {
+					return fmt.Errorf(
+						"unexpected rows count: %d",
+						len(response.GetResult().GetResultSet().GetRows()),
+					)
+				}
+				if response.GetResult().GetResultSet().GetRows()[0].GetItems()[0].GetInt32Value() != 101 {
+					return fmt.Errorf(
+						"unexpected result of select: %d",
+						response.GetResult().GetResultSet().GetRows()[0].GetInt64Value(),
+					)
+				}
+				return nil
+			}, retry.WithIdempotent(true)); err != nil {
+				t.Fatalf("Stream execute failed: %v", err)
+			}
+		})
+		t.Run("with.scripting.StreamExecuteYql", func(t *testing.T) {
+			var childDB *ydb.Driver
+			childDB, err = db.With(
+				ctx,
+				ydb.WithDialTimeout(time.Second*5),
+			)
+			if err != nil {
+				t.Fatalf("failed to open sub-connection: %v", err)
+			}
+			defer func() {
+				_ = childDB.Close(ctx)
+			}()
+			if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+				scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(ydb.GRPCConn(childDB))
+				client, err := scriptingClient.StreamExecuteYql(
+					ctx,
+					&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
+				)
+				if err != nil {
+					return err
+				}
+				response, err := client.Recv()
+				if err != nil {
+					return err
+				}
+				if len(response.GetResult().GetResultSet().GetColumns()) != 1 {
+					return fmt.Errorf(
+						"unexpected colums count: %d",
+						len(response.GetResult().GetResultSet().GetColumns()),
+					)
+				}
+				if response.GetResult().GetResultSet().GetColumns()[0].GetName() != sumColumn {
+					return fmt.Errorf(
+						"unexpected colum name: %s",
+						response.GetResult().GetResultSet().GetColumns()[0].GetName(),
+					)
+				}
+				if len(response.GetResult().GetResultSet().GetRows()) != 1 {
+					return fmt.Errorf(
+						"unexpected rows count: %d",
+						len(response.GetResult().GetResultSet().GetRows()),
+					)
+				}
+				if response.GetResult().GetResultSet().GetRows()[0].GetItems()[0].GetInt32Value() != 101 {
+					return fmt.Errorf(
+						"unexpected result of select: %d",
+						response.GetResult().GetResultSet().GetRows()[0].GetInt64Value(),
+					)
+				}
+				return nil
+			}, retry.WithIdempotent(true)); err != nil {
+				t.Fatalf("Stream execute failed: %v", err)
+			}
+		})
+		t.Run("export.ExportToS3", func(t *testing.T) {
+			if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+				exportClient := Ydb_Export_V1.NewExportServiceClient(ydb.GRPCConn(db))
+				response, err := exportClient.ExportToS3(
+					ctx,
+					&Ydb_Export.ExportToS3Request{
+						OperationParams: &Ydb_Operations.OperationParams{
+							OperationTimeout: durationpb.New(time.Second),
+							CancelAfter:      durationpb.New(time.Second),
 						},
-					)
-					if err != nil {
-						return err
-					}
-					if response.GetOperation().GetStatus() != Ydb.StatusIds_BAD_REQUEST {
-						return fmt.Errorf(
-							"operation must be BAD_REQUEST: %s",
-							response.GetOperation().GetStatus().String(),
-						)
-					}
-					return nil
-				}, retry.WithIdempotent(true)); err != nil {
-					t.Fatalf("check export failed: %v", err)
+						Settings: &Ydb_Export.ExportToS3Settings{},
+					},
+				)
+				if err != nil {
+					return err
 				}
-			})
+				if response.GetOperation().GetStatus() != Ydb.StatusIds_BAD_REQUEST {
+					return fmt.Errorf(
+						"operation must be BAD_REQUEST: %s",
+						response.GetOperation().GetStatus().String(),
+					)
+				}
+				return nil
+			}, retry.WithIdempotent(true)); err != nil {
+				t.Fatalf("check export failed: %v", err)
+			}
 		})
 	})
 }
