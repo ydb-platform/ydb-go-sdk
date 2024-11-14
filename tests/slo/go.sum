@@ -1827,8 +1827,8 @@ github.com/ydb-platform/gorm-driver v0.1.3 h1:uewwScbRuCixNPC0LF7gDKvWcB13/iLj76
 github.com/ydb-platform/gorm-driver v0.1.3/go.mod h1:49cSoG5J18muQTiKj4StL2dHs1/dB94OitnHOvetK24=
 github.com/ydb-platform/xorm v0.0.3 h1:MXk42lANB6r/MMLg/XdJfyXJycGUDlCeLiMlLGDKVPw=
 github.com/ydb-platform/xorm v0.0.3/go.mod h1:hFsU7EUF0o3S+l5c0eyP2yPVjJ0d4gsFdqCsyazzwBc=
-github.com/ydb-platform/ydb-go-genproto v0.0.0-20241022174402-dd276c7f197b h1:8yiv/W+1xTdifJh1Stkck0gFJjys9kg0/r86Buljuss=
-github.com/ydb-platform/ydb-go-genproto v0.0.0-20241022174402-dd276c7f197b/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20241112172322-ea1f63298f77 h1:LY6cI8cP4B9rrpTleZk95+08kl2gF4rixG7+V/dwL6Q=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20241112172322-ea1f63298f77/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
 github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0 h1:JxSvw+Moont8qCmibP2MjSEIHfkWJLkw0fHZemAk+d0=
 github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0/go.mod h1:YzCPoNrTbrXZg9bO2YkbjI6eQLkaRIE9Bq8ponu0g8A=
 github.com/ydb-platform/ydb-go-yc v0.12.1 h1:qw3Fa+T81+Kpu5Io2vYHJOwcrYrVjgJlT6t/0dOXJrA=

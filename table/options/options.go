@@ -28,6 +28,12 @@ func WithPartitionStats() DescribeTableOption {
 	}
 }
 
+func WithShardNodesInfo() DescribeTableOption {
+	return func(d *DescribeTableDesc) {
+		d.IncludeShardNodesInfo = true
+	}
+}
+
 type (
 	CreateTableDesc   Ydb_Table.CreateTableRequest
 	CreateTableOption interface {

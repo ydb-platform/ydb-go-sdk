@@ -73,6 +73,7 @@ type TableStats struct {
 type PartitionStats struct {
 	RowsEstimate uint64
 	StoreSize    uint64
+	LeaderNodeID uint32
 }
 
 type ColumnFamily struct {
