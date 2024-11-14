@@ -31,6 +31,7 @@ type executeSettings interface {
 	CallOptions() []grpc.CallOption
 	RetryOpts() []retry.Option
 	ResourcePool() string
+	ResponsePartLimitSizeBytes() int64
 }
 
 type executeScriptConfig interface {
@@ -77,6 +78,7 @@ func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg execut
 	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
 	request.ConcurrentResultSets = false
 	request.PoolId = cfg.ResourcePool()
+	request.ResponsePartLimitBytes = cfg.ResponsePartLimitSizeBytes()
 
 	return request, cfg.CallOptions()
 }

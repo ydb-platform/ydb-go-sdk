@@ -5,9 +5,10 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,11 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestUUIDSerializationQueryServiceIssue1501(t *testing.T) {
@@ -309,11 +312,25 @@ SELECT CAST($arg1 AS Utf8) AS v1, CAST($arg2 AS Utf8) AS v2
 }
 
 func TestReadTwoPartsIntoMemoryIssue1559(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
+		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
+	}
+
 	scope := newScope(t)
+
+	var readPartCount int
+	scope.Driver(ydb.WithTraceQuery(trace.Query{
+		OnResultNextPart: func(info trace.QueryResultNextPartStartInfo) func(info trace.QueryResultNextPartDoneInfo) {
+			return func(info trace.QueryResultNextPartDoneInfo) {
+				if info.Error == nil {
+					readPartCount++
+				}
+			}
+		},
+	}))
 
 	// prepare data
 	const targetCount = 100000 // must be more then returned in one part
-	const batchSize = 20000
 	items := make([]types.Value, 0, targetCount)
 	for i := 0; i < targetCount; i++ {
 		item := types.StructValue(
@@ -323,14 +340,10 @@ func TestReadTwoPartsIntoMemoryIssue1559(t *testing.T) {
 		items = append(items, item)
 	}
 
-	t.Log("inserting items to a table")
-	batches := slices.Chunk(items, batchSize)
-	for batch := range batches {
-		err := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
-			return s.BulkUpsert(ctx, scope.TablePath(), types.ListValue(batch...))
-		})
-		require.NoError(t, err)
-	}
+	err := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+		return s.BulkUpsert(ctx, scope.TablePath(), types.ListValue(items...))
+	})
+	require.NoError(t, err)
 
 	q := fmt.Sprintf("SELECT COUNT(*) FROM `%s`", scope.TablePath())
 
@@ -347,21 +360,29 @@ func TestReadTwoPartsIntoMemoryIssue1559(t *testing.T) {
 	var rows []query.Row
 
 	// reproduce the problem
+	var partReaded int
 	scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
-		rs, err := tx.QueryResultSet(scope.Ctx, q)
+		oldCOunt := readPartCount
+		rs, err := tx.QueryResultSet(scope.Ctx, q, options.WithResponsePartLimitSizeBytes(100))
 		if err != nil {
 			return err
 		}
 
 		rows = make([]query.Row, 0, targetCount)
-		for row, err := range rs.Rows(scope.Ctx) {
+		for {
+			row, err := rs.NextRow(ctx)
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
 			require.NoError(t, err)
 			rows = append(rows, row)
 		}
 
+		partReaded = readPartCount - oldCOunt
 		return nil
 	})
 	require.NoError(t, err)
-
 	require.Equal(t, targetCount, len(rows))
+	require.Greater(t, partReaded, 1)
 }
