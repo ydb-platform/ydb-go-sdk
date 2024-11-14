@@ -1520,22 +1520,22 @@ func TestCloseResultOnCloseClosableResultSet(t *testing.T) {
 				{
 					Items: []*Ydb.Value{{
 						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 1,
+							Uint64Value: 3,
 						},
 					}, {
 						Value: &Ydb.Value_TextValue{
-							TextValue: "1",
+							TextValue: "3",
 						},
 					}},
 				},
 				{
 					Items: []*Ydb.Value{{
 						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 2,
+							Uint64Value: 4,
 						},
 					}, {
 						Value: &Ydb.Value_TextValue{
-							TextValue: "2",
+							TextValue: "4",
 						},
 					}},
 				},
@@ -1576,8 +1576,20 @@ func TestCloseResultOnCloseClosableResultSet(t *testing.T) {
 	require.EqualValues(t, 2, a)
 	require.EqualValues(t, "2", b)
 	r3, err3 := rs.NextRow(ctx)
-	require.ErrorIs(t, err3, io.EOF)
-	require.Nil(t, r3)
+	require.NoError(t, err3)
+	scanErr3 := r3.Scan(&a, &b)
+	require.EqualValues(t, 3, a)
+	require.EqualValues(t, "3", b)
+	require.NoError(t, scanErr3)
+	r4, err4 := rs.NextRow(ctx)
+	require.NoError(t, err4)
+	scanErr4 := r4.Scan(&a, &b)
+	require.EqualValues(t, 4, a)
+	require.EqualValues(t, "4", b)
+	require.NoError(t, scanErr4)
+	r5, err5 := rs.NextRow(ctx)
+	require.ErrorIs(t, err5, io.EOF)
+	require.Nil(t, r5)
 	err = rs.Close(ctx)
 	require.NoError(t, err)
 	require.True(t, closed)

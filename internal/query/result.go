@@ -19,6 +19,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var errReadNextResultSet = xerrors.Wrap(errors.New("ydb: stop read the result set because see part of next result set"))
+
 var (
 	_ result.Result = (*streamResult)(nil)
 	_ result.Result = (*materializedResult)(nil)
@@ -294,8 +296,8 @@ func (r *streamResult) nextPartFunc(
 			}
 			if part.GetResultSetIndex() > nextResultSetIndex {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"result set (index=%d) receive part (index=%d) for next result set: %w",
-					nextResultSetIndex, part.GetResultSetIndex(), io.EOF,
+					"result set (index=%d) receive part (index=%d) for next result set: %w (%w)",
+					nextResultSetIndex, part.GetResultSetIndex(), io.EOF, errReadNextResultSet,
 				))
 			}
 
