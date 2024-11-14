@@ -49,7 +49,7 @@
   )
   ...
   db, err := ydb.Open(ctx,
-    sugar.DSN(cfg.Endpoint, cfg.Database, cfg.Secure)
+    sugar.DSN(cfg.Endpoint, cfg.Database, sugar.WithSecure(cfg.Secure))
   )
   if err != nil {
     // error fallback
