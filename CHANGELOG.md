@@ -1,3 +1,5 @@
+* Fixed connections pool leak on closing
+
 ## v3.92.2
 * Added `table/options.WithShardNodesInfo()` experimental option to get shard nodeId for describe table call
 

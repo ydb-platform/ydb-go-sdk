@@ -296,15 +296,15 @@ func makeAsyncCloseItemFunc[PT ItemConstraint[T], T any](
 	p *Pool[PT, T],
 ) func(ctx context.Context, item PT) {
 	return func(ctx context.Context, item PT) {
-		closeItemCtx, closeItemCancel := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
-		defer closeItemCancel()
-
-		if d := p.config.closeTimeout; d > 0 {
-			closeItemCtx, closeItemCancel = xcontext.WithTimeout(ctx, d)
-			defer closeItemCancel()
-		}
-
 		go func() {
+			closeItemCtx, closeItemCancel := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
+			defer closeItemCancel()
+
+			if d := p.config.closeTimeout; d > 0 {
+				closeItemCtx, closeItemCancel = xcontext.WithTimeout(ctx, d)
+				defer closeItemCancel()
+			}
+
 			_ = item.Close(closeItemCtx)
 		}()
 	}
