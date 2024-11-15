@@ -32,8 +32,7 @@ func (c *Conn) IsValid() bool {
 }
 
 func (c *Conn) CheckNamedValue(value *driver.NamedValue) error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
@@ -56,9 +55,29 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	return err
 }
 
-func (c *Conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	//TODO implement me
-	panic("implement me")
+func (c *Conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
+	if c.currentTx != nil {
+		return c.currentTx.PrepareContext(ctx, query)
+	}
+
+	onDone := trace.DatabaseSQLOnConnPrepare(c.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).PrepareContext"),
+		query,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	if !c.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+
+	return &stmt{
+		conn:      c,
+		processor: c,
+		ctx:       ctx,
+		query:     query,
+	}, nil
 }
 
 func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.Tx, error) {
