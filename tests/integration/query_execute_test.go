@@ -409,3 +409,144 @@ func TestIssue1456TooManyUnknownTransactions(t *testing.T) {
 		wg.Wait()
 	})
 }
+
+func TestQueryResultSet(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
+		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
+	}
+
+	t.Run("OK", func(t *testing.T) {
+		scope := newScope(t)
+
+		partSizeBytes := 1000
+		targetCount := partSizeBytes * 10 // for guarantee size of response will contain many parts
+		items := make([]types.Value, 0, targetCount)
+		for i := 0; i < targetCount; i++ {
+			item := types.StructValue(
+				types.StructFieldValue("val", types.Int64Value(int64(i))),
+			)
+			items = append(items, item)
+		}
+
+		err := scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+			rs, err := tx.QueryResultSet(ctx, `
+DECLARE $arg AS List<Struct<val: Int64>>;
+
+SELECT * FROM AS_TABLE($arg);
+`,
+				query.WithParameters(ydb.ParamsBuilder().Param("$arg").Any(types.ListValue(items...)).Build()),
+				query.WithResponsePartLimitSizeBytes(int64(partSizeBytes)),
+			)
+			if err != nil {
+				return err
+			}
+
+			for i := 0; i < targetCount; i++ {
+				row, err := rs.NextRow(ctx)
+				if err != nil {
+					return err
+				}
+
+				var val int64
+				err = row.Scan(&val)
+				require.NoError(t, err)
+				require.Equal(t, int64(i), val)
+			}
+
+			return nil
+		})
+		require.NoError(t, err)
+	})
+	t.Run("FailOnSecondResultSet", func(t *testing.T) {
+		scope := newScope(t)
+
+		var secondRowError error
+		err := scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+			rs, err := tx.QueryResultSet(ctx, "SELECT 1; SELECT 2")
+			if err != nil {
+				return err
+			}
+
+			_, err = rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+
+			_, secondRowError = rs.NextRow(ctx)
+
+			return nil
+		})
+		require.NoError(t, err)
+		require.Error(t, secondRowError)
+		require.NotErrorIs(t, secondRowError, io.EOF)
+	})
+}
+
+func TestQueryPartLimiter(t *testing.T) {
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
+		t.Skip("require enables transactions for topics")
+	}
+
+	scope := newScope(t)
+
+	var readPartCount int
+	scope.Driver(ydb.WithTraceQuery(trace.Query{
+		OnResultNextPart: func(info trace.QueryResultNextPartStartInfo) func(info trace.QueryResultNextPartDoneInfo) {
+			return func(info trace.QueryResultNextPartDoneInfo) {
+				if info.Error == nil {
+					readPartCount++
+				}
+			}
+		},
+	}))
+
+	targetCount := 1000
+	items := make([]types.Value, 0, targetCount)
+	for i := 0; i < targetCount; i++ {
+		item := types.StructValue(
+			types.StructFieldValue("val", types.Int64Value(int64(i))),
+		)
+		items = append(items, item)
+	}
+
+	getPartCount := func(partSize int64) int {
+		partCount := 0
+		err := scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+			oldParts := readPartCount
+			rs, err := tx.QueryResultSet(ctx, `
+DECLARE $arg AS List<Struct<val: Int64>>;
+
+SELECT * FROM AS_TABLE($arg);
+`,
+				query.WithParameters(ydb.ParamsBuilder().Param("$arg").Any(types.ListValue(items...)).Build()),
+				query.WithResponsePartLimitSizeBytes(partSize),
+			)
+			if err != nil {
+				return err
+			}
+
+			rowCount := 0
+			for {
+				_, err = rs.NextRow(scope.Ctx)
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				require.NoError(t, err)
+				rowCount++
+			}
+			require.Equal(t, targetCount, rowCount)
+
+			partCount = readPartCount - oldParts
+			return nil
+		})
+
+		require.NoError(t, err)
+		return partCount
+	}
+
+	partsWithBigSize := getPartCount(1000000)
+	partsWithLittleSize := getPartCount(100)
+
+	require.Equal(t, 1, partsWithBigSize)
+	require.Greater(t, partsWithLittleSize, 1)
+}

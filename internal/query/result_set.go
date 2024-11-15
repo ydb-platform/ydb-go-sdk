@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -29,12 +30,13 @@ type (
 		rowIndex    int
 	}
 	resultSet struct {
-		index       int64
-		recv        func() (*Ydb_Query.ExecuteQueryResponsePart, error)
-		columns     []*Ydb.Column
-		currentPart *Ydb_Query.ExecuteQueryResponsePart
-		rowIndex    int
-		done        chan struct{}
+		index               int64
+		recv                func() (*Ydb_Query.ExecuteQueryResponsePart, error)
+		columns             []*Ydb.Column
+		currentPart         *Ydb_Query.ExecuteQueryResponsePart
+		rowIndex            int
+		done                chan struct{}
+		mustBeLastResultSet bool
 	}
 	resultSetWithClose struct {
 		*resultSet
@@ -158,11 +160,17 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
+			//nolint:nestif
 			if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
 				part, err := rs.recv()
 				if err != nil {
 					if xerrors.Is(err, io.EOF) {
 						close(rs.done)
+					}
+
+					if rs.mustBeLastResultSet && errors.Is(err, errReadNextResultSet) {
+						// prevent detect io.EOF in the error
+						return nil, xerrors.WithStackTrace(xerrors.Wrap(errors.New(err.Error())))
 					}
 
 					return nil, xerrors.WithStackTrace(err)

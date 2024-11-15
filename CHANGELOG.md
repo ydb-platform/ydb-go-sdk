@@ -1,5 +1,10 @@
 * Fixed connections pool leak on closing
 
+## v3.92.3
+* Fixed error with incompleted data returen from transaction.ReadQueryResult method
+* Added option `query/WithResponsePartLimitSizeBytes(...)` for queries with query service
+
+
 ## v3.92.2
 * Added `table/options.WithShardNodesInfo()` experimental option to get shard nodeId for describe table call
 
