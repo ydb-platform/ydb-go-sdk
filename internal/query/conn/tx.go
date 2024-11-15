@@ -36,6 +36,10 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (currentT
 		return nil, xerrors.WithStackTrace(err)
 	}
 
+	if txc == nil {
+		return nil, nil
+	}
+
 	nativeTx, err := c.session.Begin(ctx, query.TxSettings(txc))
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -145,9 +149,45 @@ func (tx *transaction) QueryContext(ctx context.Context, query string, args []dr
 func (tx *transaction) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
-	panic("not implemented")
+	onDone := trace.DatabaseSQLOnTxExec(tx.conn.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*transaction).ExecContext"),
+		tx.ctx, tx, query,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	query, parameters, err := tx.conn.normalize(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	err = tx.tx.Exec(ctx,
+		query, options.WithParameters(&parameters),
+	)
+
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	return resultNoRows{}, nil
 }
 
 func (tx *transaction) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
-	panic("not implemented")
+	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*transaction).PrepareContext"),
+		tx.ctx, tx, query,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+	if !tx.conn.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+
+	return &stmt{
+		conn:      tx.conn,
+		processor: tx,
+		ctx:       ctx,
+		query:     query,
+	}, nil
 }
