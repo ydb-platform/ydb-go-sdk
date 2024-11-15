@@ -11,53 +11,46 @@ import (
 
 func TestDSN(t *testing.T) {
 	for _, tt := range []struct {
-		endpoint string
-		database string
-		secure   bool
-		dsn      string
+		act string
+		exp string
 	}{
 		{
-			"localhost:2135",
-			"/local",
-			false,
+			DSN("localhost:2135", "/local"),
 			"grpc://localhost:2135/local",
 		},
 		{
-			"ydb-ru.yandex.net:2135",
-			"/ru/home/gvit/mydb",
-			false,
+			DSN("localhost:2135", "/local", WithUserPassword("user", "")),
+			"grpc://user@localhost:2135/local",
+		},
+		{
+			DSN("localhost:2135", "/local", WithUserPassword("user", "password")),
+			"grpc://user:password@localhost:2135/local",
+		},
+		{
+			DSN("ydb-ru.yandex.net:2135", "/ru/home/gvit/mydb"),
 			"grpc://ydb-ru.yandex.net:2135/ru/home/gvit/mydb",
 		},
 		{
-			"ydb.serverless.yandexcloud.net:2135",
-			"/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
-			true,
+			DSN("ydb.serverless.yandexcloud.net:2135", "/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1", WithSecure(true)), //nolint:lll
 			"grpcs://ydb.serverless.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
 		},
 		{
-			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
-			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
-			true,
+			DSN("lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135", "/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv", WithSecure(true)), //nolint:lll
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 		},
 	} {
-		t.Run(tt.dsn, func(t *testing.T) {
-			s := DSN(tt.endpoint, tt.database, tt.secure)
-			if s != tt.dsn {
-				t.Fatalf("Unexpected result: %s, exp: %s", s, tt.dsn)
-			}
-			info, err := dsn.Parse(s)
-			if err != nil {
-				t.Fatalf("")
-			}
-			lhs, rhs := config.New(info.Options...), config.New(
-				config.WithSecure(tt.secure),
-				config.WithEndpoint(tt.endpoint),
-				config.WithDatabase(tt.database),
-			)
+		t.Run(tt.exp, func(t *testing.T) {
+			act, err := dsn.Parse(tt.act)
+			require.NoError(t, err)
+			exp, err := dsn.Parse(tt.act)
+			require.NoError(t, err)
+			require.Equal(t, exp.Params, act.Params)
+			require.Equal(t, exp.UserInfo, act.UserInfo)
+			lhs, rhs := config.New(act.Options...), config.New(exp.Options...)
 			require.Equal(t, lhs.Endpoint(), rhs.Endpoint())
 			require.Equal(t, lhs.Database(), rhs.Database())
 			require.Equal(t, lhs.Secure(), rhs.Secure())
+			require.Equal(t, lhs.Credentials(), rhs.Credentials())
 		})
 	}
 }

@@ -1,3 +1,20 @@
+## v3.92.4
+* Fixed connections pool leak on closing
+
+## v3.92.3
+* Fixed error with incompleted data returen from transaction.ReadQueryResult method
+* Added option `query/WithResponsePartLimitSizeBytes(...)` for queries with query service
+
+
+## v3.92.2
+* Added `table/options.WithShardNodesInfo()` experimental option to get shard nodeId for describe table call
+
+## v3.92.1
+* Added `sugar.WithUserPassword(user,password)` option for `sugar.DSN()` helper
+* Added `sugar.WithSecure(bool)` option for `sugar.DSN()` helper
+* Small breaking change: `sugar.DSN` have only two required parameters (endpoint and database) from now on. 
+  Third parameter `secure` must be passed as option `sugar.WithSecure(bool)`
+
 ## v3.92.0
 * Added experimental ydb.ParamsFromMap and ydb.MustParamsFromMap for build query parameters
 * Refactored coordination traces

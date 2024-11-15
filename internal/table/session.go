@@ -418,6 +418,7 @@ func processTableStats(resStats *Ydb_Table.TableStats) *options.TableStats {
 	for i, v := range resStats.GetPartitionStats() {
 		partStats[i].RowsEstimate = v.GetRowsEstimate()
 		partStats[i].StoreSize = v.GetStoreSize()
+		partStats[i].LeaderNodeID = v.GetLeaderNodeId()
 	}
 
 	var creationTime, modificationTime time.Time

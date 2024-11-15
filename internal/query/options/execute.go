@@ -27,15 +27,16 @@ type (
 
 	// executeSettings is a holder for execute settings
 	executeSettings struct {
-		syntax        Syntax
-		params        params.Parameters
-		execMode      ExecMode
-		statsMode     StatsMode
-		resourcePool  string
-		statsCallback func(queryStats stats.QueryStats)
-		callOptions   []grpc.CallOption
-		txControl     *tx.Control
-		retryOptions  []retry.Option
+		syntax                 Syntax
+		params                 params.Parameters
+		execMode               ExecMode
+		statsMode              StatsMode
+		resourcePool           string
+		statsCallback          func(queryStats stats.QueryStats)
+		callOptions            []grpc.CallOption
+		txControl              *tx.Control
+		retryOptions           []retry.Option
+		responsePartLimitBytes int64
 	}
 
 	// Execute is an interface for execute method options
@@ -58,7 +59,8 @@ type (
 		mode     StatsMode
 		callback func(stats.QueryStats)
 	}
-	execModeOption = ExecMode
+	execModeOption         = ExecMode
+	responsePartLimitBytes int64
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -175,6 +177,10 @@ func (s *executeSettings) Params() *params.Parameters {
 	return &s.params
 }
 
+func (s *executeSettings) ResponsePartLimitSizeBytes() int64 {
+	return s.responsePartLimitBytes
+}
+
 func WithParameters(parameters *params.Parameters) parametersOption {
 	return parametersOption(*parameters)
 }
@@ -199,6 +205,14 @@ func WithResourcePool(id string) resourcePool {
 
 func WithExecMode(mode ExecMode) execModeOption {
 	return mode
+}
+
+func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
+	return responsePartLimitBytes(size)
+}
+
+func (size responsePartLimitBytes) applyExecuteOption(s *executeSettings) {
+	s.responsePartLimitBytes = int64(size)
 }
 
 func WithSyntax(syntax Syntax) syntaxOption {

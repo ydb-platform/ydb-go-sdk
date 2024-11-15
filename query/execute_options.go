@@ -55,6 +55,12 @@ func WithStatsMode(mode options.StatsMode, callback func(Stats)) options.Execute
 	return options.WithStatsMode(mode, callback)
 }
 
+// WithResponsePartLimitSizeBytes limit size of each part (data portion) in stream for query service resoponse
+// it isn't limit total size of answer
+func WithResponsePartLimitSizeBytes(size int64) options.Execute {
+	return options.WithResponsePartLimitSizeBytes(size)
+}
+
 func WithCallOptions(opts ...grpc.CallOption) options.Execute {
 	return options.WithCallOptions(opts...)
 }
