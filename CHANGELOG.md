@@ -1,3 +1,4 @@
+## v3.92.4
 * Fixed connections pool leak on closing
 
 ## v3.92.3
