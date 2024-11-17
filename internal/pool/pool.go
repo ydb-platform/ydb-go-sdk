@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -339,7 +340,14 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	item, err := p.getItem(ctx)
 	if err != nil {
 		if xerrors.IsYdb(err) {
-			return xerrors.WithStackTrace(xerrors.Retryable(err))
+			switch {
+			case xerrors.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED):
+				// https://github.com/ydb-platform/ydb-go-sdk/issues/1550
+				// Avoid retrying UNAUTHORIZED errors.
+				return xerrors.WithStackTrace(xerrors.Unretryable(err))
+			default:
+				return xerrors.WithStackTrace(xerrors.Retryable(err))
+			}
 		}
 
 		return xerrors.WithStackTrace(err)
