@@ -94,17 +94,22 @@ func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 
-	// TODO TX
-	// if c.currentTx != nil {
-	// 	return c.currentTx.ExecContext(ctx, query, args)
-	// }
+	if c.currentTx != nil {
+		return c.currentTx.ExecContext(ctx, query, args)
+	}
 
 	return c.execContext(ctx, query, args)
 }
 
 func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	//TODO implement me
-	panic("implement me")
+	if !c.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+	if c.currentTx != nil {
+		return c.currentTx.QueryContext(ctx, query, args)
+	}
+
+	return c.queryContext(ctx, query, args)
 }
 
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {

@@ -32,32 +32,32 @@ var (
 )
 
 type Parent interface {
-		Query() *query.Client
-		Trace() *trace.DatabaseSQL
-		TraceRetry() *trace.Retry
-		RetryBudget() budget.Budget
-		Bindings() bind.Bindings
-		Clock() clockwork.Clock
-	}
+	Query() *query.Client
+	Trace() *trace.DatabaseSQL
+	TraceRetry() *trace.Retry
+	RetryBudget() budget.Budget
+	Bindings() bind.Bindings
+	Clock() clockwork.Clock
+}
 
 type currentTx interface {
-		tx.Identifier
-		driver.Tx
-		driver.ExecerContext
-		driver.QueryerContext
+	tx.Identifier
+	driver.Tx
+	driver.ExecerContext
+	driver.QueryerContext
 	driver.ConnPrepareContext
-		Rollback() error
-	}
+	Rollback() error
+}
 
 type Conn struct {
-		currentTx
-		ctx       context.Context //nolint:containedctx
-		parent    Parent
-		session   *query.Session
-		onClose   []func()
-		closed    atomic.Bool
-		lastUsage atomic.Int64
-	}
+	currentTx
+	ctx       context.Context //nolint:containedctx
+	parent    Parent
+	session   *query.Session
+	onClose   []func()
+	closed    atomic.Bool
+	lastUsage atomic.Int64
+}
 
 func New(ctx context.Context, parent Parent, s *query.Session, opts ...Option) *Conn {
 	cc := &Conn{
@@ -152,4 +152,44 @@ func (c *Conn) execContext(
 	}
 
 	return resultNoRows{}, nil
+}
+
+func (c *Conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (
+	_ driver.Rows, finalErr error,
+) {
+	defer func() {
+		c.lastUsage.Store(c.parent.Clock().Now().Unix())
+	}()
+
+	if !c.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+
+	if c.currentTx != nil {
+		return c.currentTx.QueryContext(ctx, query, args)
+	}
+
+	var onDone = trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).queryContext"),
+		query, tableConn.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
+	)
+
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	normalizedQuery, parameters, err := c.normalize(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	res, err := c.session.Query(ctx, normalizedQuery, options.WithParameters(&parameters))
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	return &rows{
+		conn:   c,
+		result: res,
+	}, nil
 }
