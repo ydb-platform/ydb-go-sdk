@@ -31,8 +31,7 @@ var (
 	_ driver.Result = resultNoRows{}
 )
 
-type (
-	Parent interface {
+type Parent interface {
 		Query() *query.Client
 		Trace() *trace.DatabaseSQL
 		TraceRetry() *trace.Retry
@@ -41,15 +40,16 @@ type (
 		Clock() clockwork.Clock
 	}
 
-	currentTx interface {
+type currentTx interface {
 		tx.Identifier
 		driver.Tx
 		driver.ExecerContext
 		driver.QueryerContext
+	driver.ConnPrepareContext
 		Rollback() error
 	}
 
-	Conn struct {
+type Conn struct {
 		currentTx
 		ctx       context.Context //nolint:containedctx
 		parent    Parent
@@ -58,7 +58,6 @@ type (
 		closed    atomic.Bool
 		lastUsage atomic.Int64
 	}
-)
 
 func New(ctx context.Context, parent Parent, s *query.Session, opts ...Option) *Conn {
 	cc := &Conn{
@@ -129,10 +128,9 @@ func (c *Conn) execContext(
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 
-	// TODO tx
-	// if c.currentTx != nil {
-	// 	return c.currentTx.ExecContext(ctx, query, args)
-	// }
+	if c.currentTx != nil {
+		return c.currentTx.ExecContext(ctx, query, args)
+	}
 
 	onDone := trace.DatabaseSQLOnConnExec(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).execContext"),
