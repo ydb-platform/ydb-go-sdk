@@ -52,6 +52,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	}
 
 	err := c.session.Exec(ctx, "select 1")
+
 	return err
 }
 

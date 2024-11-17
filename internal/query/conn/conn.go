@@ -100,9 +100,6 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx curr
 		)
 	}
 
-	// TODO: fake tx
-	/* tx, err := beginFakeTx(...) */
-
 	tx, err := beginTx(ctx, c, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

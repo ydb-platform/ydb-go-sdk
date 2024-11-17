@@ -14,12 +14,11 @@ import (
 )
 
 var (
-	_                      driver.Rows                           = &rows{}
-	_                      driver.RowsNextResultSet              = &rows{}
-	_                      driver.RowsColumnTypeDatabaseTypeName = &rows{}
-	_                      driver.RowsColumnTypeNullable         = &rows{}
-	_                      driver.Rows                           = &single{}
-	ignoreColumnPrefixName                                       = "__discard_column_"
+	_ driver.Rows                           = &rows{}
+	_ driver.RowsNextResultSet              = &rows{}
+	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
+	_ driver.RowsColumnTypeNullable         = &rows{}
+	_ driver.Rows                           = &single{}
 )
 
 type rows struct {
@@ -46,6 +45,7 @@ func (r *rows) Columns() []string {
 	if r.nextErr != nil {
 		panic(r.nextErr)
 	}
+
 	return r.nextSet.Columns()
 }
 
@@ -54,6 +54,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	if r.nextErr != nil {
 		panic(r.nextErr)
 	}
+
 	return r.nextSet.ColumnTypes()[index].String()
 }
 
@@ -63,6 +64,7 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 		panic(r.nextErr)
 	}
 	_, castResult := r.nextSet.ColumnTypes()[index].(interface{ IsOptional() })
+
 	return castResult, castResult
 }
 
@@ -77,6 +79,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 	}
 
 	r.nextSet = res
+
 	return err
 }
 
@@ -93,6 +96,7 @@ func (r *rows) Next(dst []driver.Value) error {
 		if errors.Is(err, io.EOF) {
 			return err
 		}
+
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
@@ -105,6 +109,7 @@ func (r *rows) Next(dst []driver.Value) error {
 
 func (r *rows) Close() error {
 	ctx := context.Background()
+
 	return r.result.Close(ctx)
 }
 

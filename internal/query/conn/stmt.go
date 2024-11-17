@@ -52,6 +52,7 @@ func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 	if !stmt.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	return stmt.processor.ExecContext(ctx, stmt.query, args)
 }
 
