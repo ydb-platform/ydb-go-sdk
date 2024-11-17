@@ -1,6 +1,8 @@
 package retry
 
 import (
+	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -14,6 +16,7 @@ type retryMode struct {
 }
 
 func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
+	fmt.Println("MustRetry", m.errType, isOperationIdempotent)
 	switch m.errType {
 	case
 		xerrors.TypeUndefined,

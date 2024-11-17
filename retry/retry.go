@@ -258,6 +258,7 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 //
 // # If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
+	fmt.Println("Retry 1")
 	_, err := RetryWithResult[*struct{}](ctx, func(ctx context.Context) (*struct{}, error) {
 		err := op(ctx)
 		if err != nil {
@@ -266,10 +267,13 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 
 		return nil, nil //nolint:nilnil
 	}, opts...)
+	fmt.Println("Retry 2")
 	if err != nil {
+		fmt.Println("Retry 3")
 		return xerrors.WithStackTrace(err)
 	}
 
+	fmt.Println("Retry 4")
 	return nil
 }
 
@@ -300,17 +304,21 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 		}
 	)
 	for _, opt := range opts {
+		fmt.Println("RWR opt", opt)
 		if opt != nil {
 			opt.ApplyRetryOption(options)
 		}
 	}
 	if options.idempotent {
+		fmt.Println("RWR opt idempotent")
 		ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	}
 
 	defer func() {
+		fmt.Println("RWR defer 1 - A")
 		if finalErr != nil && options.stackTrace {
 			//nolint:gomnd
+			fmt.Println("RWR defer 1 - B")
 			finalErr = xerrors.WithStackTrace(finalErr,
 				xerrors.WithSkipDepth(2), // 1 - exit from defer, 1 - exit from Retry call
 			)
@@ -327,6 +335,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 		)
 	)
 	defer func() {
+		fmt.Println("RWR defer 2")
 		onDone(attempts, finalErr)
 	}()
 	for {
@@ -334,20 +343,24 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 		attempts++
 		select {
 		case <-ctx.Done():
+			fmt.Println("RWR for loop ctx.Done")
 			return zeroValue, xerrors.WithStackTrace(xerrors.Join(
 				fmt.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()),
 				lastErr,
 			))
 
 		default:
+			fmt.Println("RWR for loop defer 1")
 			v, err := opWithRecover(ctx, options, op)
 
 			if err == nil {
+				fmt.Println("RWR for loop defer 2")
 				return v, nil
 			}
 
 			m := Check(err)
 
+			fmt.Println("RWR for loop defer 3", m, code)
 			if m.StatusCode() != code {
 				i = 0
 			}
@@ -355,6 +368,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 			code = m.StatusCode()
 
 			if !m.MustRetry(options.idempotent) {
+				fmt.Println("RWR for loop defer 4")
 				return zeroValue, xerrors.WithStackTrace(xerrors.Join(
 					fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
 						attempts, options.idempotent, err),
@@ -367,8 +381,10 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 				backoff.WithSlowBackoff(options.slowBackoff),
 			))
 
+			fmt.Println("RWR for loop defer 5")
 			select {
 			case <-ctx.Done():
+				fmt.Println("RWR for loop defer case ctx.Done")
 				t.Stop()
 
 				return zeroValue, xerrors.WithStackTrace(
@@ -379,6 +395,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 					),
 				)
 			case <-t.C:
+				fmt.Println("RWR for loop defer case timer")
 				t.Stop()
 
 				if acquireErr := options.budget.Acquire(ctx); acquireErr != nil {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -339,6 +340,17 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	item, err := p.getItem(ctx)
 	if err != nil {
 		if xerrors.IsYdb(err) {
+			fmt.Printf("TRY 1: %v %T\n", err, err)
+			var e xerrors.Error
+			if xerrors.As(err, &e) {
+				fmt.Printf("TRY 2: %v\n", e.Code())
+				// if e.Code() == Ydb.StatusIds_UNAUTHORIZED {
+				// 	return xerrors.WithStackTrace(xerrors.Unretryable(err))
+				// }
+				if credentials.IsAccessError(err) {
+					return xerrors.WithStackTrace(xerrors.Unretryable(err))
+				}
+			}
 			return xerrors.WithStackTrace(xerrors.Retryable(err))
 		}
 
@@ -362,6 +374,7 @@ func (p *Pool[PT, T]) With(
 	f func(ctx context.Context, item PT) error,
 	opts ...retry.Option,
 ) (finalErr error) {
+	fmt.Println("Pool.With 1")
 	var attempts int
 
 	if onWith := p.config.trace.OnWith; onWith != nil {
@@ -370,11 +383,13 @@ func (p *Pool[PT, T]) With(
 		)
 		if onDone != nil {
 			defer func() {
+				fmt.Println("Pool.With defer onDone")
 				onDone(attempts, finalErr)
 			}()
 		}
 	}
 
+	fmt.Println("Pool.With 2")
 	err := retry.Retry(ctx, func(ctx context.Context) error {
 		attempts++
 		err := p.try(ctx, f)
@@ -384,10 +399,13 @@ func (p *Pool[PT, T]) With(
 
 		return nil
 	}, opts...)
+	fmt.Println("Pool.With 3")
 	if err != nil {
+		fmt.Println("Pool.With 4")
 		return xerrors.WithStackTrace(fmt.Errorf("pool.With failed with %d attempts: %w", attempts, err))
 	}
 
+	fmt.Println("Pool.With 5")
 	return nil
 }
 

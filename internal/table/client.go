@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -192,11 +193,14 @@ func (c *Client) Close(ctx context.Context) (err error) {
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (finalErr error) {
+	fmt.Println("DO 1")
 	if c == nil {
+		fmt.Println("DO 2")
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
 	if c.isClosed() {
+		fmt.Println("DO 3")
 		return xerrors.WithStackTrace(errClosedClient)
 	}
 
@@ -207,16 +211,20 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
+		fmt.Println("DO onDone")
 		onDone(attempts, finalErr)
 	}()
 
+	fmt.Println("DO 4")
 	err := do(ctx, c.pool, c.config, op, func(err error) {
 		attempts++
 	}, config.RetryOptions...)
 	if err != nil {
+		fmt.Println("DO 5")
 		return xerrors.WithStackTrace(err)
 	}
 
+	fmt.Println("DO 6")
 	return nil
 }
 

@@ -1,6 +1,8 @@
 package xerrors
 
 import (
+	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 )
 
@@ -11,7 +13,9 @@ func Check(err error) (
 	backoffType backoff.Type,
 	invalidObject bool,
 ) {
+	fmt.Println("CHECK 1")
 	if err == nil {
+		fmt.Println("CHECK 2")
 		return -1,
 			TypeNoError,
 			backoff.TypeNoBackoff,
@@ -19,9 +23,11 @@ func Check(err error) (
 	}
 	var e Error
 	if As(err, &e) {
+		fmt.Println("CHECK 3", fmt.Sprintf("%T", e), e.Code(), e.Name(), e.Type(), e.BackoffType(), e.IsRetryObjectValid())
 		return int64(e.Code()), e.Type(), e.BackoffType(), !e.IsRetryObjectValid()
 	}
 
+	fmt.Println("CHECK 4")
 	return -1,
 		TypeNonRetryable, // unknown errors are not retryable
 		backoff.TypeNoBackoff,

@@ -97,7 +97,9 @@ func InvalidObject() invalidObjectOption {
 }
 
 func Retryable(err error, opts ...RetryableErrorOption) error {
+	fmt.Println("Retryable 1")
 	if err == nil {
+		fmt.Println("Retryable 2")
 		return nil
 	}
 	var (
@@ -109,18 +111,24 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 			isRetryObjectValid: true,
 		}
 	)
+
+	fmt.Println("Retryable 3")
 	if As(err, &e) {
+		fmt.Println("Retryable 4")
 		re.backoffType = e.BackoffType()
 		re.isRetryObjectValid = e.IsRetryObjectValid()
 		re.code = e.Code()
 		re.name = e.Name()
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
+			fmt.Println("Retryable 5")
 			opt.applyToRetryableError(re)
 		}
 	}
 
+	fmt.Println("Retryable 6")
 	return re
 }
 

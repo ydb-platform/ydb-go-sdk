@@ -487,6 +487,7 @@ func (s *singleSession) Stats() pool.Stats {
 func (s *singleSession) With(ctx context.Context,
 	f func(ctx context.Context, s *session) error, opts ...retry.Option,
 ) error {
+	fmt.Println("singleSession.With 1")
 	return retry.Retry(ctx, func(ctx context.Context) error {
 		return f(ctx, s.s)
 	}, opts...)
