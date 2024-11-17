@@ -113,8 +113,7 @@ func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 }
 
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {
-	// TODO implement me
-	panic("implement me")
+	return nil, errDeprecated
 }
 
 func (c *Conn) Close() (finalErr error) {
@@ -150,11 +149,9 @@ func (c *Conn) Close() (finalErr error) {
 }
 
 func (c *Conn) Begin() (driver.Tx, error) {
-	// TODO implement me
-	panic("implement me")
+	return nil, errDeprecated
 }
 
 func (c *Conn) LastUsage() time.Time {
-	// TODO implement me
-	panic("implement me")
+	return time.Unix(c.lastUsage.Load(), 0)
 }
