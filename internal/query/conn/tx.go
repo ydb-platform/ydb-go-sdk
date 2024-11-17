@@ -164,7 +164,6 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 	err = tx.tx.Exec(ctx,
 		query, options.WithParameters(&parameters),
 	)
-
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}

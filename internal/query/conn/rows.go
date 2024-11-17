@@ -89,7 +89,6 @@ func (r *rows) Next(dst []driver.Value) error {
 	ctx := context.Background()
 
 	nextRow, err := r.nextSet.NextRow(ctx)
-
 	if err != nil {
 		if errors.Is(err, io.EOF) {
 			return err

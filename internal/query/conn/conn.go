@@ -27,9 +27,7 @@ type resultNoRows struct{}
 func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
-var (
-	_ driver.Result = resultNoRows{}
-)
+var _ driver.Result = resultNoRows{}
 
 type Parent interface {
 	Query() *query.Client
@@ -141,7 +139,6 @@ func (c *Conn) execContext(
 	}()
 
 	normalizedQuery, params, err := c.normalize(query, args...)
-
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -169,7 +166,7 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		return c.currentTx.QueryContext(ctx, query, args)
 	}
 
-	var onDone = trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
+	onDone := trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).queryContext"),
 		query, tableConn.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 	)
