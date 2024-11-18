@@ -1,3 +1,4 @@
+## v3.92.5
 * Avoid retrying requests finished with 'UNAUTHORIZED' errors
 
 ## v3.92.4
