@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"io"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 )
 
 var (
