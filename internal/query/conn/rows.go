@@ -43,6 +43,12 @@ func (r *rows) loadFirstNextSet() {
 	res, err := r.result.NextResultSet(ctx)
 	r.nextErr = err
 	r.nextSet = res
+
+	if err == nil {
+		r.columns = r.nextSet.Columns()
+		r.columnsType = r.nextSet.ColumnTypes()
+		r.columnsFetchError = r.nextErr
+	}
 }
 
 func (r *rows) Columns() []string {
@@ -74,10 +80,15 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 }
 
 func (r *rows) NextResultSet() (finalErr error) {
-	r.firstNextSet.Do(r.loadFirstNextSet)
+	r.firstNextSet.Do(func() {})
+
+	ctx := context.Background()
+	res, err := r.result.NextResultSet(ctx)
+	r.nextErr = err
+	r.nextSet = res
 
 	if errors.Is(r.nextErr, io.EOF) {
-		return r.nextErr
+		return io.EOF
 	}
 
 	if r.nextErr != nil {
@@ -88,15 +99,11 @@ func (r *rows) NextResultSet() (finalErr error) {
 	r.columnsType = r.nextSet.ColumnTypes()
 	r.columnsFetchError = r.nextErr
 
-	ctx := context.Background()
-	res, err := r.result.NextResultSet(ctx)
-	r.nextErr = err
-	r.nextSet = res
-
 	return nil
 }
 
 func (r *rows) HasNextResultSet() bool {
+	r.firstNextSet.Do(r.loadFirstNextSet)
 	return r.nextErr == nil
 }
 
@@ -104,18 +111,17 @@ func (r *rows) Next(dst []driver.Value) error {
 	r.firstNextSet.Do(r.loadFirstNextSet)
 	ctx := context.Background()
 
-	if errors.Is(r.nextErr, io.EOF) {
-		return r.nextErr
-	}
-
 	if r.nextErr != nil {
+		if errors.Is(r.nextErr, io.EOF) {
+			return io.EOF
+		}
 		return badconn.Map(xerrors.WithStackTrace(r.nextErr))
 	}
 
 	nextRow, err := r.nextSet.NextRow(ctx)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			return err
+			return io.EOF
 		}
 
 		return badconn.Map(xerrors.WithStackTrace(err))
