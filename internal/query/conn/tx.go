@@ -36,10 +36,6 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (currentT
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if txc == nil {
-		return nil, nil
-	}
-
 	nativeTx, err := c.session.Begin(ctx, query.TxSettings(txc))
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
