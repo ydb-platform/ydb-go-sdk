@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -28,6 +29,10 @@ type rows struct {
 	firstNextSet sync.Once
 	nextSet      result.Set
 	nextErr      error
+
+	columnsFetchError error
+	columns           []string
+	columnsType       []types.Type
 }
 
 func (r *rows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
@@ -42,26 +47,26 @@ func (r *rows) loadFirstNextSet() {
 
 func (r *rows) Columns() []string {
 	r.firstNextSet.Do(r.loadFirstNextSet)
-	if r.nextErr != nil {
-		panic(r.nextErr)
+	if r.columnsFetchError != nil {
+		panic(badconn.Map(xerrors.WithStackTrace(r.columnsFetchError)))
 	}
 
-	return r.nextSet.Columns()
+	return r.columns
 }
 
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	r.firstNextSet.Do(r.loadFirstNextSet)
-	if r.nextErr != nil {
-		panic(r.nextErr)
+	if r.columnsFetchError != nil {
+		panic(badconn.Map(xerrors.WithStackTrace(r.columnsFetchError)))
 	}
 
-	return r.nextSet.ColumnTypes()[index].String()
+	return r.columnsType[index].String()
 }
 
 func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	r.firstNextSet.Do(r.loadFirstNextSet)
-	if r.nextErr != nil {
-		panic(r.nextErr)
+	if r.columnsFetchError != nil {
+		panic(badconn.Map(xerrors.WithStackTrace(r.columnsFetchError)))
 	}
 	_, castResult := r.nextSet.ColumnTypes()[index].(interface{ IsOptional() })
 
@@ -71,25 +76,41 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 func (r *rows) NextResultSet() (finalErr error) {
 	r.firstNextSet.Do(r.loadFirstNextSet)
 
+	if errors.Is(r.nextErr, io.EOF) {
+		return r.nextErr
+	}
+
+	if r.nextErr != nil {
+		return badconn.Map(xerrors.WithStackTrace(r.nextErr))
+	}
+
+	r.columns = r.nextSet.Columns()
+	r.columnsType = r.nextSet.ColumnTypes()
+	r.columnsFetchError = r.nextErr
+
 	ctx := context.Background()
 	res, err := r.result.NextResultSet(ctx)
 	r.nextErr = err
-	if err != nil {
-		return err
-	}
-
 	r.nextSet = res
 
-	return err
+	return nil
 }
 
 func (r *rows) HasNextResultSet() bool {
-	return r.nextSet != nil
+	return r.nextErr == nil
 }
 
 func (r *rows) Next(dst []driver.Value) error {
 	r.firstNextSet.Do(r.loadFirstNextSet)
 	ctx := context.Background()
+
+	if errors.Is(r.nextErr, io.EOF) {
+		return r.nextErr
+	}
+
+	if r.nextErr != nil {
+		return badconn.Map(xerrors.WithStackTrace(r.nextErr))
+	}
 
 	nextRow, err := r.nextSet.NextRow(ctx)
 	if err != nil {
