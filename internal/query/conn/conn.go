@@ -183,17 +183,20 @@ func (c *Conn) queryContext(ctx context.Context, queryString string, args []driv
 
 	if queryMode == tableConn.ExplainQueryMode {
 		return c.queryContextExplain(ctx, normalizedQuery, parameters)
-	} else {
-		return c.queryContextOther(ctx, normalizedQuery, parameters)
 	}
+
+	return c.queryContextOther(ctx, normalizedQuery, parameters)
 }
 
-func (c *Conn) queryContextOther(ctx context.Context, queryString string, parameters params.Parameters) (driver.Rows, error) {
+func (c *Conn) queryContextOther(
+	ctx context.Context,
+	queryString string,
+	parameters params.Parameters,
+) (driver.Rows, error) {
 	res, err := c.session.Query(
 		ctx, queryString,
 		options.WithParameters(&parameters),
 	)
-
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -204,7 +207,11 @@ func (c *Conn) queryContextOther(ctx context.Context, queryString string, parame
 	}, nil
 }
 
-func (c *Conn) queryContextExplain(ctx context.Context, queryString string, parameters params.Parameters) (driver.Rows, error) {
+func (c *Conn) queryContextExplain(
+	ctx context.Context,
+	queryString string,
+	parameters params.Parameters,
+) (driver.Rows, error) {
 	var ast, plan string
 	_, err := c.session.Query(
 		ctx, queryString,
@@ -215,7 +222,6 @@ func (c *Conn) queryContextExplain(ctx context.Context, queryString string, para
 			plan = stats.QueryPlan()
 		}),
 	)
-
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}

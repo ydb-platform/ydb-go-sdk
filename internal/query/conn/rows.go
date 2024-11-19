@@ -104,6 +104,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 
 func (r *rows) HasNextResultSet() bool {
 	r.firstNextSet.Do(r.loadFirstNextSet)
+
 	return r.nextErr == nil
 }
 
@@ -115,6 +116,7 @@ func (r *rows) Next(dst []driver.Value) error {
 		if errors.Is(r.nextErr, io.EOF) {
 			return io.EOF
 		}
+
 		return badconn.Map(xerrors.WithStackTrace(r.nextErr))
 	}
 
