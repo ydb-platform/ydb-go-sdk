@@ -26,8 +26,8 @@ func WithQueryMode(ctx context.Context, m QueryMode) context.Context {
 	return context.WithValue(ctx, ctxModeTypeKey{}, m)
 }
 
-// queryModeFromContext returns defined QueryMode or DefaultQueryMode
-func queryModeFromContext(ctx context.Context, defaultQueryMode QueryMode) QueryMode {
+// QueryModeFromContext returns defined QueryMode or DefaultQueryMode
+func QueryModeFromContext(ctx context.Context, defaultQueryMode QueryMode) QueryMode {
 	if m, ok := ctx.Value(ctxModeTypeKey{}).(QueryMode); ok {
 		return m
 	}

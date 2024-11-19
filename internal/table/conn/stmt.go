@@ -38,7 +38,7 @@ func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 	if !stmt.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
-	switch m := queryModeFromContext(ctx, stmt.conn.defaultQueryMode); m {
+	switch m := QueryModeFromContext(ctx, stmt.conn.defaultQueryMode); m {
 	case DataQueryMode:
 		return stmt.processor.QueryContext(stmt.conn.withKeepInCache(ctx), stmt.query, args)
 	default:
@@ -57,7 +57,7 @@ func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 	if !stmt.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
-	switch m := queryModeFromContext(ctx, stmt.conn.defaultQueryMode); m {
+	switch m := QueryModeFromContext(ctx, stmt.conn.defaultQueryMode); m {
 	case DataQueryMode:
 		return stmt.processor.ExecContext(stmt.conn.withKeepInCache(ctx), stmt.query, args)
 	default:

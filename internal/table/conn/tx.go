@@ -121,7 +121,7 @@ func (tx *transaction) QueryContext(ctx context.Context, query string, args []dr
 	defer func() {
 		onDone(finalErr)
 	}()
-	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
+	m := QueryModeFromContext(ctx, tx.conn.defaultQueryMode)
 	if m != DataQueryMode {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
@@ -163,7 +163,7 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 	defer func() {
 		onDone(finalErr)
 	}()
-	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
+	m := QueryModeFromContext(ctx, tx.conn.defaultQueryMode)
 	if m != DataQueryMode {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
