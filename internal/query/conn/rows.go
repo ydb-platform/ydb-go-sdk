@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"io"
 	"sync"
 
@@ -100,7 +101,9 @@ func (r *rows) Next(dst []driver.Value) error {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
-	if err = nextRow.Scan(dst); err != nil {
+	if err = nextRow.Scan(xslices.Transform(dst, func(v driver.Value) any {
+		return &v
+	})...); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 

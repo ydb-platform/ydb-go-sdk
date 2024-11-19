@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"io"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -184,9 +185,15 @@ func (c *Connector) Close() error {
 
 func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (_ *Connector, err error) {
 	c := &Connector{
-		parent:         parent,
-		balancer:       balancer,
-		queryProcessor: TABLE_SERVICE,
+		parent:   parent,
+		balancer: balancer,
+		queryProcessor: func() queryProcessor {
+			if v, has := os.LookupEnv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE"); has && v != "" {
+				return QUERY_SERVICE
+			}
+
+			return TABLE_SERVICE
+		}(),
 		clock:          clockwork.NewRealClock(),
 		done:           make(chan struct{}),
 		trace:          &trace.DatabaseSQL{},
