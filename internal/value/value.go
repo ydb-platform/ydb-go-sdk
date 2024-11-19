@@ -1,6 +1,7 @@
 package value
 
 import (
+	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
 	"math/big"
@@ -28,7 +29,7 @@ type Value interface {
 	Type() types.Type
 	Yql() string
 
-	castTo(dst interface{}) error
+	castTo(dst any) error
 	toYDB(a *allocator.Allocator) *Ydb.Value
 }
 
@@ -317,9 +318,13 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 type boolValue bool
 
-func (v boolValue) castTo(dst interface{}) error {
+func (v boolValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *bool:
+		*vv = bool(v)
+
+		return nil
+	case *driver.Value:
 		*vv = bool(v)
 
 		return nil
@@ -360,9 +365,13 @@ func BoolValue(v bool) boolValue {
 
 type dateValue uint32
 
-func (v dateValue) castTo(dst interface{}) error {
+func (v dateValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *time.Time:
+		*vv = DateToTime(uint32(v)).UTC()
+
+		return nil
+	case *driver.Value:
 		*vv = DateToTime(uint32(v)).UTC()
 
 		return nil
@@ -416,9 +425,13 @@ func DateValueFromTime(t time.Time) dateValue {
 
 type datetimeValue uint32
 
-func (v datetimeValue) castTo(dst interface{}) error {
+func (v datetimeValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *time.Time:
+		*vv = DatetimeToTime(uint32(v))
+
+		return nil
+	case *driver.Value:
 		*vv = DatetimeToTime(uint32(v))
 
 		return nil
@@ -494,7 +507,7 @@ type DecimalValuer interface {
 	Scale() uint32
 }
 
-func (v *decimalValue) castTo(dst interface{}) error {
+func (v *decimalValue) castTo(dst any) error {
 	return xerrors.WithStackTrace(fmt.Errorf(
 		"%w '%+v' to '%T' destination",
 		ErrCannotCast, v, dst,
@@ -583,7 +596,7 @@ func (v *dictValue) DictValues() map[Value]Value {
 	return values
 }
 
-func (v *dictValue) castTo(dst interface{}) error {
+func (v *dictValue) castTo(dst any) error {
 	return xerrors.WithStackTrace(fmt.Errorf(
 		"%w '%+v' to '%T' destination",
 		ErrCannotCast, v, dst,
@@ -652,18 +665,22 @@ type doubleValue struct {
 	value float64
 }
 
-func (v *doubleValue) castTo(dst interface{}) error {
+func (v *doubleValue) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *float64:
+		*vv = v.value
+
+		return nil
+	case *driver.Value:
+		*vv = v.value
+
+		return nil
 	case *string:
 		*vv = strconv.FormatFloat(v.value, 'f', -1, 64)
 
 		return nil
 	case *[]byte:
 		*vv = xstring.ToBytes(strconv.FormatFloat(v.value, 'f', -1, 64))
-
-		return nil
-	case *float64:
-		*vv = v.value
 
 		return nil
 	default:
@@ -700,7 +717,7 @@ func DoubleValue(v float64) *doubleValue {
 
 type dyNumberValue string
 
-func (v dyNumberValue) castTo(dst interface{}) error {
+func (v dyNumberValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = string(v)
@@ -744,22 +761,26 @@ type floatValue struct {
 	value float32
 }
 
-func (v *floatValue) castTo(dst interface{}) error {
+func (v *floatValue) castTo(dst any) error {
 	switch vv := dst.(type) {
-	case *string:
-		*vv = strconv.FormatFloat(float64(v.value), 'f', -1, 32)
-
-		return nil
-	case *[]byte:
-		*vv = xstring.ToBytes(strconv.FormatFloat(float64(v.value), 'f', -1, 32))
+	case *float32:
+		*vv = v.value
 
 		return nil
 	case *float64:
 		*vv = float64(v.value)
 
 		return nil
-	case *float32:
+	case *driver.Value:
 		*vv = v.value
+
+		return nil
+	case *string:
+		*vv = strconv.FormatFloat(float64(v.value), 'f', -1, 32)
+
+		return nil
+	case *[]byte:
+		*vv = xstring.ToBytes(strconv.FormatFloat(float64(v.value), 'f', -1, 32))
 
 		return nil
 	default:
@@ -796,8 +817,16 @@ func FloatValue(v float32) *floatValue {
 
 type int8Value int8
 
-func (v int8Value) castTo(dst interface{}) error {
+func (v int8Value) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *int8:
+		*vv = int8(v)
+
+		return nil
+	case *driver.Value:
+		*vv = int8(v)
+
+		return nil
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 
@@ -806,6 +835,7 @@ func (v int8Value) castTo(dst interface{}) error {
 		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 
 		return nil
+
 	case *int64:
 		*vv = int64(v)
 
@@ -818,11 +848,6 @@ func (v int8Value) castTo(dst interface{}) error {
 
 	case *int16:
 		*vv = int16(v)
-
-		return nil
-
-	case *int8:
-		*vv = int8(v)
 
 		return nil
 
@@ -866,8 +891,16 @@ func Int8Value(v int8) int8Value {
 
 type int16Value int16
 
-func (v int16Value) castTo(dst interface{}) error {
+func (v int16Value) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *int16:
+		*vv = int16(v)
+
+		return nil
+	case *driver.Value:
+		*vv = int16(v)
+
+		return nil
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 
@@ -882,10 +915,6 @@ func (v int16Value) castTo(dst interface{}) error {
 		return nil
 	case *int32:
 		*vv = int32(v)
-
-		return nil
-	case *int16:
-		*vv = int16(v)
 
 		return nil
 	case *float64:
@@ -928,8 +957,16 @@ func Int16Value(v int16) int16Value {
 
 type int32Value int32
 
-func (v int32Value) castTo(dst interface{}) error {
+func (v int32Value) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *int32:
+		*vv = int32(v)
+
+		return nil
+	case *driver.Value:
+		*vv = int32(v)
+
+		return nil
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 
@@ -938,6 +975,7 @@ func (v int32Value) castTo(dst interface{}) error {
 		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 
 		return nil
+
 	case *int64:
 		*vv = int64(v)
 
@@ -945,11 +983,6 @@ func (v int32Value) castTo(dst interface{}) error {
 
 	case *int:
 		*vv = int(v)
-
-		return nil
-
-	case *int32:
-		*vv = int32(v)
 
 		return nil
 
@@ -993,18 +1026,22 @@ func Int32Value(v int32) int32Value {
 
 type int64Value int64
 
-func (v int64Value) castTo(dst interface{}) error {
+func (v int64Value) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *int64:
+		*vv = int64(v)
+
+		return nil
+	case *driver.Value:
+		*vv = int64(v)
+
+		return nil
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 
 		return nil
 	case *[]byte:
 		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
-
-		return nil
-	case *int64:
-		*vv = int64(v)
 
 		return nil
 
@@ -1044,9 +1081,13 @@ func Int64Value(v int64) int64Value {
 
 type intervalValue int64
 
-func (v intervalValue) castTo(dst interface{}) error {
+func (v intervalValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *time.Duration:
+		*vv = IntervalToDuration(int64(v))
+
+		return nil
+	case *driver.Value:
 		*vv = IntervalToDuration(int64(v))
 
 		return nil
@@ -1129,7 +1170,7 @@ func IntervalValueFromDuration(v time.Duration) intervalValue {
 
 type jsonValue string
 
-func (v jsonValue) castTo(dst interface{}) error {
+func (v jsonValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = string(v)
@@ -1171,9 +1212,13 @@ func JSONValue(v string) jsonValue {
 
 type jsonDocumentValue string
 
-func (v jsonDocumentValue) castTo(dst interface{}) error {
+func (v jsonDocumentValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *string:
+		*vv = string(v)
+
+		return nil
+	case *driver.Value:
 		*vv = string(v)
 
 		return nil
@@ -1220,7 +1265,7 @@ func (v *listValue) ListItems() []Value {
 	return v.items
 }
 
-func (v *listValue) castTo(dst interface{}) error {
+func (v *listValue) castTo(dst any) error {
 	return xerrors.WithStackTrace(fmt.Errorf(
 		"%w '%s(%+v)' to '%T' destination",
 		ErrCannotCast, v.Type().Yql(), v, dst,
@@ -1280,7 +1325,7 @@ type pgValue struct {
 	val string
 }
 
-func (v pgValue) castTo(dst interface{}) error {
+func (v pgValue) castTo(dst any) error {
 	return xerrors.WithStackTrace(fmt.Errorf(
 		"%w  PgType to '%T' destination",
 		ErrCannotCast, dst,
@@ -1313,7 +1358,7 @@ type setValue struct {
 	items []Value
 }
 
-func (v *setValue) castTo(dst interface{}) error {
+func (v *setValue) castTo(dst any) error {
 	return xerrors.WithStackTrace(fmt.Errorf(
 		"%w '%+v' to '%T' destination",
 		ErrCannotCast, v, dst,
@@ -1394,7 +1439,7 @@ type optionalValue struct {
 	value     Value
 }
 
-func (v *optionalValue) castTo(dst interface{}) error {
+func (v *optionalValue) castTo(dst any) error {
 	ptr := reflect.ValueOf(dst)
 	if ptr.Kind() != reflect.Pointer {
 		return xerrors.WithStackTrace(fmt.Errorf("%w: '%s'", errDestinationTypeIsNotAPointer, ptr.Kind().String()))
@@ -1489,7 +1534,7 @@ func (v *structValue) StructFields() map[string]Value {
 	return fields
 }
 
-func (v *structValue) castTo(dst interface{}) error {
+func (v *structValue) castTo(dst any) error {
 	return xerrors.WithStackTrace(fmt.Errorf(
 		"%w '%+v' to '%T' destination",
 		ErrCannotCast, v, dst,
@@ -1546,9 +1591,13 @@ func StructValue(fields ...StructValueField) *structValue {
 
 type timestampValue uint64
 
-func (v timestampValue) castTo(dst interface{}) error {
+func (v timestampValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *time.Time:
+		*vv = TimestampToTime(uint64(v))
+
+		return nil
+	case *driver.Value:
 		*vv = TimestampToTime(uint64(v))
 
 		return nil
@@ -1600,7 +1649,7 @@ func (v *tupleValue) TupleItems() []Value {
 	return v.items
 }
 
-func (v *tupleValue) castTo(dst interface{}) error {
+func (v *tupleValue) castTo(dst any) error {
 	if len(v.items) == 1 {
 		return v.items[0].castTo(dst)
 	}
@@ -1658,7 +1707,7 @@ func TupleValue(values ...Value) *tupleValue {
 
 type tzDateValue string
 
-func (v tzDateValue) castTo(dst interface{}) error {
+func (v tzDateValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = string(v)
@@ -1699,12 +1748,12 @@ func TzDateValue(v string) tzDateValue {
 }
 
 func TzDateValueFromTime(t time.Time) tzDateValue {
-	return tzDateValue(t.Format(LayoutDate))
+	return tzDateValue(t.Format(LayoutTzDate) + "," + t.Location().String())
 }
 
 type tzDatetimeValue string
 
-func (v tzDatetimeValue) castTo(dst interface{}) error {
+func (v tzDatetimeValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = string(v)
@@ -1745,14 +1794,22 @@ func TzDatetimeValue(v string) tzDatetimeValue {
 }
 
 func TzDatetimeValueFromTime(t time.Time) tzDatetimeValue {
-	return tzDatetimeValue(t.Format(LayoutDatetime))
+	return tzDatetimeValue(t.Format(LayoutTzDatetime) + "," + t.Location().String())
 }
 
 type tzTimestampValue string
 
-func (v tzTimestampValue) castTo(dst interface{}) error {
+func (v tzTimestampValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *time.Time:
+		t, err := TzTimestampToTime(string(v))
+		if err != nil {
+			return err
+		}
+		*vv = t
+
+		return nil
+	case *driver.Value:
 		t, err := TzTimestampToTime(string(v))
 		if err != nil {
 			return err
@@ -1799,13 +1856,21 @@ func TzTimestampValue(v string) tzTimestampValue {
 }
 
 func TzTimestampValueFromTime(t time.Time) tzTimestampValue {
-	return tzTimestampValue(t.Format(LayoutTimestamp))
+	return tzTimestampValue(t.Format(LayoutTzTimestamp) + "," + t.Location().String())
 }
 
 type uint8Value uint8
 
-func (v uint8Value) castTo(dst interface{}) error {
+func (v uint8Value) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *uint8:
+		*vv = uint8(v)
+
+		return nil
+	case *driver.Value:
+		*vv = uint8(v)
+
+		return nil
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 
@@ -1836,10 +1901,6 @@ func (v uint8Value) castTo(dst interface{}) error {
 		return nil
 	case *int16:
 		*vv = int16(v)
-
-		return nil
-	case *uint8:
-		*vv = uint8(v)
 
 		return nil
 	case *float64:
@@ -1882,8 +1943,16 @@ func Uint8Value(v uint8) uint8Value {
 
 type uint16Value uint16
 
-func (v uint16Value) castTo(dst interface{}) error {
+func (v uint16Value) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *uint16:
+		*vv = uint16(v)
+
+		return nil
+	case *driver.Value:
+		*vv = uint16(v)
+
+		return nil
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 
@@ -1906,10 +1975,6 @@ func (v uint16Value) castTo(dst interface{}) error {
 		return nil
 	case *int32:
 		*vv = int32(v)
-
-		return nil
-	case *uint16:
-		*vv = uint16(v)
 
 		return nil
 	case *float32:
@@ -1952,8 +2017,16 @@ func Uint16Value(v uint16) uint16Value {
 
 type uint32Value uint32
 
-func (v uint32Value) castTo(dst interface{}) error {
+func (v uint32Value) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *uint32:
+		*vv = uint32(v)
+
+		return nil
+	case *driver.Value:
+		*vv = uint32(v)
+
+		return nil
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 
@@ -1968,10 +2041,6 @@ func (v uint32Value) castTo(dst interface{}) error {
 		return nil
 	case *int64:
 		*vv = int64(v)
-
-		return nil
-	case *uint32:
-		*vv = uint32(v)
 
 		return nil
 	case *float64:
@@ -2010,8 +2079,16 @@ func Uint32Value(v uint32) uint32Value {
 
 type uint64Value uint64
 
-func (v uint64Value) castTo(dst interface{}) error {
+func (v uint64Value) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *uint64:
+		*vv = uint64(v)
+
+		return nil
+	case *driver.Value:
+		*vv = uint64(v)
+
+		return nil
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 
@@ -2020,10 +2097,7 @@ func (v uint64Value) castTo(dst interface{}) error {
 		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 
 		return nil
-	case *uint64:
-		*vv = uint64(v)
 
-		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
@@ -2056,9 +2130,13 @@ func Uint64Value(v uint64) uint64Value {
 
 type textValue string
 
-func (v textValue) castTo(dst interface{}) error {
+func (v textValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *string:
+		*vv = string(v)
+
+		return nil
+	case *driver.Value:
 		*vv = string(v)
 
 		return nil
@@ -2127,8 +2205,16 @@ type uuidValue struct {
 	reproduceStorageBug bool
 }
 
-func (v *uuidValue) castTo(dst interface{}) error {
+func (v *uuidValue) castTo(dst any) error {
 	switch vv := dst.(type) {
+	case *uuid.UUID:
+		*vv = v.value
+
+		return nil
+	case *driver.Value:
+		*vv = v.value
+
+		return nil
 	case *string:
 		return ErrIssue1501BadUUID
 	case *[]byte:
@@ -2137,10 +2223,6 @@ func (v *uuidValue) castTo(dst interface{}) error {
 		return ErrIssue1501BadUUID
 	case *UUIDIssue1501FixedBytesWrapper:
 		*vv = NewUUIDIssue1501FixedBytesWrapper(uuidReorderBytesForReadWithBug(v.value))
-
-		return nil
-	case *uuid.UUID:
-		*vv = v.value
 
 		return nil
 	default:
@@ -2339,7 +2421,7 @@ func (v *variantValue) Value() Value {
 	return v.value
 }
 
-func (v *variantValue) castTo(dst interface{}) error {
+func (v *variantValue) castTo(dst any) error {
 	return v.value.castTo(dst)
 }
 
@@ -2421,7 +2503,7 @@ func VariantValueStruct(v Value, name string, t types.Type) *variantValue {
 
 type voidValue struct{}
 
-func (v voidValue) castTo(dst interface{}) error {
+func (v voidValue) castTo(dst any) error {
 	return xerrors.WithStackTrace(fmt.Errorf(
 		"%w '%s' to '%T' destination",
 		ErrCannotCast, v.Type().Yql(), dst,
@@ -2453,7 +2535,7 @@ func VoidValue() voidValue {
 
 type ysonValue []byte
 
-func (v ysonValue) castTo(dst interface{}) error {
+func (v ysonValue) castTo(dst any) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = xstring.FromBytes(v)
@@ -2638,14 +2720,18 @@ func ZeroValue(t types.Type) Value {
 
 type bytesValue []byte
 
-func (v bytesValue) castTo(dst interface{}) error {
+func (v bytesValue) castTo(dst any) error {
 	switch vv := dst.(type) {
-	case *string:
-		*vv = xstring.FromBytes(v)
-
-		return nil
 	case *[]byte:
 		*vv = v
+
+		return nil
+	case *driver.Value:
+		*vv = []byte(v)
+
+		return nil
+	case *string:
+		*vv = xstring.FromBytes(v)
 
 		return nil
 	default:
