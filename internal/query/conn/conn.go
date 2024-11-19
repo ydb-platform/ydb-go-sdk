@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"sync/atomic"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	tableConn "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -148,7 +150,7 @@ func (c *Conn) execContext(
 	return resultNoRows{}, nil
 }
 
-func (c *Conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (
+func (c *Conn) queryContext(ctx context.Context, queryString string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
 	defer func() {
@@ -160,24 +162,38 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	}
 
 	if c.currentTx != nil {
-		return c.currentTx.QueryContext(ctx, query, args)
+		return c.currentTx.QueryContext(ctx, queryString, args)
 	}
 
 	onDone := trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).queryContext"),
-		query, tableConn.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
+		queryString, tableConn.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 	)
 
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	normalizedQuery, parameters, err := c.normalize(query, args...)
+	normalizedQuery, parameters, err := c.normalize(queryString, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	res, err := c.session.Query(ctx, normalizedQuery, options.WithParameters(&parameters))
+	queryMode := tableConn.QueryModeFromContext(ctx, tableConn.UnknownQueryMode)
+
+	if queryMode == tableConn.ExplainQueryMode {
+		return c.queryContextExplain(ctx, normalizedQuery, parameters)
+	} else {
+		return c.queryContextOther(ctx, normalizedQuery, parameters)
+	}
+}
+
+func (c *Conn) queryContextOther(ctx context.Context, queryString string, parameters params.Parameters) (driver.Rows, error) {
+	res, err := c.session.Query(
+		ctx, queryString,
+		options.WithParameters(&parameters),
+	)
+
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -185,5 +201,29 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	return &rows{
 		conn:   c,
 		result: res,
+	}, nil
+}
+
+func (c *Conn) queryContextExplain(ctx context.Context, queryString string, parameters params.Parameters) (driver.Rows, error) {
+	var ast, plan string
+	_, err := c.session.Query(
+		ctx, queryString,
+		options.WithParameters(&parameters),
+		options.WithExecMode(options.ExecModeExplain),
+		options.WithStatsMode(options.StatsModeNone, func(stats stats.QueryStats) {
+			ast = stats.QueryAST()
+			plan = stats.QueryPlan()
+		}),
+	)
+
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	return &single{
+		values: []sql.NamedArg{
+			sql.Named("AST", ast),
+			sql.Named("Plan", plan),
+		},
 	}, nil
 }
