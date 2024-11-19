@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 )
 
 var (
@@ -101,9 +100,12 @@ func (r *rows) Next(dst []driver.Value) error {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
-	if err = nextRow.Scan(xslices.Transform(dst, func(v driver.Value) any {
-		return &v
-	})...); err != nil {
+	ptrs := make([]any, len(dst))
+	for i := range dst {
+		ptrs[i] = &dst[i]
+	}
+
+	if err = nextRow.Scan(ptrs...); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
