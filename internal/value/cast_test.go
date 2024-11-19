@@ -1,6 +1,7 @@
 package value
 
 import (
+	"database/sql/driver"
 	"reflect"
 	"testing"
 	"time"
@@ -24,9 +25,9 @@ func unwrapPtr(v interface{}) interface{} {
 	return reflect.ValueOf(v).Elem().Interface()
 }
 
-func loadLocation(T *testing.T, name string) *time.Location {
+func loadLocation(t *testing.T, name string) *time.Location {
 	loc, err := time.LoadLocation(name)
-	require.NoError(T, err)
+	require.NoError(t, err)
 
 	return loc
 }
@@ -358,16 +359,30 @@ func TestCastTo(t *testing.T) {
 		},
 		{
 			name:  xtest.CurrentFileLine(),
-			value: TzTimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)),
+			value: TzTimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Moscow"))),
 			dst:   ptr[string](),
-			exp:   "2024-01-02T03:04:05.000000Z",
+			exp:   "2024-01-02T03:04:05.000000,Europe/Moscow",
 			err:   nil,
 		},
 		{
 			name:  xtest.CurrentFileLine(),
-			value: TzTimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)),
+			value: TzDatetimeValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Moscow"))),
+			dst:   ptr[string](),
+			exp:   "2024-01-02T03:04:05,Europe/Moscow",
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TzDateValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Moscow"))),
+			dst:   ptr[string](),
+			exp:   "2024-01-02,Europe/Moscow",
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TzTimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Moscow"))),
 			dst:   ptr[[]byte](),
-			exp:   []byte("2024-01-02T03:04:05.000000Z"),
+			exp:   []byte("2024-01-02T03:04:05.000000,Europe/Moscow"),
 			err:   nil,
 		},
 		{
@@ -421,6 +436,345 @@ func TestCastTo(t *testing.T) {
 				require.Equal(t, tt.exp, unwrapPtr(tt.dst))
 			} else {
 				require.ErrorIs(t, CastTo(tt.value, tt.dst), tt.err)
+			}
+		})
+	}
+}
+
+func TestCastToDriverValue(t *testing.T) {
+	testsCases := []struct {
+		name  string
+		value Value
+		exp   interface{}
+		err   error
+	}{
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TextValue("test"),
+			exp:   "test",
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(TextValue("test")),
+			exp:   "test",
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TextValue("test"),
+			exp:   "test",
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(TextValue("test")),
+			exp:   "test",
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TextValue("test"),
+			exp:   "test",
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(BytesValue([]byte("test"))),
+			exp:   []byte("test"),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TextValue("test"),
+			exp:   "test",
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TextValue("test"),
+			exp:   "test",
+			err:   nil,
+		},
+
+		{
+			name:  xtest.CurrentFileLine(),
+			value: BytesValue([]byte("test")),
+			exp:   []byte("test"),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: BytesValue([]byte("test")),
+			exp:   []byte("test"),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: BytesValue([]byte("test")),
+			exp:   []byte("test"),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: BytesValue([]byte("test")),
+			exp:   []byte("test"),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: BytesValue([]byte("test")),
+			exp:   []byte("test"),
+			err:   nil,
+		},
+
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONDocumentValue(`{"test": "text"}"`),
+			exp:   `{"test": "text"}"`,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONDocumentValue(`{"test":"text"}"`),
+			exp:   `{"test":"text"}"`,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(JSONDocumentValue(`{"test": "text"}"`)),
+			exp:   `{"test": "text"}"`,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONDocumentValue(`{"test":"text"}"`),
+			exp:   `{"test":"text"}"`,
+			err:   nil,
+		},
+
+		{
+			name:  xtest.CurrentFileLine(),
+			value: BoolValue(true),
+			exp:   true,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: BoolValue(true),
+			exp:   true,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(BoolValue(true)),
+			exp:   true,
+			err:   nil,
+		},
+
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int32Value(123),
+			exp:   int32(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int32Value(123),
+			exp:   int32(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int32Value(123),
+			exp:   int32(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int32Value(123),
+			exp:   int32(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int32Value(123),
+			exp:   int32(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(Int32Value(123)),
+			exp:   int32(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int32Value(123),
+			exp:   int32(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int32Value(123),
+			exp:   int32(123),
+			err:   nil,
+		},
+
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int64Value(123),
+			exp:   int64(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int64Value(123),
+			exp:   int64(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(Int64Value(123)),
+			exp:   int64(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int64Value(123),
+			exp:   int64(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int64Value(123),
+			exp:   int64(123),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: Int64Value(123),
+			exp:   int64(123),
+			err:   nil,
+		},
+
+		{
+			name:  xtest.CurrentFileLine(),
+			value: DoubleValue(1.23),
+			exp:   1.23,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: DoubleValue(1.23),
+			exp:   1.23,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(DoubleValue(1.23)),
+			exp:   1.23,
+			err:   nil,
+		},
+
+		{
+			name:  xtest.CurrentFileLine(),
+			value: IntervalValueFromDuration(time.Second),
+			exp:   time.Second,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: IntervalValueFromDuration(time.Second),
+			exp:   time.Second,
+			err:   nil,
+		},
+
+		// nanoseconds are ignored in YDB timestamps
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, time.Local)),
+			exp:   time.Date(2024, 1, 2, 3, 4, 5, 0, time.Local),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, time.Local)),
+			exp:   time.Date(2024, 1, 2, 3, 4, 5, 0, time.Local),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TimestampValue(uint64(time.Date(2024, 1, 2, 3, 4, 5, 0, time.Local).UnixMicro())),
+			exp:   time.Date(2024, 1, 2, 3, 4, 5, 0, time.Local),
+			err:   nil,
+		},
+
+		// nanoseconds are ignored in YDB timestamps
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TzTimestampValue("2024-01-02T03:04:05.000000,Europe/Moscow"),
+			exp:   time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Moscow")),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TzTimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Berlin"))),
+			exp:   time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Berlin")),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TzTimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Berlin"))),
+			exp:   time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Berlin")),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TzTimestampValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Berlin"))),
+			exp:   time.Date(2024, 1, 2, 3, 4, 5, 0, loadLocation(t, "Europe/Berlin")),
+			err:   nil,
+		},
+
+		{
+			name:  xtest.CurrentFileLine(),
+			value: DateValue(uint32(time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC).Unix() / 60 / 60 / 24)),
+			exp:   time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: DateValueFromTime(time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)),
+			exp:   time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: DateValueFromTime(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
+			exp:   time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: DateValueFromTime(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
+			exp:   time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: DateValueFromTime(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
+			exp:   time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			err:   nil,
+		},
+	}
+	for _, tt := range testsCases {
+		t.Run(tt.name, func(t *testing.T) {
+			var v driver.Value
+			if tt.err == nil {
+				require.NoError(t, CastTo(tt.value, &v))
+				require.Equal(t, tt.exp, v)
+			} else {
+				require.ErrorIs(t, CastTo(tt.value, &v), tt.err)
 			}
 		})
 	}
