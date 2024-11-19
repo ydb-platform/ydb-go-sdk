@@ -1,10 +1,15 @@
+* Fixed string representation of `TzTimestamp`, `TzDatetime` and `TzDate` type values
+* Added `database/sql/driver.Value` as type destination for almost ydb values
+
+## v3.92.5
+* Avoid retrying requests finished with 'UNAUTHORIZED' errors
+
 ## v3.92.4
 * Fixed connections pool leak on closing
 
 ## v3.92.3
 * Fixed error with incompleted data returen from transaction.ReadQueryResult method
 * Added option `query/WithResponsePartLimitSizeBytes(...)` for queries with query service
-
 
 ## v3.92.2
 * Added `table/options.WithShardNodesInfo()` experimental option to get shard nodeId for describe table call

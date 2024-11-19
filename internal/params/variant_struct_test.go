@@ -414,7 +414,7 @@ func TestVariantStruct(t *testing.T) {
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
-						TextValue: "1973-11-29T21:33:09Z",
+						TextValue: "1973-11-29T21:33:09,UTC",
 					},
 					VariantIndex: 0,
 				},
@@ -430,7 +430,7 @@ func TestVariantStruct(t *testing.T) {
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
-						TextValue: "1973-11-29",
+						TextValue: "1973-11-29,UTC",
 					},
 					VariantIndex: 0,
 				},
@@ -446,7 +446,7 @@ func TestVariantStruct(t *testing.T) {
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
-						TextValue: "1973-11-29T21:33:09.000000Z",
+						TextValue: "1973-11-29T21:33:09.000000,UTC",
 					},
 					VariantIndex: 0,
 				},
