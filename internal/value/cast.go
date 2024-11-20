@@ -30,9 +30,6 @@ func CastTo(v Value, dst interface{}) error {
 	}
 
 	return xerrors.WithStackTrace(
-		xerrors.Join(
-			err,
-			fmt.Errorf("cannot cast %T to driver.Value", dst),
-		),
+		fmt.Errorf("%w and cannot cast %T to driver.Value", err, dst),
 	)
 }
