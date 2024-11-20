@@ -262,6 +262,9 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
 				r.closeOnce()
+				if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
+					return nil, xerrors.WithStackTrace(io.EOF)
+				}
 
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"next result set rowIndex %d less than last result set index %d: %w",
