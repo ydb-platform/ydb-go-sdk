@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -74,5 +75,11 @@ func TestIssue847ScanError(t *testing.T) {
 		return res.Err()
 	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())))
 	require.Error(t, err)
-	require.ErrorContains(t, err, "Unexpected token 'SELICT'")
+	if !strings.Contains(
+		err.Error(), "Unexpected token 'SELICT'", /*antlr3 parser*/
+	) && !strings.Contains(
+		err.Error(), "mismatched input 'SELICT'", /*antlr4 parser*/
+	) {
+		t.Fail()
+	}
 }
