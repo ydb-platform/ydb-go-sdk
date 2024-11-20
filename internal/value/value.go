@@ -2422,10 +2422,7 @@ func (v *variantValue) Value() Value {
 }
 
 func (v *variantValue) castTo(dst any) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w '%s' to '%T' destination",
-		ErrCannotCast, v.Type().Yql(), dst,
-	))
+	return v.value.castTo(dst)
 }
 
 func (v *variantValue) Yql() string {
