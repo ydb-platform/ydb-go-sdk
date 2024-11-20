@@ -16,14 +16,13 @@ func CastTo(v Value, dst interface{}) error {
 		return nil
 	}
 
-	err := v.castTo(dst)
-
-	if err == nil {
+	if err := v.castTo(dst); err == nil {
 		return nil
 	}
 
 	if ptr, has := dst.(*driver.Value); has {
 		*ptr = v
+
 		return nil
 	}
 
