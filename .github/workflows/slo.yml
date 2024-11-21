@@ -85,15 +85,6 @@ jobs:
         run: |
           ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 create grpc://localhost:2135 /Root/testdb
 
-      - name: Chaos YDB
-        run: |
-          chmod +x ./.github/scripts/chaos-ydb.sh
-          nohup ./.github/scripts/chaos-ydb.sh > chaos-ydb.log 2>&1 &
-
-      # - name: Chaos Network
-      #   run: |
-      #     sudo tc qdisc add dev lo root netem delay 100ms 50ms loss 5% corrupt 1%
-
       - name: Run SLO Tests
         run: |
           ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 run grpc://localhost:2135 /Root/testdb \
@@ -105,9 +96,10 @@ jobs:
             -read-timeout 1000 \
             -write-timeout 1000 || true
 
-      # - if: always()
-      #   run: |
-      #     sudo tc qdisc del dev lo root
+      - if: always()
+        name: Store ydb chaos testing logs
+        run: |
+          docker logs ydb-chaos > chaos-ydb.log
 
       - if: always()
         uses: actions/upload-artifact@v4
