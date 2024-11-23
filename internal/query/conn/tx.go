@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -38,7 +37,7 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (currentT
 
 	nativeTx, err := c.session.Begin(ctx, query.TxSettings(txc))
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &transaction{
@@ -77,13 +76,13 @@ func (tx *transaction) Commit() (finalErr error) {
 		onDone(finalErr)
 	}()
 	if err := tx.checkTxState(); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
 	if err := tx.tx.CommitTx(tx.ctx); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -101,14 +100,14 @@ func (tx *transaction) Rollback() (finalErr error) {
 		onDone(finalErr)
 	}()
 	if err := tx.checkTxState(); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
 	err := tx.tx.Rollback(tx.ctx)
 	if err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return err
@@ -133,7 +132,7 @@ func (tx *transaction) QueryContext(ctx context.Context, query string, args []dr
 		query, options.WithParameters(&parameters),
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
@@ -161,7 +160,7 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 		query, options.WithParameters(&parameters),
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return resultNoRows{}, nil
@@ -176,7 +175,7 @@ func (tx *transaction) PrepareContext(ctx context.Context, query string) (_ driv
 		onDone(finalErr)
 	}()
 	if !tx.conn.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
 	return &stmt{

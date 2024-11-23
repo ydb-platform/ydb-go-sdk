@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -54,7 +53,7 @@ func (r *rows) loadFirstNextSet() {
 func (r *rows) Columns() []string {
 	r.firstNextSet.Do(r.loadFirstNextSet)
 	if r.columnsFetchError != nil {
-		panic(badconn.Map(xerrors.WithStackTrace(r.columnsFetchError)))
+		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
 
 	return r.columns
@@ -63,7 +62,7 @@ func (r *rows) Columns() []string {
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	r.firstNextSet.Do(r.loadFirstNextSet)
 	if r.columnsFetchError != nil {
-		panic(badconn.Map(xerrors.WithStackTrace(r.columnsFetchError)))
+		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
 
 	return r.columnsType[index].String()
@@ -72,7 +71,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	r.firstNextSet.Do(r.loadFirstNextSet)
 	if r.columnsFetchError != nil {
-		panic(badconn.Map(xerrors.WithStackTrace(r.columnsFetchError)))
+		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
 	_, castResult := r.nextSet.ColumnTypes()[index].(interface{ IsOptional() })
 
@@ -92,7 +91,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 	}
 
 	if r.nextErr != nil {
-		return badconn.Map(xerrors.WithStackTrace(r.nextErr))
+		return xerrors.WithStackTrace(r.nextErr)
 	}
 
 	r.columns = r.nextSet.Columns()
@@ -117,7 +116,7 @@ func (r *rows) Next(dst []driver.Value) error {
 			return io.EOF
 		}
 
-		return badconn.Map(xerrors.WithStackTrace(r.nextErr))
+		return xerrors.WithStackTrace(r.nextErr)
 	}
 
 	nextRow, err := r.nextSet.NextRow(ctx)
@@ -126,7 +125,7 @@ func (r *rows) Next(dst []driver.Value) error {
 			return io.EOF
 		}
 
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	ptrs := make([]any, len(dst))
@@ -135,7 +134,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	}
 
 	if err = nextRow.Scan(ptrs...); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil

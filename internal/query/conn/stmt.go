@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -35,7 +34,7 @@ func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 		onDone(finalErr)
 	}()
 	if !stmt.conn.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
 	return stmt.processor.QueryContext(ctx, stmt.query, args)
@@ -50,7 +49,7 @@ func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 		onDone(finalErr)
 	}()
 	if !stmt.conn.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
 	return stmt.processor.ExecContext(ctx, stmt.query, args)

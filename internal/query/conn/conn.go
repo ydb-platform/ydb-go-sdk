@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -96,9 +95,7 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx curr
 	}()
 
 	if c.currentTx != nil {
-		return nil, badconn.Map(
-			xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID())),
-		)
+		return nil, xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID()))
 	}
 
 	tx, err := beginTx(ctx, c, txOptions)
@@ -121,7 +118,7 @@ func (c *Conn) execContext(
 	}()
 
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
 	if c.currentTx != nil {
@@ -143,7 +140,7 @@ func (c *Conn) execContext(
 
 	err = c.session.Exec(ctx, normalizedQuery, options.WithParameters(&params))
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return resultNoRows{}, nil
@@ -157,7 +154,7 @@ func (c *Conn) queryContext(ctx context.Context, queryString string, args []driv
 	}()
 
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
 	if c.currentTx != nil {
@@ -197,7 +194,7 @@ func (c *Conn) queryContextOther(
 		options.WithParameters(&parameters),
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
@@ -222,7 +219,7 @@ func (c *Conn) queryContextExplain(
 		}),
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &single{
