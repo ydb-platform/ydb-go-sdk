@@ -162,7 +162,7 @@ func (c *Conn) execContext(
 		return c.currentTx.ExecContext(ctx, query, args)
 	}
 
-	m := QueryModeFromContext(ctx, c.defaultQueryMode)
+	m := xcontext.QueryModeFromContext(ctx, c.defaultQueryMode)
 	onDone := trace.DatabaseSQLOnConnExec(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).execContext"),
 		query, m.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
@@ -285,7 +285,7 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	}
 
 	var (
-		queryMode = QueryModeFromContext(ctx, c.defaultQueryMode)
+		queryMode = xcontext.QueryModeFromContext(ctx, c.defaultQueryMode)
 		onDone    = trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).queryContext"),
 			query, queryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
@@ -462,7 +462,7 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx curr
 		)
 	}
 
-	m := QueryModeFromContext(ctx, c.defaultQueryMode)
+	m := xcontext.mContext(ctx, c.defaultQueryMode)
 
 	if slices.Contains(c.fakeTxModes, m) {
 		return beginTxFake(ctx, c), nil

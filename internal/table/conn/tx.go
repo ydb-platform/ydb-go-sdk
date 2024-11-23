@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -121,7 +122,7 @@ func (tx *transaction) QueryContext(ctx context.Context, query string, args []dr
 	defer func() {
 		onDone(finalErr)
 	}()
-	m := QueryModeFromContext(ctx, tx.conn.defaultQueryMode)
+	m := xcontext.QueryModeFromContext(ctx, tx.conn.defaultQueryMode)
 	if m != DataQueryMode {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
@@ -163,7 +164,7 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 	defer func() {
 		onDone(finalErr)
 	}()
-	m := QueryModeFromContext(ctx, tx.conn.defaultQueryMode)
+	m := xcontext.QueryModeFromContext(ctx, tx.conn.defaultQueryMode)
 	if m != DataQueryMode {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(

@@ -21,20 +21,6 @@ func WithTxControlHook(ctx context.Context, hook txControlHook) context.Context 
 	return context.WithValue(ctx, ctxTxControlHookKey{}, hook)
 }
 
-// WithQueryMode returns a copy of context with given QueryMode
-func WithQueryMode(ctx context.Context, m QueryMode) context.Context {
-	return context.WithValue(ctx, ctxModeTypeKey{}, m)
-}
-
-// QueryModeFromContext returns defined QueryMode or DefaultQueryMode
-func QueryModeFromContext(ctx context.Context, defaultQueryMode QueryMode) QueryMode {
-	if m, ok := ctx.Value(ctxModeTypeKey{}).(QueryMode); ok {
-		return m
-	}
-
-	return defaultQueryMode
-}
-
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
 	return context.WithValue(ctx, ctxTransactionControlKey{}, txc)
 }

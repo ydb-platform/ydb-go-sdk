@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
-	tableConn "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -131,7 +130,7 @@ func (c *Conn) execContext(
 
 	onDone := trace.DatabaseSQLOnConnExec(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).execContext"),
-		query, tableConn.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
+		query, xcontext.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -167,7 +166,7 @@ func (c *Conn) queryContext(ctx context.Context, queryString string, args []driv
 
 	onDone := trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).queryContext"),
-		queryString, tableConn.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
+		queryString, xcontext.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 	)
 
 	defer func() {
@@ -179,9 +178,9 @@ func (c *Conn) queryContext(ctx context.Context, queryString string, args []driv
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	queryMode := tableConn.QueryModeFromContext(ctx, tableConn.UnknownQueryMode)
+	queryMode := xcontext.QueryModeFromContext(ctx, xcontext.UnknownQueryMode)
 
-	if queryMode == tableConn.ExplainQueryMode {
+	if queryMode == xcontext.ExplainQueryMode {
 		return c.queryContextExplain(ctx, normalizedQuery, parameters)
 	}
 

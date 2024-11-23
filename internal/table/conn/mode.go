@@ -1,49 +1,18 @@
 package conn
 
-import "fmt"
+import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
+)
 
-type QueryMode int
+type QueryMode = xcontext.QueryMode
 
 const (
-	UnknownQueryMode = QueryMode(iota)
-	DataQueryMode
-	ExplainQueryMode
-	ScanQueryMode
-	SchemeQueryMode
-	ScriptingQueryMode
+	UnknownQueryMode   = xcontext.UnknownQueryMode
+	DataQueryMode      = xcontext.DataQueryMode
+	ExplainQueryMode   = xcontext.ExplainQueryMode
+	ScanQueryMode      = xcontext.ScanQueryMode
+	SchemeQueryMode    = xcontext.SchemeQueryMode
+	ScriptingQueryMode = xcontext.UnknownQueryMode
 
-	DefaultQueryMode = DataQueryMode
+	DefaultQueryMode = xcontext.UnknownQueryMode
 )
-
-var (
-	typeToString = map[QueryMode]string{
-		DataQueryMode:      "data",
-		ScanQueryMode:      "scan",
-		ExplainQueryMode:   "explain",
-		SchemeQueryMode:    "scheme",
-		ScriptingQueryMode: "scripting",
-	}
-	stringToType = map[string]QueryMode{
-		"data":      DataQueryMode,
-		"scan":      ScanQueryMode,
-		"explain":   ExplainQueryMode,
-		"scheme":    SchemeQueryMode,
-		"scripting": ScriptingQueryMode,
-	}
-)
-
-func (t QueryMode) String() string {
-	if s, ok := typeToString[t]; ok {
-		return s
-	}
-
-	return fmt.Sprintf("unknown_mode_%d", t)
-}
-
-func QueryModeFromString(s string) QueryMode {
-	if t, ok := stringToType[s]; ok {
-		return t
-	}
-
-	return UnknownQueryMode
-}
