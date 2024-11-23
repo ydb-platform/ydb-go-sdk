@@ -462,7 +462,7 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx curr
 		)
 	}
 
-	m := xcontext.mContext(ctx, c.defaultQueryMode)
+	m := xcontext.QueryModeFromContext(ctx, c.defaultQueryMode)
 
 	if slices.Contains(c.fakeTxModes, m) {
 		return beginTxFake(ctx, c), nil

@@ -11,7 +11,6 @@ type (
 	ctxTransactionControlKey struct{}
 	ctxDataQueryOptionsKey   struct{}
 	ctxScanQueryOptionsKey   struct{}
-	ctxModeTypeKey           struct{}
 	ctxTxControlHookKey      struct{}
 
 	txControlHook func(txControl *table.TransactionControl)
