@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -71,7 +70,7 @@ func (r *rows) Columns() []string {
 	if r.columnsFetchError != nil {
 		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
-	fmt.Println(r.columns)
+
 	return r.columns
 }
 
@@ -80,6 +79,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	if r.columnsFetchError != nil {
 		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
+
 	return r.columnsType[index].Yql()
 }
 
