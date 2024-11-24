@@ -508,10 +508,17 @@ type DecimalValuer interface {
 }
 
 func (v *decimalValue) castTo(dst any) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w '%+v' to '%T' destination",
-		ErrCannotCast, v, dst,
-	))
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v *decimalValue) Yql() string {
@@ -597,10 +604,17 @@ func (v *dictValue) DictValues() map[Value]Value {
 }
 
 func (v *dictValue) castTo(dst any) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w '%+v' to '%T' destination",
-		ErrCannotCast, v, dst,
-	))
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v *dictValue) Yql() string {
@@ -1266,10 +1280,17 @@ func (v *listValue) ListItems() []Value {
 }
 
 func (v *listValue) castTo(dst any) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w '%s(%+v)' to '%T' destination",
-		ErrCannotCast, v.Type().Yql(), v, dst,
-	))
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v *listValue) Yql() string {
@@ -1326,10 +1347,17 @@ type pgValue struct {
 }
 
 func (v pgValue) castTo(dst any) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w  PgType to '%T' destination",
-		ErrCannotCast, dst,
-	))
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v pgValue) Type() types.Type {
@@ -1359,10 +1387,17 @@ type setValue struct {
 }
 
 func (v *setValue) castTo(dst any) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w '%+v' to '%T' destination",
-		ErrCannotCast, v, dst,
-	))
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v *setValue) Yql() string {
@@ -1535,10 +1570,17 @@ func (v *structValue) StructFields() map[string]Value {
 }
 
 func (v *structValue) castTo(dst any) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w '%+v' to '%T' destination",
-		ErrCannotCast, v, dst,
-	))
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v *structValue) Yql() string {
@@ -2422,7 +2464,17 @@ func (v *variantValue) Value() Value {
 }
 
 func (v *variantValue) castTo(dst any) error {
-	return v.value.castTo(dst)
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v *variantValue) Yql() string {
@@ -2504,10 +2556,17 @@ func VariantValueStruct(v Value, name string, t types.Type) *variantValue {
 type voidValue struct{}
 
 func (v voidValue) castTo(dst any) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w '%s' to '%T' destination",
-		ErrCannotCast, v.Type().Yql(), dst,
-	))
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v voidValue) Yql() string {

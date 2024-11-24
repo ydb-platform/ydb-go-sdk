@@ -1,12 +1,5 @@
 package value
 
-import (
-	"database/sql/driver"
-	"fmt"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-)
-
 func CastTo(v Value, dst interface{}) error {
 	if dst == nil {
 		return errNilDestination
@@ -17,19 +10,5 @@ func CastTo(v Value, dst interface{}) error {
 		return nil
 	}
 
-	var err error
-
-	if err = v.castTo(dst); err == nil {
-		return nil
-	}
-
-	if ptr, has := dst.(*driver.Value); has {
-		*ptr = v
-
-		return nil
-	}
-
-	return xerrors.WithStackTrace(
-		fmt.Errorf("%w and cannot cast %T to driver.Value", err, dst),
-	)
+	return v.castTo(dst)
 }
