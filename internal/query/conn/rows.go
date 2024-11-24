@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
@@ -19,6 +21,8 @@ var (
 	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
 	_ driver.RowsColumnTypeNullable         = &rows{}
 	_ driver.Rows                           = &single{}
+
+	ignoreColumnPrefixName = "__discard_column_"
 )
 
 type rows struct {
@@ -29,9 +33,26 @@ type rows struct {
 	nextSet      result.Set
 	nextErr      error
 
-	columnsFetchError error
-	columns           []string
-	columnsType       []types.Type
+	columnsFetchError   error
+	allColumns, columns []string
+	columnsType         []types.Type
+	discarded           []bool
+}
+
+func (r *rows) updateColumns() {
+	if r.nextErr == nil {
+		r.allColumns = r.nextSet.Columns()
+		r.columns = make([]string, 0, len(r.allColumns))
+		r.discarded = make([]bool, len(r.allColumns))
+		for i, v := range r.allColumns {
+			r.discarded[i] = strings.HasPrefix(v, ignoreColumnPrefixName)
+			if !r.discarded[i] {
+				r.columns = append(r.columns, v)
+			}
+		}
+		r.columnsType = r.nextSet.ColumnTypes()
+		r.columnsFetchError = r.nextErr
+	}
 }
 
 func (r *rows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
@@ -42,12 +63,7 @@ func (r *rows) loadFirstNextSet() {
 	res, err := r.result.NextResultSet(ctx)
 	r.nextErr = err
 	r.nextSet = res
-
-	if err == nil {
-		r.columns = r.nextSet.Columns()
-		r.columnsType = r.nextSet.ColumnTypes()
-		r.columnsFetchError = r.nextErr
-	}
+	r.updateColumns()
 }
 
 func (r *rows) Columns() []string {
@@ -55,7 +71,7 @@ func (r *rows) Columns() []string {
 	if r.columnsFetchError != nil {
 		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
-
+	fmt.Println(r.columns)
 	return r.columns
 }
 
@@ -92,10 +108,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 	if r.nextErr != nil {
 		return xerrors.WithStackTrace(r.nextErr)
 	}
-
-	r.columns = r.nextSet.Columns()
-	r.columnsType = r.nextSet.ColumnTypes()
-	r.columnsFetchError = r.nextErr
+	r.updateColumns()
 
 	return nil
 }
@@ -127,13 +140,22 @@ func (r *rows) Next(dst []driver.Value) error {
 		return xerrors.WithStackTrace(err)
 	}
 
-	ptrs := make([]any, len(dst))
-	for i := range dst {
-		ptrs[i] = &dst[i]
+	dstBuf := make([]driver.Value, len(r.allColumns))
+	ptrs := make([]any, len(dstBuf))
+	for i := range dstBuf {
+		ptrs[i] = &dstBuf[i]
 	}
 
 	if err = nextRow.Scan(ptrs...); err != nil {
 		return xerrors.WithStackTrace(err)
+	}
+
+	dstI := 0
+	for i := range dstBuf {
+		if !r.discarded[i] {
+			dst[dstI] = dstBuf[i]
+			dstI++
+		}
 	}
 
 	return nil
