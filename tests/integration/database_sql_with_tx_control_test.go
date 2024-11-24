@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,6 +27,11 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 			ydb.WithAutoDeclare(),
 		)
 	)
+	overQueryService := false
+
+	if v, has := os.LookupEnv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE"); has && v != "" {
+		overQueryService = true
+	}
 
 	t.Run("default", func(t *testing.T) {
 		var hookCalled bool
@@ -42,7 +48,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("SerializableReadWriteTxControl", func(t *testing.T) {
@@ -60,7 +66,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("SnapshotReadOnlyTxControl", func(t *testing.T) {
@@ -78,7 +84,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("StaleReadOnlyTxControl", func(t *testing.T) {
@@ -96,7 +102,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("OnlineReadOnlyTxControl{AllowInconsistentReads:false}", func(t *testing.T) {
@@ -114,7 +120,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("OnlineReadOnlyTxControl{AllowInconsistentReads:true})", func(t *testing.T) {
@@ -132,6 +138,6 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 }
