@@ -64,8 +64,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	if r.columnsFetchError != nil {
 		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
-
-	return r.columnsType[index].String()
+	return r.columnsType[index].Yql()
 }
 
 func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
@@ -75,7 +74,7 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	}
 	_, castResult := r.nextSet.ColumnTypes()[index].(interface{ IsOptional() })
 
-	return castResult, castResult
+	return castResult, true
 }
 
 func (r *rows) NextResultSet() (finalErr error) {
