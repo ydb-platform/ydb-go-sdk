@@ -54,7 +54,8 @@ jobs:
             label: xorm
 
     concurrency:
-      group: slo-${{ github.ref }}-${{matrix.sdk.name}}
+      group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout repository
@@ -78,17 +79,36 @@ jobs:
           github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           sdk_name: ${{ matrix.sdk.name }}
+          ydb_database_node_count: 5
+
+      - name: Prepare SLO Database
+        run: |
+          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 create grpc://localhost:2135 /Root/testdb
 
       - name: Run SLO Tests
         run: |
-          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 create grpc://localhost:2135 /Root/testdb
           ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 run grpc://localhost:2135 /Root/testdb \
             -prom-pgw localhost:9091 \
             -report-period 250 \
             -time ${{inputs.slo_workload_duration_seconds || 600}} \
             -read-rps ${{inputs.slo_workload_read_max_rps || 1000}} \
             -write-rps ${{inputs.slo_workload_write_max_rps || 100}} \
-            -read-timeout 10000 \
-            -write-timeout 10000 \
-            -shutdown-time 30
-          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 cleanup grpc://localhost:2135 /Root/testdb
+            -read-timeout 1000 \
+            -write-timeout 1000 || true
+
+      - if: always()
+        name: Store ydb chaos testing logs
+        run: |
+          docker logs ydb-chaos > chaos-ydb.log
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{matrix.sdk.name}}-chaos-ydb.log
+          path: ./chaos-ydb.log
+          retention-days: 1
+
+      - if: always()
+        name: Cleanup SLO Database
+        run: |
+          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 cleanup grpc://localhost:2135 /Root/testdb || true

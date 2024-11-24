@@ -27,6 +27,7 @@ type (
 		operationsFailureTotal  *prometheus.CounterVec
 		operationLatencySeconds *prometheus.HistogramVec
 
+		retryAttempts       *prometheus.GaugeVec
 		retryAttemptsTotal  *prometheus.CounterVec
 		retriesSuccessTotal *prometheus.CounterVec
 		retriesFailureTotal *prometheus.CounterVec
@@ -107,6 +108,14 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 		[]string{"operation_type", "operation_status"},
 	)
 
+	m.retryAttempts = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "sdk_retry_attempts",
+			Help: "Current retry attempts, categorized by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+
 	m.retryAttemptsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "sdk_retry_attempts_total",
@@ -147,6 +156,7 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 		Collector(m.operationsSuccessTotal).
 		Collector(m.operationsFailureTotal).
 		Collector(m.operationLatencySeconds).
+		Collector(m.retryAttempts).
 		Collector(m.retryAttemptsTotal).
 		Collector(m.retriesSuccessTotal).
 		Collector(m.retriesFailureTotal).
@@ -167,6 +177,7 @@ func (m *Metrics) Reset() error {
 	m.operationsFailureTotal.Reset()
 	m.operationLatencySeconds.Reset()
 
+	m.retryAttempts.Reset()
 	m.retryAttemptsTotal.Reset()
 	m.retriesSuccessTotal.Reset()
 	m.retriesFailureTotal.Reset()
@@ -192,17 +203,18 @@ func (j Span) Finish(err error, attempts int) {
 	latency := time.Since(j.start)
 	j.m.pendingOperations.WithLabelValues(j.name).Sub(1)
 
+	j.m.retryAttempts.WithLabelValues(j.name).Set(float64(attempts))
 	j.m.operationsTotal.WithLabelValues(j.name).Add(1)
 	j.m.retryAttemptsTotal.WithLabelValues(j.name).Add(float64(attempts))
 
 	if err != nil {
 		j.m.errorsTotal.WithLabelValues(err.Error()).Add(1)
-		// j.m.retriesFailureTotal.WithLabelValues(j.name).Add(1)
+		j.m.retriesFailureTotal.WithLabelValues(j.name).Add(float64(attempts))
 		j.m.operationsFailureTotal.WithLabelValues(j.name).Add(1)
 		j.m.operationLatencySeconds.WithLabelValues(j.name, OperationStatusFailue).Observe(latency.Seconds())
 	} else {
+		j.m.retriesSuccessTotal.WithLabelValues(j.name).Add(float64(attempts))
 		j.m.operationsSuccessTotal.WithLabelValues(j.name).Add(1)
-		// j.m.retriesSuccessTotal.WithLabelValues(j.name).Add(1)
 		j.m.operationLatencySeconds.WithLabelValues(j.name, OperationStatusSuccess).Observe(latency.Seconds())
 	}
 }
