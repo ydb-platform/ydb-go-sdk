@@ -12,7 +12,7 @@ const (
 	ExplainQueryMode   = xcontext.ExplainQueryMode
 	ScanQueryMode      = xcontext.ScanQueryMode
 	SchemeQueryMode    = xcontext.SchemeQueryMode
-	ScriptingQueryMode = xcontext.UnknownQueryMode
+	ScriptingQueryMode = xcontext.ScriptingQueryMode
 
-	DefaultQueryMode = xcontext.UnknownQueryMode
+	DefaultQueryMode = xcontext.DefaultQueryMode
 )
