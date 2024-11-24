@@ -1696,10 +1696,17 @@ func (v *tupleValue) castTo(dst any) error {
 		return v.items[0].castTo(dst)
 	}
 
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"%w '%+v' to '%T' destination",
-		ErrCannotCast, v, dst,
-	))
+	switch dstValue := dst.(type) {
+	case *driver.Value:
+		*dstValue = v
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, dstValue,
+		))
+	}
 }
 
 func (v *tupleValue) Yql() string {
