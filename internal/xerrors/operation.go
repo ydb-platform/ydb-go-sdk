@@ -189,6 +189,9 @@ func (e *operationError) Type() Type {
 }
 
 func (e *operationError) BackoffType() backoff.Type {
+	if IsOperationErrorTransactionLocksInvalidated(e) {
+		return backoff.TypeSlow
+	}
 	switch e.code {
 	case Ydb.StatusIds_OVERLOADED:
 		return backoff.TypeSlow
