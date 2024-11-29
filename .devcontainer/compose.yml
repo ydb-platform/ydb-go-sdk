@@ -1,0 +1,55 @@
+version: '3.8'
+
+volumes:
+  ydb-data:
+    # driver: local
+    # driver_opts:
+    #   type: tmpfs
+    #   device: tmpfs
+    #   o: size=80g
+  ydb-certs:
+
+services:
+  sdk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    volumes:
+      - ydb-certs:/ydb_certs
+      - ../:/workspaces/ydb-go-sdk:cached
+
+    environment:
+    - YDB_VERSION=24.3
+    - YDB_CONNECTION_STRING=grpc://ydb:2136/local
+    - YDB_CONNECTION_STRING_SECURE=grpcs://ydb:2135/local
+    - YDB_ANONYMOUS_CREDENTIALS=1
+    - YDB_SSL_ROOT_CERTIFICATES_FILE=/ydb_certs/ca.pem
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+    # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
+    network_mode: service:ydb
+
+    # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
+    # (Adding the "ports" property to this file will not forward from a Codespace.)
+
+  ydb:
+    image: ghcr.io/ydb-platform/local-ydb:24.3
+    restart: unless-stopped
+    hostname: ydb
+    platform: linux/amd64
+
+    volumes:
+      - ydb-data:/ydb_data
+      - ydb-certs:/ydb_certs
+
+    environment:
+      - YDB_USE_IN_MEMORY_PDISKS=true
+      - GRPC_TLS_PORT=2135
+      - GRPC_PORT=2136
+      - MON_PORT=8765
+
+    # Add "forwardPorts": [2135, 8765] to **devcontainer.json** to forward YDB locally.
+    # (Adding the "ports" property to this file will not forward from a Codespace.)
