@@ -76,6 +76,10 @@ type Client interface {
 	// Returns success only when all rows were successfully upserted. In case of an error some rows might
 	// be upserted and some might not.
 	BulkUpsert(ctx context.Context, table string, data BulkUpsertData, opts ...Option) error
+
+	BulkUpsertMultitable(
+		ctx context.Context, scheme []byte, tables []string, rowsnum []int, data []byte, opts ...Option,
+	) (finalErr error)
 }
 
 type SessionStatus = string
@@ -598,8 +602,8 @@ type bulkUpsertRows struct {
 
 func (data bulkUpsertRows) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
 	return &Ydb_Table.BulkUpsertRequest{
-		Table: tableName,
-		Rows:  value.ToYDB(data.rows, a),
+		Mode: &Ydb_Table.BulkUpsertRequest_Table{Table: tableName},
+		Rows: value.ToYDB(data.rows, a),
 	}, nil
 }
 
@@ -621,8 +625,8 @@ type csvFormatOption interface {
 func (data bulkUpsertCsv) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
 	var (
 		request = &Ydb_Table.BulkUpsertRequest{
-			Table: tableName,
-			Data:  data.data,
+			Mode: &Ydb_Table.BulkUpsertRequest_Table{Table: tableName},
+			Data: data.data,
 		}
 		dataFormat = &Ydb_Table.BulkUpsertRequest_CsvSettings{
 			CsvSettings: &Ydb_Formats.CsvSettings{},
@@ -713,8 +717,8 @@ type arrowFormatOption interface {
 func (data bulkUpsertArrow) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
 	var (
 		request = &Ydb_Table.BulkUpsertRequest{
-			Table: tableName,
-			Data:  data.data,
+			Mode: &Ydb_Table.BulkUpsertRequest_Table{Table: tableName},
+			Data: data.data,
 		}
 		dataFormat = &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{
 			ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{},

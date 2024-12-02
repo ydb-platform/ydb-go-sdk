@@ -9,12 +9,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -1283,8 +1284,8 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 
 	_, err = s.client.BulkUpsert(ctx,
 		&Ydb_Table.BulkUpsertRequest{
-			Table: table,
-			Rows:  value.ToYDB(rows, a),
+			Mode: &Ydb_Table.BulkUpsertRequest_Table{Table: table},
+			Rows: value.ToYDB(rows, a),
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),

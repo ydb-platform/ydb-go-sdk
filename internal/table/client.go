@@ -4,8 +4,11 @@ import (
 	"context"
 
 	"github.com/jonboulle/clockwork"
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"google.golang.org/grpc"
+
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -335,4 +338,62 @@ func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx
 	}
 
 	return op(xcontext.MarkRetryCall(ctx), tx)
+}
+
+func (c *Client) BulkUpsertMultitable(
+	ctx context.Context, scheme []byte, tables []string, rowsnum []int, data []byte, opts ...table.Option,
+) (finalErr error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+
+	if c.isClosed() {
+		return xerrors.WithStackTrace(errClosedClient)
+	}
+
+	a := allocator.New()
+	defer a.Free()
+
+	attempts, config := 0, c.retryOptions(opts...)
+	config.RetryOptions = append(config.RetryOptions,
+		retry.WithIdempotent(true),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+	)
+
+	onDone := trace.TableOnBulkUpsert(config.Trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsertMultitable"),
+	)
+	defer func() {
+		onDone(finalErr, attempts)
+	}()
+
+	request := &Ydb_Table.BulkUpsertRequest{
+		Mode:       &Ydb_Table.BulkUpsertRequest_MultiTable{},
+		DataFormat: &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{Schema: scheme}},
+		Data:       data,
+	}
+
+	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+
+	err := retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			attempts++
+			_, err = client.BulkUpsert(ctx, request)
+
+			return err
+		},
+		config.RetryOptions...,
+	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+
 }
