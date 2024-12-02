@@ -1,3 +1,4 @@
+## v3.93.0
 * Added `ydb.WithStaticCredentialsLogin` and `ydb.WithStaticCredentialsPassword` options
 
 ## v3.92.6
