@@ -1,3 +1,5 @@
+* Added `ydb.WithStaticCredentialsLogin` and `ydb.WithStaticCredentialsPassword` options
+
 ## v3.92.6
 * Fixed string representation of `TzTimestamp`, `TzDatetime` and `TzDate` type values
 * Added `database/sql/driver.Value` as type destination for almost ydb values
