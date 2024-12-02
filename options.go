@@ -44,6 +44,34 @@ func WithStaticCredentials(user, password string) Option {
 	}
 }
 
+func WithStaticCredentialsLogin(login string) Option {
+	return func(ctx context.Context, d *Driver) error {
+		if d.userInfo == nil {
+			d.userInfo = &dsn.UserInfo{
+				User: login,
+			}
+		} else {
+			d.userInfo.User = login
+		}
+
+		return nil
+	}
+}
+
+func WithStaticCredentialsPassword(password string) Option {
+	return func(ctx context.Context, d *Driver) error {
+		if d.userInfo == nil {
+			d.userInfo = &dsn.UserInfo{
+				Password: password,
+			}
+		} else {
+			d.userInfo.Password = password
+		}
+
+		return nil
+	}
+}
+
 // WithNodeAddressMutator applies mutator for node addresses from discovery.ListEndpoints response
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
