@@ -78,7 +78,7 @@ type Client interface {
 	BulkUpsert(ctx context.Context, table string, data BulkUpsertData, opts ...Option) error
 
 	BulkUpsertMultitable(
-		ctx context.Context, scheme []byte, tables []string, rowsnum []int, data []byte, opts ...Option,
+		ctx context.Context, scheme []byte, tables []string, rowsnum []uint64, data []byte, opts ...Option,
 	) (finalErr error)
 }
 

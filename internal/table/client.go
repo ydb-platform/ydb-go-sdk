@@ -341,7 +341,7 @@ func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx
 }
 
 func (c *Client) BulkUpsertMultitable(
-	ctx context.Context, scheme []byte, tables []string, rowsnum []int, data []byte, opts ...table.Option,
+	ctx context.Context, scheme []byte, tables []string, rowsnum []uint64, data []byte, opts ...table.Option,
 ) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
@@ -373,8 +373,17 @@ func (c *Client) BulkUpsertMultitable(
 		onDone(finalErr, attempts)
 	}()
 
+	multitable := &Ydb_Table.MultiTable{}
+	multitable.Tables = tables
+
+	for _, rows := range rowsnum {
+		multitable.Numrows = append(multitable.Numrows, rows)
+	}
+
 	request := &Ydb_Table.BulkUpsertRequest{
-		Mode:       &Ydb_Table.BulkUpsertRequest_MultiTable{},
+		Mode: &Ydb_Table.BulkUpsertRequest_MultiTable{
+			MultiTable: multitable,
+		},
 		DataFormat: &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{Schema: scheme}},
 		Data:       data,
 	}
