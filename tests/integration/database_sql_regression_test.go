@@ -358,7 +358,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		row := db.QueryRow(`
 			DECLARE $val AS Utf8;
 			SELECT $val`,
-			sql.Named("val", id), // send as string because uuid implements Value() (driver.Value, error)
+			sql.Named("val", id.String()), // send as string because uuid implements Value() (driver.Value, error)
 		)
 
 		require.NoError(t, row.Err())
@@ -405,7 +405,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		row := db.QueryRow(`
 			DECLARE $val AS Utf8;
 			SELECT $val`,
-			sql.Named("val", id),
+			sql.Named("val", id.String()),
 		)
 
 		require.NoError(t, row.Err())

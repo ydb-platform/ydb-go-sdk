@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"sort"
 	"time"
 
@@ -23,8 +24,31 @@ var (
 	errMultipleQueryParameters = errors.New("only one query arg *table.QueryParameters allowed")
 )
 
+func asUUID(v interface{}) (*uuid.UUID, bool) {
+	if _, ok := v.(interface {
+		URN() string
+		ClockSequence() int
+		ID() uint32
+	}); !ok {
+		return nil, false
+	}
+
+	switch vv := v.(type) {
+	case uuid.UUID:
+		return &vv, true
+	case *uuid.UUID:
+		return vv, true
+	default:
+		return nil, false
+	}
+}
+
 //nolint:gocyclo,funlen
 func toValue(v interface{}) (_ types.Value, err error) {
+	if x, ok := asUUID(v); ok {
+		return types.UuidValue(*x), nil
+	}
+
 	if valuer, ok := v.(driver.Valuer); ok {
 		v, err = valuer.Value()
 		if err != nil {
@@ -114,10 +138,6 @@ func toValue(v interface{}) (_ types.Value, err error) {
 		}
 
 		return types.ListValue(items...), nil
-	case [16]byte:
-		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
-	case *[16]byte:
-		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case types.UUIDBytesWithIssue1501Type:
 		return types.UUIDWithIssue1501Value(x.AsBytesArray()), nil
 	case *types.UUIDBytesWithIssue1501Type:
@@ -131,6 +151,10 @@ func toValue(v interface{}) (_ types.Value, err error) {
 		return types.UuidValue(x), nil
 	case *uuid.UUID:
 		return types.NullableUUIDTypedValue(x), nil
+	case [16]byte:
+		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
+	case *[16]byte:
+		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
 		return types.TimestampValueFromTime(x), nil
 	case *time.Time:
@@ -140,11 +164,89 @@ func toValue(v interface{}) (_ types.Value, err error) {
 	case *time.Duration:
 		return types.NullableIntervalValueFromDuration(x), nil
 	default:
-		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("%T: %w. Create issue for support new type %s",
-				x, errUnsupportedType, supportNewTypeLink(x),
-			),
-		)
+		kind := reflect.TypeOf(x).Kind()
+		switch kind {
+		case reflect.Pointer:
+			v, err := toValue(reflect.ValueOf(x).Elem().Interface())
+			if err != nil {
+				return nil, xerrors.WithStackTrace(
+					fmt.Errorf("cannot parse %d as a optional value: %w",
+						reflect.ValueOf(x).Elem().Interface(), errUnsupportedType,
+					),
+				)
+			}
+
+			return types.OptionalValue(v), nil
+		case reflect.Slice, reflect.Array:
+			v := reflect.ValueOf(x)
+			list := make([]types.Value, v.Len())
+
+			for i := range list {
+				list[i], err = toValue(v.Index(i).Interface())
+				if err != nil {
+					return nil, xerrors.WithStackTrace(
+						fmt.Errorf("cannot parse %d item of slice %T: %w",
+							i, x, errUnsupportedType,
+						),
+					)
+				}
+			}
+
+			return value.ListValue(list...), nil
+		case reflect.Map:
+			v := reflect.ValueOf(x)
+			fields := make([]types.DictValueOption, 0, len(v.MapKeys()))
+			iter := v.MapRange()
+			for iter.Next() {
+				kk, err := toValue(iter.Key().Interface())
+				if err != nil {
+					return nil, fmt.Errorf("cannot parse %v map key: %w",
+						iter.Key().Interface(), errUnsupportedType,
+					)
+				}
+				vv, err := toValue(iter.Value().Interface())
+				if err != nil {
+					return nil, fmt.Errorf("cannot parse %v map value: %w",
+						iter.Value().Interface(), errUnsupportedType,
+					)
+				}
+				fields = append(fields, types.DictFieldValue(kk, vv))
+			}
+
+			return types.DictValue(fields...), nil
+		case reflect.Struct:
+			v := reflect.ValueOf(x)
+			fields := make([]types.StructValueOption, v.NumField())
+
+			for i := range fields {
+				kk, has := v.Type().Field(i).Tag.Lookup("sql")
+				if !has {
+					return nil, xerrors.WithStackTrace(
+						fmt.Errorf("cannot parse %v as key field of struct: %w",
+							v.Field(i).Interface(), errUnsupportedType,
+						),
+					)
+				}
+				vv, err := toValue(v.Field(i).Interface())
+				if err != nil {
+					return nil, xerrors.WithStackTrace(
+						fmt.Errorf("cannot parse %v as values of dict: %w",
+							v.Index(i).Interface(), errUnsupportedType,
+						),
+					)
+				}
+
+				fields[i] = types.StructFieldValue(kk, vv)
+			}
+
+			return types.StructValue(fields...), nil
+		default:
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("%T: %w. Create issue for support new type %s",
+					x, errUnsupportedType, supportNewTypeLink(x),
+				),
+			)
+		}
 	}
 }
 
