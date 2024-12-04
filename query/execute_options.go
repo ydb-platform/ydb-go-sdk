@@ -29,11 +29,11 @@ const (
 	StatsModeProfile = options.StatsModeProfile
 )
 
-func WithParameters(parameters *params.Parameters) options.Execute {
+func WithParameters(parameters *params.Parameters) ExecuteOption {
 	return options.WithParameters(parameters)
 }
 
-func WithTxControl(txControl *tx.Control) options.Execute {
+func WithTxControl(txControl *tx.Control) ExecuteOption {
 	return options.WithTxControl(txControl)
 }
 
@@ -41,35 +41,35 @@ func WithTxSettings(txSettings tx.Settings) options.DoTxOption {
 	return options.WithTxSettings(txSettings)
 }
 
-func WithCommit() options.Execute {
+func WithCommit() ExecuteOption {
 	return options.WithCommit()
 }
 
-func WithExecMode(mode options.ExecMode) options.Execute {
+func WithExecMode(mode options.ExecMode) ExecuteOption {
 	return options.WithExecMode(mode)
 }
 
-func WithSyntax(syntax options.Syntax) options.Execute {
+func WithSyntax(syntax options.Syntax) ExecuteOption {
 	return options.WithSyntax(syntax)
 }
 
-func WithStatsMode(mode options.StatsMode, callback func(Stats)) options.Execute {
+func WithStatsMode(mode options.StatsMode, callback func(Stats)) ExecuteOption {
 	return options.WithStatsMode(mode, callback)
 }
 
 // WithResponsePartLimitSizeBytes limit size of each part (data portion) in stream for query service resoponse
 // it isn't limit total size of answer
-func WithResponsePartLimitSizeBytes(size int64) options.Execute {
+func WithResponsePartLimitSizeBytes(size int64) ExecuteOption {
 	return options.WithResponsePartLimitSizeBytes(size)
 }
 
-func WithCallOptions(opts ...grpc.CallOption) options.Execute {
+func WithCallOptions(opts ...grpc.CallOption) ExecuteOption {
 	return options.WithCallOptions(opts...)
 }
 
 // WithResourcePool is an option for define resource pool for execute query
 //
 // Read more https://ydb.tech/docs/ru/dev/resource-consumption-management
-func WithResourcePool(id string) options.Execute {
+func WithResourcePool(id string) ExecuteOption {
 	return options.WithResourcePool(id)
 }
