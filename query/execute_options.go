@@ -8,6 +8,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 )
 
+type ExecuteOption = options.Execute
+
 const (
 	SyntaxYQL        = options.SyntaxYQL
 	SyntaxPostgreSQL = options.SyntaxPostgreSQL
