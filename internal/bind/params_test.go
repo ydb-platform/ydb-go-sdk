@@ -29,14 +29,12 @@ func TestToValue(t *testing.T) {
 			dst:  types.BoolValue(true),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  nil,
 			dst:  types.VoidValue(),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  true,
@@ -55,7 +53,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeBool),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  42,
@@ -74,7 +71,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeInt32),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  uint(42),
@@ -93,7 +89,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeUint32),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  int8(42),
@@ -112,7 +107,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeInt8),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  uint8(42),
@@ -131,7 +125,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeUint8),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  int16(42),
@@ -150,7 +143,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeInt16),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  uint16(42),
@@ -169,7 +161,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeUint16),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  int32(42),
@@ -188,7 +179,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeInt32),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  uint32(42),
@@ -207,7 +197,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeUint32),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  int64(42),
@@ -226,7 +215,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeInt64),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  uint64(42),
@@ -245,7 +233,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeUint64),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  float32(42),
@@ -264,7 +251,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeFloat),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  float64(42),
@@ -283,7 +269,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeDouble),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  "test",
@@ -302,7 +287,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeText),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  []byte("test"),
@@ -321,7 +305,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeBytes),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  []string{"test"},
@@ -354,17 +337,18 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v uuid.UUID) *uuid.UUID { return &v }(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
+			src:  &uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 			// uuid implemented driver.Valuer and doesn't set optional wrapper
-			dst: types.UuidValue(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
+			dst: types.OptionalValue(types.UuidValue(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})),
 			err: nil,
 		},
 		// https://github.com/ydb-platform/ydb-go-sdk/issues/1515
-		//{
-		//	src: func() *uuid.UUID { return nil }(),
-		//	dst: nil,
-		//	err: nil,
-		//},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *uuid.UUID { return nil }(),
+			dst:  types.NullValue(types.TypeUUID),
+			err:  nil,
+		},
 		{
 			name: xtest.CurrentFileLine(),
 			src:  time.Unix(42, 43),
@@ -383,7 +367,6 @@ func TestToValue(t *testing.T) {
 			dst:  types.NullValue(types.TypeTimestamp),
 			err:  nil,
 		},
-
 		{
 			name: xtest.CurrentFileLine(),
 			src:  time.Duration(42),
@@ -471,13 +454,101 @@ func TestToValue(t *testing.T) {
 			),
 			err: nil,
 		},
+		{
+			name: xtest.CurrentFileLine(),
+			src: &struct {
+				A string   `sql:"a"`
+				B uint64   `sql:"b"`
+				C []string `sql:"c"`
+			}{
+				A: "a",
+				B: 123,
+				C: []string{"1", "2", "3"},
+			},
+			dst: types.OptionalValue(types.StructValue(
+				types.StructFieldValue("a", types.TextValue("a")),
+				types.StructFieldValue("b", types.Uint64Value(123)),
+				types.StructFieldValue("c", types.ListValue(types.TextValue("1"), types.TextValue("2"), types.TextValue("3"))),
+			)),
+			err: nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src: (*struct {
+				A string   `sql:"a"`
+				B uint64   `sql:"b"`
+				C []string `sql:"c"`
+			})(nil),
+			dst: types.NullValue(types.Struct(
+				types.StructField("a", types.TypeText),
+				types.StructField("b", types.TypeUint64),
+				types.StructField("c", types.List(types.TypeText)),
+			)),
+			err: nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src: map[uint64]any{
+				1: "1",
+				2: uint64(2),
+				3: []*uuid.UUID{
+					{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+					{17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
+					{33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48},
+				},
+			},
+			dst: types.DictValue(
+				types.DictFieldValue(types.Uint64Value(1), types.TextValue("1")),
+				types.DictFieldValue(types.Uint64Value(2), types.Uint64Value(2)),
+				types.DictFieldValue(types.Uint64Value(3), types.ListValue(
+					types.OptionalValue(types.UuidValue(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})),
+					types.OptionalValue(types.UuidValue(uuid.UUID{17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32})),
+					types.OptionalValue(types.UuidValue(uuid.UUID{33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48})),
+				)),
+			),
+			err: nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src: &map[uint64]any{
+				1: "1",
+				2: uint64(2),
+				3: []*uuid.UUID{
+					{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+					{17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
+					{33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48},
+				},
+			},
+			dst: types.OptionalValue(types.DictValue(
+				types.DictFieldValue(types.Uint64Value(1), types.TextValue("1")),
+				types.DictFieldValue(types.Uint64Value(2), types.Uint64Value(2)),
+				types.DictFieldValue(types.Uint64Value(3), types.ListValue(
+					types.OptionalValue(types.UuidValue(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})),
+					types.OptionalValue(types.UuidValue(uuid.UUID{17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32})),
+					types.OptionalValue(types.UuidValue(uuid.UUID{33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48})),
+				)),
+			)),
+			err: nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  (*map[uint64]any)(nil),
+			dst:  nil,
+			err:  errUnsupportedType,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+			dst:  nil,
+			err:  value.ErrIssue1501BadUUID,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			dst, err := toValue(tt.src)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {
-				require.Equal(t, tt.dst, dst)
+				require.Equal(t, tt.dst.Yql(), dst.Yql())
 			}
 		})
 	}
@@ -694,9 +765,16 @@ func TestArgsToParams(t *testing.T) {
 
 func TestAsUUID(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		v, ok := asUUID(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
-		require.True(t, ok)
-		require.Equal(t, &uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, v)
+		t.Run("uuid.UUID", func(t *testing.T) {
+			v, ok := asUUID(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+			require.True(t, ok)
+			require.Equal(t, types.UuidValue(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}), v)
+		})
+		t.Run("*uuid.UUID", func(t *testing.T) {
+			v, ok := asUUID(&uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+			require.True(t, ok)
+			require.Equal(t, types.OptionalValue(types.UuidValue(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})), v) //nolint:lll
+		})
 	})
 	t.Run("Invalid", func(t *testing.T) {
 		v, ok := asUUID([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})

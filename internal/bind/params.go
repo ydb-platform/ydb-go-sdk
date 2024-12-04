@@ -24,7 +24,11 @@ var (
 	errMultipleQueryParameters = errors.New("only one query arg *table.QueryParameters allowed")
 )
 
-func asUUID(v interface{}) (*uuid.UUID, bool) {
+// Benchmarking of asUUID
+//
+// explicit UUID   	 2566760	       462.1 ns/op	      32 B/op	       2 allocs/op
+// asUUID        	 2103366	       595.9 ns/op	      48 B/op	       3 allocs/op
+func asUUID(v interface{}) (types.Value, bool) {
 	if _, ok := v.(interface {
 		URN() string
 		ClockSequence() int
@@ -35,25 +39,166 @@ func asUUID(v interface{}) (*uuid.UUID, bool) {
 
 	switch vv := v.(type) {
 	case uuid.UUID:
-		return &vv, true
+		return types.UuidValue(vv), true
 	case *uuid.UUID:
-		return vv, true
+		if vv == nil {
+			return types.NullValue(types.TypeUUID), true
+		}
+
+		return types.OptionalValue(types.UuidValue(*vv)), true
 	default:
 		return nil, false
+	}
+}
+
+func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
+	switch x := v.(type) {
+	case bool:
+		return types.TypeBool, nil
+	case int:
+		return types.TypeInt32, nil
+	case uint:
+		return types.TypeUint32, nil
+	case int8:
+		return types.TypeInt8, nil
+	case uint8:
+		return types.TypeUint8, nil
+	case int16:
+		return types.TypeInt16, nil
+	case uint16:
+		return types.TypeUint16, nil
+	case int32:
+		return types.TypeInt32, nil
+	case uint32:
+		return types.TypeUint32, nil
+	case int64:
+		return types.TypeInt64, nil
+	case uint64:
+		return types.TypeUint64, nil
+	case float32:
+		return types.TypeFloat, nil
+	case float64:
+		return types.TypeDouble, nil
+	case []byte:
+		return types.TypeBytes, nil
+	case string:
+		return types.TypeText, nil
+	case [16]byte:
+		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
+	case time.Time:
+		return types.TypeTimestamp, nil
+	case time.Duration:
+		return types.TypeInterval, nil
+	default:
+		kind := reflect.TypeOf(x).Kind()
+		switch kind {
+		case reflect.Slice, reflect.Array:
+			v := reflect.ValueOf(x)
+			t, err := toType(reflect.New(v.Type().Elem()).Elem().Interface())
+			if err != nil {
+				return nil, xerrors.WithStackTrace(
+					fmt.Errorf("cannot parse slice item type %T: %w",
+						x, errUnsupportedType,
+					),
+				)
+			}
+
+			return types.List(t), nil
+		case reflect.Map:
+			v := reflect.ValueOf(x)
+
+			keyType, err := toType(reflect.New(v.Type().Key()).Interface())
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse %T map key: %w",
+					reflect.New(v.Type().Key()).Interface(), err,
+				)
+			}
+			valueType, err := toType(reflect.New(v.Type().Elem()).Interface())
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse %T map value: %w",
+					v.MapKeys()[0].Interface(), err,
+				)
+			}
+
+			return types.Dict(keyType, valueType), nil
+		case reflect.Struct:
+			v := reflect.ValueOf(x)
+
+			fields := make([]types.StructOption, v.NumField())
+
+			for i := range fields {
+				kk, has := v.Type().Field(i).Tag.Lookup("sql")
+				if !has {
+					return nil, xerrors.WithStackTrace(
+						fmt.Errorf("cannot parse %v as key field of struct: %w",
+							v.Field(i).Interface(), errUnsupportedType,
+						),
+					)
+				}
+				tt, err := toType(v.Field(i).Interface())
+				if err != nil {
+					return nil, xerrors.WithStackTrace(
+						fmt.Errorf("cannot parse %v as values of dict: %w",
+							v.Field(i).Interface(), errUnsupportedType,
+						),
+					)
+				}
+
+				fields[i] = types.StructField(kk, tt)
+			}
+
+			return types.Struct(fields...), nil
+		default:
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("%T: %w. Create issue for support new type %s",
+					x, errUnsupportedType, supportNewTypeLink(x),
+				),
+			)
+		}
 	}
 }
 
 //nolint:gocyclo,funlen
 func toValue(v interface{}) (_ types.Value, err error) {
 	if x, ok := asUUID(v); ok {
-		return types.UuidValue(*x), nil
+		if x == nil {
+			return types.NullValue(types.TypeUUID), nil
+		}
+
+		return x, nil
 	}
 
-	if valuer, ok := v.(driver.Valuer); ok {
-		v, err = valuer.Value()
-		if err != nil {
-			return nil, fmt.Errorf("ydb: driver.Valuer error: %w", err)
+	switch x := v.(type) {
+	case nil:
+		return types.VoidValue(), nil
+	case value.Value:
+		return x, nil
+	}
+
+	if vv := reflect.ValueOf(v); vv.Kind() == reflect.Pointer {
+		if vv.IsNil() {
+			tt, err := toType(reflect.New(vv.Type().Elem()).Elem().Interface())
+			if err != nil {
+				return nil, xerrors.WithStackTrace(
+					fmt.Errorf("cannot parse type of %T: %w",
+						v, err,
+					),
+				)
+			}
+
+			return types.NullValue(tt), nil
 		}
+
+		vv, err := toValue(vv.Elem().Interface())
+		if err != nil {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("cannot parse value of %T: %w",
+					v, err,
+				),
+			)
+		}
+
+		return types.OptionalValue(vv), nil
 	}
 
 	switch x := v.(type) {
@@ -63,74 +208,34 @@ func toValue(v interface{}) (_ types.Value, err error) {
 		return x, nil
 	case bool:
 		return types.BoolValue(x), nil
-	case *bool:
-		return types.NullableBoolValue(x), nil
 	case int:
 		return types.Int32Value(int32(x)), nil
-	case *int:
-		if x == nil {
-			return types.NullValue(types.TypeInt32), nil
-		}
-		xx := int32(*x)
-
-		return types.NullableInt32Value(&xx), nil
 	case uint:
 		return types.Uint32Value(uint32(x)), nil
-	case *uint:
-		if x == nil {
-			return types.NullValue(types.TypeUint32), nil
-		}
-		xx := uint32(*x)
-
-		return types.NullableUint32Value(&xx), nil
 	case int8:
 		return types.Int8Value(x), nil
-	case *int8:
-		return types.NullableInt8Value(x), nil
 	case uint8:
 		return types.Uint8Value(x), nil
-	case *uint8:
-		return types.NullableUint8Value(x), nil
 	case int16:
 		return types.Int16Value(x), nil
-	case *int16:
-		return types.NullableInt16Value(x), nil
 	case uint16:
 		return types.Uint16Value(x), nil
-	case *uint16:
-		return types.NullableUint16Value(x), nil
 	case int32:
 		return types.Int32Value(x), nil
-	case *int32:
-		return types.NullableInt32Value(x), nil
 	case uint32:
 		return types.Uint32Value(x), nil
-	case *uint32:
-		return types.NullableUint32Value(x), nil
 	case int64:
 		return types.Int64Value(x), nil
-	case *int64:
-		return types.NullableInt64Value(x), nil
 	case uint64:
 		return types.Uint64Value(x), nil
-	case *uint64:
-		return types.NullableUint64Value(x), nil
 	case float32:
 		return types.FloatValue(x), nil
-	case *float32:
-		return types.NullableFloatValue(x), nil
 	case float64:
 		return types.DoubleValue(x), nil
-	case *float64:
-		return types.NullableDoubleValue(x), nil
 	case []byte:
 		return types.BytesValue(x), nil
-	case *[]byte:
-		return types.NullableBytesValue(x), nil
 	case string:
 		return types.TextValue(x), nil
-	case *string:
-		return types.NullableTextValue(x), nil
 	case []string:
 		items := make([]types.Value, len(x))
 		for i := range x {
@@ -138,45 +243,15 @@ func toValue(v interface{}) (_ types.Value, err error) {
 		}
 
 		return types.ListValue(items...), nil
-	case types.UUIDBytesWithIssue1501Type:
-		return types.UUIDWithIssue1501Value(x.AsBytesArray()), nil
-	case *types.UUIDBytesWithIssue1501Type:
-		if x == nil {
-			return types.NullableUUIDValueWithIssue1501(nil), nil
-		}
-		val := x.AsBytesArray()
-
-		return types.NullableUUIDValueWithIssue1501(&val), nil
-	case uuid.UUID:
-		return types.UuidValue(x), nil
-	case *uuid.UUID:
-		return types.NullableUUIDTypedValue(x), nil
 	case [16]byte:
-		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
-	case *[16]byte:
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
 		return types.TimestampValueFromTime(x), nil
-	case *time.Time:
-		return types.NullableTimestampValueFromTime(x), nil
 	case time.Duration:
 		return types.IntervalValueFromDuration(x), nil
-	case *time.Duration:
-		return types.NullableIntervalValueFromDuration(x), nil
 	default:
 		kind := reflect.TypeOf(x).Kind()
 		switch kind {
-		case reflect.Pointer:
-			v, err := toValue(reflect.ValueOf(x).Elem().Interface())
-			if err != nil {
-				return nil, xerrors.WithStackTrace(
-					fmt.Errorf("cannot parse %d as a optional value: %w",
-						reflect.ValueOf(x).Elem().Interface(), errUnsupportedType,
-					),
-				)
-			}
-
-			return types.OptionalValue(v), nil
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
 			list := make([]types.Value, v.Len())
@@ -186,7 +261,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 				if err != nil {
 					return nil, xerrors.WithStackTrace(
 						fmt.Errorf("cannot parse %d item of slice %T: %w",
-							i, x, errUnsupportedType,
+							i, x, err,
 						),
 					)
 				}
@@ -201,13 +276,13 @@ func toValue(v interface{}) (_ types.Value, err error) {
 				kk, err := toValue(iter.Key().Interface())
 				if err != nil {
 					return nil, fmt.Errorf("cannot parse %v map key: %w",
-						iter.Key().Interface(), errUnsupportedType,
+						iter.Key().Interface(), err,
 					)
 				}
 				vv, err := toValue(iter.Value().Interface())
 				if err != nil {
 					return nil, fmt.Errorf("cannot parse %v map value: %w",
-						iter.Value().Interface(), errUnsupportedType,
+						iter.Value().Interface(), err,
 					)
 				}
 				fields = append(fields, types.DictFieldValue(kk, vv))
@@ -216,6 +291,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 			return types.DictValue(fields...), nil
 		case reflect.Struct:
 			v := reflect.ValueOf(x)
+
 			fields := make([]types.StructValueOption, v.NumField())
 
 			for i := range fields {
@@ -231,7 +307,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 				if err != nil {
 					return nil, xerrors.WithStackTrace(
 						fmt.Errorf("cannot parse %v as values of dict: %w",
-							v.Index(i).Interface(), errUnsupportedType,
+							v.Index(i).Interface(), err,
 						),
 					)
 				}
@@ -261,13 +337,6 @@ func supportNewTypeLink(x interface{}) string {
 
 func toYdbParam(name string, value interface{}) (*params.Parameter, error) {
 	if na, ok := value.(driver.NamedValue); ok {
-		n, v := na.Name, na.Value
-		if n != "" {
-			name = n
-		}
-		value = v
-	}
-	if na, ok := value.(sql.NamedArg); ok {
 		n, v := na.Name, na.Value
 		if n != "" {
 			name = n
