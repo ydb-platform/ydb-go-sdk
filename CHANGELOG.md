@@ -1,3 +1,5 @@
+* Published `query.ExecuteOption` as alias to `internal/query/options.Execute`
+
 ## v3.93.0
 * Added `ydb.WithStaticCredentialsLogin` and `ydb.WithStaticCredentialsPassword` options
 
@@ -6,7 +8,7 @@
 * Added `database/sql/driver.Value` as type destination for almost ydb values
 
 ## v3.92.5
-* Avoid retrying requests finished with 'UNAUTHORIZED' errors
+* Avoid retrying requests finished with `UNAUTHORIZED` errors
 
 ## v3.92.4
 * Fixed connections pool leak on closing
