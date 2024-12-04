@@ -1,3 +1,4 @@
+## v3.93.1
 * Published `query.ExecuteOption` as alias to `internal/query/options.Execute`
 
 ## v3.93.0
