@@ -2776,7 +2776,7 @@ func (v protobufValue) Type() types.Type {
 }
 
 func (v protobufValue) Yql() string {
-	return fmt.Sprintf("protobufValue(%s)", v.pb.String())
+	return FromYDB(v.pb.GetType(), v.pb.GetValue()).Yql()
 }
 
 func (v protobufValue) castTo(dst any) error {

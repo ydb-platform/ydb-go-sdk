@@ -966,11 +966,13 @@ type protobufType struct {
 }
 
 func (v protobufType) Yql() string {
-	return fmt.Sprintf("protobufType(%s)", v.pb.String())
+	return FromYDB([]*Ydb.Type{
+		v.pb,
+	})[0].Yql()
 }
 
 func (v protobufType) String() string {
-	return fmt.Sprintf("protobufType(%s)", v.pb.String())
+	return v.Yql()
 }
 
 func (v protobufType) ToYDB(a *allocator.Allocator) *Ydb.Type {
