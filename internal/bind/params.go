@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (
@@ -28,7 +28,7 @@ var (
 //
 // explicit UUID   	 2566760	       462.1 ns/op	      32 B/op	       2 allocs/op
 // asUUID        	 2103366	       595.9 ns/op	      48 B/op	       3 allocs/op
-func asUUID(v interface{}) (types.Value, bool) {
+func asUUID(v interface{}) (value.Value, bool) {
 	if _, ok := v.(interface {
 		URN() string
 		ClockSequence() int
@@ -39,13 +39,13 @@ func asUUID(v interface{}) (types.Value, bool) {
 
 	switch vv := v.(type) {
 	case uuid.UUID:
-		return types.UuidValue(vv), true
+		return value.Uuid(vv), true
 	case *uuid.UUID:
 		if vv == nil {
-			return types.NullValue(types.TypeUUID), true
+			return value.NullValue(types.UUID), true
 		}
 
-		return types.OptionalValue(types.UuidValue(*vv)), true
+		return value.OptionalValue(value.Uuid(*vv)), true
 	default:
 		return nil, false
 	}
@@ -54,41 +54,41 @@ func asUUID(v interface{}) (types.Value, bool) {
 func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
 	switch x := v.(type) {
 	case bool:
-		return types.TypeBool, nil
+		return types.Bool, nil
 	case int:
-		return types.TypeInt32, nil
+		return types.Int32, nil
 	case uint:
-		return types.TypeUint32, nil
+		return types.Uint32, nil
 	case int8:
-		return types.TypeInt8, nil
+		return types.Int8, nil
 	case uint8:
-		return types.TypeUint8, nil
+		return types.Uint8, nil
 	case int16:
-		return types.TypeInt16, nil
+		return types.Int16, nil
 	case uint16:
-		return types.TypeUint16, nil
+		return types.Uint16, nil
 	case int32:
-		return types.TypeInt32, nil
+		return types.Int32, nil
 	case uint32:
-		return types.TypeUint32, nil
+		return types.Uint32, nil
 	case int64:
-		return types.TypeInt64, nil
+		return types.Int64, nil
 	case uint64:
-		return types.TypeUint64, nil
+		return types.Uint64, nil
 	case float32:
-		return types.TypeFloat, nil
+		return types.Float, nil
 	case float64:
-		return types.TypeDouble, nil
+		return types.Double, nil
 	case []byte:
-		return types.TypeBytes, nil
+		return types.Bytes, nil
 	case string:
-		return types.TypeText, nil
+		return types.Text, nil
 	case [16]byte:
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
-		return types.TypeTimestamp, nil
+		return types.Timestamp, nil
 	case time.Duration:
-		return types.TypeInterval, nil
+		return types.Interval, nil
 	default:
 		kind := reflect.TypeOf(x).Kind()
 		switch kind {
@@ -103,7 +103,7 @@ func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
 				)
 			}
 
-			return types.List(t), nil
+			return types.NewList(t), nil
 		case reflect.Map:
 			v := reflect.ValueOf(x)
 
@@ -120,11 +120,11 @@ func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
 				)
 			}
 
-			return types.Dict(keyType, valueType), nil
+			return types.NewDict(keyType, valueType), nil
 		case reflect.Struct:
 			v := reflect.ValueOf(x)
 
-			fields := make([]types.StructOption, v.NumField())
+			fields := make([]types.StructField, v.NumField())
 
 			for i := range fields {
 				kk, has := v.Type().Field(i).Tag.Lookup("sql")
@@ -144,10 +144,13 @@ func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
 					)
 				}
 
-				fields[i] = types.StructField(kk, tt)
+				fields[i] = types.StructField{
+					Name: kk,
+					T:    tt,
+				}
 			}
 
-			return types.Struct(fields...), nil
+			return types.NewStruct(fields...), nil
 		default:
 			return nil, xerrors.WithStackTrace(
 				fmt.Errorf("%T: %w. Create issue for support new type %s",
@@ -159,10 +162,10 @@ func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
 }
 
 //nolint:gocyclo,funlen
-func toValue(v interface{}) (_ types.Value, err error) {
+func toValue(v interface{}) (_ value.Value, err error) {
 	if x, ok := asUUID(v); ok {
 		if x == nil {
-			return types.NullValue(types.TypeUUID), nil
+			return value.NullValue(types.UUID), nil
 		}
 
 		return x, nil
@@ -170,7 +173,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 
 	switch x := v.(type) {
 	case nil:
-		return types.VoidValue(), nil
+		return value.VoidValue(), nil
 	case value.Value:
 		return x, nil
 	}
@@ -186,7 +189,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 				)
 			}
 
-			return types.NullValue(tt), nil
+			return value.NullValue(tt), nil
 		}
 
 		vv, err := toValue(vv.Elem().Interface())
@@ -198,63 +201,65 @@ func toValue(v interface{}) (_ types.Value, err error) {
 			)
 		}
 
-		return types.OptionalValue(vv), nil
+		return value.OptionalValue(vv), nil
 	}
 
 	switch x := v.(type) {
 	case nil:
-		return types.VoidValue(), nil
+		return value.VoidValue(), nil
 	case value.Value:
 		return x, nil
 	case bool:
-		return types.BoolValue(x), nil
+		return value.BoolValue(x), nil
 	case int:
-		return types.Int32Value(int32(x)), nil
+		return value.Int32Value(int32(x)), nil
 	case uint:
-		return types.Uint32Value(uint32(x)), nil
+		return value.Uint32Value(uint32(x)), nil
 	case int8:
-		return types.Int8Value(x), nil
+		return value.Int8Value(x), nil
 	case uint8:
-		return types.Uint8Value(x), nil
+		return value.Uint8Value(x), nil
 	case int16:
-		return types.Int16Value(x), nil
+		return value.Int16Value(x), nil
 	case uint16:
-		return types.Uint16Value(x), nil
+		return value.Uint16Value(x), nil
 	case int32:
-		return types.Int32Value(x), nil
+		return value.Int32Value(x), nil
 	case uint32:
-		return types.Uint32Value(x), nil
+		return value.Uint32Value(x), nil
 	case int64:
-		return types.Int64Value(x), nil
+		return value.Int64Value(x), nil
 	case uint64:
-		return types.Uint64Value(x), nil
+		return value.Uint64Value(x), nil
 	case float32:
-		return types.FloatValue(x), nil
+		return value.FloatValue(x), nil
 	case float64:
-		return types.DoubleValue(x), nil
+		return value.DoubleValue(x), nil
 	case []byte:
-		return types.BytesValue(x), nil
+		return value.BytesValue(x), nil
 	case string:
-		return types.TextValue(x), nil
+		return value.TextValue(x), nil
 	case []string:
-		items := make([]types.Value, len(x))
+		items := make([]value.Value, len(x))
 		for i := range x {
-			items[i] = types.TextValue(x[i])
+			items[i] = value.TextValue(x[i])
 		}
 
-		return types.ListValue(items...), nil
+		return value.ListValue(items...), nil
+	case value.UUIDIssue1501FixedBytesWrapper:
+		return value.UUIDWithIssue1501Value(x.AsBytesArray()), nil
 	case [16]byte:
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
-		return types.TimestampValueFromTime(x), nil
+		return value.TimestampValueFromTime(x), nil
 	case time.Duration:
-		return types.IntervalValueFromDuration(x), nil
+		return value.IntervalValueFromDuration(x), nil
 	default:
 		kind := reflect.TypeOf(x).Kind()
 		switch kind {
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
-			list := make([]types.Value, v.Len())
+			list := make([]value.Value, v.Len())
 
 			for i := range list {
 				list[i], err = toValue(v.Index(i).Interface())
@@ -270,7 +275,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 			return value.ListValue(list...), nil
 		case reflect.Map:
 			v := reflect.ValueOf(x)
-			fields := make([]types.DictValueOption, 0, len(v.MapKeys()))
+			fields := make([]value.DictValueField, 0, len(v.MapKeys()))
 			iter := v.MapRange()
 			for iter.Next() {
 				kk, err := toValue(iter.Key().Interface())
@@ -285,21 +290,24 @@ func toValue(v interface{}) (_ types.Value, err error) {
 						iter.Value().Interface(), err,
 					)
 				}
-				fields = append(fields, types.DictFieldValue(kk, vv))
+				fields = append(fields, value.DictValueField{
+					K: kk,
+					V: vv,
+				})
 			}
 
-			return types.DictValue(fields...), nil
+			return value.DictValue(fields...), nil
 		case reflect.Struct:
 			v := reflect.ValueOf(x)
 
-			fields := make([]types.StructValueOption, v.NumField())
+			fields := make([]value.StructValueField, v.NumField())
 
 			for i := range fields {
 				kk, has := v.Type().Field(i).Tag.Lookup("sql")
 				if !has {
 					return nil, xerrors.WithStackTrace(
-						fmt.Errorf("cannot parse %v as key field of struct: %w",
-							v.Field(i).Interface(), errUnsupportedType,
+						fmt.Errorf("cannot parse %q as key field of struct: %w",
+							v.Type().Field(i).Name, errUnsupportedType,
 						),
 					)
 				}
@@ -312,10 +320,13 @@ func toValue(v interface{}) (_ types.Value, err error) {
 					)
 				}
 
-				fields[i] = types.StructFieldValue(kk, vv)
+				fields[i] = value.StructValueField{
+					Name: kk,
+					V:    vv,
+				}
 			}
 
-			return types.StructValue(fields...), nil
+			return value.StructValue(fields...), nil
 		default:
 			return nil, xerrors.WithStackTrace(
 				fmt.Errorf("%T: %w. Create issue for support new type %s",
