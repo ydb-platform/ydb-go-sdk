@@ -832,7 +832,7 @@ func TestAsUUID(t *testing.T) {
 		t.Run("*uuid.UUID", func(t *testing.T) {
 			v, ok := asUUID(&uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 			require.True(t, ok)
-			require.Equal(t, value.OptionalValue(expUUIDValue), v) //nolint:lll
+			require.Equal(t, value.OptionalValue(expUUIDValue), v)
 		})
 	})
 	t.Run("Invalid", func(t *testing.T) {

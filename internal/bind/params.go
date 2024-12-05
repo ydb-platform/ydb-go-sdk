@@ -32,14 +32,14 @@ var (
 func asUUID(v interface{}) (value.Value, bool) {
 	switch reflect.TypeOf(v) {
 	case uuidType:
-		return value.Uuid(v.(uuid.UUID)), true
+		return value.Uuid(v.(uuid.UUID)), true //nolint:forcetypeassert
 	case uuidPtrType:
-		vv := v.(*uuid.UUID)
+		vv := v.(*uuid.UUID) //nolint:forcetypeassert
 		if vv == nil {
 			return value.NullValue(types.UUID), true
 		}
 
-		return value.OptionalValue(value.Uuid(*(v.(*uuid.UUID)))), true
+		return value.OptionalValue(value.Uuid(*(v.(*uuid.UUID)))), true //nolint:forcetypeassert
 	}
 
 	return nil, false
