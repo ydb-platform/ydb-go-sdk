@@ -347,7 +347,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		require.Equal(t, id, resUUID)
 	})
-	t.Run("good-send", func(t *testing.T) {
+	t.Run("old-send-uuid-receive-error-bad-request", func(t *testing.T) {
 		var (
 			scope = newScope(t)
 			db    = scope.SQLDriver()
@@ -359,6 +359,24 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 			DECLARE $val AS Utf8;
 			SELECT $val`,
 			sql.Named("val", id), // send as string because uuid implements Value() (driver.Value, error)
+		)
+
+		require.Error(t, row.Err())
+		require.True(t, xerrors.IsOperationError(row.Err(), Ydb.StatusIds_BAD_REQUEST))
+		require.ErrorContains(t, row.Err(), "Parameter $val type mismatch, expected:")
+	})
+	t.Run("good-send", func(t *testing.T) {
+		var (
+			scope = newScope(t)
+			db    = scope.SQLDriver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		id := uuid.MustParse(idString)
+		row := db.QueryRow(`
+			DECLARE $val AS Utf8;
+			SELECT $val`,
+			sql.Named("val", id.String()), // send as string because uuid implements Value() (driver.Value, error)
 		)
 
 		require.NoError(t, row.Err())
@@ -405,7 +423,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		row := db.QueryRow(`
 			DECLARE $val AS Utf8;
 			SELECT $val`,
-			sql.Named("val", id),
+			sql.Named("val", id.String()),
 		)
 
 		require.NoError(t, row.Err())

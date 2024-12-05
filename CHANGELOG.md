@@ -1,5 +1,8 @@
+* Refactored golang types mapping into ydb types using `ydb.ParamsFromMap` and `database/sql` query arguments
+* Small breaking change: type mapping for `ydb.ParamsFromMap` and `database/sql` type `uuid.UUID` changed from ydb type `Text` to ydb type `UUID`
+
 ## v3.93.3
-* Supported raw protobuf typed value using `ydb.ParamsBuilder()`
+* Supported raw protobuf `*Ydb.TypedValue` using `ydb.ParamsBuilder()`
 
 ## v3.93.2
 * Removed experimental helper `ydb.MustParamsFromMap`
