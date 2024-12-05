@@ -68,6 +68,10 @@ func (p *Params) String() string {
 }
 
 func (p *Params) ToYDB(a *allocator.Allocator) (map[string]*Ydb.TypedValue, error) {
+	if p == nil {
+		return nil, nil //nolint:nilnil
+	}
+
 	parameters := make(map[string]*Ydb.TypedValue, len(*p))
 	for _, param := range *p {
 		parameters[param.name] = value.ToYDB(param.value, a)

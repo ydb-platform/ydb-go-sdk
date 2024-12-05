@@ -1,5 +1,5 @@
 * Marked as deprecated `ydb.MustParamsFromMap`
-* Changed result `ydb.ParamsFromMap` result from tuple <`params.Parameters`, `error`> to `params.Parameters` only 
+* Changed result of experimental helper `ydb.ParamsFromMap` from tuple <`params.Parameters`, `error`> to `params.Parameters` only 
 
 ## v3.93.1
 * Published `query.ExecuteOption` as alias to `internal/query/options.Execute`

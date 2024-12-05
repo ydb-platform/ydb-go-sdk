@@ -536,7 +536,7 @@ DECLARE $textArg AS Text;
 DECLARE $intArg AS Int64;
 
 SELECT $textArg AS TextField, $intArg AS IntField
-`, query.WithParameters(ydb.MustParamsFromMap(map[string]any{
+`, query.WithParameters(ydb.ParamsFromMap(map[string]any{
 		"$textArg": "asd",
 		"$intArg":  int64(123),
 	})))
