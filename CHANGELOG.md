@@ -1,3 +1,4 @@
+## v3.94.0
 * Refactored golang types mapping into ydb types using `ydb.ParamsFromMap` and `database/sql` query arguments
 * Small breaking change: type mapping for `ydb.ParamsFromMap` and `database/sql` type `uuid.UUID` changed from ydb type `Text` to ydb type `UUID`
 
