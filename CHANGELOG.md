@@ -1,3 +1,5 @@
+* Supported raw protobuf typed value using `ydb.ParamsBuilder()`
+
 ## v3.93.2
 * Removed experimental helper `ydb.MustParamsFromMap`
 * Changed result of experimental helper `ydb.ParamsFromMap` from tuple <`params.Parameters`, `error`> to `params.Parameters` only 
