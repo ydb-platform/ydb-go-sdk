@@ -24,31 +24,25 @@ var (
 	errMultipleQueryParameters = errors.New("only one query arg *table.QueryParameters allowed")
 )
 
-// Benchmarking of asUUID
-//
-// explicit UUID   	 2566760	       462.1 ns/op	      32 B/op	       2 allocs/op
-// asUUID        	 2103366	       595.9 ns/op	      48 B/op	       3 allocs/op
-func asUUID(v interface{}) (value.Value, bool) {
-	// explicit casting of type [16]byte to uuid.UUID will success, 
-	// but casting of [16]byte to some interface with  methods from uuid.UUID will failed
-	if _, ok := v.(interface {
-		URN() string
-	}); !ok {
-		return nil, false
-	}
+var (
+	uuidType    = reflect.TypeOf(uuid.UUID{})
+	uuidPtrType = reflect.TypeOf((*uuid.UUID)(nil))
+)
 
-	switch vv := v.(type) {
-	case uuid.UUID:
-		return value.Uuid(vv), true
-	case *uuid.UUID:
+func asUUID(v interface{}) (value.Value, bool) {
+	switch reflect.TypeOf(v) {
+	case uuidType:
+		return value.Uuid(v.(uuid.UUID)), true
+	case uuidPtrType:
+		vv := v.(*uuid.UUID)
 		if vv == nil {
 			return value.NullValue(types.UUID), true
 		}
 
-		return value.OptionalValue(value.Uuid(*vv)), true
-	default:
-		return nil, false
+		return value.OptionalValue(value.Uuid(*(v.(*uuid.UUID)))), true
 	}
+
+	return nil, false
 }
 
 func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
