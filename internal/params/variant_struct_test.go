@@ -467,7 +467,7 @@ func TestVariantStruct(t *testing.T) {
 			builder, ok := xtest.CallMethod(vs.Name("key"), tc.method, tc.itemArgs...)[0].(*variantStructBuilder)
 			require.True(t, ok)
 
-			params := builder.EndStruct().EndVariant().Build().toYDB(a)
+			params := builder.EndStruct().EndVariant().build().toYDB(a)
 
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
@@ -519,7 +519,7 @@ func TestVariantStruct_AddFields(t *testing.T) {
 				T:    types.Text,
 			},
 		}...).Name("key3").Text("Hello, World!").EndStruct().
-		EndVariant().Build().toYDB(a)
+		EndVariant().build().toYDB(a)
 
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{

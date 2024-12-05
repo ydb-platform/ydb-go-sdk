@@ -417,7 +417,7 @@ func TestBuilder(t *testing.T) {
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(Builder)
 			require.True(t, ok)
 
-			params := result.Build().toYDB(a)
+			params := result.build().toYDB(a)
 
 			require.Equal(t,
 				xtest.ToJSON(
