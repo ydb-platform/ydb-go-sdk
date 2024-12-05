@@ -164,10 +164,6 @@ func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
 //nolint:gocyclo,funlen
 func toValue(v interface{}) (_ value.Value, err error) {
 	if x, ok := asUUID(v); ok {
-		if x == nil {
-			return value.NullValue(types.UUID), nil
-		}
-
 		return x, nil
 	}
 

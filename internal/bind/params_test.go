@@ -3,6 +3,7 @@ package bind
 import (
 	"database/sql"
 	"database/sql/driver"
+	"reflect"
 	"testing"
 	"time"
 
@@ -783,19 +784,82 @@ func TestAsUUID(t *testing.T) {
 	})
 }
 
-func BenchmarkNoCastUUID(b *testing.B) {
+func asUUIDForceTypeCast(v interface{}) (value.Value, bool) {
+	return value.Uuid(v.(uuid.UUID)), true
+}
+
+func BenchmarkAsUUIDForceTypeCast(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		v := &uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
-		require.Equal(b, &uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, v)
+		v, ok := asUUIDForceTypeCast(srcUUID)
+		require.True(b, ok)
+		require.Equal(b, expUUIDValue, v)
 	}
 }
 
 func BenchmarkAsUUID(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		v, ok := asUUID(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+		v, ok := asUUID(srcUUID)
 		require.True(b, ok)
-		require.Equal(b, &uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, v)
+		require.Equal(b, expUUIDValue, v)
+	}
+}
+
+var (
+	uuidType     = reflect.TypeOf(uuid.UUID{})
+	uuidPtrType  = reflect.TypeOf(&uuid.UUID{})
+	srcUUID      = uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	expUUIDValue = value.Uuid(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+)
+
+func asUUIDUsingReflect(v interface{}) (value.Value, bool) {
+	switch reflect.TypeOf(v) {
+	case uuidType:
+		return value.Uuid(v.(uuid.UUID)), true
+	case uuidPtrType:
+		if v == nil {
+			return value.NullValue(types.TypeUUID), false
+		}
+
+		return value.OptionalValue(value.Uuid(*(v.(*uuid.UUID)))), true
+	}
+
+	return nil, false
+}
+
+func TestAsUUIDUsingReflect(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
+		t.Run("uuid.UUID", func(t *testing.T) {
+			v, ok := asUUIDUsingReflect(srcUUID)
+			require.True(t, ok)
+			require.Equal(t, expUUIDValue, v)
+		})
+		t.Run("*uuid.UUID", func(t *testing.T) {
+			v, ok := asUUIDUsingReflect(&srcUUID)
+			require.True(t, ok)
+			require.Equal(t, value.OptionalValue(expUUIDValue), v)
+		})
+	})
+	t.Run("Invalid", func(t *testing.T) {
+		t.Run("[16]byte", func(t *testing.T) {
+			v, ok := asUUIDUsingReflect(([16]byte)(srcUUID))
+			require.False(t, ok)
+			require.Nil(t, v)
+		})
+		t.Run("*[16]byte", func(t *testing.T) {
+			v, ok := asUUIDUsingReflect((*[16]byte)(&srcUUID))
+			require.False(t, ok)
+			require.Nil(t, v)
+		})
+	})
+}
+
+func BenchmarkAsUUIDUsingReflect(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		v, ok := asUUIDUsingReflect(srcUUID)
+		require.True(b, ok)
+		require.Equal(b, expUUIDValue, v)
 	}
 }
