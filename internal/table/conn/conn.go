@@ -314,7 +314,7 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	}
 }
 
-func (c *Conn) execDataQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
+func (c *Conn) execDataQuery(ctx context.Context, query string, params params.Params) (driver.Rows, error) {
 	_, res, err := c.session.Execute(ctx,
 		txControl(ctx, c.defaultTxControl),
 		query, &params, c.dataQueryOptions(ctx)...,
@@ -332,7 +332,7 @@ func (c *Conn) execDataQuery(ctx context.Context, query string, params params.Pa
 	}, nil
 }
 
-func (c *Conn) execScanQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
+func (c *Conn) execScanQuery(ctx context.Context, query string, params params.Params) (driver.Rows, error) {
 	res, err := c.session.StreamExecuteScanQuery(ctx,
 		query, &params, c.scanQueryOptions(ctx)...,
 	)
@@ -363,7 +363,7 @@ func (c *Conn) explainQuery(ctx context.Context, query string) (driver.Rows, err
 	}, nil
 }
 
-func (c *Conn) execScriptingQuery(ctx context.Context, query string, params params.Parameters) (driver.Rows, error) {
+func (c *Conn) execScriptingQuery(ctx context.Context, query string, params params.Params) (driver.Rows, error) {
 	res, err := c.parent.Scripting().StreamExecute(ctx, query, &params)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -434,7 +434,7 @@ func (c *Conn) Begin() (driver.Tx, error) {
 	return nil, errDeprecated
 }
 
-func (c *Conn) normalize(q string, args ...driver.NamedValue) (query string, _ params.Parameters, _ error) {
+func (c *Conn) normalize(q string, args ...driver.NamedValue) (query string, _ params.Params, _ error) {
 	return c.parent.Bindings().RewriteQuery(q, func() (ii []interface{}) {
 		for i := range args {
 			ii = append(ii, args[i])

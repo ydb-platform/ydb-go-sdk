@@ -435,7 +435,7 @@ func TestOptional(t *testing.T) {
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(*optionalBuilder)
 			require.True(t, ok)
 
-			params := result.EndOptional().Build().ToYDB(a)
+			params := result.EndOptional().Build().toYDB(a)
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {

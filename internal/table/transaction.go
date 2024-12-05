@@ -58,7 +58,7 @@ type transaction struct {
 // Execute executes query represented by text within transaction tx.
 func (tx *transaction) Execute(
 	ctx context.Context,
-	query string, parameters *params.Parameters,
+	query string, parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
 	onDone := trace.TableOnTxExecute(
@@ -92,7 +92,7 @@ func (tx *transaction) Execute(
 // ExecuteStatement executes prepared statement stmt within transaction tx.
 func (tx *transaction) ExecuteStatement(
 	ctx context.Context,
-	stmt table.Statement, parameters *params.Parameters,
+	stmt table.Statement, parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
 	a := allocator.New()

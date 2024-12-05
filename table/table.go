@@ -160,7 +160,7 @@ type Session interface {
 		ctx context.Context,
 		tx *TransactionControl,
 		query string,
-		params *params.Parameters,
+		params *params.Params,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 
@@ -183,7 +183,7 @@ type Session interface {
 	StreamExecuteScanQuery(
 		ctx context.Context,
 		query string,
-		params *params.Parameters,
+		params *params.Params,
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)
 
@@ -258,13 +258,13 @@ type TransactionActor interface {
 	Execute(
 		ctx context.Context,
 		query string,
-		params *params.Parameters,
+		params *params.Params,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
 	ExecuteStatement(
 		ctx context.Context,
 		stmt Statement,
-		params *params.Parameters,
+		params *params.Params,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
 }
@@ -285,7 +285,7 @@ type Statement interface {
 	Execute(
 		ctx context.Context,
 		tx *TransactionControl,
-		params *params.Parameters,
+		params *params.Params,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 	NumInput() int
@@ -471,7 +471,7 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 // QueryParameters
 type (
 	ParameterOption = params.NamedValue
-	QueryParameters = params.Parameters
+	QueryParameters = params.Params
 )
 
 func NewQueryParameters(opts ...ParameterOption) *QueryParameters {

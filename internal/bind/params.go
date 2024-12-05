@@ -204,7 +204,7 @@ func Params(args ...interface{}) ([]*params.Parameter, error) {
 			}
 			newParam, err = toYdbParam(x.Name, x.Value)
 			newParams = append(newParams, newParam)
-		case *params.Parameters:
+		case *params.Params:
 			if len(args) > 1 {
 				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 			}
@@ -230,7 +230,7 @@ func Params(args ...interface{}) ([]*params.Parameter, error) {
 func paramHandleNamedValue(arg driver.NamedValue, paramNumber, argsLen int) ([]*params.Parameter, error) {
 	if arg.Name == "" {
 		switch x := arg.Value.(type) {
-		case *params.Parameters:
+		case *params.Params:
 			if argsLen > 1 {
 				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 			}

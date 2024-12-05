@@ -42,7 +42,7 @@ type (
 func (c *Client) Execute(
 	ctx context.Context,
 	query string,
-	parameters *params.Parameters,
+	parameters *params.Params,
 ) (r result.Result, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
@@ -69,7 +69,7 @@ func (c *Client) Execute(
 func (c *Client) execute(
 	ctx context.Context,
 	query string,
-	parameters *params.Parameters,
+	parameters *params.Params,
 ) (r result.Result, err error) {
 	var (
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
@@ -78,8 +78,7 @@ func (c *Client) execute(
 		)
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
-			Script:     query,
-			Parameters: parameters.ToYDB(a),
+			Script: query,
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),
@@ -94,6 +93,14 @@ func (c *Client) execute(
 		a.Free()
 		onDone(r, err)
 	}()
+
+	params, err := parameters.ToYDB(a)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	request.Parameters = params
+
 	response, err = c.service.ExecuteYql(ctx, request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -197,7 +204,7 @@ func (c *Client) explain(
 func (c *Client) StreamExecute(
 	ctx context.Context,
 	query string,
-	params *params.Parameters,
+	params *params.Params,
 ) (r result.StreamResult, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
@@ -225,7 +232,7 @@ func (c *Client) StreamExecute(
 func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
-	parameters *params.Parameters,
+	parameters *params.Params,
 ) (r result.StreamResult, err error) {
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
@@ -234,8 +241,7 @@ func (c *Client) streamExecute(
 		)
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
-			Script:     query,
-			Parameters: parameters.ToYDB(a),
+			Script: query,
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),
@@ -250,6 +256,13 @@ func (c *Client) streamExecute(
 			onIntermediate(err)(err)
 		}
 	}()
+
+	params, err := parameters.ToYDB(a)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	request.Parameters = params
 
 	ctx, cancel := xcontext.WithCancel(ctx)
 

@@ -22,7 +22,7 @@ type Client interface {
 	Execute(
 		ctx context.Context,
 		query string,
-		params *params.Parameters,
+		params *params.Params,
 	) (result.Result, error)
 	Explain(
 		ctx context.Context,
@@ -32,6 +32,6 @@ type Client interface {
 	StreamExecute(
 		ctx context.Context,
 		query string,
-		params *params.Parameters,
+		params *params.Params,
 	) (result.StreamResult, error)
 }

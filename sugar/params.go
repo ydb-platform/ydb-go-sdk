@@ -13,7 +13,7 @@ import (
 )
 
 type constraint interface {
-	params.Parameters | []*params.Parameter | *table.QueryParameters | []table.ParameterOption | []sql.NamedArg
+	params.Params | []*params.Parameter | *table.QueryParameters | []table.ParameterOption | []sql.NamedArg
 }
 
 // GenerateDeclareSection generates DECLARE section text in YQL query by params
@@ -24,7 +24,7 @@ type constraint interface {
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func GenerateDeclareSection[T constraint](parameters T) (string, error) {
 	switch v := any(parameters).(type) {
-	case *params.Parameters:
+	case *params.Params:
 		return parametersToDeclares(*v), nil
 	case []*params.Parameter:
 		return parametersToDeclares(v), nil

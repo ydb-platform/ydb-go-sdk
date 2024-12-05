@@ -440,7 +440,7 @@ func TestDict(t *testing.T) {
 				d, ok := xtest.CallMethod(addedKey, val.method, val.args...)[0].(*dict)
 				require.True(t, ok)
 
-				params := d.EndDict().Build().ToYDB(a)
+				params := d.EndDict().Build().toYDB(a)
 				require.Equal(t, xtest.ToJSON(
 					map[string]*Ydb.TypedValue{
 						"$x": {
@@ -482,7 +482,7 @@ func TestDict_AddPairs(t *testing.T) {
 		},
 	}
 
-	params := Builder{}.Param("$x").BeginDict().AddPairs(pairs...).EndDict().Build().ToYDB(a)
+	params := Builder{}.Param("$x").BeginDict().AddPairs(pairs...).EndDict().Build().toYDB(a)
 
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{

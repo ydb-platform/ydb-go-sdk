@@ -18,7 +18,7 @@ func TestParameter(t *testing.T) {
 }
 
 func TestParameters(t *testing.T) {
-	p := &Parameters{}
+	p := &Params{}
 	p.Add(
 		Named("x", value.TextValue("X")),
 		Named("y", value.TextValue("Y")),
@@ -39,7 +39,7 @@ func TestParameters(t *testing.T) {
 func TestNil(t *testing.T) {
 	for _, tt := range []struct {
 		name string
-		p    *Parameters
+		p    *Params
 	}{
 		{
 			name: xtest.CurrentFileLine(),
@@ -47,7 +47,7 @@ func TestNil(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			p:    &Parameters{},
+			p:    &Params{},
 		},
 		{
 			name: xtest.CurrentFileLine(),
@@ -64,7 +64,7 @@ func TestNil(t *testing.T) {
 			require.Empty(t, visited)
 			a := allocator.New()
 			defer a.Free()
-			require.Empty(t, tt.p.ToYDB(a))
+			require.Empty(t, tt.p.toYDB(a))
 		})
 	}
 }
