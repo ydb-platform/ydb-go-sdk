@@ -1,5 +1,15 @@
 package conn
 
-import "errors"
+import (
+	"database/sql/driver"
+	"errors"
 
-var errConnClosedEarly = errors.New("Conn closed early")
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+)
+
+var (
+	ErrUnsupported     = driver.ErrSkip
+	errDeprecated      = driver.ErrSkip
+	errConnClosedEarly = xerrors.Retryable(errors.New("Conn closed early"), xerrors.InvalidObject())
+	errNotReadyConn    = xerrors.Retryable(errors.New("Conn not ready"), xerrors.InvalidObject())
+)

@@ -5,13 +5,12 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn/isolation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -20,7 +19,7 @@ type transaction struct {
 
 	conn *Conn
 	ctx  context.Context //nolint:containedctx
-	tx   table.Transaction
+	tx   query.Transaction
 }
 
 var (
@@ -35,9 +34,10 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (currentT
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	nativeTx, err := c.session.BeginTransaction(ctx, table.TxSettings(txc))
+
+	nativeTx, err := c.session.Begin(ctx, query.TxSettings(txc))
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &transaction{
@@ -52,6 +52,7 @@ func (tx *transaction) checkTxState() error {
 	if tx.conn.currentTx == tx {
 		return nil
 	}
+
 	if tx.conn.currentTx == nil {
 		return fmt.Errorf("broken conn state: tx=%q not related to conn=%q",
 			tx.ID(), tx.conn.ID(),
@@ -67,7 +68,7 @@ func (tx *transaction) Commit() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.parent.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).Commit"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*transaction).Commit"),
 			tx,
 		)
 	)
@@ -75,13 +76,13 @@ func (tx *transaction) Commit() (finalErr error) {
 		onDone(finalErr)
 	}()
 	if err := tx.checkTxState(); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
-	if _, err := tx.tx.CommitTx(tx.ctx); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+	if err := tx.tx.CommitTx(tx.ctx); err != nil {
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -91,7 +92,7 @@ func (tx *transaction) Rollback() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.parent.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).Rollback"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*transaction).Rollback"),
 			tx,
 		)
 	)
@@ -99,14 +100,14 @@ func (tx *transaction) Rollback() (finalErr error) {
 		onDone(finalErr)
 	}()
 	if err := tx.checkTxState(); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
 	err := tx.tx.Rollback(tx.ctx)
 	if err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return err
@@ -116,36 +117,22 @@ func (tx *transaction) QueryContext(ctx context.Context, query string, args []dr
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.parent.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).QueryContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*transaction).QueryContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
-	m := xcontext.QueryModeFromContext(ctx, tx.conn.defaultQueryMode)
-	if m != DataQueryMode {
-		return nil, badconn.Map(
-			xerrors.WithStackTrace(
-				xerrors.Retryable(
-					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.InvalidObject(),
-					xerrors.WithName("WRONG_QUERY_MODE"),
-				),
-			),
-		)
-	}
+
 	query, parameters, err := tx.conn.normalize(query, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	res, err := tx.tx.Execute(ctx,
-		query, &parameters, tx.conn.dataQueryOptions(ctx)...,
+	res, err := tx.tx.Query(ctx,
+		query, options.WithParameters(&parameters),
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
-	}
-	if err = res.Err(); err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
@@ -158,33 +145,22 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.parent.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).ExecContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*transaction).ExecContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
-	m := xcontext.QueryModeFromContext(ctx, tx.conn.defaultQueryMode)
-	if m != DataQueryMode {
-		return nil, badconn.Map(
-			xerrors.WithStackTrace(
-				xerrors.Retryable(
-					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.InvalidObject(),
-					xerrors.WithName("WRONG_QUERY_MODE"),
-				),
-			),
-		)
-	}
+
 	query, parameters, err := tx.conn.normalize(query, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	_, err = tx.tx.Execute(ctx,
-		query, &parameters, tx.conn.dataQueryOptions(ctx)...,
+	err = tx.tx.Exec(ctx,
+		query, options.WithParameters(&parameters),
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return resultNoRows{}, nil
@@ -192,14 +168,14 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 
 func (tx *transaction) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.parent.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*transaction).PrepareContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*transaction).PrepareContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 	if !tx.conn.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
 	return &stmt{

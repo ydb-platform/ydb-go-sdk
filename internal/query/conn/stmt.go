@@ -3,11 +3,8 @@ package conn
 import (
 	"context"
 	"database/sql/driver"
-	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -30,40 +27,32 @@ var (
 
 func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtQuery(stmt.conn.parent.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*stmt).QueryContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*stmt).QueryContext"),
 		stmt.ctx, stmt.query,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 	if !stmt.conn.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
-	switch m := xcontext.QueryModeFromContext(ctx, stmt.conn.defaultQueryMode); m {
-	case DataQueryMode:
-		return stmt.processor.QueryContext(stmt.conn.withKeepInCache(ctx), stmt.query, args)
-	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
-	}
+
+	return stmt.processor.QueryContext(ctx, stmt.query, args)
 }
 
 func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtExec(stmt.conn.parent.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*stmt).ExecContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*stmt).ExecContext"),
 		stmt.ctx, stmt.query,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 	if !stmt.conn.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
-	switch m := xcontext.QueryModeFromContext(ctx, stmt.conn.defaultQueryMode); m {
-	case DataQueryMode:
-		return stmt.processor.ExecContext(stmt.conn.withKeepInCache(ctx), stmt.query, args)
-	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
-	}
+
+	return stmt.processor.ExecContext(ctx, stmt.query, args)
 }
 
 func (stmt *stmt) NumInput() int {
@@ -74,7 +63,7 @@ func (stmt *stmt) Close() (finalErr error) {
 	var (
 		ctx    = stmt.ctx
 		onDone = trace.DatabaseSQLOnStmtClose(stmt.conn.parent.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*stmt).Close"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*stmt).Close"),
 		)
 	)
 	defer func() {

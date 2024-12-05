@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
 	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -89,7 +90,7 @@ const (
 )
 
 func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
-	return tableSql.WithQueryMode(ctx, mode)
+	return xcontext.WithQueryMode(ctx, mode)
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
