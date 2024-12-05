@@ -2764,3 +2764,37 @@ func (v bytesValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 func BytesValue(v []byte) bytesValue {
 	return v
 }
+
+var _ Value = (*protobufValue)(nil)
+
+type protobufValue struct {
+	pb *Ydb.TypedValue
+}
+
+func (v protobufValue) Type() types.Type {
+	return types.FromProtobuf(v.pb.GetType())
+}
+
+func (v protobufValue) Yql() string {
+	return fmt.Sprintf("protobufValue(%s)", v.pb.String())
+}
+
+func (v protobufValue) castTo(dst any) error {
+	switch x := dst.(type) {
+	case *Ydb.TypedValue:
+		x.Type = v.pb.GetType()
+		x.Value = v.pb.GetValue()
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(ErrCannotCast)
+	}
+}
+
+func (v protobufValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	return v.pb.GetValue()
+}
+
+func FromProtobuf(pb *Ydb.TypedValue) protobufValue {
+	return protobufValue{pb: pb}
+}

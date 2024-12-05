@@ -51,7 +51,7 @@ func TestNil(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			p:    Builder{}.Build(),
+			p:    Builder{}.build(),
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

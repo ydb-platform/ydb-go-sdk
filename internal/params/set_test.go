@@ -435,7 +435,7 @@ func TestSet(t *testing.T) {
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(*set)
 			require.True(t, ok)
 
-			params := result.EndSet().Build().toYDB(a)
+			params := result.EndSet().build().toYDB(a)
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
@@ -470,7 +470,7 @@ func TestSet_AddItems(t *testing.T) {
 	defer a.Free()
 	params := Builder{}.Param("$x").BeginSet().
 		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
-		EndSet().Build().toYDB(a)
+		EndSet().build().toYDB(a)
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {

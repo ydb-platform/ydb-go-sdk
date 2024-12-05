@@ -6,7 +6,11 @@ type (
 	}
 )
 
-func (b Builder) Build() *Params {
+func (b Builder) Build() Parameters {
+	return &b.params
+}
+
+func (b Builder) build() *Params {
 	return &b.params
 }
 

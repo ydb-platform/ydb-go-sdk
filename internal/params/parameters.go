@@ -365,6 +365,13 @@ func (p *Parameter) TzDatetime(v time.Time) Builder {
 	return p.parent
 }
 
+func (p *Parameter) Raw(pb *Ydb.TypedValue) Builder {
+	p.value = value.FromProtobuf(pb)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
 func Declare(p *Parameter) string {
 	return fmt.Sprintf(
 		"DECLARE %s AS %s",
