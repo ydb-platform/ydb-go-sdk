@@ -11,15 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-// MustParamsFromMap build parameters from named map, panic if error
-//
-// Deprecated: use explicitly ParamsFromMap
-// Will be removed after June 2025.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func MustParamsFromMap(m map[string]any) params.Parameters {
-	return ParamsFromMap(m)
-}
-
 type wrongParameters struct {
 	err error
 }
