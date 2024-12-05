@@ -184,9 +184,9 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := [16]byte(uuid.MustParse(idString))
 		row := db.QueryRow(`
-DECLARE $val AS UUID;
-
-SELECT CAST($val AS Utf8)`, sql.Named("val", id),
+			DECLARE $val AS UUID;
+			SELECT CAST($val AS Utf8)`,
+			sql.Named("val", id),
 		)
 
 		require.ErrorIs(t, row.Err(), types.ErrIssue1501BadUUID)
@@ -202,9 +202,8 @@ SELECT CAST($val AS Utf8)`, sql.Named("val", id),
 		expectedResultWithBug := "2d9e498b-b746-9cfb-084d-de4e1cb4736e"
 		id := [16]byte(uuid.MustParse(idString))
 		row := db.QueryRow(`
-DECLARE $val AS UUID;
-
-SELECT CAST($val AS Utf8)`,
+			DECLARE $val AS UUID;
+			SELECT CAST($val AS Utf8)`,
 			sql.Named("val", types.NewUUIDBytesWithIssue1501(id)),
 		)
 
@@ -225,9 +224,8 @@ SELECT CAST($val AS Utf8)`,
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		row := db.QueryRow(`
-DECLARE $val AS Text;
-
-SELECT CAST($val AS UUID)`,
+			DECLARE $val AS Text;
+			SELECT CAST($val AS UUID)`,
 			sql.Named("val", idString),
 		)
 
@@ -248,9 +246,8 @@ SELECT CAST($val AS UUID)`,
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		expectedResultWithBug := "8b499e2d-46b7-fb9c-4d08-4ede6e73b41c"
 		row := db.QueryRow(`
-DECLARE $val AS Text;
-
-SELECT CAST($val AS UUID)`,
+			DECLARE $val AS Text;
+			SELECT CAST($val AS UUID)`,
 			sql.Named("val", idString),
 		)
 
@@ -274,9 +271,8 @@ SELECT CAST($val AS UUID)`,
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		row := db.QueryRow(`
-DECLARE $val AS Text;
-
-SELECT CAST($val AS UUID)`,
+			DECLARE $val AS Text;
+			SELECT CAST($val AS UUID)`,
 			sql.Named("val", idString),
 		)
 
@@ -296,9 +292,8 @@ SELECT CAST($val AS UUID)`,
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		row := db.QueryRow(`
-DECLARE $val AS Text;
-
-SELECT CAST($val AS UUID)`,
+			DECLARE $val AS Text;
+			SELECT CAST($val AS UUID)`,
 			sql.Named("val", idString),
 		)
 
@@ -320,9 +315,8 @@ SELECT CAST($val AS UUID)`,
 		id := uuid.MustParse(idString)
 		idParam := [16]byte(id)
 		row := db.QueryRow(`
-DECLARE $val AS UUID;
-
-SELECT $val`,
+			DECLARE $val AS UUID;
+			SELECT $val`,
 			sql.Named("val", idParam),
 		)
 
@@ -338,9 +332,8 @@ SELECT $val`,
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := uuid.MustParse(idString)
 		row := db.QueryRow(`
-DECLARE $val AS UUID;
-
-SELECT $val`,
+			DECLARE $val AS UUID;
+			SELECT $val`,
 			sql.Named("val", types.UUIDWithIssue1501Value(id)),
 		)
 
@@ -363,9 +356,8 @@ SELECT $val`,
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := uuid.MustParse(idString)
 		row := db.QueryRow(`
-DECLARE $val AS Utf8;
-
-SELECT $val`,
+			DECLARE $val AS Utf8;
+			SELECT $val`,
 			sql.Named("val", id), // send as string because uuid implements Value() (driver.Value, error)
 		)
 
@@ -385,9 +377,8 @@ SELECT $val`,
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		row := db.QueryRow(`
-DECLARE $val AS Utf8;
-
-SELECT CAST($val AS UUID)`,
+			DECLARE $val AS Utf8;
+			SELECT CAST($val AS UUID)`,
 			sql.Named("val", idString),
 		)
 
@@ -412,9 +403,8 @@ SELECT CAST($val AS UUID)`,
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		id := uuid.MustParse(idString)
 		row := db.QueryRow(`
-DECLARE $val AS Utf8;
-
-SELECT $val`,
+			DECLARE $val AS Utf8;
+			SELECT $val`,
 			sql.Named("val", id),
 		)
 
