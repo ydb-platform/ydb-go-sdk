@@ -29,10 +29,10 @@ var (
 // explicit UUID   	 2566760	       462.1 ns/op	      32 B/op	       2 allocs/op
 // asUUID        	 2103366	       595.9 ns/op	      48 B/op	       3 allocs/op
 func asUUID(v interface{}) (value.Value, bool) {
+	// explicit casting of type [16]byte to uuid.UUID will success, 
+	// but casting of [16]byte to some interface with  methods from uuid.UUID will failed
 	if _, ok := v.(interface {
 		URN() string
-		ClockSequence() int
-		ID() uint32
 	}); !ok {
 		return nil, false
 	}
