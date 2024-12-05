@@ -1,3 +1,4 @@
+## v3.93.3
 * Supported raw protobuf typed value using `ydb.ParamsBuilder()`
 
 ## v3.93.2
