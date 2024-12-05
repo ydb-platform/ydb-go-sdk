@@ -27,7 +27,7 @@ type statement struct {
 // Execute executes prepared data query.
 func (s *statement) Execute(
 	ctx context.Context, txControl *table.TransactionControl,
-	parameters *params.Parameters,
+	parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
@@ -42,9 +42,14 @@ func (s *statement) Execute(
 	)
 	defer a.Free()
 
+	params, err := parameters.ToYDB(a)
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
 	request.SessionId = s.session.id
 	request.TxControl = txControl.Desc()
-	request.Parameters = parameters.ToYDB(a)
+	request.Parameters = params
 	request.Query = s.query.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
 	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0

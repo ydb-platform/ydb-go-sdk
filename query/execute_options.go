@@ -29,7 +29,7 @@ const (
 	StatsModeProfile = options.StatsModeProfile
 )
 
-func WithParameters(parameters *params.Parameters) ExecuteOption {
+func WithParameters(parameters params.Parameters) ExecuteOption {
 	return options.WithParameters(parameters)
 }
 

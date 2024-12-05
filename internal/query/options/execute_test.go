@@ -38,6 +38,7 @@ func TestExecuteSettings(t *testing.T) {
 				statsMode: StatsModeNone,
 				txControl: internal.NewControl(internal.WithTxID("test")),
 				syntax:    SyntaxYQL,
+				params:    &params.Params{},
 			},
 		},
 		{
@@ -50,6 +51,7 @@ func TestExecuteSettings(t *testing.T) {
 				statsMode: StatsModeFull,
 				txControl: internal.NewControl(internal.WithTxID("")),
 				syntax:    SyntaxYQL,
+				params:    &params.Params{},
 			},
 		},
 		{
@@ -62,6 +64,7 @@ func TestExecuteSettings(t *testing.T) {
 				statsMode: StatsModeNone,
 				txControl: internal.NewControl(internal.WithTxID("")),
 				syntax:    SyntaxYQL,
+				params:    &params.Params{},
 			},
 		},
 		{
@@ -74,6 +77,7 @@ func TestExecuteSettings(t *testing.T) {
 				statsMode: StatsModeNone,
 				txControl: internal.NewControl(internal.WithTxID("")),
 				syntax:    SyntaxPostgreSQL,
+				params:    &params.Params{},
 			},
 		},
 		{
@@ -86,6 +90,7 @@ func TestExecuteSettings(t *testing.T) {
 				statsMode: StatsModeNone,
 				txControl: internal.NewControl(internal.WithTxID("")),
 				syntax:    SyntaxYQL,
+				params:    &params.Params{},
 				callOptions: []grpc.CallOption{
 					grpc.CallContentSubtype("test"),
 				},
@@ -103,7 +108,7 @@ func TestExecuteSettings(t *testing.T) {
 				statsMode: StatsModeNone,
 				txControl: internal.NewControl(internal.WithTxID("")),
 				syntax:    SyntaxYQL,
-				params:    *params.Builder{}.Param("$a").Text("A").Build(),
+				params:    params.Builder{}.Param("$a").Text("A").Build(),
 			},
 		},
 		{
@@ -116,7 +121,7 @@ func TestExecuteSettings(t *testing.T) {
 				statsMode: StatsModeNone,
 				txControl: internal.NewControl(internal.WithTxID(""), internal.CommitTx()),
 				syntax:    SyntaxYQL,
-				params:    nil,
+				params:    &params.Params{},
 			},
 		},
 		{
@@ -129,6 +134,7 @@ func TestExecuteSettings(t *testing.T) {
 				statsMode:    StatsModeNone,
 				txControl:    internal.NewControl(internal.WithTxID("")),
 				syntax:       SyntaxYQL,
+				params:       &params.Params{},
 				resourcePool: "test-pool-id",
 			},
 		},
@@ -146,8 +152,16 @@ func TestExecuteSettings(t *testing.T) {
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
 			require.Equal(t, tt.settings.ResourcePool(), settings.ResourcePool())
 			require.Equal(t, tt.settings.TxControl().ToYDB(a).String(), settings.TxControl().ToYDB(a).String())
-			require.Equal(t, tt.settings.Params().ToYDB(a), settings.Params().ToYDB(a))
+			require.Equal(t, must(tt.settings.Params().ToYDB(a)), must(settings.Params().ToYDB(a)))
 			require.Equal(t, tt.settings.CallOptions(), settings.CallOptions())
 		})
 	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+
+	return v
 }

@@ -796,7 +796,7 @@ func (s *session) Execute(
 	ctx context.Context,
 	txControl *table.TransactionControl,
 	query string,
-	parameters *params.Parameters,
+	parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
@@ -812,9 +812,14 @@ func (s *session) Execute(
 	)
 	defer a.Free()
 
+	params, err := parameters.ToYDB(a)
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
 	request.SessionId = s.id
 	request.TxControl = txControl.Desc()
-	request.Parameters = parameters.ToYDB(a)
+	request.Parameters = params
 	request.Query = q.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
 	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
@@ -1189,7 +1194,7 @@ func (s *session) ReadRows(
 func (s *session) StreamExecuteScanQuery(
 	ctx context.Context,
 	query string,
-	parameters *params.Parameters,
+	parameters *params.Params,
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
 	var (
@@ -1201,9 +1206,8 @@ func (s *session) StreamExecuteScanQuery(
 			s, q, parameters,
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
-			Query:      q.toYDB(a),
-			Parameters: parameters.ToYDB(a),
-			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
+			Query: q.toYDB(a),
+			Mode:  Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 		callOptions []grpc.CallOption
@@ -1212,6 +1216,13 @@ func (s *session) StreamExecuteScanQuery(
 		a.Free()
 		onDone(xerrors.HideEOF(err))
 	}()
+
+	params, err := parameters.ToYDB(a)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	request.Parameters = params
 
 	for _, opt := range opts {
 		if opt != nil {

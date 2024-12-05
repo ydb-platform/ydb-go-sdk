@@ -435,7 +435,7 @@ func TestList(t *testing.T) {
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(*list)
 			require.True(t, ok)
 
-			params := result.EndList().Build().ToYDB(a)
+			params := result.EndList().Build().toYDB(a)
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
@@ -462,7 +462,7 @@ func TestList_AddItems(t *testing.T) {
 	defer a.Free()
 	params := Builder{}.Param("$x").BeginList().
 		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
-		EndList().Build().ToYDB(a)
+		EndList().Build().toYDB(a)
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {

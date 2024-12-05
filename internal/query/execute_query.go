@@ -27,7 +27,7 @@ type executeSettings interface {
 	StatsCallback() func(stats stats.QueryStats)
 	TxControl() *query.TransactionControl
 	Syntax() options.Syntax
-	Params() *params.Parameters
+	Params() params.Parameters
 	CallOptions() []grpc.CallOption
 	RetryOpts() []retry.Option
 	ResourcePool() string
@@ -44,7 +44,13 @@ type executeScriptConfig interface {
 func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScriptConfig) (
 	*Ydb_Query.ExecuteScriptRequest,
 	[]grpc.CallOption,
+	error,
 ) {
+	params, err := cfg.Params().ToYDB(a)
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
 	request := &Ydb_Query.ExecuteScriptRequest{
 		OperationParams: &Ydb_Operations.OperationParams{
 			OperationMode:    0,
@@ -55,32 +61,38 @@ func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScri
 		},
 		ExecMode:      Ydb_Query.ExecMode(cfg.ExecMode()),
 		ScriptContent: queryQueryContent(a, Ydb_Query.Syntax(cfg.Syntax()), q),
-		Parameters:    cfg.Params().ToYDB(a),
+		Parameters:    params,
 		StatsMode:     Ydb_Query.StatsMode(cfg.StatsMode()),
 		ResultsTtl:    durationpb.New(cfg.ResultsTTL()),
 		PoolId:        cfg.ResourcePool(),
 	}
 
-	return request, cfg.CallOptions()
+	return request, cfg.CallOptions(), nil
 }
 
 func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeSettings) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
+	error,
 ) {
+	params, err := cfg.Params().ToYDB(a)
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
 	request := a.QueryExecuteQueryRequest()
 
 	request.SessionId = sessionID
 	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
 	request.TxControl = cfg.TxControl().ToYDB(a)
 	request.Query = queryFromText(a, q, Ydb_Query.Syntax(cfg.Syntax()))
-	request.Parameters = cfg.Params().ToYDB(a)
+	request.Parameters = params
 	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
 	request.ConcurrentResultSets = false
 	request.PoolId = cfg.ResourcePool()
 	request.ResponsePartLimitBytes = cfg.ResponsePartLimitSizeBytes()
 
-	return request, cfg.CallOptions()
+	return request, cfg.CallOptions(), nil
 }
 
 func queryQueryContent(a *allocator.Allocator, syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
@@ -109,7 +121,10 @@ func execute(
 	a := allocator.New()
 	defer a.Free()
 
-	request, callOptions := executeQueryRequest(a, sessionID, q, settings)
+	request, callOptions, err := executeQueryRequest(a, sessionID, q, settings)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	executeCtx := xcontext.ValueOnly(ctx)
 
