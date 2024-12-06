@@ -3,7 +3,6 @@
 *.code-workspace
 .vscode/*
 .history/
-.devcontainer
 *.vsix
 *.swp
 *.exe
