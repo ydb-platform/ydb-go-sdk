@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"database/sql"
 	"database/sql/driver"
 	"sync/atomic"
 
@@ -55,6 +54,22 @@ type Conn struct {
 	onClose   []func()
 	closed    atomic.Bool
 	lastUsage atomic.Int64
+}
+
+func (c *Conn) Explain(ctx context.Context, sql string) (ast string, plan string, _ error) {
+	_, err := c.session.Query(
+		ctx, sql,
+		options.WithExecMode(options.ExecModeExplain),
+		options.WithStatsMode(options.StatsModeNone, func(stats stats.QueryStats) {
+			ast = stats.QueryAST()
+			plan = stats.QueryPlan()
+		}),
+	)
+	if err != nil {
+		return "", "", xerrors.WithStackTrace(err)
+	}
+
+	return ast, plan, nil
 }
 
 func New(ctx context.Context, parent Parent, s *query.Session, opts ...Option) *Conn {
@@ -134,7 +149,7 @@ func (c *Conn) execContext(
 
 	onDone := trace.DatabaseSQLOnConnExec(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).execContext"),
-		query, xcontext.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
+		query, "query", xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -170,7 +185,7 @@ func (c *Conn) queryContext(ctx context.Context, queryString string, args []driv
 
 	onDone := trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn.(*Conn).queryContext"),
-		queryString, xcontext.UnknownQueryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
+		queryString, "query", xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
 	)
 
 	defer func() {
@@ -180,12 +195,6 @@ func (c *Conn) queryContext(ctx context.Context, queryString string, args []driv
 	normalizedQuery, parameters, err := c.normalize(queryString, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
-	}
-
-	queryMode := xcontext.QueryModeFromContext(ctx, xcontext.UnknownQueryMode)
-
-	if queryMode == xcontext.ExplainQueryMode {
-		return c.queryContextExplain(ctx, normalizedQuery, parameters)
 	}
 
 	return c.queryContextOther(ctx, normalizedQuery, parameters)
@@ -207,32 +216,5 @@ func (c *Conn) queryContextOther(
 	return &rows{
 		conn:   c,
 		result: res,
-	}, nil
-}
-
-func (c *Conn) queryContextExplain(
-	ctx context.Context,
-	queryString string,
-	parameters params.Parameters,
-) (driver.Rows, error) {
-	var ast, plan string
-	_, err := c.session.Query(
-		ctx, queryString,
-		options.WithParameters(parameters),
-		options.WithExecMode(options.ExecModeExplain),
-		options.WithStatsMode(options.StatsModeNone, func(stats stats.QueryStats) {
-			ast = stats.QueryAST()
-			plan = stats.QueryPlan()
-		}),
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return &single{
-		values: []sql.NamedArg{
-			sql.Named("AST", ast),
-			sql.Named("Plan", plan),
-		},
 	}, nil
 }

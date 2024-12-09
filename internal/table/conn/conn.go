@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"io"
@@ -59,6 +58,15 @@ type (
 		onClose       []func()
 	}
 )
+
+func (c *Conn) Explain(ctx context.Context, sql string) (ast string, plan string, err error) {
+	exp, err := c.session.Explain(ctx, sql)
+	if err != nil {
+		return "", "", badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	return exp.AST, exp.Plan, nil
+}
 
 func (c *Conn) LastUsage() time.Time {
 	return time.Unix(c.lastUsage.Load(), 0)
@@ -162,7 +170,7 @@ func (c *Conn) execContext(
 		return c.currentTx.ExecContext(ctx, query, args)
 	}
 
-	m := xcontext.QueryModeFromContext(ctx, c.defaultQueryMode)
+	m := queryModeFromContext(ctx, c.defaultQueryMode)
 	onDone := trace.DatabaseSQLOnConnExec(c.parent.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).execContext"),
 		query, m.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
@@ -285,7 +293,7 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	}
 
 	var (
-		queryMode = xcontext.QueryModeFromContext(ctx, c.defaultQueryMode)
+		queryMode = queryModeFromContext(ctx, c.defaultQueryMode)
 		onDone    = trace.DatabaseSQLOnConnQuery(c.parent.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn.(*Conn).queryContext"),
 			query, queryMode.String(), xcontext.IsIdempotent(ctx), c.parent.Clock().Since(c.LastUsage()),
@@ -305,8 +313,6 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		return c.execDataQuery(ctx, normalizedQuery, parameters)
 	case ScanQueryMode:
 		return c.execScanQuery(ctx, normalizedQuery, parameters)
-	case ExplainQueryMode:
-		return c.explainQuery(ctx, normalizedQuery)
 	case ScriptingQueryMode:
 		return c.execScriptingQuery(ctx, normalizedQuery, parameters)
 	default:
@@ -346,20 +352,6 @@ func (c *Conn) execScanQuery(ctx context.Context, query string, params params.Pa
 	return &rows{
 		conn:   c,
 		result: res,
-	}, nil
-}
-
-func (c *Conn) explainQuery(ctx context.Context, query string) (driver.Rows, error) {
-	exp, err := c.session.Explain(ctx, query)
-	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
-	}
-
-	return &single{
-		values: []sql.NamedArg{
-			sql.Named("AST", exp.AST),
-			sql.Named("Plan", exp.Plan),
-		},
 	}, nil
 }
 
@@ -462,7 +454,7 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx curr
 		)
 	}
 
-	m := xcontext.QueryModeFromContext(ctx, c.defaultQueryMode)
+	m := queryModeFromContext(ctx, c.defaultQueryMode)
 
 	if slices.Contains(c.fakeTxModes, m) {
 		return beginTxFake(ctx, c), nil

@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"io"
@@ -19,7 +18,6 @@ var (
 	_ driver.RowsNextResultSet              = &rows{}
 	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
 	_ driver.RowsColumnTypeNullable         = &rows{}
-	_ driver.Rows                           = &single{}
 
 	ignoreColumnPrefixName = "__discard_column_"
 )
@@ -165,33 +163,4 @@ func (r *rows) Close() error {
 	ctx := context.Background()
 
 	return r.result.Close(ctx)
-}
-
-type single struct {
-	values  []sql.NamedArg
-	readAll bool
-}
-
-func (r *single) Columns() (columns []string) {
-	for i := range r.values {
-		columns = append(columns, r.values[i].Name)
-	}
-
-	return columns
-}
-
-func (r *single) Close() error {
-	return nil
-}
-
-func (r *single) Next(dst []driver.Value) error {
-	if r.values == nil || r.readAll {
-		return io.EOF
-	}
-	for i := range r.values {
-		dst[i] = r.values[i].Value
-	}
-	r.readAll = true
-
-	return nil
 }
