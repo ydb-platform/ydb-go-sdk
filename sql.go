@@ -81,15 +81,28 @@ func (d *sqlDriver) detach(c *connector.Connector) {
 type QueryMode = tableSql.QueryMode
 
 const (
-	DataQueryMode      = tableSql.DataQueryMode
-	ExplainQueryMode   = tableSql.ExplainQueryMode
-	ScanQueryMode      = tableSql.ScanQueryMode
-	SchemeQueryMode    = tableSql.SchemeQueryMode
-	ScriptingQueryMode = tableSql.ScriptingQueryMode
+	DataQueryMode = iota + 1
+	ExplainQueryMode
+	ScanQueryMode
+	SchemeQueryMode
+	ScriptingQueryMode
 )
 
 func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
-	return tableSql.WithQueryMode(ctx, mode)
+	switch mode {
+	case ExplainQueryMode:
+		return connector.WithExplain(ctx)
+	case DataQueryMode:
+		return tableSql.WithQueryMode(ctx, tableSql.DataQueryMode)
+	case ScanQueryMode:
+		return tableSql.WithQueryMode(ctx, tableSql.ScanQueryMode)
+	case SchemeQueryMode:
+		return tableSql.WithQueryMode(ctx, tableSql.SchemeQueryMode)
+	case ScriptingQueryMode:
+		return tableSql.WithQueryMode(ctx, tableSql.ScriptingQueryMode)
+	default:
+		return ctx
+	}
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {

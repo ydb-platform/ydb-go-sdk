@@ -2,8 +2,10 @@ package connector
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"io"
 	"path"
 	"strings"
 	"time"
@@ -31,6 +33,8 @@ type (
 		driver.Validator
 		driver.NamedValueChecker
 
+		Explain(ctx context.Context, sql string) (ast string, plan string, err error)
+
 		LastUsage() time.Time
 		ID() string
 	}
@@ -39,7 +43,57 @@ type (
 
 		connector *Connector
 	}
+	singleRow struct {
+		values  []sql.NamedArg
+		readAll bool
+	}
 )
+
+func (r *singleRow) Columns() (columns []string) {
+	for i := range r.values {
+		columns = append(columns, r.values[i].Name)
+	}
+
+	return columns
+}
+
+func (r *singleRow) Close() error {
+	return nil
+}
+
+func (r *singleRow) Next(dst []driver.Value) error {
+	if r.values == nil || r.readAll {
+		return io.EOF
+	}
+	for i := range r.values {
+		dst[i] = r.values[i].Value
+	}
+	r.readAll = true
+
+	return nil
+}
+
+func (c *connWrapper) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	if isExplain(ctx) {
+		ast, plan, err := c.conn.Explain(ctx, query)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return &singleRow{
+			values: []sql.NamedArg{
+				sql.Named("AST", ast),
+				sql.Named("Plan", plan),
+			},
+		}, nil
+	}
+
+	return c.conn.QueryContext(ctx, query, args)
+}
+
+func (c *connWrapper) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	return c.conn.ExecContext(ctx, query, args)
+}
 
 func (c *connWrapper) GetDatabaseName() string {
 	return c.connector.Name()

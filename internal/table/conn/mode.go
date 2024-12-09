@@ -1,32 +1,45 @@
 package conn
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
-type QueryMode int
+type (
+	QueryMode           int
+	ctxQueryModeTypeKey struct{}
+)
 
 const (
 	UnknownQueryMode = QueryMode(iota)
 	DataQueryMode
-	ExplainQueryMode
 	ScanQueryMode
 	SchemeQueryMode
 	ScriptingQueryMode
-
-	DefaultQueryMode = DataQueryMode
 )
+
+func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
+	return context.WithValue(ctx, ctxQueryModeTypeKey{}, mode)
+}
+
+func queryModeFromContext(ctx context.Context, defaultMode QueryMode) QueryMode {
+	if mode, ok := ctx.Value(ctxQueryModeTypeKey{}).(QueryMode); ok {
+		return mode
+	}
+
+	return defaultMode
+}
 
 var (
 	typeToString = map[QueryMode]string{
 		DataQueryMode:      "data",
 		ScanQueryMode:      "scan",
-		ExplainQueryMode:   "explain",
 		SchemeQueryMode:    "scheme",
 		ScriptingQueryMode: "scripting",
 	}
 	stringToType = map[string]QueryMode{
 		"data":      DataQueryMode,
 		"scan":      ScanQueryMode,
-		"explain":   ExplainQueryMode,
 		"scheme":    SchemeQueryMode,
 		"scripting": ScriptingQueryMode,
 	}
