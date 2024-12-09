@@ -83,7 +83,14 @@ func (c *Conn) normalize(q string, args ...driver.NamedValue) (query string, _ p
 		queryArgs[i] = args[i]
 	}
 
-	return c.parent.Bindings().RewriteQuery(q, queryArgs...)
+	sql, parameters, err := c.parent.Bindings().RewriteQuery(q, queryArgs...)
+	if err != nil {
+		return "", nil, xerrors.WithStackTrace(err)
+	}
+
+	params := params.Params(parameters)
+
+	return sql, &params, nil
 }
 
 func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx currentTx, finalErr error) {
@@ -138,7 +145,7 @@ func (c *Conn) execContext(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	err = c.session.Exec(ctx, normalizedQuery, options.WithParameters(&params))
+	err = c.session.Exec(ctx, normalizedQuery, options.WithParameters(params))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -191,7 +198,7 @@ func (c *Conn) queryContextOther(
 ) (driver.Rows, error) {
 	res, err := c.session.Query(
 		ctx, queryString,
-		options.WithParameters(&parameters),
+		options.WithParameters(parameters),
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -211,7 +218,7 @@ func (c *Conn) queryContextExplain(
 	var ast, plan string
 	_, err := c.session.Query(
 		ctx, queryString,
-		options.WithParameters(&parameters),
+		options.WithParameters(parameters),
 		options.WithExecMode(options.ExecModeExplain),
 		options.WithStatsMode(options.StatsModeNone, func(stats stats.QueryStats) {
 			ast = stats.QueryAST()

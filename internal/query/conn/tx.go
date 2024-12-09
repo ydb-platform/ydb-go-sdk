@@ -129,7 +129,7 @@ func (tx *transaction) QueryContext(ctx context.Context, query string, args []dr
 		return nil, xerrors.WithStackTrace(err)
 	}
 	res, err := tx.tx.Query(ctx,
-		query, options.WithParameters(&parameters),
+		query, options.WithParameters(parameters),
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -157,7 +157,7 @@ func (tx *transaction) ExecContext(ctx context.Context, query string, args []dri
 		return nil, xerrors.WithStackTrace(err)
 	}
 	err = tx.tx.Exec(ctx,
-		query, options.WithParameters(&parameters),
+		query, options.WithParameters(parameters),
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
