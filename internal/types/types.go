@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -956,4 +957,37 @@ func (Null) ToYDB(*allocator.Allocator) *Ydb.Type {
 
 func NewNull() Null {
 	return Null{}
+}
+
+var _ Type = (*protobufType)(nil)
+
+type protobufType struct {
+	pb *Ydb.Type
+}
+
+func (v protobufType) Yql() string {
+	return FromYDB([]*Ydb.Type{
+		v.pb,
+	})[0].Yql()
+}
+
+func (v protobufType) String() string {
+	return v.Yql()
+}
+
+func (v protobufType) ToYDB(a *allocator.Allocator) *Ydb.Type {
+	return v.pb
+}
+
+func (v protobufType) equalsTo(rhs Type) bool {
+	switch t := rhs.(type) {
+	case *protobufType:
+		return proto.Equal(v.pb, t.pb)
+	default:
+		return false
+	}
+}
+
+func FromProtobuf(pb *Ydb.Type) *protobufType {
+	return &protobufType{pb: pb}
 }

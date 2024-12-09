@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
@@ -504,8 +505,67 @@ func TestValueYql(t *testing.T) {
 			value:   PgValue(pg.OIDUnknown, "123"),
 			literal: `PgConst("123", PgType(705))`,
 		},
+		{
+			value: FromProtobuf(&Ydb.TypedValue{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TupleType{
+						TupleType: &Ydb.TupleType{
+							Elements: []*Ydb.Type{
+								{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_INT32,
+									},
+								},
+								{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_INT64,
+									},
+								},
+								{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_FLOAT,
+									},
+								},
+								{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UTF8,
+									},
+								},
+							},
+						},
+					},
+				},
+				Value: &Ydb.Value{
+					Items: []*Ydb.Value{
+						{
+							Value: &Ydb.Value_Int32Value{
+								Int32Value: 0,
+							},
+						},
+						{
+							Value: &Ydb.Value_Int64Value{
+								Int64Value: 1,
+							},
+						},
+						{
+							Value: &Ydb.Value_FloatValue{
+								FloatValue: 2,
+							},
+						},
+						{
+							Value: &Ydb.Value_TextValue{
+								TextValue: "3",
+							},
+						},
+					},
+				},
+			}),
+			literal: `(0,1l,Float("2"),"3"u)`,
+		},
 	} {
 		t.Run(strconv.Itoa(i)+"."+tt.literal, func(t *testing.T) {
+			pb := tt.value.toYDB(allocator.New())
+			fmt.Println(pb)
 			require.Equal(t, tt.literal, tt.value.Yql())
 		})
 	}

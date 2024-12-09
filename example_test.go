@@ -511,8 +511,7 @@ func ExampleOpen_advanced() {
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }
 
-// func ExampleParamsMap
-func ExampleMustParamsFromMap() {
+func ExampleParamsFromMap() {
 	ctx := context.TODO()
 	db, err := ydb.Open(
 		ctx,
@@ -532,14 +531,16 @@ func ExampleMustParamsFromMap() {
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 
 	res, err := db.Query().QueryRow(ctx, `
-DECLARE $textArg AS Text;
-DECLARE $intArg AS Int64;
-
-SELECT $textArg AS TextField, $intArg AS IntField
-`, query.WithParameters(ydb.MustParamsFromMap(map[string]any{
-		"$textArg": "asd",
-		"$intArg":  int64(123),
-	})))
+		DECLARE $textArg AS Text;
+		DECLARE $intArg AS Int64;
+		
+		SELECT $textArg AS TextField, $intArg AS IntField
+		`,
+		query.WithParameters(ydb.ParamsFromMap(map[string]any{
+			"$textArg": "asd",
+			"$intArg":  int64(123),
+		})),
+	)
 	if err != nil {
 		fmt.Printf("query failed")
 	}

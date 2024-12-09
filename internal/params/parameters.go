@@ -23,8 +23,13 @@ type (
 		name   string
 		value  value.Value
 	}
-	Parameters []*Parameter
+	Parameters interface {
+		ToYDB(a *allocator.Allocator) (map[string]*Ydb.TypedValue, error)
+	}
+	Params []*Parameter
 )
+
+var _ Parameters = (*Params)(nil)
 
 func Named(name string, value value.Value) *Parameter {
 	return &Parameter{
@@ -41,7 +46,7 @@ func (p *Parameter) Value() value.Value {
 	return p.value
 }
 
-func (p *Parameters) String() string {
+func (p *Params) String() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 
@@ -62,7 +67,20 @@ func (p *Parameters) String() string {
 	return buffer.String()
 }
 
-func (p *Parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+func (p *Params) ToYDB(a *allocator.Allocator) (map[string]*Ydb.TypedValue, error) {
+	if p == nil {
+		return nil, nil //nolint:nilnil
+	}
+
+	parameters := make(map[string]*Ydb.TypedValue, len(*p))
+	for _, param := range *p {
+		parameters[param.name] = value.ToYDB(param.value, a)
+	}
+
+	return parameters, nil
+}
+
+func (p *Params) toYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
 	if p == nil {
 		return nil
 	}
@@ -74,7 +92,7 @@ func (p *Parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
 	return parameters
 }
 
-func (p *Parameters) Each(it func(name string, v value.Value)) {
+func (p *Params) Each(it func(name string, v value.Value)) {
 	if p == nil {
 		return
 	}
@@ -83,7 +101,7 @@ func (p *Parameters) Each(it func(name string, v value.Value)) {
 	}
 }
 
-func (p *Parameters) Count() int {
+func (p *Params) Count() int {
 	if p == nil {
 		return 0
 	}
@@ -91,7 +109,7 @@ func (p *Parameters) Count() int {
 	return len(*p)
 }
 
-func (p *Parameters) Add(params ...NamedValue) {
+func (p *Params) Add(params ...NamedValue) {
 	for _, param := range params {
 		*p = append(*p, Named(param.Name(), param.Value()))
 	}
@@ -342,6 +360,13 @@ func (p *Parameter) TzTimestamp(v time.Time) Builder {
 
 func (p *Parameter) TzDatetime(v time.Time) Builder {
 	p.value = value.TzDatetimeValueFromTime(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) Raw(pb *Ydb.TypedValue) Builder {
+	p.value = value.FromProtobuf(pb)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent

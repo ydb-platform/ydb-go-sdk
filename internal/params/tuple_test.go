@@ -435,7 +435,7 @@ func TestTuple(t *testing.T) {
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(*tuple)
 			require.True(t, ok)
 
-			params := result.EndTuple().Build().ToYDB(a)
+			params := result.EndTuple().build().toYDB(a)
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
@@ -464,7 +464,7 @@ func TestTuple_AddItems(t *testing.T) {
 	defer a.Free()
 	params := Builder{}.Param("$x").BeginTuple().
 		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
-		EndTuple().Build().ToYDB(a)
+		EndTuple().build().toYDB(a)
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {

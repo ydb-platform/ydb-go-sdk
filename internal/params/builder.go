@@ -2,11 +2,15 @@ package params
 
 type (
 	Builder struct {
-		params Parameters
+		params Params
 	}
 )
 
-func (b Builder) Build() *Parameters {
+func (b Builder) Build() Parameters {
+	return &b.params
+}
+
+func (b Builder) build() *Params {
 	return &b.params
 }
 

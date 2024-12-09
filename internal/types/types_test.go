@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 )
@@ -273,11 +274,40 @@ func TestTypeToString(t *testing.T) {
 			t: PgType{OID: pg.OIDUnknown},
 			s: "PgType(705)",
 		},
+		{
+			t: FromProtobuf(&Ydb.Type{
+				Type: &Ydb.Type_VariantType{
+					VariantType: &Ydb.VariantType{
+						Type: &Ydb.VariantType_StructItems{
+							StructItems: &Ydb.StructType{
+								Members: []*Ydb.StructMember{
+									{
+										Name: "a",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_BOOL,
+											},
+										},
+									},
+									{
+										Name: "a",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_FLOAT,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+			s: "Variant<'a':Bool,'a':Float>",
+		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {
-			if got := tt.t.Yql(); got != tt.s {
-				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.s)
-			}
+			require.Equal(t, tt.s, tt.t.Yql())
 		})
 	}
 }

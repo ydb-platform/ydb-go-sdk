@@ -1,15 +1,32 @@
+## v3.94.0
+* Refactored golang types mapping into ydb types using `ydb.ParamsFromMap` and `database/sql` query arguments
+* Small breaking change: type mapping for `ydb.ParamsFromMap` and `database/sql` type `uuid.UUID` changed from ydb type `Text` to ydb type `UUID`
+
+## v3.93.3
+* Supported raw protobuf `*Ydb.TypedValue` using `ydb.ParamsBuilder()`
+
+## v3.93.2
+* Removed experimental helper `ydb.MustParamsFromMap`
+* Changed result of experimental helper `ydb.ParamsFromMap` from tuple <`params.Parameters`, `error`> to `params.Parameters` only 
+
+## v3.93.1
+* Published `query.ExecuteOption` as alias to `internal/query/options.Execute`
+
+## v3.93.0
+* Added `ydb.WithStaticCredentialsLogin` and `ydb.WithStaticCredentialsPassword` options
+
 ## v3.92.6
 * Fixed string representation of `TzTimestamp`, `TzDatetime` and `TzDate` type values
 * Added `database/sql/driver.Value` as type destination for almost ydb values
 
 ## v3.92.5
-* Avoid retrying requests finished with 'UNAUTHORIZED' errors
+* Avoid retrying requests finished with `UNAUTHORIZED` errors
 
 ## v3.92.4
 * Fixed connections pool leak on closing
 
 ## v3.92.3
-* Fixed error with incompleted data returen from transaction.ReadQueryResult method
+* Fixed error with incompleted data return from transaction.ReadQueryResult method
 * Added option `query/WithResponsePartLimitSizeBytes(...)` for queries with query service
 
 ## v3.92.2

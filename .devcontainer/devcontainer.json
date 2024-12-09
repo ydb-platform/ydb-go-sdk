@@ -1,0 +1,42 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/go-postgres
+{
+	"name": "Go & YDB",
+	"service": "sdk",
+	"dockerComposeFile": "compose.yml",
+	"workspaceFolder": "/workspaces/ydb-go-sdk",
+	// Allows the container to use ptrace, which is useful for debugging.
+	"capAdd": [
+		"SYS_PTRACE"
+	],
+	// Disables seccomp, which can be necessary for some debugging tools to function correctly.
+	"securityOpt": [
+		"seccomp=unconfined"
+	],
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"ghcr.io/devcontainers/features/github-cli:1": {}
+	},
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go",
+				"VisualStudioExptTeam.vscodeintellicode",
+				"redhat.vscode-yaml",
+				"zxh404.vscode-proto3",
+				"github.vscode-github-actions"
+			]
+		}
+	},
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [2135, 2136, 8765],
+	// Use 'initializeCommand' to run commands before the container is created.
+	"initializeCommand": "cd \"${localWorkspaceFolder}\" && git config --local user.email \"$(git config user.email)\" && git config --local user.name \"$(git config user.name)\"",
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "go version && golangci-lint --version && go mod download",
+	// Use 'postStartCommand' to run commands after the container is started.
+	"postStartCommand": ".devcontainer/configure.sh"
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}

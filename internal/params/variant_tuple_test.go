@@ -466,7 +466,7 @@ func TestVariantTuple(t *testing.T) {
 			builder, ok := xtest.CallMethod(types.Index(0), tc.method, tc.itemArgs...)[0].(*variantTupleBuilder)
 			require.True(t, ok)
 
-			params := builder.EndTuple().EndVariant().Build().ToYDB(a)
+			params := builder.EndTuple().EndVariant().build().toYDB(a)
 
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
@@ -503,7 +503,7 @@ func TestVariantTuple_AddTypes(t *testing.T) {
 		Types().AddTypes(types.Int64, types.Bool).
 		Index(1).
 		Bool(true).
-		EndTuple().EndVariant().Build().ToYDB(a)
+		EndTuple().EndVariant().build().toYDB(a)
 
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{

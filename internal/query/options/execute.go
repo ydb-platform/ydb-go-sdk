@@ -52,10 +52,12 @@ type (
 	callOptionsOption []grpc.CallOption
 	txCommitOption    struct{}
 	resourcePool      string
-	parametersOption  params.Parameters
-	txControlOption   tx.Control
-	syntaxOption      = Syntax
-	statsModeOption   struct {
+	parametersOption  struct {
+		params params.Parameters
+	}
+	txControlOption tx.Control
+	syntaxOption    = Syntax
+	statsModeOption struct {
 		mode     StatsMode
 		callback func(stats.QueryStats)
 	}
@@ -94,8 +96,8 @@ const (
 	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG)
 )
 
-func (params parametersOption) applyExecuteOption(s *executeSettings) {
-	s.params = append(s.params, params...)
+func (opt parametersOption) applyExecuteOption(s *executeSettings) {
+	s.params = opt.params
 }
 
 func (opts callOptionsOption) applyExecuteOption(s *executeSettings) {
@@ -130,6 +132,7 @@ func defaultExecuteSettings() executeSettings {
 		execMode:  ExecModeExecute,
 		statsMode: StatsModeNone,
 		txControl: tx.DefaultTxControl(),
+		params:    &params.Params{},
 	}
 }
 
@@ -169,20 +172,18 @@ func (s *executeSettings) ResourcePool() string {
 	return s.resourcePool
 }
 
-func (s *executeSettings) Params() *params.Parameters {
-	if len(s.params) == 0 {
-		return nil
-	}
-
-	return &s.params
+func (s *executeSettings) Params() params.Parameters {
+	return s.params
 }
 
 func (s *executeSettings) ResponsePartLimitSizeBytes() int64 {
 	return s.responsePartLimitBytes
 }
 
-func WithParameters(parameters *params.Parameters) parametersOption {
-	return parametersOption(*parameters)
+func WithParameters(params params.Parameters) parametersOption {
+	return parametersOption{
+		params: params,
+	}
 }
 
 var (
