@@ -1,13 +1,13 @@
-package connector
+package xsql
 
 import (
 	"context"
 	"database/sql/driver"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -31,7 +31,7 @@ func (tx *txWrapper) Commit() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.connector.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*txWrapper).Commit"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).Commit"),
 			tx,
 		)
 	)
@@ -50,7 +50,7 @@ func (tx *txWrapper) Rollback() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.connector.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*txWrapper).Rollback"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).Rollback"),
 			tx,
 		)
 	)
@@ -70,7 +70,7 @@ func (tx *txWrapper) QueryContext(ctx context.Context, query string, args []driv
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*txWrapper).QueryContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).QueryContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
@@ -103,7 +103,7 @@ func (tx *txWrapper) ExecContext(ctx context.Context, query string, args []drive
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*txWrapper).ExecContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).ExecContext"),
 		tx.ctx, tx, query,
 	)
 	defer func() {
@@ -125,7 +125,7 @@ func (tx *txWrapper) ExecContext(ctx context.Context, query string, args []drive
 
 func (tx *txWrapper) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*txWrapper).PrepareContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).PrepareContext"),
 		tx.ctx, tx, sql,
 	)
 	defer func() {

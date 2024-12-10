@@ -1,4 +1,4 @@
-package connector
+package xsql
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/iface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -18,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -124,7 +124,7 @@ func (c *conn) Prepare(string) (driver.Stmt, error) {
 
 func (c *conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnPrepare(c.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*conn).PrepareContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*conn).PrepareContext"),
 		sql,
 	)
 	defer func() {
@@ -393,7 +393,7 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
 	onDone := trace.DatabaseSQLOnConnIsTableExists(c.connector.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*conn).IsTableExists"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*conn).IsTableExists"),
 		tableName,
 	)
 	defer func() {

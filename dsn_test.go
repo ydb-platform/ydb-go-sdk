@@ -8,14 +8,14 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
-	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/query/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
+	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/query/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
 )
 
 func TestParse(t *testing.T) {
-	newConnector := func(opts ...connector.Option) *connector.Connector {
-		c := &connector.Connector{}
+	newConnector := func(opts ...xsql.Option) *xsql.Connector {
+		c := &xsql.Connector{}
 		for _, opt := range opts {
 			if opt != nil {
 				if err := opt.Apply(c); err != nil {
@@ -40,7 +40,7 @@ func TestParse(t *testing.T) {
 	for _, tt := range []struct {
 		dsn           string
 		opts          []config.Option
-		connectorOpts []connector.Option
+		connectorOpts []xsql.Option
 		err           error
 	}{
 		{
@@ -70,8 +70,8 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(conn.ScriptingQueryMode),
 			},
 			err: nil,
 		},
@@ -82,9 +82,9 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(conn.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 			},
 			err: nil,
 		},
@@ -95,10 +95,10 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
-				connector.WithQueryBind(bind.NumericArgs{}),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(conn.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+				xsql.WithQueryBind(bind.NumericArgs{}),
 			},
 			err: nil,
 		},
@@ -109,10 +109,10 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
-				connector.WithQueryBind(bind.PositionalArgs{}),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(conn.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+				xsql.WithQueryBind(bind.PositionalArgs{}),
 			},
 			err: nil,
 		},
@@ -123,10 +123,10 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
-				connector.WithQueryBind(bind.AutoDeclare{}),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(conn.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+				xsql.WithQueryBind(bind.AutoDeclare{}),
 			},
 			err: nil,
 		},
@@ -137,9 +137,9 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(conn.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 			},
 			err: nil,
 		},
@@ -150,11 +150,11 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
-				connector.WithQueryBind(bind.PositionalArgs{}),
-				connector.WithQueryBind(bind.AutoDeclare{}),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(conn.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+				xsql.WithQueryBind(bind.PositionalArgs{}),
+				xsql.WithQueryBind(bind.AutoDeclare{}),
 			},
 			err: nil,
 		},
@@ -165,9 +165,9 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithFakeTx(conn.ScriptingQueryMode),
-				connector.WithFakeTx(conn.SchemeQueryMode),
+			connectorOpts: []xsql.Option{
+				xsql.WithFakeTx(conn.ScriptingQueryMode),
+				xsql.WithFakeTx(conn.SchemeQueryMode),
 			},
 			err: nil,
 		},

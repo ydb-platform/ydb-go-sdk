@@ -1,4 +1,4 @@
-package connector
+package xsql
 
 import (
 	"context"
@@ -12,11 +12,11 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	conn3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/query/conn"
-	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	conn3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/query/conn"
+	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"

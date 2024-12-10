@@ -1,11 +1,11 @@
-package connector
+package xsql
 
 import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/query/conn"
-	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn"
+	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/query/conn"
+	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )

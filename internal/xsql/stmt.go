@@ -1,4 +1,4 @@
-package connector
+package xsql
 
 import (
 	"context"
@@ -28,7 +28,7 @@ var (
 
 func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtQuery(stmt.conn.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*stmt).QueryContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*stmt).QueryContext"),
 		stmt.ctx, stmt.sql,
 	)
 	defer func() {
@@ -49,7 +49,7 @@ func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 
 func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtExec(stmt.conn.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*stmt).ExecContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*stmt).ExecContext"),
 		stmt.ctx, stmt.sql,
 	)
 	defer func() {
@@ -76,7 +76,7 @@ func (stmt *stmt) Close() (finalErr error) {
 	var (
 		ctx    = stmt.ctx
 		onDone = trace.DatabaseSQLOnStmtClose(stmt.conn.connector.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*stmt).Close"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*stmt).Close"),
 		)
 	)
 	defer func() {

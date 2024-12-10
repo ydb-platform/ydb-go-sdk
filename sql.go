@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -32,7 +32,7 @@ func withConnectorOptions(opts ...ConnectorOption) Option {
 }
 
 type sqlDriver struct {
-	connectors xsync.Map[*connector.Connector, *Driver]
+	connectors xsync.Map[*xsql.Connector, *Driver]
 }
 
 var (
@@ -42,7 +42,7 @@ var (
 
 func (d *sqlDriver) Close() error {
 	var errs []error
-	d.connectors.Range(func(c *connector.Connector, _ *Driver) bool {
+	d.connectors.Range(func(c *xsql.Connector, _ *Driver) bool {
 		if err := c.Close(); err != nil {
 			errs = append(errs, err)
 		}
@@ -58,7 +58,7 @@ func (d *sqlDriver) Close() error {
 
 // Open returns a new Driver to the ydb.
 func (d *sqlDriver) Open(string) (driver.Conn, error) {
-	return nil, connector.ErrUnsupported
+	return nil, xsql.ErrUnsupported
 }
 
 func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, error) {
@@ -70,11 +70,11 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	return Connector(db, db.databaseSQLOptions...)
 }
 
-func (d *sqlDriver) attach(c *connector.Connector, parent *Driver) {
+func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
 	d.connectors.Set(c, parent)
 }
 
-func (d *sqlDriver) detach(c *connector.Connector) {
+func (d *sqlDriver) detach(c *xsql.Connector) {
 	d.connectors.Delete(c)
 }
 
@@ -91,7 +91,7 @@ const (
 func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 	switch mode {
 	case ExplainQueryMode:
-		return connector.WithExplain(ctx)
+		return xsql.WithExplain(ctx)
 	case DataQueryMode:
 		return conn.WithQueryMode(ctx, conn.DataQueryMode)
 	case ScanQueryMode:
@@ -109,7 +109,7 @@ func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.C
 	return conn.WithTxControl(ctx, txc)
 }
 
-type ConnectorOption = connector.Option
+type ConnectorOption = xsql.Option
 
 type QueryBindConnectorOption interface {
 	ConnectorOption
@@ -117,50 +117,50 @@ type QueryBindConnectorOption interface {
 }
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
-	return connector.WithTableOptions(conn.WithDefaultQueryMode(mode))
+	return xsql.WithTableOptions(conn.WithDefaultQueryMode(mode))
 }
 
 func WithFakeTx(mode QueryMode) ConnectorOption {
-	return connector.WithTableOptions(conn.WithFakeTxModes(mode))
+	return xsql.WithTableOptions(conn.WithFakeTxModes(mode))
 }
 
 func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
-	return connector.WithTablePathPrefix(tablePathPrefix)
+	return xsql.WithTablePathPrefix(tablePathPrefix)
 }
 
 func WithAutoDeclare() QueryBindConnectorOption {
-	return connector.WithQueryBind(bind.AutoDeclare{})
+	return xsql.WithQueryBind(bind.AutoDeclare{})
 }
 
 func WithPositionalArgs() QueryBindConnectorOption {
-	return connector.WithQueryBind(bind.PositionalArgs{})
+	return xsql.WithQueryBind(bind.PositionalArgs{})
 }
 
 func WithNumericArgs() QueryBindConnectorOption {
-	return connector.WithQueryBind(bind.NumericArgs{})
+	return xsql.WithQueryBind(bind.NumericArgs{})
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
-	return connector.WithTableOptions(conn.WithDefaultTxControl(txControl))
+	return xsql.WithTableOptions(conn.WithDefaultTxControl(txControl))
 }
 
 func WithDefaultDataQueryOptions(opts ...options.ExecuteDataQueryOption) ConnectorOption {
-	return connector.WithTableOptions(conn.WithDataOpts(opts...))
+	return xsql.WithTableOptions(conn.WithDataOpts(opts...))
 }
 
 func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) ConnectorOption {
-	return connector.WithTableOptions(conn.WithScanOpts(opts...))
+	return xsql.WithTableOptions(conn.WithScanOpts(opts...))
 }
 
 func WithDatabaseSQLTrace(
 	t trace.DatabaseSQL, //nolint:gocritic
 	opts ...trace.DatabaseSQLComposeOption,
 ) ConnectorOption {
-	return connector.WithTrace(&t, opts...)
+	return xsql.WithTrace(&t, opts...)
 }
 
 func WithDisableServerBalancer() ConnectorOption {
-	return connector.WithDisableServerBalancer()
+	return xsql.WithDisableServerBalancer()
 }
 
 type SQLConnector interface {
@@ -170,15 +170,15 @@ type SQLConnector interface {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	c, err := connector.Open(parent, parent.metaBalancer,
+	c, err := xsql.Open(parent, parent.metaBalancer,
 		append(
 			append(
 				parent.databaseSQLOptions,
 				opts...,
 			),
-			connector.WithOnClose(d.detach),
-			connector.WithTraceRetry(parent.config.TraceRetry()),
-			connector.WithRetryBudget(parent.config.RetryBudget()),
+			xsql.WithOnClose(d.detach),
+			xsql.WithTraceRetry(parent.config.TraceRetry()),
+			xsql.WithRetryBudget(parent.config.RetryBudget()),
 		)...,
 	)
 	if err != nil {
