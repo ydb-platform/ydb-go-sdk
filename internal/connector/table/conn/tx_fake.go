@@ -5,8 +5,8 @@ import (
 	"database/sql/driver"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )

@@ -9,8 +9,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
+	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/query/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn"
 )
 
 func TestParse(t *testing.T) {
@@ -26,11 +26,11 @@ func TestParse(t *testing.T) {
 
 		return c
 	}
-	newTableConn := func(opts ...tableSql.Option) *tableSql.Conn {
-		return tableSql.New(context.Background(), nil, nil, opts...)
+	newTableConn := func(opts ...conn.Option) *conn.Conn {
+		return conn.New(context.Background(), nil, nil, opts...)
 	}
-	newQueryConn := func(opts ...querySql.Option) *querySql.Conn {
-		return querySql.New(context.Background(), nil, nil, opts...)
+	newQueryConn := func(opts ...conn2.Option) *conn2.Conn {
+		return conn2.New(context.Background(), nil, nil, opts...)
 	}
 	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {
 		require.Equal(t, lhs.Secure(), rhs.Secure())
@@ -71,7 +71,7 @@ func TestParse(t *testing.T) {
 				config.WithDatabase("/local"),
 			},
 			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
+				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
 			},
 			err: nil,
 		},
@@ -83,7 +83,7 @@ func TestParse(t *testing.T) {
 				config.WithDatabase("/local"),
 			},
 			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
+				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
 				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 			},
 			err: nil,
@@ -96,7 +96,7 @@ func TestParse(t *testing.T) {
 				config.WithDatabase("/local"),
 			},
 			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
+				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
 				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 				connector.WithQueryBind(bind.NumericArgs{}),
 			},
@@ -110,7 +110,7 @@ func TestParse(t *testing.T) {
 				config.WithDatabase("/local"),
 			},
 			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
+				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
 				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 				connector.WithQueryBind(bind.PositionalArgs{}),
 			},
@@ -124,7 +124,7 @@ func TestParse(t *testing.T) {
 				config.WithDatabase("/local"),
 			},
 			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
+				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
 				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 				connector.WithQueryBind(bind.AutoDeclare{}),
 			},
@@ -138,7 +138,7 @@ func TestParse(t *testing.T) {
 				config.WithDatabase("/local"),
 			},
 			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
+				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
 				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 			},
 			err: nil,
@@ -151,7 +151,7 @@ func TestParse(t *testing.T) {
 				config.WithDatabase("/local"),
 			},
 			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
+				connector.WithDefaultQueryMode(conn.ScriptingQueryMode),
 				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 				connector.WithQueryBind(bind.PositionalArgs{}),
 				connector.WithQueryBind(bind.AutoDeclare{}),
@@ -166,8 +166,8 @@ func TestParse(t *testing.T) {
 				config.WithDatabase("/local"),
 			},
 			connectorOpts: []connector.Option{
-				connector.WithFakeTx(tableSql.ScriptingQueryMode),
-				connector.WithFakeTx(tableSql.SchemeQueryMode),
+				connector.WithFakeTx(conn.ScriptingQueryMode),
+				connector.WithFakeTx(conn.SchemeQueryMode),
 			},
 			err: nil,
 		},

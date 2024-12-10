@@ -8,7 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -78,7 +78,7 @@ func (d *sqlDriver) detach(c *connector.Connector) {
 	d.connectors.Delete(c)
 }
 
-type QueryMode = tableSql.QueryMode
+type QueryMode = conn.QueryMode
 
 const (
 	DataQueryMode = iota + 1
@@ -93,20 +93,20 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 	case ExplainQueryMode:
 		return connector.WithExplain(ctx)
 	case DataQueryMode:
-		return tableSql.WithQueryMode(ctx, tableSql.DataQueryMode)
+		return conn.WithQueryMode(ctx, conn.DataQueryMode)
 	case ScanQueryMode:
-		return tableSql.WithQueryMode(ctx, tableSql.ScanQueryMode)
+		return conn.WithQueryMode(ctx, conn.ScanQueryMode)
 	case SchemeQueryMode:
-		return tableSql.WithQueryMode(ctx, tableSql.SchemeQueryMode)
+		return conn.WithQueryMode(ctx, conn.SchemeQueryMode)
 	case ScriptingQueryMode:
-		return tableSql.WithQueryMode(ctx, tableSql.ScriptingQueryMode)
+		return conn.WithQueryMode(ctx, conn.ScriptingQueryMode)
 	default:
 		return ctx
 	}
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
-	return tableSql.WithTxControl(ctx, txc)
+	return conn.WithTxControl(ctx, txc)
 }
 
 type ConnectorOption = connector.Option
@@ -117,11 +117,11 @@ type QueryBindConnectorOption interface {
 }
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
-	return connector.WithTableOptions(tableSql.WithDefaultQueryMode(mode))
+	return connector.WithTableOptions(conn.WithDefaultQueryMode(mode))
 }
 
 func WithFakeTx(mode QueryMode) ConnectorOption {
-	return connector.WithTableOptions(tableSql.WithFakeTxModes(mode))
+	return connector.WithTableOptions(conn.WithFakeTxModes(mode))
 }
 
 func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
@@ -141,15 +141,15 @@ func WithNumericArgs() QueryBindConnectorOption {
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
-	return connector.WithTableOptions(tableSql.WithDefaultTxControl(txControl))
+	return connector.WithTableOptions(conn.WithDefaultTxControl(txControl))
 }
 
 func WithDefaultDataQueryOptions(opts ...options.ExecuteDataQueryOption) ConnectorOption {
-	return connector.WithTableOptions(tableSql.WithDataOpts(opts...))
+	return connector.WithTableOptions(conn.WithDataOpts(opts...))
 }
 
 func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) ConnectorOption {
-	return connector.WithTableOptions(tableSql.WithScanOpts(opts...))
+	return connector.WithTableOptions(conn.WithScanOpts(opts...))
 }
 
 func WithDatabaseSQLTrace(

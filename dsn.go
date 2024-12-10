@@ -10,8 +10,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
+	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 

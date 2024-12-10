@@ -12,9 +12,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	conn3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/query/conn"
+	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -38,8 +38,8 @@ type (
 
 		queryProcessor queryProcessor
 
-		TableOpts             []tableSql.Option
-		QueryOpts             []querySql.Option
+		TableOpts             []conn2.Option
+		QueryOpts             []conn3.Option
 		disableServerBalancer bool
 		onCLose               []func(*Connector)
 
@@ -122,9 +122,9 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		id := uuid.New()
 
 		conn := &conn{
-			cc: querySql.New(ctx, c, s, append(
+			cc: conn3.New(ctx, c, s, append(
 				c.QueryOpts,
-				querySql.WithOnClose(func() {
+				conn3.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
@@ -145,8 +145,8 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		id := uuid.New()
 
 		conn := &conn{
-			cc: tableSql.New(ctx, c, s, append(c.TableOpts,
-				tableSql.WithOnClose(func() {
+			cc: conn2.New(ctx, c, s, append(c.TableOpts,
+				conn2.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),

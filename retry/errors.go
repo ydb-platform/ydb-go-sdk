@@ -1,7 +1,7 @@
 package retry
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 

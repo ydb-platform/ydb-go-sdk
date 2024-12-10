@@ -5,8 +5,8 @@ import (
 	"database/sql/driver"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector/query/conn/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
