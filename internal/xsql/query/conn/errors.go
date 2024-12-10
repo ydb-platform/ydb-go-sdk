@@ -10,6 +10,6 @@ import (
 var (
 	ErrUnsupported     = driver.ErrSkip
 	errDeprecated      = driver.ErrSkip
-	errConnClosedEarly = xerrors.Retryable(errors.New("conn closed early"), xerrors.InvalidObject())
-	errNotReadyConn    = xerrors.Retryable(errors.New("conn not ready"), xerrors.InvalidObject())
+	errConnClosedEarly = xerrors.Retryable(errors.New("Conn closed early"), xerrors.InvalidObject())
+	errNotReadyConn    = xerrors.Retryable(errors.New("Conn not ready"), xerrors.InvalidObject())
 )

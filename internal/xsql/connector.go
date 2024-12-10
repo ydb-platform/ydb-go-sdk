@@ -1,9 +1,10 @@
-package connector
+package xsql
 
 import (
 	"context"
 	"database/sql/driver"
 	"io"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,10 +13,10 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	conn3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/query/conn"
+	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -37,14 +38,14 @@ type (
 
 		queryProcessor queryProcessor
 
-		TableOpts             []tableSql.Option
-		QueryOpts             []querySql.Option
+		TableOpts             []conn2.Option
+		QueryOpts             []conn3.Option
 		disableServerBalancer bool
 		onCLose               []func(*Connector)
 
 		clock          clockwork.Clock
 		idleThreshold  time.Duration
-		conns          xsync.Map[uuid.UUID, *connWrapper]
+		conns          xsync.Map[uuid.UUID, *conn]
 		done           chan struct{}
 		trace          *trace.DatabaseSQL
 		traceRetry     *trace.Retry
@@ -120,14 +121,15 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		id := uuid.New()
 
-		conn := &connWrapper{
-			conn: querySql.New(ctx, c, s, append(
+		conn := &conn{
+			cc: conn3.New(ctx, c, s, append(
 				c.QueryOpts,
-				querySql.WithOnClose(func() {
+				conn3.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
 			connector: c,
+			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		c.conns.Set(id, conn)
@@ -142,13 +144,14 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		id := uuid.New()
 
-		conn := &connWrapper{
-			conn: tableSql.New(ctx, c, s, append(c.TableOpts,
-				tableSql.WithOnClose(func() {
+		conn := &conn{
+			cc: conn2.New(ctx, c, s, append(c.TableOpts,
+				conn2.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
 			connector: c,
+			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		c.conns.Set(id, conn)
@@ -184,9 +187,15 @@ func (c *Connector) Close() error {
 
 func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (_ *Connector, err error) {
 	c := &Connector{
-		parent:         parent,
-		balancer:       balancer,
-		queryProcessor: TABLE_SERVICE,
+		parent:   parent,
+		balancer: balancer,
+		queryProcessor: func() queryProcessor {
+			if v, has := os.LookupEnv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE"); has && v != "" {
+				return QUERY_SERVICE
+			}
+
+			return TABLE_SERVICE
+		}(),
 		clock:          clockwork.NewRealClock(),
 		done:           make(chan struct{}),
 		trace:          &trace.DatabaseSQL{},
@@ -215,7 +224,7 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 					return
 				case <-idleThresholdTimer.Chan():
 					idleThresholdTimer.Stop() // no really need, stop for common style only
-					c.conns.Range(func(_ uuid.UUID, cc *connWrapper) bool {
+					c.conns.Range(func(_ uuid.UUID, cc *conn) bool {
 						if c.clock.Since(cc.LastUsage()) > c.idleThreshold {
 							_ = cc.Close()
 						}

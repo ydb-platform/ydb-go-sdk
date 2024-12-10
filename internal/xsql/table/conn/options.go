@@ -20,7 +20,7 @@ func WithFakeTxModes(modes ...QueryMode) Option {
 
 func WithDataOpts(dataOpts ...options.ExecuteDataQueryOption) Option {
 	return func(c *Conn) {
-		c.dataOpts = dataOpts
+		c.dataOpts = append(c.dataOpts, dataOpts...)
 	}
 }
 

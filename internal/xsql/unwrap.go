@@ -1,11 +1,11 @@
-package connector
+package xsql
 
 import (
 	"database/sql"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn/badconn"
 )
 
 func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, _ error) {
@@ -18,13 +18,13 @@ func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, _ error) {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("%T is not a *driverWrapper", v))
 	case *sql.Conn:
 		if err := vv.Raw(func(driverConn interface{}) error {
-			if cc, ok := driverConn.(*connWrapper); ok {
+			if cc, ok := driverConn.(*conn); ok {
 				connector = cc.connector
 
 				return nil
 			}
 
-			return xerrors.WithStackTrace(fmt.Errorf("%T is not a *connWrapper", driverConn))
+			return xerrors.WithStackTrace(fmt.Errorf("%T is not a *conn", driverConn))
 		}); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
