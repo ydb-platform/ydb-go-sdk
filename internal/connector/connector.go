@@ -45,7 +45,7 @@ type (
 
 		clock          clockwork.Clock
 		idleThreshold  time.Duration
-		conns          xsync.Map[uuid.UUID, *connWrapper]
+		conns          xsync.Map[uuid.UUID, *conn]
 		done           chan struct{}
 		trace          *trace.DatabaseSQL
 		traceRetry     *trace.Retry
@@ -121,14 +121,15 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		id := uuid.New()
 
-		conn := &connWrapper{
-			conn: querySql.New(ctx, c, s, append(
+		conn := &conn{
+			cc: querySql.New(ctx, c, s, append(
 				c.QueryOpts,
 				querySql.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
 			connector: c,
+			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		c.conns.Set(id, conn)
@@ -143,13 +144,14 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		id := uuid.New()
 
-		conn := &connWrapper{
-			conn: tableSql.New(ctx, c, s, append(c.TableOpts,
+		conn := &conn{
+			cc: tableSql.New(ctx, c, s, append(c.TableOpts,
 				tableSql.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
 			connector: c,
+			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		c.conns.Set(id, conn)
@@ -222,7 +224,7 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 					return
 				case <-idleThresholdTimer.Chan():
 					idleThresholdTimer.Stop() // no really need, stop for common style only
-					c.conns.Range(func(_ uuid.UUID, cc *connWrapper) bool {
+					c.conns.Range(func(_ uuid.UUID, cc *conn) bool {
 						if c.clock.Since(cc.LastUsage()) > c.idleThreshold {
 							_ = cc.Close()
 						}

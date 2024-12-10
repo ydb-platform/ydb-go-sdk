@@ -72,7 +72,3 @@ func (c *Conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryO
 
 	return c.dataOpts
 }
-
-func (c *Conn) withKeepInCache(ctx context.Context) context.Context {
-	return c.WithDataQueryOptions(ctx, options.WithKeepInCache(true))
-}
