@@ -1,4 +1,4 @@
-package conn
+package table
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
 )
 
 type txFake struct {

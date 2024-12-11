@@ -1,4 +1,4 @@
-package isolation
+package query
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-func ToYDB(opts driver.TxOptions) (txcControl tx.Option, err error) {
+func toYDB(opts driver.TxOptions) (txcControl tx.Option, err error) {
 	level := sql.IsolationLevel(opts.Isolation)
 	switch level {
 	case sql.LevelDefault, sql.LevelSerializable:

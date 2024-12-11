@@ -147,33 +147,31 @@ func (c *connWrapper) LastUsage() time.Time {
 	return c.lastUsage.Get()
 }
 
-func (c *connWrapper) normalize(q string, args ...driver.NamedValue) (query string, _ *params.Params, _ error) {
+func (c *connWrapper) toYdb(sql string, args ...driver.NamedValue) (yql string, _ *params.Params, _ error) {
 	queryArgs := make([]any, len(args))
 	for i := range args {
 		queryArgs[i] = args[i]
 	}
 
-	sql, parameters, err := c.connector.Bindings().RewriteQuery(q, queryArgs...)
+	yql, params, err := c.connector.Bindings().ToYdb(sql, queryArgs...)
 	if err != nil {
 		return "", nil, xerrors.WithStackTrace(err)
 	}
 
-	params := params.Params(parameters)
-
-	return sql, &params, nil
+	return yql, &params, nil
 }
 
-func (c *connWrapper) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (c *connWrapper) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Rows, error) {
 	done := c.lastUsage.Start()
 	defer done()
 
-	query, params, err := c.normalize(query, args...)
+	sql, params, err := c.toYdb(sql, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if isExplain(ctx) {
-		ast, plan, err := c.cc.Explain(ctx, query, params)
+		ast, plan, err := c.cc.Explain(ctx, sql, params)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -181,19 +179,19 @@ func (c *connWrapper) QueryContext(ctx context.Context, query string, args []dri
 		return rowByAstPlan(ast, plan), nil
 	}
 
-	return c.cc.Query(ctx, query, params)
+	return c.cc.Query(ctx, sql, params)
 }
 
-func (c *connWrapper) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func (c *connWrapper) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Result, error) {
 	done := c.lastUsage.Start()
 	defer done()
 
-	query, params, err := c.normalize(query, args...)
+	sql, params, err := c.toYdb(sql, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return c.cc.Exec(ctx, query, params)
+	return c.cc.Exec(ctx, sql, params)
 }
 
 func (c *connWrapper) GetDatabaseName() string {

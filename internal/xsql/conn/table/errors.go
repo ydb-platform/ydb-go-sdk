@@ -1,4 +1,4 @@
-package conn
+package table
 
 import (
 	"database/sql/driver"

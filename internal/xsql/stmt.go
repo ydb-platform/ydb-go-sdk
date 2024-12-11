@@ -39,7 +39,7 @@ func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
-	sql, params, err := stmt.conn.normalize(stmt.sql, args...)
+	sql, params, err := stmt.conn.toYdb(stmt.sql, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -60,7 +60,7 @@ func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
-	sql, params, err := stmt.conn.normalize(stmt.sql, args...)
+	sql, params, err := stmt.conn.toYdb(stmt.sql, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

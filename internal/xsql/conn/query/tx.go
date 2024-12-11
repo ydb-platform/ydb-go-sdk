@@ -1,4 +1,4 @@
-package conn
+package query
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/query/conn/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -45,7 +44,7 @@ func (tx *transaction) Query(ctx context.Context, sql string, params *params.Par
 }
 
 func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (conn.Tx, error) {
-	txc, err := isolation.ToYDB(txOptions)
+	txc, err := toYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

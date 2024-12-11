@@ -13,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
 )
 
 type mockConnector struct {
@@ -63,22 +63,22 @@ var (
 	_ driver.QueryerContext     = &mockConn{}
 )
 
-func (m *mockConn) Prepare(query string) (driver.Stmt, error) {
+func (m *mockConn) Prepare(string) (driver.Stmt, error) {
 	m.t.Log(stack.Record(0))
 
 	return nil, driver.ErrSkip
 }
 
-func (m *mockConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+func (m *mockConn) PrepareContext(ctx context.Context, sql string) (driver.Stmt, error) {
 	m.t.Log(stack.Record(0))
 	if m.closed {
 		return nil, driver.ErrBadConn
 	}
 
 	return &mockStmt{
-		t:     m.t,
-		conn:  m,
-		query: query,
+		t:    m.t,
+		conn: m,
+		sql:  sql,
 	}, nil
 }
 
@@ -104,7 +104,7 @@ func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 	return m, nil
 }
 
-func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (m *mockConn) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Rows, error) {
 	m.t.Log(stack.Record(0))
 	if !xerrors.IsRetryObjectValid(m.execErr) {
 		m.closed = true
@@ -113,7 +113,7 @@ func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver
 	return nil, m.queryErr
 }
 
-func (m *mockConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func (m *mockConn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Result, error) {
 	m.t.Log(stack.Record(0))
 	if !xerrors.IsRetryObjectValid(m.execErr) {
 		m.closed = true
@@ -135,9 +135,9 @@ func (m *mockConn) Rollback() error {
 }
 
 type mockStmt struct {
-	t     testing.TB
-	conn  *mockConn
-	query string
+	t    testing.TB
+	conn *mockConn
+	sql  string
 }
 
 var (
@@ -167,7 +167,7 @@ func (m *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 func (m *mockStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	m.t.Log(stack.Record(0))
 
-	return m.conn.ExecContext(ctx, m.query, args)
+	return m.conn.ExecContext(ctx, m.sql, args)
 }
 
 func (m *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
@@ -179,7 +179,7 @@ func (m *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 func (m *mockStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	m.t.Log(stack.Record(0))
 
-	return m.conn.QueryContext(ctx, m.query, args)
+	return m.conn.QueryContext(ctx, m.sql, args)
 }
 
 func TestDoTx(t *testing.T) {

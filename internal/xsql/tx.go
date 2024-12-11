@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -66,24 +66,24 @@ func (tx *txWrapper) Rollback() (finalErr error) {
 	return err
 }
 
-func (tx *txWrapper) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (
+func (tx *txWrapper) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.connector.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).QueryContext"),
-		tx.ctx, tx, query,
+		tx.ctx, tx, sql,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	query, params, err := tx.conn.normalize(query, args...)
+	sql, params, err := tx.conn.toYdb(sql, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if isExplain(ctx) {
-		ast, plan, err := tx.conn.cc.Explain(ctx, query, params)
+		ast, plan, err := tx.conn.cc.Explain(ctx, sql, params)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -91,7 +91,7 @@ func (tx *txWrapper) QueryContext(ctx context.Context, query string, args []driv
 		return rowByAstPlan(ast, plan), nil
 	}
 
-	rows, err := tx.tx.Query(ctx, query, params)
+	rows, err := tx.tx.Query(ctx, sql, params)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -99,23 +99,23 @@ func (tx *txWrapper) QueryContext(ctx context.Context, query string, args []driv
 	return rows, nil
 }
 
-func (tx *txWrapper) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
+func (tx *txWrapper) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.connector.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).ExecContext"),
-		tx.ctx, tx, query,
+		tx.ctx, tx, sql,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	query, params, err := tx.conn.normalize(query, args...)
+	sql, params, err := tx.conn.toYdb(sql, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	result, err := tx.tx.Exec(ctx, query, params)
+	result, err := tx.tx.Exec(ctx, sql, params)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

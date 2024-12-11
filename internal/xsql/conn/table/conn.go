@@ -1,4 +1,4 @@
-package conn
+package table
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -113,9 +113,6 @@ func New(ctx context.Context, parent Parent, s table.ClosableSession, opts ...Op
 		session:          s,
 		defaultQueryMode: DataQueryMode,
 		defaultTxControl: table.DefaultTxControl(),
-		dataOpts: []options.ExecuteDataQueryOption{
-			options.WithKeepInCache(true),
-		},
 	}
 
 	for _, opt := range opts {
@@ -178,12 +175,12 @@ func (c *Conn) executeScriptingQuery(ctx context.Context, sql string, params *pa
 	return resultNoRows{}, nil
 }
 
-func (c *Conn) execDataQuery(ctx context.Context, query string, params *params.Params) (
+func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Params) (
 	driver.RowsNextResultSet, error,
 ) {
 	_, res, err := c.session.Execute(ctx,
 		txControl(ctx, c.defaultTxControl),
-		query, params, c.dataQueryOptions(ctx)...,
+		sql, params, c.dataQueryOptions(ctx)...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -198,11 +195,11 @@ func (c *Conn) execDataQuery(ctx context.Context, query string, params *params.P
 	}, nil
 }
 
-func (c *Conn) execScanQuery(ctx context.Context, query string, params *params.Params) (
+func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Params) (
 	driver.RowsNextResultSet, error,
 ) {
 	res, err := c.session.StreamExecuteScanQuery(ctx,
-		query, params, c.scanQueryOptions(ctx)...,
+		sql, params, c.scanOpts...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -217,10 +214,10 @@ func (c *Conn) execScanQuery(ctx context.Context, query string, params *params.P
 	}, nil
 }
 
-func (c *Conn) execScriptingQuery(ctx context.Context, query string, params *params.Params) (
+func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *params.Params) (
 	driver.RowsNextResultSet, error,
 ) {
-	res, err := c.parent.Scripting().StreamExecute(ctx, query, params)
+	res, err := c.parent.Scripting().StreamExecute(ctx, sql, params)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}

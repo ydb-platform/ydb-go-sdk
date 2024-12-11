@@ -1,4 +1,4 @@
-package conn
+package table
 
 import (
 	"context"
@@ -8,8 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/isolation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -85,7 +84,7 @@ func (tx *transaction) Rollback(ctx context.Context) error {
 }
 
 func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (conn.Tx, error) {
-	txc, err := isolation.ToYDB(txOptions)
+	txc, err := toYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

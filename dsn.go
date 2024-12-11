@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table"
 )
 
 const tablePathPrefixTransformer = "table_path_prefix"
@@ -60,22 +60,22 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 		opts = append(opts, WithBalancer(balancers.FromConfig(balancer)))
 	}
 	if queryMode := info.Params.Get("go_query_mode"); queryMode != "" {
-		mode := tableSql.QueryModeFromString(queryMode)
-		if mode == tableSql.UnknownQueryMode {
+		mode := table.QueryModeFromString(queryMode)
+		if mode == table.UnknownQueryMode {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		}
 		opts = append(opts, withConnectorOptions(xsql.WithDefaultQueryMode(mode)))
 	} else if queryMode := info.Params.Get("query_mode"); queryMode != "" {
-		mode := tableSql.QueryModeFromString(queryMode)
-		if mode == tableSql.UnknownQueryMode {
+		mode := table.QueryModeFromString(queryMode)
+		if mode == table.UnknownQueryMode {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		}
 		opts = append(opts, withConnectorOptions(xsql.WithDefaultQueryMode(mode)))
 	}
 	if fakeTx := info.Params.Get("go_fake_tx"); fakeTx != "" {
 		for _, queryMode := range strings.Split(fakeTx, ",") {
-			mode := tableSql.QueryModeFromString(queryMode)
-			if mode == tableSql.UnknownQueryMode {
+			mode := table.QueryModeFromString(queryMode)
+			if mode == table.UnknownQueryMode {
 				return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 			}
 			opts = append(opts, withConnectorOptions(xsql.WithFakeTx(mode)))
