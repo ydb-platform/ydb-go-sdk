@@ -33,6 +33,8 @@ var (
 
 type (
 	connWrapper struct {
+		processor Engine
+
 		cc        conn.Conn
 		currentTx *txWrapper
 
@@ -44,6 +46,10 @@ type (
 		readAll bool
 	}
 )
+
+func (c *connWrapper) Engine() Engine {
+	return c.processor
+}
 
 func (c *connWrapper) Ping(ctx context.Context) error {
 	return c.cc.Ping(ctx)
@@ -80,6 +86,10 @@ func (c *connWrapper) Close() error {
 	}
 
 	return nil
+}
+
+func (c *connWrapper) Connector() *Connector {
+	return c.connector
 }
 
 func (c *connWrapper) Begin() (driver.Tx, error) {

@@ -41,7 +41,7 @@ type (
 	bindOption struct {
 		bind.Bind
 	}
-	queryProcessorOption queryProcessor
+	queryProcessorOption Engine
 )
 
 func (t tablePathPrefixOption) Apply(c *Connector) error {
@@ -52,7 +52,7 @@ func (t tablePathPrefixOption) Apply(c *Connector) error {
 }
 
 func (processor queryProcessorOption) Apply(c *Connector) error {
-	c.queryProcessor = queryProcessor(processor)
+	c.processor = Engine(processor)
 
 	return nil
 }

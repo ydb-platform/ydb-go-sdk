@@ -141,6 +141,14 @@ func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	)
 }
 
+// OverQueryService is an experimental flag for create database/sql driver over query service client
+//
+// By default database/sql driver works over table service client
+// Default will be changed to `OverQueryService` after March 2025
+func OverQueryService() ConnectorOption {
+	return xsql.OverQueryService()
+}
+
 func WithFakeTx(modes ...QueryMode) ConnectorOption {
 	opts := make([]ConnectorOption, 0, len(modes))
 

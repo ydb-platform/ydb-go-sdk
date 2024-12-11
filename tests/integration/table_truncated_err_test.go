@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -133,7 +134,12 @@ func TestIssue798TruncatedError(t *testing.T) {
 			}
 			return rows.Err()
 		}, retry.WithIdempotent(true))
-		scope.Require.ErrorIs(err, result.ErrTruncated)
+		switch driverEngine(db) {
+		case xsql.TABLE_SERVICE:
+			scope.Require.ErrorIs(err, result.ErrTruncated)
+		case xsql.QUERY_SERVICE:
+			scope.Require.NoError(err)
+		}
 	}
 
 	// select all rows without truncated result error

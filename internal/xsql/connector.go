@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"io"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,12 +32,12 @@ var (
 )
 
 type (
-	queryProcessor uint8
-	Connector      struct {
+	Engine    uint8
+	Connector struct {
 		parent   ydbDriver
 		balancer grpc.ClientConnInterface
 
-		queryProcessor queryProcessor
+		processor Engine
 
 		TableOpts             []connOverTableServiceClient.Option
 		QueryOpts             []connOverQueryServiceClient.Option
@@ -112,7 +113,7 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 }
 
 func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
-	switch c.queryProcessor {
+	switch c.processor {
 	case QUERY_SERVICE:
 		s, err := query.CreateSession(ctx, c.Query())
 		if err != nil {
@@ -122,6 +123,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		id := uuid.New()
 
 		conn := &connWrapper{
+			processor: QUERY_SERVICE,
 			cc: connOverQueryServiceClient.New(ctx, c, s, append(
 				c.QueryOpts,
 				connOverQueryServiceClient.WithOnClose(func() {
@@ -145,6 +147,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		id := uuid.New()
 
 		conn := &connWrapper{
+			processor: TABLE_SERVICE,
 			cc: connOverTableServiceClient.New(ctx, c, s, append(c.TableOpts,
 				connOverTableServiceClient.WithOnClose(func() {
 					c.conns.Delete(id)
@@ -189,8 +192,8 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 	c := &Connector{
 		parent:   parent,
 		balancer: balancer,
-		queryProcessor: func() queryProcessor {
-			if v, has := os.LookupEnv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE"); has && v != "" {
+		processor: func() Engine {
+			if overQueryService, _ := strconv.ParseBool(os.Getenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE")); overQueryService {
 				return QUERY_SERVICE
 			}
 
