@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,15 +15,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestQueryTxExecute(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	scope := newScope(t)
 
 	t.Run("Default", func(t *testing.T) {
@@ -243,10 +237,6 @@ func TestQueryTxExecute(t *testing.T) {
 }
 
 func TestQueryLazyTxExecute(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	scope := newScope(t)
 
 	var (
@@ -457,10 +447,6 @@ func TestQueryLazyTxExecute(t *testing.T) {
 }
 
 func TestQueryWithCommitTxFlag(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	scope := newScope(t)
 	var count uint64
 	err := scope.DriverWithLogs().Query().Do(scope.Ctx, func(ctx context.Context, s query.Session) error {
