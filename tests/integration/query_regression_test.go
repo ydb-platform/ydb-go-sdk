@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -19,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -277,10 +275,6 @@ SELECT $val`,
 
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1506
 func TestIssue1506TypedNullPushdown(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	scope := newScope(t)
 	ctx := scope.Ctx
 	db := scope.Driver()
@@ -312,10 +306,6 @@ SELECT CAST($arg1 AS Utf8) AS v1, CAST($arg2 AS Utf8) AS v2
 }
 
 func TestReadTwoPartsIntoMemoryIssue1559(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	scope := newScope(t)
 
 	var readPartCount int

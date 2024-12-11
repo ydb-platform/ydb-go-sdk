@@ -215,7 +215,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			yql, _, err := b.RewriteQuery("", tt.params...)
+			yql, _, err := b.ToYdb("", tt.params...)
 			require.NoError(t, err)
 			require.Equal(t, tt.declares, getDeclares(yql))
 		})
@@ -363,7 +363,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			yql, _, err := b.RewriteQuery("", tt.params...)
+			yql, _, err := b.ToYdb("", tt.params...)
 			require.NoError(t, err)
 			require.Equal(t, tt.declares, getDeclares(yql))
 		})

@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.21.x, 1.22.x, 1.23.x]
+        go-version: [1.22.x, 1.23.x]
         os: [ubuntu, windows, macOS]
     env:
       OS: ${{ matrix.os }}-latest
@@ -52,8 +52,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.21.x, 1.22.x, 1.23.x]
-        ydb-version: [23.3, 24.1, 24.2]
+        go-version: [1.22.x, 1.23.x]
+        ydb-version: [24.1, 24.2, 24.3]
         os: [ubuntu]
     services:
       ydb:
@@ -133,6 +133,7 @@ jobs:
       YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
+      YDB_DATABASE_SQL_OVER_QUERY_SERVICE: 1
       HIDE_APPLICATION_OUTPUT: 1
     steps:
       - name: Checkout code

@@ -17,25 +17,25 @@ type (
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		Exec(ctx context.Context, query string, opts ...ExecuteOption) error
+		Exec(ctx context.Context, sql string, opts ...ExecuteOption) error
 
 		// Query execute query with result
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		Query(ctx context.Context, query string, opts ...ExecuteOption) (Result, error)
+		Query(ctx context.Context, sql string, opts ...ExecuteOption) (Result, error)
 
 		// QueryResultSet execute query and take the exactly single materialized result set from result
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		QueryResultSet(ctx context.Context, query string, opts ...ExecuteOption) (ClosableResultSet, error)
+		QueryResultSet(ctx context.Context, sql string, opts ...ExecuteOption) (ClosableResultSet, error)
 
 		// QueryRow execute query and take the exactly single row from exactly single result set from result
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		QueryRow(ctx context.Context, query string, opts ...ExecuteOption) (Row, error)
+		QueryRow(ctx context.Context, sql string, opts ...ExecuteOption) (Row, error)
 	}
 	// Client defines API of query client
 	Client interface {
@@ -68,7 +68,7 @@ type (
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		Exec(ctx context.Context, query string, opts ...ExecuteOption) error
+		Exec(ctx context.Context, sql string, opts ...ExecuteOption) error
 
 		// Query execute query with materialized result
 		//
@@ -76,23 +76,23 @@ type (
 		//
 		// Exec used by default:
 		// - DefaultTxControl
-		Query(ctx context.Context, query string, opts ...ExecuteOption) (Result, error)
+		Query(ctx context.Context, sql string, opts ...ExecuteOption) (Result, error)
 
 		// QueryResultSet is a helper which read all rows from first result set in result
 		//
 		// Warning: the large result set from query will be materialized and can happened to "OOM killed" problem
-		QueryResultSet(ctx context.Context, query string, opts ...ExecuteOption) (ClosableResultSet, error)
+		QueryResultSet(ctx context.Context, sql string, opts ...ExecuteOption) (ClosableResultSet, error)
 
 		// QueryRow is a helper which read only one row from first result set in result
 		//
 		// ReadRow returns error if result contains more than one result set or more than one row
-		QueryRow(ctx context.Context, query string, opts ...ExecuteOption) (Row, error)
+		QueryRow(ctx context.Context, sql string, opts ...ExecuteOption) (Row, error)
 
 		// ExecuteScript starts long executing script with polling results later
 		//
 		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 		ExecuteScript(
-			ctx context.Context, query string, ttl time.Duration, ops ...ExecuteOption,
+			ctx context.Context, sql string, ttl time.Duration, ops ...ExecuteOption,
 		) (*options.ExecuteScriptOperation, error)
 
 		// FetchScriptResults fetching the script results

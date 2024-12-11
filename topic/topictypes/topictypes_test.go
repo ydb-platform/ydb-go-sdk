@@ -152,7 +152,6 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 	}
 
 	for _, v := range testData {
-		v := v
 		t.Run(
 			v.testName, func(t *testing.T) {
 				d := TopicDescription{}
@@ -322,7 +321,6 @@ func TestTopicConsumerDescriptionFromRaw(t *testing.T) {
 		},
 	}
 	for _, v := range testData {
-		v := v
 		t.Run(
 			v.testName, func(t *testing.T) {
 				d := TopicConsumerDescription{}

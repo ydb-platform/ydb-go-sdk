@@ -5,22 +5,16 @@ package integration
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
 func TestSugarUnmarshallRow(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 

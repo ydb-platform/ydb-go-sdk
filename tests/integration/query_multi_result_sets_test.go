@@ -8,18 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestQueryMultiResultSets(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	scope := newScope(t)
 	var i, j, k int
 	db := scope.Driver()

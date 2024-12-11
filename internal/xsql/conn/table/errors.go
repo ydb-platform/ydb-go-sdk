@@ -1,4 +1,4 @@
-package conn
+package table
 
 import (
 	"database/sql/driver"
@@ -9,7 +9,7 @@ import (
 
 var (
 	ErrUnsupported     = driver.ErrSkip
-	errDeprecated      = driver.ErrSkip
 	errConnClosedEarly = xerrors.Retryable(errors.New("conn closed early"), xerrors.InvalidObject())
 	errNotReadyConn    = xerrors.Retryable(errors.New("conn not ready"), xerrors.InvalidObject())
+	ErrWrongQueryMode  = errors.New("wrong query mode")
 )

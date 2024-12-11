@@ -8,14 +8,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -116,9 +114,6 @@ func TestMessageJsonUnmarshalIterator(t *testing.T) {
 }
 
 func TestCDCReaderIterator(t *testing.T) {
-	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("require minimum version 24.1 for work with within yql")
-	}
 	scope := newScope(t)
 	ctx := scope.Ctx
 

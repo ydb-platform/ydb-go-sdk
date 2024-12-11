@@ -17,7 +17,7 @@ const (
 )
 
 type Bind interface {
-	RewriteQuery(sql string, args ...interface{}) (
+	ToYdb(sql string, args ...interface{}) (
 		yql string, newArgs []interface{}, _ error,
 	)
 
@@ -26,16 +26,16 @@ type Bind interface {
 
 type Bindings []Bind
 
-func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
-	yql string, parameters []*params.Parameter, err error,
+func (bindings Bindings) ToYdb(sql string, args ...interface{}) (
+	yql string, params params.Params, err error,
 ) {
 	if len(bindings) == 0 {
-		parameters, err = Params(args...)
+		params, err = Params(args...)
 		if err != nil {
 			return "", nil, xerrors.WithStackTrace(err)
 		}
 
-		return query, parameters, nil
+		return sql, params, nil
 	}
 
 	buffer := xstring.Buffer()
@@ -43,18 +43,18 @@ func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
 
 	for i := range bindings {
 		var e error
-		query, args, e = bindings[len(bindings)-1-i].RewriteQuery(query, args...)
+		sql, args, e = bindings[len(bindings)-1-i].ToYdb(sql, args...)
 		if e != nil {
 			return "", nil, xerrors.WithStackTrace(e)
 		}
 	}
 
-	parameters, err = Params(args...)
+	params, err = Params(args...)
 	if err != nil {
 		return "", nil, xerrors.WithStackTrace(err)
 	}
 
-	return query, parameters, nil
+	return sql, params, nil
 }
 
 func Sort(bindings []Bind) []Bind {

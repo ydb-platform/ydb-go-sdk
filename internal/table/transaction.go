@@ -56,15 +56,13 @@ type transaction struct {
 }
 
 // Execute executes query represented by text within transaction tx.
-func (tx *transaction) Execute(
-	ctx context.Context,
-	query string, parameters *params.Params,
+func (tx *transaction) Execute(ctx context.Context, sql string, params *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
 	onDone := trace.TableOnTxExecute(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).Execute"),
-		tx.s, tx, queryFromText(query), parameters,
+		tx.s, tx, queryFromText(sql), params,
 	)
 	defer func() {
 		onDone(r, err)
@@ -76,7 +74,7 @@ func (tx *transaction) Execute(
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-		_, r, err = tx.s.Execute(ctx, tx.control, query, parameters, opts...)
+		_, r, err = tx.s.Execute(ctx, tx.control, sql, params, opts...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}

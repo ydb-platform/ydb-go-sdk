@@ -1,9 +1,11 @@
-package connector
+package xsql
 
 import (
 	"context"
 	"database/sql/driver"
 	"io"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,10 +14,10 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	connOverQueryServiceClient "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/query"
+	connOverTableServiceClient "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -30,15 +32,15 @@ var (
 )
 
 type (
-	queryProcessor uint8
-	Connector      struct {
+	Engine    uint8
+	Connector struct {
 		parent   ydbDriver
 		balancer grpc.ClientConnInterface
 
-		queryProcessor queryProcessor
+		processor Engine
 
-		TableOpts             []tableSql.Option
-		QueryOpts             []querySql.Option
+		TableOpts             []connOverTableServiceClient.Option
+		QueryOpts             []connOverQueryServiceClient.Option
 		disableServerBalancer bool
 		onCLose               []func(*Connector)
 
@@ -60,6 +62,17 @@ type (
 		Scheme() scheme.Client
 	}
 )
+
+func (e Engine) String() string {
+	switch e {
+	case TABLE_SERVICE:
+		return "TABLE_SERVICE"
+	case QUERY_SERVICE:
+		return "QUERY_SERVICE"
+	default:
+		return "UNKNOWN"
+	}
+}
 
 func (c *Connector) RetryBudget() budget.Budget {
 	return c.retryBudget
@@ -111,7 +124,7 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 }
 
 func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
-	switch c.queryProcessor {
+	switch c.processor {
 	case QUERY_SERVICE:
 		s, err := query.CreateSession(ctx, c.Query())
 		if err != nil {
@@ -121,13 +134,16 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		id := uuid.New()
 
 		conn := &connWrapper{
-			conn: querySql.New(ctx, c, s, append(
+			processor: QUERY_SERVICE,
+			cc: connOverQueryServiceClient.New(ctx, c, s, append(
 				c.QueryOpts,
-				querySql.WithOnClose(func() {
+				connOverQueryServiceClient.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
+			ctx:       ctx,
 			connector: c,
+			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		c.conns.Set(id, conn)
@@ -143,12 +159,15 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		id := uuid.New()
 
 		conn := &connWrapper{
-			conn: tableSql.New(ctx, c, s, append(c.TableOpts,
-				tableSql.WithOnClose(func() {
+			processor: TABLE_SERVICE,
+			cc: connOverTableServiceClient.New(ctx, c, s, append(c.TableOpts,
+				connOverTableServiceClient.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
+			ctx:       ctx,
 			connector: c,
+			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		c.conns.Set(id, conn)
@@ -184,9 +203,15 @@ func (c *Connector) Close() error {
 
 func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (_ *Connector, err error) {
 	c := &Connector{
-		parent:         parent,
-		balancer:       balancer,
-		queryProcessor: TABLE_SERVICE,
+		parent:   parent,
+		balancer: balancer,
+		processor: func() Engine {
+			if overQueryService, _ := strconv.ParseBool(os.Getenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE")); overQueryService {
+				return QUERY_SERVICE
+			}
+
+			return TABLE_SERVICE
+		}(),
 		clock:          clockwork.NewRealClock(),
 		done:           make(chan struct{}),
 		trace:          &trace.DatabaseSQL{},

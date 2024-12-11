@@ -98,118 +98,76 @@ type SessionInfo interface {
 type Session interface {
 	SessionInfo
 
-	CreateTable(
-		ctx context.Context,
-		path string,
+	CreateTable(ctx context.Context, path string,
 		opts ...options.CreateTableOption,
 	) (err error)
 
-	DescribeTable(
-		ctx context.Context,
-		path string,
+	DescribeTable(ctx context.Context, path string,
 		opts ...options.DescribeTableOption,
 	) (desc options.Description, err error)
 
-	DropTable(
-		ctx context.Context,
-		path string,
+	DropTable(ctx context.Context, path string,
 		opts ...options.DropTableOption,
 	) (err error)
 
-	AlterTable(
-		ctx context.Context,
-		path string,
+	AlterTable(ctx context.Context, path string,
 		opts ...options.AlterTableOption,
 	) (err error)
 
 	// Deprecated: use CopyTables method instead
 	// Will be removed after Oct 2024.
 	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-	CopyTable(
-		ctx context.Context,
-		dst, src string,
+	CopyTable(ctx context.Context, dst, src string,
 		opts ...options.CopyTableOption,
 	) (err error)
 
-	CopyTables(
-		ctx context.Context,
+	CopyTables(ctx context.Context,
 		opts ...options.CopyTablesOption,
 	) (err error)
 
-	RenameTables(
-		ctx context.Context,
+	RenameTables(ctx context.Context,
 		opts ...options.RenameTablesOption,
 	) (err error)
 
-	Explain(
-		ctx context.Context,
-		query string,
-	) (exp DataQueryExplanation, err error)
+	Explain(ctx context.Context, sql string) (exp DataQueryExplanation, err error)
 
 	// Prepare prepares query for executing in the future
-	Prepare(
-		ctx context.Context,
-		query string,
-	) (stmt Statement, err error)
+	Prepare(ctx context.Context, sql string) (stmt Statement, err error)
 
 	// Execute executes query.
 	//
 	// By default, Execute have a flag options.WithKeepInCache(true) if params is not empty. For redefine behavior -
 	// append option options.WithKeepInCache(false)
-	Execute(
-		ctx context.Context,
-		tx *TransactionControl,
-		query string,
-		params *params.Params,
+	Execute(ctx context.Context, tx *TransactionControl, sql string, params *params.Params,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 
-	ExecuteSchemeQuery(
-		ctx context.Context,
-		query string,
+	ExecuteSchemeQuery(ctx context.Context, sql string,
 		opts ...options.ExecuteSchemeQueryOption,
 	) (err error)
 
-	DescribeTableOptions(
-		ctx context.Context,
-	) (desc options.TableOptionsDescription, err error)
+	DescribeTableOptions(ctx context.Context) (desc options.TableOptionsDescription, err error)
 
-	StreamReadTable(
-		ctx context.Context,
-		path string,
+	StreamReadTable(ctx context.Context, path string,
 		opts ...options.ReadTableOption,
 	) (r result.StreamResult, err error)
 
-	StreamExecuteScanQuery(
-		ctx context.Context,
-		query string,
-		params *params.Params,
+	StreamExecuteScanQuery(ctx context.Context, sql string, params *params.Params,
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)
 
 	// Deprecated: use Client instance instead.
-	BulkUpsert(
-		ctx context.Context,
-		table string,
-		rows value.Value,
+	BulkUpsert(ctx context.Context, table string, rows value.Value,
 		opts ...options.BulkUpsertOption,
 	) (err error)
 
-	ReadRows(
-		ctx context.Context,
-		path string,
-		keys value.Value,
+	ReadRows(ctx context.Context, path string, keys value.Value,
 		opts ...options.ReadRowsOption,
 	) (_ result.Result, err error)
 
-	BeginTransaction(
-		ctx context.Context,
-		tx *TransactionSettings,
-	) (x Transaction, err error)
+	BeginTransaction(ctx context.Context, tx *TransactionSettings) (x Transaction, err error)
 
-	KeepAlive(
-		ctx context.Context,
-	) error
+	KeepAlive(ctx context.Context) error
 }
 
 type TransactionSettings struct {
@@ -257,7 +215,7 @@ type TransactionActor interface {
 
 	Execute(
 		ctx context.Context,
-		query string,
+		sql string,
 		params *params.Params,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)

@@ -39,16 +39,12 @@ type (
 	}
 )
 
-func (c *Client) Execute(
-	ctx context.Context,
-	query string,
-	parameters *params.Params,
-) (r result.Result, err error) {
+func (c *Client) Execute(ctx context.Context, sql string, parameters *params.Params) (r result.Result, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
 	call := func(ctx context.Context) error {
-		r, err = c.execute(ctx, query, parameters)
+		r, err = c.execute(ctx, sql, parameters)
 
 		return xerrors.WithStackTrace(err)
 	}
@@ -66,19 +62,15 @@ func (c *Client) Execute(
 	return r, xerrors.WithStackTrace(err)
 }
 
-func (c *Client) execute(
-	ctx context.Context,
-	query string,
-	parameters *params.Params,
-) (r result.Result, err error) {
+func (c *Client) execute(ctx context.Context, sql string, parameters *params.Params) (r result.Result, err error) {
 	var (
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).execute"),
-			query, parameters,
+			sql, parameters,
 		)
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
-			Script: query,
+			Script: sql,
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),
@@ -125,16 +117,14 @@ func mode2mode(mode scripting.ExplainMode) Ydb_Scripting.ExplainYqlRequest_Mode 
 	}
 }
 
-func (c *Client) Explain(
-	ctx context.Context,
-	query string,
-	mode scripting.ExplainMode,
-) (e table.ScriptingYQLExplanation, err error) {
+func (c *Client) Explain(ctx context.Context, sql string, mode scripting.ExplainMode) (
+	e table.ScriptingYQLExplanation, err error,
+) {
 	if c == nil {
 		return e, xerrors.WithStackTrace(errNilClient)
 	}
 	call := func(ctx context.Context) error {
-		e, err = c.explain(ctx, query, mode)
+		e, err = c.explain(ctx, sql, mode)
 
 		return xerrors.WithStackTrace(err)
 	}
@@ -153,18 +143,16 @@ func (c *Client) Explain(
 	return e, xerrors.WithStackTrace(err)
 }
 
-func (c *Client) explain(
-	ctx context.Context,
-	query string,
-	mode scripting.ExplainMode,
-) (e table.ScriptingYQLExplanation, err error) {
+func (c *Client) explain(ctx context.Context, sql string, mode scripting.ExplainMode) (
+	e table.ScriptingYQLExplanation, err error,
+) {
 	var (
 		onDone = trace.ScriptingOnExplain(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).explain"),
-			query,
+			sql,
 		)
 		request = &Ydb_Scripting.ExplainYqlRequest{
-			Script: query,
+			Script: sql,
 			Mode:   mode2mode(mode),
 			OperationParams: operation.Params(
 				ctx,
@@ -201,16 +189,14 @@ func (c *Client) explain(
 	return e, nil
 }
 
-func (c *Client) StreamExecute(
-	ctx context.Context,
-	query string,
-	params *params.Params,
-) (r result.StreamResult, err error) {
+func (c *Client) StreamExecute(ctx context.Context, sql string, params *params.Params) (
+	r result.StreamResult, err error,
+) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
 	call := func(ctx context.Context) error {
-		r, err = c.streamExecute(ctx, query, params)
+		r, err = c.streamExecute(ctx, sql, params)
 
 		return xerrors.WithStackTrace(err)
 	}
@@ -229,19 +215,17 @@ func (c *Client) StreamExecute(
 }
 
 //nolint:funlen
-func (c *Client) streamExecute(
-	ctx context.Context,
-	query string,
-	parameters *params.Params,
-) (r result.StreamResult, err error) {
+func (c *Client) streamExecute(ctx context.Context, sql string, parameters *params.Params) (
+	r result.StreamResult, err error,
+) {
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).streamExecute"),
-			query, parameters,
+			sql, parameters,
 		)
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
-			Script: query,
+			Script: sql,
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),

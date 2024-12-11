@@ -688,20 +688,14 @@ func (s *session) RenameTables(
 }
 
 // Explain explains data query represented by text.
-func (s *session) Explain(
-	ctx context.Context,
-	query string,
-) (
-	exp table.DataQueryExplanation,
-	err error,
-) {
+func (s *session) Explain(ctx context.Context, sql string) (exp table.DataQueryExplanation, err error) {
 	var (
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
 		onDone   = trace.TableOnSessionQueryExplain(
 			s.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*session).Explain"),
-			s, query,
+			s, sql,
 		)
 	)
 	defer func() {
@@ -715,7 +709,7 @@ func (s *session) Explain(
 	response, err = s.client.ExplainDataQuery(ctx,
 		&Ydb_Table.ExplainDataQueryRequest{
 			SessionId: s.id,
-			YqlText:   query,
+			YqlText:   sql,
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),
@@ -792,18 +786,14 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 }
 
 // Execute executes given data query represented by text.
-func (s *session) Execute(
-	ctx context.Context,
-	txControl *table.TransactionControl,
-	query string,
-	parameters *params.Params,
+func (s *session) Execute(ctx context.Context, txControl *table.TransactionControl, sql string, params *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
 		a       = allocator.New()
-		q       = queryFromText(query)
+		q       = queryFromText(sql)
 		request = options.ExecuteDataQueryDesc{
 			ExecuteDataQueryRequest: a.TableExecuteDataQueryRequest(),
 			IgnoreTruncated:         s.config.IgnoreTruncated(),
@@ -812,14 +802,14 @@ func (s *session) Execute(
 	)
 	defer a.Free()
 
-	params, err := parameters.ToYDB(a)
+	parameters, err := params.ToYDB(a)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
 	request.SessionId = s.id
 	request.TxControl = txControl.Desc()
-	request.Parameters = params
+	request.Parameters = parameters
 	request.Query = q.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
 	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
@@ -838,7 +828,7 @@ func (s *session) Execute(
 	onDone := trace.TableOnSessionQueryExecute(
 		s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*session).Execute"),
-		s, q, parameters,
+		s, q, params,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
@@ -907,14 +897,12 @@ func (s *session) executeDataQuery(
 }
 
 // ExecuteSchemeQuery executes scheme query.
-func (s *session) ExecuteSchemeQuery(
-	ctx context.Context,
-	query string,
+func (s *session) ExecuteSchemeQuery(ctx context.Context, sql string,
 	opts ...options.ExecuteSchemeQueryOption,
 ) (err error) {
 	request := Ydb_Table.ExecuteSchemeQueryRequest{
 		SessionId: s.id,
-		YqlText:   query,
+		YqlText:   sql,
 		OperationParams: operation.Params(
 			ctx,
 			s.config.OperationTimeout(),
@@ -1191,15 +1179,12 @@ func (s *session) ReadRows(
 // via Close() call or fully drained by sequential NextResultSet() calls.
 //
 //nolint:funlen
-func (s *session) StreamExecuteScanQuery(
-	ctx context.Context,
-	query string,
-	parameters *params.Params,
+func (s *session) StreamExecuteScanQuery(ctx context.Context, sql string, parameters *params.Params,
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
 	var (
 		a      = allocator.New()
-		q      = queryFromText(query)
+		q      = queryFromText(sql)
 		onDone = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*session).StreamExecuteScanQuery"),

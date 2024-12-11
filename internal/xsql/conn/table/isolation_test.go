@@ -1,4 +1,4 @@
-package isolation
+package table
 
 import (
 	"database/sql"
@@ -154,7 +154,7 @@ func TestToYDB(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			toYDB, err := ToYDB(tt.txOptions)
+			toYDB, err := toYDB(tt.txOptions)
 			if !tt.err {
 				require.NoError(t, err)
 				require.Equal(t, table.TxSettings(tt.txControl).Settings(), table.TxSettings(toYDB).Settings())

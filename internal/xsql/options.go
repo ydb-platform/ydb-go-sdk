@@ -1,11 +1,11 @@
-package connector
+package xsql
 
 import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -22,8 +22,8 @@ type (
 		bind.TablePathPrefix
 	}
 	tableQueryOptionsOption struct {
-		tableOps  []tableSql.Option
-		queryOpts []querySql.Option
+		tableOps  []table.Option
+		queryOpts []query.Option
 	}
 	traceDatabaseSQLOption struct {
 		t    *trace.DatabaseSQL
@@ -41,7 +41,7 @@ type (
 	bindOption struct {
 		bind.Bind
 	}
-	queryProcessorOption queryProcessor
+	queryProcessorOption Engine
 )
 
 func (t tablePathPrefixOption) Apply(c *Connector) error {
@@ -52,7 +52,7 @@ func (t tablePathPrefixOption) Apply(c *Connector) error {
 }
 
 func (processor queryProcessorOption) Apply(c *Connector) error {
-	c.queryProcessor = queryProcessor(processor)
+	c.processor = Engine(processor)
 
 	return nil
 }
@@ -146,37 +146,53 @@ func WithQueryBind(bind bind.Bind) QueryBindOption {
 	}
 }
 
-func WithDefaultQueryMode(mode tableSql.QueryMode) Option {
+func WithDefaultQueryMode(mode table.QueryMode) Option {
 	return tableQueryOptionsOption{
-		tableOps: []tableSql.Option{
-			tableSql.WithDefaultQueryMode(mode),
+		tableOps: []table.Option{
+			table.WithDefaultQueryMode(mode),
 		},
 	}
 }
 
-func WithFakeTx(modes ...tableSql.QueryMode) Option {
+func WithFakeTx(modes ...table.QueryMode) Option {
 	return tableQueryOptionsOption{
-		tableOps: []tableSql.Option{
-			tableSql.WithFakeTxModes(modes...),
+		tableOps: []table.Option{
+			table.WithFakeTxModes(modes...),
 		},
 	}
 }
 
 func WithIdleThreshold(idleThreshold time.Duration) Option {
 	return tableQueryOptionsOption{
-		tableOps: []tableSql.Option{
-			tableSql.WithIdleThreshold(idleThreshold),
+		tableOps: []table.Option{
+			table.WithIdleThreshold(idleThreshold),
 		},
 	}
 }
 
-func WithTableOptions(opts ...tableSql.Option) Option {
+type mergedOptions []Option
+
+func (opts mergedOptions) Apply(c *Connector) error {
+	for _, opt := range opts {
+		if err := opt.Apply(c); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func Merge(opts ...Option) Option {
+	return mergedOptions(opts)
+}
+
+func WithTableOptions(opts ...table.Option) Option {
 	return tableQueryOptionsOption{
 		tableOps: opts,
 	}
 }
 
-func WithQueryOptions(opts ...querySql.Option) Option {
+func WithQueryOptions(opts ...query.Option) Option {
 	return tableQueryOptionsOption{
 		queryOpts: opts,
 	}

@@ -19,19 +19,7 @@ const (
 )
 
 type Client interface {
-	Execute(
-		ctx context.Context,
-		query string,
-		params *params.Params,
-	) (result.Result, error)
-	Explain(
-		ctx context.Context,
-		query string,
-		mode ExplainMode,
-	) (table.ScriptingYQLExplanation, error)
-	StreamExecute(
-		ctx context.Context,
-		query string,
-		params *params.Params,
-	) (result.StreamResult, error)
+	Execute(ctx context.Context, sql string, params *params.Params) (result.Result, error)
+	Explain(ctx context.Context, sql string, mode ExplainMode) (table.ScriptingYQLExplanation, error)
+	StreamExecute(ctx context.Context, sql string, params *params.Params) (result.StreamResult, error)
 }

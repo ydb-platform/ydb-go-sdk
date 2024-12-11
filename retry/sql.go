@@ -40,7 +40,7 @@ func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
 	return opts
 }
 
-// Do is a retryer of database/sql Conn with fallbacks on errors
+// Do is a retryer of database/sql conn with fallbacks on errors
 func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Conn) error, opts ...doOption) error {
 	_, err := DoWithResult(ctx, db, func(ctx context.Context, cc *sql.Conn) (*struct{}, error) {
 		err := op(ctx, cc)
@@ -57,7 +57,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 	return nil
 }
 
-// DoWithResult is a retryer of database/sql Conn with fallbacks on errors
+// DoWithResult is a retryer of database/sql conn with fallbacks on errors
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func DoWithResult[T any](ctx context.Context, db *sql.DB,
