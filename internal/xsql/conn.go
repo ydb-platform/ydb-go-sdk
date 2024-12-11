@@ -33,7 +33,8 @@ var (
 
 type (
 	connWrapper struct {
-		cc conn.Conn
+		cc        conn.Conn
+		currentTx *txWrapper
 
 		connector *Connector
 		lastUsage xsync.LastUsage
@@ -54,16 +55,22 @@ func (c *connWrapper) CheckNamedValue(value *driver.NamedValue) error {
 }
 
 func (c *connWrapper) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	if c.currentTx != nil {
+		return nil, xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID()))
+	}
+
 	tx, err := c.cc.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return &txWrapper{
+	c.currentTx = &txWrapper{
 		conn: c,
 		ctx:  ctx,
 		tx:   tx,
-	}, nil
+	}
+
+	return c.currentTx, nil
 }
 
 func (c *connWrapper) Close() error {
@@ -179,6 +186,10 @@ func (c *connWrapper) QueryContext(ctx context.Context, sql string, args []drive
 		return rowByAstPlan(ast, plan), nil
 	}
 
+	if c.currentTx != nil {
+		return c.currentTx.tx.Query(ctx, sql, params)
+	}
+
 	return c.cc.Query(ctx, sql, params)
 }
 
@@ -189,6 +200,10 @@ func (c *connWrapper) ExecContext(ctx context.Context, sql string, args []driver
 	sql, params, err := c.toYdb(sql, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if c.currentTx != nil {
+		return c.currentTx.tx.Exec(ctx, sql, params)
 	}
 
 	return c.cc.Exec(ctx, sql, params)

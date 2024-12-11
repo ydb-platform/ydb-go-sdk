@@ -32,6 +32,7 @@ type Conn struct {
 	session *query.Session
 	onClose []func()
 	closed  atomic.Bool
+	fakeTx  bool
 }
 
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
@@ -114,6 +115,10 @@ func (c *Conn) isReady() bool {
 }
 
 func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx conn.Tx, finalErr error) {
+	if c.fakeTx {
+		return beginTxFake(ctx, c), nil
+	}
+
 	tx, err := beginTx(ctx, c, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

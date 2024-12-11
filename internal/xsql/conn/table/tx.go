@@ -26,15 +26,7 @@ func (tx *transaction) ID() string {
 func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
 	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
 	if m != DataQueryMode {
-		return nil, badconn.Map(
-			xerrors.WithStackTrace(
-				xerrors.Retryable(
-					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.InvalidObject(),
-					xerrors.WithName("WRONG_QUERY_MODE"),
-				),
-			),
-		)
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%q: %w", m.String(), ErrWrongQueryMode))
 	}
 	_, err := tx.tx.Execute(ctx, sql, params, tx.conn.dataQueryOptions(ctx)...)
 	if err != nil {

@@ -7,3 +7,9 @@ func WithOnClose(onClose func()) Option {
 		c.onClose = append(c.onClose, onClose)
 	}
 }
+
+func WithFakeTx() Option {
+	return func(c *Conn) {
+		c.fakeTx = true
+	}
+}

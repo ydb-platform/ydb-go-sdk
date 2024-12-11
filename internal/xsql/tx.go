@@ -28,6 +28,10 @@ var (
 )
 
 func (tx *txWrapper) Commit() (finalErr error) {
+	defer func() {
+		tx.conn.currentTx = nil
+	}()
+
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.connector.Trace(), &ctx,
@@ -47,6 +51,10 @@ func (tx *txWrapper) Commit() (finalErr error) {
 }
 
 func (tx *txWrapper) Rollback() (finalErr error) {
+	defer func() {
+		tx.conn.currentTx = nil
+	}()
+
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.connector.Trace(), &ctx,

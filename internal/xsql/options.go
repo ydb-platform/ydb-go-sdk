@@ -170,6 +170,22 @@ func WithIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
+type mergedOptions []Option
+
+func (opts mergedOptions) Apply(c *Connector) error {
+	for _, opt := range opts {
+		if err := opt.Apply(c); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func Merge(opts ...Option) Option {
+	return mergedOptions(opts)
+}
+
 func WithTableOptions(opts ...table.Option) Option {
 	return tableQueryOptionsOption{
 		tableOps: opts,
