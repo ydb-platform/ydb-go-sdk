@@ -63,6 +63,17 @@ type (
 	}
 )
 
+func (e Engine) String() string {
+	switch e {
+	case TABLE_SERVICE:
+		return "TABLE_SERVICE"
+	case QUERY_SERVICE:
+		return "QUERY_SERVICE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func (c *Connector) RetryBudget() budget.Budget {
 	return c.retryBudget
 }
@@ -130,6 +141,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 					c.conns.Delete(id)
 				}))...,
 			),
+			ctx:       ctx,
 			connector: c,
 			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
@@ -153,6 +165,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 					c.conns.Delete(id)
 				}))...,
 			),
+			ctx:       ctx,
 			connector: c,
 			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}

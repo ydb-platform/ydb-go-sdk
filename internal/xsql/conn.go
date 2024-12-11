@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
@@ -37,6 +38,7 @@ type (
 
 		cc        conn.Conn
 		currentTx *txWrapper
+		ctx       context.Context //nolint:containedctx
 
 		connector *Connector
 		lastUsage xsync.LastUsage
@@ -60,10 +62,13 @@ func (c *connWrapper) CheckNamedValue(value *driver.NamedValue) error {
 	return nil
 }
 
-func (c *connWrapper) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	if c.currentTx != nil {
-		return nil, xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID()))
-	}
+func BeginTx(ctx context.Context, c *connWrapper, opts driver.TxOptions) (_ driver.Tx, finalErr error) {
+	onDone := trace.DatabaseSQLOnConnBegin(c.connector.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.BeginTx"),
+	)
+	defer func() {
+		onDone(c.currentTx, finalErr)
+	}()
 
 	tx, err := c.cc.BeginTx(ctx, opts)
 	if err != nil {
@@ -79,13 +84,32 @@ func (c *connWrapper) BeginTx(ctx context.Context, opts driver.TxOptions) (drive
 	return c.currentTx, nil
 }
 
-func (c *connWrapper) Close() error {
+func (c *connWrapper) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	if c.currentTx != nil {
+		return nil, xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID()))
+	}
+
+	return BeginTx(ctx, c, opts)
+}
+
+func Close(c *connWrapper) (finalErr error) {
+	onDone := trace.DatabaseSQLOnConnClose(c.connector.Trace(), &c.ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.Close"),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	err := c.cc.Close()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
+}
+
+func (c *connWrapper) Close() (finalErr error) {
+	return Close(c)
 }
 
 func (c *connWrapper) Connector() *Connector {
@@ -139,9 +163,9 @@ func (c *connWrapper) Prepare(string) (driver.Stmt, error) {
 	return nil, errDeprecated
 }
 
-func (c *connWrapper) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
+func PrepareContext(ctx context.Context, c *connWrapper, sql string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnPrepare(c.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*connWrapper).PrepareContext"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.PrepareContext"),
 		sql,
 	)
 	defer func() {
@@ -158,6 +182,10 @@ func (c *connWrapper) PrepareContext(ctx context.Context, sql string) (_ driver.
 		ctx:       ctx,
 		sql:       sql,
 	}, nil
+}
+
+func (c *connWrapper) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
+	return PrepareContext(ctx, c, sql)
 }
 
 func (c *connWrapper) LastUsage() time.Time {
@@ -178,7 +206,17 @@ func (c *connWrapper) toYdb(sql string, args ...driver.NamedValue) (yql string, 
 	return yql, &params, nil
 }
 
-func (c *connWrapper) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Rows, error) {
+func QueryContext(ctx context.Context, c *connWrapper, sql string, args []driver.NamedValue) (
+	_ driver.Rows, finalErr error,
+) {
+	onDone := trace.DatabaseSQLOnConnQuery(c.connector.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.QueryContext"),
+		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), c.connector.clock.Since(c.lastUsage.Get()),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	done := c.lastUsage.Start()
 	defer done()
 
@@ -203,7 +241,21 @@ func (c *connWrapper) QueryContext(ctx context.Context, sql string, args []drive
 	return c.cc.Query(ctx, sql, params)
 }
 
-func (c *connWrapper) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Result, error) {
+func (c *connWrapper) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Rows, error) {
+	return QueryContext(ctx, c, sql, args)
+}
+
+func ExecContext(ctx context.Context, c *connWrapper, sql string, args []driver.NamedValue) (
+	_ driver.Result, finalErr error,
+) {
+	onDone := trace.DatabaseSQLOnConnExec(c.connector.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.ExecContext"),
+		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), c.connector.clock.Since(c.lastUsage.Get()),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	done := c.lastUsage.Start()
 	defer done()
 
@@ -217,6 +269,10 @@ func (c *connWrapper) ExecContext(ctx context.Context, sql string, args []driver
 	}
 
 	return c.cc.Exec(ctx, sql, params)
+}
+
+func (c *connWrapper) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Result, error) {
+	return ExecContext(ctx, c, sql, args)
 }
 
 func (c *connWrapper) GetDatabaseName() string {
