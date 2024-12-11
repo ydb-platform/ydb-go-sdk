@@ -7,13 +7,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn/badconn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn/isolation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-var _ iface.Tx = (*transaction)(nil)
+var _ conn.Tx = (*transaction)(nil)
 
 type transaction struct {
 	conn *Conn
@@ -84,7 +84,7 @@ func (tx *transaction) Rollback(ctx context.Context) error {
 	return err
 }
 
-func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (iface.Tx, error) {
+func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (conn.Tx, error) {
 	txc, err := isolation.ToYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

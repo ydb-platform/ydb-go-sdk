@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
+	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn"
 )
 
 const tablePathPrefixTransformer = "table_path_prefix"

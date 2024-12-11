@@ -1,4 +1,4 @@
-package iface
+package conn
 
 import (
 	"context"

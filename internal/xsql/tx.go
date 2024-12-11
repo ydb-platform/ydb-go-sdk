@@ -6,14 +6,14 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type txWrapper struct {
-	conn *conn
-	tx   iface.Tx
+	conn *connWrapper
+	tx   conn.Tx
 	ctx  context.Context //nolint:containedctx
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
+	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"

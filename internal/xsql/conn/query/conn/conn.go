@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
 )
 
 type resultNoRows struct{}
@@ -113,7 +113,7 @@ func (c *Conn) isReady() bool {
 	return c.session.Status() == session.StatusIdle.String()
 }
 
-func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx iface.Tx, finalErr error) {
+func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx conn.Tx, finalErr error) {
 	tx, err := beginTx(ctx, c, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -144,7 +144,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	return err
 }
 
-func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (iface.Tx, error) {
+func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (conn.Tx, error) {
 	tx, err := c.beginTx(ctx, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

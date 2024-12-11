@@ -12,8 +12,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -268,7 +268,7 @@ func (c *Conn) ID() string {
 	return c.session.ID()
 }
 
-func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx iface.Tx, finalErr error) {
+func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx conn.Tx, finalErr error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 
 	if slices.Contains(c.fakeTxModes, m) {
@@ -283,7 +283,7 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx ifac
 	return tx, nil
 }
 
-func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (iface.Tx, error) {
+func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (conn.Tx, error) {
 	tx, err := c.beginTx(ctx, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

@@ -7,8 +7,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn/badconn"
 )
 
 type txFake struct {
@@ -36,7 +36,7 @@ func (tx *txFake) Query(ctx context.Context, sql string, params *params.Params) 
 	return rows, nil
 }
 
-func beginTxFake(ctx context.Context, c *Conn) iface.Tx {
+func beginTxFake(ctx context.Context, c *Conn) conn.Tx {
 	return &txFake{
 		Identifier: tx.ID("FAKE"),
 		conn:       c,

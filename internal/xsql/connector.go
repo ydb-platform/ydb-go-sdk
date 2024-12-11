@@ -15,8 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	conn3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/query/conn"
-	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
+	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/query/conn"
+	conn4 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -38,14 +38,14 @@ type (
 
 		queryProcessor queryProcessor
 
-		TableOpts             []conn2.Option
-		QueryOpts             []conn3.Option
+		TableOpts             []conn4.Option
+		QueryOpts             []conn2.Option
 		disableServerBalancer bool
 		onCLose               []func(*Connector)
 
 		clock          clockwork.Clock
 		idleThreshold  time.Duration
-		conns          xsync.Map[uuid.UUID, *conn]
+		conns          xsync.Map[uuid.UUID, *connWrapper]
 		done           chan struct{}
 		trace          *trace.DatabaseSQL
 		traceRetry     *trace.Retry
@@ -121,10 +121,10 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		id := uuid.New()
 
-		conn := &conn{
-			cc: conn3.New(ctx, c, s, append(
+		conn := &connWrapper{
+			cc: conn2.New(ctx, c, s, append(
 				c.QueryOpts,
-				conn3.WithOnClose(func() {
+				conn2.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
@@ -144,9 +144,9 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		id := uuid.New()
 
-		conn := &conn{
-			cc: conn2.New(ctx, c, s, append(c.TableOpts,
-				conn2.WithOnClose(func() {
+		conn := &connWrapper{
+			cc: conn4.New(ctx, c, s, append(c.TableOpts,
+				conn4.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
@@ -224,7 +224,7 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 					return
 				case <-idleThresholdTimer.Chan():
 					idleThresholdTimer.Stop() // no really need, stop for common style only
-					c.conns.Range(func(_ uuid.UUID, cc *conn) bool {
+					c.conns.Range(func(_ uuid.UUID, cc *connWrapper) bool {
 						if c.clock.Since(cc.LastUsage()) > c.idleThreshold {
 							_ = cc.Close()
 						}

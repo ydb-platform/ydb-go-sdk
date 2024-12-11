@@ -11,7 +11,7 @@ import (
 )
 
 type stmt struct {
-	conn      *conn
+	conn      *connWrapper
 	processor interface {
 		Exec(ctx context.Context, sql string, params *params.Params) (driver.Result, error)
 		Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error)

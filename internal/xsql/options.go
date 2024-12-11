@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/query/conn"
-	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/table/conn"
+	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/query/conn"
+	conn3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -22,7 +22,7 @@ type (
 		bind.TablePathPrefix
 	}
 	tableQueryOptionsOption struct {
-		tableOps  []conn2.Option
+		tableOps  []conn3.Option
 		queryOpts []querySql.Option
 	}
 	traceDatabaseSQLOption struct {
@@ -146,31 +146,31 @@ func WithQueryBind(bind bind.Bind) QueryBindOption {
 	}
 }
 
-func WithDefaultQueryMode(mode conn2.QueryMode) Option {
+func WithDefaultQueryMode(mode conn3.QueryMode) Option {
 	return tableQueryOptionsOption{
-		tableOps: []conn2.Option{
-			conn2.WithDefaultQueryMode(mode),
+		tableOps: []conn3.Option{
+			conn3.WithDefaultQueryMode(mode),
 		},
 	}
 }
 
-func WithFakeTx(modes ...conn2.QueryMode) Option {
+func WithFakeTx(modes ...conn3.QueryMode) Option {
 	return tableQueryOptionsOption{
-		tableOps: []conn2.Option{
-			conn2.WithFakeTxModes(modes...),
+		tableOps: []conn3.Option{
+			conn3.WithFakeTxModes(modes...),
 		},
 	}
 }
 
 func WithIdleThreshold(idleThreshold time.Duration) Option {
 	return tableQueryOptionsOption{
-		tableOps: []conn2.Option{
-			conn2.WithIdleThreshold(idleThreshold),
+		tableOps: []conn3.Option{
+			conn3.WithIdleThreshold(idleThreshold),
 		},
 	}
 }
 
-func WithTableOptions(opts ...conn2.Option) Option {
+func WithTableOptions(opts ...conn3.Option) Option {
 	return tableQueryOptionsOption{
 		tableOps: opts,
 	}
