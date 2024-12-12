@@ -151,7 +151,7 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 		reader = &bytes.Reader{}
 	}
 
-	buf := bytes.NewBuffer([]byte(""))
+	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(reader)
 	if err != nil {
 		return err

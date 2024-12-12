@@ -25,7 +25,8 @@ type encoderPool struct {
 }
 
 func (p *encoderPool) Get() encoder {
-	return p.pool.Get().(encoder)
+	enc, _ := p.pool.Get().(encoder)
+	return enc
 }
 
 func (p *encoderPool) Put(encoder encoder) {
