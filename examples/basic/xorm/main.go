@@ -35,7 +35,7 @@ func main() {
 	} else if dsn, exists = os.LookupEnv("SQLITE_CONNECTION_STRING"); exists {
 		db, err = xorm.NewEngine("sqlite", dsn)
 	} else if dsn, exists = os.LookupEnv("YDB_CONNECTION_STRING"); exists {
-		dsn += "?go_query_bind=table_path_prefix(/local/xorm),declare,numeric&go_fake_tx=scripting&go_query_mode=scripting"
+		dsn += "?go_query_bind=table_path_prefix(/local/xorm),declare,numeric&go_fake_tx=scripting,query&go_query_mode=scripting"
 		db, err = xorm.NewEngine("ydb", dsn)
 	} else {
 		panic(envNotFoundMessage)
