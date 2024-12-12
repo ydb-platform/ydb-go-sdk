@@ -1,11 +1,11 @@
-package connector
+package xsql
 
 import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -21,9 +21,9 @@ type (
 	tablePathPrefixOption struct {
 		bind.TablePathPrefix
 	}
-	tableQueryOptionsOption struct {
-		tableOps  []tableSql.Option
-		queryOpts []querySql.Option
+	legacyOptionsOption struct {
+		legacyOps []legacy.Option
+		options   []propose.Option
 	}
 	traceDatabaseSQLOption struct {
 		t    *trace.DatabaseSQL
@@ -41,7 +41,7 @@ type (
 	bindOption struct {
 		bind.Bind
 	}
-	queryProcessorOption queryProcessor
+	queryProcessorOption Engine
 )
 
 func (t tablePathPrefixOption) Apply(c *Connector) error {
@@ -52,7 +52,7 @@ func (t tablePathPrefixOption) Apply(c *Connector) error {
 }
 
 func (processor queryProcessorOption) Apply(c *Connector) error {
-	c.queryProcessor = queryProcessor(processor)
+	c.processor = Engine(processor)
 
 	return nil
 }
@@ -93,9 +93,9 @@ func (opt traceDatabaseSQLOption) Apply(c *Connector) error {
 	return nil
 }
 
-func (opt tableQueryOptionsOption) Apply(c *Connector) error {
-	c.QueryOpts = append(c.QueryOpts, opt.queryOpts...)
-	c.TableOpts = append(c.TableOpts, opt.tableOps...)
+func (opt legacyOptionsOption) Apply(c *Connector) error {
+	c.Options = append(c.Options, opt.options...)
+	c.LegacyOpts = append(c.LegacyOpts, opt.legacyOps...)
 
 	return nil
 }
@@ -146,46 +146,62 @@ func WithQueryBind(bind bind.Bind) QueryBindOption {
 	}
 }
 
-func WithDefaultQueryMode(mode tableSql.QueryMode) Option {
-	return tableQueryOptionsOption{
-		tableOps: []tableSql.Option{
-			tableSql.WithDefaultQueryMode(mode),
+func WithDefaultQueryMode(mode legacy.QueryMode) Option {
+	return legacyOptionsOption{
+		legacyOps: []legacy.Option{
+			legacy.WithDefaultQueryMode(mode),
 		},
 	}
 }
 
-func WithFakeTx(modes ...tableSql.QueryMode) Option {
-	return tableQueryOptionsOption{
-		tableOps: []tableSql.Option{
-			tableSql.WithFakeTxModes(modes...),
+func WithFakeTx(modes ...legacy.QueryMode) Option {
+	return legacyOptionsOption{
+		legacyOps: []legacy.Option{
+			legacy.WithFakeTxModes(modes...),
 		},
 	}
 }
 
 func WithIdleThreshold(idleThreshold time.Duration) Option {
-	return tableQueryOptionsOption{
-		tableOps: []tableSql.Option{
-			tableSql.WithIdleThreshold(idleThreshold),
+	return legacyOptionsOption{
+		legacyOps: []legacy.Option{
+			legacy.WithIdleThreshold(idleThreshold),
 		},
 	}
 }
 
-func WithTableOptions(opts ...tableSql.Option) Option {
-	return tableQueryOptionsOption{
-		tableOps: opts,
+type mergedOptions []Option
+
+func (opts mergedOptions) Apply(c *Connector) error {
+	for _, opt := range opts {
+		if err := opt.Apply(c); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func Merge(opts ...Option) Option {
+	return mergedOptions(opts)
+}
+
+func WithTableOptions(opts ...legacy.Option) Option {
+	return legacyOptionsOption{
+		legacyOps: opts,
 	}
 }
 
-func WithQueryOptions(opts ...querySql.Option) Option {
-	return tableQueryOptionsOption{
-		queryOpts: opts,
+func WithQueryOptions(opts ...propose.Option) Option {
+	return legacyOptionsOption{
+		options: opts,
 	}
 }
 
-func OverQueryService() Option {
-	return queryProcessorOption(QUERY_SERVICE)
-}
+func WithQueryService(b bool) Option {
+	if b {
+		return queryProcessorOption(QUERY_SERVICE)
+	}
 
-func OverTableService() Option {
-	return queryProcessorOption(TABLE_SERVICE)
+	return queryProcessorOption(LEGACY)
 }

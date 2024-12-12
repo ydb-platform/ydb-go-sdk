@@ -1,4 +1,4 @@
-package connector
+package xsql
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
@@ -20,38 +21,39 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type (
-	conn interface {
-		driver.Conn
-		driver.ConnPrepareContext
-		driver.ConnBeginTx
-		driver.ExecerContext
-		driver.QueryerContext
-		driver.Pinger
-		driver.Validator
-		driver.NamedValueChecker
-
-		LastUsage() time.Time
-		ID() string
+func (c *Conn) toYdb(sql string, args ...driver.NamedValue) (yql string, _ *params.Params, _ error) {
+	queryArgs := make([]any, len(args))
+	for i := range args {
+		queryArgs[i] = args[i]
 	}
-	connWrapper struct {
-		conn
 
-		connector *Connector
+	yql, params, err := c.connector.Bindings().ToYdb(sql, queryArgs...)
+	if err != nil {
+		return "", nil, xerrors.WithStackTrace(err)
 	}
-)
 
-func (c *connWrapper) GetDatabaseName() string {
+	return yql, &params, nil
+}
+
+func (c *Conn) LastUsage() time.Time {
+	return c.lastUsage.Get()
+}
+
+func (c *Conn) Engine() Engine {
+	return c.processor
+}
+
+func (c *Conn) GetDatabaseName() string {
 	return c.connector.Name()
 }
 
-func (c *connWrapper) normalizePath(tableName string) string {
+func (c *Conn) normalizePath(tableName string) string {
 	return c.connector.pathNormalizer.NormalizePath(tableName)
 }
 
-func (c *connWrapper) tableDescription(ctx context.Context, tableName string) (d options.Description, _ error) {
+func (c *Conn) tableDescription(ctx context.Context, tableName string) (d options.Description, _ error) {
 	d, err := retry.RetryWithResult(ctx, func(ctx context.Context) (options.Description, error) {
-		return internalTable.Session(c.ID(), c.connector.balancer, config.New()).DescribeTable(ctx, tableName)
+		return internalTable.Session(c.cc.ID(), c.connector.balancer, config.New()).DescribeTable(ctx, tableName)
 	}, retry.WithIdempotent(true), retry.WithBudget(c.connector.retryBudget), retry.WithTrace(c.connector.traceRetry))
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
@@ -60,7 +62,7 @@ func (c *connWrapper) tableDescription(ctx context.Context, tableName string) (d
 	return d, nil
 }
 
-func (c *connWrapper) GetColumns(ctx context.Context, tableName string) (columns []string, _ error) {
+func (c *Conn) GetColumns(ctx context.Context, tableName string) (columns []string, _ error) {
 	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -73,7 +75,7 @@ func (c *connWrapper) GetColumns(ctx context.Context, tableName string) (columns
 	return columns, nil
 }
 
-func (c *connWrapper) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, _ error) {
+func (c *Conn) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, _ error) {
 	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
@@ -88,7 +90,7 @@ func (c *connWrapper) GetColumnType(ctx context.Context, tableName, columnName s
 	return "", xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
 }
 
-func (c *connWrapper) GetPrimaryKeys(ctx context.Context, tableName string) ([]string, error) {
+func (c *Conn) GetPrimaryKeys(ctx context.Context, tableName string) ([]string, error) {
 	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -97,7 +99,7 @@ func (c *connWrapper) GetPrimaryKeys(ctx context.Context, tableName string) ([]s
 	return d.PrimaryKey, nil
 }
 
-func (c *connWrapper) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, _ error) {
+func (c *Conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, _ error) {
 	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
@@ -112,7 +114,7 @@ func (c *connWrapper) IsPrimaryKey(ctx context.Context, tableName, columnName st
 	return false, nil
 }
 
-func (c *connWrapper) Version(_ context.Context) (_ string, _ error) {
+func (c *Conn) Version(_ context.Context) (_ string, _ error) {
 	const version = "default"
 
 	return version, nil
@@ -131,7 +133,7 @@ func isSysDir(databaseName, dirAbsPath string) bool {
 	return false
 }
 
-func (c *connWrapper) getTables(ctx context.Context, absPath string, recursive, excludeSysDirs bool) (
+func (c *Conn) getTables(ctx context.Context, absPath string, recursive, excludeSysDirs bool) (
 	tables []string, _ error,
 ) {
 	if excludeSysDirs && isSysDir(c.connector.Name(), absPath) {
@@ -165,7 +167,7 @@ func (c *connWrapper) getTables(ctx context.Context, absPath string, recursive, 
 	return tables, nil
 }
 
-func (c *connWrapper) GetTables(ctx context.Context, folder string, recursive, excludeSysDirs bool) (
+func (c *Conn) GetTables(ctx context.Context, folder string, recursive, excludeSysDirs bool) (
 	tables []string, _ error,
 ) {
 	absPath := c.normalizePath(folder)
@@ -194,7 +196,7 @@ func (c *connWrapper) GetTables(ctx context.Context, folder string, recursive, e
 	}
 }
 
-func (c *connWrapper) GetIndexes(ctx context.Context, tableName string) (indexes []string, _ error) {
+func (c *Conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, _ error) {
 	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -205,8 +207,16 @@ func (c *connWrapper) GetIndexes(ctx context.Context, tableName string) (indexes
 	}), nil
 }
 
-func (c *connWrapper) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, _ error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
+func (c *Conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, finalErr error) {
+	tableName = c.normalizePath(tableName)
+	onDone := trace.DatabaseSQLOnConnGetIndexColumns(c.connector.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).GetIndexColumns"),
+		tableName, indexName,
+	)
+	defer func() {
+		onDone(columns, finalErr)
+	}()
+	d, err := c.tableDescription(ctx, tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -220,8 +230,16 @@ func (c *connWrapper) GetIndexColumns(ctx context.Context, tableName, indexName 
 	return xslices.Uniq(columns), nil
 }
 
-func (c *connWrapper) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, _ error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
+func (c *Conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, finalErr error) {
+	tableName = c.normalizePath(tableName)
+	onDone := trace.DatabaseSQLOnConnIsColumnExists(c.connector.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).IsColumnExists"),
+		tableName, columnName,
+	)
+	defer func() {
+		onDone(columnExists, finalErr)
+	}()
+	d, err := c.tableDescription(ctx, tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -235,10 +253,10 @@ func (c *connWrapper) IsColumnExists(ctx context.Context, tableName, columnName 
 	return false, nil
 }
 
-func (c *connWrapper) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
+func (c *Conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
 	onDone := trace.DatabaseSQLOnConnIsTableExists(c.connector.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/connector.(*connWrapper).IsTableExists"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).IsTableExists"),
 		tableName,
 	)
 	defer func() {

@@ -29,10 +29,6 @@ import (
 )
 
 func TestQueryExecute(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 
@@ -297,10 +293,6 @@ func TestQueryExecute(t *testing.T) {
 
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1456
 func TestIssue1456TooManyUnknownTransactions(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 
@@ -411,10 +403,6 @@ func TestIssue1456TooManyUnknownTransactions(t *testing.T) {
 }
 
 func TestQueryResultSet(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	t.Run("OK", func(t *testing.T) {
 		scope := newScope(t)
 

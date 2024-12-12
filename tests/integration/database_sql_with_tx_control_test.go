@@ -6,12 +6,13 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -26,12 +27,17 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 			ydb.WithAutoDeclare(),
 		)
 	)
+	overQueryService := false
+
+	if v, has := os.LookupEnv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE"); has && v != "" {
+		overQueryService = true
+	}
 
 	t.Run("default", func(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.SerializableReadWriteTxControl().Desc(), txControl.Desc())
 				}),
@@ -42,14 +48,14 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("SerializableReadWriteTxControl", func(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.SerializableReadWriteTxControl().Desc(), txControl.Desc())
 				}),
@@ -60,14 +66,14 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("SnapshotReadOnlyTxControl", func(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.SnapshotReadOnlyTxControl().Desc(), txControl.Desc())
 				}),
@@ -78,14 +84,14 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("StaleReadOnlyTxControl", func(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.StaleReadOnlyTxControl().Desc(), txControl.Desc())
 				}),
@@ -96,14 +102,14 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("OnlineReadOnlyTxControl{AllowInconsistentReads:false}", func(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.OnlineReadOnlyTxControl().Desc(), txControl.Desc())
 				}),
@@ -114,14 +120,14 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 
 	t.Run("OnlineReadOnlyTxControl{AllowInconsistentReads:true})", func(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.OnlineReadOnlyTxControl(table.WithInconsistentReads()).Desc(), txControl.Desc())
 				}),
@@ -132,6 +138,6 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				return err
 			},
 		))
-		require.True(t, hookCalled)
+		require.True(t, hookCalled || overQueryService)
 	})
 }

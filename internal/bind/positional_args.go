@@ -16,7 +16,7 @@ func (m PositionalArgs) blockID() blockID {
 	return blockYQL
 }
 
-func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
+func (m PositionalArgs) ToYdb(sql string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {
 	l := &sqlLexer{

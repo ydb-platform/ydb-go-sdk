@@ -1,8 +1,7 @@
-package conn
+package legacy
 
 import (
 	"context"
-	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"io"
@@ -10,8 +9,8 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -22,7 +21,6 @@ var (
 	_ driver.RowsNextResultSet              = &rows{}
 	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
 	_ driver.RowsColumnTypeNullable         = &rows{}
-	_ driver.Rows                           = &single{}
 
 	_ scanner.Scanner = &valuer{}
 
@@ -145,33 +143,4 @@ func (r *rows) Next(dst []driver.Value) error {
 
 func (r *rows) Close() error {
 	return r.result.Close()
-}
-
-type single struct {
-	values  []sql.NamedArg
-	readAll bool
-}
-
-func (r *single) Columns() (columns []string) {
-	for i := range r.values {
-		columns = append(columns, r.values[i].Name)
-	}
-
-	return columns
-}
-
-func (r *single) Close() error {
-	return nil
-}
-
-func (r *single) Next(dst []driver.Value) error {
-	if r.values == nil || r.readAll {
-		return io.EOF
-	}
-	for i := range r.values {
-		dst[i] = r.values[i].Value
-	}
-	r.readAll = true
-
-	return nil
 }

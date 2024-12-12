@@ -18,8 +18,9 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -234,7 +235,12 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		var res [16]byte
 
 		err := row.Scan(&res)
-		require.Error(t, err)
+		switch driverEngine(db) {
+		case xsql.LEGACY:
+			require.Error(t, err)
+		case xsql.QUERY_SERVICE:
+			require.NoError(t, err)
+		}
 	})
 	t.Run("old-receive-to-bytes-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -256,10 +262,14 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		var res types.UUIDBytesWithIssue1501Type
 
 		err := row.Scan(&res)
-		require.NoError(t, err)
-
-		resUUID := uuid.UUID(res.AsBytesArray())
-		require.Equal(t, expectedResultWithBug, resUUID.String())
+		switch driverEngine(db) {
+		case xsql.LEGACY:
+			require.NoError(t, err)
+			resUUID := uuid.UUID(res.AsBytesArray())
+			require.Equal(t, expectedResultWithBug, resUUID.String())
+		case xsql.QUERY_SERVICE:
+			require.Error(t, err)
+		}
 	})
 
 	t.Run("old-receive-to-string", func(t *testing.T) {
@@ -341,11 +351,14 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		var resBytes types.UUIDBytesWithIssue1501Type
 		err := row.Scan(&resBytes)
-		require.NoError(t, err)
-
-		resUUID := uuid.UUID(resBytes.AsBytesArray())
-
-		require.Equal(t, id, resUUID)
+		switch driverEngine(db) {
+		case xsql.LEGACY:
+			require.NoError(t, err)
+			resUUID := uuid.UUID(resBytes.AsBytesArray())
+			require.Equal(t, id, resUUID)
+		case xsql.QUERY_SERVICE:
+			require.Error(t, err)
+		}
 	})
 	t.Run("old-send-uuid-receive-error-bad-request", func(t *testing.T) {
 		var (
@@ -405,12 +418,15 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		var resFromDB types.UUIDBytesWithIssue1501Type
 
 		err := row.Scan(&resFromDB)
-		require.NoError(t, err)
-
-		resUUID := resFromDB.PublicRevertReorderForIssue1501()
-
-		resString := strings.ToUpper(resUUID.String())
-		require.Equal(t, idString, resString)
+		switch driverEngine(db) {
+		case xsql.LEGACY:
+			require.NoError(t, err)
+			resUUID := resFromDB.PublicRevertReorderForIssue1501()
+			resString := strings.ToUpper(resUUID.String())
+			require.Equal(t, idString, resString)
+		case xsql.QUERY_SERVICE:
+			require.Error(t, err)
+		}
 	})
 	t.Run("good-send-receive", func(t *testing.T) {
 		var (

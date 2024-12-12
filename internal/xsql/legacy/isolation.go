@@ -1,4 +1,4 @@
-package isolation
+package legacy
 
 import (
 	"database/sql"
@@ -9,11 +9,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-// ToYDB maps driver transaction options to ydb transaction Option or query transaction control.
+// toYDB maps driver transaction options to ydb transaction Option or query transaction control.
 // This caused by ydb logic that prevents start actual transaction with OnlineReadOnly mode and ReadCommitted
 // and ReadUncommitted isolation levels should use tx_control in every query request.
 // It returns error on unsupported options.
-func ToYDB(opts driver.TxOptions) (txcControl table.TxOption, err error) {
+func toYDB(opts driver.TxOptions) (txcControl table.TxOption, err error) {
 	level := sql.IsolationLevel(opts.Isolation)
 	switch level {
 	case sql.LevelDefault, sql.LevelSerializable:

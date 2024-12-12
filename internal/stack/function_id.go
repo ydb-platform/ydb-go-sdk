@@ -12,10 +12,10 @@ func (id functionID) String() string {
 	return string(id)
 }
 
-func FunctionID(id string) Caller {
+func FunctionID(id string, opts ...recordOption) Caller {
 	if id != "" {
 		return functionID(id)
 	}
 
-	return Call(1)
+	return Call(1, opts...)
 }

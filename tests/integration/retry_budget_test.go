@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -91,18 +90,16 @@ func TestRetryBudget(t *testing.T) {
 		}, table.WithRetryBudget(retryBudget))
 		require.ErrorIs(t, err, budget.ErrNoQuota)
 	})
-	if version.Gte(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Run("db.Query().Do", func(t *testing.T) {
-			err := nativeDriver.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-				return retry.RetryableError(errors.New("custom error"))
-			}, query.WithRetryBudget(retryBudget))
-			require.ErrorIs(t, err, budget.ErrNoQuota)
-		})
-		t.Run("db.Query().DoTx", func(t *testing.T) {
-			err := nativeDriver.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-				return retry.RetryableError(errors.New("custom error"))
-			}, query.WithRetryBudget(retryBudget))
-			require.ErrorIs(t, err, budget.ErrNoQuota)
-		})
-	}
+	t.Run("db.Query().Do", func(t *testing.T) {
+		err := nativeDriver.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+			return retry.RetryableError(errors.New("custom error"))
+		}, query.WithRetryBudget(retryBudget))
+		require.ErrorIs(t, err, budget.ErrNoQuota)
+	})
+	t.Run("db.Query().DoTx", func(t *testing.T) {
+		err := nativeDriver.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+			return retry.RetryableError(errors.New("custom error"))
+		}, query.WithRetryBudget(retryBudget))
+		require.ErrorIs(t, err, budget.ErrNoQuota)
+	})
 }
