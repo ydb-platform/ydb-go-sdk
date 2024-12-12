@@ -111,18 +111,7 @@ func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([
 
 	m.bufEncoded.Reset()
 
-	writer, err := m.encoders.CreateLazyEncodeWriter(codec, &m.bufEncoded)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-			"ydb: failed create encoder for message, codec '%v': %w",
-			codec,
-			err,
-		)))
-	}
-	_, err = writer.Write(m.rawBuf.Bytes())
-	if err == nil {
-		err = writer.Close()
-	}
+	_, err := m.encoders.Encode(codec, &m.bufEncoded, m.rawBuf.Bytes())
 	if err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to compress message, codec '%v': %w",
@@ -157,19 +146,18 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 	m.bufCodec = codec
 	m.bufEncoded.Reset()
 
-	encoder, err := m.encoders.CreateLazyEncodeWriter(codec, &m.bufEncoded)
-	if err != nil {
-		return err
-	}
-
 	reader := m.Data
 	if reader == nil {
 		reader = &bytes.Reader{}
 	}
-	bytesCount, err := io.Copy(encoder, reader)
-	if err == nil {
-		err = encoder.Close()
+
+	buf := bytes.NewBuffer([]byte(""))
+	_, err := buf.ReadFrom(reader)
+	if err != nil {
+		return err
 	}
+
+	bytesCount, err := m.encoders.Encode(codec, &m.bufEncoded, buf.Bytes())
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed compress message with codec '%v': %w",

@@ -1,7 +1,6 @@
 package topicwriterinternal
 
 import (
-	"compress/gzip"
 	"fmt"
 	"io"
 	"sync"
@@ -17,8 +16,31 @@ const (
 	codecUnknown                = rawtopiccommon.CodecUNSPECIFIED
 )
 
+type encoder interface {
+	Encode(target io.Writer, data []byte) (int, error)
+}
+
+type encoderPool struct {
+	pool sync.Pool
+}
+
+func (p *encoderPool) Get() encoder {
+	return p.pool.Get().(encoder)
+}
+
+func (p *encoderPool) Put(encoder encoder) {
+	p.pool.Put(encoder)
+}
+
+func newEncoderPool(newEncoderFunc func() any) *encoderPool {
+	return &encoderPool{
+		pool: sync.Pool{New: newEncoderFunc},
+	}
+}
+
 type EncoderMap struct {
 	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	p map[rawtopiccommon.Codec]*encoderPool
 }
 
 func NewEncoderMap() *EncoderMap {
@@ -27,9 +49,9 @@ func NewEncoderMap() *EncoderMap {
 			rawtopiccommon.CodecRaw: func(writer io.Writer) (io.WriteCloser, error) {
 				return nopWriteCloser{writer}, nil
 			},
-			rawtopiccommon.CodecGzip: func(writer io.Writer) (io.WriteCloser, error) {
-				return gzip.NewWriter(writer), nil
-			},
+		},
+		p: map[rawtopiccommon.Codec]*encoderPool{
+			rawtopiccommon.CodecGzip: newEncoderPool(newGzipEncoder),
 		},
 	}
 }
@@ -46,6 +68,45 @@ func (e *EncoderMap) CreateLazyEncodeWriter(codec rawtopiccommon.Codec, target i
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
 }
 
+func (e *EncoderMap) Encode(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
+	ePool, ok := e.p[codec]
+	if !ok {
+		return e.encodeWithLazyWriter(codec, target, data)
+	}
+
+	enc := ePool.Get()
+	n, err := enc.Encode(target, data)
+	if err != nil {
+		return 0, err
+	}
+
+	ePool.Put(enc)
+
+	return n, nil
+}
+
+func (e *EncoderMap) encodeWithLazyWriter(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
+	encoderCreator, ok := e.m[codec]
+	if !ok {
+		return 0, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
+	}
+
+	enc, err := encoderCreator(target)
+	if err != nil {
+		return 0, err
+	}
+
+	n, err := enc.Write(data)
+	if err == nil {
+		err = enc.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
 func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
 	res := make(rawtopiccommon.SupportedCodecs, 0, len(e.m))
 	for codec := range e.m {
@@ -57,6 +118,11 @@ func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
 
 func (e *EncoderMap) IsSupported(codec rawtopiccommon.Codec) bool {
 	_, ok := e.m[codec]
+	if ok {
+		return true
+	}
+
+	_, ok = e.p[codec]
 
 	return ok
 }
