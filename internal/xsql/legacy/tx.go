@@ -39,14 +39,8 @@ func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Para
 func (tx *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
 	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
 	if m != DataQueryMode {
-		return nil, badconn.Map(
-			xerrors.WithStackTrace(
-				xerrors.Retryable(
-					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.InvalidObject(),
-					xerrors.WithName("WRONG_QUERY_MODE"),
-				),
-			),
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("%s: %w", m.String(), ErrWrongQueryMode),
 		)
 	}
 	res, err := tx.tx.Execute(ctx,
