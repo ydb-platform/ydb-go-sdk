@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -433,5 +434,42 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, id.String(), res.String())
+	})
+}
+
+type testValuer struct {
+	value driver.Value
+}
+
+func (v *testValuer) Value() (driver.Value, error) {
+	return v.value, nil
+}
+
+func TestSQLX(t *testing.T) {
+	// test sqlx
+
+	t.Run("named-exec-context", func(t *testing.T) {
+		// test old behavior - for test way of safe work with data, written with bagged API version
+		var (
+			scope = newScope(t)
+			db    = scope.SQLDriver()
+		)
+
+		id := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		v := testValuer{value: id}
+
+		row := db.QueryRow(`
+			DECLARE $val AS String;
+			SELECT $val as result_s`,
+			sql.Named("val", v),
+		)
+
+		require.NoError(t, row.Err())
+
+		var res string
+		err := row.Scan(&res)
+		require.NoError(t, err)
+
+		require.Equal(t, id, res)
 	})
 }
