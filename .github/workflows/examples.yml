@@ -9,7 +9,7 @@ on:
 jobs:
   basic-ydb:
     concurrency:
-      group: basic-ydb-${{ github.ref }}-${{ matrix.ydb-version }}-${{ matrix.application }}
+      group: basic-ydb-${{ github.ref }}-${{ matrix.ydb-version }}-${{ matrix.application }}-${{ matrix.query_service }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
@@ -17,6 +17,7 @@ jobs:
       matrix:
         ydb-version: [ 24.1, 24.2, 24.3 ]
         application: [ native/table, native/query, database_sql, gorm, xorm ]
+        query_service: [ 0, 1 ]
     services:
       ydb:
         image: ydbplatform/local-ydb:${{ matrix.ydb-version }}
@@ -37,6 +38,7 @@ jobs:
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
       YDB_VERSION: ${{ matrix.ydb-version }}
+      YDB_DATABASE_SQL_OVER_QUERY_SERVICE: ${{ matrix.query_service }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
