@@ -1,4 +1,4 @@
-package query
+package propose
 
 import (
 	"database/sql"

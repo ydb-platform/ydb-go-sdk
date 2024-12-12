@@ -1,9 +1,9 @@
-package table
+package legacy
 
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
@@ -37,7 +37,7 @@ func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) 
 }
 
 func (c *Conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
-	if conn.IsPreparedStatement(ctx) {
+	if iface.IsPreparedStatement(ctx) {
 		return append(c.dataOpts, options.WithKeepInCache(true))
 	}
 

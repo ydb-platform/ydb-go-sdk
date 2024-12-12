@@ -6,28 +6,28 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type txWrapper struct {
-	conn *connWrapper
-	tx   conn.Tx
+type Tx struct {
+	conn *Conn
+	tx   iface.Tx
 	ctx  context.Context //nolint:containedctx
 }
 
-func (tx *txWrapper) ID() string {
+func (tx *Tx) ID() string {
 	return tx.tx.ID()
 }
 
 var (
-	_ driver.Tx             = &txWrapper{}
-	_ driver.ExecerContext  = &txWrapper{}
-	_ driver.QueryerContext = &txWrapper{}
+	_ driver.Tx             = &Tx{}
+	_ driver.ExecerContext  = &Tx{}
+	_ driver.QueryerContext = &Tx{}
 )
 
-func (tx *txWrapper) Commit() (finalErr error) {
+func (tx *Tx) Commit() (finalErr error) {
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
@@ -35,7 +35,7 @@ func (tx *txWrapper) Commit() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.connector.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).Commit"),
+			stack.FunctionID("", stack.Package("database/sql")),
 			tx,
 		)
 	)
@@ -50,7 +50,7 @@ func (tx *txWrapper) Commit() (finalErr error) {
 	return nil
 }
 
-func (tx *txWrapper) Rollback() (finalErr error) {
+func (tx *Tx) Rollback() (finalErr error) {
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
@@ -58,7 +58,7 @@ func (tx *txWrapper) Rollback() (finalErr error) {
 	var (
 		ctx    = tx.ctx
 		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.connector.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).Rollback"),
+			stack.FunctionID("", stack.Package("database/sql")),
 			tx,
 		)
 	)
@@ -74,11 +74,11 @@ func (tx *txWrapper) Rollback() (finalErr error) {
 	return err
 }
 
-func (tx *txWrapper) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
+func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).QueryContext"),
+		stack.FunctionID("", stack.Package("database/sql")),
 		tx.ctx, tx, sql,
 	)
 	defer func() {
@@ -107,11 +107,11 @@ func (tx *txWrapper) QueryContext(ctx context.Context, sql string, args []driver
 	return rows, nil
 }
 
-func (tx *txWrapper) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
+func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).ExecContext"),
+		stack.FunctionID("", stack.Package("database/sql")),
 		tx.ctx, tx, sql,
 	)
 	defer func() {
@@ -131,9 +131,9 @@ func (tx *txWrapper) ExecContext(ctx context.Context, sql string, args []driver.
 	return result, nil
 }
 
-func (tx *txWrapper) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
+func (tx *Tx) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*txWrapper).PrepareContext"),
+		stack.FunctionID("", stack.Package("database/sql")),
 		tx.ctx, tx, sql,
 	)
 	defer func() {
@@ -143,7 +143,7 @@ func (tx *txWrapper) PrepareContext(ctx context.Context, sql string) (_ driver.S
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 
-	return &stmt{
+	return &Stmt{
 		conn:      tx.conn,
 		processor: tx.tx,
 		ctx:       ctx,

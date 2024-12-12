@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -37,7 +37,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.SerializableReadWriteTxControl().Desc(), txControl.Desc())
 				}),
@@ -55,7 +55,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.SerializableReadWriteTxControl().Desc(), txControl.Desc())
 				}),
@@ -73,7 +73,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.SnapshotReadOnlyTxControl().Desc(), txControl.Desc())
 				}),
@@ -91,7 +91,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.StaleReadOnlyTxControl().Desc(), txControl.Desc())
 				}),
@@ -109,7 +109,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.OnlineReadOnlyTxControl().Desc(), txControl.Desc())
 				}),
@@ -127,7 +127,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tableSql.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				legacy.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
 					hookCalled = true
 					require.Equal(t, table.OnlineReadOnlyTxControl(table.WithInconsistentReads()).Desc(), txControl.Desc())
 				}),

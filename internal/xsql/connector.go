@@ -16,8 +16,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	connOverQueryServiceClient "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/query"
-	connOverTableServiceClient "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
+	propose "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -39,14 +39,14 @@ type (
 
 		processor Engine
 
-		TableOpts             []connOverTableServiceClient.Option
-		QueryOpts             []connOverQueryServiceClient.Option
+		LegacyOpts            []legacy.Option
+		Options               []propose.Option
 		disableServerBalancer bool
 		onCLose               []func(*Connector)
 
 		clock          clockwork.Clock
 		idleThreshold  time.Duration
-		conns          xsync.Map[uuid.UUID, *connWrapper]
+		conns          xsync.Map[uuid.UUID, *Conn]
 		done           chan struct{}
 		trace          *trace.DatabaseSQL
 		traceRetry     *trace.Retry
@@ -65,8 +65,8 @@ type (
 
 func (e Engine) String() string {
 	switch e {
-	case TABLE_SERVICE:
-		return "TABLE_SERVICE"
+	case LEGACY:
+		return "LEGACY"
 	case QUERY_SERVICE:
 		return "QUERY_SERVICE"
 	default:
@@ -116,7 +116,7 @@ func (c *Connector) Scheme() scheme.Client {
 
 const (
 	QUERY_SERVICE = iota + 1 //nolint:revive,stylecheck
-	TABLE_SERVICE            //nolint:revive,stylecheck
+	LEGACY                   //nolint:revive,stylecheck
 )
 
 func (c *Connector) Open(name string) (driver.Conn, error) {
@@ -133,11 +133,11 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		id := uuid.New()
 
-		conn := &connWrapper{
+		conn := &Conn{
 			processor: QUERY_SERVICE,
-			cc: connOverQueryServiceClient.New(ctx, c, s, append(
-				c.QueryOpts,
-				connOverQueryServiceClient.WithOnClose(func() {
+			cc: propose.New(ctx, c, s, append(
+				c.Options,
+				propose.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
@@ -150,7 +150,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		return conn, nil
 
-	case TABLE_SERVICE:
+	case LEGACY:
 		s, err := c.Table().CreateSession(ctx) //nolint:staticcheck
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -158,10 +158,10 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 		id := uuid.New()
 
-		conn := &connWrapper{
-			processor: TABLE_SERVICE,
-			cc: connOverTableServiceClient.New(ctx, c, s, append(c.TableOpts,
-				connOverTableServiceClient.WithOnClose(func() {
+		conn := &Conn{
+			processor: LEGACY,
+			cc: legacy.New(ctx, c, s, append(c.LegacyOpts,
+				legacy.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),
@@ -210,7 +210,7 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 				return QUERY_SERVICE
 			}
 
-			return TABLE_SERVICE
+			return LEGACY
 		}(),
 		clock:          clockwork.NewRealClock(),
 		done:           make(chan struct{}),
@@ -240,7 +240,7 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 					return
 				case <-idleThresholdTimer.Chan():
 					idleThresholdTimer.Stop() // no really need, stop for common style only
-					c.conns.Range(func(_ uuid.UUID, cc *connWrapper) bool {
+					c.conns.Range(func(_ uuid.UUID, cc *Conn) bool {
 						if c.clock.Since(cc.LastUsage()) > c.idleThreshold {
 							_ = cc.Close()
 						}

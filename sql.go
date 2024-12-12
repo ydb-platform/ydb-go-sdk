@@ -9,8 +9,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
-	connOverQueryServiceClient "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/query"
-	connOverTableServiceClient "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -82,7 +82,7 @@ func (d *sqlDriver) detach(c *xsql.Connector) {
 type QueryMode int
 
 const (
-	_ = QueryMode(iota)
+	unknownQueryMode = QueryMode(iota)
 	DataQueryMode
 	ExplainQueryMode
 	ScanQueryMode
@@ -99,20 +99,20 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 	case ExplainQueryMode:
 		return xsql.WithExplain(ctx)
 	case DataQueryMode:
-		return connOverTableServiceClient.WithQueryMode(ctx, connOverTableServiceClient.DataQueryMode)
+		return legacy.WithQueryMode(ctx, legacy.DataQueryMode)
 	case ScanQueryMode:
-		return connOverTableServiceClient.WithQueryMode(ctx, connOverTableServiceClient.ScanQueryMode)
+		return legacy.WithQueryMode(ctx, legacy.ScanQueryMode)
 	case SchemeQueryMode:
-		return connOverTableServiceClient.WithQueryMode(ctx, connOverTableServiceClient.SchemeQueryMode)
+		return legacy.WithQueryMode(ctx, legacy.SchemeQueryMode)
 	case ScriptingQueryMode:
-		return connOverTableServiceClient.WithQueryMode(ctx, connOverTableServiceClient.ScriptingQueryMode)
+		return legacy.WithQueryMode(ctx, legacy.ScriptingQueryMode)
 	default:
 		return ctx
 	}
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
-	return connOverTableServiceClient.WithTxControl(ctx, txc)
+	return legacy.WithTxControl(ctx, txc)
 }
 
 type ConnectorOption = xsql.Option
@@ -122,31 +122,31 @@ type QueryBindConnectorOption interface {
 	bind.Bind
 }
 
-func modeToMode(mode QueryMode) connOverTableServiceClient.QueryMode {
+func modeToMode(mode QueryMode) legacy.QueryMode {
 	switch mode {
 	case ScanQueryMode:
-		return connOverTableServiceClient.ScanQueryMode
+		return legacy.ScanQueryMode
 	case SchemeQueryMode:
-		return connOverTableServiceClient.SchemeQueryMode
+		return legacy.SchemeQueryMode
 	case ScriptingQueryMode:
-		return connOverTableServiceClient.ScriptingQueryMode
+		return legacy.ScriptingQueryMode
 	default:
-		return connOverTableServiceClient.DataQueryMode
+		return legacy.DataQueryMode
 	}
 }
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return xsql.WithTableOptions(
-		connOverTableServiceClient.WithDefaultQueryMode(modeToMode(mode)),
+		legacy.WithDefaultQueryMode(modeToMode(mode)),
 	)
 }
 
-// OverQueryService is an experimental flag for create database/sql driver over query service client
+// WithQueryService is an experimental flag for create database/sql driver over query service client
 //
 // By default database/sql driver works over table service client
-// Default will be changed to `OverQueryService` after March 2025
-func OverQueryService() ConnectorOption {
-	return xsql.OverQueryService()
+// Default will be changed to `WithQueryService` after March 2025
+func WithQueryService(b bool) ConnectorOption {
+	return xsql.WithQueryService(b)
 }
 
 func WithFakeTx(modes ...QueryMode) ConnectorOption {
@@ -156,31 +156,31 @@ func WithFakeTx(modes ...QueryMode) ConnectorOption {
 		switch mode {
 		case DataQueryMode:
 			opts = append(opts,
-				xsql.WithTableOptions(connOverTableServiceClient.WithFakeTxModes(
-					connOverTableServiceClient.DataQueryMode,
+				xsql.WithTableOptions(legacy.WithFakeTxModes(
+					legacy.DataQueryMode,
 				)),
 			)
 		case ScanQueryMode:
 			opts = append(opts,
-				xsql.WithTableOptions(connOverTableServiceClient.WithFakeTxModes(
-					connOverTableServiceClient.ScanQueryMode,
+				xsql.WithTableOptions(legacy.WithFakeTxModes(
+					legacy.ScanQueryMode,
 				)),
 			)
 		case SchemeQueryMode:
 			opts = append(opts,
-				xsql.WithTableOptions(connOverTableServiceClient.WithFakeTxModes(
-					connOverTableServiceClient.SchemeQueryMode,
+				xsql.WithTableOptions(legacy.WithFakeTxModes(
+					legacy.SchemeQueryMode,
 				)),
 			)
 		case ScriptingQueryMode:
 			opts = append(opts,
-				xsql.WithTableOptions(connOverTableServiceClient.WithFakeTxModes(
-					connOverTableServiceClient.DataQueryMode,
+				xsql.WithTableOptions(legacy.WithFakeTxModes(
+					legacy.DataQueryMode,
 				)),
 			)
 		case QueryExecuteQueryMode:
 			opts = append(opts,
-				xsql.WithQueryOptions(connOverQueryServiceClient.WithFakeTx()),
+				xsql.WithQueryOptions(propose.WithFakeTx()),
 			)
 		default:
 		}
@@ -206,15 +206,15 @@ func WithNumericArgs() QueryBindConnectorOption {
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
-	return xsql.WithTableOptions(connOverTableServiceClient.WithDefaultTxControl(txControl))
+	return xsql.WithTableOptions(legacy.WithDefaultTxControl(txControl))
 }
 
 func WithDefaultDataQueryOptions(opts ...options.ExecuteDataQueryOption) ConnectorOption {
-	return xsql.WithTableOptions(connOverTableServiceClient.WithDataOpts(opts...))
+	return xsql.WithTableOptions(legacy.WithDataOpts(opts...))
 }
 
 func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) ConnectorOption {
-	return xsql.WithTableOptions(connOverTableServiceClient.WithScanOpts(opts...))
+	return xsql.WithTableOptions(legacy.WithScanOpts(opts...))
 }
 
 func WithDatabaseSQLTrace(

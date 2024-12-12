@@ -1,4 +1,4 @@
-package table
+package legacy
 
 import (
 	"context"
@@ -30,20 +30,12 @@ func queryModeFromContext(ctx context.Context, defaultMode QueryMode) QueryMode 
 	return defaultMode
 }
 
-var (
-	typeToString = map[QueryMode]string{
-		DataQueryMode:      "data",
-		ScanQueryMode:      "scan",
-		SchemeQueryMode:    "scheme",
-		ScriptingQueryMode: "scripting",
-	}
-	stringToType = map[string]QueryMode{
-		"data":      DataQueryMode,
-		"scan":      ScanQueryMode,
-		"scheme":    SchemeQueryMode,
-		"scripting": ScriptingQueryMode,
-	}
-)
+var typeToString = map[QueryMode]string{
+	DataQueryMode:      "data",
+	ScanQueryMode:      "scan",
+	SchemeQueryMode:    "scheme",
+	ScriptingQueryMode: "scripting",
+}
 
 func (t QueryMode) String() string {
 	if s, ok := typeToString[t]; ok {
@@ -51,12 +43,4 @@ func (t QueryMode) String() string {
 	}
 
 	return fmt.Sprintf("unknown_mode_%d", t)
-}
-
-func QueryModeFromString(s string) QueryMode {
-	if t, ok := stringToType[s]; ok {
-		return t
-	}
-
-	return UnknownQueryMode
 }

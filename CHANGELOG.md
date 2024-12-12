@@ -1,3 +1,7 @@
+* Added implementation of `database/sql` driver over query service client
+* Added `ydb.WithQueryService(bool)` option to explicitly enable `database/sql` driver over query service client
+* Added environment parameter `YDB_DATABASE_SQL_OVER_QUERY_SERVICE` to enable `database/sql` driver over query service client without code rewriting
+
 ## v3.94.0
 * Refactored golang types mapping into ydb types using `ydb.ParamsFromMap` and `database/sql` query arguments
 * Small breaking change: type mapping for `ydb.ParamsFromMap` and `database/sql` type `uuid.UUID` changed from ydb type `Text` to ydb type `UUID`

@@ -12,5 +12,5 @@ var (
 	errDeprecated          = driver.ErrSkip
 	errAlreadyClosed       = errors.New("already closed")
 	errWrongQueryProcessor = errors.New("wrong query processor")
-	errNotReadyConn        = xerrors.Retryable(errors.New("conn not ready"), xerrors.InvalidObject())
+	errNotReadyConn        = xerrors.Retryable(errors.New("iface not ready"), xerrors.InvalidObject())
 )

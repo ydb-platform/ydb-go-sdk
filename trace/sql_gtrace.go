@@ -4,6 +4,7 @@ package trace
 
 import (
 	"context"
+	"database/sql/driver"
 	"time"
 )
 
@@ -213,6 +214,76 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 		}
 	}
 	{
+		h1 := t.OnConnBeginTx
+		h2 := x.OnConnBeginTx
+		ret.OnConnBeginTx = func(d DatabaseSQLConnBeginTxStartInfo) func(DatabaseSQLConnBeginTxDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DatabaseSQLConnBeginTxDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DatabaseSQLConnBeginTxDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnConnCheckNamedValue
+		h2 := x.OnConnCheckNamedValue
+		ret.OnConnCheckNamedValue = func(d DatabaseSQLConnCheckNamedValueStartInfo) func(DatabaseSQLConnCheckNamedValueDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DatabaseSQLConnCheckNamedValueDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DatabaseSQLConnCheckNamedValueDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnConnQuery
 		h2 := x.OnConnQuery
 		ret.OnConnQuery = func(d DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo) {
@@ -313,6 +384,76 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 				}
 				if r1 != nil {
 					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnConnIsColumnExists
+		h2 := x.OnConnIsColumnExists
+		ret.OnConnIsColumnExists = func(info DatabaseSQLConnIsColumnExistsStartInfo) func(DatabaseSQLConnIsColumnExistsDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DatabaseSQLConnIsColumnExistsDoneInfo)
+			if h1 != nil {
+				r = h1(info)
+			}
+			if h2 != nil {
+				r1 = h2(info)
+			}
+			return func(doneInfo DatabaseSQLConnIsColumnExistsDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnConnGetIndexColumns
+		h2 := x.OnConnGetIndexColumns
+		ret.OnConnGetIndexColumns = func(info DatabaseSQLConnGetIndexColumnsStartInfo) func(DatabaseSQLConnGetIndexColumnsDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DatabaseSQLConnGetIndexColumnsDoneInfo)
+			if h1 != nil {
+				r = h1(info)
+			}
+			if h2 != nil {
+				r1 = h2(info)
+			}
+			return func(doneInfo DatabaseSQLConnGetIndexColumnsDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
 				}
 			}
 		}
@@ -725,6 +866,36 @@ func (t *DatabaseSQL) onConnBegin(d DatabaseSQLConnBeginStartInfo) func(Database
 	}
 	return res
 }
+func (t *DatabaseSQL) onConnBeginTx(d DatabaseSQLConnBeginTxStartInfo) func(DatabaseSQLConnBeginTxDoneInfo) {
+	fn := t.OnConnBeginTx
+	if fn == nil {
+		return func(DatabaseSQLConnBeginTxDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DatabaseSQLConnBeginTxDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *DatabaseSQL) onConnCheckNamedValue(d DatabaseSQLConnCheckNamedValueStartInfo) func(DatabaseSQLConnCheckNamedValueDoneInfo) {
+	fn := t.OnConnCheckNamedValue
+	if fn == nil {
+		return func(DatabaseSQLConnCheckNamedValueDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DatabaseSQLConnCheckNamedValueDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *DatabaseSQL) onConnQuery(d DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo) {
 	fn := t.OnConnQuery
 	if fn == nil {
@@ -765,6 +936,36 @@ func (t *DatabaseSQL) onConnIsTableExists(d DatabaseSQLConnIsTableExistsStartInf
 	res := fn(d)
 	if res == nil {
 		return func(DatabaseSQLConnIsTableExistsDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *DatabaseSQL) onConnIsColumnExists(info DatabaseSQLConnIsColumnExistsStartInfo) func(doneInfo DatabaseSQLConnIsColumnExistsDoneInfo) {
+	fn := t.OnConnIsColumnExists
+	if fn == nil {
+		return func(DatabaseSQLConnIsColumnExistsDoneInfo) {
+			return
+		}
+	}
+	res := fn(info)
+	if res == nil {
+		return func(DatabaseSQLConnIsColumnExistsDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *DatabaseSQL) onConnGetIndexColumns(info DatabaseSQLConnGetIndexColumnsStartInfo) func(doneInfo DatabaseSQLConnGetIndexColumnsDoneInfo) {
+	fn := t.OnConnGetIndexColumns
+	if fn == nil {
+		return func(DatabaseSQLConnGetIndexColumnsDoneInfo) {
+			return
+		}
+	}
+	res := fn(info)
+	if res == nil {
+		return func(DatabaseSQLConnGetIndexColumnsDoneInfo) {
 			return
 		}
 	}
@@ -917,6 +1118,7 @@ func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxInt
 		return res
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context, call call) func(_ error, session sessionInfo) {
 	var p DatabaseSQLConnectorConnectStartInfo
@@ -930,6 +1132,7 @@ func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context, call call
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context, call call) func(error) {
 	var p DatabaseSQLConnPingStartInfo
@@ -942,6 +1145,7 @@ func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context, call call) func(e
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, call call, query string) func(error) {
 	var p DatabaseSQLConnPrepareStartInfo
@@ -955,6 +1159,7 @@ func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, call call, que
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnClose(t *DatabaseSQL, c *context.Context, call call) func(error) {
 	var p DatabaseSQLConnCloseStartInfo
@@ -967,6 +1172,7 @@ func DatabaseSQLOnConnClose(t *DatabaseSQL, c *context.Context, call call) func(
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context, call call) func(tx txInfo, _ error) {
 	var p DatabaseSQLConnBeginStartInfo
@@ -980,6 +1186,35 @@ func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context, call call) func(
 		res(p)
 	}
 }
+
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DatabaseSQLOnConnBeginTx(t *DatabaseSQL, c *context.Context, call call) func(tx txInfo, _ error) {
+	var p DatabaseSQLConnBeginTxStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onConnBeginTx(p)
+	return func(tx txInfo, e error) {
+		var p DatabaseSQLConnBeginTxDoneInfo
+		p.Tx = tx
+		p.Error = e
+		res(p)
+	}
+}
+
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DatabaseSQLOnConnCheckNamedValue(t *DatabaseSQL, c *context.Context, call call, value *driver.NamedValue) func(error) {
+	var p DatabaseSQLConnCheckNamedValueStartInfo
+	p.Context = c
+	p.Call = call
+	p.Value = value
+	res := t.onConnCheckNamedValue(p)
+	return func(e error) {
+		var p DatabaseSQLConnCheckNamedValueDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
 	var p DatabaseSQLConnQueryStartInfo
@@ -996,6 +1231,7 @@ func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
 	var p DatabaseSQLConnExecStartInfo
@@ -1012,6 +1248,7 @@ func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, call call, query 
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call call, tableName string) func(exists bool, _ error) {
 	var p DatabaseSQLConnIsTableExistsStartInfo
@@ -1026,6 +1263,39 @@ func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call cal
 		res(p)
 	}
 }
+
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DatabaseSQLOnConnIsColumnExists(t *DatabaseSQL, c *context.Context, call call, tableName string, columnName string) func(exists bool, _ error) {
+	var p DatabaseSQLConnIsColumnExistsStartInfo
+	p.Context = c
+	p.Call = call
+	p.TableName = tableName
+	p.ColumnName = columnName
+	res := t.onConnIsColumnExists(p)
+	return func(exists bool, e error) {
+		var p DatabaseSQLConnIsColumnExistsDoneInfo
+		p.Exists = exists
+		p.Error = e
+		res(p)
+	}
+}
+
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DatabaseSQLOnConnGetIndexColumns(t *DatabaseSQL, c *context.Context, call call, tableName string, indexName string) func(columns []string, _ error) {
+	var p DatabaseSQLConnGetIndexColumnsStartInfo
+	p.Context = c
+	p.Call = call
+	p.TableName = tableName
+	p.IndexName = indexName
+	res := t.onConnGetIndexColumns(p)
+	return func(columns []string, e error) {
+		var p DatabaseSQLConnGetIndexColumnsDoneInfo
+		p.Columns = columns
+		p.Error = e
+		res(p)
+	}
+}
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx txInfo, query string) func(error) {
 	var p DatabaseSQLTxQueryStartInfo
@@ -1041,6 +1311,7 @@ func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txConte
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx txInfo, query string) func(error) {
 	var p DatabaseSQLTxExecStartInfo
@@ -1056,6 +1327,7 @@ func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContex
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx txInfo, query string) func(error) {
 	var p DatabaseSQLTxPrepareStartInfo
@@ -1071,6 +1343,7 @@ func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txCon
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxCommit(t *DatabaseSQL, c *context.Context, call call, tx txInfo) func(error) {
 	var p DatabaseSQLTxCommitStartInfo
@@ -1084,6 +1357,7 @@ func DatabaseSQLOnTxCommit(t *DatabaseSQL, c *context.Context, call call, tx txI
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxRollback(t *DatabaseSQL, c *context.Context, call call, tx txInfo) func(error) {
 	var p DatabaseSQLTxRollbackStartInfo
@@ -1097,6 +1371,7 @@ func DatabaseSQLOnTxRollback(t *DatabaseSQL, c *context.Context, call call, tx t
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtContext context.Context, query string) func(error) {
 	var p DatabaseSQLStmtQueryStartInfo
@@ -1111,6 +1386,7 @@ func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtC
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, call call, stmtContext context.Context, query string) func(error) {
 	var p DatabaseSQLStmtExecStartInfo
@@ -1125,6 +1401,7 @@ func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, call call, stmtCo
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtClose(t *DatabaseSQL, stmtContext *context.Context, call call) func(error) {
 	var p DatabaseSQLStmtCloseStartInfo
@@ -1137,6 +1414,7 @@ func DatabaseSQLOnStmtClose(t *DatabaseSQL, stmtContext *context.Context, call c
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnDoTx(t *DatabaseSQL, c *context.Context, call call, iD string, idempotent bool) func(error) func(attempts int, _ error) {
 	var p DatabaseSQLDoTxStartInfo

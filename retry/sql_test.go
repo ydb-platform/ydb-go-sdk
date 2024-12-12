@@ -13,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 )
 
 type mockConnector struct {

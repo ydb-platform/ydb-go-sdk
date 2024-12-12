@@ -2,80 +2,69 @@ package xsql
 
 import (
 	"context"
-	"database/sql"
 	"database/sql/driver"
-	"fmt"
-	"io"
-	"path"
-	"strings"
-	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var (
-	_ driver.ConnBeginTx       = (*connWrapper)(nil)
-	_ driver.NamedValueChecker = (*connWrapper)(nil)
-	_ driver.Pinger            = (*connWrapper)(nil)
-)
+type Conn struct {
+	processor Engine
 
-type (
-	connWrapper struct {
-		processor Engine
+	cc        iface.Conn
+	currentTx *Tx
+	ctx       context.Context //nolint:containedctx
 
-		cc        conn.Conn
-		currentTx *txWrapper
-		ctx       context.Context //nolint:containedctx
-
-		connector *Connector
-		lastUsage xsync.LastUsage
-	}
-	singleRow struct {
-		values  []sql.NamedArg
-		readAll bool
-	}
-)
-
-func (c *connWrapper) Engine() Engine {
-	return c.processor
+	connector *Connector
+	lastUsage xsync.LastUsage
 }
 
-func (c *connWrapper) Ping(ctx context.Context) error {
+func (c *Conn) Ping(ctx context.Context) (finalErr error) {
+	onDone := trace.DatabaseSQLOnConnPing(c.connector.trace, &c.ctx,
+		stack.FunctionID("", stack.Package("database/sql")),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	return c.cc.Ping(ctx)
 }
 
-func (c *connWrapper) CheckNamedValue(value *driver.NamedValue) error {
+func (c *Conn) CheckNamedValue(value *driver.NamedValue) (finalErr error) {
+	onDone := trace.DatabaseSQLOnConnCheckNamedValue(c.connector.trace, &c.ctx,
+		stack.FunctionID("", stack.Package("database/sql")),
+		value,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	// on this stage allows all values
 	return nil
 }
 
-func BeginTx(ctx context.Context, c *connWrapper, opts driver.TxOptions) (_ driver.Tx, finalErr error) {
-	onDone := trace.DatabaseSQLOnConnBegin(c.connector.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.BeginTx"),
+func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx, finalErr error) {
+	onDone := trace.DatabaseSQLOnConnBeginTx(c.connector.trace, &ctx,
+		stack.FunctionID("", stack.Package("database/sql")),
 	)
 	defer func() {
 		onDone(c.currentTx, finalErr)
 	}()
+
+	if c.currentTx != nil {
+		return nil, xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID()))
+	}
 
 	tx, err := c.cc.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	c.currentTx = &txWrapper{
+	c.currentTx = &Tx{
 		conn: c,
 		ctx:  ctx,
 		tx:   tx,
@@ -84,17 +73,9 @@ func BeginTx(ctx context.Context, c *connWrapper, opts driver.TxOptions) (_ driv
 	return c.currentTx, nil
 }
 
-func (c *connWrapper) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	if c.currentTx != nil {
-		return nil, xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID()))
-	}
-
-	return BeginTx(ctx, c, opts)
-}
-
-func Close(c *connWrapper) (finalErr error) {
+func (c *Conn) Close() (finalErr error) {
 	onDone := trace.DatabaseSQLOnConnClose(c.connector.Trace(), &c.ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.Close"),
+		stack.FunctionID("", stack.Package("database/sql")),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -108,64 +89,28 @@ func Close(c *connWrapper) (finalErr error) {
 	return nil
 }
 
-func (c *connWrapper) Close() (finalErr error) {
-	return Close(c)
-}
+func (c *Conn) Begin() (_ driver.Tx, finalErr error) {
+	onDone := trace.DatabaseSQLOnConnBegin(c.connector.trace, &c.ctx,
+		stack.FunctionID("", stack.Package("database/sql")),
+	)
+	defer func() {
+		onDone(c.currentTx, finalErr)
+	}()
 
-func (c *connWrapper) Connector() *Connector {
-	return c.connector
-}
+	if c.currentTx != nil {
+		return nil, xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID()))
+	}
 
-func (c *connWrapper) Begin() (driver.Tx, error) {
 	return nil, xerrors.WithStackTrace(errDeprecated)
 }
 
-func rowByAstPlan(ast, plan string) *singleRow {
-	return &singleRow{
-		values: []sql.NamedArg{
-			{
-				Name:  "Ast",
-				Value: ast,
-			},
-			{
-				Name:  "Plan",
-				Value: plan,
-			},
-		},
-	}
-}
-
-func (r *singleRow) Columns() (columns []string) {
-	for i := range r.values {
-		columns = append(columns, r.values[i].Name)
-	}
-
-	return columns
-}
-
-func (r *singleRow) Close() error {
-	return nil
-}
-
-func (r *singleRow) Next(dst []driver.Value) error {
-	if r.values == nil || r.readAll {
-		return io.EOF
-	}
-	for i := range r.values {
-		dst[i] = r.values[i].Value
-	}
-	r.readAll = true
-
-	return nil
-}
-
-func (c *connWrapper) Prepare(string) (driver.Stmt, error) {
+func (c *Conn) Prepare(string) (driver.Stmt, error) {
 	return nil, errDeprecated
 }
 
-func PrepareContext(ctx context.Context, c *connWrapper, sql string) (_ driver.Stmt, finalErr error) {
+func (c *Conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnPrepare(c.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.PrepareContext"),
+		stack.FunctionID("", stack.Package("database/sql")),
 		sql,
 	)
 	defer func() {
@@ -176,7 +121,7 @@ func PrepareContext(ctx context.Context, c *connWrapper, sql string) (_ driver.S
 		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
-	return &stmt{
+	return &Stmt{
 		conn:      c,
 		processor: c.cc,
 		ctx:       ctx,
@@ -184,33 +129,11 @@ func PrepareContext(ctx context.Context, c *connWrapper, sql string) (_ driver.S
 	}, nil
 }
 
-func (c *connWrapper) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
-	return PrepareContext(ctx, c, sql)
-}
-
-func (c *connWrapper) LastUsage() time.Time {
-	return c.lastUsage.Get()
-}
-
-func (c *connWrapper) toYdb(sql string, args ...driver.NamedValue) (yql string, _ *params.Params, _ error) {
-	queryArgs := make([]any, len(args))
-	for i := range args {
-		queryArgs[i] = args[i]
-	}
-
-	yql, params, err := c.connector.Bindings().ToYdb(sql, queryArgs...)
-	if err != nil {
-		return "", nil, xerrors.WithStackTrace(err)
-	}
-
-	return yql, &params, nil
-}
-
-func QueryContext(ctx context.Context, c *connWrapper, sql string, args []driver.NamedValue) (
+func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnConnQuery(c.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.QueryContext"),
+		stack.FunctionID("", stack.Package("database/sql")),
 		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), c.connector.clock.Since(c.lastUsage.Get()),
 	)
 	defer func() {
@@ -241,15 +164,11 @@ func QueryContext(ctx context.Context, c *connWrapper, sql string, args []driver
 	return c.cc.Query(ctx, sql, params)
 }
 
-func (c *connWrapper) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Rows, error) {
-	return QueryContext(ctx, c, sql, args)
-}
-
-func ExecContext(ctx context.Context, c *connWrapper, sql string, args []driver.NamedValue) (
+func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnConnExec(c.connector.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.ExecContext"),
+		stack.FunctionID("", stack.Package("database/sql")),
 		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), c.connector.clock.Since(c.lastUsage.Get()),
 	)
 	defer func() {
@@ -269,223 +188,4 @@ func ExecContext(ctx context.Context, c *connWrapper, sql string, args []driver.
 	}
 
 	return c.cc.Exec(ctx, sql, params)
-}
-
-func (c *connWrapper) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Result, error) {
-	return ExecContext(ctx, c, sql, args)
-}
-
-func (c *connWrapper) GetDatabaseName() string {
-	return c.connector.Name()
-}
-
-func (c *connWrapper) normalizePath(tableName string) string {
-	return c.connector.pathNormalizer.NormalizePath(tableName)
-}
-
-func (c *connWrapper) tableDescription(ctx context.Context, tableName string) (d options.Description, _ error) {
-	d, err := retry.RetryWithResult(ctx, func(ctx context.Context) (options.Description, error) {
-		return internalTable.Session(c.cc.ID(), c.connector.balancer, config.New()).DescribeTable(ctx, tableName)
-	}, retry.WithIdempotent(true), retry.WithBudget(c.connector.retryBudget), retry.WithTrace(c.connector.traceRetry))
-	if err != nil {
-		return d, xerrors.WithStackTrace(err)
-	}
-
-	return d, nil
-}
-
-func (c *connWrapper) GetColumns(ctx context.Context, tableName string) (columns []string, _ error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	for i := range d.Columns {
-		columns = append(columns, d.Columns[i].Name)
-	}
-
-	return columns, nil
-}
-
-func (c *connWrapper) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, _ error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
-	if err != nil {
-		return "", xerrors.WithStackTrace(err)
-	}
-
-	for i := range d.Columns {
-		if d.Columns[i].Name == columnName {
-			return d.Columns[i].Type.Yql(), nil
-		}
-	}
-
-	return "", xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
-}
-
-func (c *connWrapper) GetPrimaryKeys(ctx context.Context, tableName string) ([]string, error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return d.PrimaryKey, nil
-}
-
-func (c *connWrapper) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, _ error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
-	if err != nil {
-		return false, xerrors.WithStackTrace(err)
-	}
-
-	for _, pkCol := range d.PrimaryKey {
-		if pkCol == columnName {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func (c *connWrapper) Version(_ context.Context) (_ string, _ error) {
-	const version = "default"
-
-	return version, nil
-}
-
-func isSysDir(databaseName, dirAbsPath string) bool {
-	for _, sysDir := range [...]string{
-		path.Join(databaseName, ".sys"),
-		path.Join(databaseName, ".sys_health"),
-	} {
-		if strings.HasPrefix(dirAbsPath, sysDir) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (c *connWrapper) getTables(ctx context.Context, absPath string, recursive, excludeSysDirs bool) (
-	tables []string, _ error,
-) {
-	if excludeSysDirs && isSysDir(c.connector.Name(), absPath) {
-		return nil, nil
-	}
-
-	d, err := c.connector.Scheme().ListDirectory(ctx, absPath)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	if !d.IsDirectory() && !d.IsDatabase() {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("'%s' is not a folder", absPath))
-	}
-
-	for i := range d.Children {
-		switch d.Children[i].Type {
-		case scheme.EntryTable, scheme.EntryColumnTable:
-			tables = append(tables, path.Join(absPath, d.Children[i].Name))
-		case scheme.EntryDirectory, scheme.EntryDatabase:
-			if recursive {
-				childTables, err := c.getTables(ctx, path.Join(absPath, d.Children[i].Name), recursive, excludeSysDirs)
-				if err != nil {
-					return nil, xerrors.WithStackTrace(err)
-				}
-				tables = append(tables, childTables...)
-			}
-		}
-	}
-
-	return tables, nil
-}
-
-func (c *connWrapper) GetTables(ctx context.Context, folder string, recursive, excludeSysDirs bool) (
-	tables []string, _ error,
-) {
-	absPath := c.normalizePath(folder)
-
-	e, err := c.connector.Scheme().DescribePath(ctx, absPath)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	switch e.Type {
-	case scheme.EntryTable, scheme.EntryColumnTable:
-		return []string{e.Name}, err
-	case scheme.EntryDirectory, scheme.EntryDatabase:
-		tables, err = c.getTables(ctx, absPath, recursive, excludeSysDirs)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		return xslices.Transform(tables, func(tbl string) string {
-			return strings.TrimPrefix(tbl, absPath+"/")
-		}), nil
-	default:
-		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("'%s' is not a table or directory (%s)", folder, e.Type.String()),
-		)
-	}
-}
-
-func (c *connWrapper) GetIndexes(ctx context.Context, tableName string) (indexes []string, _ error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return xslices.Transform(d.Indexes, func(idx options.IndexDescription) string {
-		return idx.Name
-	}), nil
-}
-
-func (c *connWrapper) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, _ error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	for i := range d.Indexes {
-		if d.Indexes[i].Name == indexName {
-			columns = append(columns, d.Indexes[i].IndexColumns...)
-		}
-	}
-
-	return xslices.Uniq(columns), nil
-}
-
-func (c *connWrapper) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, _ error) {
-	d, err := c.tableDescription(ctx, c.normalizePath(tableName))
-	if err != nil {
-		return false, xerrors.WithStackTrace(err)
-	}
-
-	for i := range d.Columns {
-		if d.Columns[i].Name == columnName {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func (c *connWrapper) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
-	tableName = c.normalizePath(tableName)
-	onDone := trace.DatabaseSQLOnConnIsTableExists(c.connector.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*connWrapper).IsTableExists"),
-		tableName,
-	)
-	defer func() {
-		onDone(tableExists, finalErr)
-	}()
-
-	tableExists, err := helpers.IsEntryExists(ctx,
-		c.connector.parent.Scheme(), tableName,
-		scheme.EntryTable, scheme.EntryColumnTable,
-	)
-	if err != nil {
-		return false, xerrors.WithStackTrace(err)
-	}
-
-	return tableExists, nil
 }

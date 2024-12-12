@@ -1,4 +1,4 @@
-package table
+package legacy
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"

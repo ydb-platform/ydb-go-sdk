@@ -1,4 +1,4 @@
-package table
+package legacy
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -79,7 +79,7 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	case ScriptingQueryMode:
 		return c.execScriptingQuery(ctx, sql, params)
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' on conn query", queryMode)
+		return nil, fmt.Errorf("unsupported query mode '%s' on iface query", queryMode)
 	}
 }
 
@@ -265,7 +265,7 @@ func (c *Conn) ID() string {
 	return c.session.ID()
 }
 
-func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx conn.Tx, finalErr error) {
+func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx iface.Tx, finalErr error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 
 	if slices.Contains(c.fakeTxModes, m) {
@@ -280,7 +280,7 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx conn
 	return tx, nil
 }
 
-func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (conn.Tx, error) {
+func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (iface.Tx, error) {
 	tx, err := c.beginTx(ctx, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

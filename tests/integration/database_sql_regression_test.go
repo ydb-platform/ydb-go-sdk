@@ -20,7 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -236,7 +236,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		err := row.Scan(&res)
 		switch driverEngine(db) {
-		case xsql.TABLE_SERVICE:
+		case xsql.LEGACY:
 			require.Error(t, err)
 		case xsql.QUERY_SERVICE:
 			require.NoError(t, err)
@@ -263,7 +263,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		err := row.Scan(&res)
 		switch driverEngine(db) {
-		case xsql.TABLE_SERVICE:
+		case xsql.LEGACY:
 			require.NoError(t, err)
 			resUUID := uuid.UUID(res.AsBytesArray())
 			require.Equal(t, expectedResultWithBug, resUUID.String())
@@ -352,7 +352,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		var resBytes types.UUIDBytesWithIssue1501Type
 		err := row.Scan(&resBytes)
 		switch driverEngine(db) {
-		case xsql.TABLE_SERVICE:
+		case xsql.LEGACY:
 			require.NoError(t, err)
 			resUUID := uuid.UUID(resBytes.AsBytesArray())
 			require.Equal(t, id, resUUID)
@@ -419,7 +419,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		err := row.Scan(&resFromDB)
 		switch driverEngine(db) {
-		case xsql.TABLE_SERVICE:
+		case xsql.LEGACY:
 			require.NoError(t, err)
 			resUUID := resFromDB.PublicRevertReorderForIssue1501()
 			resString := strings.ToUpper(resUUID.String())

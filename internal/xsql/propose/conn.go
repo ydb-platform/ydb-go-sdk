@@ -1,4 +1,4 @@
-package query
+package propose
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
 )
 
 type resultNoRows struct{}
@@ -114,7 +114,7 @@ func (c *Conn) isReady() bool {
 	return c.session.Status() == session.StatusIdle.String()
 }
 
-func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx conn.Tx, finalErr error) {
+func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx iface.Tx, finalErr error) {
 	if c.fakeTx {
 		return beginTxFake(ctx, c), nil
 	}
@@ -149,7 +149,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	return err
 }
 
-func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (conn.Tx, error) {
+func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (iface.Tx, error) {
 	tx, err := c.beginTx(ctx, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

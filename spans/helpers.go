@@ -61,7 +61,7 @@ func logToParentSpan(
 	cfg Adapter,
 	ctx context.Context, //nolint:revive
 	msg string,
-	fields ...KeyValue, //nolint:unparam
+	fields ...KeyValue,
 ) {
 	parent := cfg.SpanFromContext(ctx)
 	parent.Log(msg, fields...)
@@ -71,7 +71,7 @@ func logToParentSpanError(
 	cfg Adapter,
 	ctx context.Context, //nolint:revive
 	err error,
-	fields ...KeyValue, //nolint:unparam
+	fields ...KeyValue,
 ) {
 	parent := cfg.SpanFromContext(ctx)
 	logError(parent, err, fields...)

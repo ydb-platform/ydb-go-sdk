@@ -163,7 +163,7 @@ func buildRecordString(
 ) string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
-	if optionsHolder.packageAlias != "" {
+	if optionsHolder.packageAlias != "" { //nolint:nestif
 		buffer.WriteString(optionsHolder.packageAlias)
 	} else {
 		if optionsHolder.packagePath {

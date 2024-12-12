@@ -1,4 +1,4 @@
-package query
+package propose
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/conn/table/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 )
 
 type txFake struct {
@@ -38,7 +38,7 @@ func (t *txFake) ID() string {
 	return tx.FakeTxID
 }
 
-func beginTxFake(ctx context.Context, c *Conn) conn.Tx {
+func beginTxFake(ctx context.Context, c *Conn) iface.Tx {
 	return &txFake{
 		conn: c,
 		ctx:  ctx,
