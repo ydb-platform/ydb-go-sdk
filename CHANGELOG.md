@@ -1,3 +1,5 @@
+* Fix - returned support of sql/driver.Valuer interfaces for params which passed to query using sql driver 
+
 ## v3.94.0
 * Refactored golang types mapping into ydb types using `ydb.ParamsFromMap` and `database/sql` query arguments
 * Small breaking change: type mapping for `ydb.ParamsFromMap` and `database/sql` type `uuid.UUID` changed from ydb type `Text` to ydb type `UUID`

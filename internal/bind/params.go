@@ -161,6 +161,17 @@ func toValue(v interface{}) (_ value.Value, err error) {
 		return x, nil
 	}
 
+	if valuer, ok := v.(driver.Valuer); ok {
+		v, err = valuer.Value()
+		if err != nil {
+			return nil, fmt.Errorf("ydb: driver.Valuer error: %w", err)
+		}
+	}
+
+	if x, ok := asUUID(v); ok {
+		return x, nil
+	}
+
 	switch x := v.(type) {
 	case nil:
 		return value.VoidValue(), nil
@@ -337,16 +348,17 @@ func supportNewTypeLink(x interface{}) string {
 }
 
 func toYdbParam(name string, value interface{}) (*params.Parameter, error) {
-	if na, ok := value.(driver.NamedValue); ok {
-		n, v := na.Name, na.Value
+	switch tv := value.(type) {
+	case driver.NamedValue:
+		n, v := tv.Name, tv.Value
 		if n != "" {
 			name = n
 		}
 		value = v
+	case *params.Parameter:
+		return tv, nil
 	}
-	if v, ok := value.(*params.Parameter); ok {
-		return v, nil
-	}
+
 	v, err := toValue(value)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -434,4 +435,12 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		require.Equal(t, id.String(), res.String())
 	})
+}
+
+type testValuer struct {
+	value driver.Value
+}
+
+func (v *testValuer) Value() (driver.Value, error) {
+	return v.value, nil
 }

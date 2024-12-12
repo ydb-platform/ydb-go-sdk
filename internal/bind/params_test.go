@@ -17,6 +17,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
+type testValuer struct {
+	value driver.Value
+}
+
+func (v testValuer) Value() (driver.Value, error) {
+	return v.value, nil
+}
+
 func TestToValue(t *testing.T) {
 	for _, tt := range []struct {
 		name string
@@ -600,6 +608,24 @@ func TestToValue(t *testing.T) {
 			src:  [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 			dst:  nil,
 			err:  value.ErrIssue1501BadUUID,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testValuer{value: "1234567890"},
+			dst:  value.TextValue("1234567890"),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testValuer{value: uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
+			dst:  value.Uuid(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testValuer{value: func() *string { return nil }()},
+			dst:  value.NullValue(types.Text),
+			err:  nil,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
