@@ -427,7 +427,6 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		case xsql.QUERY_SERVICE:
 			require.Error(t, err)
 		}
-
 	})
 	t.Run("good-send-receive", func(t *testing.T) {
 		var (
