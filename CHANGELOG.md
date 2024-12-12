@@ -1,3 +1,4 @@
+## v3.95.0
 * Added implementation of `database/sql` driver over query service client
 * Added `ydb.WithQueryService(bool)` option to explicitly enable `database/sql` driver over query service client
 * Added environment parameter `YDB_DATABASE_SQL_OVER_QUERY_SERVICE` to enable `database/sql` driver over query service client without code rewriting
