@@ -31,7 +31,7 @@ func main() {
 	}
 	defer func() { _ = cc.Close(ctx) }()
 
-	prefix := path.Join(cc.Name(), "database_sql")
+	prefix := path.Join(cc.Name(), "database/sql")
 
 	c, err := ydb.Connector(cc,
 		ydb.WithAutoDeclare(),
