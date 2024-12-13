@@ -1,3 +1,5 @@
+* Added alias from `ydb.WithFakeTx(ydb.ScriptingQueryMode)` to `ydb.WithFakeTx(ydb.QueryExecuteQueryMode)` for compatibility with legacy code   
+
 ## v3.95.0
 * Added implementation of `database/sql` driver over query service client
 * Added `ydb.WithQueryService(bool)` option to explicitly enable `database/sql` driver over query service client
