@@ -61,14 +61,6 @@ func (e *EncoderMap) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreate
 	e.m[codec] = creator
 }
 
-func (e *EncoderMap) CreateLazyEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
-	if encoderCreator, ok := e.m[codec]; ok {
-		return encoderCreator(target)
-	}
-
-	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
-}
-
 func (e *EncoderMap) Encode(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
 	ePool, ok := e.p[codec]
 	if !ok {
