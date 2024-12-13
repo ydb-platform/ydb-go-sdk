@@ -6,12 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"embed"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"log"
 	"os"
 
 	"github.com/pressly/goose/v3"
-	_ "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 //go:embed schema/*.sql
