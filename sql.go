@@ -177,6 +177,7 @@ func WithFakeTx(modes ...QueryMode) ConnectorOption {
 				xsql.WithTableOptions(legacy.WithFakeTxModes(
 					legacy.ScriptingQueryMode,
 				)),
+				xsql.WithQueryOptions(propose.WithFakeTx()),
 			)
 		case QueryExecuteQueryMode:
 			opts = append(opts,

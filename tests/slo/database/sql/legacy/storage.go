@@ -109,6 +109,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 	s.c, err = ydb.Connector(s.cc,
 		ydb.WithAutoDeclare(),
 		ydb.WithTablePathPrefix(path.Join(s.cc.Name(), label)),
+		ydb.WithQueryService(false),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Connector error: %w", err)
