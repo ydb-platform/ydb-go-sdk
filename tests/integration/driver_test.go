@@ -651,3 +651,22 @@ func TestClusterDiscoveryRetry(t *testing.T) {
 	}
 	require.Greater(t, counter, 1)
 }
+
+func TestMultipleClosingDriverIssue1585(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
+	require.NoError(t, err)
+
+	require.NotPanics(t, func() {
+		err = db.Close(ctx)
+		require.NoError(t, err)
+
+		err = db.Close(ctx)
+		require.NoError(t, err)
+
+		err = db.Close(ctx)
+		require.NoError(t, err)
+	})
+}
