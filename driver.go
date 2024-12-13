@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 
@@ -103,6 +104,7 @@ type (
 		children    map[uint64]*Driver
 		childrenMtx xsync.Mutex
 		onClose     []func(c *Driver)
+		closed      atomic.Bool
 
 		panicCallback func(e interface{})
 	}
@@ -149,6 +151,11 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	defer func() {
 		onDone(finalErr)
 	}()
+
+	if !d.closed.CompareAndSwap(false, true) {
+		return nil
+	}
+
 	d.ctxCancel()
 
 	d.mtx.Lock()

@@ -7,6 +7,7 @@ import (
 )
 
 var (
+	errNilClient               = xerrors.Wrap(errors.New("table client is not initialized"))
 	ErrTransactionRollingBack  = xerrors.Wrap(errors.New("ydb: the transaction is rolling back"))
 	errWrongNextResultSetIndex = errors.New("wrong result set index")
 	errWrongResultSetIndex     = errors.New("critical violation of the logic - wrong result set index")
