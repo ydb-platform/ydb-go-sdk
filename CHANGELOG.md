@@ -1,3 +1,4 @@
+## v3.95.2
 * Fixed panic on multiple closing driver
 
 ## v3.95.1
