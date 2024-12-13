@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -16,6 +17,10 @@ import (
 	"slo/internal/log"
 	"slo/internal/workers"
 )
+
+func init() {
+	os.Setenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE", "true")
+}
 
 var (
 	ref     string
@@ -38,7 +43,7 @@ func main() {
 	ctx, cancel = context.WithTimeout(ctx, time.Duration(cfg.Time)*time.Second)
 	defer cancel()
 
-	s, err := NewStorage(cfg, cfg.ReadRPS+cfg.WriteRPS)
+	s, err := NewStorage(ctx, cfg, cfg.ReadRPS+cfg.WriteRPS)
 	if err != nil {
 		panic(fmt.Errorf("create storage failed: %w", err))
 	}

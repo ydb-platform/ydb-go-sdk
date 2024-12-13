@@ -32,10 +32,14 @@ jobs:
     strategy:
       matrix:
         sdk:
-          - id: database_sql
-            name: database-sql
-            path: ./database/sql
-            label: database/sql
+          - id: database_sql_legacy
+            name: database-sql-legacy
+            path: ./database/sql/legacy
+            label: database/sql/legacy
+          - id: database_sql_propose
+            name: database-sql-propose
+            path: ./database/sql/propose
+            label: database/sql/propose
           - id: native_query
             name: native-query
             path: ./native/query
@@ -44,14 +48,22 @@ jobs:
             name: native-table
             path: ./native/table
             label: native/table
-          - id: gorm
-            name: gorm
-            path: ./gorm
-            label: gorm
-          - id: xorm
-            name: xorm
-            path: ./xorm
-            label: xorm
+          - id: gorm_legacy
+            name: gorm-legacy
+            path: ./gorm/legacy
+            label: gorm/legacy
+          - id: gorm_propose
+            name: gorm-propose
+            path: ./gorm/propose
+            label: gorm/propose
+          - id: xorm_legacy
+            name: xorm-legacy
+            path: ./xorm/legacy
+            label: xorm/legacy
+          - id: xorm_propose
+            name: xorm-propose
+            path: ./xorm/propose
+            label: xorm/propose
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
