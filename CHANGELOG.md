@@ -1,3 +1,4 @@
+## v3.95.1
 * Added alias from `ydb.WithFakeTx(ydb.ScriptingQueryMode)` to `ydb.WithFakeTx(ydb.QueryExecuteQueryMode)` for compatibility with legacy code   
 
 ## v3.95.0
