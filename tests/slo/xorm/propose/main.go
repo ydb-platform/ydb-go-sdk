@@ -18,7 +18,7 @@ import (
 	"slo/internal/workers"
 )
 
-func init() {
+func init() { //nolint:gochecknoinits
 	os.Setenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE", "true")
 }
 
