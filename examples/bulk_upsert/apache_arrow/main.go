@@ -1,22 +1,36 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/apache/arrow/go/v18/arrow"
 	"github.com/apache/arrow/go/v18/arrow/csv"
 	"github.com/apache/arrow/go/v18/arrow/ipc"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
+	"io"
 	"os"
 	"path"
+	"strconv"
+	"time"
 )
 
 var (
-	//go:embed moscow.csv
-	moscowWeather []byte
+	// https://github.com/zonination/weather-intl/blob/master/moscow.csv
+	//go:embed weather.csv
+	weatherCSV []byte
+
+	// git log --date=format-local:'%Y-%m-%d %H:%M:%S' --pretty=format:'{"hash":"%h","msg":"%q","date":"%ad","author":"%ae"}' > commits.json
+	//go:embed commits.json
+	commitsJSON []byte
 
 	//go:embed schema.sql
 	schema string
@@ -33,11 +47,72 @@ func main() {
 
 	defer db.Close(ctx)
 
-	err = db.Query().Exec(ctx, schema)
+	createSchema(ctx, db)
+
+	//fillTableWeather(ctx, db)
+
+	//minTemperature, avgTemperature, maxTemperature, err := getWeatherStatsFromTable(ctx, db, 2014)
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	//fmt.Println(minTemperature, avgTemperature, maxTemperature)
+
+	fillTopicCommits(ctx, db)
+
+	commits := getCommitStats(ctx, db, 2022)
+
+	fmt.Println(commits)
+}
+
+func createSchema(ctx context.Context, db *ydb.Driver) {
+	err := db.Query().Exec(ctx, schema)
 	if err != nil {
 		panic(err)
 	}
+}
 
+type commit struct {
+	Hash   string `json:"hash"`
+	Msg    string `json:"msg"`
+	Author string `json:"author"`
+	Date   string `json:"date"`
+}
+
+func fillTopicCommits(ctx context.Context, db *ydb.Driver) {
+	writer, err := db.Topic().StartWriter("commits", topicoptions.WithWriterWaitServerAck(false))
+	if err != nil {
+		panic(err)
+	}
+	defer writer.Close(ctx)
+
+	scanner := bufio.NewScanner(bytes.NewReader(commitsJSON))
+	messages := make([]topicwriter.Message, 0, 1000)
+	n := 0
+	for scanner.Scan() {
+		content := scanner.Bytes()
+
+		var commit commit
+
+		err = json.Unmarshal(content, &commit)
+		if err == nil {
+			messages = append(messages, topicwriter.Message{Data: bytes.NewReader(scanner.Bytes())})
+			n++
+			if n%1000 == 0 {
+				err = writer.Write(ctx, messages...)
+				if err != nil {
+					panic(err)
+				}
+				messages = messages[:0]
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
+}
+
+func fillTableWeather(ctx context.Context, db *ydb.Driver) {
 	schema := arrow.NewSchema(
 		[]arrow.Field{
 			{Name: "ID", Type: arrow.PrimitiveTypes.Uint64},
@@ -70,7 +145,7 @@ func main() {
 		nil,
 	)
 	r := csv.NewReader(
-		bytes.NewBuffer(moscowWeather),
+		bytes.NewBuffer(weatherCSV),
 		schema,
 		csv.WithComma(','),
 		csv.WithLazyQuotes(true),
@@ -95,7 +170,7 @@ func main() {
 
 		d := bytes.TrimPrefix(data.Bytes(), s)
 
-		err = db.Table().BulkUpsert(ctx, path.Join(db.Name(), "moscow_weather"),
+		err = db.Table().BulkUpsert(ctx, path.Join(db.Name(), "weather"),
 			table.BulkUpsertDataArrow(d, table.WithArrowSchema(s)),
 		)
 		if err != nil {
@@ -126,4 +201,88 @@ func schemaBytes(s *arrow.Schema) (schema []byte, err error) {
 	schema = bytes.TrimSuffix(schema, arrowIPCEndOfStreamMark)
 
 	return schema, nil
+}
+
+func getWeatherStatsFromTable(ctx context.Context, db *ydb.Driver, year int) (
+	minTemperature float64,
+	avgTemperature float64,
+	maxTemperature float64,
+	_ error,
+) {
+	row, err := db.Query().QueryRow(ctx, `
+		SELECT
+		    MIN(MinTemperatureF),
+		    AVG(MeanTemperatureF),
+		    MAX(MaxTemperatureF)
+		FROM weather
+		WHERE 
+    		CAST(Date AS Date) BETWEEN Date("`+strconv.Itoa(year)+`-01-01") AND Date("`+strconv.Itoa(year)+`-12-31")
+		AND
+    		Events LIKE "%Snow%"
+	`)
+	if err != nil {
+		return minTemperature, avgTemperature, maxTemperature, err
+	}
+
+	err = row.Scan(&minTemperature, &avgTemperature, &maxTemperature)
+	if err != nil {
+		return minTemperature, avgTemperature, maxTemperature, err
+	}
+
+	return minTemperature, avgTemperature, maxTemperature, nil
+}
+
+func getCommitStats(ctx context.Context, db *ydb.Driver, year int) (commits int64) {
+	_ = db.Topic().Alter(ctx, "commits", topicoptions.AlterWithDropConsumers("consumer"))
+
+	err := db.Topic().Alter(ctx, "commits", topicoptions.AlterWithAddConsumers(topictypes.Consumer{
+		Name: "consumer",
+	}))
+	if err != nil {
+		panic(err)
+	}
+
+	reader, err := db.Topic().StartReader("consumer", topicoptions.ReadTopic("commits"))
+	if err != nil {
+		panic(err)
+	}
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer waitCancel()
+
+	for {
+		msg, err := reader.ReadMessage(waitCtx)
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return commits
+			}
+
+			panic(err)
+		}
+
+		content, err := io.ReadAll(msg)
+		if err != nil {
+			return
+		}
+
+		var commit commit
+
+		err = json.Unmarshal(content, &commit)
+		if err == nil {
+			date, err := time.Parse("2006-01-02 15:04:05", commit.Date)
+			if err != nil {
+				panic(err)
+			}
+
+			if date.Year() == year {
+				commits++
+			}
+			//} else {
+			//	fmt.Println(string(content))
+			//
+			//	panic(err)
+		}
+	}
+
+	return commits
 }

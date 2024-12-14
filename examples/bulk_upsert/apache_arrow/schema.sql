@@ -1,6 +1,6 @@
-DROP TABLE IF EXISTS `moscow_weather`;
+DROP TABLE IF EXISTS `weather`;
 
-CREATE TABLE IF NOT EXISTS `moscow_weather` (
+CREATE TABLE IF NOT EXISTS `weather` (
     `ID` Uint64 NOT NULL,
     `Date` Text NOT NULL,
     `MaxTemperatureF` Int64,
@@ -29,3 +29,7 @@ CREATE TABLE IF NOT EXISTS `moscow_weather` (
     `season` Text,
     PRIMARY KEY (`ID`)
 );
+
+DROP TOPIC `commits`;
+
+CREATE TOPIC `commits`;
