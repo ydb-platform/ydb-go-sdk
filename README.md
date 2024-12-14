@@ -62,8 +62,8 @@ err := db.Query().Do( // Do retry operation on errors with best effort
 					return err
 				}
 				type myStruct struct {
-					id  uint64 `sql:"id"`
-					str string `sql:"myStr"`
+					Id  int32  `sql:"id"`
+					Str string `sql:"myStr"`
 				}
 				var s myStruct
 				if err = row.ScanStruct(&s); err != nil {
