@@ -97,7 +97,12 @@ func fillTopicCommits(ctx context.Context, db *ydb.Driver) {
 
 		err = json.Unmarshal(content, &commit)
 		if err == nil {
-			messages = append(messages, topicwriter.Message{Data: bytes.NewReader(scanner.Bytes())})
+			data, err := json.Marshal(commit)
+			if err != nil {
+				panic(err)
+			}
+
+			messages = append(messages, topicwriter.Message{Data: bytes.NewReader(data)})
 
 			date, err := time.Parse("2006-01-02 15:04:05", commit.Date)
 			if err != nil {
@@ -290,10 +295,10 @@ func getCommitStats(ctx context.Context, db *ydb.Driver, year int) (commits int6
 			if date.Year() == year {
 				commits++
 			}
-			//} else {
-			//	fmt.Println(string(content))
-			//
-			//	panic(err)
+		} else {
+			fmt.Println(string(content))
+
+			panic(err)
 		}
 	}
 
