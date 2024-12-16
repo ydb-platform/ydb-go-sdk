@@ -1,4 +1,4 @@
-* Fix - returned support of sql/driver.Valuer interfaces for params which passed to query using sql driver 
+* Supported of `database/sql/driver.Valuer` interfaces for params which passed to query using sql driver 
 
 ## v3.95.2
 * Fixed panic on multiple closing driver
