@@ -621,6 +621,7 @@ func (cfg *OAuth2Config) AsOptions() ([]Oauth2TokenExchangeCredentialsOption, er
 	if err := cfg.applyConfig(&fullOptions); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return fullOptions, nil
 }
 

@@ -11,7 +11,7 @@ import (
 
 type OAuth2Config = credentials.OAuth2Config
 
-type StringOrArrayConfig = credentials.StringOrArrayConfig
+type OAuth2StringOrArrayConfig = credentials.StringOrArrayConfig
 
 type OAuth2TokenSourceConfig = credentials.OAuth2TokenSourceConfig
 
