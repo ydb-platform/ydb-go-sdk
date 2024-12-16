@@ -165,7 +165,7 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 			err,
 		)))
 	}
-	m.BufUncompressedSize = int(bytesCount)
+	m.BufUncompressedSize = bytesCount
 	m.Data = nil
 
 	return nil

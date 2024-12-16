@@ -206,3 +206,34 @@ func TestCompressMessages(t *testing.T) {
 		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 	})
 }
+
+func TestEncodersPool(t *testing.T) {
+	t.Run("Not resetable writer", func(t *testing.T) {
+		testEncoderMap := NewEncoderMap()
+
+		buf := &bytes.Buffer{}
+		_, err := testEncoderMap.Encode(rawtopiccommon.CodecRaw, buf, []byte("test_data"))
+		require.NoError(t, err)
+
+		require.Len(t, testEncoderMap.p, 0)
+	})
+
+	t.Run("Resetable writer", func(t *testing.T) {
+		testEncoderMap := NewEncoderMap()
+
+		buf := &bytes.Buffer{}
+		_, err := testEncoderMap.Encode(rawtopiccommon.CodecGzip, buf, []byte("test_data"))
+		require.NoError(t, err)
+
+		require.Len(t, testEncoderMap.p, 1)
+
+		wr := testEncoderMap.p[rawtopiccommon.CodecGzip].Get()
+		require.NotNil(t, wr)
+
+		buf.Reset()
+		_, err = testEncoderMap.Encode(rawtopiccommon.CodecGzip, buf, []byte("test_data"))
+		require.NoError(t, err)
+
+		require.Len(t, testEncoderMap.p, 1)
+	})
+}
