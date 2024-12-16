@@ -9,6 +9,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 )
 
+type OAuth2Config = credentials.OAuth2Config
+
+type StringOrArrayConfig = credentials.StringOrArrayConfig
+
+type OAuth2TokenSourceConfig = credentials.OAuth2TokenSourceConfig
+
 type Oauth2TokenExchangeCredentialsOption = credentials.Oauth2TokenExchangeCredentialsOption
 
 type TokenSource = credentials.TokenSource

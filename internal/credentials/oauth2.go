@@ -451,11 +451,11 @@ func GetSupportedOauth2TokenExchangeJwtAlgorithms() []string {
 	return algs
 }
 
-type stringOrArrayConfig struct {
+type StringOrArrayConfig struct {
 	Values []string
 }
 
-func (a *stringOrArrayConfig) UnmarshalJSON(data []byte) error {
+func (a *StringOrArrayConfig) UnmarshalJSON(data []byte) error {
 	// Case 1: string
 	var s string
 	err := json.Unmarshal(data, &s)
@@ -497,7 +497,7 @@ func (d *prettyTTL) UnmarshalJSON(data []byte) error {
 }
 
 //nolint:tagliatelle
-type oauth2TokenSourceConfig struct {
+type OAuth2TokenSourceConfig struct {
 	Type string `json:"type"`
 
 	// Fixed
@@ -510,7 +510,7 @@ type oauth2TokenSourceConfig struct {
 	KeyID      string               `json:"kid"`
 	Issuer     string               `json:"iss"`
 	Subject    string               `json:"sub"`
-	Audience   *stringOrArrayConfig `json:"aud"`
+	Audience   *StringOrArrayConfig `json:"aud"`
 	ID         string               `json:"jti"`
 	TTL        *prettyTTL           `json:"ttl"`
 }
@@ -529,7 +529,7 @@ func signingMethodNotSupportedError(method string) error {
 	return fmt.Errorf("%w: %q. Supported signing methods are %s", errUnsupportedSigningMethod, method, supported)
 }
 
-func (cfg *oauth2TokenSourceConfig) applyConfigFixed(tokenSrcType int) (*tokenSourceOption, error) {
+func (cfg *OAuth2TokenSourceConfig) applyConfigFixed(tokenSrcType int) (*tokenSourceOption, error) {
 	if cfg.Token == "" || cfg.TokenType == "" {
 		return nil, xerrors.WithStackTrace(errTokenAndTokenTypeRequired)
 	}
@@ -542,7 +542,7 @@ func (cfg *oauth2TokenSourceConfig) applyConfigFixed(tokenSrcType int) (*tokenSo
 	}, nil
 }
 
-func (cfg *oauth2TokenSourceConfig) applyConfigFixedJWT(tokenSrcType int) (*tokenSourceOption, error) {
+func (cfg *OAuth2TokenSourceConfig) applyConfigFixedJWT(tokenSrcType int) (*tokenSourceOption, error) {
 	var opts []JWTTokenSourceOption
 
 	if cfg.Algorithm == "" || cfg.PrivateKey == "" {
@@ -591,7 +591,7 @@ func (cfg *oauth2TokenSourceConfig) applyConfigFixedJWT(tokenSrcType int) (*toke
 	}, nil
 }
 
-func (cfg *oauth2TokenSourceConfig) applyConfig(tokenSrcType int) (*tokenSourceOption, error) {
+func (cfg *OAuth2TokenSourceConfig) applyConfig(tokenSrcType int) (*tokenSourceOption, error) {
 	if strings.EqualFold(cfg.Type, "FIXED") {
 		return cfg.applyConfigFixed(tokenSrcType)
 	}
@@ -604,19 +604,27 @@ func (cfg *oauth2TokenSourceConfig) applyConfig(tokenSrcType int) (*tokenSourceO
 }
 
 //nolint:tagliatelle
-type oauth2Config struct {
+type OAuth2Config struct {
 	GrantType          string               `json:"grant-type"`
-	Resource           *stringOrArrayConfig `json:"res"`
-	Audience           *stringOrArrayConfig `json:"aud"`
-	Scope              *stringOrArrayConfig `json:"scope"`
+	Resource           *StringOrArrayConfig `json:"res"`
+	Audience           *StringOrArrayConfig `json:"aud"`
+	Scope              *StringOrArrayConfig `json:"scope"`
 	RequestedTokenType string               `json:"requested-token-type"`
 	TokenEndpoint      string               `json:"token-endpoint"`
 
-	SubjectCreds *oauth2TokenSourceConfig `json:"subject-credentials"`
-	ActorCreds   *oauth2TokenSourceConfig `json:"actor-credentials"`
+	SubjectCreds *OAuth2TokenSourceConfig `json:"subject-credentials"`
+	ActorCreds   *OAuth2TokenSourceConfig `json:"actor-credentials"`
 }
 
-func (cfg *oauth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOption) error {
+func (cfg *OAuth2Config) AsOptions() ([]Oauth2TokenExchangeCredentialsOption, error) {
+	var fullOptions []Oauth2TokenExchangeCredentialsOption
+	if err := cfg.applyConfig(&fullOptions); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	return fullOptions, nil
+}
+
+func (cfg *OAuth2Config) applyConfig(opts *[]Oauth2TokenExchangeCredentialsOption) error {
 	if cfg.GrantType != "" {
 		*opts = append(*opts, WithGrantType(cfg.GrantType))
 	}
@@ -669,7 +677,7 @@ func NewOauth2TokenExchangeCredentialsFile(
 		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotReadConfigFile, err))
 	}
 
-	var cfg oauth2Config
+	var cfg OAuth2Config
 	if err = json.Unmarshal(configFileData, &cfg); err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotUnmarshalJSON, err))
 	}
