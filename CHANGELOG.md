@@ -1,4 +1,3 @@
-## v3.95.3
 * Exposed `credentials/credentials.OAuth2Config` OAuth2 config
 
 ## v3.95.2
