@@ -15,16 +15,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestQueryRange(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 

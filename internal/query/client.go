@@ -188,6 +188,10 @@ func (c *Client) ExecuteScript(
 }
 
 func (c *Client) Close(ctx context.Context) error {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+
 	close(c.done)
 
 	if err := c.pool.Close(ctx); err != nil {

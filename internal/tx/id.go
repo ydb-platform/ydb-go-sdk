@@ -4,6 +4,7 @@ var _ Identifier = LazyID{}
 
 const (
 	LazyTxID = "LAZY_TX"
+	FakeTxID = "FAKE_TX"
 )
 
 type (

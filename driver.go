@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
@@ -37,6 +37,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/operation"
@@ -93,7 +94,7 @@ type (
 		topic        *xsync.Once[*topicclientinternal.Client]
 		topicOptions []topicoptions.TopicOption
 
-		databaseSQLOptions []connector.Option
+		databaseSQLOptions []xsql.Option
 
 		pool *conn.Pool
 
@@ -103,6 +104,7 @@ type (
 		children    map[uint64]*Driver
 		childrenMtx xsync.Mutex
 		onClose     []func(c *Driver)
+		closed      atomic.Bool
 
 		panicCallback func(e interface{})
 	}
@@ -149,6 +151,11 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	defer func() {
 		onDone(finalErr)
 	}()
+
+	if !d.closed.CompareAndSwap(false, true) {
+		return nil
+	}
+
 	d.ctxCancel()
 
 	d.mtx.Lock()

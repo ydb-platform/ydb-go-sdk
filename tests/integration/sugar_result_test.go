@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -21,10 +20,6 @@ import (
 )
 
 func TestSugarResult(t *testing.T) {
-	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

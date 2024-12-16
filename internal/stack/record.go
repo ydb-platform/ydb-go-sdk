@@ -10,6 +10,7 @@ import (
 )
 
 type recordOptions struct {
+	packageAlias string
 	packagePath  bool
 	packageName  bool
 	structName   bool
@@ -71,16 +72,25 @@ func PackagePath(b bool) recordOption {
 	}
 }
 
+func Package(alias string) recordOption {
+	return func(opts *recordOptions) {
+		opts.packageAlias = alias
+	}
+}
+
 var _ Caller = call{}
 
 type call struct {
 	function uintptr
 	file     string
 	line     int
+	opts     []recordOption
 }
 
-func Call(depth int) (c call) {
+func Call(depth int, opts ...recordOption) (c call) {
 	c.function, c.file, c.line, _ = runtime.Caller(depth + 1)
+
+	c.opts = opts
 
 	return c
 }
@@ -88,6 +98,7 @@ func Call(depth int) (c call) {
 func (c call) Record(opts ...recordOption) string {
 	optionsHolder := recordOptions{
 		packagePath:  true,
+		packageAlias: "",
 		packageName:  true,
 		structName:   true,
 		functionName: true,
@@ -95,6 +106,7 @@ func (c call) Record(opts ...recordOption) string {
 		line:         true,
 		lambdas:      true,
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&optionsHolder)
@@ -151,14 +163,22 @@ func buildRecordString(
 ) string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
-	if optionsHolder.packagePath {
-		buffer.WriteString(fnDetails.pkgPath)
-	}
-	if optionsHolder.packageName {
-		if buffer.Len() > 0 {
-			buffer.WriteByte('/')
+	if optionsHolder.packageAlias != "" { //nolint:nestif
+		buffer.WriteString(optionsHolder.packageAlias)
+	} else {
+		if optionsHolder.packagePath {
+			if optionsHolder.packageAlias != "" {
+				buffer.WriteString(optionsHolder.packageAlias)
+			} else {
+				buffer.WriteString(fnDetails.pkgPath)
+			}
 		}
-		buffer.WriteString(fnDetails.pkgName)
+		if optionsHolder.packageName {
+			if buffer.Len() > 0 {
+				buffer.WriteByte('/')
+			}
+			buffer.WriteString(fnDetails.pkgName)
+		}
 	}
 	if optionsHolder.structName && len(fnDetails.structName) > 0 {
 		if buffer.Len() > 0 {
@@ -198,7 +218,7 @@ func buildRecordString(
 }
 
 func (c call) String() string {
-	return c.Record(Lambda(false), FileName(false))
+	return c.Record(append(c.opts, Lambda(false), FileName(false))...)
 }
 
 func Record(depth int, opts ...recordOption) string {

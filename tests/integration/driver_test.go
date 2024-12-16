@@ -32,7 +32,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -172,9 +171,6 @@ func TestDriver(sourceTest *testing.T) {
 			}
 		}()
 		t.RunSynced("WithStaticCredentials", func(t *xtest.SyncedTest) {
-			if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
-				t.Skip("read rows not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
-			}
 			db, err := ydb.Open(ctx,
 				os.Getenv("YDB_CONNECTION_STRING"),
 				ydb.WithAccessTokenCredentials(
@@ -654,4 +650,23 @@ func TestClusterDiscoveryRetry(t *testing.T) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 	}
 	require.Greater(t, counter, 1)
+}
+
+func TestMultipleClosingDriverIssue1585(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
+	require.NoError(t, err)
+
+	require.NotPanics(t, func() {
+		err = db.Close(ctx)
+		require.NoError(t, err)
+
+		err = db.Close(ctx)
+		require.NoError(t, err)
+
+		err = db.Close(ctx)
+		require.NoError(t, err)
+	})
 }

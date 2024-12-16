@@ -16,8 +16,8 @@ type (
 	}
 	textDataQuery     string
 	preparedDataQuery struct {
-		id    string
-		query string
+		id  string
+		sql string
 	}
 )
 
@@ -41,7 +41,7 @@ func (q textDataQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
 }
 
 func (q preparedDataQuery) String() string {
-	return q.query
+	return q.sql
 }
 
 func (q preparedDataQuery) ID() string {
@@ -49,7 +49,7 @@ func (q preparedDataQuery) ID() string {
 }
 
 func (q preparedDataQuery) YQL() string {
-	return q.query
+	return q.sql
 }
 
 func (q preparedDataQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
@@ -63,9 +63,9 @@ func queryFromText(s string) query {
 	return textDataQuery(s)
 }
 
-func queryPrepared(id, query string) query {
+func queryPrepared(id, sql string) query {
 	return preparedDataQuery{
-		id:    id,
-		query: query,
+		id:  id,
+		sql: sql,
 	}
 }

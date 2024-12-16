@@ -314,7 +314,7 @@ SELECT $p0, $p1`,
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			yql, params, err := b.RewriteQuery(tt.sql, tt.args...)
+			yql, params, err := b.ToYdb(tt.sql, tt.args...)
 			if tt.err != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.err)

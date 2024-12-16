@@ -8,14 +8,14 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/connector"
-	querySql "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/conn"
-	tableSql "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
 )
 
 func TestParse(t *testing.T) {
-	newConnector := func(opts ...connector.Option) *connector.Connector {
-		c := &connector.Connector{}
+	newConnector := func(opts ...xsql.Option) *xsql.Connector {
+		c := &xsql.Connector{}
 		for _, opt := range opts {
 			if opt != nil {
 				if err := opt.Apply(c); err != nil {
@@ -26,11 +26,11 @@ func TestParse(t *testing.T) {
 
 		return c
 	}
-	newTableConn := func(opts ...tableSql.Option) *tableSql.Conn {
-		return tableSql.New(context.Background(), nil, nil, opts...)
+	newLegacyConn := func(opts ...legacy.Option) *legacy.Conn {
+		return legacy.New(context.Background(), nil, nil, opts...)
 	}
-	newQueryConn := func(opts ...querySql.Option) *querySql.Conn {
-		return querySql.New(context.Background(), nil, nil, opts...)
+	newQueryConn := func(opts ...propose.Option) *propose.Conn {
+		return propose.New(context.Background(), nil, nil, opts...)
 	}
 	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {
 		require.Equal(t, lhs.Secure(), rhs.Secure())
@@ -40,7 +40,7 @@ func TestParse(t *testing.T) {
 	for _, tt := range []struct {
 		dsn           string
 		opts          []config.Option
-		connectorOpts []connector.Option
+		connectorOpts []xsql.Option
 		err           error
 	}{
 		{
@@ -70,8 +70,8 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(legacy.ScriptingQueryMode),
 			},
 			err: nil,
 		},
@@ -82,9 +82,9 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(legacy.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 			},
 			err: nil,
 		},
@@ -95,10 +95,10 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
-				connector.WithQueryBind(bind.NumericArgs{}),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(legacy.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+				xsql.WithQueryBind(bind.NumericArgs{}),
 			},
 			err: nil,
 		},
@@ -109,10 +109,10 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
-				connector.WithQueryBind(bind.PositionalArgs{}),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(legacy.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+				xsql.WithQueryBind(bind.PositionalArgs{}),
 			},
 			err: nil,
 		},
@@ -123,10 +123,10 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
-				connector.WithQueryBind(bind.AutoDeclare{}),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(legacy.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+				xsql.WithQueryBind(bind.AutoDeclare{}),
 			},
 			err: nil,
 		},
@@ -137,9 +137,9 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(legacy.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
 			},
 			err: nil,
 		},
@@ -150,11 +150,11 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithDefaultQueryMode(tableSql.ScriptingQueryMode),
-				connector.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
-				connector.WithQueryBind(bind.PositionalArgs{}),
-				connector.WithQueryBind(bind.AutoDeclare{}),
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(legacy.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.TablePathPrefix("path/to/tables")),
+				xsql.WithQueryBind(bind.PositionalArgs{}),
+				xsql.WithQueryBind(bind.AutoDeclare{}),
 			},
 			err: nil,
 		},
@@ -165,9 +165,9 @@ func TestParse(t *testing.T) {
 				config.WithEndpoint("localhost:2135"),
 				config.WithDatabase("/local"),
 			},
-			connectorOpts: []connector.Option{
-				connector.WithFakeTx(tableSql.ScriptingQueryMode),
-				connector.WithFakeTx(tableSql.SchemeQueryMode),
+			connectorOpts: []xsql.Option{
+				WithFakeTx(ScriptingQueryMode),
+				WithFakeTx(SchemeQueryMode),
 			},
 			err: nil,
 		},
@@ -183,15 +183,15 @@ func TestParse(t *testing.T) {
 				exp := newConnector(tt.connectorOpts...)
 				act := newConnector(d.databaseSQLOptions...)
 				t.Run("tableOptions", func(t *testing.T) {
-					require.Equal(t, newTableConn(exp.TableOpts...), newTableConn(act.TableOpts...))
+					require.Equal(t, newLegacyConn(exp.LegacyOpts...), newLegacyConn(act.LegacyOpts...))
 				})
 				t.Run("queryOptions", func(t *testing.T) {
-					require.Equal(t, newQueryConn(exp.QueryOpts...), newQueryConn(act.QueryOpts...))
+					require.Equal(t, newQueryConn(exp.Options...), newQueryConn(act.Options...))
 				})
-				exp.TableOpts = nil
-				exp.QueryOpts = nil
-				act.TableOpts = nil
-				act.QueryOpts = nil
+				exp.LegacyOpts = nil
+				exp.Options = nil
+				act.LegacyOpts = nil
+				act.Options = nil
 				require.Equal(t, exp.Bindings(), act.Bindings())
 				require.Equal(t, exp, act)
 				compareConfigs(t, config.New(tt.opts...), d.config)

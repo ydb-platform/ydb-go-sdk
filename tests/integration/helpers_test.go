@@ -21,6 +21,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -442,4 +443,27 @@ func (t *testLogger) flush() {
 		message := "\n" + strings.Join(t.messages, "\n")
 		t.test.Log(message)
 	})
+}
+
+func driverEngine(db *sql.DB) (engine xsql.Engine) {
+	cc, err := db.Conn(context.Background())
+	if err != nil {
+		return engine
+	}
+
+	defer func() {
+		_ = cc.Close()
+	}()
+
+	cc.Raw(func(driverConn any) error {
+		if ccc, has := driverConn.(interface {
+			Engine() xsql.Engine
+		}); has {
+			engine = ccc.Engine()
+		}
+
+		return nil
+	})
+
+	return engine
 }

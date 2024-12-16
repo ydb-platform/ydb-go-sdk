@@ -1,5 +1,16 @@
 * Fix - returned support of sql/driver.Valuer interfaces for params which passed to query using sql driver 
 
+## v3.95.2
+* Fixed panic on multiple closing driver
+
+## v3.95.1
+* Added alias from `ydb.WithFakeTx(ydb.ScriptingQueryMode)` to `ydb.WithFakeTx(ydb.QueryExecuteQueryMode)` for compatibility with legacy code   
+
+## v3.95.0
+* Added implementation of `database/sql` driver over query service client
+* Added `ydb.WithQueryService(bool)` option to explicitly enable `database/sql` driver over query service client
+* Added environment parameter `YDB_DATABASE_SQL_OVER_QUERY_SERVICE` to enable `database/sql` driver over query service client without code rewriting
+
 ## v3.94.0
 * Refactored golang types mapping into ydb types using `ydb.ParamsFromMap` and `database/sql` query arguments
 * Small breaking change: type mapping for `ydb.ParamsFromMap` and `database/sql` type `uuid.UUID` changed from ydb type `Text` to ydb type `UUID`

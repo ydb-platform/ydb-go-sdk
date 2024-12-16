@@ -4,6 +4,7 @@ package trace
 
 import (
 	"context"
+	"database/sql/driver"
 	"time"
 )
 
@@ -24,11 +25,24 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnConnBegin func(DatabaseSQLConnBeginStartInfo) func(DatabaseSQLConnBeginDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnConnBeginTx func(DatabaseSQLConnBeginTxStartInfo) func(DatabaseSQLConnBeginTxDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnConnCheckNamedValue func(DatabaseSQLConnCheckNamedValueStartInfo) func(
+			DatabaseSQLConnCheckNamedValueDoneInfo,
+		)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnConnQuery func(DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnConnExec func(DatabaseSQLConnExecStartInfo) func(DatabaseSQLConnExecDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnConnIsTableExists func(DatabaseSQLConnIsTableExistsStartInfo) func(DatabaseSQLConnIsTableExistsDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnConnIsColumnExists func(info DatabaseSQLConnIsColumnExistsStartInfo) func(
+			DatabaseSQLConnIsColumnExistsDoneInfo,
+		)
+		OnConnGetIndexColumns func(info DatabaseSQLConnGetIndexColumnsStartInfo) func(
+			DatabaseSQLConnGetIndexColumnsDoneInfo,
+		)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnTxQuery func(DatabaseSQLTxQueryStartInfo) func(DatabaseSQLTxQueryDoneInfo)
@@ -137,6 +151,34 @@ type (
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DatabaseSQLConnBeginTxStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DatabaseSQLConnBeginTxDoneInfo struct {
+		Tx    txInfo
+		Error error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DatabaseSQLConnCheckNamedValueStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+		Value   *driver.NamedValue
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DatabaseSQLConnCheckNamedValueDoneInfo struct {
+		Error error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -184,6 +226,38 @@ type (
 	DatabaseSQLConnIsTableExistsDoneInfo struct {
 		Exists bool
 		Error  error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DatabaseSQLConnIsColumnExistsStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
+		Call       call
+		TableName  string
+		ColumnName string
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DatabaseSQLConnIsColumnExistsDoneInfo struct {
+		Exists bool
+		Error  error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DatabaseSQLConnGetIndexColumnsStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context   *context.Context
+		Call      call
+		TableName string
+		IndexName string
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DatabaseSQLConnGetIndexColumnsDoneInfo struct {
+		Columns []string
+		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxQueryStartInfo struct {
