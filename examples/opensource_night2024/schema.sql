@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `weather` (
     `MinTemperatureF` Int64,
     `MaxDewPointF` Int64,
     `MeanDewPointF` Int64,
-    `MinDewpointF` Int64,
+    `MinDewPointF` Int64,
     `MaxHumidity` Int64,
     `MeanHumidity` Int64,
     `MinHumidity` Int64,

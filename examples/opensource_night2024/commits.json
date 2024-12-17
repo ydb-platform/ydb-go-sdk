@@ -1,0 +1,10 @@
+{"hash":"030896f914b","msg":"Remove Boost metaproject","date":"2022-12-31 17:40:08","author":"bugaevskiy"}
+{"hash":"014fdab1c4b","msg":"clean logging","date":"2022-12-31 15:24:07","author":"ivanmorozov"}
+{"hash":"0d2a3ef454d","msg":"Apply boost yamaker helpers to unsafe subset","date":"2022-12-31 15:11:54","author":"bugaevskiy"}
+{"hash":"ebf3c8be803","msg":"Modify executable name in README.md.","date":"2022-12-31 14:41:55","author":"yuryalekseev"}
+{"hash":"c8099767cc7","msg":"Tidy up README.md a bit.","date":"2022-12-31 13:36:10","author":"yuryalekseev"}
+{"hash":"ec49685b324","msg":"Update contrib/restricted/boost/locale to 1.81.0","date":"2022-12-31 12:45:45","author":"thegeorg"}
+{"hash":"8fd51d45ec7","msg":"Update contrib/restricted/boost/math to 1.81.0","date":"2022-12-31 10:35:47","author":"thegeorg"}
+{"hash":"0ec27b614f4","msg":"Remove patch from boost/config","date":"2022-12-31 10:34:59","author":"thegeorg"}
+{"hash":"a2d8ecbb598","msg":"Fix type annotation for Block{Combine,MergeFinalize,MergeManyFinalize}Hashed","date":"2022-12-31 10:30:30","author":"aneporada"}
+{"hash":"a9d867bc7d9","msg":"drop squeezeToDict by finalizeByKey","date":"2022-12-31 09:38:14","author":"ivanmorozov"}

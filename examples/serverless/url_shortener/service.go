@@ -130,7 +130,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 			ydbMetrics.WithTraces(
 				registry,
 				ydbMetrics.WithSeparator("_"),
-				ydbMetrics.WithDetails(
+				ydbMetrics.WithDetailer(
 					trace.DetailsAll,
 				),
 			),
