@@ -70,6 +70,7 @@ type Entry struct {
 	Type                 EntryType
 	Permissions          []Permissions
 	EffectivePermissions []Permissions
+	ShardingInfo         []ConsistencyShardingTablet
 }
 
 func (e *Entry) IsDirectory() bool {
@@ -115,6 +116,7 @@ func (e *Entry) From(y *Ydb_Scheme.Entry) {
 		Type:                 entryType(y.GetType()),
 		Permissions:          makePermissions(y.GetPermissions()),
 		EffectivePermissions: makePermissions(y.GetEffectivePermissions()),
+		ShardingInfo:         makeShardingInfo(y.GetShardingInfo()),
 	}
 }
 
@@ -158,6 +160,23 @@ func from(y *Ydb_Scheme.Permissions) (p Permissions) {
 		Subject:         y.GetSubject(),
 		PermissionNames: y.GetPermissionNames(),
 	}
+}
+
+type ConsistencyShardingTablet struct {
+	TabletId   uint64
+	LeftClosed uint64
+	RightOpen  uint64
+}
+
+func makeShardingInfo(src []*Ydb_Scheme.ConsistencyShardingTablet) (dst []ConsistencyShardingTablet) {
+	for _, s := range src {
+		dst = append(dst, ConsistencyShardingTablet{
+			TabletId:   s.TabletId,
+			LeftClosed: s.LeftClosed,
+			RightOpen:  s.RightOpened,
+		})
+	}
+	return dst
 }
 
 type Permissions struct {
