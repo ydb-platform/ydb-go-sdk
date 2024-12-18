@@ -17,8 +17,34 @@ const (
 	codecUnknown                = rawtopiccommon.CodecUNSPECIFIED
 )
 
+type resetableWriter interface {
+	io.WriteCloser
+	Reset(wr io.Writer)
+}
+
+type encoderPool struct {
+	pool sync.Pool
+}
+
+func (p *encoderPool) Get() resetableWriter {
+	enc, _ := p.pool.Get().(resetableWriter)
+
+	return enc
+}
+
+func (p *encoderPool) Put(wr resetableWriter) {
+	p.pool.Put(wr)
+}
+
+func newEncoderPool() *encoderPool {
+	return &encoderPool{
+		pool: sync.Pool{},
+	}
+}
+
 type EncoderMap struct {
 	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	p map[rawtopiccommon.Codec]*encoderPool
 }
 
 func NewEncoderMap() *EncoderMap {
@@ -31,6 +57,7 @@ func NewEncoderMap() *EncoderMap {
 				return gzip.NewWriter(writer), nil
 			},
 		},
+		p: make(map[rawtopiccommon.Codec]*encoderPool),
 	}
 }
 
@@ -38,7 +65,42 @@ func (e *EncoderMap) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreate
 	e.m[codec] = creator
 }
 
-func (e *EncoderMap) CreateLazyEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
+func (e *EncoderMap) Encode(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
+	enc, err := e.createEncodeWriter(codec, target)
+	if err != nil {
+		return 0, err
+	}
+
+	n, err := enc.Write(data)
+	if err == nil {
+		err = enc.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	resetableEnc, ok := enc.(resetableWriter)
+	if ok {
+		if _, ok := e.p[codec]; !ok {
+			e.p[codec] = newEncoderPool()
+		}
+
+		e.p[codec].Put(resetableEnc)
+	}
+
+	return n, nil
+}
+
+func (e *EncoderMap) createEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
+	if ePool, ok := e.p[codec]; ok {
+		wr := ePool.Get()
+		if wr != nil {
+			wr.Reset(target)
+
+			return wr, nil
+		}
+	}
+
 	if encoderCreator, ok := e.m[codec]; ok {
 		return encoderCreator(target)
 	}
