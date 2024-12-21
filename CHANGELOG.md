@@ -1,3 +1,5 @@
+* Fixed connections pool leak on closing sessions
+
 ## v3.95.3
 * Supported of `database/sql/driver.Valuer` interfaces for params which passed to query using sql driver 
 * Exposed `credentials/credentials.OAuth2Config` OAuth2 config

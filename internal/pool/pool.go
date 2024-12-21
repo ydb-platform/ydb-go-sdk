@@ -302,7 +302,7 @@ func makeAsyncCloseItemFunc[PT ItemConstraint[T], T any](
 			defer closeItemCancel()
 
 			if d := p.config.closeTimeout; d > 0 {
-				closeItemCtx, closeItemCancel = xcontext.WithTimeout(ctx, d)
+				closeItemCtx, closeItemCancel = xcontext.WithTimeout(closeItemCtx, d)
 				defer closeItemCancel()
 			}
 
