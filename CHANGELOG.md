@@ -1,3 +1,4 @@
+## v3.95.5
 * Fixed goroutine leak on failed execute call in query client
 
 ## v3.95.4
