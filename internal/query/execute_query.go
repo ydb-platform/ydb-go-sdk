@@ -126,14 +126,22 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	executeCtx := xcontext.ValueOnly(ctx)
+	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	defer func() {
+		if finalErr != nil {
+			executeCancel()
+		}
+	}()
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	r, err := newResult(ctx, stream, append(opts, withStatsCallback(settings.StatsCallback()))...)
+	r, err := newResult(ctx, stream, append(opts,
+		withStatsCallback(settings.StatsCallback()),
+		withOnClose(executeCancel),
+	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

@@ -1,3 +1,5 @@
+* Fixed goroutine leak on failed execute call in query client
+
 ## v3.95.4
 * Fixed connections pool leak on closing sessions
 * Fixed an error in logging session deletion events
