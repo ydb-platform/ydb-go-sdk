@@ -193,8 +193,8 @@ func (s *session) Close(ctx context.Context) (err error) {
 			s,
 		)
 		defer func() {
-			s.SetStatus(table.SessionClosed)
 			onDone(err)
+			s.SetStatus(table.SessionClosed)
 		}()
 
 		if time.Since(s.LastUsage()) < s.config.IdleThreshold() {
