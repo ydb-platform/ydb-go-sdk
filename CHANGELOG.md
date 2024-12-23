@@ -1,3 +1,4 @@
+* Fixed connections pool leak on closing sessions
 * Fixed an error in logging session deletion events
 
 ## v3.95.3
