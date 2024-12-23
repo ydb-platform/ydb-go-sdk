@@ -39,6 +39,7 @@ type (
 		closed         chan struct{}
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
+		onClose        []func()
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 	}
@@ -98,6 +99,12 @@ func withStatsCallback(callback func(queryStats stats.QueryStats)) resultOption 
 	}
 }
 
+func withOnClose(onClose func()) resultOption {
+	return func(s *streamResult) {
+		s.onClose = append(s.onClose, onClose)
+	}
+}
+
 func onNextPartErr(callback func(err error)) resultOption {
 	return func(s *streamResult) {
 		s.onNextPartErr = append(s.onNextPartErr, callback)
@@ -115,21 +122,32 @@ func newResult(
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	opts ...resultOption,
 ) (_ *streamResult, finalErr error) {
-	r := streamResult{
-		stream:         stream,
-		closed:         make(chan struct{}),
-		resultSetIndex: -1,
-	}
-	r.closeOnce = sync.OnceFunc(func() {
-		close(r.closed)
-		r.stream = nil
-	})
+	var (
+		closed = make(chan struct{})
+		r      = streamResult{
+			stream: stream,
+			onClose: []func(){
+				func() {
+					close(closed)
+				},
+			},
+			closed:         closed,
+			resultSetIndex: -1,
+		}
+	)
 
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&r)
 		}
 	}
+
+	r.closeOnce = sync.OnceFunc(func() {
+		for _, onClose := range r.onClose {
+			onClose()
+		}
+		r.stream = nil
+	})
 
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNew(r.trace, &ctx,
