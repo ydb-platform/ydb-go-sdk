@@ -1,4 +1,5 @@
 * Fixed connections pool leak on closing sessions
+* Fixed an error in logging session deletion events
 
 ## v3.95.3
 * Supported of `database/sql/driver.Valuer` interfaces for params which passed to query using sql driver 
