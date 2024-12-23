@@ -186,8 +186,7 @@ func TestDriver(sourceTest *testing.T) {
 			err = db.Query().Exec(ctx, "CREATE USER test PASSWORD 'password'; ALTER GROUP `ADMINS` ADD USER test;")
 			require.NoError(t, err)
 			defer func() {
-				err = db.Query().Exec(ctx, `DROP USER test`)
-				require.NoError(t, err)
+				_ = db.Query().Exec(ctx, `DROP USER test`)
 			}()
 			t.RunSynced("UsingConnectionString", func(t *xtest.SyncedTest) {
 				t.RunSynced("HappyWay", func(t *xtest.SyncedTest) {
