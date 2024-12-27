@@ -1,3 +1,5 @@
+* Added support of custom types to row.ScanStruc 
+
 ## v3.95.5
 * Fixed goroutine leak on failed execute call in query client
 
