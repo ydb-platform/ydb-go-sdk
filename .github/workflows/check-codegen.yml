@@ -67,17 +67,17 @@ jobs:
         go-version: ${{ matrix.go-version }}
       
     - name: Build Docker image (ANTLR)
-      working-directory: ydb-go-sdk/parser/yql
+      working-directory: parser/yql
       run: |
         make build-image
     
     - name: Make clean
-      working-directory: ydb-go-sdk/parser/yql
+      working-directory: parser/yql
       run: |
         make clean
 
     - name: Generate (ANTLR)
-      working-directory: ydb-go-sdk/parser/yql
+      working-directory: parser/yql
       run: |
         make generate
 
