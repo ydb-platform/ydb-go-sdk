@@ -50,7 +50,7 @@ jobs:
   
   parser-check:
     concurrency:
-      group: codegen-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      group: parser-check-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
     strategy:
       matrix:
