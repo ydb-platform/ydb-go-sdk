@@ -47,3 +47,43 @@ jobs:
 
     - name: Check repository diff
       run: bash ./.github/scripts/check-work-copy-equals-to-committed.sh "code-generation not equal with committed"
+  
+  parser-check:
+    concurrency:
+      group: codegen-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      cancel-in-progress: true
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        go-version: [1.23.x]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+      
+    - name: Build Docker image (ANTLR)
+      working-directory: ydb-go-sdk/parser/yql
+      run: |
+        make build-image
+    
+    - name: Make clean
+      working-directory: ydb-go-sdk/parser/yql
+      run: |
+        make clean
+
+    - name: Generate (ANTLR)
+      working-directory: ydb-go-sdk/parser/yql
+      run: |
+        make generate
+
+    - name: Check repository diff
+      run: |
+        git diff --exit-code --quiet \
+        || (echo "YQL Parser code-generation not equal with committed" && exit 1)
+
+
