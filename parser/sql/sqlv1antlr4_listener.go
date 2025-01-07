@@ -1,6 +1,6 @@
 // Code generated from SQLv1Antlr4.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
-package parsing // SQLv1Antlr4
+package sql // SQLv1Antlr4
 import "github.com/antlr4-go/antlr/v4"
 
 

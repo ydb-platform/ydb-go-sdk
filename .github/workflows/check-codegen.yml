@@ -67,19 +67,19 @@ jobs:
         go-version: ${{ matrix.go-version }}
       
     - name: Build Docker image (ANTLR)
-      working-directory: parser/yql
+      working-directory: parser
       run: |
         make build-image
     
     - name: Make clean
-      working-directory: parser/yql
+      working-directory: parser
       run: |
         make clean
 
-    - name: Generate (ANTLR)
-      working-directory: parser/yql
+    - name: Generate YQL & SQL Parser (ANTLR)
+      working-directory: parser
       run: |
-        make generate
+        make all
 
     - name: Check repository diff
       run: |
