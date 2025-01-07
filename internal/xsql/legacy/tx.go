@@ -20,6 +20,10 @@ type transaction struct {
 }
 
 func (tx *transaction) ID() string {
+	if tx.tx == nil {
+		return ""
+	}
+
 	return tx.tx.ID()
 }
 
