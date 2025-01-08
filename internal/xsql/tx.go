@@ -18,6 +18,10 @@ type Tx struct {
 }
 
 func (tx *Tx) ID() string {
+	if tx.tx == nil {
+		return ""
+	}
+
 	return tx.tx.ID()
 }
 

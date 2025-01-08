@@ -1,3 +1,5 @@
+* Fixed panic on span reporting in `xsql/Tx`
+
 ## v3.95.5
 * Fixed goroutine leak on failed execute call in query client
 
