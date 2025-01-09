@@ -76,10 +76,10 @@ jobs:
       run: |
         make clean
 
-    - name: Generate YQL & SQL Parser (ANTLR)
+    - name: Generate YQL Parser (ANTLR)
       working-directory: parser
       run: |
-        make all
+        make yql
 
     - name: Check repository diff
       run: |
