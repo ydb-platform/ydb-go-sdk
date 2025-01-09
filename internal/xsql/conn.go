@@ -48,7 +48,7 @@ func (c *Conn) CheckNamedValue(value *driver.NamedValue) (finalErr error) {
 }
 
 func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx, finalErr error) {
-	onDone := trace.DatabaseSQLOnConnBeginTx(c.connector.trace, &ctx,
+	onDone := trace.DatabaseSQLOnConnBegin(c.connector.trace, &ctx,
 		stack.FunctionID("", stack.Package("database/sql")),
 	)
 	defer func() {
