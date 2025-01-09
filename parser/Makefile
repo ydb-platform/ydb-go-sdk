@@ -6,7 +6,7 @@ CURRENT_DIR := $(shell pwd)
 
 yql: build-image
 	docker run --rm -v "$(CURRENT_DIR)/yql":/workspace/yql $(IMAGE_NAME) \
-		java -jar /antlr-${ANTLR_VERSION}-complete.jar -Dlanguage=Go -package yql -o yql YQLv1Antlr4.g4
+		java -jar /antlr-${ANTLR_VERSION}-complete.jar -Dlanguage=Go -package yql -o yql YQL.g4
 
 build-image:
 	docker build -t $(IMAGE_NAME) .

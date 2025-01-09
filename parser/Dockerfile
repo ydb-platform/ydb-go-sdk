@@ -18,8 +18,8 @@ RUN echo "alias antlr='java -jar /antlr-${ANTLR_VERSION}-complete.jar'" >> ~/.ba
 
 WORKDIR /workspace
 
-RUN curl -L -o YQLv1Antlr4.g4 https://raw.githubusercontent.com/ydb-platform/ydb/${COMMIT_HASH}/yql/essentials/sql/v1/SQLv1Antlr4.g.in
+RUN curl -L -o YQL.g4 https://raw.githubusercontent.com/ydb-platform/ydb/${COMMIT_HASH}/yql/essentials/sql/v1/SQLv1Antlr4.g.in
 
-RUN sed -i "s/grammar SQLv1Antlr4/grammar YQLv1Antlr4/g; s/@GRAMMAR_STRING_CORE_SINGLE@/~('\\\'\' | '\\\\\\\\') | ('\\\\\\\\' .)/g; s/@GRAMMAR_STRING_CORE_DOUBLE@/~('\\\"\' | '\\\\\\\\') | ('\\\\\\\\' .)/g; s/@GRAMMAR_MULTILINE_COMMENT_CORE@/./g" YQLv1Antlr4.g4
+RUN sed -i "s/grammar SQLv1Antlr4/grammar YQL/g; s/@GRAMMAR_STRING_CORE_SINGLE@/~('\\\'\' | '\\\\\\\\') | ('\\\\\\\\' .)/g; s/@GRAMMAR_STRING_CORE_DOUBLE@/~('\\\"\' | '\\\\\\\\') | ('\\\\\\\\' .)/g; s/@GRAMMAR_MULTILINE_COMMENT_CORE@/./g" YQL.g4
 
 CMD ["bash"]

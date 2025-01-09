@@ -1,11 +1,11 @@
-// Code generated from YQLv1Antlr4.g4 by ANTLR 4.13.2. DO NOT EDIT.
+// Code generated from YQL.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
-package yql // YQLv1Antlr4
+package yql // YQL
 import "github.com/antlr4-go/antlr/v4"
 
 
-// YQLv1Antlr4Listener is a complete listener for a parse tree produced by YQLv1Antlr4Parser.
-type YQLv1Antlr4Listener interface {
+// YQLListener is a complete listener for a parse tree produced by YQLParser.
+type YQLListener interface {
 	antlr.ParseTreeListener
 
 	// EnterSql_query is called when entering the sql_query production.
