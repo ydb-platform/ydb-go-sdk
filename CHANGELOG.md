@@ -1,3 +1,4 @@
+## v3.95.6
 * Fixed panic on span reporting in `xsql/Tx`
 
 ## v3.95.5
