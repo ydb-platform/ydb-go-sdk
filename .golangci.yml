@@ -311,3 +311,5 @@ issues:
     - linters:
         - nosnakecase
       text : "(?:_[a-z]+(?:[A-Z](?:[a-z\\d]+|[A-Z\\d]+))+|(?:[A-Z][a-z\\d]+|[A-Z][A-Z\\d]+)+_(?:(?:[A-Z][a-z\\d]+|[A-Z\\d][A-Z\\d]+)_?)+)"
+  exclude-dirs:
+    - parser/yql

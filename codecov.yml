@@ -8,3 +8,4 @@ ignore:
   - trace
   - testutil
   - examples
+  - parser
