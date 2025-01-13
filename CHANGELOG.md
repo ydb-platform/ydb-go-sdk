@@ -1,3 +1,5 @@
+* Supported of list, set and struct for unmarshall using `sugar.Unmarshall...`
+
 ## v3.95.6
 * Fixed panic on span reporting in `xsql/Tx`
 
