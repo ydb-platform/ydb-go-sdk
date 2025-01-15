@@ -1119,15 +1119,15 @@ func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxInt
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context, call call) func(_ error, session sessionInfo) {
+func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context, call call) func(session sessionInfo, _ error) {
 	var p DatabaseSQLConnectorConnectStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onConnectorConnect(p)
-	return func(e error, session sessionInfo) {
+	return func(session sessionInfo, e error) {
 		var p DatabaseSQLConnectorConnectDoneInfo
-		p.Error = e
 		p.Session = session
+		p.Error = e
 		res(p)
 	}
 }

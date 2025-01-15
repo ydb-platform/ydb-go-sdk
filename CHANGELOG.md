@@ -1,3 +1,5 @@
+* Fixed broken metric `ydb_go_sdk_ydb_database_sql_conns`
+
 ## v3.96.1
 * Fixed drop session from pool unnecessary in query service 
 

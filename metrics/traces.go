@@ -19,7 +19,7 @@ func WithTraces(config Config) ydb.Option {
 		ydb.WithTraceCoordination(coordination(config)),
 		ydb.WithTraceRatelimiter(ratelimiter(config)),
 		ydb.WithTraceDiscovery(discovery(config)),
-		ydb.WithTraceDatabaseSQL(databaseSQL(config)),
+		ydb.WithTraceDatabaseSQL(DatabaseSQL(config)),
 		ydb.WithTraceRetry(retry(config)),
 	)
 }

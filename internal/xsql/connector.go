@@ -14,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
@@ -67,8 +68,8 @@ func (e Engine) String() string {
 	switch e {
 	case LEGACY:
 		return "LEGACY"
-	case QUERY_SERVICE:
-		return "QUERY_SERVICE"
+	case PROPOSE:
+		return "PROPOSE"
 	default:
 		return "UNKNOWN"
 	}
@@ -115,18 +116,25 @@ func (c *Connector) Scheme() scheme.Client {
 }
 
 const (
-	QUERY_SERVICE = iota + 1 //nolint:revive,stylecheck
-	LEGACY                   //nolint:revive,stylecheck
+	PROPOSE = iota + 1
+	LEGACY
 )
 
 func (c *Connector) Open(name string) (driver.Conn, error) {
 	return nil, xerrors.WithStackTrace(driver.ErrSkip)
 }
 
-func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
+func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) { //nolint:funlen
+	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
+		stack.FunctionID("", stack.Package("database/sql")),
+	)
+
 	switch c.processor {
-	case QUERY_SERVICE:
+	case PROPOSE:
 		s, err := query.CreateSession(ctx, c.Query())
+		defer func() {
+			onDone(s, finalErr)
+		}()
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -134,7 +142,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		id := uuid.New()
 
 		conn := &Conn{
-			processor: QUERY_SERVICE,
+			processor: PROPOSE,
 			cc: propose.New(ctx, c, s, append(
 				c.Options,
 				propose.WithOnClose(func() {
@@ -152,6 +160,9 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 	case LEGACY:
 		s, err := c.Table().CreateSession(ctx) //nolint:staticcheck
+		defer func() {
+			onDone(s, finalErr)
+		}()
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -207,7 +218,7 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 		balancer: balancer,
 		processor: func() Engine {
 			if overQueryService, _ := strconv.ParseBool(os.Getenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE")); overQueryService {
-				return QUERY_SERVICE
+				return PROPOSE
 			}
 
 			return LEGACY
