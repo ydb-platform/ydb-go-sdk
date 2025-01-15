@@ -336,7 +336,8 @@ func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 
 	err = commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
-		tx.s.handleSessionErrorStatus(err)
+		tx.s.setStatusFromError(err)
+
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -371,7 +372,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 
 	err := rollback(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
-		tx.s.handleSessionErrorStatus(err)
+		tx.s.setStatusFromError(err)
 
 		return xerrors.WithStackTrace(err)
 	}

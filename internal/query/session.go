@@ -39,7 +39,7 @@ func (s *Session) QueryResultSet(
 
 	r, err := execute(ctx, s.ID(), s.client, q, options.ExecuteSettings(opts...), withTrace(s.trace))
 	if err != nil {
-		s.handleSessionErrorStatus(err)
+		s.setStatusFromError(err)
 
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -57,7 +57,7 @@ func (s *Session) queryRow(
 ) (row query.Row, finalErr error) {
 	r, err := execute(ctx, s.ID(), s.client, q, settings, resultOpts...)
 	if err != nil {
-		s.handleSessionErrorStatus(err)
+		s.setStatusFromError(err)
 
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -125,7 +125,7 @@ func (s *Session) Begin(
 
 	txID, err := begin(ctx, s.client, s.ID(), txSettings)
 	if err != nil {
-		s.handleSessionErrorStatus(err)
+		s.setStatusFromError(err)
 
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -147,7 +147,7 @@ func (s *Session) Exec(
 
 	r, err := execute(ctx, s.ID(), s.client, q, options.ExecuteSettings(opts...), withTrace(s.trace))
 	if err != nil {
-		s.handleSessionErrorStatus(err)
+		s.setStatusFromError(err)
 
 		return xerrors.WithStackTrace(err)
 	}
@@ -171,7 +171,7 @@ func (s *Session) Query(
 
 	r, err := execute(ctx, s.ID(), s.client, q, options.ExecuteSettings(opts...), withTrace(s.trace))
 	if err != nil {
-		s.handleSessionErrorStatus(err)
+		s.setStatusFromError(err)
 
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -179,9 +179,10 @@ func (s *Session) Query(
 	return r, nil
 }
 
-func (s *Session) handleSessionErrorStatus(err error) {
+func (s *Session) setStatusFromError(err error) {
 	switch {
-	case xerrors.IsTransportError(err) || xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY, Ydb.StatusIds_BAD_SESSION):
+	case xerrors.IsTransportError(err) ||
+		xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY, Ydb.StatusIds_BAD_SESSION):
 		s.SetStatus(session.StatusError)
 	case xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION):
 		s.SetStatus(session.StatusClosed)

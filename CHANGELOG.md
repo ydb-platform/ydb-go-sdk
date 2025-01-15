@@ -1,3 +1,5 @@
+* Fixed drop session from pool unnecessary in query service 
+
 ## v3.95.6
 * Fixed panic on span reporting in `xsql/Tx`
 

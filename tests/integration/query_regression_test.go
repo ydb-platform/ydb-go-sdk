@@ -376,3 +376,22 @@ func TestReadTwoPartsIntoMemoryIssue1559(t *testing.T) {
 	require.Equal(t, targetCount, len(rows))
 	require.Greater(t, partReaded, 1)
 }
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1607
+func TestCloseSessionOnCustomerErrorsIssue1607(t *testing.T) {
+	scope := newScope(t)
+
+	sessionID1 := ""
+	_ = scope.Driver().Query().Do(scope.Ctx, func(ctx context.Context, s query.Session) error {
+		sessionID1 = s.ID()
+		return errors.New("test")
+	})
+
+	sessionID2 := ""
+	_ = scope.Driver().Query().Do(scope.Ctx, func(ctx context.Context, s query.Session) error {
+		sessionID2 = s.ID()
+		return nil
+	})
+
+	scope.Require.Equal(sessionID1, sessionID2)
+}
