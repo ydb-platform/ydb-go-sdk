@@ -1,3 +1,5 @@
+* Fixed broken metric `ydb_go_sdk_ydb_database_sql_conns`
+
 ## v3.96.1
 * Fixed drop session from pool unnecessary in query service 
 
@@ -6,7 +8,6 @@
 
 ## v3.95.6
 * Fixed panic on span reporting in `xsql/Tx`
-* Fixed broken metric `ydb_go_sdk_ydb_database_sql_conns`
 
 ## v3.95.5
 * Fixed goroutine leak on failed execute call in query client
