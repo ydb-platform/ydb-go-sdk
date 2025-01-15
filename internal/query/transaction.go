@@ -5,13 +5,11 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	queryTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -338,10 +336,7 @@ func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 
 	err = commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
-		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
-			tx.s.SetStatus(session.StatusClosed)
-		}
-
+		tx.s.handleSessionErrorStatus(err)
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -376,9 +371,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 
 	err := rollback(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
-		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
-			tx.s.SetStatus(session.StatusClosed)
-		}
+		tx.s.handleSessionErrorStatus(err)
 
 		return xerrors.WithStackTrace(err)
 	}

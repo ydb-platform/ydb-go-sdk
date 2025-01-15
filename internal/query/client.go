@@ -212,8 +212,6 @@ func do(
 
 		err := op(ctx, s)
 		if err != nil {
-			s.SetStatus(session.StatusError)
-
 			return xerrors.WithStackTrace(err)
 		}
 
@@ -276,10 +274,6 @@ func doTx(
 
 		defer func() {
 			_ = tx.Rollback(ctx)
-
-			if opErr != nil {
-				s.SetStatus(session.StatusError)
-			}
 		}()
 
 		err = op(ctx, tx)
