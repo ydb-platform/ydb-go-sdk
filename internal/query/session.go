@@ -181,8 +181,9 @@ func (s *Session) Query(
 
 func (s *Session) setStatusFromError(err error) {
 	switch {
-	case xerrors.IsTransportError(err) ||
-		xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY, Ydb.StatusIds_BAD_SESSION):
+	case xerrors.IsTransportError(err):
+		s.SetStatus(session.StatusError)
+	case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY, Ydb.StatusIds_BAD_SESSION):
 		s.SetStatus(session.StatusError)
 	case xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION):
 		s.SetStatus(session.StatusClosed)
