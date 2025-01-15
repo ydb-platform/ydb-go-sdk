@@ -1,5 +1,8 @@
 * Fixed drop session from pool unnecessary in query service 
 
+## v3.96.0
+* Supported of list, set and struct for unmarshall using `sugar.Unmarshall...`
+
 ## v3.95.6
 * Fixed panic on span reporting in `xsql/Tx`
 
