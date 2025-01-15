@@ -1142,6 +1142,145 @@ func TestCastNumbers(t *testing.T) {
 	}
 }
 
+func TestCastList(t *testing.T) {
+	for _, tt := range []struct {
+		v      Value
+		dst    interface{}
+		result interface{}
+		error  bool
+	}{
+		{
+			v:      ListValue(Int32Value(12), Int32Value(21), Int32Value(56)),
+			dst:    func(v []int64) *[]int64 { return &v }([]int64{}),
+			result: func(v []int64) *[]int64 { return &v }([]int64{12, 21, 56}),
+			error:  false,
+		},
+		{
+			v:      ListValue(Int32Value(12), Int32Value(21), Int32Value(56)),
+			dst:    func(v []int64) *[]int64 { return &v }([]int64{17}),
+			result: func(v []int64) *[]int64 { return &v }([]int64{12, 21, 56}),
+			error:  false,
+		},
+		{
+			v:      ListValue(BytesValue([]byte("test")), BytesValue([]byte("test2"))),
+			dst:    func(v []string) *[]string { return &v }([]string{}),
+			result: func(v []string) *[]string { return &v }([]string{"test", "test2"}),
+			error:  false,
+		},
+		{
+			v:      ListValue(BytesValue([]byte("test")), BytesValue([]byte("test2"))),
+			dst:    func(v []string) *[]string { return &v }([]string{"list"}),
+			result: func(v []string) *[]string { return &v }([]string{"test", "test2"}),
+			error:  false,
+		},
+	} {
+		t.Run(fmt.Sprintf("%s→%v", tt.v.Type().Yql(), reflect.ValueOf(tt.dst).Type().Elem()),
+			func(t *testing.T) {
+				if err := CastTo(tt.v, tt.dst); (err != nil) != tt.error {
+					t.Errorf("castTo() error = %v, want %v", err, tt.error)
+				} else if !reflect.DeepEqual(tt.dst, tt.result) {
+					t.Errorf("castTo() result = %+v, want %+v",
+						reflect.ValueOf(tt.dst).Elem(),
+						reflect.ValueOf(tt.result).Elem(),
+					)
+				}
+			},
+		)
+	}
+}
+
+func TestCastSet(t *testing.T) {
+	for _, tt := range []struct {
+		v      Value
+		dst    interface{}
+		result interface{}
+		error  bool
+	}{
+		{
+			v:      SetValue(Int32Value(12), Int32Value(21), Int32Value(56)),
+			dst:    func(v []int64) *[]int64 { return &v }([]int64{}),
+			result: func(v []int64) *[]int64 { return &v }([]int64{12, 21, 56}),
+			error:  false,
+		},
+		{
+			v:      SetValue(Int32Value(12), Int32Value(21), Int32Value(56)),
+			dst:    func(v []int64) *[]int64 { return &v }([]int64{17}),
+			result: func(v []int64) *[]int64 { return &v }([]int64{12, 21, 56}),
+			error:  false,
+		},
+		{
+			v:      SetValue(BytesValue([]byte("test")), BytesValue([]byte("test2"))),
+			dst:    func(v []string) *[]string { return &v }([]string{}),
+			result: func(v []string) *[]string { return &v }([]string{"test", "test2"}),
+			error:  false,
+		},
+		{
+			v:      SetValue(BytesValue([]byte("test")), BytesValue([]byte("test2"))),
+			dst:    func(v []string) *[]string { return &v }([]string{"list"}),
+			result: func(v []string) *[]string { return &v }([]string{"test", "test2"}),
+			error:  false,
+		},
+	} {
+		t.Run(fmt.Sprintf("%s→%v", tt.v.Type().Yql(), reflect.ValueOf(tt.dst).Type().Elem()),
+			func(t *testing.T) {
+				if err := CastTo(tt.v, tt.dst); (err != nil) != tt.error {
+					t.Errorf("castTo() error = %v, want %v", err, tt.error)
+				} else if !reflect.DeepEqual(tt.dst, tt.result) {
+					t.Errorf("castTo() result = %+v, want %+v",
+						reflect.ValueOf(tt.dst).Elem(),
+						reflect.ValueOf(tt.result).Elem(),
+					)
+				}
+			},
+		)
+	}
+}
+
+func TestCastStruct(t *testing.T) {
+	type defaultStruct struct {
+		ID  int32  `sql:"id"`
+		Str string `sql:"myStr"`
+	}
+	for _, tt := range []struct {
+		v      Value
+		dst    interface{}
+		result interface{}
+		error  bool
+	}{
+		{
+			v: StructValue(
+				StructValueField{Name: "id", V: Int32Value(123)},
+				StructValueField{Name: "myStr", V: BytesValue([]byte("myStr123"))},
+			),
+			dst:    func(v defaultStruct) *defaultStruct { return &v }(defaultStruct{1, "myStr1"}),
+			result: func(v defaultStruct) *defaultStruct { return &v }(defaultStruct{123, "myStr123"}),
+			error:  false,
+		},
+		{
+			v: StructValue(
+				StructValueField{Name: "id", V: Int32Value(12)},
+				StructValueField{Name: "myStr", V: BytesValue([]byte("myStr12"))},
+			),
+			dst:    func(v defaultStruct) *defaultStruct { return &v }(defaultStruct{}),
+			result: func(v defaultStruct) *defaultStruct { return &v }(defaultStruct{12, "myStr12"}),
+			error:  false,
+		},
+	} {
+		t.Run(fmt.Sprintf("%s→%v", tt.v.Type().Yql(), reflect.ValueOf(tt.dst).Type().Elem()),
+			func(t *testing.T) {
+				if err := CastTo(tt.v, tt.dst); (err != nil) != tt.error {
+					t.Errorf("castTo() error = %v, want %v", err, tt.error)
+				} else if !reflect.DeepEqual(tt.dst, tt.result) {
+					t.Errorf("castTo() result = %+v, want %+v",
+						reflect.ValueOf(tt.dst).Elem(),
+						reflect.ValueOf(tt.result).Elem(),
+					)
+				}
+			},
+		)
+	}
+}
+
 func TestCastOtherTypes(t *testing.T) {
 	for _, tt := range []struct {
 		v      Value

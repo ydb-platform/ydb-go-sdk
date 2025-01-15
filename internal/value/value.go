@@ -1285,6 +1285,33 @@ func (v *listValue) castTo(dst any) error {
 		*dstValue = v
 
 		return nil
+	case interface{}:
+		ptr := reflect.ValueOf(dstValue)
+
+		inner := reflect.Indirect(ptr)
+		if inner.Kind() != reflect.Slice && inner.Kind() != reflect.Array {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"%w '%s(%+v)' to '%T' destination",
+				ErrCannotCast, v.Type().Yql(), v, dstValue,
+			))
+		}
+
+		targetType := inner.Type().Elem()
+		valueInner := reflect.ValueOf(v.ListItems())
+
+		newSlice := reflect.MakeSlice(reflect.SliceOf(targetType), valueInner.Len(), valueInner.Cap())
+		inner.Set(newSlice)
+
+		for i, item := range v.ListItems() {
+			if err := item.castTo(inner.Index(i).Addr().Interface()); err != nil {
+				return xerrors.WithStackTrace(fmt.Errorf(
+					"%w '%s(%+v)' to '%T' destination",
+					ErrCannotCast, v.Type().Yql(), v, dstValue,
+				))
+			}
+		}
+
+		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
@@ -1390,6 +1417,33 @@ func (v *setValue) castTo(dst any) error {
 	switch dstValue := dst.(type) {
 	case *driver.Value:
 		*dstValue = v
+
+		return nil
+	case interface{}:
+		ptr := reflect.ValueOf(dstValue)
+
+		inner := reflect.Indirect(ptr)
+		if inner.Kind() != reflect.Slice && inner.Kind() != reflect.Array {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"%w '%s(%+v)' to '%T' destination",
+				ErrCannotCast, v.Type().Yql(), v, dstValue,
+			))
+		}
+
+		targetType := inner.Type().Elem()
+		valueInner := reflect.ValueOf(v.items)
+
+		newSlice := reflect.MakeSlice(reflect.SliceOf(targetType), valueInner.Len(), valueInner.Cap())
+		inner.Set(newSlice)
+
+		for i, item := range v.items {
+			if err := item.castTo(inner.Index(i).Addr().Interface()); err != nil {
+				return xerrors.WithStackTrace(fmt.Errorf(
+					"%w '%s(%+v)' to '%T' destination",
+					ErrCannotCast, v.Type().Yql(), v, dstValue,
+				))
+			}
+		}
 
 		return nil
 	default:
@@ -1573,6 +1627,27 @@ func (v *structValue) castTo(dst any) error {
 	switch dstValue := dst.(type) {
 	case *driver.Value:
 		*dstValue = v
+
+		return nil
+	case interface{}:
+		ptr := reflect.ValueOf(dst)
+
+		inner := reflect.Indirect(ptr)
+		if inner.Kind() != reflect.Struct {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"%w '%s(%+v)' to '%T' destination",
+				ErrCannotCast, v.Type().Yql(), v, dstValue,
+			))
+		}
+
+		for i, field := range v.fields {
+			if err := field.V.castTo(inner.Field(i).Addr().Interface()); err != nil {
+				return xerrors.WithStackTrace(fmt.Errorf(
+					"scan error on struct field name '%s': %w",
+					field.Name, err,
+				))
+			}
+		}
 
 		return nil
 	default:

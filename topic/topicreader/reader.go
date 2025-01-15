@@ -59,9 +59,10 @@ type MessageContentUnmarshaler = topicreadercommon.PublicMessageContentUnmarshal
 
 // Commit receive Message, Batch of single offset
 // It can be fast (by default) or sync and waite response from server
-// see topicoptions.CommitMode for details
-//
-// for topicoptions.CommitModeSync mode sync the method can return ErrCommitToExpiredSession
+// see topicoptions.CommitMode for details.
+// Fast mode of commit (default) - store commit info to internal buffer only and send it to the server later.
+// Close the reader for wait to send all commits to the server.
+// For topicoptions.CommitModeSync mode sync the method can return ErrCommitToExpiredSession
 // it means about the message/batch was not committed because connection broken or partition routed to
 // other reader by server.
 // Client code should continue work normally
@@ -160,9 +161,9 @@ type Batch = topicreadercommon.PublicBatch
 // ReadBatchOption is type for options of read batch
 type ReadBatchOption = topicreaderinternal.PublicReadBatchOption
 
-// Close stop work with reader
-// return when reader complete internal works, flush commit buffer, ets
-// or when ctx cancelled
+// Close stop work with reader.
+// return when reader complete internal works, flush commit buffer. You should close the Reader after use and before
+// exit from a program for prevent lost last commits.
 func (r *Reader) Close(ctx context.Context) error {
 	// close must be non-concurrent with read and commit
 
