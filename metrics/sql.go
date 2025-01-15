@@ -1,16 +1,16 @@
 package metrics
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// databaseSQL makes trace.DatabaseSQL with measuring `database/sql` events
+// DatabaseSQL makes trace.DatabaseSQL with measuring `database/sql` events
 //
 //nolint:funlen
-func databaseSQL(config Config) trace.DatabaseSQL {
+func DatabaseSQL(config Config) trace.DatabaseSQL {
 	config = config.WithSystem("database").WithSystem("sql")
 
 	conns := config.GaugeVec("conns")

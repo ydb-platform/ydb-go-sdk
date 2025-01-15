@@ -14,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
@@ -123,10 +124,17 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 	return nil, xerrors.WithStackTrace(driver.ErrSkip)
 }
 
-func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
+func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) { //nolint:funlen
+	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
+		stack.FunctionID("", stack.Package("database/sql")),
+	)
+
 	switch c.processor {
 	case QUERY_SERVICE:
 		s, err := query.CreateSession(ctx, c.Query())
+		defer func() {
+			onDone(s, finalErr)
+		}()
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -152,6 +160,9 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 	case LEGACY:
 		s, err := c.Table().CreateSession(ctx) //nolint:staticcheck
+		defer func() {
+			onDone(s, finalErr)
+		}()
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
