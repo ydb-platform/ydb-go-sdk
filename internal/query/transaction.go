@@ -114,6 +114,8 @@ func (tx *Transaction) QueryResultSet(
 	}
 	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
+		tx.s.setStatusFromError(err)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -163,6 +165,8 @@ func (tx *Transaction) QueryRow(
 	}
 	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
+		tx.s.setStatusFromError(err)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -229,6 +233,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 
 	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
+		tx.s.setStatusFromError(err)
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -297,6 +302,8 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	}
 	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
+		tx.s.setStatusFromError(err)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
