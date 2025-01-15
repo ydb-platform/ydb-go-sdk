@@ -234,6 +234,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
 	if err != nil {
 		tx.s.setStatusFromError(err)
+
 		return xerrors.WithStackTrace(err)
 	}
 
