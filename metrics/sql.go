@@ -64,6 +64,19 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 
 		return nil
 	}
+	t.OnConnBeginTx = func(info trace.DatabaseSQLConnBeginTxStartInfo) func(trace.DatabaseSQLConnBeginTxDoneInfo) {
+		start := time.Now()
+		if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+			return func(info trace.DatabaseSQLConnBeginTxDoneInfo) {
+				txBegin.With(map[string]string{
+					"status": errorBrief(info.Error),
+				}).Inc()
+				txBeginLatency.With(nil).Record(time.Since(start))
+			}
+		}
+
+		return nil
+	}
 	t.OnTxCommit = func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
 		start := time.Now()
 
