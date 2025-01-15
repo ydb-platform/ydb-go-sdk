@@ -1,3 +1,4 @@
+## v3.96.1
 * Fixed drop session from pool unnecessary in query service 
 
 ## v3.96.0
