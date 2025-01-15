@@ -137,7 +137,7 @@ func TestIssue798TruncatedError(t *testing.T) {
 		switch driverEngine(db) {
 		case xsql.LEGACY:
 			scope.Require.ErrorIs(err, result.ErrTruncated)
-		case xsql.QUERY_SERVICE:
+		case xsql.PROPOSE:
 			scope.Require.NoError(err)
 		}
 	}

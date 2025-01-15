@@ -68,8 +68,8 @@ func (e Engine) String() string {
 	switch e {
 	case LEGACY:
 		return "LEGACY"
-	case QUERY_SERVICE:
-		return "QUERY_SERVICE"
+	case PROPOSE:
+		return "PROPOSE"
 	default:
 		return "UNKNOWN"
 	}
@@ -116,8 +116,8 @@ func (c *Connector) Scheme() scheme.Client {
 }
 
 const (
-	QUERY_SERVICE = iota + 1 //nolint:revive,stylecheck
-	LEGACY                   //nolint:revive,stylecheck
+	PROPOSE = iota + 1
+	LEGACY
 )
 
 func (c *Connector) Open(name string) (driver.Conn, error) {
@@ -130,7 +130,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 	)
 
 	switch c.processor {
-	case QUERY_SERVICE:
+	case PROPOSE:
 		s, err := query.CreateSession(ctx, c.Query())
 		defer func() {
 			onDone(s, finalErr)
@@ -142,7 +142,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 		id := uuid.New()
 
 		conn := &Conn{
-			processor: QUERY_SERVICE,
+			processor: PROPOSE,
 			cc: propose.New(ctx, c, s, append(
 				c.Options,
 				propose.WithOnClose(func() {
@@ -218,7 +218,7 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 		balancer: balancer,
 		processor: func() Engine {
 			if overQueryService, _ := strconv.ParseBool(os.Getenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE")); overQueryService {
-				return QUERY_SERVICE
+				return PROPOSE
 			}
 
 			return LEGACY
