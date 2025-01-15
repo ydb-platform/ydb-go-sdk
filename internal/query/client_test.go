@@ -1580,7 +1580,7 @@ func newTestSessionWithClient(id string, client Ydb_Query_V1.QueryServiceClient,
 		Core:   &sessionControllerMock{id: id},
 		client: client,
 		trace:  &trace.Query{},
-		laztTx: lazyTx,
+		lazyTx: lazyTx,
 	}
 }
 

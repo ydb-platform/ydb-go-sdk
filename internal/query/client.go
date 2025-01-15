@@ -212,8 +212,6 @@ func do(
 
 		err := op(ctx, s)
 		if err != nil {
-			s.SetStatus(session.StatusError)
-
 			return xerrors.WithStackTrace(err)
 		}
 
@@ -276,10 +274,6 @@ func doTx(
 
 		defer func() {
 			_ = tx.Rollback(ctx)
-
-			if opErr != nil {
-				s.SetStatus(session.StatusError)
-			}
 		}()
 
 		err = op(ctx, tx)
@@ -539,7 +533,7 @@ func CreateSession(ctx context.Context, c *Client) (*Session, error) {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		s.laztTx = c.config.LazyTx()
+		s.lazyTx = c.config.LazyTx()
 
 		return s, nil
 	})
@@ -590,7 +584,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 					return nil, xerrors.WithStackTrace(err)
 				}
 
-				s.laztTx = cfg.LazyTx()
+				s.lazyTx = cfg.LazyTx()
 
 				return s, nil
 			}),
