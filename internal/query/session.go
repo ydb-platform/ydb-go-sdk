@@ -24,7 +24,7 @@ type (
 
 		client Ydb_Query_V1.QueryServiceClient
 		trace  *trace.Query
-		laztTx bool
+		lazyTx bool
 	}
 )
 
@@ -116,7 +116,7 @@ func (s *Session) Begin(
 		}
 	}()
 
-	if s.laztTx {
+	if s.lazyTx {
 		return &Transaction{
 			s:          s,
 			txSettings: txSettings,

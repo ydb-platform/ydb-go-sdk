@@ -533,7 +533,7 @@ func CreateSession(ctx context.Context, c *Client) (*Session, error) {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		s.laztTx = c.config.LazyTx()
+		s.lazyTx = c.config.LazyTx()
 
 		return s, nil
 	})
@@ -584,7 +584,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 					return nil, xerrors.WithStackTrace(err)
 				}
 
-				s.laztTx = cfg.LazyTx()
+				s.lazyTx = cfg.LazyTx()
 
 				return s, nil
 			}),
