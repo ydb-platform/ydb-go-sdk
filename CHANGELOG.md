@@ -1,3 +1,4 @@
+## v3.97.0
 * Added immutable range iterators from go1.23 into query stats to iterate over query phases and accessed tables without query stats object mutation
 
 ## v3.96.2
