@@ -1,3 +1,5 @@
+* Added the use of sync.Pool in EncoderMap
+
 ## v3.96.2
 * Fixed broken metric `ydb_go_sdk_ydb_database_sql_conns`
 
