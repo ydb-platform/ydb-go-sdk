@@ -1,4 +1,4 @@
-* Added into query stats the immutable range iterators from go1.23 for iterate over query phases and accessed tables   
+* Added immutable range iterators from go1.23 into query stats to iterate over query phases and accessed tables without query stats object mutation
 
 ## v3.96.2
 * Fixed broken metric `ydb_go_sdk_ydb_database_sql_conns`
