@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"strconv"
 	"testing"
 	"time"
@@ -232,4 +233,62 @@ func TestDoTx(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCleanUpResourcesOnPanicInRetryOperation(t *testing.T) {
+	panicErr := errors.New("test")
+	t.Run("Do", func(t *testing.T) {
+		m := &mockConnector{
+			t: t,
+		}
+		db := sql.OpenDB(m)
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
+		require.Panics(t, func() {
+			require.Equal(t, 0, db.Stats().OpenConnections)
+			require.Equal(t, 0, db.Stats().Idle)
+			require.Equal(t, 0, db.Stats().InUse)
+			defer func() {
+				require.Equal(t, 1, db.Stats().OpenConnections)
+				require.Equal(t, 1, db.Stats().Idle)
+				require.Equal(t, 0, db.Stats().InUse)
+			}()
+			_ = Do(context.Background(), db,
+				func(ctx context.Context, cc *sql.Conn) error {
+					require.Equal(t, 1, db.Stats().OpenConnections)
+					require.Equal(t, 0, db.Stats().Idle)
+					require.Equal(t, 1, db.Stats().InUse)
+					panic(panicErr)
+				},
+			)
+		})
+	})
+	t.Run("DoTx", func(t *testing.T) {
+		m := &mockConnector{
+			t: t,
+		}
+		db := sql.OpenDB(m)
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
+		require.Panics(t, func() {
+			require.Equal(t, 0, db.Stats().OpenConnections)
+			require.Equal(t, 0, db.Stats().Idle)
+			require.Equal(t, 0, db.Stats().InUse)
+			defer func() {
+				require.Equal(t, 1, db.Stats().OpenConnections)
+				require.Equal(t, 1, db.Stats().Idle)
+				require.Equal(t, 0, db.Stats().InUse)
+			}()
+			_ = DoTx(context.Background(), db,
+				func(ctx context.Context, tx *sql.Tx) error {
+					require.Equal(t, 1, db.Stats().OpenConnections)
+					require.Equal(t, 0, db.Stats().Idle)
+					require.Equal(t, 1, db.Stats().InUse)
+					panic(panicErr)
+				},
+			)
+		})
+	})
 }
