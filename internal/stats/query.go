@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
-	
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 )
 
