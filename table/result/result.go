@@ -108,7 +108,7 @@ type BaseResult interface {
 	// Stats returns query execution QueryStats.
 	//
 	// If query result have no stats - returns nil
-	Stats() (s Stats)
+	Stats() (s stats.QueryStats)
 
 	// Err return scanner error
 	// To handle errors, do not need to check after scanning each row
@@ -130,5 +130,3 @@ type Result interface {
 type StreamResult interface {
 	BaseResult
 }
-
-type Stats = *stats.QueryStats

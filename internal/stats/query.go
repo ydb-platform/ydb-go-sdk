@@ -4,8 +4,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 )
 
 type (
@@ -106,19 +104,6 @@ func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
 	}, true
 }
 
-func (s *QueryStats) RangeQueryPhases() xiter.Seq[QueryPhase] {
-	return func(yield func(p QueryPhase) bool) {
-		for _, pb := range s.pb.GetQueryPhases() {
-			cont := yield(QueryPhase{
-				pb: pb,
-			})
-			if !cont {
-				return
-			}
-		}
-	}
-}
-
 // NextTableAccess returns next accessed table within query execution phase.
 //
 // If ok flag is false, then there are no more accessed tables and t is
@@ -137,23 +122,6 @@ func (phase *QueryPhase) NextTableAccess() (t *TableAccess, ok bool) {
 		Deletes:         fromOperationStats(pb.GetDeletes()),
 		PartitionsCount: pb.GetPartitionsCount(),
 	}, true
-}
-
-func (phase *QueryPhase) RangeTableAccess() xiter.Seq[*TableAccess] {
-	return func(yield func(access *TableAccess) bool) {
-		for _, pb := range phase.pb.GetTableAccess() {
-			cont := yield(&TableAccess{
-				Name:            pb.GetName(),
-				Reads:           fromOperationStats(pb.GetReads()),
-				Updates:         fromOperationStats(pb.GetUpdates()),
-				Deletes:         fromOperationStats(pb.GetDeletes()),
-				PartitionsCount: pb.GetPartitionsCount(),
-			})
-			if !cont {
-				return
-			}
-		}
-	}
 }
 
 func (phase *QueryPhase) Duration() time.Duration {

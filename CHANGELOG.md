@@ -1,4 +1,3 @@
-* Refactored query stats for table-service result and query-service result: implementation instead interface
 * Added into query stats the range iterators for iterate over query phases and table access  
 
 ## v3.96.2
