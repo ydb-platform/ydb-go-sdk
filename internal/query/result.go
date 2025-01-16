@@ -38,7 +38,7 @@ type (
 		resultSetIndex int64
 		closed         chan struct{}
 		trace          *trace.Query
-		statsCallback  func(queryStats stats.QueryStats)
+		statsCallback  func(queryStats *stats.QueryStats)
 		onClose        []func()
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
@@ -93,7 +93,7 @@ func withTrace(t *trace.Query) resultOption {
 	}
 }
 
-func withStatsCallback(callback func(queryStats stats.QueryStats)) resultOption {
+func withStatsCallback(callback func(queryStats *stats.QueryStats)) resultOption {
 	return func(s *streamResult) {
 		s.statsCallback = callback
 	}

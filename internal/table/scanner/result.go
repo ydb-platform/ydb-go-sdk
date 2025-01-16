@@ -220,7 +220,7 @@ func (r *baseResult) CurrentResultSet() result.Set {
 }
 
 // Stats returns query execution queryStats.
-func (r *baseResult) Stats() stats.QueryStats {
+func (r *baseResult) Stats() *stats.QueryStats {
 	r.statsMtx.RLock()
 	defer r.statsMtx.RUnlock()
 

@@ -7,29 +7,6 @@ import (
 )
 
 type (
-	// QueryStats holds query execution statistics.
-	QueryStats interface {
-		ProcessCPUTime() time.Duration
-		Compilation() (c *CompilationStats)
-		QueryPlan() string
-		QueryAST() string
-		TotalCPUTime() time.Duration
-		TotalDuration() time.Duration
-
-		// NextPhase returns next execution phase within query.
-		// If ok flag is false, then there are no more phases and p is invalid.
-		NextPhase() (p QueryPhase, ok bool)
-	}
-	// QueryPhase holds query execution phase statistics.
-	QueryPhase interface {
-		// NextTableAccess returns next accessed table within query execution phase.
-		// If ok flag is false, then there are no more accessed tables and t is invalid.
-		NextTableAccess() (t *TableAccess, ok bool)
-		Duration() time.Duration
-		CPUTime() time.Duration
-		AffectedShards() uint64
-		IsLiteralPhase() bool
-	}
 	OperationStats struct {
 		Rows  uint64
 		Bytes uint64
@@ -55,13 +32,13 @@ type (
 		Duration  time.Duration
 		CPUTime   time.Duration
 	}
-	// queryStats holds query execution statistics.
-	queryStats struct {
+	// QueryStats holds query execution statistics.
+	QueryStats struct {
 		pb  *Ydb_TableStats.QueryStats
 		pos int
 	}
-	// queryPhase holds query execution phase statistics.
-	queryPhase struct {
+	// QueryPhase holds query execution phase statistics.
+	QueryPhase struct {
 		pb  *Ydb_TableStats.QueryPhaseStats
 		pos int
 	}
@@ -86,33 +63,33 @@ func fromOperationStats(pb *Ydb_TableStats.OperationStats) OperationStats {
 	}
 }
 
-func (s *queryStats) ProcessCPUTime() time.Duration {
+func (s *QueryStats) ProcessCPUTime() time.Duration {
 	return fromUs(s.pb.GetProcessCpuTimeUs())
 }
 
-func (s *queryStats) Compilation() (c *CompilationStats) {
+func (s *QueryStats) Compilation() (c *CompilationStats) {
 	return fromCompilationStats(s.pb.GetCompilation())
 }
 
-func (s *queryStats) QueryPlan() string {
+func (s *QueryStats) QueryPlan() string {
 	return s.pb.GetQueryPlan()
 }
 
-func (s *queryStats) QueryAST() string {
+func (s *QueryStats) QueryAST() string {
 	return s.pb.GetQueryAst()
 }
 
-func (s *queryStats) TotalCPUTime() time.Duration {
+func (s *QueryStats) TotalCPUTime() time.Duration {
 	return fromUs(s.pb.GetTotalCpuTimeUs())
 }
 
-func (s *queryStats) TotalDuration() time.Duration {
+func (s *QueryStats) TotalDuration() time.Duration {
 	return fromUs(s.pb.GetTotalDurationUs())
 }
 
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
-func (s *queryStats) NextPhase() (p QueryPhase, ok bool) {
+func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
 	if s.pos >= len(s.pb.GetQueryPhases()) {
 		return
 	}
@@ -122,7 +99,7 @@ func (s *queryStats) NextPhase() (p QueryPhase, ok bool) {
 	}
 	s.pos++
 
-	return &queryPhase{
+	return QueryPhase{
 		pb: pb,
 	}, true
 }
@@ -131,12 +108,12 @@ func (s *queryStats) NextPhase() (p QueryPhase, ok bool) {
 //
 // If ok flag is false, then there are no more accessed tables and t is
 // invalid.
-func (queryPhase *queryPhase) NextTableAccess() (t *TableAccess, ok bool) {
-	if queryPhase.pos >= len(queryPhase.pb.GetTableAccess()) {
+func (QueryPhase *QueryPhase) NextTableAccess() (t *TableAccess, ok bool) {
+	if QueryPhase.pos >= len(QueryPhase.pb.GetTableAccess()) {
 		return
 	}
-	pb := queryPhase.pb.GetTableAccess()[queryPhase.pos]
-	queryPhase.pos++
+	pb := QueryPhase.pb.GetTableAccess()[QueryPhase.pos]
+	QueryPhase.pos++
 
 	return &TableAccess{
 		Name:            pb.GetName(),
@@ -147,28 +124,28 @@ func (queryPhase *queryPhase) NextTableAccess() (t *TableAccess, ok bool) {
 	}, true
 }
 
-func (queryPhase *queryPhase) Duration() time.Duration {
-	return fromUs(queryPhase.pb.GetDurationUs())
+func (QueryPhase *QueryPhase) Duration() time.Duration {
+	return fromUs(QueryPhase.pb.GetDurationUs())
 }
 
-func (queryPhase *queryPhase) CPUTime() time.Duration {
-	return fromUs(queryPhase.pb.GetCpuTimeUs())
+func (QueryPhase *QueryPhase) CPUTime() time.Duration {
+	return fromUs(QueryPhase.pb.GetCpuTimeUs())
 }
 
-func (queryPhase *queryPhase) AffectedShards() uint64 {
-	return queryPhase.pb.GetAffectedShards()
+func (QueryPhase *QueryPhase) AffectedShards() uint64 {
+	return QueryPhase.pb.GetAffectedShards()
 }
 
-func (queryPhase *queryPhase) IsLiteralPhase() bool {
-	return queryPhase.pb.GetLiteralPhase()
+func (QueryPhase *QueryPhase) IsLiteralPhase() bool {
+	return QueryPhase.pb.GetLiteralPhase()
 }
 
-func FromQueryStats(pb *Ydb_TableStats.QueryStats) QueryStats {
+func FromQueryStats(pb *Ydb_TableStats.QueryStats) *QueryStats {
 	if pb == nil {
 		return nil
 	}
 
-	return &queryStats{
+	return &QueryStats{
 		pb: pb,
 	}
 }

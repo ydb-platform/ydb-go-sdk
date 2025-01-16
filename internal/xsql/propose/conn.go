@@ -82,7 +82,7 @@ func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast s
 	_, err := c.session.Query(
 		ctx, sql,
 		options.WithExecMode(options.ExecModeExplain),
-		options.WithStatsMode(options.StatsModeNone, func(stats stats.QueryStats) {
+		options.WithStatsMode(options.StatsModeNone, func(stats *stats.QueryStats) {
 			ast = stats.QueryAST()
 			plan = stats.QueryPlan()
 		}),

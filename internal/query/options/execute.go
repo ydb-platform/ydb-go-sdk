@@ -32,7 +32,7 @@ type (
 		execMode               ExecMode
 		statsMode              StatsMode
 		resourcePool           string
-		statsCallback          func(queryStats stats.QueryStats)
+		statsCallback          func(queryStats *stats.QueryStats)
 		callOptions            []grpc.CallOption
 		txControl              *tx.Control
 		retryOptions           []retry.Option
@@ -59,7 +59,7 @@ type (
 	syntaxOption    = Syntax
 	statsModeOption struct {
 		mode     StatsMode
-		callback func(stats.QueryStats)
+		callback func(*stats.QueryStats)
 	}
 	execModeOption         = ExecMode
 	responsePartLimitBytes int64
@@ -73,7 +73,7 @@ func (s *executeSettings) RetryOpts() []retry.Option {
 	return s.retryOptions
 }
 
-func (s *executeSettings) StatsCallback() func(stats.QueryStats) {
+func (s *executeSettings) StatsCallback() func(*stats.QueryStats) {
 	return s.statsCallback
 }
 
@@ -225,7 +225,7 @@ func (opt statsModeOption) applyExecuteOption(s *executeSettings) {
 	s.statsCallback = opt.callback
 }
 
-func WithStatsMode(mode StatsMode, callback func(stats.QueryStats)) statsModeOption {
+func WithStatsMode(mode StatsMode, callback func(*stats.QueryStats)) statsModeOption {
 	return statsModeOption{
 		mode:     mode,
 		callback: callback,

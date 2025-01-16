@@ -1926,8 +1926,8 @@ func TestResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			var s stats.QueryStats
-			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			var s *stats.QueryStats
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats *stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -2287,8 +2287,8 @@ func TestResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			var s stats.QueryStats
-			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			var s *stats.QueryStats
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats *stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -2649,8 +2649,8 @@ func TestResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			var s stats.QueryStats
-			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			var s *stats.QueryStats
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats *stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -2986,8 +2986,8 @@ func TestResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			var s stats.QueryStats
-			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			var s *stats.QueryStats
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats *stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -3358,8 +3358,8 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			var s stats.QueryStats
-			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			var s *stats.QueryStats
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats *stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -3719,8 +3719,8 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			var s stats.QueryStats
-			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			var s *stats.QueryStats
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats *stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -4081,8 +4081,8 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			var s stats.QueryStats
-			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			var s *stats.QueryStats
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats *stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)
@@ -4418,8 +4418,8 @@ func TestMaterializedResultStats(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			var s stats.QueryStats
-			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats stats.QueryStats) {
+			var s *stats.QueryStats
+			result, err := newResult(ctx, stream, withStatsCallback(func(queryStats *stats.QueryStats) {
 				s = queryStats
 			}))
 			require.NoError(t, err)

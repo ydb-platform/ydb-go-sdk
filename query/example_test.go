@@ -246,7 +246,7 @@ func Example_resultStats() {
 		id    int32  // required value
 		myStr string // required value
 	)
-	var stats query.Stats
+	var s query.Stats
 	// Do retry operation on errors with best effort
 	row, err := db.Query().QueryRow(ctx, // context manage exiting from Do
 		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
@@ -256,8 +256,8 @@ func Example_resultStats() {
 				Param("$myStr").Text("123").
 				Build(),
 		),
-		query.WithStatsMode(query.StatsModeFull, func(s query.Stats) {
-			stats = s
+		query.WithStatsMode(query.StatsModeFull, func(stats query.Stats) {
+			s = stats
 		}),
 		query.WithIdempotent(),
 	)
@@ -275,14 +275,14 @@ func Example_resultStats() {
 
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
 	fmt.Println("Stats:")
-	fmt.Printf("- Compilation='%v'\n", stats.Compilation())
-	fmt.Printf("- TotalCPUTime='%v'\n", stats.TotalCPUTime())
-	fmt.Printf("- ProcessCPUTime='%v'\n", stats.ProcessCPUTime())
-	fmt.Printf("- QueryAST='%v'\n", stats.QueryAST())
-	fmt.Printf("- QueryPlan='%v'\n", stats.QueryPlan())
+	fmt.Printf("- Compilation='%v'\n", s.Compilation())
+	fmt.Printf("- TotalCPUTime='%v'\n", s.TotalCPUTime())
+	fmt.Printf("- ProcessCPUTime='%v'\n", s.ProcessCPUTime())
+	fmt.Printf("- QueryAST='%v'\n", s.QueryAST())
+	fmt.Printf("- QueryPlan='%v'\n", s.QueryPlan())
 	fmt.Println("- Phases:")
 	for {
-		phase, ok := stats.NextPhase()
+		phase, ok := s.NextPhase()
 		if !ok {
 			break
 		}

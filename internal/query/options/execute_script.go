@@ -34,7 +34,7 @@ type (
 			Query  string
 		}
 		Mode           ExecMode
-		Stats          stats.QueryStats
+		Stats          *stats.QueryStats
 		ResultSetsMeta []struct {
 			Columns []struct {
 				Name string
