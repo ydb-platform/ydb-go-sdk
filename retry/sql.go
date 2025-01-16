@@ -211,17 +211,7 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB, //nolint:funlen
 			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
-			if finalErr == nil {
-				return
-			}
-			errRollback := tx.Rollback()
-			if errRollback == nil {
-				return
-			}
-			finalErr = xerrors.NewWithIssues("",
-				xerrors.WithStackTrace(finalErr),
-				xerrors.WithStackTrace(fmt.Errorf("rollback failed: %w", errRollback)),
-			)
+			_ = tx.Rollback()
 		}()
 		v, err := op(xcontext.MarkRetryCall(ctx), tx)
 		if err != nil {
