@@ -42,15 +42,15 @@ func newEncoderPool() *encoderPool {
 	}
 }
 
-type EncoderMap struct {
+type MultiEncoder struct {
 	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
 
 	mx sync.RWMutex
 	p  map[rawtopiccommon.Codec]*encoderPool
 }
 
-func NewEncoderMap() *EncoderMap {
-	return &EncoderMap{
+func NewEncoderMap() *MultiEncoder {
+	return &MultiEncoder{
 		m: map[rawtopiccommon.Codec]PublicCreateEncoderFunc{
 			rawtopiccommon.CodecRaw: func(writer io.Writer) (io.WriteCloser, error) {
 				return nopWriteCloser{writer}, nil
@@ -64,11 +64,11 @@ func NewEncoderMap() *EncoderMap {
 	}
 }
 
-func (e *EncoderMap) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreateEncoderFunc) {
+func (e *MultiEncoder) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreateEncoderFunc) {
 	e.m[codec] = creator
 }
 
-func (e *EncoderMap) Encode(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
+func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
 	enc, err := e.createEncodeWriter(codec, target)
 	if err != nil {
 		return 0, err
@@ -98,7 +98,7 @@ func (e *EncoderMap) Encode(codec rawtopiccommon.Codec, target io.Writer, data [
 	return n, nil
 }
 
-func (e *EncoderMap) createEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
+func (e *MultiEncoder) createEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
 	e.mx.RLock()
 	defer e.mx.RUnlock()
 
@@ -118,7 +118,7 @@ func (e *EncoderMap) createEncodeWriter(codec rawtopiccommon.Codec, target io.Wr
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
 }
 
-func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
+func (e *MultiEncoder) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
 	res := make(rawtopiccommon.SupportedCodecs, 0, len(e.m))
 	for codec := range e.m {
 		res = append(res, codec)
@@ -127,7 +127,7 @@ func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
 	return res
 }
 
-func (e *EncoderMap) IsSupported(codec rawtopiccommon.Codec) bool {
+func (e *MultiEncoder) IsSupported(codec rawtopiccommon.Codec) bool {
 	_, ok := e.m[codec]
 
 	return ok
@@ -145,7 +145,7 @@ func (nopWriteCloser) Close() error {
 
 // EncoderSelector not thread safe
 type EncoderSelector struct {
-	m *EncoderMap
+	m *MultiEncoder
 
 	tracer              *trace.Topic
 	writerReconnectorID string
@@ -159,7 +159,7 @@ type EncoderSelector struct {
 }
 
 func NewEncoderSelector(
-	m *EncoderMap,
+	m *MultiEncoder,
 	allowedCodecs rawtopiccommon.SupportedCodecs,
 	parallelCompressors int,
 	tracer *trace.Topic,

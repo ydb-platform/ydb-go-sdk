@@ -67,7 +67,7 @@ type messageWithDataContent struct {
 	bufCodec            rawtopiccommon.Codec
 	bufEncoded          bytes.Buffer
 	rawBuf              bytes.Buffer
-	encoders            *EncoderMap
+	encoders            *MultiEncoder
 	BufUncompressedSize int
 }
 
@@ -206,7 +206,7 @@ func (m *messageWithDataContent) getEncodedBytes(codec rawtopiccommon.Codec) ([]
 
 func newMessageDataWithContent(
 	message PublicMessage, //nolint:gocritic
-	encoders *EncoderMap,
+	encoders *MultiEncoder,
 ) messageWithDataContent {
 	return messageWithDataContent{
 		PublicMessage: message,

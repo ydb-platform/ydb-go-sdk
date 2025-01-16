@@ -124,7 +124,7 @@ type WriterReconnector struct {
 	semaphore                      *semaphore.Weighted
 	firstInitResponseProcessedChan empty.Chan
 	lastSeqNo                      int64
-	encodersMap                    *EncoderMap
+	encodersMap                    *MultiEncoder
 	initDoneCh                     empty.Chan
 	initInfo                       InitialInfo
 	m                              xsync.RWMutex
@@ -760,7 +760,7 @@ func createRawMessageData(
 	return res, err
 }
 
-func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *EncoderMap,
+func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *MultiEncoder,
 	serverCodecs rawtopiccommon.SupportedCodecs,
 ) rawtopiccommon.SupportedCodecs {
 	if forceCodec != rawtopiccommon.CodecUNSPECIFIED {
