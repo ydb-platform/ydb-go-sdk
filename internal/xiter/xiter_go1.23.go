@@ -6,4 +6,7 @@ import (
 	"iter"
 )
 
-type Seq2[K, V any] iter.Seq2[K, V]
+type (
+	Seq[T any]     iter.Seq[T]
+	Seq2[K, V any] iter.Seq2[K, V]
+)

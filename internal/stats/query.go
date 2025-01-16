@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 )
 
 type (
@@ -102,6 +104,19 @@ func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
 	return QueryPhase{
 		pb: pb,
 	}, true
+}
+
+func (s *QueryStats) QueryPhases() xiter.Seq[QueryPhase] {
+	return func(yield func(p QueryPhase) bool) {
+		for _, pb := range s.pb.GetQueryPhases() {
+			cont := yield(QueryPhase{
+				pb: pb,
+			})
+			if !cont {
+				return
+			}
+		}
+	}
 }
 
 // NextTableAccess returns next accessed table within query execution phase.
