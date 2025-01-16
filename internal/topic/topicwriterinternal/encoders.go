@@ -17,7 +17,7 @@ const (
 	codecUnknown                = rawtopiccommon.CodecUNSPECIFIED
 )
 
-type resetableWriter interface {
+type PublicResetableWriter interface {
 	io.WriteCloser
 	Reset(wr io.Writer)
 }
@@ -26,13 +26,13 @@ type encoderPool struct {
 	pool sync.Pool
 }
 
-func (p *encoderPool) Get() resetableWriter {
-	enc, _ := p.pool.Get().(resetableWriter)
+func (p *encoderPool) Get() PublicResetableWriter {
+	enc, _ := p.pool.Get().(PublicResetableWriter)
 
 	return enc
 }
 
-func (p *encoderPool) Put(wr resetableWriter) {
+func (p *encoderPool) Put(wr PublicResetableWriter) {
 	p.pool.Put(wr)
 }
 
@@ -79,7 +79,7 @@ func (e *EncoderMap) Encode(codec rawtopiccommon.Codec, target io.Writer, data [
 		return 0, err
 	}
 
-	resetableEnc, ok := enc.(resetableWriter)
+	resetableEnc, ok := enc.(PublicResetableWriter)
 	if ok {
 		if _, ok := e.p[codec]; !ok {
 			e.p[codec] = newEncoderPool()

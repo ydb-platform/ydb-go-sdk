@@ -19,8 +19,14 @@ type WriteSessionMetadata map[string]string
 // CreateEncoderFunc for create message decoders
 type CreateEncoderFunc = topicwriterinternal.PublicCreateEncoderFunc
 
+// ResettableWriter is able to reset a nested writer between uses.
+type ResetableWriter = topicwriterinternal.PublicResetableWriter
+
 // WithWriterAddEncoder add custom codec implementation to writer.
 // It allows to set custom codecs implementations for custom and internal codecs.
+//
+// If CreateEncoderFunc returns a writer implementing ResetableWriter, then the compression objects
+// will be reused for this codec. This will reduce the load on the GC.
 func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOption {
 	return topicwriterinternal.WithAddEncoder(rawtopiccommon.Codec(codec), f)
 }
