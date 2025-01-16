@@ -44,7 +44,9 @@ func newEncoderPool() *encoderPool {
 
 type EncoderMap struct {
 	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
-	p map[rawtopiccommon.Codec]*encoderPool
+
+	mx sync.Mutex
+	p  map[rawtopiccommon.Codec]*encoderPool
 }
 
 func NewEncoderMap() *EncoderMap {
@@ -57,7 +59,8 @@ func NewEncoderMap() *EncoderMap {
 				return gzip.NewWriter(writer), nil
 			},
 		},
-		p: make(map[rawtopiccommon.Codec]*encoderPool),
+		mx: sync.Mutex{},
+		p:  make(map[rawtopiccommon.Codec]*encoderPool),
 	}
 }
 
@@ -82,7 +85,9 @@ func (e *EncoderMap) Encode(codec rawtopiccommon.Codec, target io.Writer, data [
 	resetableEnc, ok := enc.(PublicResetableWriter)
 	if ok {
 		if _, ok := e.p[codec]; !ok {
+			e.mx.Lock()
 			e.p[codec] = newEncoderPool()
+			e.mx.Unlock()
 		}
 
 		e.p[codec].Put(resetableEnc)
