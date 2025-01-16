@@ -24,7 +24,7 @@ import (
 type executeSettings interface {
 	ExecMode() options.ExecMode
 	StatsMode() options.StatsMode
-	StatsCallback() func(stats *stats.QueryStats)
+	StatsCallback() func(stats stats.QueryStats)
 	TxControl() *query.TransactionControl
 	Syntax() options.Syntax
 	Params() params.Parameters
