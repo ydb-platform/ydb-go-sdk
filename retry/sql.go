@@ -173,7 +173,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 // DoTxWithResult is a retryer of database/sql transactions with fallbacks on errors
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func DoTxWithResult[T any](ctx context.Context, db *sql.DB, //nolint:funlen
+func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	op func(context.Context, *sql.Tx) (T, error),
 	opts ...doTxOption,
 ) (T, error) {
