@@ -18,5 +18,5 @@ type (
 
 		Begin(ctx context.Context, txSettings TransactionSettings) (Transaction, error)
 	}
-	Stats = *stats.QueryStats
+	Stats = stats.QueryStats
 )
