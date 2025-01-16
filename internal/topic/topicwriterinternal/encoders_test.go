@@ -2,6 +2,9 @@ package topicwriterinternal
 
 import (
 	"bytes"
+	"compress/gzip"
+	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -208,31 +211,76 @@ func TestCompressMessages(t *testing.T) {
 }
 
 func TestEncodersPool(t *testing.T) {
-	t.Run("Not resetable writer", func(t *testing.T) {
+	decompressGzip := func(rd io.Reader) string {
+		gzreader, err := gzip.NewReader(rd)
+		require.NoError(t, err)
+
+		decompressedMsg, err := io.ReadAll(gzreader)
+		require.NoError(t, err)
+
+		return string(decompressedMsg)
+	}
+
+	t.Run("NotResetableWriter", func(t *testing.T) {
 		testEncoderMap := NewEncoderMap()
 
 		buf := &bytes.Buffer{}
 		_, err := testEncoderMap.Encode(rawtopiccommon.CodecRaw, buf, []byte("test_data"))
 		require.NoError(t, err)
-
 		require.Len(t, testEncoderMap.p, 0)
+		require.Equal(t, "test_data", buf.String())
 	})
 
-	t.Run("Resetable writer", func(t *testing.T) {
+	t.Run("ResetableWriterCustom", func(t *testing.T) {
+		testEncoderMap := NewEncoderMap()
+
+		customCodecCode := rawtopiccommon.Codec(5)
+		testEncoderMap.AddEncoder(customCodecCode, func(writer io.Writer) (io.WriteCloser, error) {
+			return gzip.NewWriter(writer), nil
+		})
+
+		buf := &bytes.Buffer{}
+		_, err := testEncoderMap.Encode(customCodecCode, buf, []byte("test_data_1"))
+		require.NoError(t, err)
+		require.Len(t, testEncoderMap.p, 1)
+		require.Equal(t, "test_data_1", decompressGzip(buf))
+
+		buf.Reset()
+		_, err = testEncoderMap.Encode(rawtopiccommon.CodecGzip, buf, []byte("test_data_2"))
+		require.NoError(t, err)
+		require.Len(t, testEncoderMap.p, 2)
+		require.Equal(t, "test_data_2", decompressGzip(buf))
+	})
+
+	t.Run("ResetableWriter", func(t *testing.T) {
 		testEncoderMap := NewEncoderMap()
 
 		buf := &bytes.Buffer{}
-		_, err := testEncoderMap.Encode(rawtopiccommon.CodecGzip, buf, []byte("test_data"))
+		_, err := testEncoderMap.Encode(rawtopiccommon.CodecGzip, buf, []byte("test_data_1"))
 		require.NoError(t, err)
-
 		require.Len(t, testEncoderMap.p, 1)
-
-		wr := testEncoderMap.p[rawtopiccommon.CodecGzip].Get()
-		require.NotNil(t, wr)
+		require.Equal(t, "test_data_1", decompressGzip(buf))
 
 		buf.Reset()
-		_, err = testEncoderMap.Encode(rawtopiccommon.CodecGzip, buf, []byte("test_data"))
+		_, err = testEncoderMap.Encode(rawtopiccommon.CodecGzip, buf, []byte("test_data_2"))
 		require.NoError(t, err)
+		require.Len(t, testEncoderMap.p, 1)
+		require.Equal(t, "test_data_2", decompressGzip(buf))
+	})
+
+	t.Run("ResetableWriterManyMessages", func(t *testing.T) {
+		testEncoderMap := NewEncoderMap()
+
+		buf := &bytes.Buffer{}
+		for i := 0; i < 50; i++ {
+			testMsg := []byte(fmt.Sprintf("data_%d", i))
+
+			buf.Reset()
+			_, err := testEncoderMap.Encode(rawtopiccommon.CodecGzip, buf, testMsg)
+			require.NoError(t, err)
+
+			require.Equal(t, string(testMsg), decompressGzip(buf))
+		}
 
 		require.Len(t, testEncoderMap.p, 1)
 	})
