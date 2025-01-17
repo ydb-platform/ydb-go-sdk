@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 )
 
 type (
@@ -19,12 +21,17 @@ type (
 		// NextPhase returns next execution phase within query.
 		// If ok flag is false, then there are no more phases and p is invalid.
 		NextPhase() (p QueryPhase, ok bool)
+
+		// QueryPhases is a range iterator over query phases.
+		QueryPhases() xiter.Seq[QueryPhase]
 	}
 	// QueryPhase holds query execution phase statistics.
 	QueryPhase interface {
 		// NextTableAccess returns next accessed table within query execution phase.
 		// If ok flag is false, then there are no more accessed tables and t is invalid.
 		NextTableAccess() (t *TableAccess, ok bool)
+		// TableAccess is a range iterator over query execution phase's accessed tables.
+		TableAccess() xiter.Seq[*TableAccess]
 		Duration() time.Duration
 		CPUTime() time.Duration
 		AffectedShards() uint64
@@ -86,57 +93,70 @@ func fromOperationStats(pb *Ydb_TableStats.OperationStats) OperationStats {
 	}
 }
 
-func (s *queryStats) ProcessCPUTime() time.Duration {
-	return fromUs(s.pb.GetProcessCpuTimeUs())
+func (stats *queryStats) ProcessCPUTime() time.Duration {
+	return fromUs(stats.pb.GetProcessCpuTimeUs())
 }
 
-func (s *queryStats) Compilation() (c *CompilationStats) {
-	return fromCompilationStats(s.pb.GetCompilation())
+func (stats *queryStats) Compilation() (c *CompilationStats) {
+	return fromCompilationStats(stats.pb.GetCompilation())
 }
 
-func (s *queryStats) QueryPlan() string {
-	return s.pb.GetQueryPlan()
+func (stats *queryStats) QueryPlan() string {
+	return stats.pb.GetQueryPlan()
 }
 
-func (s *queryStats) QueryAST() string {
-	return s.pb.GetQueryAst()
+func (stats *queryStats) QueryAST() string {
+	return stats.pb.GetQueryAst()
 }
 
-func (s *queryStats) TotalCPUTime() time.Duration {
-	return fromUs(s.pb.GetTotalCpuTimeUs())
+func (stats *queryStats) TotalCPUTime() time.Duration {
+	return fromUs(stats.pb.GetTotalCpuTimeUs())
 }
 
-func (s *queryStats) TotalDuration() time.Duration {
-	return fromUs(s.pb.GetTotalDurationUs())
+func (stats *queryStats) TotalDuration() time.Duration {
+	return fromUs(stats.pb.GetTotalDurationUs())
 }
 
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
-func (s *queryStats) NextPhase() (p QueryPhase, ok bool) {
-	if s.pos >= len(s.pb.GetQueryPhases()) {
+func (stats *queryStats) NextPhase() (p QueryPhase, ok bool) {
+	if stats.pos >= len(stats.pb.GetQueryPhases()) {
 		return
 	}
-	pb := s.pb.GetQueryPhases()[s.pos]
+	pb := stats.pb.GetQueryPhases()[stats.pos]
 	if pb == nil {
 		return
 	}
-	s.pos++
+	stats.pos++
 
 	return &queryPhase{
 		pb: pb,
 	}, true
 }
 
+func (stats *queryStats) QueryPhases() xiter.Seq[QueryPhase] {
+	return func(yield func(p QueryPhase) bool) {
+		for _, pb := range stats.pb.GetQueryPhases() {
+			cont := yield(&queryPhase{
+				pb: pb,
+			})
+			if !cont {
+				return
+			}
+		}
+	}
+}
+
 // NextTableAccess returns next accessed table within query execution phase.
 //
 // If ok flag is false, then there are no more accessed tables and t is
 // invalid.
-func (queryPhase *queryPhase) NextTableAccess() (t *TableAccess, ok bool) {
-	if queryPhase.pos >= len(queryPhase.pb.GetTableAccess()) {
+func (phase *queryPhase) NextTableAccess() (t *TableAccess, ok bool) {
+	if phase.pos >= len(phase.pb.GetTableAccess()) {
 		return
 	}
-	pb := queryPhase.pb.GetTableAccess()[queryPhase.pos]
-	queryPhase.pos++
+	pb := phase.pb.GetTableAccess()[phase.pos]
+	phase.pos++
 
 	return &TableAccess{
 		Name:            pb.GetName(),
@@ -147,20 +167,37 @@ func (queryPhase *queryPhase) NextTableAccess() (t *TableAccess, ok bool) {
 	}, true
 }
 
-func (queryPhase *queryPhase) Duration() time.Duration {
-	return fromUs(queryPhase.pb.GetDurationUs())
+func (phase *queryPhase) TableAccess() xiter.Seq[*TableAccess] {
+	return func(yield func(access *TableAccess) bool) {
+		for _, pb := range phase.pb.GetTableAccess() {
+			cont := yield(&TableAccess{
+				Name:            pb.GetName(),
+				Reads:           fromOperationStats(pb.GetReads()),
+				Updates:         fromOperationStats(pb.GetUpdates()),
+				Deletes:         fromOperationStats(pb.GetDeletes()),
+				PartitionsCount: pb.GetPartitionsCount(),
+			})
+			if !cont {
+				return
+			}
+		}
+	}
 }
 
-func (queryPhase *queryPhase) CPUTime() time.Duration {
-	return fromUs(queryPhase.pb.GetCpuTimeUs())
+func (phase *queryPhase) Duration() time.Duration {
+	return fromUs(phase.pb.GetDurationUs())
 }
 
-func (queryPhase *queryPhase) AffectedShards() uint64 {
-	return queryPhase.pb.GetAffectedShards()
+func (phase *queryPhase) CPUTime() time.Duration {
+	return fromUs(phase.pb.GetCpuTimeUs())
 }
 
-func (queryPhase *queryPhase) IsLiteralPhase() bool {
-	return queryPhase.pb.GetLiteralPhase()
+func (phase *queryPhase) AffectedShards() uint64 {
+	return phase.pb.GetAffectedShards()
+}
+
+func (phase *queryPhase) IsLiteralPhase() bool {
+	return phase.pb.GetLiteralPhase()
 }
 
 func FromQueryStats(pb *Ydb_TableStats.QueryStats) QueryStats {

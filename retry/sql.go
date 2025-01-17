@@ -173,7 +173,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 // DoTxWithResult is a retryer of database/sql transactions with fallbacks on errors
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func DoTxWithResult[T any](ctx context.Context, db *sql.DB, //nolint:funlen
+func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	op func(context.Context, *sql.Tx) (T, error),
 	opts ...doTxOption,
 ) (T, error) {
@@ -211,17 +211,7 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB, //nolint:funlen
 			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
-			if finalErr == nil {
-				return
-			}
-			errRollback := tx.Rollback()
-			if errRollback == nil {
-				return
-			}
-			finalErr = xerrors.NewWithIssues("",
-				xerrors.WithStackTrace(finalErr),
-				xerrors.WithStackTrace(fmt.Errorf("rollback failed: %w", errRollback)),
-			)
+			_ = tx.Rollback()
 		}()
 		v, err := op(xcontext.MarkRetryCall(ctx), tx)
 		if err != nil {
