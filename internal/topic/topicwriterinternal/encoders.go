@@ -1,6 +1,7 @@
 package topicwriterinternal
 
 import (
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -45,30 +46,49 @@ func newEncoderPool() *encoderPool {
 type MultiEncoder struct {
 	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
 
-	mx sync.RWMutex
-	p  map[rawtopiccommon.Codec]*encoderPool
+	bp xsync.Pool[bytes.Buffer]
+	ep map[rawtopiccommon.Codec]*encoderPool
 }
 
-func NewEncoderMap() *MultiEncoder {
-	return &MultiEncoder{
-		m: map[rawtopiccommon.Codec]PublicCreateEncoderFunc{
-			rawtopiccommon.CodecRaw: func(writer io.Writer) (io.WriteCloser, error) {
-				return nopWriteCloser{writer}, nil
-			},
-			rawtopiccommon.CodecGzip: func(writer io.Writer) (io.WriteCloser, error) {
-				return gzip.NewWriter(writer), nil
+func NewMultiEncoder() *MultiEncoder {
+	me := &MultiEncoder{
+		m: make(map[rawtopiccommon.Codec]PublicCreateEncoderFunc),
+		bp: xsync.Pool[bytes.Buffer]{
+			New: func() *bytes.Buffer {
+				return &bytes.Buffer{}
 			},
 		},
-		mx: sync.RWMutex{},
-		p:  make(map[rawtopiccommon.Codec]*encoderPool),
+		ep: make(map[rawtopiccommon.Codec]*encoderPool),
 	}
+
+	me.AddEncoder(rawtopiccommon.CodecRaw, func(writer io.Writer) (io.WriteCloser, error) {
+		return nopWriteCloser{writer}, nil
+	})
+	me.AddEncoder(rawtopiccommon.CodecGzip, func(writer io.Writer) (io.WriteCloser, error) {
+		return gzip.NewWriter(writer), nil
+	})
+
+	return me
 }
 
 func (e *MultiEncoder) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreateEncoderFunc) {
 	e.m[codec] = creator
+	e.ep[codec] = newEncoderPool()
 }
 
-func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
+func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, source io.Reader) (int, error) {
+	buf := e.bp.GetOrNew()
+	defer e.bp.Put(buf)
+
+	buf.Reset()
+	if _, err := buf.ReadFrom(source); err != nil {
+		return 0, err
+	}
+
+	return e.EncodeBytes(codec, target, buf.Bytes())
+}
+
+func (e *MultiEncoder) EncodeBytes(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
 	enc, err := e.createEncodeWriter(codec, target)
 	if err != nil {
 		return 0, err
@@ -82,27 +102,15 @@ func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, data
 		return 0, err
 	}
 
-	resetableEnc, ok := enc.(PublicResetableWriter)
-	if ok {
-		e.mx.Lock()
-		if _, ok := e.p[codec]; !ok {
-			e.p[codec] = newEncoderPool()
-		}
-		e.mx.Unlock()
-
-		e.mx.RLock()
-		e.p[codec].Put(resetableEnc)
-		e.mx.RUnlock()
+	if resetableEnc, ok := enc.(PublicResetableWriter); ok {
+		e.ep[codec].Put(resetableEnc)
 	}
 
 	return n, nil
 }
 
 func (e *MultiEncoder) createEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
-	e.mx.RLock()
-	defer e.mx.RUnlock()
-
-	if ePool, ok := e.p[codec]; ok {
+	if ePool, ok := e.ep[codec]; ok {
 		wr := ePool.Get()
 		if wr != nil {
 			wr.Reset(target)

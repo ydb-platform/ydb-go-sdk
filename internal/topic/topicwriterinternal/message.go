@@ -111,7 +111,7 @@ func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([
 
 	m.bufEncoded.Reset()
 
-	_, err := m.encoders.Encode(codec, &m.bufEncoded, m.rawBuf.Bytes())
+	_, err := m.encoders.EncodeBytes(codec, &m.bufEncoded, m.rawBuf.Bytes())
 	if err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to compress message, codec '%v': %w",
@@ -151,13 +151,7 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 		reader = &bytes.Reader{}
 	}
 
-	buf := &bytes.Buffer{}
-	_, err := buf.ReadFrom(reader)
-	if err != nil {
-		return err
-	}
-
-	bytesCount, err := m.encoders.Encode(codec, &m.bufEncoded, buf.Bytes())
+	bytesCount, err := m.encoders.Encode(codec, &m.bufEncoded, reader)
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed compress message with codec '%v': %w",
