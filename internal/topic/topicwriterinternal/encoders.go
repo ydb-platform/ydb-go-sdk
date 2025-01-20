@@ -1,6 +1,7 @@
 package topicwriterinternal
 
 import (
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -17,28 +18,107 @@ const (
 	codecUnknown                = rawtopiccommon.CodecUNSPECIFIED
 )
 
-type EncoderMap struct {
-	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+type PublicResetableWriter interface {
+	io.WriteCloser
+	Reset(wr io.Writer)
 }
 
-func NewEncoderMap() *EncoderMap {
-	return &EncoderMap{
-		m: map[rawtopiccommon.Codec]PublicCreateEncoderFunc{
-			rawtopiccommon.CodecRaw: func(writer io.Writer) (io.WriteCloser, error) {
-				return nopWriteCloser{writer}, nil
-			},
-			rawtopiccommon.CodecGzip: func(writer io.Writer) (io.WriteCloser, error) {
-				return gzip.NewWriter(writer), nil
-			},
-		},
+type encoderPool struct {
+	pool sync.Pool
+}
+
+func (p *encoderPool) Get() PublicResetableWriter {
+	enc, _ := p.pool.Get().(PublicResetableWriter)
+
+	return enc
+}
+
+func (p *encoderPool) Put(wr PublicResetableWriter) {
+	p.pool.Put(wr)
+}
+
+func newEncoderPool() *encoderPool {
+	return &encoderPool{
+		pool: sync.Pool{},
 	}
 }
 
-func (e *EncoderMap) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreateEncoderFunc) {
-	e.m[codec] = creator
+type MultiEncoder struct {
+	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+
+	bp xsync.Pool[bytes.Buffer]
+	ep map[rawtopiccommon.Codec]*encoderPool
 }
 
-func (e *EncoderMap) CreateLazyEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
+func NewMultiEncoder() *MultiEncoder {
+	me := &MultiEncoder{
+		m: make(map[rawtopiccommon.Codec]PublicCreateEncoderFunc),
+		bp: xsync.Pool[bytes.Buffer]{
+			New: func() *bytes.Buffer {
+				return &bytes.Buffer{}
+			},
+		},
+		ep: make(map[rawtopiccommon.Codec]*encoderPool),
+	}
+
+	me.AddEncoder(rawtopiccommon.CodecRaw, func(writer io.Writer) (io.WriteCloser, error) {
+		return nopWriteCloser{writer}, nil
+	})
+	me.AddEncoder(rawtopiccommon.CodecGzip, func(writer io.Writer) (io.WriteCloser, error) {
+		return gzip.NewWriter(writer), nil
+	})
+
+	return me
+}
+
+func (e *MultiEncoder) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreateEncoderFunc) {
+	e.m[codec] = creator
+	e.ep[codec] = newEncoderPool()
+}
+
+func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, source io.Reader) (int, error) {
+	buf := e.bp.GetOrNew()
+	defer e.bp.Put(buf)
+
+	buf.Reset()
+	if _, err := buf.ReadFrom(source); err != nil {
+		return 0, err
+	}
+
+	return e.EncodeBytes(codec, target, buf.Bytes())
+}
+
+func (e *MultiEncoder) EncodeBytes(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
+	enc, err := e.createEncodeWriter(codec, target)
+	if err != nil {
+		return 0, err
+	}
+
+	n, err := enc.Write(data)
+	if err == nil {
+		err = enc.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	if resetableEnc, ok := enc.(PublicResetableWriter); ok {
+		e.ep[codec].Put(resetableEnc)
+	}
+
+	return n, nil
+}
+
+func (e *MultiEncoder) createEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
+	if ePool, ok := e.ep[codec]; ok {
+		wr := ePool.Get()
+		if wr != nil {
+			wr.Reset(target)
+
+			return wr, nil
+		}
+	}
+
 	if encoderCreator, ok := e.m[codec]; ok {
 		return encoderCreator(target)
 	}
@@ -46,7 +126,7 @@ func (e *EncoderMap) CreateLazyEncodeWriter(codec rawtopiccommon.Codec, target i
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
 }
 
-func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
+func (e *MultiEncoder) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
 	res := make(rawtopiccommon.SupportedCodecs, 0, len(e.m))
 	for codec := range e.m {
 		res = append(res, codec)
@@ -55,7 +135,7 @@ func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
 	return res
 }
 
-func (e *EncoderMap) IsSupported(codec rawtopiccommon.Codec) bool {
+func (e *MultiEncoder) IsSupported(codec rawtopiccommon.Codec) bool {
 	_, ok := e.m[codec]
 
 	return ok
@@ -73,7 +153,7 @@ func (nopWriteCloser) Close() error {
 
 // EncoderSelector not thread safe
 type EncoderSelector struct {
-	m *EncoderMap
+	m *MultiEncoder
 
 	tracer              *trace.Topic
 	writerReconnectorID string
@@ -87,7 +167,7 @@ type EncoderSelector struct {
 }
 
 func NewEncoderSelector(
-	m *EncoderMap,
+	m *MultiEncoder,
 	allowedCodecs rawtopiccommon.SupportedCodecs,
 	parallelCompressors int,
 	tracer *trace.Topic,

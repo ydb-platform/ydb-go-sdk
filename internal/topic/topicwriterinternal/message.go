@@ -67,7 +67,7 @@ type messageWithDataContent struct {
 	bufCodec            rawtopiccommon.Codec
 	bufEncoded          bytes.Buffer
 	rawBuf              bytes.Buffer
-	encoders            *EncoderMap
+	encoders            *MultiEncoder
 	BufUncompressedSize int
 }
 
@@ -111,18 +111,7 @@ func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([
 
 	m.bufEncoded.Reset()
 
-	writer, err := m.encoders.CreateLazyEncodeWriter(codec, &m.bufEncoded)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-			"ydb: failed create encoder for message, codec '%v': %w",
-			codec,
-			err,
-		)))
-	}
-	_, err = writer.Write(m.rawBuf.Bytes())
-	if err == nil {
-		err = writer.Close()
-	}
+	_, err := m.encoders.EncodeBytes(codec, &m.bufEncoded, m.rawBuf.Bytes())
 	if err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to compress message, codec '%v': %w",
@@ -157,19 +146,12 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 	m.bufCodec = codec
 	m.bufEncoded.Reset()
 
-	encoder, err := m.encoders.CreateLazyEncodeWriter(codec, &m.bufEncoded)
-	if err != nil {
-		return err
-	}
-
 	reader := m.Data
 	if reader == nil {
 		reader = &bytes.Reader{}
 	}
-	bytesCount, err := io.Copy(encoder, reader)
-	if err == nil {
-		err = encoder.Close()
-	}
+
+	bytesCount, err := m.encoders.Encode(codec, &m.bufEncoded, reader)
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed compress message with codec '%v': %w",
@@ -177,7 +159,7 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 			err,
 		)))
 	}
-	m.BufUncompressedSize = int(bytesCount)
+	m.BufUncompressedSize = bytesCount
 	m.Data = nil
 
 	return nil
@@ -218,7 +200,7 @@ func (m *messageWithDataContent) getEncodedBytes(codec rawtopiccommon.Codec) ([]
 
 func newMessageDataWithContent(
 	message PublicMessage, //nolint:gocritic
-	encoders *EncoderMap,
+	encoders *MultiEncoder,
 ) messageWithDataContent {
 	return messageWithDataContent{
 		PublicMessage: message,

@@ -124,7 +124,7 @@ type WriterReconnector struct {
 	semaphore                      *semaphore.Weighted
 	firstInitResponseProcessedChan empty.Chan
 	lastSeqNo                      int64
-	encodersMap                    *EncoderMap
+	encodersMap                    *MultiEncoder
 	initDoneCh                     empty.Chan
 	initInfo                       InitialInfo
 	m                              xsync.RWMutex
@@ -156,7 +156,7 @@ func newWriterReconnectorStopped(
 		queue:                          newMessageQueue(),
 		lastSeqNo:                      -1,
 		firstInitResponseProcessedChan: make(empty.Chan),
-		encodersMap:                    NewEncoderMap(),
+		encodersMap:                    NewMultiEncoder(),
 		writerInstanceID:               writerInstanceID.String(),
 		retrySettings:                  cfg.RetrySettings,
 	}
@@ -760,11 +760,11 @@ func createRawMessageData(
 	return res, err
 }
 
-func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *EncoderMap,
+func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, multiEncoder *MultiEncoder,
 	serverCodecs rawtopiccommon.SupportedCodecs,
 ) rawtopiccommon.SupportedCodecs {
 	if forceCodec != rawtopiccommon.CodecUNSPECIFIED {
-		if serverCodecs.AllowedByCodecsList(forceCodec) && encoderMap.IsSupported(forceCodec) {
+		if serverCodecs.AllowedByCodecsList(forceCodec) && multiEncoder.IsSupported(forceCodec) {
 			return rawtopiccommon.SupportedCodecs{forceCodec}
 		}
 
@@ -779,7 +779,7 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *Encoder
 
 	res := make(rawtopiccommon.SupportedCodecs, 0, len(serverCodecs))
 	for _, codec := range serverCodecs {
-		if encoderMap.IsSupported(codec) {
+		if multiEncoder.IsSupported(codec) {
 			res = append(res, codec)
 		}
 	}

@@ -23,7 +23,7 @@ type SingleStreamWriterConfig struct {
 
 	stream                RawTopicWriterStream
 	queue                 *messageQueue
-	encodersMap           *EncoderMap
+	encodersMap           *MultiEncoder
 	getLastSeqNum         bool
 	reconnectorInstanceID string
 }
@@ -32,7 +32,7 @@ func newSingleStreamWriterConfig(
 	common WritersCommonConfig, //nolint:gocritic
 	stream RawTopicWriterStream,
 	queue *messageQueue,
-	encodersMap *EncoderMap,
+	encodersMap *MultiEncoder,
 	getLastSeqNum bool,
 	reconnectorID string,
 ) SingleStreamWriterConfig {

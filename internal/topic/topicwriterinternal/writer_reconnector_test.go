@@ -26,7 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-var testCommonEncoders = NewEncoderMap()
+var testCommonEncoders = NewMultiEncoder()
 
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
@@ -829,7 +829,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 func TestCalculateAllowedCodecs(t *testing.T) {
 	customCodecSupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst)
 	customCodecUnsupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst + 1)
-	encoders := NewEncoderMap()
+	encoders := NewMultiEncoder()
 	encoders.AddEncoder(customCodecSupported, func(writer io.Writer) (io.WriteCloser, error) {
 		return nil, errors.New("test")
 	})
