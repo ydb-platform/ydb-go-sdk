@@ -1,3 +1,4 @@
+## v3.98.0
 * Supported pool of encoders, which implement ResetableWriter interface
 
 ## v3.97.0
