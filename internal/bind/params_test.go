@@ -427,6 +427,16 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
+			src: struct {
+				A struct {
+					Unsupported string
+				} `sql:"A"`
+			}{},
+			dst: nil,
+			err: errUnsupportedType,
+		},
+		{
+			name: xtest.CurrentFileLine(),
 			src:  []uint64{123, 123, 123, 123, 123, 123},
 			dst: value.ListValue(
 				value.Uint64Value(123),

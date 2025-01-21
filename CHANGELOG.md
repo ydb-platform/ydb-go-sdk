@@ -1,3 +1,5 @@
+* Fixed panic when error returned from parsing sql params
+
 ## v3.98.0
 * Supported pool of encoders, which implement ResetableWriter interface
 
