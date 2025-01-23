@@ -1,4 +1,4 @@
-* Added environment variable `YDB_TABLE_CLIENT_USE_QUERY_SESSION` for create session in table client using query service client API 
+* Added environment variable `YDB_EXECUTE_DATA_QUERY_OVER_QUERY_SERVICE` for execute data queries from table service client using query client API 
 
 ## v3.98.0
 * Supported pool of encoders, which implement ResetableWriter interface

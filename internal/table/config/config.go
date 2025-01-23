@@ -159,9 +159,6 @@ func WithIgnoreTruncated() Option {
 func ExecuteDataQueryOverQueryService(b bool) Option {
 	return func(c *Config) {
 		c.executeDataQueryOverQueryService = b
-		if b {
-			c.useQuerySession = true
-		}
 	}
 }
 
@@ -237,6 +234,11 @@ func (c *Config) IgnoreTruncated() bool {
 	return c.ignoreTruncated
 }
 
+// UseQuerySession specifies behavior on create/delete session
+func (c *Config) UseQuerySession(b bool) bool {
+	return c.useQuerySession
+}
+
 // ExecuteDataQueryOverQueryService specifies behavior on execute handle
 func (c *Config) ExecuteDataQueryOverQueryService() bool {
 	return c.executeDataQueryOverQueryService
@@ -288,13 +290,16 @@ func (c *Config) DeleteTimeout() time.Duration {
 }
 
 func defaults() *Config {
+	executeDataQueryOverQueryService := os.Getenv("YDB_EXECUTE_DATA_QUERY_OVER_QUERY_SERVICE") != ""
+
 	return &Config{
-		sizeLimit:            DefaultSessionPoolSizeLimit,
-		createSessionTimeout: DefaultSessionPoolCreateSessionTimeout,
-		deleteTimeout:        DefaultSessionPoolDeleteTimeout,
-		idleThreshold:        DefaultSessionPoolIdleThreshold,
-		clock:                clockwork.NewRealClock(),
-		trace:                &trace.Table{},
-		useQuerySession:      os.Getenv("YDB_TABLE_CLIENT_USE_QUERY_SESSION") != "",
+		sizeLimit:                        DefaultSessionPoolSizeLimit,
+		createSessionTimeout:             DefaultSessionPoolCreateSessionTimeout,
+		deleteTimeout:                    DefaultSessionPoolDeleteTimeout,
+		idleThreshold:                    DefaultSessionPoolIdleThreshold,
+		clock:                            clockwork.NewRealClock(),
+		trace:                            &trace.Table{},
+		useQuerySession:                  executeDataQueryOverQueryService,
+		executeDataQueryOverQueryService: executeDataQueryOverQueryService,
 	}
 }

@@ -50,7 +50,7 @@ var _ tx.Identifier = (*transaction)(nil)
 type transaction struct {
 	tx.Identifier
 
-	s       *session
+	s       *Session
 	control *table.TransactionControl
 	state   txState
 }

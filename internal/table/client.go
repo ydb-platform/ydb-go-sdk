@@ -19,7 +19,7 @@ import (
 )
 
 // sessionBuilder is the interface that holds logic of creating sessions.
-type sessionBuilder func(ctx context.Context) (*session, error)
+type sessionBuilder func(ctx context.Context) (*Session, error)
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
@@ -30,20 +30,20 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		clock:  config.Clock(),
 		config: config,
 		cc:     cc,
-		build: func(ctx context.Context) (s *session, err error) {
+		build: func(ctx context.Context) (s *Session, err error) {
 			return newSession(ctx, cc, config)
 		},
-		pool: pool.New[*session, session](ctx,
-			pool.WithLimit[*session, session](config.SizeLimit()),
-			pool.WithItemUsageLimit[*session, session](config.SessionUsageLimit()),
-			pool.WithIdleTimeToLive[*session, session](config.IdleThreshold()),
-			pool.WithCreateItemTimeout[*session, session](config.CreateSessionTimeout()),
-			pool.WithCloseItemTimeout[*session, session](config.DeleteTimeout()),
-			pool.WithClock[*session, session](config.Clock()),
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+		pool: pool.New[*Session, Session](ctx,
+			pool.WithLimit[*Session, Session](config.SizeLimit()),
+			pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
+			pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
+			pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
+			pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
+			pool.WithClock[*Session, Session](config.Clock()),
+			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				return newSession(ctx, cc, config)
 			}),
-			pool.WithTrace[*session, session](&pool.Trace{
+			pool.WithTrace[*Session, Session](&pool.Trace{
 				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
 					return func(limit int) {
 						onDone(limit)
@@ -51,7 +51,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				},
 				OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
 					onDone := trace.TableOnPoolPut( //nolint:forcetypeassert
-						config.Trace(), ctx, call, item.(*session),
+						config.Trace(), ctx, call, item.(*Session),
 					)
 
 					return func(err error) {
@@ -62,7 +62,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 					onDone := trace.TableOnPoolGet(config.Trace(), ctx, call)
 
 					return func(item any, attempts int, err error) {
-						onDone(item.(*session), attempts, err) //nolint:forcetypeassert
+						onDone(item.(*Session), attempts, err) //nolint:forcetypeassert
 					}
 				},
 				OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
@@ -102,7 +102,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
-	createSession := func(ctx context.Context) (*session, error) {
+	createSession := func(ctx context.Context) (*Session, error) {
 		s, err := c.build(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -125,7 +125,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"),
 		)
 		attempts = 0
-		s        *session
+		s        *Session
 	)
 	defer func() {
 		if s != nil {

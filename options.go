@@ -556,6 +556,16 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
+// WithExecuteDataQueryOverQueryClient overrides table.Session.Execute with query service
+// execute with materialized result
+func WithExecuteDataQueryOverQueryClient() Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.ExecuteDataQueryOverQueryService(true))
+
+		return nil
+	}
+}
+
 // WithSessionPoolSessionIdleTimeToLive limits maximum time to live of idle session
 // If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
 func WithSessionPoolSessionIdleTimeToLive(idleThreshold time.Duration) Option {

@@ -19,7 +19,7 @@ import (
 )
 
 type statement struct {
-	session *session
+	session *Session
 	query   Query
 	params  map[string]*Ydb.Type
 }
@@ -86,12 +86,12 @@ func (s *statement) execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	res, err := s.session.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+	res, err := executeDataQuery(ctx, s.session.client, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return s.session.executeQueryResult(res, txControl, request.IgnoreTruncated)
+	return executeQueryResult(res, txControl, request.IgnoreTruncated)
 }
 
 func (s *statement) NumInput() int {

@@ -128,7 +128,7 @@ var simpleCluster = testutil.NewBalancer(
 	),
 )
 
-func simpleSession(t testing.TB) *session {
+func simpleSession(t testing.TB) *Session {
 	s, err := newTableSession(context.Background(), simpleCluster, config.New())
 	if err != nil {
 		t.Fatalf("newTableSession unexpected error: %v", err)
@@ -138,7 +138,7 @@ func simpleSession(t testing.TB) *session {
 }
 
 type StubBuilder struct {
-	OnCreateSession func(ctx context.Context) (*session, error)
+	OnCreateSession func(ctx context.Context) (*Session, error)
 
 	cc    grpc.ClientConnInterface
 	Limit int
@@ -148,7 +148,7 @@ type StubBuilder struct {
 	actual int
 }
 
-func (s *StubBuilder) createSession(ctx context.Context) (session *session, err error) {
+func (s *StubBuilder) createSession(ctx context.Context) (session *Session, err error) {
 	defer s.mu.WithLock(func() {
 		if session != nil {
 			s.actual++

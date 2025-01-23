@@ -326,7 +326,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 		onDone(finalErr)
 	}()
 
-	row, err := clientQueryRow(ctx, c.pool, q, options.ExecuteSettings(opts...), withTrace(c.config.Trace()))
+	row, err := clientQueryRow(ctx, c.pool, q, options.ExecuteSettings(opts...), WithTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -337,7 +337,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := execute(ctx, s.ID(), s.client, q, settings, withTrace(s.trace))
+		streamResult, err := execute(ctx, s.ID(), s.client, q, settings, WithTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -382,7 +382,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := execute(ctx, s.ID(), s.client, q,
-			options.ExecuteSettings(opts...), withTrace(s.trace),
+			options.ExecuteSettings(opts...), WithTrace(s.trace),
 		)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -467,7 +467,7 @@ func (c *Client) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	rs, err := clientQueryResultSet(ctx, c.pool, q, options.ExecuteSettings(opts...), withTrace(c.config.Trace()))
+	rs, err := clientQueryResultSet(ctx, c.pool, q, options.ExecuteSettings(opts...), WithTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
