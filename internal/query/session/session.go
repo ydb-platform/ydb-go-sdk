@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -23,6 +24,7 @@ import (
 type (
 	Core interface {
 		query.SessionInfo
+		closer.Closer
 		pool.Item
 
 		SetStatus(code Status)
@@ -32,12 +34,13 @@ type (
 		Client Ydb_Query_V1.QueryServiceClient
 		Trace  *trace.Query
 
-		deleteTimeout time.Duration
-		id            string
-		nodeID        uint32
-		status        atomic.Uint32
-		closeOnce     func(ctx context.Context) error
-		checks        []func(s *core) bool
+		deleteTimeout  time.Duration
+		id             string
+		nodeID         uint32
+		status         atomic.Uint32
+		onChangeStatus []func(status Status)
+		closeOnce      func(ctx context.Context) error
+		checks         []func(s *core) bool
 	}
 )
 
@@ -58,7 +61,11 @@ func (c *core) SetStatus(status Status) {
 	case StatusClosed, StatusError:
 		// nop
 	default:
-		c.status.Store(uint32(status))
+		if old := c.status.Swap(uint32(status)); old != uint32(status) {
+			for _, onChangeStatus := range c.onChangeStatus {
+				onChangeStatus(Status(old))
+			}
+		}
 	}
 }
 
@@ -71,6 +78,12 @@ type Option func(*core)
 func WithConn(cc grpc.ClientConnInterface) Option {
 	return func(c *core) {
 		c.cc = cc
+	}
+}
+
+func OnChangeStatus(onChangeStatus func(status Status)) Option {
+	return func(c *core) {
+		c.onChangeStatus = append(c.onChangeStatus, onChangeStatus)
 	}
 }
 

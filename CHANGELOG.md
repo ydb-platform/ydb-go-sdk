@@ -1,3 +1,5 @@
+* Added environment variable `YDB_TABLE_CLIENT_USE_QUERY_SESSION` for create session in table client using query service client API 
+
 ## v3.98.0
 * Supported pool of encoders, which implement ResetableWriter interface
 

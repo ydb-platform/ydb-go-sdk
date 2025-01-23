@@ -8,11 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
+
+	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -52,9 +54,24 @@ func (c *Conn) normalizePath(tableName string) string {
 }
 
 func (c *Conn) tableDescription(ctx context.Context, tableName string) (d options.Description, _ error) {
-	d, err := retry.RetryWithResult(ctx, func(ctx context.Context) (options.Description, error) {
-		return internalTable.Session(c.cc.ID(), c.connector.balancer, config.New()).DescribeTable(ctx, tableName)
-	}, retry.WithIdempotent(true), retry.WithBudget(c.connector.retryBudget), retry.WithTrace(c.connector.traceRetry))
+	d, err := retry.RetryWithResult(ctx,
+		func(ctx context.Context) (options.Description, error) {
+			d, err := internalTable.DescribeTable(
+				balancerContext.WithNodeID(ctx, c.cc.NodeID()),
+				c.cc.ID(),
+				Ydb_Table_V1.NewTableServiceClient(c.connector.balancer),
+				tableName,
+			)
+			if err != nil {
+				return d, xerrors.WithStackTrace(err)
+			}
+
+			return d, nil
+		},
+		retry.WithIdempotent(true),
+		retry.WithBudget(c.connector.retryBudget),
+		retry.WithTrace(c.connector.traceRetry),
+	)
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
 	}

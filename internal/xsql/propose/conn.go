@@ -35,6 +35,10 @@ type Conn struct {
 	fakeTx  bool
 }
 
+func (c *Conn) NodeID() uint32 {
+	return c.session.NodeID()
+}
+
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	result driver.Result, finalErr error,
 ) {

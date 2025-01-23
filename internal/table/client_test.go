@@ -129,9 +129,9 @@ var simpleCluster = testutil.NewBalancer(
 )
 
 func simpleSession(t testing.TB) *session {
-	s, err := newSession(context.Background(), simpleCluster, config.New())
+	s, err := newTableSession(context.Background(), simpleCluster, config.New())
 	if err != nil {
-		t.Fatalf("newSession unexpected error: %v", err)
+		t.Fatalf("newTableSession unexpected error: %v", err)
 	}
 
 	return s
@@ -168,5 +168,5 @@ func (s *StubBuilder) createSession(ctx context.Context) (session *session, err 
 		return f(ctx)
 	}
 
-	return newSession(ctx, s.cc, config.New())
+	return newTableSession(ctx, s.cc, config.New())
 }

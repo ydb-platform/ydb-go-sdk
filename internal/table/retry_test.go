@@ -307,7 +307,7 @@ func TestDoContextDeadline(t *testing.T) {
 	ctx := xtest.Context(t)
 	p := pool.New[*session, session](ctx,
 		pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
-			return newSession(ctx, client.cc, config.New())
+			return newTableSession(ctx, client.cc, config.New())
 		}),
 		pool.WithSyncCloseItem[*session, session](),
 	)

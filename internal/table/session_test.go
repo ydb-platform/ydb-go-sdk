@@ -473,7 +473,7 @@ func TestCreateTableRegression(t *testing.T) {
 				},
 			},
 		),
-	), config.New())
+	), config.New(config.UseQuerySession(false)))
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
@@ -564,7 +564,7 @@ func TestDescribeTableRegression(t *testing.T) {
 				},
 			},
 		),
-	), config.New())
+	), config.New(config.UseQuerySession(false)))
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
