@@ -378,7 +378,7 @@ func newTableSession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 	)
 	s.executor = tableExecutor{
 		client:          s.client,
-		ignoreTruncated: false,
+		ignoreTruncated: s.config.IgnoreTruncated(),
 	}
 
 	return s, nil

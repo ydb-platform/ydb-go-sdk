@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -290,16 +289,12 @@ func (c *Config) DeleteTimeout() time.Duration {
 }
 
 func defaults() *Config {
-	executeDataQueryOverQueryService := os.Getenv("YDB_EXECUTE_DATA_QUERY_OVER_QUERY_SERVICE") != ""
-
 	return &Config{
-		sizeLimit:                        DefaultSessionPoolSizeLimit,
-		createSessionTimeout:             DefaultSessionPoolCreateSessionTimeout,
-		deleteTimeout:                    DefaultSessionPoolDeleteTimeout,
-		idleThreshold:                    DefaultSessionPoolIdleThreshold,
-		clock:                            clockwork.NewRealClock(),
-		trace:                            &trace.Table{},
-		useQuerySession:                  executeDataQueryOverQueryService,
-		executeDataQueryOverQueryService: executeDataQueryOverQueryService,
+		sizeLimit:            DefaultSessionPoolSizeLimit,
+		createSessionTimeout: DefaultSessionPoolCreateSessionTimeout,
+		deleteTimeout:        DefaultSessionPoolDeleteTimeout,
+		idleThreshold:        DefaultSessionPoolIdleThreshold,
+		clock:                clockwork.NewRealClock(),
+		trace:                &trace.Table{},
 	}
 }

@@ -558,9 +558,9 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 
 // WithExecuteDataQueryOverQueryClient overrides table.Session.Execute with query service
 // execute with materialized result
-func WithExecuteDataQueryOverQueryClient() Option {
+func WithExecuteDataQueryOverQueryClient(b bool) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.ExecuteDataQueryOverQueryService(true))
+		d.tableOptions = append(d.tableOptions, tableConfig.ExecuteDataQueryOverQueryService(b))
 
 		return nil
 	}
