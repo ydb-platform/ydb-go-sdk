@@ -44,7 +44,7 @@ import (
 
 type (
 	executor interface {
-		Execute(
+		executeDataQuery(
 			ctx context.Context,
 			a *allocator.Allocator,
 			request *Ydb_Table.ExecuteDataQueryRequest,
@@ -184,7 +184,7 @@ func queryExecuteStreamResultToTableResult(
 	), nil
 }
 
-func (e queryExecutor) Execute(
+func (e queryExecutor) executeDataQuery(
 	ctx context.Context,
 	a *allocator.Allocator,
 	executeDataQueryRequest *Ydb_Table.ExecuteDataQueryRequest,
@@ -216,7 +216,7 @@ func (e queryExecutor) Execute(
 	return queryExecuteStreamResultToTableResult(ctx, stream)
 }
 
-func (e tableExecutor) Execute(
+func (e tableExecutor) executeDataQuery(
 	ctx context.Context,
 	a *allocator.Allocator,
 	request *Ydb_Table.ExecuteDataQueryRequest,
@@ -1103,7 +1103,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 		onDone(txr, false, r, err)
 	}()
 
-	t, r, err := s.executor.Execute(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+	t, r, err := s.executor.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
