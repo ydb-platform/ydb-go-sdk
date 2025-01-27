@@ -57,6 +57,7 @@ type (
 	}
 	queryExecutor struct {
 		client Ydb_Query_V1.QueryServiceClient
+		core   query.Core
 	}
 )
 
@@ -210,6 +211,15 @@ func (e queryExecutor) executeDataQuery(
 
 	stream, err := e.client.ExecuteQuery(ctx, request, callOptions...)
 	if err != nil {
+		switch {
+		case xerrors.IsTransportError(err):
+			e.core.SetStatus(query.StatusError)
+		case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY, Ydb.StatusIds_BAD_SESSION):
+			e.core.SetStatus(query.StatusError)
+		case xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION):
+			e.core.SetStatus(query.StatusClosed)
+		}
+
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
@@ -431,6 +441,7 @@ func newQuerySession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 		},
 	}
 	s.executor = queryExecutor{
+		core:   core,
 		client: core.Client,
 	}
 
