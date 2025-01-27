@@ -139,8 +139,8 @@ func execute(
 	}
 
 	r, err := newResult(ctx, stream, append(opts,
-		WithStatsCallback(settings.StatsCallback()),
-		WithOnClose(executeCancel),
+		withStatsCallback(settings.StatsCallback()),
+		withOnClose(executeCancel),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

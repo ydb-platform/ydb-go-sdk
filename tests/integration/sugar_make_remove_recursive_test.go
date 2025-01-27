@@ -38,7 +38,7 @@ func TestSugarMakeRemoveRecursive(t *testing.T) {
 	_, err = db.Scripting().Execute(scope.Ctx, query, nil)
 	require.NoError(t, err)
 
-	if version.Gte(os.Getenv("YDB_VERSION"), "23.1") {
+	if version.Gte(os.Getenv("YDB_VERSION"), "25.0") {
 		tablePath = path.Join(testPrefix, "columnTableName")
 		query = fmt.Sprintf(
 			"CREATE TABLE `%v` (id Uint64 NOT NULL, PRIMARY KEY (id)) PARTITION BY HASH(id) WITH (STORE = COLUMN)",

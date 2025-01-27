@@ -87,31 +87,31 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, err
 	return r.resultSets[r.idx], nil
 }
 
-func WithTrace(t *trace.Query) resultOption {
+func withTrace(t *trace.Query) resultOption {
 	return func(s *streamResult) {
 		s.trace = t
 	}
 }
 
-func WithStatsCallback(callback func(queryStats stats.QueryStats)) resultOption {
+func withStatsCallback(callback func(queryStats stats.QueryStats)) resultOption {
 	return func(s *streamResult) {
 		s.statsCallback = callback
 	}
 }
 
-func WithOnClose(onClose func()) resultOption {
+func withOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
 		s.onClose = append(s.onClose, onClose)
 	}
 }
 
-func OnNextPartErr(callback func(err error)) resultOption {
+func onNextPartErr(callback func(err error)) resultOption {
 	return func(s *streamResult) {
 		s.onNextPartErr = append(s.onNextPartErr, callback)
 	}
 }
 
-func OnTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
+func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
 	return func(s *streamResult) {
 		s.onTxMeta = append(s.onTxMeta, callback)
 	}

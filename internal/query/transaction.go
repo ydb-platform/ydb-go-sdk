@@ -93,8 +93,8 @@ func (tx *Transaction) QueryResultSet(
 	}
 
 	resultOpts := []resultOption{
-		WithTrace(tx.s.trace),
-		OnTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+		withTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
@@ -107,7 +107,7 @@ func (tx *Transaction) QueryResultSet(
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
-			OnNextPartErr(func(err error) {
+			onNextPartErr(func(err error) {
 				tx.notifyOnCompleted(xerrors.HideEOF(err))
 			}),
 		)
@@ -144,8 +144,8 @@ func (tx *Transaction) QueryRow(
 	)
 
 	resultOpts := []resultOption{
-		WithTrace(tx.s.trace),
-		OnTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+		withTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
@@ -158,7 +158,7 @@ func (tx *Transaction) QueryRow(
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
-			OnNextPartErr(func(err error) {
+			onNextPartErr(func(err error) {
 				tx.notifyOnCompleted(xerrors.HideEOF(err))
 			}),
 		)
@@ -211,8 +211,8 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	}
 
 	resultOpts := []resultOption{
-		WithTrace(tx.s.trace),
-		OnTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+		withTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
@@ -225,7 +225,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
-			OnNextPartErr(func(err error) {
+			onNextPartErr(func(err error) {
 				tx.notifyOnCompleted(xerrors.HideEOF(err))
 			}),
 		)
@@ -282,8 +282,8 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	}
 
 	resultOpts := []resultOption{
-		WithTrace(tx.s.trace),
-		OnTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+		withTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
@@ -296,7 +296,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 		// notification about complete transaction must be sended for any error or for successfully read all result if
 		// it was execution with commit flag
 		resultOpts = append(resultOpts,
-			OnNextPartErr(func(err error) {
+			onNextPartErr(func(err error) {
 				tx.notifyOnCompleted(xerrors.HideEOF(err))
 			}),
 		)

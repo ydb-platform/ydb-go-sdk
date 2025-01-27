@@ -358,7 +358,7 @@ func TestExecute(t *testing.T) {
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 		var txID string
 		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
-			OnTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+			onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 				txID = txMeta.GetId()
 			}),
 		)
@@ -577,7 +577,7 @@ func TestExecute(t *testing.T) {
 			t.Log("execute")
 			var txID string
 			r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
-				OnTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+				onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 					txID = txMeta.GetId()
 				}),
 			)
@@ -718,7 +718,7 @@ func TestExecute(t *testing.T) {
 			t.Log("execute")
 			var txID string
 			r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
-				OnTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+				onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 					txID = txMeta.GetId()
 				}),
 			)

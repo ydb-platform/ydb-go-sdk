@@ -21,7 +21,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -48,7 +47,7 @@ func TestClient(t *testing.T) {
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
 			attached := 0
-			s, err := createSession(ctx, client, session.WithTrace(
+			s, err := createSession(ctx, client, WithTrace(
 				&trace.Query{
 					OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {
 						return func(info trace.QuerySessionAttachDoneInfo) {
@@ -1541,18 +1540,18 @@ func TestClient(t *testing.T) {
 
 type sessionControllerMock struct {
 	id     string
-	status session.Status
+	status Status
 }
 
 func (s *sessionControllerMock) IsAlive() bool {
-	return session.IsAlive(s.status)
+	return IsAlive(s.status)
 }
 
 func (s *sessionControllerMock) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *sessionControllerMock) SetStatus(status session.Status) {
+func (s *sessionControllerMock) SetStatus(status Status) {
 	s.status = status
 }
 

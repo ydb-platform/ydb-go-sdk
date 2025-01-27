@@ -26,7 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
@@ -390,19 +390,19 @@ func newQuerySession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 		status: table.SessionReady,
 	}
 
-	core, err := session.Open(ctx,
+	core, err := query.Open(ctx,
 		Ydb_Query_V1.NewQueryServiceClient(cc),
-		session.WithConn(cc),
-		session.OnChangeStatus(func(status session.Status) {
+		query.WithConn(cc),
+		query.OnChangeStatus(func(status query.Status) {
 			switch status {
-			case session.StatusClosed:
+			case query.StatusClosed:
 				s.SetStatus(table.SessionClosed)
 				_ = s.Close(context.Background())
-			case session.StatusClosing:
+			case query.StatusClosing:
 				s.SetStatus(table.SessionClosing)
-			case session.StatusInUse:
+			case query.StatusInUse:
 				s.SetStatus(table.SessionBusy)
-			case session.StatusIdle:
+			case query.StatusIdle:
 				s.SetStatus(table.SessionReady)
 			default:
 				s.SetStatus(table.SessionStatusUnknown)
