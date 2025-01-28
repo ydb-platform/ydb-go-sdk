@@ -206,18 +206,13 @@ func (e queryExecutor) executeDataQuery(
 	request.StatsMode = statsModeToStatsMode(executeDataQueryRequest.GetCollectStats())
 	request.ConcurrentResultSets = false
 
-	ctx, cancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	ctx, cancel := xcontext.WithDone(xcontext.ValueOnly(ctx), e.core.Done())
 	defer cancel()
 
 	stream, err := e.client.ExecuteQuery(ctx, request, callOptions...)
 	if err != nil {
-		switch {
-		case xerrors.IsTransportError(err):
-			e.core.SetStatus(query.StatusError)
-		case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY, Ydb.StatusIds_BAD_SESSION):
-			e.core.SetStatus(query.StatusError)
-		case xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION):
-			e.core.SetStatus(query.StatusClosed)
+		if status := query.StatusFromErr(err); status != query.StatusUnknown {
+			e.core.SetStatus(status)
 		}
 
 		return nil, nil, xerrors.WithStackTrace(err)

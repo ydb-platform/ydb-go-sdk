@@ -9,6 +9,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -20,8 +21,9 @@ import (
 
 type (
 	Item interface {
+		closer.Closer
+
 		IsAlive() bool
-		Close(ctx context.Context) error
 		NodeID() uint32
 	}
 	ItemConstraint[T any] interface {

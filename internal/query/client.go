@@ -34,7 +34,6 @@ var (
 )
 
 type (
-	Status      uint32
 	sessionPool interface {
 		closer.Closer
 
@@ -337,10 +336,13 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := execute(ctx, s.ID(), s.client, q, settings, withTrace(s.trace))
+		streamResult, err := s.execute(ctx, q, settings, withTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+		defer func() {
+			_ = streamResult.Close(ctx)
+		}()
 
 		err = readAll(ctx, streamResult)
 		if err != nil {
@@ -381,13 +383,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := execute(ctx, s.ID(), s.client, q,
-			options.ExecuteSettings(opts...), withTrace(s.trace),
-		)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
+		streamResult, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -433,10 +429,13 @@ func clientQueryResultSet(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
 ) (rs result.ClosableResultSet, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
-		streamResult, err := execute(ctx, s.ID(), s.client, q, settings, resultOpts...)
+		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+		defer func() {
+			_ = streamResult.Close(ctx)
+		}()
 
 		rs, err = readMaterializedResultSet(ctx, streamResult)
 		if err != nil {

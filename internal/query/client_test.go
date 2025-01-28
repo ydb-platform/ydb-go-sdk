@@ -1541,6 +1541,7 @@ func TestClient(t *testing.T) {
 type sessionControllerMock struct {
 	id     string
 	status Status
+	done   chan struct{}
 }
 
 func (s *sessionControllerMock) IsAlive() bool {
@@ -1567,16 +1568,26 @@ func (s sessionControllerMock) Status() string {
 	return s.status.String()
 }
 
+func (s sessionControllerMock) Done() <-chan struct{} {
+	return s.done
+}
+
 func newTestSession(id string) *Session {
 	return &Session{
-		Core:  &sessionControllerMock{id: id},
+		Core: &sessionControllerMock{
+			id:   id,
+			done: make(chan struct{}),
+		},
 		trace: &trace.Query{},
 	}
 }
 
 func newTestSessionWithClient(id string, client Ydb_Query_V1.QueryServiceClient, lazyTx bool) *Session {
 	return &Session{
-		Core:   &sessionControllerMock{id: id},
+		Core: &sessionControllerMock{
+			id:   id,
+			done: make(chan struct{}),
+		},
 		client: client,
 		trace:  &trace.Query{},
 		lazyTx: lazyTx,

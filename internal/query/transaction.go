@@ -112,10 +112,8 @@ func (tx *Transaction) QueryResultSet(
 			}),
 		)
 	}
-	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, settings, resultOpts...)
 	if err != nil {
-		tx.s.setStatusFromError(err)
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -163,12 +161,13 @@ func (tx *Transaction) QueryRow(
 			}),
 		)
 	}
-	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, settings, resultOpts...)
 	if err != nil {
-		tx.s.setStatusFromError(err)
-
 		return nil, xerrors.WithStackTrace(err)
 	}
+	defer func() {
+		_ = r.Close(ctx)
+	}()
 
 	row, err = readRow(ctx, r)
 	if err != nil {
@@ -231,12 +230,13 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		)
 	}
 
-	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, settings, resultOpts...)
 	if err != nil {
-		tx.s.setStatusFromError(err)
-
 		return xerrors.WithStackTrace(err)
 	}
+	defer func() {
+		_ = r.Close(ctx)
+	}()
 
 	err = readAll(ctx, r)
 	if err != nil {
@@ -301,10 +301,8 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			}),
 		)
 	}
-	r, err := execute(ctx, tx.s.ID(), tx.s.client, q, settings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, settings, resultOpts...)
 	if err != nil {
-		tx.s.setStatusFromError(err)
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -324,6 +322,12 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
+	defer func() {
+		if finalErr != nil {
+			applyStatusByError(tx.s, finalErr)
+		}
+	}()
+
 	if tx.ID() == baseTx.LazyTxID {
 		return nil
 	}
@@ -344,8 +348,6 @@ func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 
 	err = commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
-		tx.s.setStatusFromError(err)
-
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -365,6 +367,12 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
+	defer func() {
+		if finalErr != nil {
+			applyStatusByError(tx.s, finalErr)
+		}
+	}()
+
 	if tx.ID() == baseTx.LazyTxID {
 		// https://github.com/ydb-platform/ydb-go-sdk/issues/1456
 		return tx.s.Close(ctx)
@@ -380,8 +388,6 @@ func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 
 	err := rollback(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
-		tx.s.setStatusFromError(err)
-
 		return xerrors.WithStackTrace(err)
 	}
 
