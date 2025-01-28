@@ -435,10 +435,14 @@ func newQuerySession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 			_ = core.Close(ctx)
 		},
 	}
-	s.executor = queryExecutor{
-		core:   core,
-		client: core.Client,
+	s.executor = tableExecutor{
+		client:          s.client,
+		ignoreTruncated: s.config.IgnoreTruncated(),
 	}
+	//s.executor = queryExecutor{
+	//	core:   core,
+	//	client: core.Client,
+	//}
 
 	return s, nil
 }
