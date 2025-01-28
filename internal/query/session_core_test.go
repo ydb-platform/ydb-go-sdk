@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/streadway/handy/atomic"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -26,11 +27,11 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 			done           chan struct{}
 			startRecv      = make(chan struct{}, 1)
 			stopRecv       = make(chan struct{}, 1)
-			recvMsgCounter int
+			recvMsgCounter atomic.Int
 		)
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			startRecv <- struct{}{}
-			recvMsgCounter++
+			recvMsgCounter.Add(1)
 			select {
 			case <-done:
 				return nil, errSessionClosed
@@ -49,13 +50,13 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, core)
 		<-stopRecv
-		require.Equal(t, 1, recvMsgCounter)
+		require.Equal(t, int64(1), recvMsgCounter.Get())
 		<-startRecv
 		<-stopRecv
-		require.Equal(t, 2, recvMsgCounter)
+		require.Equal(t, int64(2), recvMsgCounter.Get())
 		<-startRecv
 		close(done)
-		require.GreaterOrEqual(t, recvMsgCounter, 2)
-		require.LessOrEqual(t, recvMsgCounter, 3)
+		require.GreaterOrEqual(t, recvMsgCounter.Get(), int64(2))
+		require.LessOrEqual(t, recvMsgCounter.Get(), int64(3))
 	}, xtest.StopAfter(time.Second))
 }
