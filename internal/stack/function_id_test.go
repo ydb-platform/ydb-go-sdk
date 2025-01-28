@@ -40,6 +40,10 @@ func anonymousFunctionCall() string {
 	return result
 }
 
+func callWithPackageDefinition() string {
+	return FunctionID("", Package("database/sql")).String()
+}
+
 func TestFunctionIDForGenericType(t *testing.T) {
 	t.Run("StaticFunc", func(t *testing.T) {
 		require.Equal(t,
@@ -64,6 +68,12 @@ func TestFunctionIDForGenericType(t *testing.T) {
 		require.Equal(t,
 			"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.anonymousFunctionCall",
 			anonymousFunctionCall(),
+		)
+	})
+	t.Run("CallWithPackageDefinition", func(t *testing.T) {
+		require.Equal(t,
+			"database/sql.callWithPackageDefinition",
+			callWithPackageDefinition(),
 		)
 	})
 }
