@@ -262,6 +262,13 @@ func (core *sessionCore) IsAlive() bool {
 }
 
 func (core *sessionCore) Close(ctx context.Context) (err error) {
+	select {
+	case <-core.done:
+		return nil
+	default:
+		close(core.done)
+	}
+
 	return core.closeOnce(ctx)
 }
 
