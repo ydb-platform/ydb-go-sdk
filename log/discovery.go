@@ -18,7 +18,7 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 			return nil
 		}
 		ctx := with(*info.Context, DEBUG, "ydb", "discovery", "list", "endpoints")
-		l.Log(ctx, "start",
+		l.Log(ctx, "starting discovery...",
 			kv.String("address", info.Address),
 			kv.String("database", info.Database),
 		)
@@ -26,12 +26,12 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 
 		return func(info trace.DiscoveryDiscoverDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, INFO), "done",
+				l.Log(WithLevel(ctx, INFO), "discovery done",
 					kv.Latency(start),
 					kv.Stringer("endpoints", kv.Endpoints(info.Endpoints)),
 				)
 			} else {
-				l.Log(WithLevel(ctx, ERROR), "failed",
+				l.Log(WithLevel(ctx, ERROR), "discovery failed",
 					kv.Error(info.Error),
 					kv.Latency(start),
 					kv.Version(),
@@ -44,18 +44,18 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "discovery", "whoAmI")
-		l.Log(ctx, "start")
+		l.Log(ctx, "starting discovery whoami")
 		start := time.Now()
 
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "done",
+				l.Log(ctx, "done discovery whoami",
 					kv.Latency(start),
 					kv.String("user", info.User),
 					kv.Strings("groups", info.Groups),
 				)
 			} else {
-				l.Log(WithLevel(ctx, WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed discovery whoami",
 					kv.Error(info.Error),
 					kv.Latency(start),
 					kv.Version(),
