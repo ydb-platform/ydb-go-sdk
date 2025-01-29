@@ -1,8 +1,6 @@
 package config
 
 import (
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -301,12 +299,5 @@ func defaults() *Config {
 		idleThreshold:        DefaultSessionPoolIdleThreshold,
 		clock:                clockwork.NewRealClock(),
 		trace:                &trace.Table{},
-		useQuerySession: func() bool {
-			if b, err := strconv.ParseBool(os.Getenv("YDB_TABLE_CLIENT_USE_QUERY_SESSION")); err == nil {
-				return b
-			}
-
-			return false
-		}(),
 	}
 }
