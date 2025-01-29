@@ -556,6 +556,18 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
+// WithExecuteDataQueryOverQueryClient option enables execution data queries from legacy table service client over
+// query client API. Using this option you can execute queries from legacy table service client through
+// `table.Session.Execute` using internal query client API without limitation of 1000 rows in response.
+// Be careful: an OOM problem may happen because bigger result requires more memory
+func WithExecuteDataQueryOverQueryClient(b bool) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.ExecuteDataQueryOverQueryService(b))
+
+		return nil
+	}
+}
+
 // WithSessionPoolSessionIdleTimeToLive limits maximum time to live of idle session
 // If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
 func WithSessionPoolSessionIdleTimeToLive(idleThreshold time.Duration) Option {

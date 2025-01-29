@@ -240,8 +240,12 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableExecuteDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
-				s := &session{
-					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+				s := &Session{
+					client: client,
+					dataQuery: tableClientExecutor{
+						client: client,
+					},
 					config: config.New(),
 				}
 				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
@@ -251,8 +255,12 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableExplainDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
-				s := &session{
-					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+				s := &Session{
+					client: client,
+					dataQuery: tableClientExecutor{
+						client: client,
+					},
 					config: config.New(),
 				}
 				_, err := s.Explain(ctx, "")
@@ -262,8 +270,12 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TablePrepareDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
-				s := &session{
-					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+				s := &Session{
+					client: client,
+					dataQuery: tableClientExecutor{
+						client: client,
+					},
 					config: config.New(),
 				}
 				_, err := s.Prepare(ctx, "")
@@ -279,8 +291,12 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableDeleteSession,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
-				s := &session{
-					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+				s := &Session{
+					client: client,
+					dataQuery: tableClientExecutor{
+						client: client,
+					},
 					config: config.New(),
 				}
 				require.NoError(t, s.Close(ctx))
@@ -289,8 +305,12 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableBeginTransaction,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
-				s := &session{
-					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+				s := &Session{
+					client: client,
+					dataQuery: tableClientExecutor{
+						client: client,
+					},
 					config: config.New(),
 				}
 				_, err := s.BeginTransaction(ctx, table.TxSettings())
@@ -300,10 +320,14 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableCommitTransaction,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
+				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 				tx := &transaction{
 					Identifier: tx.ID(""),
-					s: &session{
-						client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					s: &Session{
+						client: client,
+						dataQuery: tableClientExecutor{
+							client: client,
+						},
 						config: config.New(),
 					},
 				}
@@ -314,10 +338,14 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableRollbackTransaction,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
+				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 				tx := &transaction{
 					Identifier: tx.ID(""),
-					s: &session{
-						client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					s: &Session{
+						client: client,
+						dataQuery: tableClientExecutor{
+							client: client,
+						},
 						config: config.New(),
 					},
 				}
@@ -328,8 +356,12 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableKeepAlive,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
-				s := &session{
-					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+				s := &Session{
+					client: client,
+					dataQuery: tableClientExecutor{
+						client: client,
+					},
 					config: config.New(),
 				}
 				require.NoError(t, s.KeepAlive(ctx))
@@ -473,7 +505,7 @@ func TestCreateTableRegression(t *testing.T) {
 				},
 			},
 		),
-	), config.New())
+	), config.New(config.UseQuerySession(false)))
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
@@ -564,7 +596,7 @@ func TestDescribeTableRegression(t *testing.T) {
 				},
 			},
 		),
-	), config.New())
+	), config.New(config.UseQuerySession(false)))
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),

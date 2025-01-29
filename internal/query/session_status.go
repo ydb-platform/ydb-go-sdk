@@ -1,13 +1,11 @@
-package session
+package query
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type Status uint32
 
 const (
-	statusUnknown = Status(iota)
+	StatusUnknown = Status(iota)
 	StatusIdle
 	StatusInUse
 	StatusClosing
@@ -17,7 +15,7 @@ const (
 
 func (s Status) String() string {
 	switch s {
-	case statusUnknown:
+	case StatusUnknown:
 		return "Unknown"
 	case StatusIdle:
 		return "Idle"
@@ -31,5 +29,14 @@ func (s Status) String() string {
 		return "Error"
 	default:
 		return fmt.Sprintf("Unknown%d", s)
+	}
+}
+
+func IsAlive(status Status) bool {
+	switch status {
+	case StatusClosed, StatusClosing, StatusError:
+		return false
+	default:
+		return true
 	}
 }

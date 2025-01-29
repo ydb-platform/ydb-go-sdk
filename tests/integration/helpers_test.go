@@ -157,6 +157,7 @@ func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
 		if err != nil {
 			return nil, err
 		}
+
 		return fixenv.NewGenericResult(db), nil
 	}
 	return fixenv.CacheResult(scope.Env, f)
