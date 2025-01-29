@@ -49,13 +49,13 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "done discovery whoami",
+				l.Log(ctx, "discovery whoami done",
 					kv.Latency(start),
 					kv.String("user", info.User),
 					kv.Strings("groups", info.Groups),
 				)
 			} else {
-				l.Log(WithLevel(ctx, WARN), "failed discovery whoami",
+				l.Log(WithLevel(ctx, WARN), "discovery whoami failed",
 					kv.Error(info.Error),
 					kv.Latency(start),
 					kv.Version(),

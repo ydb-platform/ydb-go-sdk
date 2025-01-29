@@ -24,11 +24,11 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "new")
-			l.Log(ctx, "start")
+			l.Log(ctx, "ydb starting create new query client")
 			start := time.Now()
 
 			return func(info trace.QueryNewDoneInfo) {
-				l.Log(WithLevel(ctx, INFO), "done",
+				l.Log(WithLevel(ctx, INFO), "ydb create query client done",
 					kv.Latency(start),
 				)
 			}
@@ -38,12 +38,12 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "close")
-			l.Log(ctx, "start")
+			l.Log(ctx, "ydb query client starting close...")
 			start := time.Now()
 
 			return func(info trace.QueryCloseDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "done",
+					l.Log(ctx, "ydb query close done",
 						kv.Latency(start),
 					)
 				} else {
@@ -51,7 +51,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "failed",
+					l.Log(WithLevel(ctx, lvl), "ydb query close failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -64,11 +64,11 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "new")
-			l.Log(ctx, "start")
+			l.Log(ctx, "ydb query service starting create pool...")
 			start := time.Now()
 
 			return func(info trace.QueryPoolNewDoneInfo) {
-				l.Log(WithLevel(ctx, INFO), "done",
+				l.Log(WithLevel(ctx, INFO), "ydb query service create pool done",
 					kv.Latency(start),
 					kv.Int("Limit", info.Limit),
 				)
@@ -79,12 +79,12 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "close")
-			l.Log(ctx, "start")
+			l.Log(ctx, "ydb query service starting close pool...")
 			start := time.Now()
 
 			return func(info trace.QueryPoolCloseDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "done",
+					l.Log(ctx, "ydb query service close done",
 						kv.Latency(start),
 					)
 				} else {
@@ -92,7 +92,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "failed",
+					l.Log(WithLevel(ctx, lvl), "ydb query service close failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -105,12 +105,12 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "try")
-			l.Log(ctx, "start")
+			l.Log(ctx, "ydb query service starting pool try attempt...")
 			start := time.Now()
 
 			return func(info trace.QueryPoolTryDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "done",
+					l.Log(ctx, "ydb query service pool try done",
 						kv.Latency(start),
 					)
 				} else {
@@ -118,7 +118,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "failed",
+					l.Log(WithLevel(ctx, lvl), "ydb query service pool try failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),

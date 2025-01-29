@@ -70,7 +70,7 @@ func internalCoordination(
 
 			return func(info trace.CoordinationAlterNodeDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "alter coordination node completed",
+					l.Log(WithLevel(ctx, INFO), "alter coordination node done",
 						kv.Latency(start),
 					)
 				} else {
@@ -317,7 +317,7 @@ func internalCoordination(
 			start := time.Now()
 
 			return func(info trace.CoordinationSessionStartDoneInfo) {
-				l.Log(ctx, "coordination session start completed",
+				l.Log(ctx, "coordination session start done",
 					kv.Latency(start),
 					kv.Error(info.Error),
 					kv.Version(),
