@@ -88,8 +88,10 @@ func TestDoBadSession(t *testing.T) {
 		p := pool.New[*Session, Session](ctx,
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				s := simpleSession(t)
-				s.onClose = append(s.onClose, func(s *Session) {
+				s.onClose = append(s.onClose, func(s *Session) error {
 					closed[s] = true
+
+					return nil
 				})
 
 				return s, nil

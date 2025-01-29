@@ -241,7 +241,7 @@ func TestIssue798TruncatedError(t *testing.T) {
 	}
 }
 
-func TestTestIssue798NoTruncatedErrorOverQueryService(t *testing.T) {
+func TestIssue798NoTruncatedErrorOverQueryService(t *testing.T) {
 	const rowsLimit = 1000
 	var (
 		scope     = newScope(t)

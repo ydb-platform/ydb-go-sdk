@@ -69,7 +69,7 @@ func (core *sessionCore) SetStatus(status Status) {
 	default:
 		if old := core.status.Swap(uint32(status)); old != uint32(status) {
 			for _, onChangeStatus := range core.onChangeStatus {
-				onChangeStatus(Status(old))
+				onChangeStatus(status)
 			}
 		}
 	}

@@ -248,7 +248,7 @@ var (
 // Note that after session is no longer needed it should be destroyed by
 // Close() call.
 type Session struct {
-	onClose   []func(s *Session)
+	onClose   []func(s *Session) error
 	id        string
 	client    Ydb_Table_V1.TableServiceClient
 	status    table.SessionStatus
@@ -256,7 +256,6 @@ type Session struct {
 	dataQuery dataQueryExecutor
 	lastUsage atomic.Int64
 	statusMtx sync.RWMutex
-	closeOnce sync.Once
 	nodeID    atomic.Uint32
 }
 
@@ -330,7 +329,9 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 	return newTableSession(ctx, cc, config)
 }
 
-func newTableSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Session, error) {
+func newTableSession( //nolint:funlen
+	ctx context.Context, cc grpc.ClientConnInterface, config *config.Config,
+) (*Session, error) {
 	response, err := Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(ctx,
 		&Ydb_Table.CreateSessionRequest{
 			OperationParams: operation.Params(
@@ -354,8 +355,8 @@ func newTableSession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 		id:     result.GetSessionId(),
 		config: config,
 		status: table.SessionReady,
-		onClose: []func(s *Session){
-			func(s *Session) {
+		onClose: []func(s *Session) error{
+			func(s *Session) error {
 				_, err = s.client.DeleteSession(ctx,
 					&Ydb_Table.DeleteSessionRequest{
 						SessionId: s.id,
@@ -366,6 +367,11 @@ func newTableSession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 						),
 					},
 				)
+				if err != nil {
+					return xerrors.WithStackTrace(err)
+				}
+
+				return nil
 			},
 		},
 	}
@@ -389,7 +395,9 @@ func newTableSession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 	return s, nil
 }
 
-func newQuerySession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Session, error) {
+func newQuerySession( //nolint:funlen
+	ctx context.Context, cc grpc.ClientConnInterface, config *config.Config,
+) (*Session, error) {
 	s := &Session{
 		config: config,
 		status: table.SessionReady,
@@ -430,9 +438,14 @@ func newQuerySession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 			},
 		),
 	)
-	s.onClose = []func(s *Session){
-		func(s *Session) {
-			_ = core.Close(ctx)
+	s.onClose = []func(s *Session) error{
+		func(s *Session) error {
+			err := core.Close(ctx)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+
+			return nil
 		},
 	}
 	if config.ExecuteDataQueryOverQueryService() {
@@ -468,19 +481,11 @@ func (s *Session) Close(ctx context.Context) (err error) {
 		s.SetStatus(table.SessionClosed)
 	}()
 
-	isClosed := true
-	s.closeOnce.Do(func() {
-		isClosed = false
-
-		for _, onClose := range s.onClose {
-			onClose(s)
+	for _, onClose := range s.onClose {
+		err := onClose(s)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
 		}
-	})
-	if isClosed {
-		return xerrors.WithStackTrace(errSessionClosed)
-	}
-	if err != nil {
-		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
