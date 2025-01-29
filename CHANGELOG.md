@@ -1,5 +1,3 @@
-* Supported raw value for optional builder using `ydb.ParamsBuilder().Param("$param").BeginOptional().Value(raw value.Value).EndOptional().Build()`
-
 ## v3.98.0
 * Supported pool of encoders, which implement ResetableWriter interface
 
