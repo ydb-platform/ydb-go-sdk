@@ -30,7 +30,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint64Value{
@@ -45,7 +51,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int64Value{
@@ -60,7 +72,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
@@ -75,7 +93,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int32Value{
@@ -90,7 +114,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
@@ -105,7 +135,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int32Value{
@@ -120,7 +156,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
@@ -135,7 +177,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int32Value{
@@ -150,7 +198,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_BoolValue{
@@ -165,7 +219,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
@@ -180,7 +240,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_BytesValue{
@@ -195,7 +261,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_FloatValue{
@@ -210,7 +282,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_DoubleValue{
@@ -225,9 +303,14 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL},
+							},
+						},
+					},
 				},
-
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int64Value{
 						Int64Value: 1000000,
@@ -241,7 +324,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
@@ -256,7 +345,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
@@ -271,7 +366,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint64Value{
@@ -286,10 +387,16 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_DecimalType{
-						DecimalType: &Ydb.DecimalType{
-							Precision: 22,
-							Scale:     9,
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_DecimalType{
+									DecimalType: &Ydb.DecimalType{
+										Precision: 22,
+										Scale:     9,
+									},
+								},
+							},
 						},
 					},
 				},
@@ -307,7 +414,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
@@ -322,7 +435,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
@@ -337,7 +456,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_BytesValue{
@@ -352,7 +477,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Low_128{
@@ -368,7 +499,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Low_128{
@@ -384,7 +521,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
@@ -399,7 +542,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
@@ -414,7 +563,13 @@ func TestOptional(t *testing.T) {
 
 			expected: expected{
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP},
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP},
+							},
+						},
+					},
 				},
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
@@ -439,13 +594,7 @@ func TestOptional(t *testing.T) {
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_OptionalType{
-								OptionalType: &Ydb.OptionalType{
-									Item: tc.expected.Type,
-								},
-							},
-						},
+						Type:  tc.expected.Type,
 						Value: tc.expected.Value,
 					},
 				}), xtest.ToJSON(params))
