@@ -29,12 +29,6 @@ func (b *optionalBuilder) EndOptional() Builder {
 	return b.opt.parent
 }
 
-func (p *optional) Value(v value.Value) *optionalBuilder {
-	p.value = v
-
-	return &optionalBuilder{opt: p}
-}
-
 func (p *optional) Text(v *string) *optionalBuilder {
 	p.value = value.NullableTextValue(v)
 
