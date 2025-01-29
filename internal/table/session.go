@@ -323,7 +323,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 		onDone(s, finalErr)
 	}()
 
-	if config.ExecuteDataQueryOverQueryService() {
+	if config.UseQuerySession() {
 		return newQuerySession(ctx, cc, config)
 	}
 
@@ -435,9 +435,16 @@ func newQuerySession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 			_ = core.Close(ctx)
 		},
 	}
-	s.dataQuery = queryClientExecutor{
-		core:   core,
-		client: core.Client,
+	if config.ExecuteDataQueryOverQueryService() {
+		s.dataQuery = queryClientExecutor{
+			core:   core,
+			client: core.Client,
+		}
+	} else {
+		s.dataQuery = tableClientExecutor{
+			client:          s.client,
+			ignoreTruncated: s.config.IgnoreTruncated(),
+		}
 	}
 
 	return s, nil
