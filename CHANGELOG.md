@@ -1,3 +1,4 @@
+## v3.99.0
 * Added `ydb.WithExecuteDataQueryOverQueryClient(bool)` option to execute data queries from table service 
   client using query client API. Using this option you can execute queries from legacy table service client 
   through `table.Session.Execute` using internal query client API without limitation of 1000 rows in response.
