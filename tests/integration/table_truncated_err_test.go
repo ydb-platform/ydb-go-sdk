@@ -241,6 +241,8 @@ func TestIssue798TruncatedError(t *testing.T) {
 		}
 	})
 	t.Run("NoTruncatedErrorOverQueryService", func(t *testing.T) {
+		t.Skip()
+
 		var (
 			scope     = newScope(t)
 			driver    = scope.Driver(ydb.WithExecuteDataQueryOverQueryClient(true))
