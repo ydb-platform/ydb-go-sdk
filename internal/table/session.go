@@ -43,19 +43,19 @@ import (
 )
 
 type (
-	executor interface {
-		executeDataQuery(
+	dataQueryExecutor interface {
+		execute(
 			ctx context.Context,
 			a *allocator.Allocator,
 			request *Ydb_Table.ExecuteDataQueryRequest,
 			callOptions ...grpc.CallOption,
 		) (*transaction, result.Result, error)
 	}
-	tableExecutor struct {
+	tableClientExecutor struct {
 		client          Ydb_Table_V1.TableServiceClient
 		ignoreTruncated bool
 	}
-	queryExecutor struct {
+	queryClientExecutor struct {
 		client Ydb_Query_V1.QueryServiceClient
 		core   query.Core
 	}
@@ -185,7 +185,7 @@ func queryExecuteStreamResultToTableResult(
 	), nil
 }
 
-func (e queryExecutor) executeDataQuery(
+func (e queryClientExecutor) execute(
 	ctx context.Context,
 	a *allocator.Allocator,
 	executeDataQueryRequest *Ydb_Table.ExecuteDataQueryRequest,
@@ -221,7 +221,7 @@ func (e queryExecutor) executeDataQuery(
 	return queryExecuteStreamResultToTableResult(ctx, stream)
 }
 
-func (e tableExecutor) executeDataQuery(
+func (e tableClientExecutor) execute(
 	ctx context.Context,
 	a *allocator.Allocator,
 	request *Ydb_Table.ExecuteDataQueryRequest,
@@ -236,8 +236,8 @@ func (e tableExecutor) executeDataQuery(
 }
 
 var (
-	_ executor = (*tableExecutor)(nil)
-	_ executor = (*queryExecutor)(nil)
+	_ dataQueryExecutor = (*tableClientExecutor)(nil)
+	_ dataQueryExecutor = (*queryClientExecutor)(nil)
 )
 
 // Session represents a single table API session.
@@ -253,7 +253,7 @@ type Session struct {
 	client    Ydb_Table_V1.TableServiceClient
 	status    table.SessionStatus
 	config    *config.Config
-	executor  executor
+	dataQuery dataQueryExecutor
 	lastUsage atomic.Int64
 	statusMtx sync.RWMutex
 	closeOnce sync.Once
@@ -381,7 +381,7 @@ func newTableSession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 			},
 		),
 	)
-	s.executor = tableExecutor{
+	s.dataQuery = tableClientExecutor{
 		client:          s.client,
 		ignoreTruncated: s.config.IgnoreTruncated(),
 	}
@@ -435,7 +435,7 @@ func newQuerySession(ctx context.Context, cc grpc.ClientConnInterface, config *c
 			_ = core.Close(ctx)
 		},
 	}
-	s.executor = queryExecutor{
+	s.dataQuery = queryClientExecutor{
 		core:   core,
 		client: core.Client,
 	}
@@ -1109,7 +1109,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 		onDone(txr, false, r, err)
 	}()
 
-	t, r, err := s.executor.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+	t, r, err := s.dataQuery.execute(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}

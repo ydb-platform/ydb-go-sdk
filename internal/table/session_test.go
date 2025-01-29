@@ -243,7 +243,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 				s := &Session{
 					client: client,
-					executor: tableExecutor{
+					dataQuery: tableClientExecutor{
 						client: client,
 					},
 					config: config.New(),
@@ -258,7 +258,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 				s := &Session{
 					client: client,
-					executor: tableExecutor{
+					dataQuery: tableClientExecutor{
 						client: client,
 					},
 					config: config.New(),
@@ -273,7 +273,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 				s := &Session{
 					client: client,
-					executor: tableExecutor{
+					dataQuery: tableClientExecutor{
 						client: client,
 					},
 					config: config.New(),
@@ -294,7 +294,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 				s := &Session{
 					client: client,
-					executor: tableExecutor{
+					dataQuery: tableClientExecutor{
 						client: client,
 					},
 					config: config.New(),
@@ -308,7 +308,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 				s := &Session{
 					client: client,
-					executor: tableExecutor{
+					dataQuery: tableClientExecutor{
 						client: client,
 					},
 					config: config.New(),
@@ -325,7 +325,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					Identifier: tx.ID(""),
 					s: &Session{
 						client: client,
-						executor: tableExecutor{
+						dataQuery: tableClientExecutor{
 							client: client,
 						},
 						config: config.New(),
@@ -343,7 +343,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					Identifier: tx.ID(""),
 					s: &Session{
 						client: client,
-						executor: tableExecutor{
+						dataQuery: tableClientExecutor{
 							client: client,
 						},
 						config: config.New(),
@@ -359,7 +359,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 				s := &Session{
 					client: client,
-					executor: tableExecutor{
+					dataQuery: tableClientExecutor{
 						client: client,
 					},
 					config: config.New(),

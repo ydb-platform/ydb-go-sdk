@@ -85,7 +85,7 @@ func (s *statement) execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	t, r, err := s.session.executor.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+	t, r, err := s.session.dataQuery.execute(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
