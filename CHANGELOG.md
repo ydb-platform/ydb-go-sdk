@@ -1,3 +1,4 @@
+## v3.99.1
 * Bumped dependencies:
   - `golang.org/x/net from` v0.23.0 to v0.33.0
   - `golang.org/x/sync from` v0.6.0 to v0.10.0
