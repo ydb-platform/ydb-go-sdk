@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -12,6 +13,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
+
+var errNilExpiresAt = errors.New("nil claims.ExpiresAt field")
 
 type authErrorOption interface {
 	applyAuthErrorOption(w io.Writer)

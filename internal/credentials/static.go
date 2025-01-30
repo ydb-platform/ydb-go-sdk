@@ -146,6 +146,10 @@ func parseExpiresAt(raw string) (expiresAt time.Time, err error) {
 		return expiresAt, xerrors.WithStackTrace(err)
 	}
 
+	if claims.ExpiresAt == nil {
+		return expiresAt, xerrors.WithStackTrace(errNilExpiresAt)
+	}
+
 	return claims.ExpiresAt.Time, nil
 }
 
