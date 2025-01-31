@@ -315,8 +315,8 @@ func toValue(v interface{}) (_ value.Value, err error) {
 				vv, err := toValue(v.Field(i).Interface())
 				if err != nil {
 					return nil, xerrors.WithStackTrace(
-						fmt.Errorf("cannot parse %v as values of dict: %w",
-							v.Index(i).Interface(), err,
+						fmt.Errorf("cannot parse %v as values of struct: %w",
+							v.Field(i).Interface(), err,
 						),
 					)
 				}

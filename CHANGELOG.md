@@ -1,3 +1,4 @@
+* Fixed panic when error returned from parsing sql params
 * Fixed explicit null dereferenced issue in internal/credentials/static.go (CWE-476)
 
 ## v3.99.1
