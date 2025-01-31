@@ -1,3 +1,6 @@
+* Fixed potential infinity loop for local dc detection
+* Fixed nil pointer dereferenced in a topic listener
+
 ## v3.99.2
 * Fixed panic when error returned from parsing sql params
 * Fixed explicit null dereferenced issue in internal/credentials/static.go (CWE-476)
