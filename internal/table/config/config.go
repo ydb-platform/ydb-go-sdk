@@ -154,6 +154,23 @@ func WithIgnoreTruncated() Option {
 	}
 }
 
+// ExecuteDataQueryOverQueryService overrides Execute handle with query service execute with materialized result
+func ExecuteDataQueryOverQueryService(b bool) Option {
+	return func(c *Config) {
+		c.executeDataQueryOverQueryService = b
+		if b {
+			c.useQuerySession = true
+		}
+	}
+}
+
+// UseQuerySession creates session using query service client
+func UseQuerySession(b bool) Option {
+	return func(c *Config) {
+		c.useQuerySession = b
+	}
+}
+
 // WithClock replaces default clock
 func WithClock(clock clockwork.Clock) Option {
 	return func(c *Config) {
@@ -172,7 +189,9 @@ type Config struct {
 	deleteTimeout        time.Duration
 	idleThreshold        time.Duration
 
-	ignoreTruncated bool
+	ignoreTruncated                  bool
+	useQuerySession                  bool
+	executeDataQueryOverQueryService bool
 
 	trace *trace.Table
 
@@ -215,6 +234,16 @@ func (c *Config) KeepAliveMinSize() int {
 // IgnoreTruncated specifies behavior on truncated flag
 func (c *Config) IgnoreTruncated() bool {
 	return c.ignoreTruncated
+}
+
+// UseQuerySession specifies behavior on create/delete session
+func (c *Config) UseQuerySession() bool {
+	return c.useQuerySession
+}
+
+// ExecuteDataQueryOverQueryService specifies behavior on execute handle
+func (c *Config) ExecuteDataQueryOverQueryService() bool {
+	return c.executeDataQueryOverQueryService
 }
 
 // IdleKeepAliveThreshold is a number of keepAlive messages to call before the

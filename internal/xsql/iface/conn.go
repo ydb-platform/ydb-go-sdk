@@ -12,6 +12,7 @@ type Conn interface {
 	driver.Pinger
 
 	ID() string
+	NodeID() uint32
 
 	Exec(ctx context.Context, sql string, params *params.Params) (result driver.Result, err error)
 	Query(ctx context.Context, sql string, params *params.Params) (result driver.RowsNextResultSet, err error)

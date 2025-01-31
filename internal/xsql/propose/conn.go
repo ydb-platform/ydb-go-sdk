@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -33,6 +32,10 @@ type Conn struct {
 	onClose []func()
 	closed  atomic.Bool
 	fakeTx  bool
+}
+
+func (c *Conn) NodeID() uint32 {
+	return c.session.NodeID()
 }
 
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
@@ -111,7 +114,7 @@ func New(ctx context.Context, parent Parent, s *query.Session, opts ...Option) *
 }
 
 func (c *Conn) isReady() bool {
-	return c.session.Status() == session.StatusIdle.String()
+	return c.session.Status() == query.StatusIdle.String()
 }
 
 func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx iface.Tx, finalErr error) {
@@ -140,7 +143,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(errNotReadyConn)
 	}
 
-	if !c.session.Core.IsAlive() {
+	if !c.session.IsAlive() {
 		return xerrors.WithStackTrace(errNotReadyConn)
 	}
 

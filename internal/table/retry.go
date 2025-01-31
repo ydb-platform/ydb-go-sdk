@@ -18,7 +18,7 @@ type sessionPool interface {
 	closer.Closer
 
 	Stats() pool.Stats
-	With(ctx context.Context, f func(ctx context.Context, s *session) error, opts ...retry.Option) error
+	With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
 }
 
 func do(
@@ -64,7 +64,7 @@ func retryBackoff(
 	op table.Operation,
 	opts ...retry.Option,
 ) error {
-	return pool.With(ctx, func(ctx context.Context, s *session) error {
+	return pool.With(ctx, func(ctx context.Context, s *Session) error {
 		if err := op(ctx, s); err != nil {
 			s.checkError(err)
 

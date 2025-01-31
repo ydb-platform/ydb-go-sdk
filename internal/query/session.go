@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -20,7 +19,7 @@ var _ query.Session = (*Session)(nil)
 
 type (
 	Session struct {
-		session.Core
+		Core
 
 		client Ydb_Query_V1.QueryServiceClient
 		trace  *trace.Query
@@ -37,10 +36,8 @@ func (s *Session) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	r, err := execute(ctx, s.ID(), s.client, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
 	if err != nil {
-		s.setStatusFromError(err)
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -55,12 +52,13 @@ func (s *Session) QueryResultSet(
 func (s *Session) queryRow(
 	ctx context.Context, q string, settings executeSettings, resultOpts ...resultOption,
 ) (row query.Row, finalErr error) {
-	r, err := execute(ctx, s.ID(), s.client, q, settings, resultOpts...)
+	r, err := s.execute(ctx, q, settings, resultOpts...)
 	if err != nil {
-		s.setStatusFromError(err)
-
 		return nil, xerrors.WithStackTrace(err)
 	}
+	defer func() {
+		_ = r.Close(ctx)
+	}()
 
 	row, err = readRow(ctx, r)
 	if err != nil {
@@ -86,9 +84,9 @@ func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execut
 }
 
 func createSession(
-	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...session.Option,
+	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...Option,
 ) (*Session, error) {
-	core, err := session.Open(ctx, client, opts...)
+	core, err := Open(ctx, client, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -110,6 +108,7 @@ func (s *Session) Begin(
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
 	defer func() {
 		if finalErr != nil {
+			applyStatusByError(s, finalErr)
 			onDone(finalErr, nil)
 		} else {
 			onDone(nil, tx)
@@ -125,8 +124,6 @@ func (s *Session) Begin(
 
 	txID, err := begin(ctx, s.client, s.ID(), txSettings)
 	if err != nil {
-		s.setStatusFromError(err)
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -134,6 +131,25 @@ func (s *Session) Begin(
 		LazyID: baseTx.ID(txID),
 		s:      s,
 	}, nil
+}
+
+func (s *Session) execute(
+	ctx context.Context, q string, settings executeSettings, opts ...resultOption,
+) (_ *streamResult, finalErr error) {
+	ctx, cancel := xcontext.WithDone(ctx, s.Done())
+	defer func() {
+		if finalErr != nil {
+			cancel()
+			applyStatusByError(s, finalErr)
+		}
+	}()
+
+	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts, withOnClose(cancel))...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
 }
 
 func (s *Session) Exec(
@@ -145,12 +161,13 @@ func (s *Session) Exec(
 		onDone(finalErr)
 	}()
 
-	r, err := execute(ctx, s.ID(), s.client, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
 	if err != nil {
-		s.setStatusFromError(err)
-
 		return xerrors.WithStackTrace(err)
 	}
+	defer func() {
+		_ = r.Close(ctx)
+	}()
 
 	err = readAll(ctx, r)
 	if err != nil {
@@ -169,23 +186,10 @@ func (s *Session) Query(
 		onDone(finalErr)
 	}()
 
-	r, err := execute(ctx, s.ID(), s.client, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
 	if err != nil {
-		s.setStatusFromError(err)
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return r, nil
-}
-
-func (s *Session) setStatusFromError(err error) {
-	switch {
-	case xerrors.IsTransportError(err):
-		s.SetStatus(session.StatusError)
-	case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY, Ydb.StatusIds_BAD_SESSION):
-		s.SetStatus(session.StatusError)
-	case xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION):
-		s.SetStatus(session.StatusClosed)
-	}
 }

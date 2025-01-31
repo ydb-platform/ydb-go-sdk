@@ -7,64 +7,64 @@ import (
 )
 
 type (
-	query interface {
+	Query interface {
 		String() string
 		ID() string
 		YQL() string
 
 		toYDB(a *allocator.Allocator) *Ydb_Table.Query
 	}
-	textDataQuery     string
-	preparedDataQuery struct {
+	textQuery     string
+	preparedQuery struct {
 		id  string
 		sql string
 	}
 )
 
-func (q textDataQuery) String() string {
+func (q textQuery) String() string {
 	return string(q)
 }
 
-func (q textDataQuery) ID() string {
+func (q textQuery) ID() string {
 	return ""
 }
 
-func (q textDataQuery) YQL() string {
+func (q textQuery) YQL() string {
 	return string(q)
 }
 
-func (q textDataQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
+func (q textQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
 	query := a.TableQuery()
 	query.Query = a.TableQueryYqlText(string(q))
 
 	return query
 }
 
-func (q preparedDataQuery) String() string {
+func (q preparedQuery) String() string {
 	return q.sql
 }
 
-func (q preparedDataQuery) ID() string {
+func (q preparedQuery) ID() string {
 	return q.id
 }
 
-func (q preparedDataQuery) YQL() string {
+func (q preparedQuery) YQL() string {
 	return q.sql
 }
 
-func (q preparedDataQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
+func (q preparedQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
 	query := a.TableQuery()
 	query.Query = a.TableQueryID(q.id)
 
 	return query
 }
 
-func queryFromText(s string) query {
-	return textDataQuery(s)
+func queryFromText(s string) Query {
+	return textQuery(s)
 }
 
-func queryPrepared(id, sql string) query {
-	return preparedDataQuery{
+func queryPrepared(id, sql string) Query {
+	return preparedQuery{
 		id:  id,
 		sql: sql,
 	}

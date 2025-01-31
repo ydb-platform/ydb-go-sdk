@@ -14,9 +14,10 @@ import (
 )
 
 type FunctionIDArg struct {
-	FuncDecl *ast.FuncDecl
-	ArgPos   token.Pos
-	ArgEnd   token.Pos
+	FuncDecl      *ast.FuncDecl
+	ArgPos        token.Pos
+	ArgEnd        token.Pos
+	StackCallPath string
 }
 
 func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
@@ -24,39 +25,47 @@ func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer f.Close()
-	size := int(info.Size())
-	src := make([]byte, size)
+
+	fileSize := int(info.Size())
+	src := make([]byte, fileSize)
 	n, err := io.ReadFull(f, src)
 	if err != nil {
 		return nil, err
 	}
-	if n < size {
-		return nil, fmt.Errorf("error: size of %q changed during reading (from %d to %d bytes)", filename, size, n)
-	} else if n > size {
-		return nil, fmt.Errorf("error: size of %q changed during reading (from %d to >=%d bytes)", filename, size, len(src))
+
+	if n < fileSize {
+		return nil, fmt.Errorf("error: fileSize of %s changed during reading (from %d to %d bytes)", filename,
+			fileSize, n)
+	} else if n > fileSize {
+		return nil, fmt.Errorf("error: fileSize of %s changed during reading (from %d to >=%d bytes)", filename,
+			fileSize, len(src))
 	}
 
 	return src, nil
 }
 
 func FixSource(fset *token.FileSet, path string, src []byte, listOfArgs []FunctionIDArg) ([]byte, error) {
-	var fixed []byte
 	var previousArgEnd int
+	var fixedSource []byte
+
 	for _, arg := range listOfArgs {
 		argPosOffset := fset.Position(arg.ArgPos).Offset
 		argEndOffset := fset.Position(arg.ArgEnd).Offset
+
 		argument, err := makeCall(fset, path, arg)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error during making call path: %w", err)
 		}
-		fixed = append(fixed, src[previousArgEnd:argPosOffset]...)
-		fixed = append(fixed, fmt.Sprintf("%q", argument)...)
+
+		fixedSource = append(fixedSource, src[previousArgEnd:argPosOffset]...)
+		fixedSource = append(fixedSource, fmt.Sprintf("%q", argument)...)
 		previousArgEnd = argEndOffset
 	}
-	fixed = append(fixed, src[previousArgEnd:]...)
+	fixedSource = append(fixedSource, src[previousArgEnd:]...)
 
-	return fixed, nil
+	return fixedSource, nil
 }
 
 func WriteFile(filename string, formatted []byte, perm fs.FileMode) error {
@@ -76,18 +85,24 @@ func WriteFile(filename string, formatted []byte, perm fs.FileMode) error {
 }
 
 func makeCall(fset *token.FileSet, path string, arg FunctionIDArg) (string, error) {
-	basePath := filepath.Join("github.com", "ydb-platform", version.Package, "v"+version.Major, "")
-	packageName, err := getPackageName(fset, arg)
-	if err != nil {
-		return "", err
-	}
-	filePath := filepath.Dir(filepath.Dir(path))
 	funcName, err := getFuncName(arg.FuncDecl)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error during getting function name: %w", err)
 	}
 
-	return filepath.Join(basePath, filePath, packageName) + "." + funcName, nil
+	if arg.StackCallPath != "" {
+		return arg.StackCallPath + "." + funcName, nil
+	}
+
+	modulePath := filepath.Join("github.com", "ydb-platform", version.Package, "v"+version.Major, "")
+	packageName, err := getPackageName(fset, arg)
+	if err != nil {
+		return "", fmt.Errorf("error during getting package name for %s: %w", funcName, err)
+	}
+
+	filePath := filepath.Dir(filepath.Dir(path))
+
+	return filepath.Join(modulePath, filePath, packageName) + "." + funcName, nil
 }
 
 func getFuncName(funcDecl *ast.FuncDecl) (string, error) {
@@ -128,7 +143,7 @@ func getPackageName(fset *token.FileSet, arg FunctionIDArg) (string, error) {
 	file := fset.File(arg.ArgPos)
 	parsedFile, err := parser.ParseFile(fset, file.Name(), nil, parser.PackageClauseOnly)
 	if err != nil {
-		return "", fmt.Errorf("error during get package name function")
+		return "", fmt.Errorf("error during getting package name function")
 	}
 
 	return parsedFile.Name.Name, nil

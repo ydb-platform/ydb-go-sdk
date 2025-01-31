@@ -85,16 +85,18 @@ func TestDoBadSession(t *testing.T) {
 	ctx := xtest.Context(t)
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		closed := make(map[table.Session]bool)
-		p := pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+		p := pool.New[*Session, Session](ctx,
+			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				s := simpleSession(t)
-				s.onClose = append(s.onClose, func(s *session) {
+				s.onClose = append(s.onClose, func(s *Session) error {
 					closed[s] = true
+
+					return nil
 				})
 
 				return s, nil
 			}),
-			pool.WithSyncCloseItem[*session, session](),
+			pool.WithSyncCloseItem[*Session, Session](),
 		)
 		var (
 			i          int
@@ -136,11 +138,11 @@ func TestDoCreateSessionError(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithTimeout(rootCtx, 30*time.Millisecond)
 		defer cancel()
-		p := pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+		p := pool.New[*Session, Session](ctx,
+			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 			}),
-			pool.WithSyncCloseItem[*session, session](),
+			pool.WithSyncCloseItem[*Session, Session](),
 		)
 		err := do(ctx, p, config.New(),
 			func(ctx context.Context, s table.Session) error {
@@ -305,11 +307,11 @@ func TestDoContextDeadline(t *testing.T) {
 		cc: testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	ctx := xtest.Context(t)
-	p := pool.New[*session, session](ctx,
-		pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
-			return newSession(ctx, client.cc, config.New())
+	p := pool.New[*Session, Session](ctx,
+		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
+			return newTableSession(ctx, client.cc, config.New())
 		}),
-		pool.WithSyncCloseItem[*session, session](),
+		pool.WithSyncCloseItem[*Session, Session](),
 	)
 	r := xrand.New(xrand.WithLock())
 	for i := range timeouts {
@@ -354,12 +356,12 @@ func TestDoWithCustomErrors(t *testing.T) {
 	var (
 		limit = 10
 		ctx   = context.Background()
-		p     = pool.New[*session, session](ctx,
-			pool.WithCreateItemFunc[*session, session](func(ctx context.Context) (*session, error) {
+		p     = pool.New[*Session, Session](ctx,
+			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				return simpleSession(t), nil
 			}),
-			pool.WithLimit[*session, session](limit),
-			pool.WithSyncCloseItem[*session, session](),
+			pool.WithLimit[*Session, Session](limit),
+			pool.WithSyncCloseItem[*Session, Session](),
 		)
 	)
 	for _, test := range []struct {
@@ -465,12 +467,12 @@ func TestDoWithCustomErrors(t *testing.T) {
 }
 
 // SingleSession returns sessionPool that uses only given session during retries.
-func SingleSession(s *session) sessionPool {
+func SingleSession(s *Session) sessionPool {
 	return &singleSession{s: s}
 }
 
 type singleSession struct {
-	s *session
+	s *Session
 }
 
 func (s *singleSession) Close(ctx context.Context) error {
@@ -485,7 +487,7 @@ func (s *singleSession) Stats() pool.Stats {
 }
 
 func (s *singleSession) With(ctx context.Context,
-	f func(ctx context.Context, s *session) error, opts ...retry.Option,
+	f func(ctx context.Context, s *Session) error, opts ...retry.Option,
 ) error {
 	return retry.Retry(ctx, func(ctx context.Context) error {
 		return f(ctx, s.s)

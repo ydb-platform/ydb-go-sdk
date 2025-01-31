@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -208,14 +207,14 @@ func do(
 	opts ...retry.Option,
 ) (finalErr error) {
 	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
-		s.SetStatus(session.StatusInUse)
+		s.SetStatus(StatusInUse)
 
 		err := op(ctx, s)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 
-		s.SetStatus(session.StatusIdle)
+		s.SetStatus(StatusIdle)
 
 		return nil
 	}, opts...)
@@ -337,10 +336,13 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := execute(ctx, s.ID(), s.client, q, settings, withTrace(s.trace))
+		streamResult, err := s.execute(ctx, q, settings, withTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+		defer func() {
+			_ = streamResult.Close(ctx)
+		}()
 
 		err = readAll(ctx, streamResult)
 		if err != nil {
@@ -381,13 +383,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := execute(ctx, s.ID(), s.client, q,
-			options.ExecuteSettings(opts...), withTrace(s.trace),
-		)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
+		streamResult, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -433,10 +429,13 @@ func clientQueryResultSet(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
 ) (rs result.ClosableResultSet, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
-		streamResult, err := execute(ctx, s.ID(), s.client, q, settings, resultOpts...)
+		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+		defer func() {
+			_ = streamResult.Close(ctx)
+		}()
 
 		rs, err = readMaterializedResultSet(ctx, streamResult)
 		if err != nil {
@@ -526,8 +525,8 @@ func CreateSession(ctx context.Context, c *Client) (*Session, error) {
 		defer cancelCreate()
 
 		s, err := createSession(createCtx, c.client,
-			session.WithDeleteTimeout(c.config.SessionDeleteTimeout()),
-			session.WithTrace(c.config.Trace()),
+			WithDeleteTimeout(c.config.SessionDeleteTimeout()),
+			WithTrace(c.config.Trace()),
 		)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -576,9 +575,9 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 				defer cancelCreate()
 
 				s, err := createSession(createCtx, client,
-					session.WithConn(cc),
-					session.WithDeleteTimeout(cfg.SessionDeleteTimeout()),
-					session.WithTrace(cfg.Trace()),
+					WithConn(cc),
+					WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+					WithTrace(cfg.Trace()),
 				)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)

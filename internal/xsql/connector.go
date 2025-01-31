@@ -126,7 +126,7 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) { //nolint:funlen
 	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
-		stack.FunctionID("", stack.Package("database/sql")),
+		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
 
 	switch c.processor {

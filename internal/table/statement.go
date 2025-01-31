@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
@@ -19,8 +18,8 @@ import (
 )
 
 type statement struct {
-	session *session
-	query   query
+	session *Session
+	query   Query
 	params  map[string]*Ydb.Type
 }
 
@@ -75,23 +74,27 @@ func (s *statement) Execute(
 		onDone(txr, true, r, err)
 	}()
 
-	return s.execute(ctx, a, &request, request.TxControl, callOptions...)
+	return s.execute(ctx, a, &request, callOptions...)
 }
 
 // execute executes prepared query without any tracing.
 func (s *statement) execute(
 	ctx context.Context, a *allocator.Allocator,
-	request *options.ExecuteDataQueryDesc, txControl *Ydb_Table.TransactionControl,
+	request *options.ExecuteDataQueryDesc,
 	callOptions ...grpc.CallOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	res, err := s.session.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+	t, r, err := s.session.dataQuery.execute(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return s.session.executeQueryResult(res, txControl, request.IgnoreTruncated)
+	if t != nil {
+		t.s = s.session
+	}
+
+	return t, r, nil
 }
 
 func (s *statement) NumInput() int {

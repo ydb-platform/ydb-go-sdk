@@ -1,4 +1,19 @@
 * Fixed panic when error returned from parsing sql params
+* Fixed explicit null dereferenced issue in internal/credentials/static.go (CWE-476)
+
+## v3.99.1
+* Bumped dependencies:
+  - `golang.org/x/net from` v0.23.0 to v0.33.0
+  - `golang.org/x/sync from` v0.6.0 to v0.10.0
+  - `golang.org/x/sys from` v0.18.0 to v0.28.0
+  - `golang.org/x/text from` v0.14.0 to v0.21.0
+  - `github.com/golang-jwt/jwt/v4` from v4.4.1 to v4.5.0
+
+## v3.99.0
+* Added `ydb.WithExecuteDataQueryOverQueryClient(bool)` option to execute data queries from table service 
+  client using query client API. Using this option you can execute queries from legacy table service client 
+  through `table.Session.Execute` using internal query client API without limitation of 1000 rows in response.
+  Be careful: an OOM problem may happen because bigger result requires more memory
 
 ## v3.98.0
 * Supported pool of encoders, which implement ResetableWriter interface
