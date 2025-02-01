@@ -1515,7 +1515,7 @@ func (v *listValue) castTo(dst any) error {
 		inner.Set(newSlice)
 
 		for i, item := range v.ListItems() {
-			if err := item.castTo(inner.Index(i).Addr().Interface()); err != nil {
+			if err := CastTo(item, inner.Index(i).Addr().Interface()); err != nil {
 				return xerrors.WithStackTrace(fmt.Errorf(
 					"%w '%s(%+v)' to '%T' destination",
 					ErrCannotCast, v.Type().Yql(), v, dstValue,
@@ -1649,7 +1649,7 @@ func (v *setValue) castTo(dst any) error {
 		inner.Set(newSlice)
 
 		for i, item := range v.items {
-			if err := item.castTo(inner.Index(i).Addr().Interface()); err != nil {
+			if err := CastTo(item, inner.Index(i).Addr().Interface()); err != nil {
 				return xerrors.WithStackTrace(fmt.Errorf(
 					"%w '%s(%+v)' to '%T' destination",
 					ErrCannotCast, v.Type().Yql(), v, dstValue,
@@ -1757,7 +1757,7 @@ func (v *optionalValue) castTo(dst any) error {
 			return nil
 		}
 
-		if err := v.value.castTo(ptr.Interface()); err != nil {
+		if err := CastTo(v.value, (ptr.Interface())); err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 
@@ -1772,7 +1772,7 @@ func (v *optionalValue) castTo(dst any) error {
 
 	inner.Set(reflect.New(inner.Type().Elem()))
 
-	if err := v.value.castTo(inner.Interface()); err != nil {
+	if err := CastTo(v.value, inner.Interface()); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -1853,7 +1853,7 @@ func (v *structValue) castTo(dst any) error {
 		}
 
 		for i, field := range v.fields {
-			if err := field.V.castTo(inner.Field(i).Addr().Interface()); err != nil {
+			if err := CastTo(field.V, inner.Field(i).Addr().Interface()); err != nil {
 				return xerrors.WithStackTrace(fmt.Errorf(
 					"scan error on struct field name '%s': %w",
 					field.Name, err,
@@ -2031,7 +2031,7 @@ func (v *tupleValue) TupleItems() []Value {
 
 func (v *tupleValue) castTo(dst any) error {
 	if len(v.items) == 1 {
-		return v.items[0].castTo(dst)
+		return CastTo(v.items[0], dst)
 	}
 
 	switch dstValue := dst.(type) {
