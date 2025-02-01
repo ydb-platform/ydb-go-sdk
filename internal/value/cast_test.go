@@ -2,6 +2,7 @@ package value
 
 import (
 	"database/sql/driver"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -32,12 +33,17 @@ func loadLocation(t *testing.T, name string) *time.Location {
 	return loc
 }
 
-type testStringValueScanner struct {
-	field string
-}
+type testStringSQLScanner string
 
-func (s *testStringValueScanner) UnmarshalYDBValue(v Value) error {
-	return CastTo(v, &s.field)
+func (s *testStringSQLScanner) Scan(value any) error {
+	ts, ok := value.(string)
+	if !ok {
+		return errors.New("can't cast from " + reflect.TypeOf(value).String() + " to string")
+	}
+
+	*s = testStringSQLScanner(ts)
+
+	return nil
 }
 
 func TestCastTo(t *testing.T) {
@@ -439,8 +445,8 @@ func TestCastTo(t *testing.T) {
 		{
 			name:  xtest.CurrentFileLine(),
 			value: TextValue("text-string"),
-			dst:   ptr[testStringValueScanner](),
-			exp:   testStringValueScanner{field: "text-string"},
+			dst:   ptr[testStringSQLScanner](),
+			exp:   testStringSQLScanner("text-string"),
 			err:   nil,
 		},
 	}
