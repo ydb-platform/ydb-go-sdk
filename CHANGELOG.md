@@ -1,5 +1,5 @@
-* Fixed potential infinity loop for local dc detection
-* Fixed nil pointer dereferenced in a topic listener
+* Fixed potential infinity loop for local dc detection (CWE-835)
+* Fixed nil pointer dereferenced in a topic listener (CWE-476)
 
 ## v3.99.2
 * Fixed panic when error returned from parsing sql params
