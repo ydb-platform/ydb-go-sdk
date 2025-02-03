@@ -1,3 +1,4 @@
+## v3.99.3
 * Fixed potential infinity loop for local dc detection (CWE-835)
 * Fixed nil pointer dereferenced in a topic listener (CWE-476)
 
