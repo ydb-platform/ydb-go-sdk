@@ -1,4 +1,4 @@
-* Added reason of internal topic writer reconnect to logs
+* "No endpoints" is retriable error now
 
 ## v3.99.3
 * Fixed potential infinity loop for local dc detection (CWE-835)
