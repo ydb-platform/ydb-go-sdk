@@ -640,7 +640,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 	///
 	t.OnWriterReconnect = func(
 		info trace.TopicWriterReconnectStartInfo,
-	) func(doneInfo trace.TopicWriterReconnectDoneInfo) {
+	) func(doneInfo trace.TopicWriterReconnectConnectedInfo) func(reconnectDoneInfo trace.TopicWriterReconnectDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
@@ -653,8 +653,9 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			kv.Int("attempt", info.Attempt),
 		)
 
-		return func(doneInfo trace.TopicWriterReconnectDoneInfo) {
-			if doneInfo.Error == nil {
+		return func(doneInfo trace.TopicWriterReconnectConnectedInfo) func(reconnectDoneInfo trace.TopicWriterReconnectDoneInfo) { //nolint:lll
+			connectedTime := time.Now()
+			if doneInfo.ConnectionResult == nil {
 				l.Log(WithLevel(ctx, DEBUG), "connect to topic writer stream completed",
 					kv.String("topic", info.Topic),
 					kv.String("producer_id", info.ProducerID),
@@ -664,13 +665,22 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "connect to topic writer stream completed",
-					kv.Error(doneInfo.Error),
+					kv.Error(doneInfo.ConnectionResult),
 					kv.String("topic", info.Topic),
 					kv.String("producer_id", info.ProducerID),
 					kv.String("writer_instance_id", info.WriterInstanceID),
 					kv.Int("attempt", info.Attempt),
 					kv.Latency(start),
 				)
+			}
+
+			return func(reconnectDoneInfo trace.TopicWriterReconnectDoneInfo) {
+				l.Log(WithLevel(ctx, INFO), "stop topic writer stream reason",
+					kv.String("topic", info.Topic),
+					kv.String("producer_id", info.ProducerID),
+					kv.String("writer_instance_id", info.WriterInstanceID),
+					kv.Duration("write with topic writer stream duration", time.Since(connectedTime)),
+					kv.NamedError("reason", reconnectDoneInfo.Error))
 			}
 		}
 	}
