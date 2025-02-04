@@ -35,6 +35,7 @@ var (
 type (
 	Engine    uint8
 	Connector struct {
+		ID       uint64
 		parent   ydbDriver
 		balancer grpc.ClientConnInterface
 

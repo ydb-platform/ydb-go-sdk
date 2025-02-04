@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -52,17 +53,25 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
 	}
 
-	c, err := connector(db, db.databaseSQLOptions...)
+	c, err := Connector(db, db.databaseSQLOptions...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to create connector: %w", err))
 	}
 
-	d.attach(c, db)
-
 	return c, nil
 }
 
+var globalConnectorCounter atomic.Uint64
+
 func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
+	c.ID = globalConnectorCounter.Add(1)
+
+	if parent != nil {
+		parent.onClose.Append(func(_ *Driver) {
+			_ = c.Close()
+		})
+	}
+
 	d.connectors.Set(c, parent)
 }
 
@@ -239,7 +248,7 @@ type SQLConnector interface {
 	Close() error
 }
 
-func connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error) {
+func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	c, err := xsql.Open(parent, parent.metaBalancer,
 		append(
 			append(
@@ -255,16 +264,7 @@ func connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error)
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return c, nil
-}
-
-func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	c, err := connector(parent, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	d.attach(c, nil)
+	d.attach(c, parent)
 
 	return c, nil
 }

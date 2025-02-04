@@ -832,7 +832,7 @@ func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 
 func withOnClose(onClose func(c *Driver)) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.onClose = append(d.onClose, onClose)
+		d.onClose.Append(onClose)
 
 		return nil
 	}

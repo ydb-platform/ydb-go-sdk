@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc"
 	"os"
 	"sync"
 	"sync/atomic"
-
-	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
@@ -103,7 +102,7 @@ type (
 
 		children    map[uint64]*Driver
 		childrenMtx xsync.Mutex
-		onClose     []func(c *Driver)
+		onClose     xsync.Map[uint64, func(c *Driver)]
 		closed      atomic.Bool
 
 		panicCallback func(e interface{})
@@ -164,9 +163,11 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	d.ctxCancel()
 
 	defer func() {
-		for _, f := range d.onClose {
+		d.onClose.Range(func(_ uint64, f func(c *Driver)) bool {
 			f(d)
-		}
+
+			return true
+		})
 	}()
 
 	closes := make([]func(context.Context) error, 0)
