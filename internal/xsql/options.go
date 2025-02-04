@@ -76,7 +76,7 @@ func (opt traceRetryOption) Apply(c *Connector) error {
 }
 
 func (onClose onCloseOption) Apply(c *Connector) error {
-	c.onCLose = append(c.onCLose, onClose)
+	c.onClose = append(c.onClose, onClose)
 
 	return nil
 }

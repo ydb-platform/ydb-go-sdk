@@ -164,8 +164,8 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	d.ctxCancel()
 
 	defer func() {
-		for _, f := range d.onClose {
-			f(d)
+		for _, onClose := range d.onClose {
+			onClose(d)
 		}
 	}()
 

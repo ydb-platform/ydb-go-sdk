@@ -1,3 +1,4 @@
+* Fixed goroutine leak on closing `database/sql` driver
 * "No endpoints" is retriable error now
 
 ## v3.99.3
