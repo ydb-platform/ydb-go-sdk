@@ -46,14 +46,12 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 		require.NoError(t, err)
 
-		err = db.PingContext(ctx)
-		require.NoError(t, err)
+		require.NoError(t, db.PingContext(ctx))
 
 		_, err = ydb.Unwrap(db)
 		require.NoError(t, err)
 
-		err = db.Close()
-		require.NoError(t, err)
+		require.NoError(t, db.Close())
 	})
 
 	t.Run("sql.OpenDB", func(t *testing.T) {
@@ -64,26 +62,22 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 		require.NoError(t, err)
 
 		defer func() {
-			// cleanup
-			_ = nativeDriver.Close(ctx)
+			require.NoError(t, nativeDriver.Close(ctx))
 		}()
 
 		c, err := ydb.Connector(nativeDriver)
 		require.NoError(t, err)
 
 		defer func() {
-			// cleanup
-			_ = c.Close()
+			require.NoError(t, c.Close())
 		}()
 
 		db := sql.OpenDB(c)
 		defer func() {
-			// cleanup
-			_ = db.Close()
+			require.NoError(t, db.Close())
 		}()
 
-		err = db.PingContext(ctx)
-		require.NoError(t, err)
+		require.NoError(t, db.PingContext(ctx))
 
 		db.SetMaxOpenConns(50)
 		db.SetMaxIdleConns(50)
