@@ -41,22 +41,6 @@ var (
 	_ driver.DriverContext = &sqlDriver{}
 )
 
-func (d *sqlDriver) Close() error {
-	var errs []error
-	d.connectors.Range(func(c *xsql.Connector, _ *Driver) bool {
-		if err := c.Close(); err != nil {
-			errs = append(errs, err)
-		}
-
-		return true
-	})
-	if len(errs) > 0 {
-		return xerrors.NewWithIssues("ydb legacy driver close failed", errs...)
-	}
-
-	return nil
-}
-
 // Open returns a new Driver to the ydb.
 func (d *sqlDriver) Open(string) (driver.Conn, error) {
 	return nil, xsql.ErrUnsupported
@@ -68,7 +52,14 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
 	}
 
-	return Connector(db, db.databaseSQLOptions...)
+	c, err := connector(db, db.databaseSQLOptions...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to create connector: %w", err))
+	}
+
+	d.attach(c, db)
+
+	return c, nil
 }
 
 func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
@@ -76,7 +67,10 @@ func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
 }
 
 func (d *sqlDriver) detach(c *xsql.Connector) {
-	d.connectors.Delete(c)
+	parent, _ := d.connectors.Extract(c)
+	if d.connectors.Len() == 0 && parent != nil {
+		_ = parent.Close(context.Background())
+	}
 }
 
 type QueryMode int
@@ -235,7 +229,7 @@ type SQLConnector interface {
 	Close() error
 }
 
-func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
+func connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error) {
 	c, err := xsql.Open(parent, parent.metaBalancer,
 		append(
 			append(
@@ -250,7 +244,17 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	d.attach(c, parent)
+
+	return c, nil
+}
+
+func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
+	c, err := connector(parent, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	d.attach(c, nil)
 
 	return c, nil
 }

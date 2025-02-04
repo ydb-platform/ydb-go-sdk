@@ -26,6 +26,8 @@ import (
 )
 
 func TestBasicExampleDatabaseSqlBindings(t *testing.T) {
+	defer simpleDetectGoroutineLeak(t)
+
 	folder := t.Name()
 
 	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)

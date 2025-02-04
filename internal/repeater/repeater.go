@@ -163,8 +163,10 @@ func (r *repeater) wakeUp(e Event) (err error) {
 }
 
 func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
-	defer close(r.stopped)
-	defer tick.Stop()
+	defer func() {
+		close(r.stopped)
+		tick.Stop()
+	}()
 
 	// force returns backoff with delays [500ms...32s]
 	force := backoff.New(

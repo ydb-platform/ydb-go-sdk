@@ -43,7 +43,7 @@ type (
 		LegacyOpts            []legacy.Option
 		Options               []propose.Option
 		disableServerBalancer bool
-		onCLose               []func(*Connector)
+		onClose               []func(*Connector)
 
 		clock          clockwork.Clock
 		idleThreshold  time.Duration
@@ -204,7 +204,7 @@ func (c *Connector) Close() error {
 	default:
 		close(c.done)
 
-		for _, onClose := range c.onCLose {
+		for _, onClose := range c.onClose {
 			onClose(c)
 		}
 
