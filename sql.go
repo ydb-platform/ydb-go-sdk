@@ -5,14 +5,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -33,9 +31,7 @@ func withConnectorOptions(opts ...ConnectorOption) Option {
 	}
 }
 
-type sqlDriver struct {
-	connectors xsync.Map[*xsql.Connector, *Driver]
-}
+type sqlDriver struct{}
 
 var (
 	_ driver.Driver        = &sqlDriver{}
@@ -53,43 +49,16 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
 	}
 
-	c, err := Connector(db, db.databaseSQLOptions...)
+	c, err := Connector(db, append(db.databaseSQLOptions,
+		xsql.WithOnClose(func(connector *xsql.Connector) {
+			_ = db.Close(context.Background())
+		}),
+	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to create connector: %w", err))
 	}
 
 	return c, nil
-}
-
-var globalConnectorCounter atomic.Uint64
-
-func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
-	c.ID = globalConnectorCounter.Add(1)
-
-	if parent != nil {
-		parent.onClose.Append(func(_ *Driver) {
-			_ = c.Close()
-		})
-	}
-
-	d.connectors.Set(c, parent)
-}
-
-func (d *sqlDriver) detach(c *xsql.Connector) {
-	var countConnectorsPerDriver int
-	parent, _ := d.connectors.Extract(c)
-	if parent != nil {
-		d.connectors.Range(func(key *xsql.Connector, value *Driver) bool {
-			if value == parent {
-				countConnectorsPerDriver++
-			}
-
-			return true
-		})
-		if countConnectorsPerDriver == 0 {
-			_ = parent.Close(context.Background())
-		}
-	}
 }
 
 type QueryMode int
@@ -255,7 +224,6 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 				parent.databaseSQLOptions,
 				opts...,
 			),
-			xsql.WithOnClose(d.detach),
 			xsql.WithTraceRetry(parent.config.TraceRetry()),
 			xsql.WithRetryBudget(parent.config.RetryBudget()),
 		)...,
@@ -263,8 +231,6 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-
-	d.attach(c, parent)
 
 	return c, nil
 }
