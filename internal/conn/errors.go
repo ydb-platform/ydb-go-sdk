@@ -39,33 +39,6 @@ func IsBadConn(err error, goodConnCodes ...grpcCodes.Code) bool {
 	return true
 }
 
-type grpcError struct {
-	err error
-
-	nodeID  uint32
-	address string
-}
-
-func (e *grpcError) Error() string {
-	return e.err.Error()
-}
-
-func (e *grpcError) As(target any) bool {
-	return xerrors.As(e.err, target)
-}
-
-func (e *grpcError) NodeID() uint32 {
-	return e.nodeID
-}
-
-func (e *grpcError) Address() string {
-	return e.address
-}
-
 func withConnInfo(err error, nodeID uint32, address string) error {
-	return &grpcError{
-		err:     err,
-		nodeID:  nodeID,
-		address: address,
-	}
+	return xerrors.Transport(err, xerrors.WithNodeID(nodeID), xerrors.WithAddress(address))
 }

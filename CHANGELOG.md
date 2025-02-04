@@ -1,3 +1,5 @@
+* Added nodeID and address to operation and transport errors 
+
 ## v3.99.4
 * Fixed bug with wrong context on session closing
 * Fixed goroutine leak on closing `database/sql` driver

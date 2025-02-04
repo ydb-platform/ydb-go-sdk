@@ -145,19 +145,27 @@ func TestGrpcError(t *testing.T) {
 
 func TestTransportErrorString(t *testing.T) {
 	for _, tt := range []struct {
+		name string
 		err  error
 		text string
 	}{
 		{
+			name: xtest.CurrentFileLine(),
 			err:  Transport(grpcStatus.Error(grpcCodes.FailedPrecondition, "")),
 			text: "transport/FailedPrecondition (code = 9, source error = \"rpc error: code = FailedPrecondition desc = \")",
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			err:  Transport(grpcStatus.Error(grpcCodes.Unavailable, ""), WithAddress("localhost:2135")),
 			text: "transport/Unavailable (code = 14, source error = \"rpc error: code = Unavailable desc = \", address: \"localhost:2135\")", //nolint:lll
 		},
+		{
+			name: xtest.CurrentFileLine(),
+			err:  Transport(grpcStatus.Error(grpcCodes.Unavailable, ""), WithNodeID(100500)),
+			text: "transport/Unavailable (code = 14, source error = \"rpc error: code = Unavailable desc = \", nodeID = 100500)", //nolint:lll
+		},
 	} {
-		t.Run("", func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.text, tt.err.Error())
 		})
 	}
@@ -189,7 +197,7 @@ func TestTransportErrorName(t *testing.T) {
 			name: "transport/Aborted",
 		},
 	} {
-		t.Run("", func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			if tt.err == nil {
 				require.Nil(t, TransportError(tt.err)) //nolint:testifylint
 			} else {
