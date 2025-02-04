@@ -357,6 +357,10 @@ func newTableSession( //nolint:funlen
 		status: table.SessionReady,
 		onClose: []func(s *Session) error{
 			func(s *Session) error {
+				if err := ctx.Err(); err != nil {
+					return xerrors.WithStackTrace(err)
+				}
+
 				_, err = s.client.DeleteSession(ctx,
 					&Ydb_Table.DeleteSessionRequest{
 						SessionId: s.id,
@@ -471,13 +475,13 @@ func (s *Session) ID() string {
 	return s.id
 }
 
-func (s *Session) Close(ctx context.Context) (err error) {
+func (s *Session) Close(ctx context.Context) (finalErr error) {
 	onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Close"),
 		s,
 	)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 		s.SetStatus(table.SessionClosed)
 	}()
 
