@@ -200,7 +200,7 @@ func (c *Connector) Parent() ydbDriver {
 func (c *Connector) Close() error {
 	select {
 	case <-c.done:
-		return xerrors.WithStackTrace(errAlreadyClosed)
+		return nil
 	default:
 		close(c.done)
 
