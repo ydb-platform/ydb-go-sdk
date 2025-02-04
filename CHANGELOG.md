@@ -12,10 +12,10 @@
 
 ## v3.99.1
 * Bumped dependencies:
-  - `golang.org/x/net from` v0.23.0 to v0.33.0
-  - `golang.org/x/sync from` v0.6.0 to v0.10.0
-  - `golang.org/x/sys from` v0.18.0 to v0.28.0
-  - `golang.org/x/text from` v0.14.0 to v0.21.0
+  - `golang.org/x/net` from v0.23.0 to v0.33.0
+  - `golang.org/x/sync` from v0.6.0 to v0.10.0
+  - `golang.org/x/sys` from v0.18.0 to v0.28.0
+  - `golang.org/x/text` from v0.14.0 to v0.21.0
   - `github.com/golang-jwt/jwt/v4` from v4.4.1 to v4.5.0
 
 ## v3.99.0
