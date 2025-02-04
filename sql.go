@@ -67,9 +67,19 @@ func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
 }
 
 func (d *sqlDriver) detach(c *xsql.Connector) {
+	var countConnectorsPerDriver int
 	parent, _ := d.connectors.Extract(c)
-	if d.connectors.Len() == 0 && parent != nil {
-		_ = parent.Close(context.Background())
+	if parent != nil {
+		d.connectors.Range(func(key *xsql.Connector, value *Driver) bool {
+			if value == parent {
+				countConnectorsPerDriver++
+			}
+
+			return true
+		})
+		if countConnectorsPerDriver == 0 {
+			_ = parent.Close(context.Background())
+		}
 	}
 }
 
