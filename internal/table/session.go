@@ -496,9 +496,11 @@ func (s *Session) Close(ctx context.Context) (finalErr error) {
 		s.SetStatus(table.SessionClosed)
 	}()
 
-	err := s.closeOnce(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
+	if s.closeOnce != nil {
+		err := s.closeOnce(ctx)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
 	}
 
 	return nil
