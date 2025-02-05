@@ -270,7 +270,7 @@ func MessageWithSetCommitRangeForTest(m *PublicMessage, commitRange CommitRange)
 }
 
 func MessageSetNilDataForTest(m *PublicMessage) {
-	m.data = newOneTimeReaderFromReader(nil)
+	m.data = newOneTimeReader(nil)
 	m.bufferBytesAccount = 0
 	m.dataConsumed = false
 }
