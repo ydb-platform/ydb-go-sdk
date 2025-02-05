@@ -12,7 +12,7 @@ import (
 
 func TestOneTimeReader(t *testing.T) {
 	t.Run("FullRead", func(t *testing.T) {
-		r := newOneTimeReader(bytes.NewReader([]byte{1, 2, 3}))
+		r := newOneTimeReaderFromReader(bytes.NewReader([]byte{1, 2, 3}))
 		dstBuf := make([]byte, 3)
 		n, err := r.Read(dstBuf)
 		require.NoError(t, err)
@@ -24,7 +24,7 @@ func TestOneTimeReader(t *testing.T) {
 		require.Equal(t, io.EOF, r.err)
 	})
 	t.Run("DstMoreThenContent", func(t *testing.T) {
-		r := newOneTimeReader(bytes.NewReader([]byte{1, 2, 3}))
+		r := newOneTimeReaderFromReader(bytes.NewReader([]byte{1, 2, 3}))
 		dstBuf := make([]byte, 4)
 		n, err := r.Read(dstBuf)
 		require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestOneTimeReader(t *testing.T) {
 		require.Equal(t, io.EOF, r.err)
 	})
 	t.Run("ReadLess", func(t *testing.T) {
-		r := newOneTimeReader(bytes.NewReader([]byte{1, 2, 3}))
+		r := newOneTimeReaderFromReader(bytes.NewReader([]byte{1, 2, 3}))
 		dstBuf := make([]byte, 2)
 		n, err := r.Read(dstBuf)
 		require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestOneTimeReader(t *testing.T) {
 		require.Equal(t, 0, n)
 	})
 	t.Run("InnerErr", func(t *testing.T) {
-		r := newOneTimeReader(nil)
+		r := newOneTimeReaderFromReader(nil)
 
 		bufSize := 2
 		preparedData := make([]byte, 2*bufSize)
