@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -84,14 +85,18 @@ type PublicMessageContentUnmarshaler interface {
 }
 
 func createReader(decoders DecoderMap, codec rawtopiccommon.Codec, rawBytes []byte) oneTimeReader {
-	reader, err := decoders.Decode(codec, bytes.NewReader(rawBytes))
-	if err != nil {
-		reader = errorReader{
-			err: fmt.Errorf("failed to decode message with codec '%v': %w", codec, err),
+	var maker readerMaker = func() io.Reader {
+		reader, err := decoders.Decode(codec, bytes.NewReader(rawBytes))
+		if err != nil {
+			reader = errorReader{
+				err: fmt.Errorf("failed to decode message with codec '%v': %w", codec, err),
+			}
 		}
+
+		return reader
 	}
 
-	return newOneTimeReader(reader)
+	return newOneTimeReader(maker)
 }
 
 type errorReader struct {
@@ -265,7 +270,7 @@ func MessageWithSetCommitRangeForTest(m *PublicMessage, commitRange CommitRange)
 }
 
 func MessageSetNilDataForTest(m *PublicMessage) {
-	m.data = newOneTimeReader(nil)
+	m.data = newOneTimeReaderFromReader(nil)
 	m.bufferBytesAccount = 0
 	m.dataConsumed = false
 }
