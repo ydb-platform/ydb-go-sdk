@@ -58,7 +58,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 		}
 
 		if !s.wrapping {
-			return withConnInfo(err, s.parentConn.NodeID(), s.parentConn.Address())
+			return err
 		}
 
 		return xerrors.WithStackTrace(xerrors.Transport(
@@ -97,7 +97,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		}()
 
 		if !s.wrapping {
-			return withConnInfo(err, s.parentConn.NodeID(), s.parentConn.Address())
+			return err
 		}
 
 		if s.sentMark.canRetry() {
@@ -156,7 +156,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
 		}()
 
 		if !s.wrapping {
-			return withConnInfo(err, s.parentConn.NodeID(), s.parentConn.Address())
+			return err
 		}
 
 		if s.sentMark.canRetry() {

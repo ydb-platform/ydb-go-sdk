@@ -38,7 +38,3 @@ func IsBadConn(err error, goodConnCodes ...grpcCodes.Code) bool {
 
 	return true
 }
-
-func withConnInfo(err error, nodeID uint32, address string) error {
-	return xerrors.Transport(err, xerrors.WithNodeID(nodeID), xerrors.WithAddress(address))
-}

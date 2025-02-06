@@ -108,21 +108,3 @@ func TestIsBadConn(t *testing.T) {
 		})
 	}
 }
-
-func TestWithConnInfo(t *testing.T) {
-	err := withConnInfo(grpcStatus.Error(grpcCodes.Unavailable, "test"), 100500, "example.com:2135")
-	require.ErrorIs(t, err, grpcStatus.Error(grpcCodes.Unavailable, "test"))
-	var nodeID interface {
-		NodeID() uint32
-	}
-	require.ErrorAs(t, err, &nodeID)
-	require.Equal(t, uint32(100500), nodeID.NodeID())
-	var address interface {
-		Address() string
-	}
-	require.ErrorAs(t, err, &address)
-	require.Equal(t, "example.com:2135", address.Address())
-	s, has := grpcStatus.FromError(err)
-	require.True(t, has)
-	require.Equal(t, grpcCodes.Unavailable, s.Code())
-}
