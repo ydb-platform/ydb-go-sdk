@@ -1,3 +1,4 @@
+## v3.99.5
 * Fixed error `Empty query text` using prepared statements and `ydb.WithExecuteDataQueryOverQueryClient(true)` option
 * Prepared statements always send query text on Execute call from now (previous behaviour - send query ID)  
 * Prevented create decoder instance until start read a message from topics
