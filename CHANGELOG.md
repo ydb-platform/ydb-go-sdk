@@ -1,4 +1,5 @@
 * Added nodeID and address to operation and transport errors 
+* Prevented create decoder instance until start read a message from topics
 
 ## v3.99.4
 * Fixed bug with wrong context on session closing
