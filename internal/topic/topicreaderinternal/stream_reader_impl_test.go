@@ -1023,7 +1023,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	const initialBufferSizeBytes = 1000000
 
 	cfg := newTopicStreamReaderConfig()
-	cfg.BaseContext = ctx
+	cfg.LogContext = ctx
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
 	cfg.CommitterBatchTimeLag = 0
 

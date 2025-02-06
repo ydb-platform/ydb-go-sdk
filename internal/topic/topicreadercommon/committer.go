@@ -148,6 +148,7 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 
 		onDone := trace.TopicOnReaderSendCommitMessage(
 			c.tracer,
+			&ctx,
 			&commits,
 		)
 		err := c.send(commits.ToRawMessage())

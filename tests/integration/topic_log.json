@@ -1,0 +1,29 @@
+[
+{"L":"debug","T":"2025-02-26T18:21:27.231+0100","N":"ydb.topic.reader.reconnect.request","M":"topic reader reconnect request","context_name":"test_context","entity":"reader","error":"retryable/CUSTOM (code = -1, source error = \"ydb: first connection attempt not finished\")","was_sent":true},
+
+{"L":"debug","T":"2025-02-26T18:21:27.235+0100","N":"ydb.topic.reader.init","M":"topic reader init starting...","context_name":"test_context","entity":"reader","pre_init_reader_connection_id":"test-consumer_1_196_7260002587652326787_v1","consumer":"test-consumer","topics":["/local/test/feed"]},
+
+{"L":"debug","T":"2025-02-26T18:21:27.235+0100","N":"ydb.topic.reader.init","M":"topic reader init done","context_name":"test_context","entity":"reader","pre_init_reader_connection_id":"test-consumer_1_196_7260002587652326787_v1","consumer":"test-consumer","topics":["/local/test/feed"],"latency":0.000012292},
+
+{"L":"debug","T":"2025-02-26T18:21:27.235+0100","N":"ydb.topic.reader.reconnect","M":"topic reader reconnect starting...","context_name":"test_context","entity":"reader"},
+
+{"L":"info","T":"2025-02-26T18:21:27.235+0100","N":"ydb.topic.reader.reconnect","M":"topic reader reconnect done","context_name":"test_context","entity":"reader","latency":0.000006292},
+
+{"L":"debug","T":"2025-02-26T18:21:27.235+0100","N":"ydb.topic.reader.reconnect","M":"topic reader reconnect starting...","context_name":"test_context","entity":"reader"},
+
+{"L":"info","T":"2025-02-26T18:21:27.235+0100","N":"ydb.topic.reader.reconnect","M":"topic reader reconnect done","context_name":"test_context","entity":"reader","latency":0.00000325},
+
+{"L":"debug","T":"2025-02-26T18:21:27.235+0100","N":"ydb.topic.reader.sent.data.request","M":"topic reader sent data request","context_name":"test_context","entity":"reader","reader_connection_id":"test-consumer_1_196_7260002587652326787_v1","request_bytes":1048576,"local_capacity":1048576},
+
+{"L":"debug","T":"2025-02-26T18:21:27.262+0100","N":"ydb.topic.reader.partition.read.start.response","M":"topic reader start partition read response starting...","context_name":"test_context","entity":"reader","topic":"/local/test/feed","reader_connection_id":"test-consumer_1_196_7260002587652326787_v1","partition_id":0,"partition_session_id":1},
+
+{"L":"info","T":"2025-02-26T18:21:27.262+0100","N":"ydb.topic.reader.partition.read.start.response","M":"topic reader start partition read response done","context_name":"test_context","entity":"reader","topic":"/local/test/feed","reader_connection_id":"test-consumer_1_196_7260002587652326787_v1","partition_id":0,"partition_session_id":1,"latency":0.000129625},
+
+{"L":"debug","T":"2025-02-26T18:21:27.263+0100","N":"ydb.topic.reader.receive.data.response","M":"topic reader data response received, process starting...","context_name":"test_context","entity":"reader","reader_connection_id":"test-consumer_1_196_7260002587652326787_v1","received_bytes":118,"local_capacity":1048458,"partitions_count":1,"batches_count":1,"messages_count":1},
+
+{"L":"debug","T":"2025-02-26T18:21:27.263+0100","N":"ydb.topic.reader.read.messages","M":"topic read messages, waiting...","context_name":"test_context","entity":"reader","min_count":1,"max_count":1,"local_capacity_before":1048576},
+
+{"L":"debug","T":"2025-02-26T18:21:27.263+0100","N":"ydb.topic.reader.read.messages","M":"topic read messages done","context_name":"test_context","entity":"reader","min_count":1,"max_count":1,"local_capacity_before":1048576,"latency":0.000005666},
+
+{"L":"debug","T":"2025-02-26T18:21:27.263+0100","N":"ydb.topic.reader.sent.data.request","M":"topic reader sent data request","context_name":"test_context","entity":"reader","reader_connection_id":"test-consumer_1_196_7260002587652326787_v1","request_bytes":118,"local_capacity":1048576}
+]

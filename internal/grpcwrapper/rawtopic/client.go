@@ -104,6 +104,7 @@ func (c *Client) StreamRead(ctxStreamLifeTime context.Context) (rawtopicreader.S
 func (c *Client) StreamWrite(
 	ctxStreamLifeTime context.Context,
 	tracer *trace.Topic,
+	logContext *context.Context,
 ) (*rawtopicwriter.StreamWriter, error) {
 	protoResp, err := c.service.StreamWrite(ctxStreamLifeTime)
 	if err != nil {
@@ -118,6 +119,7 @@ func (c *Client) StreamWrite(
 		Stream:           protoResp,
 		Tracer:           tracer,
 		InternalStreamID: uuid.New().String(),
+		LogContext:       logContext,
 	}, nil
 }
 
