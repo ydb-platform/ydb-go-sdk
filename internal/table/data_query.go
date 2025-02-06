@@ -54,7 +54,7 @@ func (q preparedQuery) YQL() string {
 
 func (q preparedQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
 	query := a.TableQuery()
-	query.Query = a.TableQueryID(q.id)
+	query.Query = a.TableQueryYqlText(q.sql)
 
 	return query
 }

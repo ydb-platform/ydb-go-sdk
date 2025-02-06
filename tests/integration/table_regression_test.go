@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -513,4 +514,62 @@ func (c *customTestUnmarshalUUIDTyped) UnmarshalYDB(raw scanner.RawValue) error 
 
 func (c *customTestUnmarshalUUIDTyped) String() string {
 	return string(*c)
+}
+
+func TestRegressionIssue1636(t *testing.T) {
+	for _, tt := range []struct {
+		name                             string
+		executeDataQueryOverQueryService bool
+	}{
+		{
+			name:                             "ydb.WithExecuteDataQueryOverQueryClient(false)",
+			executeDataQueryOverQueryService: false,
+		},
+		{
+			name:                             "ydb.WithExecuteDataQueryOverQueryClient(true)",
+			executeDataQueryOverQueryService: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				scope  = newScope(t)
+				driver = scope.Driver(ydb.WithExecuteDataQueryOverQueryClient(tt.executeDataQueryOverQueryService))
+			)
+			err := driver.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+				stmt, err := s.Prepare(ctx, `
+				DECLARE $val AS Uint64;
+				SELECT $val;
+			`)
+				if err != nil {
+					return fmt.Errorf("prepare failed: %w", err)
+				}
+				_, r, err := stmt.Execute(ctx, table.DefaultTxControl(),
+					table.NewQueryParameters(table.ValueParam("$val", types.Uint64Value(123))),
+				)
+				if err != nil {
+					return fmt.Errorf("prepared statement execute failed: %w", err)
+				}
+
+				if !r.NextResultSet(ctx) {
+					return fmt.Errorf("no result set: %w", r.Err())
+				}
+
+				if !r.NextRow() {
+					return fmt.Errorf("no row: %w", r.Err())
+				}
+
+				var v uint64
+				if err := r.Scan(&v); err != nil {
+					return fmt.Errorf("scan failed: %w", err)
+				}
+
+				if v != 123 {
+					return fmt.Errorf("unexpected value: %d", v)
+				}
+
+				return r.Err()
+			})
+			require.NoError(t, err)
+		})
+	}
 }
