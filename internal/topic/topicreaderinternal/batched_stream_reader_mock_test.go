@@ -114,6 +114,44 @@ func (c *MockbatchedStreamReaderCommitCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
+// GetLogContext mocks base method.
+func (m *MockbatchedStreamReader) GetLogContext() context.Context {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLogContext")
+	ret0, _ := ret[0].(context.Context)
+	return ret0
+}
+
+// GetLogContext indicates an expected call of GetLogContext.
+func (mr *MockbatchedStreamReaderMockRecorder) GetLogContext() *MockbatchedStreamReaderGetLogContextCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogContext", reflect.TypeOf((*MockbatchedStreamReader)(nil).GetLogContext))
+	return &MockbatchedStreamReaderGetLogContextCall{Call: call}
+}
+
+// MockbatchedStreamReaderGetLogContextCall wrap *gomock.Call
+type MockbatchedStreamReaderGetLogContextCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockbatchedStreamReaderGetLogContextCall) Return(arg0 context.Context) *MockbatchedStreamReaderGetLogContextCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockbatchedStreamReaderGetLogContextCall) Do(f func() context.Context) *MockbatchedStreamReaderGetLogContextCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockbatchedStreamReaderGetLogContextCall) DoAndReturn(f func() context.Context) *MockbatchedStreamReaderGetLogContextCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // PopMessagesBatchTx mocks base method.
 func (m *MockbatchedStreamReader) PopMessagesBatchTx(ctx context.Context, tx tx.Transaction, opts ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error) {
 	m.ctrl.T.Helper()
@@ -188,6 +226,42 @@ func (c *MockbatchedStreamReaderReadMessageBatchCall) Do(f func(context.Context,
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockbatchedStreamReaderReadMessageBatchCall) DoAndReturn(f func(context.Context, ReadMessageBatchOptions) (*topicreadercommon.PublicBatch, error)) *MockbatchedStreamReaderReadMessageBatchCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// SetLogContext mocks base method.
+func (m *MockbatchedStreamReader) SetLogContext(ctx context.Context) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLogContext", ctx)
+}
+
+// SetLogContext indicates an expected call of SetLogContext.
+func (mr *MockbatchedStreamReaderMockRecorder) SetLogContext(ctx any) *MockbatchedStreamReaderSetLogContextCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLogContext", reflect.TypeOf((*MockbatchedStreamReader)(nil).SetLogContext), ctx)
+	return &MockbatchedStreamReaderSetLogContextCall{Call: call}
+}
+
+// MockbatchedStreamReaderSetLogContextCall wrap *gomock.Call
+type MockbatchedStreamReaderSetLogContextCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockbatchedStreamReaderSetLogContextCall) Return() *MockbatchedStreamReaderSetLogContextCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockbatchedStreamReaderSetLogContextCall) Do(f func(context.Context)) *MockbatchedStreamReaderSetLogContextCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockbatchedStreamReaderSetLogContextCall) DoAndReturn(f func(context.Context)) *MockbatchedStreamReaderSetLogContextCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -315,7 +315,10 @@ func (c *Client) StartReader(
 	if err != nil {
 		return nil, err
 	}
-	trace.TopicOnReaderStart(internalReader.Tracer(), internalReader.ID(), consumer, err)
+
+	logCtx := internalReader.GetLogContext()
+	trace.TopicOnReaderStart(internalReader.Tracer(), &logCtx, internalReader.ID(), consumer, err)
+	internalReader.SetLogContext(logCtx)
 
 	return topicreader.NewReader(internalReader), nil
 }
@@ -356,15 +359,16 @@ func (c *Client) createWriterConfig(
 	topicPath string,
 	opts []topicoptions.WriterOption,
 ) topicwriterinternal.WriterReconnectorConfig {
-	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
-		topicwriterinternal.RawTopicWriterStream,
-		error,
-	) {
-		return c.rawClient.StreamWrite(ctx, tracer)
-	}
+	//var connector topicwriterinternal.ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
+	//	topicwriterinternal.RawTopicWriterStream,
+	//	error,
+	//) {
+	//	return c.rawClient.StreamWrite(ctx, tracer)
+	//}
 
 	options := []topicoptions.WriterOption{
-		topicwriterinternal.WithConnectFunc(connector),
+		topicwriterinternal.WithRawClient(&c.rawClient),
+		// topicwriterinternal.WithConnectFunc(connector),
 		topicwriterinternal.WithTopic(topicPath),
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
 		topicwriterinternal.WithTrace(c.cfg.Trace),

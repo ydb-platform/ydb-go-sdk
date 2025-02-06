@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"strconv"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
@@ -19,8 +18,7 @@ func driver(config Config) (t trace.Driver) {
 	balancerUpdates := config.WithSystem("balancer").CounterVec("updates", "cause")
 	conns := config.GaugeVec("conns", "endpoint", "node_id")
 	banned := config.WithSystem("conn").GaugeVec("banned", "endpoint", "node_id", "cause")
-	requestStatuses := config.WithSystem("conn").CounterVec("request_statuses", "status", "endpoint", "node_id")
-	requestMethods := config.WithSystem("conn").CounterVec("request_methods", "method", "endpoint", "node_id")
+	requests := config.WithSystem("conn").CounterVec("requests", "status", "method", "endpoint")
 	tli := config.CounterVec("transaction_locks_invalidated")
 
 	type endpointKey struct {
@@ -33,20 +31,14 @@ func driver(config Config) (t trace.Driver) {
 		var (
 			method   = info.Method
 			endpoint = info.Endpoint.Address()
-			nodeID   = info.Endpoint.NodeID()
 		)
 
 		return func(info trace.DriverConnInvokeDoneInfo) {
 			if config.Details()&trace.DriverConnEvents != 0 {
-				requestStatuses.With(map[string]string{
+				requests.With(map[string]string{
 					"status":   errorBrief(info.Error),
-					"endpoint": endpoint,
-					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
-				}).Inc()
-				requestMethods.With(map[string]string{
 					"method":   string(method),
 					"endpoint": endpoint,
-					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
 				}).Inc()
 				if xerrors.IsOperationErrorTransactionLocksInvalidated(info.Error) {
 					tli.With(nil).Inc()
@@ -60,20 +52,14 @@ func driver(config Config) (t trace.Driver) {
 		var (
 			method   = info.Method
 			endpoint = info.Endpoint.Address()
-			nodeID   = info.Endpoint.NodeID()
 		)
 
 		return func(info trace.DriverConnNewStreamDoneInfo) {
 			if config.Details()&trace.DriverConnStreamEvents != 0 {
-				requestStatuses.With(map[string]string{
+				requests.With(map[string]string{
 					"status":   errorBrief(info.Error),
-					"endpoint": endpoint,
-					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
-				}).Inc()
-				requestMethods.With(map[string]string{
 					"method":   string(method),
 					"endpoint": endpoint,
-					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
 				}).Inc()
 			}
 		}
