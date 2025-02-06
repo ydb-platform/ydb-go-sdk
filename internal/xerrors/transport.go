@@ -27,6 +27,14 @@ func (e *transportError) GRPCStatus() *grpcStatus.Status {
 
 func (e *transportError) isYdbError() {}
 
+func (e *transportError) NodeID() uint32 {
+	return e.nodeID
+}
+
+func (e *transportError) Address() string {
+	return e.address
+}
+
 func (e *transportError) Code() int32 {
 	return int32(e.status.Code())
 }
@@ -134,8 +142,8 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	var status *grpcStatus.Status
 	if t := (*transportError)(nil); errors.As(err, &t) {
 		status = t.status
-	} else if t, has := grpcStatus.FromError(err); has {
-		status = t
+	} else if s, has := grpcStatus.FromError(err); has {
+		status = s
 	}
 	if status != nil {
 		if len(codes) == 0 {
