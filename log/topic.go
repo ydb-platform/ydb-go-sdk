@@ -133,7 +133,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "commit")
+		ctx := with(*info.RequestContext, TRACE, "ydb", "topic", "reader", "commit")
 		start := time.Now()
 		l.Log(ctx, "start",
 			kv.String("topic", info.Topic),
@@ -404,7 +404,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "read", "messages")
+		ctx := with(*info.RequestContext, TRACE, "ydb", "topic", "reader", "read", "messages")
 		start := time.Now()
 		l.Log(ctx, "read messages called, waiting...",
 			kv.Int("min_count", info.MinCount),

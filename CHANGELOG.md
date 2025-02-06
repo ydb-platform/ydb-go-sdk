@@ -1,3 +1,5 @@
+* Fixed not passing request context to topic event logs
+
 ## v3.99.6
 * Added log grpc messages metadata on trace log level for topic writer
 
