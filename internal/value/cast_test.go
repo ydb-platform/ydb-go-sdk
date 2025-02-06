@@ -32,6 +32,14 @@ func loadLocation(t *testing.T, name string) *time.Location {
 	return loc
 }
 
+type testStringValueScanner struct {
+	field string
+}
+
+func (s *testStringValueScanner) UnmarshalYDBValue(v Value) error {
+	return CastTo(v, &s.field)
+}
+
 func TestCastTo(t *testing.T) {
 	testsCases := []struct {
 		name  string
@@ -426,6 +434,13 @@ func TestCastTo(t *testing.T) {
 			value: DateValueFromTime(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
 			dst:   ptr[Value](),
 			exp:   DateValueFromTime(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TextValue("text-string"),
+			dst:   ptr[testStringValueScanner](),
+			exp:   testStringValueScanner{field: "text-string"},
 			err:   nil,
 		},
 	}

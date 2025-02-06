@@ -10,5 +10,13 @@ func CastTo(v Value, dst interface{}) error {
 		return nil
 	}
 
+	if scanner, has := dst.(Scanner); has {
+		return scanner.UnmarshalYDBValue(v)
+	}
+
 	return v.castTo(dst)
+}
+
+type Scanner interface {
+	UnmarshalYDBValue(value Value) error
 }

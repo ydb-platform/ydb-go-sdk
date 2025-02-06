@@ -19,6 +19,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
+type testStringScanner struct {
+	field string
+}
+
+func (v *testStringScanner) Scan(value any) error {
+	vs, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("unexpected type of value %v", value)
+	}
+	v.field = vs
+	return nil
+}
+
 func TestQueryRange(t *testing.T) {
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
@@ -84,19 +97,22 @@ func TestQueryRange(t *testing.T) {
 			p1 string
 			p2 uint64
 			p3 time.Duration
+			p4 testStringScanner
 		)
 		err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 			r, err := s.Query(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
-				SELECT $p1, $p2, $p3;
+				DECLARE $p4 AS Text;
+				SELECT $p1, $p2, $p3, $p4;
 			`,
 				query.WithParameters(
 					ydb.ParamsBuilder().
 						Param("$p1").Text("test").
 						Param("$p2").Uint64(100500000000).
 						Param("$p3").Interval(time.Duration(100500000000)).
+						Param("$p4").Text("test2").
 						Build(),
 				),
 				query.WithSyntax(query.SyntaxYQL),
@@ -112,7 +128,7 @@ func TestQueryRange(t *testing.T) {
 					if err != nil {
 						return err
 					}
-					err = row.Scan(&p1, &p2, &p3)
+					err = row.Scan(&p1, &p2, &p3, &p4)
 					if err != nil {
 						return err
 					}
@@ -125,6 +141,9 @@ func TestQueryRange(t *testing.T) {
 					}
 					if p3 != time.Duration(100500000000) {
 						return fmt.Errorf("unexpected p3 value: %v", p3)
+					}
+					if p4.field != "test2" {
+						return fmt.Errorf("unexpected p4 value: %v", p4)
 					}
 				}
 			}
