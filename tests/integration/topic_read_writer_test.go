@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"io"
 	"os"
 	"runtime/pprof"
@@ -32,6 +33,61 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestTopicWriterLogMessagesWithoutData(t *testing.T) {
+	scope := newScope(t)
+
+	producerID := "dkeujsl"
+	const seqNoInt = 486812497
+	seqNoString := "486812497"
+	data := "kdjwkruowe"
+	metaKey := "gyoeexiufo"
+	metaValue := "fjedeikeosbv"
+
+	logs := &strings.Builder{}
+	writer, err := scope.Driver().Topic().StartWriter(
+		scope.TopicPath(),
+		topicoptions.WithWriterProducerID(producerID),
+		topicoptions.WithWriterSetAutoSeqNo(false),
+		topicoptions.WithWriterWaitServerAck(true),
+		topicoptions.WithWriterTrace(log.Topic(
+			log.Default(logs, log.WithMinLevel(log.TRACE)), trace.TopicWriterStreamGrpcMessageEvents),
+		),
+	)
+
+	scope.Require.NoError(err)
+	err = writer.Write(scope.Ctx,
+		topicwriter.Message{
+			SeqNo: seqNoInt,
+			Data:  strings.NewReader(data),
+			Metadata: map[string][]byte{
+				metaKey: []byte(metaValue),
+			},
+		},
+	)
+	scope.Require.NoError(err)
+
+	err = writer.Close(scope.Ctx)
+	scope.Require.NoError(err)
+
+	logsString := logs.String()
+	scope.Require.Contains(logsString, producerID)
+	scope.Require.Contains(logsString, seqNoString)
+	scope.Require.NotContains(logsString, metaKey)
+	scope.Require.NotContains(logsString, metaValue)
+	scope.Require.NotContains(logsString, data)
+
+	mess, err := scope.TopicReader().ReadMessage(scope.Ctx)
+	scope.Require.NoError(err)
+
+	scope.Require.Equal(producerID, mess.ProducerID)
+	scope.Require.Equal(int64(seqNoInt), mess.SeqNo)
+	scope.Require.Equal(metaValue, string(mess.Metadata[metaKey]))
+
+	messData, err := io.ReadAll(mess)
+	scope.Require.NoError(err)
+	scope.Require.Equal(data, string(messData))
+}
 
 func TestSendAsyncMessages(t *testing.T) {
 	ctx := context.Background()

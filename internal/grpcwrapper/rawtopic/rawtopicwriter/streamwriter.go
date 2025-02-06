@@ -3,6 +3,7 @@ package rawtopicwriter
 import (
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -29,6 +30,12 @@ type StreamWriter struct {
 
 	sendCloseMtx sync.Mutex
 	Stream       GrpcStream
+
+	Tracer               *trace.Topic
+	InternalStreamID     string
+	readMessagesCount    int
+	writtenMessagesCount int
+	sessionID            string
 }
 
 func (w *StreamWriter) Recv() (ServerMessage, error) {
@@ -40,6 +47,8 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 	}
 
 	grpcMsg, err := w.Stream.Recv()
+	w.readMessagesCount++
+	trace.TopicOnWriterReceiveGRPCMessage(w.Tracer, w.InternalStreamID, w.sessionID, w.readMessagesCount, grpcMsg, err)
 	if err != nil {
 		if !xerrors.IsErrorFromServer(err) {
 			err = xerrors.Transport(err)
@@ -64,6 +73,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		var res InitResult
 		res.ServerMessageMetadata = meta
 		res.mustFromProto(v.InitResponse)
+		w.sessionID = res.SessionID
 
 		return &res, nil
 	case *Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse:
@@ -124,6 +134,8 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 	}
 
 	err = w.Stream.Send(&protoMsg)
+	w.writtenMessagesCount++
+	trace.TopicOnWriterSentGRPCMessage(w.Tracer, w.InternalStreamID, w.sessionID, w.writtenMessagesCount, &protoMsg, err)
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to send grpc message to writer stream: %w", err)))
 	}

@@ -2,6 +2,7 @@ package trace
 
 import (
 	"context"
+	"google.golang.org/protobuf/proto"
 )
 
 // tool gtrace used from ./internal/cmd/gtrace
@@ -132,6 +133,10 @@ type (
 		OnWriterSendMessages func(TopicWriterSendMessagesStartInfo) func(TopicWriterSendMessagesDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterReceiveResult func(TopicWriterResultMessagesInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnWriterSentGRPCMessage func(TopicWriterSentGRPCMessageInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnWriterReceiveGRPCMessage func(TopicWriterReceiveGRPCMessageInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterReadUnknownGrpcMessage func(TopicOnWriterReadUnknownGrpcMessageInfo)
 	}
@@ -532,6 +537,24 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicOnWriterAfterFinishTransactionDoneInfo struct {
 		CloseError error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicWriterSentGRPCMessageInfo struct {
+		TopicStreamInternalID string
+		SessionID             string
+		MessageNumber         int
+		Message               proto.Message
+		Error                 error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicWriterReceiveGRPCMessageInfo struct {
+		TopicStreamInternalID string
+		SessionID             string
+		MessageNumber         int
+		Message               proto.Message
+		Error                 error
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

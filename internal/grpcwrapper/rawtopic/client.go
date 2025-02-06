@@ -3,6 +3,8 @@ package rawtopic
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 
@@ -99,7 +101,10 @@ func (c *Client) StreamRead(ctxStreamLifeTime context.Context) (rawtopicreader.S
 	return rawtopicreader.StreamReader{Stream: protoResp}, nil
 }
 
-func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (*rawtopicwriter.StreamWriter, error) {
+func (c *Client) StreamWrite(
+	ctxStreamLifeTime context.Context,
+	tracer *trace.Topic,
+) (*rawtopicwriter.StreamWriter, error) {
 	protoResp, err := c.service.StreamWrite(ctxStreamLifeTime)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(
@@ -109,7 +114,11 @@ func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (*rawtopicwriter
 		)
 	}
 
-	return &rawtopicwriter.StreamWriter{Stream: protoResp}, nil
+	return &rawtopicwriter.StreamWriter{
+		Stream:           protoResp,
+		Tracer:           tracer,
+		InternalStreamID: uuid.New().String(),
+	}, nil
 }
 
 func (c *Client) UpdateOffsetsInTransaction(

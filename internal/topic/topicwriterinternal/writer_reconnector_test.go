@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"math"
 	"sort"
@@ -446,7 +447,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		connectCalled := false
 		connectCalledChan := make(empty.Chan)
 
-		w.cfg.Connect = func(streamCtxArg context.Context) (RawTopicWriterStream, error) {
+		w.cfg.Connect = func(streamCtxArg context.Context, _ *trace.Topic) (RawTopicWriterStream, error) {
 			close(connectCalledChan)
 			connectCalled = true
 			require.NotEqual(t, ctx, streamCtxArg)
@@ -562,7 +563,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		}
 
 		var connectionAttempt atomic.Int64
-		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
+		w.cfg.Connect = func(ctx context.Context, _ *trace.Topic) (RawTopicWriterStream, error) {
 			attemptIndex := int(connectionAttempt.Add(1)) - 1
 			t.Logf("connect with attempt index: %v", attemptIndex)
 			res := connectsResult[attemptIndex]
@@ -1078,17 +1079,18 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 		partitionID:           14,
 	}
 
-	writerOptions := append(defaultTestWriterOptions(), WithConnectFunc(func(ctx context.Context) (
-		RawTopicWriterStream,
-		error,
-	) {
-		connectNum := atomic.AddInt64(&res.connectCount, 1)
-		if connectNum > 1 {
-			t.Fatalf("test: default env support most one connection")
-		}
+	writerOptions := append(defaultTestWriterOptions(), WithConnectFunc(
+		func(ctx context.Context, _ *trace.Topic) (
+			RawTopicWriterStream,
+			error,
+		) {
+			connectNum := atomic.AddInt64(&res.connectCount, 1)
+			if connectNum > 1 {
+				t.Fatalf("test: default env support most one connection")
+			}
 
-		return res.stream, nil
-	}))
+			return res.stream, nil
+		}))
 	writerOptions = append(writerOptions, options.writerOptions...)
 
 	res.writer = newWriterReconnectorStopped(NewWriterReconnectorConfig(writerOptions...))

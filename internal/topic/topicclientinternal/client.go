@@ -356,11 +356,11 @@ func (c *Client) createWriterConfig(
 	topicPath string,
 	opts []topicoptions.WriterOption,
 ) topicwriterinternal.WriterReconnectorConfig {
-	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (
+	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
 		topicwriterinternal.RawTopicWriterStream,
 		error,
 	) {
-		return c.rawClient.StreamWrite(ctx)
+		return c.rawClient.StreamWrite(ctx, tracer)
 	}
 
 	options := []topicoptions.WriterOption{
