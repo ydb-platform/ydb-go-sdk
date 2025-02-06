@@ -1,3 +1,5 @@
+* Added support of custom types to row.ScanStruct using sql.Scanner interface
+
 ## v3.99.5
 * Fixed error `Empty query text` using prepared statements and `ydb.WithExecuteDataQueryOverQueryClient(true)` option
 * Prepared statements always send query text on Execute call from now (previous behaviour - send query ID)  
