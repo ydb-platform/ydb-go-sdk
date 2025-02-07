@@ -1,4 +1,5 @@
 * Fixed not passing request context to topic event logs
+* Fixed deadlock on closing table session with internal query session core
 
 ## v3.99.6
 * Added log grpc messages metadata on trace log level for topic writer
