@@ -4,6 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -885,6 +889,39 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			kv.Version(),
 		)
 	}
+
+	t.OnWriterSentGRPCMessage = func(info trace.TopicWriterSentGRPCMessageInfo) {
+		if d.Details()&trace.TopicWriterStreamGrpcMessageEvents == 0 {
+			return
+		}
+
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "grpc")
+		l.Log(
+			ctx, "topic writer sent grpc message (message body and metadata are removed)",
+			kv.String("topic_stream_internal_id", info.TopicStreamInternalID),
+			kv.String("session_id", info.SessionID),
+			kv.Int("message_number", info.MessageNumber),
+			kv.Stringer("message", lazyProtoStringifer{info.Message}),
+			kv.Error(info.Error),
+			kv.Version(),
+		)
+	}
+	t.OnWriterReceiveGRPCMessage = func(info trace.TopicWriterReceiveGRPCMessageInfo) {
+		if d.Details()&trace.TopicWriterStreamGrpcMessageEvents == 0 {
+			return
+		}
+
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "grpc")
+		l.Log(
+			ctx, "topic writer received grpc message (message body and metadata are removed)",
+			kv.String("topic_stream_internal_id", info.TopicStreamInternalID),
+			kv.String("session_id", info.SessionID),
+			kv.Int("message_number", info.MessageNumber),
+			kv.Stringer("message", lazyProtoStringifer{info.Message}),
+			kv.Error(info.Error),
+			kv.Version(),
+		)
+	}
 	t.OnWriterReadUnknownGrpcMessage = func(info trace.TopicOnWriterReadUnknownGrpcMessageInfo) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return
@@ -898,4 +935,39 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 	}
 
 	return t
+}
+
+type lazyProtoStringifer struct {
+	message proto.Message
+}
+
+func (s lazyProtoStringifer) String() string {
+	// cut message data
+	if writeRequest, ok := s.message.(*Ydb_Topic.StreamWriteMessage_FromClient); ok {
+		if data := writeRequest.GetWriteRequest(); data != nil {
+			type messDataType struct {
+				Data     []byte
+				Metadata []*Ydb_Topic.MetadataItem
+			}
+			storage := make([]messDataType, len(data.GetMessages()))
+			for i := range data.GetMessages() {
+				storage[i].Data = data.GetMessages()[i].GetData()
+				data.Messages[i] = nil
+
+				storage[i].Metadata = data.GetMessages()[i].GetMetadataItems()
+				data.Messages[i].MetadataItems = nil
+			}
+
+			defer func() {
+				for i := range data.GetMessages() {
+					data.Messages[i].Data = storage[i].Data
+					data.Messages[i].MetadataItems = storage[i].Metadata
+				}
+			}()
+		}
+	}
+
+	res := protojson.MarshalOptions{AllowPartial: true}.Format(s.message)
+
+	return res
 }

@@ -4,6 +4,8 @@ package trace
 
 import (
 	"context"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 )
 
 // topicComposeOptions is a holder of options
@@ -972,6 +974,44 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 		}
 	}
 	{
+		h1 := t.OnWriterSentGRPCMessage
+		h2 := x.OnWriterSentGRPCMessage
+		ret.OnWriterSentGRPCMessage = func(t TopicWriterSentGRPCMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnWriterReceiveGRPCMessage
+		h2 := x.OnWriterReceiveGRPCMessage
+		ret.OnWriterReceiveGRPCMessage = func(t TopicWriterReceiveGRPCMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
 		h1 := t.OnWriterReadUnknownGrpcMessage
 		h2 := x.OnWriterReadUnknownGrpcMessage
 		ret.OnWriterReadUnknownGrpcMessage = func(t TopicOnWriterReadUnknownGrpcMessageInfo) {
@@ -1395,6 +1435,20 @@ func (t *Topic) onWriterReceiveResult(t1 TopicWriterResultMessagesInfo) {
 	}
 	fn(t1)
 }
+func (t *Topic) onWriterSentGRPCMessage(t1 TopicWriterSentGRPCMessageInfo) {
+	fn := t.OnWriterSentGRPCMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onWriterReceiveGRPCMessage(t1 TopicWriterReceiveGRPCMessageInfo) {
+	fn := t.OnWriterReceiveGRPCMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
 func (t *Topic) onWriterReadUnknownGrpcMessage(t1 TopicOnWriterReadUnknownGrpcMessageInfo) {
 	fn := t.OnWriterReadUnknownGrpcMessage
 	if fn == nil {
@@ -1786,6 +1840,26 @@ func TopicOnWriterReceiveResult(t *Topic, writerInstanceID string, sessionID str
 	p.PartitionID = partitionID
 	p.Acks = acks
 	t.onWriterReceiveResult(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnWriterSentGRPCMessage(t *Topic, topicStreamInternalID string, sessionID string, messageNumber int, message *Ydb_Topic.StreamWriteMessage_FromClient, e error) {
+	var p TopicWriterSentGRPCMessageInfo
+	p.TopicStreamInternalID = topicStreamInternalID
+	p.SessionID = sessionID
+	p.MessageNumber = messageNumber
+	p.Message = message
+	p.Error = e
+	t.onWriterSentGRPCMessage(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnWriterReceiveGRPCMessage(t *Topic, topicStreamInternalID string, sessionID string, messageNumber int, message *Ydb_Topic.StreamWriteMessage_FromServer, e error) {
+	var p TopicWriterReceiveGRPCMessageInfo
+	p.TopicStreamInternalID = topicStreamInternalID
+	p.SessionID = sessionID
+	p.MessageNumber = messageNumber
+	p.Message = message
+	p.Error = e
+	t.onWriterReceiveGRPCMessage(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TopicOnWriterReadUnknownGrpcMessage(t *Topic, writerInstanceID string, sessionID string, e error) {

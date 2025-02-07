@@ -517,7 +517,7 @@ func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Con
 			}
 		}()
 
-		stream, err := w.cfg.Connect(connectCtx)
+		stream, err := w.cfg.Connect(connectCtx, w.cfg.Tracer)
 		resCh <- resT{stream: stream, err: err}
 	}()
 
@@ -789,7 +789,7 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, multiEncoder *Multi
 	return res
 }
 
-type ConnectFunc func(ctx context.Context) (RawTopicWriterStream, error)
+type ConnectFunc func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error)
 
 func createPublicCodecsFromRaw(codecs rawtopiccommon.SupportedCodecs) []topictypes.Codec {
 	res := make([]topictypes.Codec, len(codecs))

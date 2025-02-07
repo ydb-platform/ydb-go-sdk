@@ -64,6 +64,7 @@ const (
 
 	TopicWriterStreamLifeCycleEvents
 	TopicWriterStreamEvents
+	TopicWriterStreamGrpcMessageEvents
 
 	DatabaseSQLConnectorEvents
 	DatabaseSQLConnEvents
@@ -116,7 +117,10 @@ const (
 		TopicReaderPartitionEvents |
 		TopicReaderStreamLifeCycleEvents
 
-	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents
+	TopicWriterEvents = TopicWriterStreamLifeCycleEvents | TopicWriterStreamEvents |
+		TopicWriterStreamGrpcMessageEvents
+
+	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents | TopicWriterEvents
 
 	DatabaseSQLEvents = DatabaseSQLConnectorEvents |
 		DatabaseSQLConnEvents |
@@ -169,15 +173,16 @@ var (
 		DatabaseSQLTxEvents:        "ydb.database.sql.tx",
 		DatabaseSQLStmtEvents:      "ydb.database.sql.stmt",
 
-		TopicEvents:                      "ydb.topic",
-		TopicControlPlaneEvents:          "ydb.topic.controlplane",
-		TopicReaderEvents:                "ydb.topic.reader",
-		TopicReaderStreamEvents:          "ydb.topic.reader.stream",
-		TopicReaderMessageEvents:         "ydb.topic.reader.message",
-		TopicReaderPartitionEvents:       "ydb.topic.reader.partition",
-		TopicReaderStreamLifeCycleEvents: "ydb.topic.reader.lifecycle",
-		TopicWriterStreamLifeCycleEvents: "ydb.topic.writer.lifecycle",
-		TopicWriterStreamEvents:          "ydb.topic.writer.stream",
+		TopicEvents:                        "ydb.topic",
+		TopicControlPlaneEvents:            "ydb.topic.controlplane",
+		TopicReaderEvents:                  "ydb.topic.reader",
+		TopicReaderStreamEvents:            "ydb.topic.reader.stream",
+		TopicReaderMessageEvents:           "ydb.topic.reader.message",
+		TopicReaderPartitionEvents:         "ydb.topic.reader.partition",
+		TopicReaderStreamLifeCycleEvents:   "ydb.topic.reader.lifecycle",
+		TopicWriterStreamLifeCycleEvents:   "ydb.topic.writer.lifecycle",
+		TopicWriterStreamEvents:            "ydb.topic.writer.stream",
+		TopicWriterStreamGrpcMessageEvents: "ydb.topic.writer.grpc",
 	}
 	defaultDetails = DetailsAll
 )
