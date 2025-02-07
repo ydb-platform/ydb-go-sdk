@@ -1,3 +1,4 @@
+## v3.99.6
 * Added log grpc messages metadata on trace log level for topic writer
 
 ## v3.99.5
