@@ -423,7 +423,6 @@ func newQuerySession(
 			switch status {
 			case query.StatusClosed:
 				s.SetStatus(table.SessionClosed)
-				_ = s.Close(context.Background())
 			case query.StatusClosing:
 				s.SetStatus(table.SessionClosing)
 			case query.StatusInUse:
