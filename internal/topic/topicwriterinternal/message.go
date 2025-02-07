@@ -26,7 +26,17 @@ type PublicMessage struct {
 	// partitioning at level message available by protocol, but doesn't available by current server implementation
 	// the field hidden from public access for prevent runtime errors.
 	// it will be published after implementation on server side.
-	futurePartitioning PublicFuturePartitioning
+	Partitioning PublicFuturePartitioning
+}
+
+func (m *PublicMessage) SetPartitionID(partitionID int64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *PublicMessage) SetMessageGroupID(messageGroupID string) {
+	//TODO implement me
+	panic("implement me")
 }
 
 // PublicFuturePartitioning will be published in feature, after server implementation completed.

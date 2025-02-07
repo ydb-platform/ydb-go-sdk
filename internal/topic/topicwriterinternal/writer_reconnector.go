@@ -733,12 +733,12 @@ func createRawMessageData(
 	res.SeqNo = mess.SeqNo
 
 	switch {
-	case mess.futurePartitioning.hasPartitionID:
+	case mess.Partitioning.hasPartitionID:
 		res.Partitioning.Type = rawtopicwriter.PartitioningPartitionID
-		res.Partitioning.PartitionID = mess.futurePartitioning.partitionID
-	case mess.futurePartitioning.messageGroupID != "":
+		res.Partitioning.PartitionID = mess.Partitioning.partitionID
+	case mess.Partitioning.messageGroupID != "":
 		res.Partitioning.Type = rawtopicwriter.PartitioningMessageGroupID
-		res.Partitioning.MessageGroupID = mess.futurePartitioning.messageGroupID
+		res.Partitioning.MessageGroupID = mess.Partitioning.messageGroupID
 	default:
 		// pass
 	}

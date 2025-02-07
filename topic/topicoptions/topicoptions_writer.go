@@ -214,3 +214,15 @@ func WithWriterTrace(t trace.Topic) WriterOption { //nolint:gocritic
 func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
 	return topicwriterinternal.WithTokenUpdateInterval(interval)
 }
+
+// WithWriterMessageGroupHashFunc set cusrom hash function, messages split by partition with the hash value
+// messages with same hash will written to same partition
+func WithWriterMessageGroupHashFunc(f func(messageGroupID string) [32]byte) WriterOption {
+	//TODO implement me
+	panic("implement me")
+}
+
+func WithWriterMessageUseMessageGroupID(val bool) WriterOption {
+	//TODO implement me
+	panic("implement me")
+}

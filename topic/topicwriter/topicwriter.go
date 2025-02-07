@@ -129,3 +129,11 @@ func (w *TxWriter) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, er
 
 	return publicInfo, nil
 }
+
+func ExplicitPartitionID(partitionID int64) topicwriterinternal.PublicFuturePartitioning {
+	return topicwriterinternal.NewPartitioningWithPartitionID(partitionID)
+}
+
+func PartitionByMessageGroupID(groupID string) topicwriterinternal.PublicFuturePartitioning {
+	return topicwriterinternal.NewPartitioningWithMessageGroupID(groupID)
+}
