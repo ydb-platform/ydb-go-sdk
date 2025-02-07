@@ -2,7 +2,8 @@ package trace
 
 import (
 	"context"
-	"google.golang.org/protobuf/proto"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 )
 
 // tool gtrace used from ./internal/cmd/gtrace
@@ -544,7 +545,7 @@ type (
 		TopicStreamInternalID string
 		SessionID             string
 		MessageNumber         int
-		Message               proto.Message
+		Message               *Ydb_Topic.StreamWriteMessage_FromClient
 		Error                 error
 	}
 
@@ -553,7 +554,7 @@ type (
 		TopicStreamInternalID string
 		SessionID             string
 		MessageNumber         int
-		Message               proto.Message
+		Message               *Ydb_Topic.StreamWriteMessage_FromServer
 		Error                 error
 	}
 

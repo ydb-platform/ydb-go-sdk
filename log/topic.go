@@ -2,10 +2,11 @@ package log
 
 import (
 	"context"
+	"time"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -948,17 +949,17 @@ func (s lazyProtoStringifer) String() string {
 				Data     []byte
 				Metadata []*Ydb_Topic.MetadataItem
 			}
-			storage := make([]messDataType, len(data.Messages))
-			for i := range data.Messages {
-				storage[i].Data = data.Messages[i].Data
+			storage := make([]messDataType, len(data.GetMessages()))
+			for i := range data.GetMessages() {
+				storage[i].Data = data.GetMessages()[i].GetData()
 				data.Messages[i] = nil
 
-				storage[i].Metadata = data.Messages[i].MetadataItems
+				storage[i].Metadata = data.GetMessages()[i].GetMetadataItems()
 				data.Messages[i].MetadataItems = nil
 			}
 
 			defer func() {
-				for i := range data.Messages {
+				for i := range data.GetMessages() {
 					data.Messages[i].Data = storage[i].Data
 					data.Messages[i].MetadataItems = storage[i].Metadata
 				}
@@ -967,5 +968,6 @@ func (s lazyProtoStringifer) String() string {
 	}
 
 	res := protojson.MarshalOptions{AllowPartial: true}.Format(s.message)
+
 	return res
 }

@@ -3,15 +3,15 @@ package rawtopic
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Client struct {

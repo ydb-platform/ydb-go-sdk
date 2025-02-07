@@ -3,7 +3,6 @@ package rawtopicwriter
 import (
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -15,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var errConcurencyReadDenied = xerrors.Wrap(errors.New("ydb: read from rawtopicwriter in parallel"))
@@ -38,6 +38,7 @@ type StreamWriter struct {
 	sessionID            string
 }
 
+//nolint:funlen
 func (w *StreamWriter) Recv() (ServerMessage, error) {
 	readCnt := atomic.AddInt32(&w.readCounter, 1)
 	defer atomic.AddInt32(&w.readCounter, -1)
@@ -46,22 +47,27 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		return nil, xerrors.WithStackTrace(errConcurencyReadDenied)
 	}
 
-	grpcMsg, err := w.Stream.Recv()
+	grpcMsg, sendErr := w.Stream.Recv()
 	w.readMessagesCount++
-	trace.TopicOnWriterReceiveGRPCMessage(w.Tracer, w.InternalStreamID, w.sessionID, w.readMessagesCount, grpcMsg, err)
-	if err != nil {
-		if !xerrors.IsErrorFromServer(err) {
-			err = xerrors.Transport(err)
+	defer func() {
+		// defer needs for set good session id on first init response before trace the message
+		trace.TopicOnWriterReceiveGRPCMessage(
+			w.Tracer, w.InternalStreamID, w.sessionID, w.readMessagesCount, grpcMsg, sendErr,
+		)
+	}()
+	if sendErr != nil {
+		if !xerrors.IsErrorFromServer(sendErr) {
+			sendErr = xerrors.Transport(sendErr)
 		}
 
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to read grpc message from writer stream: %w",
-			err,
+			sendErr,
 		)))
 	}
 
 	var meta rawtopiccommon.ServerMessageMetadata
-	if err = meta.MetaFromStatusAndIssues(grpcMsg); err != nil {
+	if err := meta.MetaFromStatusAndIssues(grpcMsg); err != nil {
 		return nil, err
 	}
 	if !meta.Status.IsSuccess() {
@@ -79,7 +85,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 	case *Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse:
 		var res WriteResult
 		res.ServerMessageMetadata = meta
-		err = res.fromProto(v.WriteResponse)
+		err := res.fromProto(v.WriteResponse)
 		if err != nil {
 			return nil, err
 		}
