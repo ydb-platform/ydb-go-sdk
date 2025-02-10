@@ -10,7 +10,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 )
 
 var (
@@ -138,20 +140,20 @@ func (r *rows) Next(dst []driver.Value) error {
 		return xerrors.WithStackTrace(err)
 	}
 
-	dstBuf := make([]driver.Value, len(r.allColumns))
-	ptrs := make([]any, len(dstBuf))
-	for i := range dstBuf {
-		ptrs[i] = &dstBuf[i]
-	}
-
-	if err = nextRow.Scan(ptrs...); err != nil {
+	values := xslices.Transform(make([]value.Value, len(r.allColumns)), func(v value.Value) any { return &v })
+	if err = nextRow.Scan(values...); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	dstI := 0
-	for i := range dstBuf {
+	for i := range values {
 		if !r.discarded[i] {
-			dst[dstI] = dstBuf[i]
+			if v := values[i]; v != nil {
+				dst[dstI], err = value.Any(*(v.(*value.Value)))
+				if err != nil {
+					return xerrors.WithStackTrace(err)
+				}
+			}
 			dstI++
 		}
 	}

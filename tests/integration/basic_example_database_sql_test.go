@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"sync/atomic"
@@ -42,70 +43,101 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 		totalConsumedUnits.Add(meta.ConsumedUnits(md))
 	})
 
+	engines := []struct {
+		name            string
+		useQueryService bool
+	}{
+		{
+			name:            "ydb.WithQueryService(false)",
+			useQueryService: false,
+		},
+		{
+			name:            "ydb.WithQueryService(true)",
+			useQueryService: true,
+		},
+	}
+
 	t.Run("sql.Open", func(t *testing.T) {
-		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
-		require.NoError(t, err)
+		for _, tt := range engines {
+			t.Run(tt.name, func(t *testing.T) {
+				dsn, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
+				require.NoError(t, err)
 
-		require.NoError(t, db.PingContext(ctx))
+				if tt.useQueryService {
+					v := dsn.Query()
+					v.Add("go_query_mode", "query")
+					dsn.RawQuery = v.Encode()
+				}
 
-		_, err = ydb.Unwrap(db)
-		require.NoError(t, err)
+				db, err := sql.Open("ydb", dsn.String())
+				require.NoError(t, err)
 
-		require.NoError(t, db.Close())
+				require.NoError(t, db.PingContext(ctx))
+
+				_, err = ydb.Unwrap(db)
+				require.NoError(t, err)
+
+				require.NoError(t, db.Close())
+			})
+		}
 	})
 
 	t.Run("sql.OpenDB", func(t *testing.T) {
-		nativeDriver, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
-			withMetrics(t, trace.DetailsAll, 0),
-			ydb.WithDiscoveryInterval(time.Second),
-		)
-		require.NoError(t, err)
-
-		defer func() {
-			require.NoError(t, nativeDriver.Close(ctx))
-		}()
-
-		c, err := ydb.Connector(nativeDriver)
-		require.NoError(t, err)
-
-		defer func() {
-			require.NoError(t, c.Close())
-		}()
-
-		db := sql.OpenDB(c)
-		defer func() {
-			require.NoError(t, db.Close())
-		}()
-
-		require.NoError(t, db.PingContext(ctx))
-
-		db.SetMaxOpenConns(50)
-		db.SetMaxIdleConns(50)
-
-		t.Run("prepare", func(t *testing.T) {
-			t.Run("scheme", func(t *testing.T) {
-				err = sugar.RemoveRecursive(ctx, nativeDriver, folder)
+		for _, tt := range engines {
+			t.Run(tt.name, func(t *testing.T) {
+				nativeDriver, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
+					withMetrics(t, trace.DetailsAll, 0),
+					ydb.WithDiscoveryInterval(time.Second),
+				)
 				require.NoError(t, err)
 
-				err = sugar.MakeRecursive(ctx, nativeDriver, folder)
+				defer func() {
+					require.NoError(t, nativeDriver.Close(ctx))
+				}()
+
+				c, err := ydb.Connector(nativeDriver,
+					ydb.WithQueryService(tt.useQueryService),
+				)
 				require.NoError(t, err)
 
-				t.Run("series", func(t *testing.T) {
-					var (
-						ctx       = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
-						exists    bool
-						tablePath = path.Join(nativeDriver.Name(), folder, "series")
-					)
+				defer func() {
+					require.NoError(t, c.Close())
+				}()
 
-					exists, err = sugar.IsTableExists(ctx, nativeDriver.Scheme(), tablePath)
-					require.NoError(t, err)
+				db := sql.OpenDB(c)
+				defer func() {
+					require.NoError(t, db.Close())
+				}()
 
-					if exists {
-						_, err = db.ExecContext(ctx, `DROP TABLE `+"`"+tablePath+"`"+`;`)
+				require.NoError(t, db.PingContext(ctx))
+
+				db.SetMaxOpenConns(50)
+				db.SetMaxIdleConns(50)
+
+				t.Run("prepare", func(t *testing.T) {
+					t.Run("scheme", func(t *testing.T) {
+						err = sugar.RemoveRecursive(ctx, nativeDriver, folder)
 						require.NoError(t, err)
-					}
 
-					_, err = db.ExecContext(ctx, `
+						err = sugar.MakeRecursive(ctx, nativeDriver, folder)
+						require.NoError(t, err)
+
+						t.Run("series", func(t *testing.T) {
+							var (
+								ctx       = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
+								exists    bool
+								tablePath = path.Join(nativeDriver.Name(), folder, "series")
+							)
+
+							exists, err = sugar.IsTableExists(ctx, nativeDriver.Scheme(), tablePath)
+							require.NoError(t, err)
+
+							if exists {
+								_, err = db.ExecContext(ctx, `DROP TABLE `+"`"+tablePath+"`"+`;`)
+								require.NoError(t, err)
+							}
+
+							_, err = db.ExecContext(ctx, `
 						CREATE TABLE `+"`"+tablePath+"`"+` (
 							series_id Uint64,
 							title UTF8,
@@ -117,24 +149,24 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 							)
 						);
 					`)
-					require.NoError(t, err)
-				})
-				t.Run("seasons", func(t *testing.T) {
-					var (
-						ctx       = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
-						exists    bool
-						tablePath = path.Join(nativeDriver.Name(), folder, "seasons")
-					)
+							require.NoError(t, err)
+						})
+						t.Run("seasons", func(t *testing.T) {
+							var (
+								ctx       = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
+								exists    bool
+								tablePath = path.Join(nativeDriver.Name(), folder, "seasons")
+							)
 
-					exists, err = sugar.IsTableExists(ctx, nativeDriver.Scheme(), tablePath)
-					require.NoError(t, err)
+							exists, err = sugar.IsTableExists(ctx, nativeDriver.Scheme(), tablePath)
+							require.NoError(t, err)
 
-					if exists {
-						_, err = db.ExecContext(ctx, `DROP TABLE `+"`"+tablePath+"`"+`;`)
-						require.NoError(t, err)
-					}
+							if exists {
+								_, err = db.ExecContext(ctx, `DROP TABLE `+"`"+tablePath+"`"+`;`)
+								require.NoError(t, err)
+							}
 
-					_, err = db.ExecContext(ctx, `
+							_, err = db.ExecContext(ctx, `
 						CREATE TABLE `+"`"+tablePath+"`"+` (
 							series_id Uint64,
 							season_id Uint64,
@@ -147,24 +179,24 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 							)
 						);
 					`)
-					require.NoError(t, err)
-				})
-				t.Run("episodes", func(t *testing.T) {
-					var (
-						ctx       = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
-						exists    bool
-						tablePath = path.Join(nativeDriver.Name(), folder, "episodes")
-					)
+							require.NoError(t, err)
+						})
+						t.Run("episodes", func(t *testing.T) {
+							var (
+								ctx       = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
+								exists    bool
+								tablePath = path.Join(nativeDriver.Name(), folder, "episodes")
+							)
 
-					exists, err = sugar.IsTableExists(ctx, nativeDriver.Scheme(), tablePath)
-					require.NoError(t, err)
+							exists, err = sugar.IsTableExists(ctx, nativeDriver.Scheme(), tablePath)
+							require.NoError(t, err)
 
-					if exists {
-						_, err = db.ExecContext(ctx, `DROP TABLE `+"`"+tablePath+"`"+`;`)
-						require.NoError(t, err)
-					}
+							if exists {
+								_, err = db.ExecContext(ctx, `DROP TABLE `+"`"+tablePath+"`"+`;`)
+								require.NoError(t, err)
+							}
 
-					_, err = db.ExecContext(ctx, `
+							_, err = db.ExecContext(ctx, `
 						CREATE TABLE `+"`"+tablePath+"`"+` (
 							series_id Uint64,
 							season_id Uint64,
@@ -179,15 +211,15 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 							)
 						);
 					`)
-					require.NoError(t, err)
+							require.NoError(t, err)
+						})
+					})
 				})
-			})
-		})
 
-		t.Run("batch", func(t *testing.T) {
-			t.Run("upsert", func(t *testing.T) {
-				err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-					stmt, err := cc.PrepareContext(ctx, `
+				t.Run("batch", func(t *testing.T) {
+					t.Run("upsert", func(t *testing.T) {
+						err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
+							stmt, err := cc.PrepareContext(ctx, `
 						PRAGMA TablePathPrefix("`+path.Join(nativeDriver.Name(), folder)+`");
 						
 						DECLARE $seriesData AS List<Struct<
@@ -217,25 +249,25 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 
 						REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
 					`)
-					if err != nil {
-						return fmt.Errorf("failed to prepare query: %w", err)
-					}
-					_, err = stmt.ExecContext(ctx,
-						sql.Named("seriesData", getSeriesData()),
-						sql.Named("seasonsData", getSeasonsData()),
-						sql.Named("episodesData", getEpisodesData()),
-					)
-					if err != nil {
-						return fmt.Errorf("failed to execute statement: %w", err)
-					}
-					return nil
-				}, retry.WithIdempotent(true))
-				require.NoError(t, err)
-			})
-		})
+							if err != nil {
+								return fmt.Errorf("failed to prepare query: %w", err)
+							}
+							_, err = stmt.ExecContext(ctx,
+								sql.Named("seriesData", getSeriesData()),
+								sql.Named("seasonsData", getSeasonsData()),
+								sql.Named("episodesData", getEpisodesData()),
+							)
+							if err != nil {
+								return fmt.Errorf("failed to execute statement: %w", err)
+							}
+							return nil
+						}, retry.WithIdempotent(true))
+						require.NoError(t, err)
+					})
+				})
 
-		t.Run("query", func(t *testing.T) {
-			query := `
+				t.Run("query", func(t *testing.T) {
+					query := `
 				PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
 
 				DECLARE $seriesID AS Uint64;
@@ -248,47 +280,47 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 					series_id = $seriesID AND 
 					season_id = $seasonID AND 
 					episode_id = $episodeID;`
-			t.Run("explain", func(t *testing.T) {
-				row := db.QueryRowContext(
-					ydb.WithQueryMode(ctx, ydb.ExplainQueryMode), query,
-					sql.Named("seriesID", uint64(1)),
-					sql.Named("seasonID", uint64(1)),
-					sql.Named("episodeID", uint64(1)),
-				)
-				var (
-					ast  string
-					plan string
-				)
-
-				err = row.Scan(&ast, &plan)
-				require.NoError(t, err)
-
-				t.Logf("ast = %v", ast)
-				t.Logf("plan = %v", plan)
-			})
-			t.Run("increment", func(t *testing.T) {
-				t.Run("views", func(t *testing.T) {
-					err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
-						var stmt *sql.Stmt
-						stmt, err = tx.PrepareContext(ctx, query)
-						if err != nil {
-							return fmt.Errorf("cannot prepare query: %w", err)
-						}
-
-						row := stmt.QueryRowContext(ctx,
+					t.Run("explain", func(t *testing.T) {
+						row := db.QueryRowContext(
+							ydb.WithQueryMode(ctx, ydb.ExplainQueryMode), query,
 							sql.Named("seriesID", uint64(1)),
 							sql.Named("seasonID", uint64(1)),
 							sql.Named("episodeID", uint64(1)),
 						)
-						var views sql.NullFloat64
-						if err = row.Scan(&views); err != nil {
-							return fmt.Errorf("cannot scan views: %w", err)
-						}
-						if views.Valid {
-							return fmt.Errorf("unexpected valid views: %v", views.Float64)
-						}
-						// increment `views`
-						_, err = tx.ExecContext(ctx, `
+						var (
+							ast  string
+							plan string
+						)
+
+						err = row.Scan(&ast, &plan)
+						require.NoError(t, err)
+
+						t.Logf("ast = %v", ast)
+						t.Logf("plan = %v", plan)
+					})
+					t.Run("increment", func(t *testing.T) {
+						t.Run("views", func(t *testing.T) {
+							err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
+								var stmt *sql.Stmt
+								stmt, err = tx.PrepareContext(ctx, query)
+								if err != nil {
+									return fmt.Errorf("cannot prepare query: %w", err)
+								}
+
+								row := stmt.QueryRowContext(ctx,
+									sql.Named("seriesID", uint64(1)),
+									sql.Named("seasonID", uint64(1)),
+									sql.Named("episodeID", uint64(1)),
+								)
+								var views sql.NullFloat64
+								if err = row.Scan(&views); err != nil {
+									return fmt.Errorf("cannot scan views: %w", err)
+								}
+								if views.Valid {
+									return fmt.Errorf("unexpected valid views: %v", views.Float64)
+								}
+								// increment `views`
+								_, err = tx.ExecContext(ctx, `
 								PRAGMA TablePathPrefix("`+path.Join(nativeDriver.Name(), folder)+`");
 				
 								DECLARE $seriesID AS Uint64;
@@ -299,23 +331,23 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 								UPSERT INTO episodes ( series_id, season_id, episode_id, views )
 								VALUES ( $seriesID, $seasonID, $episodeID, $views );
 							`,
-							sql.Named("seriesID", uint64(1)),
-							sql.Named("seasonID", uint64(1)),
-							sql.Named("episodeID", uint64(1)),
-							sql.Named("views", uint64(views.Float64+1)), // increment views
-						)
-						if err != nil {
-							return fmt.Errorf("cannot upsert views: %w", err)
-						}
-						return nil
-					}, retry.WithIdempotent(true))
-					require.NoError(t, err)
-				})
-			})
-			t.Run("select", func(t *testing.T) {
-				t.Run("isolation", func(t *testing.T) {
-					t.Run("snapshot", func(t *testing.T) {
-						query := `
+									sql.Named("seriesID", uint64(1)),
+									sql.Named("seasonID", uint64(1)),
+									sql.Named("episodeID", uint64(1)),
+									sql.Named("views", uint64(views.Float64+1)), // increment views
+								)
+								if err != nil {
+									return fmt.Errorf("cannot upsert views: %w", err)
+								}
+								return nil
+							}, retry.WithIdempotent(true))
+							require.NoError(t, err)
+						})
+					})
+					t.Run("select", func(t *testing.T) {
+						t.Run("isolation", func(t *testing.T) {
+							t.Run("snapshot", func(t *testing.T) {
+								query := `
 							PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
 				
 							DECLARE $seriesID AS Uint64;
@@ -328,46 +360,46 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 								season_id = $seasonID AND 
 								episode_id = $episodeID;
 						`
-						err = retry.DoTx(ctx, db,
-							func(ctx context.Context, tx *sql.Tx) error {
-								row := tx.QueryRowContext(ctx, query,
-									sql.Named("seriesID", uint64(1)),
-									sql.Named("seasonID", uint64(1)),
-									sql.Named("episodeID", uint64(1)),
+								err = retry.DoTx(ctx, db,
+									func(ctx context.Context, tx *sql.Tx) error {
+										row := tx.QueryRowContext(ctx, query,
+											sql.Named("seriesID", uint64(1)),
+											sql.Named("seasonID", uint64(1)),
+											sql.Named("episodeID", uint64(1)),
+										)
+										var views sql.NullFloat64
+										if err = row.Scan(&views); err != nil {
+											return fmt.Errorf("cannot select current views: %w", err)
+										}
+										if !views.Valid {
+											return fmt.Errorf("unexpected invalid views: %v", views)
+										}
+										if views.Float64 != 1 {
+											return fmt.Errorf("unexpected views value: %v", views)
+										}
+										return nil
+									},
+									retry.WithIdempotent(true),
+									retry.WithTxOptions(&sql.TxOptions{
+										Isolation: sql.LevelSnapshot,
+										ReadOnly:  true,
+									}),
 								)
-								var views sql.NullFloat64
-								if err = row.Scan(&views); err != nil {
-									return fmt.Errorf("cannot select current views: %w", err)
+								if !errors.Is(err, context.DeadlineExceeded) {
+									require.NoError(t, err)
 								}
-								if !views.Valid {
-									return fmt.Errorf("unexpected invalid views: %v", views)
-								}
-								if views.Float64 != 1 {
-									return fmt.Errorf("unexpected views value: %v", views)
-								}
-								return nil
-							},
-							retry.WithIdempotent(true),
-							retry.WithTxOptions(&sql.TxOptions{
-								Isolation: sql.LevelSnapshot,
-								ReadOnly:  true,
-							}),
-						)
-						if !errors.Is(err, context.DeadlineExceeded) {
-							require.NoError(t, err)
-						}
-					})
-				})
-				t.Run("scan", func(t *testing.T) {
-					t.Run("query", func(t *testing.T) {
-						var (
-							seriesID  *uint64
-							seasonID  *uint64
-							episodeID *uint64
-							title     *string
-							airDate   *time.Time
-							views     sql.NullFloat64
-							query     = `
+							})
+						})
+						t.Run("scan", func(t *testing.T) {
+							t.Run("query", func(t *testing.T) {
+								var (
+									seriesID  *uint64
+									seasonID  *uint64
+									episodeID *uint64
+									title     *string
+									airDate   *time.Time
+									views     sql.NullFloat64
+									query     = `
 								PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
 					
 								DECLARE $seriesID AS Optional<Uint64>;
@@ -389,42 +421,44 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 								ORDER BY 
 									series_id, season_id, episode_id;
 							`
-						)
-						err := retry.DoTx(ctx, db,
-							func(ctx context.Context, tx *sql.Tx) error {
-								rows, err := tx.QueryContext(ctx, query,
-									sql.Named("seriesID", seriesID),
-									sql.Named("seasonID", seasonID),
-									sql.Named("episodeID", episodeID),
 								)
-								if err != nil {
-									return err
-								}
-								defer func() {
-									_ = rows.Close()
-								}()
-								for rows.NextResultSet() {
-									for rows.Next() {
-										if err = rows.Scan(&seriesID, &seasonID, &episodeID, &title, &airDate, &views); err != nil {
-											return fmt.Errorf("cannot select current views: %w", err)
-										}
-										t.Logf("[%d][%d][%d] - %s %q (%d views)",
-											*seriesID, *seasonID, *episodeID, airDate.Format("2006-01-02"),
-											*title, uint64(views.Float64),
+								err := retry.DoTx(ctx, db,
+									func(ctx context.Context, tx *sql.Tx) error {
+										rows, err := tx.QueryContext(ctx, query,
+											sql.Named("seriesID", seriesID),
+											sql.Named("seasonID", seasonID),
+											sql.Named("episodeID", episodeID),
 										)
-									}
+										if err != nil {
+											return err
+										}
+										defer func() {
+											_ = rows.Close()
+										}()
+										for rows.NextResultSet() {
+											for rows.Next() {
+												if err = rows.Scan(&seriesID, &seasonID, &episodeID, &title, &airDate, &views); err != nil {
+													return fmt.Errorf("cannot select current views: %w", err)
+												}
+												t.Logf("[%d][%d][%d] - %s %q (%d views)",
+													*seriesID, *seasonID, *episodeID, airDate.Format("2006-01-02"),
+													*title, uint64(views.Float64),
+												)
+											}
+										}
+										return rows.Err()
+									},
+									retry.WithIdempotent(true),
+									retry.WithTxOptions(&sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: true}),
+								)
+								if !errors.Is(err, context.DeadlineExceeded) {
+									require.NoError(t, err)
 								}
-								return rows.Err()
-							},
-							retry.WithIdempotent(true),
-							retry.WithTxOptions(&sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: true}),
-						)
-						if !errors.Is(err, context.DeadlineExceeded) {
-							require.NoError(t, err)
-						}
+							})
+						})
 					})
 				})
 			})
-		})
+		}
 	})
 }
