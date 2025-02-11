@@ -339,11 +339,6 @@ func (l *streamListener) onStopPartitionRequest(
 	m *rawtopicreader.StopPartitionSessionRequest,
 ) error {
 	session, err := l.sessions.Get(m.PartitionSessionID)
-	if !m.Graceful && session == nil {
-		// stop partition may be received twice: graceful and force
-		// the sdk we can forget about the session after graceful stop
-		return nil
-	}
 	if err != nil {
 		return err
 	}

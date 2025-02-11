@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -32,30 +31,12 @@ func withConnectorOptions(opts ...ConnectorOption) Option {
 	}
 }
 
-type sqlDriver struct {
-	connectors xsync.Map[*xsql.Connector, *Driver]
-}
+type sqlDriver struct{}
 
 var (
 	_ driver.Driver        = &sqlDriver{}
 	_ driver.DriverContext = &sqlDriver{}
 )
-
-func (d *sqlDriver) Close() error {
-	var errs []error
-	d.connectors.Range(func(c *xsql.Connector, _ *Driver) bool {
-		if err := c.Close(); err != nil {
-			errs = append(errs, err)
-		}
-
-		return true
-	})
-	if len(errs) > 0 {
-		return xerrors.NewWithIssues("ydb legacy driver close failed", errs...)
-	}
-
-	return nil
-}
 
 // Open returns a new Driver to the ydb.
 func (d *sqlDriver) Open(string) (driver.Conn, error) {
@@ -68,15 +49,16 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
 	}
 
-	return Connector(db, db.databaseSQLOptions...)
-}
+	c, err := Connector(db, append(db.databaseSQLOptions,
+		xsql.WithOnClose(func(connector *xsql.Connector) {
+			_ = db.Close(context.Background())
+		}),
+	)...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to create connector: %w", err))
+	}
 
-func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
-	d.connectors.Set(c, parent)
-}
-
-func (d *sqlDriver) detach(c *xsql.Connector) {
-	d.connectors.Delete(c)
+	return c, nil
 }
 
 type QueryMode int
@@ -242,7 +224,6 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 				parent.databaseSQLOptions,
 				opts...,
 			),
-			xsql.WithOnClose(d.detach),
 			xsql.WithTraceRetry(parent.config.TraceRetry()),
 			xsql.WithRetryBudget(parent.config.RetryBudget()),
 		)...,
@@ -250,7 +231,6 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	d.attach(c, parent)
 
 	return c, nil
 }

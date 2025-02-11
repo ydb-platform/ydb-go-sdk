@@ -45,6 +45,10 @@ type (
 	}
 )
 
+func (c *Conn) NodeID() uint32 {
+	return c.session.NodeID()
+}
+
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (result driver.Result, err error) {
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"testing"
 	"text/template"
@@ -157,6 +158,7 @@ func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
 		if err != nil {
 			return nil, err
 		}
+
 		return fixenv.NewGenericResult(db), nil
 	}
 	return fixenv.CacheResult(scope.Env, f)
@@ -466,4 +468,17 @@ func driverEngine(db *sql.DB) (engine xsql.Engine) {
 	})
 
 	return engine
+}
+
+func simpleDetectGoroutineLeak(t *testing.T) {
+	// 1) testing.go => main.main()
+	// 2) current test
+	const expectedGoroutinesCount = 2
+	if num := runtime.NumGoroutine(); num > expectedGoroutinesCount {
+		bb := make([]byte, 2<<32)
+		if n := runtime.Stack(bb, true); n < len(bb) {
+			bb = bb[:n]
+		}
+		t.Error(fmt.Sprintf("unexpected goroutines:\n%s\n", string(bb[runtime.Stack(bb, false)+1:])))
+	}
 }

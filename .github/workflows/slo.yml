@@ -44,10 +44,14 @@ jobs:
             name: native-query
             path: ./native/query
             label: native/query
-          - id: native_table
-            name: native-table
-            path: ./native/table
-            label: native/table
+          - id: native_table_legacy
+            name: native-table-legacy
+            path: ./native/table/legacy
+            label: native/table/legacy
+          - id: native_table_propose
+            name: native-table-propose
+            path: ./native/table/propose
+            label: native/table/propose
           - id: gorm_legacy
             name: gorm-legacy
             path: ./gorm/legacy

@@ -43,7 +43,7 @@ type (
 		LegacyOpts            []legacy.Option
 		Options               []propose.Option
 		disableServerBalancer bool
-		onCLose               []func(*Connector)
+		onClose               []func(*Connector)
 
 		clock          clockwork.Clock
 		idleThreshold  time.Duration
@@ -126,7 +126,7 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) { //nolint:funlen
 	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
-		stack.FunctionID("", stack.Package("database/sql")),
+		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
 
 	switch c.processor {
@@ -200,11 +200,11 @@ func (c *Connector) Parent() ydbDriver {
 func (c *Connector) Close() error {
 	select {
 	case <-c.done:
-		return xerrors.WithStackTrace(errAlreadyClosed)
+		return nil
 	default:
 		close(c.done)
 
-		for _, onClose := range c.onCLose {
+		for _, onClose := range c.onClose {
 			onClose(c)
 		}
 

@@ -424,14 +424,24 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			}
 		}
 
-		writer, err := w.startWriteStream(ctx, streamCtx, attempt)
+		onWriterStarted := trace.TopicOnWriterReconnect(
+			w.cfg.Tracer,
+			w.writerInstanceID,
+			w.cfg.topic,
+			w.cfg.producerID,
+			attempt,
+		)
+
+		writer, err := w.startWriteStream(ctx, streamCtx)
 		w.onWriterChange(writer)
+		onStreamError := onWriterStarted(err)
 		if err == nil {
 			reconnectReason = writer.WaitClose(ctx)
 			startOfRetries = time.Now()
 		} else {
 			reconnectReason = err
 		}
+		onStreamError(reconnectReason)
 	}
 }
 
@@ -467,21 +477,10 @@ func (w *WriterReconnector) handleReconnectRetry(
 	return false
 }
 
-func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, attempt int) (
+func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context) (
 	writer *SingleStreamWriter,
 	err error,
 ) {
-	traceOnDone := trace.TopicOnWriterReconnect(
-		w.cfg.Tracer,
-		w.writerInstanceID,
-		w.cfg.topic,
-		w.cfg.producerID,
-		attempt,
-	)
-	defer func() {
-		traceOnDone(err)
-	}()
-
 	stream, err := w.connectWithTimeout(streamCtx)
 	if err != nil {
 		return nil, err
@@ -518,7 +517,7 @@ func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Con
 			}
 		}()
 
-		stream, err := w.cfg.Connect(connectCtx)
+		stream, err := w.cfg.Connect(connectCtx, w.cfg.Tracer)
 		resCh <- resT{stream: stream, err: err}
 	}()
 
@@ -790,7 +789,7 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, multiEncoder *Multi
 	return res
 }
 
-type ConnectFunc func(ctx context.Context) (RawTopicWriterStream, error)
+type ConnectFunc func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error)
 
 func createPublicCodecsFromRaw(codecs rawtopiccommon.SupportedCodecs) []topictypes.Codec {
 	res := make([]topictypes.Codec, len(codecs))

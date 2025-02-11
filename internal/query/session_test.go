@@ -10,7 +10,6 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -42,7 +41,7 @@ func TestCreateSession(t *testing.T) {
 			SessionId: "123",
 		}).Return(attachStream, nil)
 		require.NotPanics(t, func() {
-			s, err := createSession(ctx, client, session.WithTrace(trace))
+			s, err := createSession(ctx, client, WithTrace(trace))
 			require.NoError(t, err)
 			require.NotNil(t, s)
 			require.Equal(t, "123", s.ID())
@@ -57,7 +56,7 @@ func TestCreateSession(t *testing.T) {
 				xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test")),
 			)
 			require.NotPanics(t, func() {
-				s, err := createSession(ctx, client, session.WithTrace(trace))
+				s, err := createSession(ctx, client, WithTrace(trace))
 				require.Error(t, err)
 				require.Nil(t, s)
 			})
@@ -79,7 +78,7 @@ func TestCreateSession(t *testing.T) {
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
 			require.NotPanics(t, func() {
-				s, err := createSession(ctx, client, session.WithTrace(trace))
+				s, err := createSession(ctx, client, WithTrace(trace))
 				require.Error(t, err)
 				require.Nil(t, s)
 			})
@@ -94,7 +93,7 @@ func TestCreateSession(t *testing.T) {
 				xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 			)
 			require.NotPanics(t, func() {
-				s, err := createSession(ctx, client, session.WithTrace(trace))
+				s, err := createSession(ctx, client, WithTrace(trace))
 				require.Error(t, err)
 				require.Nil(t, s)
 			})
@@ -116,7 +115,7 @@ func TestCreateSession(t *testing.T) {
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
 			require.NotPanics(t, func() {
-				s, err := createSession(ctx, client, session.WithTrace(trace))
+				s, err := createSession(ctx, client, WithTrace(trace))
 				require.Error(t, err)
 				require.Nil(t, s)
 			})

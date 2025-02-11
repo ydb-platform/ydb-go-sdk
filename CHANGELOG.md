@@ -1,3 +1,42 @@
+## v3.99.7
+* Fixed not passing request context to topic event logs
+* Fixed deadlock on closing table session with internal query session core
+
+## v3.99.6
+* Added log grpc messages metadata on trace log level for topic writer
+
+## v3.99.5
+* Fixed error `Empty query text` using prepared statements and `ydb.WithExecuteDataQueryOverQueryClient(true)` option
+* Prepared statements always send query text on Execute call from now (previous behaviour - send query ID)  
+* Prevented create decoder instance until start read a message from topics
+
+## v3.99.4
+* Fixed bug with wrong context on session closing
+* Fixed goroutine leak on closing `database/sql` driver
+* "No endpoints" is retriable error now
+
+## v3.99.3
+* Fixed potential infinity loop for local dc detection (CWE-835)
+* Fixed nil pointer dereferenced in a topic listener (CWE-476)
+
+## v3.99.2
+* Fixed panic when error returned from parsing sql params
+* Fixed explicit null dereferenced issue in internal/credentials/static.go (CWE-476)
+
+## v3.99.1
+* Bumped dependencies:
+  - `golang.org/x/net` from v0.23.0 to v0.33.0
+  - `golang.org/x/sync` from v0.6.0 to v0.10.0
+  - `golang.org/x/sys` from v0.18.0 to v0.28.0
+  - `golang.org/x/text` from v0.14.0 to v0.21.0
+  - `github.com/golang-jwt/jwt/v4` from v4.4.1 to v4.5.0
+
+## v3.99.0
+* Added `ydb.WithExecuteDataQueryOverQueryClient(bool)` option to execute data queries from table service 
+  client using query client API. Using this option you can execute queries from legacy table service client 
+  through `table.Session.Execute` using internal query client API without limitation of 1000 rows in response.
+  Be careful: an OOM problem may happen because bigger result requires more memory
+
 ## v3.98.0
 * Supported pool of encoders, which implement ResetableWriter interface
 
