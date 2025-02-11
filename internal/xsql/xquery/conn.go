@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
@@ -49,7 +50,15 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
-	err := c.session.Exec(ctx, sql, options.WithParameters(params))
+	opts := []options.Execute{
+		options.WithParameters(params),
+	}
+
+	if txControl := common.TxControl(ctx, nil); txControl != nil {
+		opts = append(opts, options.WithTxControlRaw(tx.ToQueryTxControl(txControl.Desc())))
+	}
+
+	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -68,9 +77,15 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 		return nil, xerrors.WithStackTrace(errNotReadyConn)
 	}
 
-	res, err := c.session.Query(ctx, sql,
+	opts := []options.Execute{
 		options.WithParameters(params),
-	)
+	}
+
+	if txControl := common.TxControl(ctx, nil); txControl != nil {
+		opts = append(opts, options.WithTxControlRaw(tx.ToQueryTxControl(txControl.Desc())))
+	}
+
+	res, err := c.session.Query(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

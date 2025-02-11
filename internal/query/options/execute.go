@@ -1,9 +1,12 @@
 package options
 
 import (
+	"fmt"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
@@ -25,6 +28,12 @@ type (
 	ExecMode  Ydb_Query.ExecMode
 	StatsMode Ydb_Query.StatsMode
 
+	TxControl interface {
+		ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl
+
+		Commit() bool
+	}
+
 	// executeSettings is a holder for execute settings
 	executeSettings struct {
 		syntax                 Syntax
@@ -34,7 +43,7 @@ type (
 		resourcePool           string
 		statsCallback          func(queryStats stats.QueryStats)
 		callOptions            []grpc.CallOption
-		txControl              *tx.Control
+		txControl              TxControl
 		retryOptions           []retry.Option
 		responsePartLimitBytes int64
 	}
@@ -55,7 +64,10 @@ type (
 	parametersOption  struct {
 		params params.Parameters
 	}
-	txControlOption tx.Control
+	txControlOption    tx.Control
+	txControlRawOption struct {
+		raw *Ydb_Query.TransactionControl
+	}
 	syntaxOption    = Syntax
 	statsModeOption struct {
 		mode     StatsMode
@@ -64,6 +76,18 @@ type (
 	execModeOption         = ExecMode
 	responsePartLimitBytes int64
 )
+
+func (ctrl txControlRawOption) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl {
+	return ctrl.raw
+}
+
+func (ctrl txControlRawOption) Commit() bool {
+	return ctrl.raw.GetCommitTx()
+}
+
+func (ctrl txControlRawOption) applyExecuteOption(s *executeSettings) {
+	s.txControl = ctrl
+}
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
 	s.resourcePool = string(poolID)
@@ -78,7 +102,14 @@ func (s *executeSettings) StatsCallback() func(stats.QueryStats) {
 }
 
 func (t txCommitOption) applyExecuteOption(s *executeSettings) {
-	s.txControl.Commit = true
+	switch tt := s.txControl.(type) {
+	case *tx.Control:
+		s.txControl = tx.WithCommit(tt)
+	case txControlRawOption:
+		tt.raw.CommitTx = true
+	default:
+		panic(fmt.Sprintf("unknown tx control type: %T", tt))
+	}
 }
 
 func (txControl *txControlOption) applyExecuteOption(s *executeSettings) {
@@ -148,7 +179,7 @@ func ExecuteSettings(opts ...Execute) *executeSettings {
 	return &settings
 }
 
-func (s *executeSettings) TxControl() *tx.Control {
+func (s *executeSettings) TxControl() TxControl {
 	return s.txControl
 }
 
@@ -238,4 +269,8 @@ func WithCallOptions(opts ...grpc.CallOption) callOptionsOption {
 
 func WithTxControl(txControl *tx.Control) *txControlOption {
 	return (*txControlOption)(txControl)
+}
+
+func WithTxControlRaw(txControl *Ydb_Query.TransactionControl) *txControlRawOption {
+	return &txControlRawOption{raw: txControl}
 }

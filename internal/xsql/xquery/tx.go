@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -16,12 +17,20 @@ type transaction struct {
 	tx   query.Transaction
 }
 
-func (tx *transaction) ID() string {
-	return tx.tx.ID()
+func (t *transaction) ID() string {
+	return t.tx.ID()
 }
 
-func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
-	err := tx.tx.Exec(ctx, sql, options.WithParameters(params))
+func (t *transaction) Exec(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
+	opts := []query.ExecuteOption{
+		options.WithParameters(params),
+	}
+
+	if txControl := common.TxControl(ctx, nil); txControl != nil {
+		opts = append(opts, options.WithTxControlRaw(tx.ToQueryTxControl(txControl.Desc())))
+	}
+
+	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -29,16 +38,22 @@ func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Para
 	return resultNoRows{}, nil
 }
 
-func (tx *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
-	res, err := tx.tx.Query(ctx,
-		sql, options.WithParameters(params),
-	)
+func (t *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
+	opts := []query.ExecuteOption{
+		options.WithParameters(params),
+	}
+
+	if txControl := common.TxControl(ctx, nil); txControl != nil {
+		opts = append(opts, options.WithTxControlRaw(tx.ToQueryTxControl(txControl.Desc())))
+	}
+
+	res, err := t.tx.Query(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
-		conn:   tx.conn,
+		conn:   t.conn,
 		result: res,
 	}, nil
 }
@@ -60,16 +75,16 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (common.T
 	}, nil
 }
 
-func (tx *transaction) Commit(ctx context.Context) (finalErr error) {
-	if err := tx.tx.CommitTx(ctx); err != nil {
+func (t *transaction) Commit(ctx context.Context) (finalErr error) {
+	if err := t.tx.CommitTx(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
 }
 
-func (tx *transaction) Rollback(ctx context.Context) (finalErr error) {
-	err := tx.tx.Rollback(ctx)
+func (t *transaction) Rollback(ctx context.Context) (finalErr error) {
+	err := t.tx.Rollback(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
