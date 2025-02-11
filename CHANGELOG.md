@@ -1,3 +1,5 @@
+* Fixed sometime panic on stats receive in query service
+
 ## v3.99.7
 * Fixed not passing request context to topic event logs
 * Fixed deadlock on closing table session with internal query session core
