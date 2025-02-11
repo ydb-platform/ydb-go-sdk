@@ -1,19 +1,27 @@
-package legacy
+package common
 
 import (
 	"context"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 type (
+	ctxPreparedStatementKey  struct{}
 	ctxTransactionControlKey struct{}
 	ctxTxControlHookKey      struct{}
 
 	txControlHook func(txControl *table.TransactionControl)
 )
+
+func WithPreparedStatement(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxPreparedStatementKey{}, true)
+}
+
+func IsPreparedStatement(ctx context.Context) bool {
+	_, ok := ctx.Value(ctxPreparedStatementKey{}).(bool)
+
+	return ok
+}
 
 func WithTxControlHook(ctx context.Context, hook txControlHook) context.Context {
 	return context.WithValue(ctx, ctxTxControlHookKey{}, hook)
@@ -23,7 +31,7 @@ func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.C
 	return context.WithValue(ctx, ctxTransactionControlKey{}, txc)
 }
 
-func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) (txControl *table.TransactionControl) {
+func TxControl(ctx context.Context, defaultTxControl *table.TransactionControl) (txControl *table.TransactionControl) {
 	defer func() {
 		if hook, has := ctx.Value(ctxTxControlHookKey{}).(txControlHook); has && hook != nil {
 			hook(txControl)
@@ -34,12 +42,4 @@ func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) 
 	}
 
 	return defaultTxControl
-}
-
-func (c *Conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
-	if iface.IsPreparedStatement(ctx) {
-		return append(c.dataOpts, options.WithKeepInCache(true))
-	}
-
-	return c.dataOpts
 }
