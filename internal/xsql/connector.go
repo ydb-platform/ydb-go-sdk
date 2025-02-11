@@ -18,7 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -41,7 +41,7 @@ type (
 		processor Engine
 
 		LegacyOpts            []legacy.Option
-		Options               []propose.Option
+		Options               []xquery.Option
 		disableServerBalancer bool
 		onClose               []func(*Connector)
 
@@ -143,9 +143,9 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		conn := &Conn{
 			processor: PROPOSE,
-			cc: propose.New(ctx, c, s, append(
+			cc: xquery.New(ctx, c, s, append(
 				c.Options,
-				propose.WithOnClose(func() {
+				xquery.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),

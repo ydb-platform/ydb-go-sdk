@@ -1,4 +1,4 @@
-package propose
+package xquery
 
 import (
 	"database/sql/driver"
