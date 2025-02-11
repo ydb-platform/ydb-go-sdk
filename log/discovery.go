@@ -18,7 +18,7 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 			return nil
 		}
 		ctx := with(*info.Context, DEBUG, "ydb", "discovery", "list", "endpoints")
-		l.Log(ctx, "starting discovery...",
+		l.Log(ctx, "discovery starting...",
 			kv.String("address", info.Address),
 			kv.String("database", info.Database),
 		)
@@ -44,7 +44,7 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "discovery", "whoAmI")
-		l.Log(ctx, "starting discovery whoami")
+		l.Log(ctx, "discovery whoami starting...")
 		start := time.Now()
 
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
