@@ -119,6 +119,10 @@ func modeToMode(mode QueryMode) xtable.QueryMode {
 }
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
+	if mode == QueryExecuteQueryMode {
+		return xsql.WithQueryService(true)
+	}
+
 	return xsql.WithTableOptions(
 		xtable.WithDefaultQueryMode(modeToMode(mode)),
 	)
