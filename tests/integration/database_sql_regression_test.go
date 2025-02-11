@@ -237,9 +237,9 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		err := row.Scan(&res)
 		switch driverEngine(db) {
-		case xsql.LEGACY:
+		case xsql.TABLE:
 			require.Error(t, err)
-		case xsql.PROPOSE:
+		case xsql.QUERY:
 			require.NoError(t, err)
 		}
 	})
@@ -264,11 +264,11 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		err := row.Scan(&res)
 		switch driverEngine(db) {
-		case xsql.LEGACY:
+		case xsql.TABLE:
 			require.NoError(t, err)
 			resUUID := uuid.UUID(res.AsBytesArray())
 			require.Equal(t, expectedResultWithBug, resUUID.String())
-		case xsql.PROPOSE:
+		case xsql.QUERY:
 			require.Error(t, err)
 		}
 	})
@@ -353,11 +353,11 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		var resBytes types.UUIDBytesWithIssue1501Type
 		err := row.Scan(&resBytes)
 		switch driverEngine(db) {
-		case xsql.LEGACY:
+		case xsql.TABLE:
 			require.NoError(t, err)
 			resUUID := uuid.UUID(resBytes.AsBytesArray())
 			require.Equal(t, id, resUUID)
-		case xsql.PROPOSE:
+		case xsql.QUERY:
 			require.Error(t, err)
 		}
 	})
@@ -420,12 +420,12 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		err := row.Scan(&resFromDB)
 		switch driverEngine(db) {
-		case xsql.LEGACY:
+		case xsql.TABLE:
 			require.NoError(t, err)
 			resUUID := resFromDB.PublicRevertReorderForIssue1501()
 			resString := strings.ToUpper(resUUID.String())
 			require.Equal(t, idString, resString)
-		case xsql.PROPOSE:
+		case xsql.QUERY:
 			require.Error(t, err)
 		}
 	})

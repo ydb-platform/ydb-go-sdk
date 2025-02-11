@@ -66,10 +66,10 @@ type (
 
 func (e Engine) String() string {
 	switch e {
-	case LEGACY:
-		return "LEGACY"
-	case PROPOSE:
-		return "PROPOSE"
+	case TABLE:
+		return "TABLE"
+	case QUERY:
+		return "QUERY"
 	default:
 		return "UNKNOWN"
 	}
@@ -116,8 +116,8 @@ func (c *Connector) Scheme() scheme.Client {
 }
 
 const (
-	PROPOSE = iota + 1
-	LEGACY
+	QUERY = iota + 1
+	TABLE
 )
 
 func (c *Connector) Open(name string) (driver.Conn, error) {
@@ -130,7 +130,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 	)
 
 	switch c.processor {
-	case PROPOSE:
+	case QUERY:
 		s, err := query.CreateSession(ctx, c.Query())
 		defer func() {
 			onDone(s, finalErr)
@@ -142,7 +142,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 		id := uuid.New()
 
 		conn := &Conn{
-			processor: PROPOSE,
+			processor: QUERY,
 			cc: xquery.New(ctx, c, s, append(
 				c.QueryOpts,
 				xquery.WithOnClose(func() {
@@ -158,7 +158,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		return conn, nil
 
-	case LEGACY:
+	case TABLE:
 		s, err := c.Table().CreateSession(ctx) //nolint:staticcheck
 		defer func() {
 			onDone(s, finalErr)
@@ -170,7 +170,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 		id := uuid.New()
 
 		conn := &Conn{
-			processor: LEGACY,
+			processor: TABLE,
 			cc: xtable.New(ctx, c, s, append(c.TableOpts,
 				xtable.WithOnClose(func() {
 					c.conns.Delete(id)
@@ -218,10 +218,10 @@ func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (
 		balancer: balancer,
 		processor: func() Engine {
 			if overQueryService, _ := strconv.ParseBool(os.Getenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE")); overQueryService {
-				return PROPOSE
+				return QUERY
 			}
 
-			return LEGACY
+			return TABLE
 		}(),
 		clock:          clockwork.NewRealClock(),
 		done:           make(chan struct{}),

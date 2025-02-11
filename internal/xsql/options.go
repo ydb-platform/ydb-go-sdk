@@ -200,8 +200,8 @@ func WithQueryOptions(opts ...xquery.Option) Option {
 
 func WithQueryService(b bool) Option {
 	if b {
-		return queryProcessorOption(PROPOSE)
+		return queryProcessorOption(QUERY)
 	}
 
-	return queryProcessorOption(LEGACY)
+	return queryProcessorOption(TABLE)
 }
