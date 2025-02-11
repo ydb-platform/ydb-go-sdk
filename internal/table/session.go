@@ -77,7 +77,7 @@ func statsModeToStatsMode(src Ydb_Table.QueryStatsCollection_Mode) (dst Ydb_Quer
 	}
 }
 
-func TableTxControlToQueryTxControl(src *Ydb_Table.TransactionControl) (dst *Ydb_Query.TransactionControl) {
+func txControlToQueryTxControl(src *Ydb_Table.TransactionControl) (dst *Ydb_Query.TransactionControl) {
 	dst = &Ydb_Query.TransactionControl{
 		CommitTx: src.GetCommitTx(),
 	}
@@ -196,7 +196,7 @@ func (e queryClientExecutor) execute(
 
 	request.SessionId = executeDataQueryRequest.GetSessionId()
 	request.ExecMode = Ydb_Query.ExecMode_EXEC_MODE_EXECUTE
-	request.TxControl = TableTxControlToQueryTxControl(executeDataQueryRequest.GetTxControl())
+	request.TxControl = txControlToQueryTxControl(executeDataQueryRequest.GetTxControl())
 	request.Query = &Ydb_Query.ExecuteQueryRequest_QueryContent{
 		QueryContent: &Ydb_Query.QueryContent{
 			Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,

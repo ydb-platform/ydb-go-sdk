@@ -6,13 +6,13 @@ package integration
 import (
 	"context"
 	"database/sql"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
