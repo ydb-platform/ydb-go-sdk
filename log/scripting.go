@@ -19,18 +19,18 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "scripting", "execute")
-		l.Log(ctx, "ydb starting script executing...")
+		l.Log(ctx, "starting script executing...")
 		start := time.Now()
 
 		return func(info trace.ScriptingExecuteDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "ydb start script done",
+				l.Log(ctx, "start script done",
 					kv.Latency(start),
 					kv.Int("resultSetCount", info.Result.ResultSetCount()),
 					kv.NamedError("resultSetError", info.Result.Err()),
 				)
 			} else {
-				l.Log(WithLevel(ctx, ERROR), "ydb start script failed",
+				l.Log(WithLevel(ctx, ERROR), "start script failed",
 					kv.Error(info.Error),
 					kv.Latency(start),
 					kv.Version(),
@@ -43,17 +43,17 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "scripting", "explain")
-		l.Log(ctx, "ydb starting script explain...")
+		l.Log(ctx, "starting script explain...")
 		start := time.Now()
 
 		return func(info trace.ScriptingExplainDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "ydb script explain done",
+				l.Log(ctx, "script explain done",
 					kv.Latency(start),
 					kv.String("plan", info.Plan),
 				)
 			} else {
-				l.Log(WithLevel(ctx, ERROR), "ydb script explain failed",
+				l.Log(WithLevel(ctx, ERROR), "script explain failed",
 					kv.Error(info.Error),
 					kv.Latency(start),
 					kv.Version(),
@@ -73,7 +73,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "scripting", "stream", "execute")
 		query := info.Query
-		l.Log(ctx, "ydb script stream execute starting...",
+		l.Log(ctx, "script stream execute starting...",
 			appendFieldByCondition(l.logQuery,
 				kv.String("query", query),
 			)...,
@@ -86,9 +86,9 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			trace.ScriptingStreamExecuteDoneInfo,
 		) {
 			if info.Error == nil {
-				l.Log(ctx, "ydb script stream execute intermediate success")
+				l.Log(ctx, "script stream execute intermediate success")
 			} else {
-				l.Log(WithLevel(ctx, WARN), "ydb script stream execute intermediate failed",
+				l.Log(WithLevel(ctx, WARN), "script stream execute intermediate failed",
 					kv.Error(info.Error),
 					kv.Version(),
 				)
@@ -96,14 +96,14 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 
 			return func(info trace.ScriptingStreamExecuteDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb script stream execute done",
+					l.Log(ctx, "script stream execute done",
 						appendFieldByCondition(l.logQuery,
 							kv.String("query", query),
 							kv.Latency(start),
 						)...,
 					)
 				} else {
-					l.Log(WithLevel(ctx, ERROR), "ydb script stream execute failed",
+					l.Log(WithLevel(ctx, ERROR), "script stream execute failed",
 						appendFieldByCondition(l.logQuery,
 							kv.String("query", query),
 							kv.Error(info.Error),
@@ -120,16 +120,16 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "scripting", "close")
-		l.Log(ctx, "ydb script close starting...")
+		l.Log(ctx, "script close starting...")
 		start := time.Now()
 
 		return func(info trace.ScriptingCloseDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "ydb script close done",
+				l.Log(ctx, "script close done",
 					kv.Latency(start),
 				)
 			} else {
-				l.Log(WithLevel(ctx, WARN), "ydb script close failed",
+				l.Log(WithLevel(ctx, WARN), "script close failed",
 					kv.Error(info.Error),
 					kv.Latency(start),
 					kv.Version(),

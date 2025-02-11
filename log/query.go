@@ -24,11 +24,11 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "new")
-			l.Log(ctx, "ydb starting create new query client")
+			l.Log(ctx, "starting create new query client")
 			start := time.Now()
 
 			return func(info trace.QueryNewDoneInfo) {
-				l.Log(WithLevel(ctx, INFO), "ydb create query client done",
+				l.Log(WithLevel(ctx, INFO), "create query client done",
 					kv.Latency(start),
 				)
 			}
@@ -38,12 +38,12 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "close")
-			l.Log(ctx, "ydb query client starting close...")
+			l.Log(ctx, "query client starting close...")
 			start := time.Now()
 
 			return func(info trace.QueryCloseDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query close done",
+					l.Log(ctx, "query close done",
 						kv.Latency(start),
 					)
 				} else {
@@ -51,7 +51,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query close failed",
+					l.Log(WithLevel(ctx, lvl), "query close failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -64,11 +64,11 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "new")
-			l.Log(ctx, "ydb query service starting create pool...")
+			l.Log(ctx, "query service starting create pool...")
 			start := time.Now()
 
 			return func(info trace.QueryPoolNewDoneInfo) {
-				l.Log(WithLevel(ctx, INFO), "ydb query service create pool done",
+				l.Log(WithLevel(ctx, INFO), "query service create pool done",
 					kv.Latency(start),
 					kv.Int("Limit", info.Limit),
 				)
@@ -79,12 +79,12 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "close")
-			l.Log(ctx, "ydb query service starting close pool...")
+			l.Log(ctx, "query service starting close pool...")
 			start := time.Now()
 
 			return func(info trace.QueryPoolCloseDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query service close done",
+					l.Log(ctx, "query service close done",
 						kv.Latency(start),
 					)
 				} else {
@@ -92,7 +92,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query service close failed",
+					l.Log(WithLevel(ctx, lvl), "query service close failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -105,12 +105,12 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "try")
-			l.Log(ctx, "ydb query service starting pool try attempt...")
+			l.Log(ctx, "query service starting pool try attempt...")
 			start := time.Now()
 
 			return func(info trace.QueryPoolTryDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query service pool try done",
+					l.Log(ctx, "query service pool try done",
 						kv.Latency(start),
 					)
 				} else {
@@ -118,7 +118,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query service pool try failed",
+					l.Log(WithLevel(ctx, lvl), "query service pool try failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -136,7 +136,7 @@ func internalQuery(
 
 			return func(info trace.QueryPoolWithDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query pool with done",
+					l.Log(ctx, "query pool with done",
 						kv.Latency(start),
 						kv.Int("Attempts", info.Attempts),
 					)
@@ -145,7 +145,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query pool with failed",
+					l.Log(WithLevel(ctx, lvl), "query pool with failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Int("Attempts", info.Attempts),
@@ -164,7 +164,7 @@ func internalQuery(
 
 			return func(info trace.QueryPoolPutDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query pool put done",
+					l.Log(ctx, "query pool put done",
 						kv.Latency(start),
 					)
 				} else {
@@ -172,7 +172,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query pool put failed",
+					l.Log(WithLevel(ctx, lvl), "query pool put failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -190,7 +190,7 @@ func internalQuery(
 
 			return func(info trace.QueryPoolGetDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query pool get done",
+					l.Log(ctx, "query pool get done",
 						kv.Latency(start),
 					)
 				} else {
@@ -198,7 +198,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query pool get failed",
+					l.Log(WithLevel(ctx, lvl), "query pool get failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -216,7 +216,7 @@ func internalQuery(
 
 			return func(info trace.QueryDoDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query do done",
+					l.Log(ctx, "query do done",
 						kv.Latency(start),
 						kv.Int("attempts", info.Attempts),
 					)
@@ -225,7 +225,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query do failed",
+					l.Log(WithLevel(ctx, lvl), "query do failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Int("attempts", info.Attempts),
@@ -244,7 +244,7 @@ func internalQuery(
 
 			return func(info trace.QueryDoTxDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query doTx done",
+					l.Log(ctx, "query doTx done",
 						kv.Latency(start),
 						kv.Int("attempts", info.Attempts),
 					)
@@ -253,7 +253,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query doTx failed",
+					l.Log(WithLevel(ctx, lvl), "query doTx failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Int("attempts", info.Attempts),
@@ -272,7 +272,7 @@ func internalQuery(
 
 			return func(info trace.QueryExecDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query exec done",
+					l.Log(ctx, "query exec done",
 						kv.Latency(start),
 					)
 				} else {
@@ -280,7 +280,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query exec failed",
+					l.Log(WithLevel(ctx, lvl), "query exec failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -298,7 +298,7 @@ func internalQuery(
 
 			return func(info trace.QueryQueryDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query done",
+					l.Log(ctx, "query done",
 						kv.Latency(start),
 					)
 				} else {
@@ -306,7 +306,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query failed",
+					l.Log(WithLevel(ctx, lvl), "query failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -324,7 +324,7 @@ func internalQuery(
 
 			return func(info trace.QueryQueryRowDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query row done",
+					l.Log(ctx, "query row done",
 						kv.Latency(start),
 					)
 				} else {
@@ -332,7 +332,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query row failed",
+					l.Log(WithLevel(ctx, lvl), "query row failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -350,7 +350,7 @@ func internalQuery(
 
 			return func(info trace.QueryQueryResultSetDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query result set done",
+					l.Log(ctx, "query result set done",
 						kv.Latency(start),
 					)
 				} else {
@@ -358,7 +358,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query result set failed",
+					l.Log(WithLevel(ctx, lvl), "query result set failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -376,7 +376,7 @@ func internalQuery(
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query session create done",
+					l.Log(ctx, "query session create done",
 						kv.Latency(start),
 						kv.String("session_id", info.Session.ID()),
 						kv.String("session_status", info.Session.Status()),
@@ -386,7 +386,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query session create failed",
+					l.Log(WithLevel(ctx, lvl), "query session create failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -407,7 +407,7 @@ func internalQuery(
 
 			return func(info trace.QuerySessionAttachDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query session attach done",
+					l.Log(ctx, "query session attach done",
 						kv.Latency(start),
 					)
 				} else {
@@ -415,7 +415,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query session attach failed",
+					l.Log(WithLevel(ctx, lvl), "query session attach failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -436,7 +436,7 @@ func internalQuery(
 
 			return func(info trace.QuerySessionDeleteDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query session delete done",
+					l.Log(ctx, "query session delete done",
 						kv.Latency(start),
 					)
 				} else {
@@ -444,7 +444,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query session delete failed",
+					l.Log(WithLevel(ctx, lvl), "query session delete failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -466,7 +466,7 @@ func internalQuery(
 
 			return func(info trace.QuerySessionExecDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query session exec done",
+					l.Log(ctx, "query session exec done",
 						kv.Latency(start),
 					)
 				} else {
@@ -474,7 +474,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query session exec failed",
+					l.Log(WithLevel(ctx, lvl), "query session exec failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -496,7 +496,7 @@ func internalQuery(
 
 			return func(info trace.QuerySessionQueryDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query session query done",
+					l.Log(ctx, "query session query done",
 						kv.Latency(start),
 					)
 				} else {
@@ -504,7 +504,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query session query failed",
+					l.Log(WithLevel(ctx, lvl), "query session query failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -525,7 +525,7 @@ func internalQuery(
 
 			return func(info trace.QuerySessionBeginDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, DEBUG), "ydb query session begin done",
+					l.Log(WithLevel(ctx, DEBUG), "query session begin done",
 						kv.Latency(start),
 						kv.String("TransactionID", info.Tx.ID()),
 					)
@@ -534,7 +534,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query session begin failed",
+					l.Log(WithLevel(ctx, lvl), "query session begin failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -556,7 +556,7 @@ func internalQuery(
 
 			return func(info trace.QueryTxExecDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, DEBUG), "ydb query transaction exec done",
+					l.Log(WithLevel(ctx, DEBUG), "query transaction exec done",
 						kv.Latency(start),
 					)
 				} else {
@@ -564,7 +564,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query transaction exec failed",
+					l.Log(WithLevel(ctx, lvl), "query transaction exec failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -586,7 +586,7 @@ func internalQuery(
 
 			return func(info trace.QueryTxQueryDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, DEBUG), "ydb query transaction query done",
+					l.Log(WithLevel(ctx, DEBUG), "query transaction query done",
 						kv.Latency(start),
 					)
 				} else {
@@ -594,7 +594,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query transaction query failed",
+					l.Log(WithLevel(ctx, lvl), "query transaction query failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -612,7 +612,7 @@ func internalQuery(
 
 			return func(info trace.QueryResultNewDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query result new done",
+					l.Log(ctx, "query result new done",
 						kv.Latency(start),
 					)
 				} else {
@@ -620,7 +620,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query result new failed",
+					l.Log(WithLevel(ctx, lvl), "query result new failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -638,7 +638,7 @@ func internalQuery(
 
 			return func(info trace.QueryResultNextPartDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query result next part done",
+					l.Log(ctx, "query result next part done",
 						kv.Stringer("stats", info.Stats),
 						kv.Latency(start),
 					)
@@ -647,7 +647,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query result next part failed",
+					l.Log(WithLevel(ctx, lvl), "query result next part failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -669,7 +669,7 @@ func internalQuery(
 
 			return func(info trace.QueryResultNextResultSetDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query result next set done",
+					l.Log(ctx, "query result next set done",
 						kv.Latency(start),
 					)
 				} else {
@@ -677,7 +677,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query result next set failed",
+					l.Log(WithLevel(ctx, lvl), "query result next set failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
@@ -695,7 +695,7 @@ func internalQuery(
 
 			return func(info trace.QueryResultCloseDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query result close done",
+					l.Log(ctx, "query result close done",
 						kv.Latency(start),
 					)
 				} else {
@@ -703,7 +703,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query result close failed",
+					l.Log(WithLevel(ctx, lvl), "query result close failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
