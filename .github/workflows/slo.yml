@@ -44,14 +44,14 @@ jobs:
             name: native-query
             path: ./native/query
             label: native/query
-          - id: native_table_table
-            name: native-table-table
-            path: ./native/table/table
-            label: native/table/table
-          - id: native_table_query
-            name: native-table-query
-            path: ./native/table/query
-            label: native/table/query
+          - id: native_table
+            name: native-table
+            path: ./native/table
+            label: native/table
+          - id: native_table_over_query_service
+            name: native-table-over-query-service
+            path: ./native/table/over/query/service
+            label: native/table/over/query/service
           - id: gorm_table
             name: gorm-table
             path: ./gorm/table
