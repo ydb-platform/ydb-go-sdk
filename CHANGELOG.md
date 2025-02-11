@@ -1,3 +1,5 @@
+* Massive changed log messages - those have more details now.
+
 ## v3.99.7
 * Fixed not passing request context to topic event logs
 * Fixed deadlock on closing table session with internal query session core

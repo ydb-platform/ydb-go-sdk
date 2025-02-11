@@ -30,7 +30,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 
 		return func(info trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "ydb retries completed succesfully",
+				l.Log(ctx, "ydb retries completed successfully",
 					kv.String("label", label),
 					kv.Latency(start),
 					kv.Int("attempts", info.Attempts),

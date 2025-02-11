@@ -298,7 +298,7 @@ func internalQuery(
 
 			return func(info trace.QueryQueryDoneInfo) {
 				if info.Error == nil {
-					l.Log(ctx, "ydb query query done",
+					l.Log(ctx, "ydb query done",
 						kv.Latency(start),
 					)
 				} else {
@@ -306,7 +306,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "ydb query query failed",
+					l.Log(WithLevel(ctx, lvl), "ydb query failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
