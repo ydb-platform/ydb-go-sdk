@@ -19,7 +19,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 		if d.Details()&trace.RetryEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "retry")
+		ctx := with(*info.Context, TRACE, "ydb retrier starting work...", "retry")
 		label := info.Label
 		idempotent := info.Idempotent
 		l.Log(ctx, "start",
@@ -30,7 +30,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 
 		return func(info trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "done",
+				l.Log(ctx, "ydb retries completed succesfully",
 					kv.String("label", label),
 					kv.Latency(start),
 					kv.Int("attempts", info.Attempts),
@@ -41,7 +41,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 					lvl = DEBUG
 				}
 				m := retry.Check(info.Error)
-				l.Log(WithLevel(ctx, lvl), "failed",
+				l.Log(WithLevel(ctx, lvl), "ydb retries failed",
 					kv.Error(info.Error),
 					kv.String("label", label),
 					kv.Latency(start),
