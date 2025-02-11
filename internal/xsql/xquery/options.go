@@ -1,4 +1,4 @@
-package propose
+package xquery
 
 type Option func(c *Conn)
 

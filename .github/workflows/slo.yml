@@ -37,9 +37,9 @@ jobs:
             path: ./database/sql/legacy
             label: database/sql/legacy
           - id: database_sql_propose
-            name: database-sql-propose
-            path: ./database/sql/propose
-            label: database/sql/propose
+            name: database-sql-xquery
+            path: ./database/sql/xquery
+            label: database/sql/xquery
           - id: native_query
             name: native-query
             path: ./native/query
@@ -49,25 +49,25 @@ jobs:
             path: ./native/table/legacy
             label: native/table/legacy
           - id: native_table_propose
-            name: native-table-propose
-            path: ./native/table/propose
-            label: native/table/propose
+            name: native-table-xquery
+            path: ./native/table/xquery
+            label: native/table/xquery
           - id: gorm_legacy
             name: gorm-legacy
             path: ./gorm/legacy
             label: gorm/legacy
           - id: gorm_propose
-            name: gorm-propose
-            path: ./gorm/propose
-            label: gorm/propose
+            name: gorm-xquery
+            path: ./gorm/xquery
+            label: gorm/xquery
           - id: xorm_legacy
             name: xorm-legacy
             path: ./xorm/legacy
             label: xorm/legacy
           - id: xorm_propose
-            name: xorm-propose
-            path: ./xorm/propose
-            label: xorm/propose
+            name: xorm-xquery
+            path: ./xorm/xquery
+            label: xorm/xquery
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}

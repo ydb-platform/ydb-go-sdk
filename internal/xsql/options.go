@@ -5,7 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -23,7 +23,7 @@ type (
 	}
 	legacyOptionsOption struct {
 		legacyOps []legacy.Option
-		options   []propose.Option
+		options   []xquery.Option
 	}
 	traceDatabaseSQLOption struct {
 		t    *trace.DatabaseSQL
@@ -192,7 +192,7 @@ func WithTableOptions(opts ...legacy.Option) Option {
 	}
 }
 
-func WithQueryOptions(opts ...propose.Option) Option {
+func WithQueryOptions(opts ...xquery.Option) Option {
 	return legacyOptionsOption{
 		options: opts,
 	}

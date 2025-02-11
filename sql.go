@@ -11,7 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -160,11 +160,11 @@ func WithFakeTx(modes ...QueryMode) ConnectorOption {
 				xsql.WithTableOptions(legacy.WithFakeTxModes(
 					legacy.ScriptingQueryMode,
 				)),
-				xsql.WithQueryOptions(propose.WithFakeTx()),
+				xsql.WithQueryOptions(xquery.WithFakeTx()),
 			)
 		case QueryExecuteQueryMode:
 			opts = append(opts,
-				xsql.WithQueryOptions(propose.WithFakeTx()),
+				xsql.WithQueryOptions(xquery.WithFakeTx()),
 			)
 		default:
 		}

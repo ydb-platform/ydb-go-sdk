@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 )
 
 func TestParse(t *testing.T) {
@@ -29,8 +29,8 @@ func TestParse(t *testing.T) {
 	newLegacyConn := func(opts ...legacy.Option) *legacy.Conn {
 		return legacy.New(context.Background(), nil, nil, opts...)
 	}
-	newQueryConn := func(opts ...propose.Option) *propose.Conn {
-		return propose.New(context.Background(), nil, nil, opts...)
+	newQueryConn := func(opts ...xquery.Option) *xquery.Conn {
+		return xquery.New(context.Background(), nil, nil, opts...)
 	}
 	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {
 		require.Equal(t, lhs.Secure(), rhs.Secure())
