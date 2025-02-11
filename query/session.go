@@ -3,13 +3,15 @@ package query
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/node"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 )
 
 type (
 	SessionInfo interface {
+		node.ID
+
 		ID() string
-		NodeID() uint32
 		Status() string
 	}
 	Session interface {

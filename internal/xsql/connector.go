@@ -18,7 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
-	propose "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
