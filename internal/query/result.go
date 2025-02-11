@@ -169,7 +169,7 @@ func newResult(
 
 		r.lastPart = part
 
-		if r.statsCallback != nil {
+		if part.GetExecStats() != nil && r.statsCallback != nil {
 			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 		}
 
