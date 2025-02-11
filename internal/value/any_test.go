@@ -281,7 +281,7 @@ func TestAny(t *testing.T) {
 			t.Run("Optional", func(t *testing.T) {
 				got, err := Any(OptionalValue(tt.src))
 				require.NoError(t, err)
-				require.Equal(t, &tt.exp, got)
+				require.Equal(t, tt.exp, got)
 			})
 			t.Run("Null", func(t *testing.T) {
 				got, err := Any(NullValue(tt.src.Type()))

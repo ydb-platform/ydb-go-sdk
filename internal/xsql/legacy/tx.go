@@ -7,12 +7,12 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-var _ iface.Tx = (*transaction)(nil)
+var _ common.Tx = (*transaction)(nil)
 
 type transaction struct {
 	conn *Conn
@@ -73,7 +73,7 @@ func (tx *transaction) Rollback(ctx context.Context) error {
 	return err
 }
 
-func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (iface.Tx, error) {
+func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (common.Tx, error) {
 	txc, err := toYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

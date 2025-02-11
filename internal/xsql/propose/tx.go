@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -43,7 +43,7 @@ func (tx *transaction) Query(ctx context.Context, sql string, params *params.Par
 	}, nil
 }
 
-func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (iface.Tx, error) {
+func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (common.Tx, error) {
 	txc, err := toYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

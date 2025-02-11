@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -94,7 +95,7 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
-	return legacy.WithTxControl(ctx, txc)
+	return common.WithTxControl(ctx, txc)
 }
 
 type ConnectorOption = xsql.Option

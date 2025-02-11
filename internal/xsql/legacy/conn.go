@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -83,7 +83,7 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	case ScriptingQueryMode:
 		return c.execScriptingQuery(ctx, sql, params)
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' on iface query", queryMode)
+		return nil, fmt.Errorf("unsupported query mode '%s' on conn query", queryMode)
 	}
 }
 
@@ -134,7 +134,7 @@ func (c *Conn) isReady() bool {
 
 func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
 	_, res, err := c.session.Execute(ctx,
-		txControl(ctx, c.defaultTxControl),
+		common.TxControl(ctx, c.defaultTxControl),
 		sql, params, c.dataQueryOptions(ctx)...,
 	)
 	if err != nil {
@@ -183,7 +183,7 @@ func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Par
 	driver.RowsNextResultSet, error,
 ) {
 	_, res, err := c.session.Execute(ctx,
-		txControl(ctx, c.defaultTxControl),
+		common.TxControl(ctx, c.defaultTxControl),
 		sql, params, c.dataQueryOptions(ctx)...,
 	)
 	if err != nil {
@@ -269,7 +269,7 @@ func (c *Conn) ID() string {
 	return c.session.ID()
 }
 
-func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx iface.Tx, finalErr error) {
+func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx common.Tx, finalErr error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 
 	if slices.Contains(c.fakeTxModes, m) {
@@ -284,11 +284,19 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx ifac
 	return tx, nil
 }
 
-func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (iface.Tx, error) {
+func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (common.Tx, error) {
 	tx, err := c.beginTx(ctx, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return tx, nil
+}
+
+func (c *Conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
+	if common.IsPreparedStatement(ctx) {
+		return append(c.dataOpts, options.WithKeepInCache(true))
+	}
+
+	return c.dataOpts
 }
