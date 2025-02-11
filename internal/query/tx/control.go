@@ -23,9 +23,13 @@ type (
 	}
 	Control struct {
 		selector Selector
-		Commit   bool
+		commit   bool
 	}
 )
+
+func (ctrl *Control) Commit() bool {
+	return ctrl.commit
+}
 
 func (ctrl *Control) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl {
 	if ctrl == nil {
@@ -34,7 +38,7 @@ func (ctrl *Control) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl
 
 	txControl := a.QueryTransactionControl()
 	ctrl.selector.applyTxSelector(a, txControl)
-	txControl.CommitTx = ctrl.Commit
+	txControl.CommitTx = ctrl.commit
 
 	return txControl
 }
@@ -98,7 +102,7 @@ func WithTxID(txID string) txIDTxControlOption {
 type commitTxOption struct{}
 
 func (c commitTxOption) applyTxControlOption(txControl *Control) {
-	txControl.Commit = true
+	txControl.commit = true
 }
 
 // CommitTx returns commit transaction control option
@@ -110,7 +114,7 @@ func CommitTx() ControlOption {
 func NewControl(opts ...ControlOption) *Control {
 	txControl := &Control{
 		selector: BeginTx(WithSerializableReadWrite()),
-		Commit:   false,
+		commit:   false,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -119,6 +123,12 @@ func NewControl(opts ...ControlOption) *Control {
 	}
 
 	return txControl
+}
+
+func WithCommit(ctrl *Control) *Control {
+	ctrl.commit = true
+
+	return ctrl
 }
 
 func NoTx() *Control {
