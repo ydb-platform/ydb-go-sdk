@@ -343,16 +343,7 @@ func (l *streamListener) onStopPartitionRequest(
 		return err
 	}
 
-	var handlerCtx context.Context
-	if session == nil {
-		cancelledCtx, cancel := context.WithCancelCause(ctx)
-		cancel(xerrors.WithStackTrace(xerrors.Wrap(errors.New(
-			"ydb: partition on topic listener was force stopped: %w",
-		))))
-		handlerCtx = cancelledCtx
-	} else {
-		handlerCtx = session.Context()
-	}
+	handlerCtx := session.Context()
 
 	event := NewPublicStopPartitionSessionEvent(
 		session.ToPublic(),
