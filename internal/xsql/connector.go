@@ -17,8 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -40,8 +40,8 @@ type (
 
 		processor Engine
 
-		LegacyOpts            []legacy.Option
-		Options               []xquery.Option
+		TableOpts             []xtable.Option
+		QueryOpts             []xquery.Option
 		disableServerBalancer bool
 		onClose               []func(*Connector)
 
@@ -144,7 +144,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 		conn := &Conn{
 			processor: PROPOSE,
 			cc: xquery.New(ctx, c, s, append(
-				c.Options,
+				c.QueryOpts,
 				xquery.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
@@ -171,8 +171,8 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		conn := &Conn{
 			processor: LEGACY,
-			cc: legacy.New(ctx, c, s, append(c.LegacyOpts,
-				legacy.WithOnClose(func() {
+			cc: xtable.New(ctx, c, s, append(c.TableOpts,
+				xtable.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
 			),

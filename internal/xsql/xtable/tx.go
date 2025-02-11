@@ -1,4 +1,4 @@
-package legacy
+package xtable
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
