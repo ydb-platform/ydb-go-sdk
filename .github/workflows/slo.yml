@@ -32,42 +32,42 @@ jobs:
     strategy:
       matrix:
         sdk:
-          - id: database_sql_legacy
-            name: database-sql-legacy
-            path: ./database/sql/legacy
-            label: database/sql/legacy
-          - id: database_sql_propose
-            name: database-sql-xquery
-            path: ./database/sql/xquery
-            label: database/sql/xquery
+          - id: database_sql_table
+            name: database-sql-table
+            path: ./database/sql/table
+            label: database/sql/table
+          - id: database_sql_query
+            name: database-sql-query
+            path: ./database/sql/query
+            label: database/sql/query
           - id: native_query
             name: native-query
             path: ./native/query
             label: native/query
-          - id: native_table_legacy
-            name: native-table-legacy
-            path: ./native/table/legacy
-            label: native/table/legacy
-          - id: native_table_propose
-            name: native-table-xquery
-            path: ./native/table/xquery
-            label: native/table/xquery
-          - id: gorm_legacy
-            name: gorm-legacy
-            path: ./gorm/legacy
-            label: gorm/legacy
-          - id: gorm_propose
-            name: gorm-xquery
-            path: ./gorm/xquery
-            label: gorm/xquery
-          - id: xorm_legacy
-            name: xorm-legacy
-            path: ./xorm/legacy
-            label: xorm/legacy
-          - id: xorm_propose
-            name: xorm-xquery
-            path: ./xorm/xquery
-            label: xorm/xquery
+          - id: native_table_table
+            name: native-table-table
+            path: ./native/table/table
+            label: native/table/table
+          - id: native_table_query
+            name: native-table-query
+            path: ./native/table/query
+            label: native/table/query
+          - id: gorm_table
+            name: gorm-table
+            path: ./gorm/table
+            label: gorm/table
+          - id: gorm_query
+            name: gorm-query
+            path: ./gorm/query
+            label: gorm/query
+          - id: xorm_table
+            name: xorm-table
+            path: ./xorm/table
+            label: xorm/table
+          - id: xorm_query
+            name: xorm-query
+            path: ./xorm/query
+            label: xorm/query
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
