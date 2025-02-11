@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable/badconn"
 )
 
 type txFake struct {

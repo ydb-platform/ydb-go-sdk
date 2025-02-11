@@ -1,4 +1,4 @@
-package legacy
+package xtable
 
 import (
 	"slices"

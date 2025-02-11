@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -22,7 +22,7 @@ type (
 		bind.TablePathPrefix
 	}
 	legacyOptionsOption struct {
-		legacyOps []legacy.Option
+		legacyOps []xtable.Option
 		options   []xquery.Option
 	}
 	traceDatabaseSQLOption struct {
@@ -94,8 +94,8 @@ func (opt traceDatabaseSQLOption) Apply(c *Connector) error {
 }
 
 func (opt legacyOptionsOption) Apply(c *Connector) error {
-	c.Options = append(c.Options, opt.options...)
-	c.LegacyOpts = append(c.LegacyOpts, opt.legacyOps...)
+	c.QueryOpts = append(c.QueryOpts, opt.options...)
+	c.TableOpts = append(c.TableOpts, opt.legacyOps...)
 
 	return nil
 }
@@ -146,26 +146,26 @@ func WithQueryBind(bind bind.Bind) QueryBindOption {
 	}
 }
 
-func WithDefaultQueryMode(mode legacy.QueryMode) Option {
+func WithDefaultQueryMode(mode xtable.QueryMode) Option {
 	return legacyOptionsOption{
-		legacyOps: []legacy.Option{
-			legacy.WithDefaultQueryMode(mode),
+		legacyOps: []xtable.Option{
+			xtable.WithDefaultQueryMode(mode),
 		},
 	}
 }
 
-func WithFakeTx(modes ...legacy.QueryMode) Option {
+func WithFakeTx(modes ...xtable.QueryMode) Option {
 	return legacyOptionsOption{
-		legacyOps: []legacy.Option{
-			legacy.WithFakeTxModes(modes...),
+		legacyOps: []xtable.Option{
+			xtable.WithFakeTxModes(modes...),
 		},
 	}
 }
 
 func WithIdleThreshold(idleThreshold time.Duration) Option {
 	return legacyOptionsOption{
-		legacyOps: []legacy.Option{
-			legacy.WithIdleThreshold(idleThreshold),
+		legacyOps: []xtable.Option{
+			xtable.WithIdleThreshold(idleThreshold),
 		},
 	}
 }
@@ -186,7 +186,7 @@ func Merge(opts ...Option) Option {
 	return mergedOptions(opts)
 }
 
-func WithTableOptions(opts ...legacy.Option) Option {
+func WithTableOptions(opts ...xtable.Option) Option {
 	return legacyOptionsOption{
 		legacyOps: opts,
 	}
