@@ -31,11 +31,8 @@ func main() {
 	defer nativeDriver.Close(ctx)
 
 	connector, err := ydb.Connector(nativeDriver,
-		ydb.WithDefaultQueryMode(ydb.QueryExecuteQueryMode),
+		ydb.WithQueryService(false),
 		ydb.WithFakeTx(ydb.QueryExecuteQueryMode),
-		//ydb.WithQueryService(false),
-		//ydb.WithDefaultQueryMode(ydb.ScriptingQueryMode),
-		//ydb.WithFakeTx(ydb.ScriptingQueryMode),
 		ydb.WithAutoDeclare(),
 		ydb.WithNumericArgs(),
 	)
