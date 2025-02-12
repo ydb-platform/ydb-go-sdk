@@ -44,13 +44,13 @@ func Any(v Value) (any, error) { //nolint:funlen,gocyclo
 	case uint32Value:
 		return uint32(vv), nil
 	case dateValue:
-		return DateToTime(uint32(vv)).UTC(), nil
+		return DateToTime(uint32(vv)), nil
 	case datetimeValue:
-		return DatetimeToTime(uint32(vv)).UTC(), nil
+		return DatetimeToTime(uint32(vv)), nil
 	case uint64Value:
 		return uint64(vv), nil
 	case timestampValue:
-		return TimestampToTime(uint64(vv)).UTC(), nil
+		return TimestampToTime(uint64(vv)), nil
 	case int64Value:
 		return int64(vv), nil
 	case intervalValue:
