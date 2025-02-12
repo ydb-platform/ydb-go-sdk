@@ -1,3 +1,7 @@
+* Fixed broken compatibility `database/sql` driver which worked on query engine (usnig `ydb.WithQueryService(true)` connector option):
+  - fixed list of valid data types for `database/sql.Row.Scan()`
+  - allowed legacy option `ydb.WithTxControl(ctx, txControl)` for query engine
+
 ## v3.99.8
 * Added details to all log messages
 * Fixed sometime panic on stats receive in query service
