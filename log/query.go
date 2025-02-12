@@ -293,7 +293,7 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "query")
-			l.Log(ctx, "ydb query query starting...")
+			l.Log(ctx, "ydb query starting...")
 			start := time.Now()
 
 			return func(info trace.QueryQueryDoneInfo) {
