@@ -10,7 +10,6 @@ import (
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbSDK "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -29,19 +28,6 @@ WITH (
     AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d,
     UNIFORM_PARTITIONS = %d
 )`
-
-var (
-	readTx = table.TxControl(
-		table.BeginTx(
-			table.WithOnlineReadOnly(),
-		),
-		table.CommitTx(),
-	)
-
-	writeTx = table.SerializableReadWriteTxControl(
-		table.CommitTx(),
-	)
-)
 
 type Storage struct {
 	db           *gorm.DB
@@ -91,7 +77,7 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 		return generator.Row{}, attempts, err
 	}
 
-	err = retry.Do(ydbSDK.WithTxControl(ctx, readTx), db,
+	err = retry.Do(ctx, db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -139,7 +125,7 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 		return attempts, err
 	}
 
-	err = retry.Do(ydbSDK.WithTxControl(ctx, writeTx), db,
+	err = retry.Do(ctx, db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err

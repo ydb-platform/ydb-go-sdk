@@ -120,7 +120,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 						Build(),
 				),
 				query.WithTxControl(query.TxControl(
-					query.BeginTx(query.WithOnlineReadOnly()),
+					query.BeginTx(query.WithSnapshotReadOnly()),
 					query.CommitTx(),
 				)),
 			)

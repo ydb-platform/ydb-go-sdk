@@ -11,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"xorm.io/xorm"
 	"xorm.io/xorm/core"
@@ -19,19 +18,6 @@ import (
 
 	"slo/internal/config"
 	"slo/internal/generator"
-)
-
-var (
-	readTx = table.TxControl(
-		table.BeginTx(
-			table.WithOnlineReadOnly(),
-		),
-		table.CommitTx(),
-	)
-
-	writeTx = table.SerializableReadWriteTxControl(
-		table.CommitTx(),
-	)
 )
 
 type mapper struct {
@@ -126,7 +112,7 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 
 	row.ID = id
 
-	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.x.DB().DB,
+	err = retry.Do(ctx, s.x.DB().DB,
 		func(ctx context.Context, _ *sql.Conn) (err error) {
 			has, err := s.x.Context(ctx).Where("hash = Digest::NumericHash(?)", id).Get(&row)
 			if err != nil {
@@ -161,7 +147,7 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.x.DB().DB,
+	err = retry.Do(ctx, s.x.DB().DB,
 		func(ctx context.Context, _ *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
