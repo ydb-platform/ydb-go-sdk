@@ -98,7 +98,7 @@ func (tx *Transaction) QueryResultSet(
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
-	if settings.TxControl().Commit {
+	if settings.TxControl().Commit() {
 		err = tx.waitOnBeforeCommit(ctx)
 		if err != nil {
 			return nil, err
@@ -147,7 +147,7 @@ func (tx *Transaction) QueryRow(
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
-	if settings.TxControl().Commit {
+	if settings.TxControl().Commit() {
 		err := tx.waitOnBeforeCommit(ctx)
 		if err != nil {
 			return nil, err
@@ -215,7 +215,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
-	if settings.TxControl().Commit {
+	if settings.TxControl().Commit() {
 		err = tx.waitOnBeforeCommit(ctx)
 		if err != nil {
 			return err
@@ -287,7 +287,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
-	if settings.TxControl().Commit {
+	if settings.TxControl().Commit() {
 		err = tx.waitOnBeforeCommit(ctx)
 		if err != nil {
 			return nil, err

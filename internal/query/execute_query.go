@@ -25,7 +25,7 @@ type executeSettings interface {
 	ExecMode() options.ExecMode
 	StatsMode() options.StatsMode
 	StatsCallback() func(stats stats.QueryStats)
-	TxControl() *query.TransactionControl
+	TxControl() options.TxControl
 	Syntax() options.Syntax
 	Params() params.Parameters
 	CallOptions() []grpc.CallOption

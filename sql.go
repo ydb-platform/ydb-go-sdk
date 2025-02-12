@@ -9,8 +9,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/legacy"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/propose"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -81,20 +82,20 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 	case ExplainQueryMode:
 		return xsql.WithExplain(ctx)
 	case DataQueryMode:
-		return legacy.WithQueryMode(ctx, legacy.DataQueryMode)
+		return xtable.WithQueryMode(ctx, xtable.DataQueryMode)
 	case ScanQueryMode:
-		return legacy.WithQueryMode(ctx, legacy.ScanQueryMode)
+		return xtable.WithQueryMode(ctx, xtable.ScanQueryMode)
 	case SchemeQueryMode:
-		return legacy.WithQueryMode(ctx, legacy.SchemeQueryMode)
+		return xtable.WithQueryMode(ctx, xtable.SchemeQueryMode)
 	case ScriptingQueryMode:
-		return legacy.WithQueryMode(ctx, legacy.ScriptingQueryMode)
+		return xtable.WithQueryMode(ctx, xtable.ScriptingQueryMode)
 	default:
 		return ctx
 	}
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
-	return legacy.WithTxControl(ctx, txc)
+	return common.WithTxControl(ctx, txc)
 }
 
 type ConnectorOption = xsql.Option
@@ -104,22 +105,26 @@ type QueryBindConnectorOption interface {
 	bind.Bind
 }
 
-func modeToMode(mode QueryMode) legacy.QueryMode {
+func modeToMode(mode QueryMode) xtable.QueryMode {
 	switch mode {
 	case ScanQueryMode:
-		return legacy.ScanQueryMode
+		return xtable.ScanQueryMode
 	case SchemeQueryMode:
-		return legacy.SchemeQueryMode
+		return xtable.SchemeQueryMode
 	case ScriptingQueryMode:
-		return legacy.ScriptingQueryMode
+		return xtable.ScriptingQueryMode
 	default:
-		return legacy.DataQueryMode
+		return xtable.DataQueryMode
 	}
 }
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
+	if mode == QueryExecuteQueryMode {
+		return xsql.WithQueryService(true)
+	}
+
 	return xsql.WithTableOptions(
-		legacy.WithDefaultQueryMode(modeToMode(mode)),
+		xtable.WithDefaultQueryMode(modeToMode(mode)),
 	)
 }
 
@@ -138,32 +143,32 @@ func WithFakeTx(modes ...QueryMode) ConnectorOption {
 		switch mode {
 		case DataQueryMode:
 			opts = append(opts,
-				xsql.WithTableOptions(legacy.WithFakeTxModes(
-					legacy.DataQueryMode,
+				xsql.WithTableOptions(xtable.WithFakeTxModes(
+					xtable.DataQueryMode,
 				)),
 			)
 		case ScanQueryMode:
 			opts = append(opts,
-				xsql.WithTableOptions(legacy.WithFakeTxModes(
-					legacy.ScanQueryMode,
+				xsql.WithTableOptions(xtable.WithFakeTxModes(
+					xtable.ScanQueryMode,
 				)),
 			)
 		case SchemeQueryMode:
 			opts = append(opts,
-				xsql.WithTableOptions(legacy.WithFakeTxModes(
-					legacy.SchemeQueryMode,
+				xsql.WithTableOptions(xtable.WithFakeTxModes(
+					xtable.SchemeQueryMode,
 				)),
 			)
 		case ScriptingQueryMode:
 			opts = append(opts,
-				xsql.WithTableOptions(legacy.WithFakeTxModes(
-					legacy.ScriptingQueryMode,
+				xsql.WithTableOptions(xtable.WithFakeTxModes(
+					xtable.ScriptingQueryMode,
 				)),
-				xsql.WithQueryOptions(propose.WithFakeTx()),
+				xsql.WithQueryOptions(xquery.WithFakeTx()),
 			)
 		case QueryExecuteQueryMode:
 			opts = append(opts,
-				xsql.WithQueryOptions(propose.WithFakeTx()),
+				xsql.WithQueryOptions(xquery.WithFakeTx()),
 			)
 		default:
 		}
@@ -189,15 +194,15 @@ func WithNumericArgs() QueryBindConnectorOption {
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
-	return xsql.WithTableOptions(legacy.WithDefaultTxControl(txControl))
+	return xsql.WithTableOptions(xtable.WithDefaultTxControl(txControl))
 }
 
 func WithDefaultDataQueryOptions(opts ...options.ExecuteDataQueryOption) ConnectorOption {
-	return xsql.WithTableOptions(legacy.WithDataOpts(opts...))
+	return xsql.WithTableOptions(xtable.WithDataOpts(opts...))
 }
 
 func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) ConnectorOption {
-	return xsql.WithTableOptions(legacy.WithScanOpts(opts...))
+	return xsql.WithTableOptions(xtable.WithScanOpts(opts...))
 }
 
 func WithDatabaseSQLTrace(

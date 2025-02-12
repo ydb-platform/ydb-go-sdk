@@ -79,7 +79,7 @@ func TypeFromYDB(x *Ydb.Type) Type {
 		}
 
 	default:
-		panic("ydb: unknown type")
+		panic(fmt.Sprintf("ydb: unknown type %T", x.GetType()))
 	}
 }
 

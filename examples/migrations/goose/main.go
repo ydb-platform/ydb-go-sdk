@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"embed"
 	"log"
+	"net/url"
 	"os"
 
 	"github.com/pressly/goose/v3"
@@ -20,7 +21,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	nativeDriver, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
+	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+
+	nativeDriver, err := ydb.Open(ctx, connectionString)
 	if err != nil {
 		panic(err)
 	}
@@ -28,8 +31,8 @@ func main() {
 	defer nativeDriver.Close(ctx)
 
 	connector, err := ydb.Connector(nativeDriver,
-		ydb.WithDefaultQueryMode(ydb.ScriptingQueryMode),
-		ydb.WithFakeTx(ydb.ScriptingQueryMode),
+		ydb.WithQueryService(true),
+		ydb.WithFakeTx(ydb.QueryExecuteQueryMode),
 		ydb.WithAutoDeclare(),
 		ydb.WithNumericArgs(),
 	)
@@ -46,9 +49,40 @@ func main() {
 		panic(err)
 	}
 
-	for _, command := range []string{"status", "up", "status"} {
+	dsn := func() string {
+		dsn, err := url.Parse(connectionString)
+		if err != nil {
+			panic(err)
+		}
+
+		q := dsn.Query()
+		q.Set("go_query_mode", "query")
+		q.Set("go_fake_tx", "query")
+		q.Set("go_query_bind", "declare")
+		q.Add("go_query_bind", "numeric")
+		dsn.RawQuery = q.Encode()
+
+		return dsn.String()
+	}()
+
+	for _, command := range []string{
+		"version",
+		"up-by-one",
+		"status",
+		"up",
+		"status",
+		"version",
+		"down",
+		"version",
+		"down",
+		"version",
+		"reset",
+		"version",
+		"status",
+	} {
+		log.Printf("try to run command `goose ydb \"%s\" %s`...", dsn, command)
 		if err := goose.RunContext(ctx, command, db, "schema"); err != nil {
-			log.Fatalf("goose %v: %v", "", err)
+			log.Fatalf("goose %v: %v", command, err)
 		}
 	}
 }
