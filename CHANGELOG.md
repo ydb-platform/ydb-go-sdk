@@ -1,3 +1,4 @@
+## v3.99.10
 * Returned legacy behaviour for interpret as `time.Time` YDB types `Date`, `Datetime` and `Timestamp` 
 
 ## v3.99.9
