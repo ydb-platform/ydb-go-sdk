@@ -10,7 +10,6 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"slo/internal/config"
@@ -19,50 +18,40 @@ import (
 
 const (
 	createTemplate = `
-CREATE TABLE ` + "`%s`" + ` (
-    hash              Uint64,
-    id                Uint64,
-    payload_str       Utf8,
-    payload_double    Double,
-    payload_timestamp Timestamp,
-    payload_hash      Uint64,
-    PRIMARY KEY (
-        hash,
-        id
-    )
-) WITH (
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d,
-    UNIFORM_PARTITIONS = %d
-);`
-	dropTemplate   = `DROP TABLE ` + "`%s`" + `;`
+		CREATE TABLE IF NOT EXISTS ` + "`%s`" + ` (
+			hash              Uint64,
+			id                Uint64,
+			payload_str       Utf8,
+			payload_double    Double,
+			payload_timestamp Timestamp,
+			payload_hash      Uint64,
+			PRIMARY KEY (
+				hash,
+				id
+			)
+		) WITH (
+			AUTO_PARTITIONING_BY_SIZE = ENABLED,
+			AUTO_PARTITIONING_BY_LOAD = ENABLED,
+			AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
+			AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
+			AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d,
+			UNIFORM_PARTITIONS = %d
+		);
+	`
+	dropTemplate = `
+		DROP TABLE IF EXISTS ` + "`%s`" + `;
+	`
 	upsertTemplate = `
-UPSERT INTO ` + "`%s`" + ` (
-	id, hash, payload_str, payload_double, payload_timestamp
-) VALUES (
-	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
-);
-`
+		UPSERT INTO ` + "`%s`" + ` (
+			id, hash, payload_str, payload_double, payload_timestamp
+		) VALUES (
+			$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+		);
+	`
 	selectTemplate = `
-SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
-`
-)
-
-var (
-	readTx = table.TxControl(
-		table.BeginTx(
-			table.WithOnlineReadOnly(),
-		),
-		table.CommitTx(),
-	)
-
-	writeTx = table.SerializableReadWriteTxControl(
-		table.CommitTx(),
-	)
+		SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
+		FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
+	`
 )
 
 type Storage struct {
@@ -132,13 +121,13 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.db,
+	err = retry.Do(ctx, s.db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
 
-			row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.selectQuery,
+			row := cc.QueryRowContext(ctx, s.selectQuery,
 				sql.Named("id", &entryID),
 			)
 
@@ -169,13 +158,13 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+	err = retry.Do(ctx, s.db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
 
-			_, err = cc.ExecContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.upsertQuery,
+			_, err = cc.ExecContext(ctx, s.upsertQuery,
 				sql.Named("id", e.ID),
 				sql.Named("payload_str", *e.PayloadStr),
 				sql.Named("payload_double", *e.PayloadDouble),
@@ -207,9 +196,9 @@ func (s *Storage) createTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+	return retry.Do(ctx, s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
-			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.createQuery)
+			_, err := s.db.ExecContext(ctx, s.createQuery)
 
 			return err
 		}, retry.WithIdempotent(true),
@@ -224,9 +213,9 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+	return retry.Do(ctx, s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
-			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.dropQuery)
+			_, err := s.db.ExecContext(ctx, s.dropQuery)
 
 			return err
 		}, retry.WithIdempotent(true),

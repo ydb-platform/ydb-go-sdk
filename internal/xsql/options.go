@@ -21,9 +21,9 @@ type (
 	tablePathPrefixOption struct {
 		bind.TablePathPrefix
 	}
-	legacyOptionsOption struct {
-		legacyOps []xtable.Option
-		options   []xquery.Option
+	processorOptionsOption struct {
+		tableOpts []xtable.Option
+		queryOpts []xquery.Option
 	}
 	traceDatabaseSQLOption struct {
 		t    *trace.DatabaseSQL
@@ -93,9 +93,9 @@ func (opt traceDatabaseSQLOption) Apply(c *Connector) error {
 	return nil
 }
 
-func (opt legacyOptionsOption) Apply(c *Connector) error {
-	c.QueryOpts = append(c.QueryOpts, opt.options...)
-	c.TableOpts = append(c.TableOpts, opt.legacyOps...)
+func (opt processorOptionsOption) Apply(c *Connector) error {
+	c.QueryOpts = append(c.QueryOpts, opt.queryOpts...)
+	c.TableOpts = append(c.TableOpts, opt.tableOpts...)
 
 	return nil
 }
@@ -147,24 +147,24 @@ func WithQueryBind(bind bind.Bind) QueryBindOption {
 }
 
 func WithDefaultQueryMode(mode xtable.QueryMode) Option {
-	return legacyOptionsOption{
-		legacyOps: []xtable.Option{
+	return processorOptionsOption{
+		tableOpts: []xtable.Option{
 			xtable.WithDefaultQueryMode(mode),
 		},
 	}
 }
 
 func WithFakeTx(modes ...xtable.QueryMode) Option {
-	return legacyOptionsOption{
-		legacyOps: []xtable.Option{
+	return processorOptionsOption{
+		tableOpts: []xtable.Option{
 			xtable.WithFakeTxModes(modes...),
 		},
 	}
 }
 
 func WithIdleThreshold(idleThreshold time.Duration) Option {
-	return legacyOptionsOption{
-		legacyOps: []xtable.Option{
+	return processorOptionsOption{
+		tableOpts: []xtable.Option{
 			xtable.WithIdleThreshold(idleThreshold),
 		},
 	}
@@ -187,14 +187,14 @@ func Merge(opts ...Option) Option {
 }
 
 func WithTableOptions(opts ...xtable.Option) Option {
-	return legacyOptionsOption{
-		legacyOps: opts,
+	return processorOptionsOption{
+		tableOpts: opts,
 	}
 }
 
 func WithQueryOptions(opts ...xquery.Option) Option {
-	return legacyOptionsOption{
-		options: opts,
+	return processorOptionsOption{
+		queryOpts: opts,
 	}
 }
 
