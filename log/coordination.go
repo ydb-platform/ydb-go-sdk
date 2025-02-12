@@ -25,11 +25,11 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "new")
-			l.Log(ctx, "start")
+			l.Log(ctx, "coordination client starting...")
 			start := time.Now()
 
 			return func(info trace.CoordinationNewDoneInfo) {
-				l.Log(WithLevel(ctx, INFO), "done",
+				l.Log(WithLevel(ctx, INFO), "coordination client start done",
 					kv.Latency(start),
 					kv.Version(),
 				)
@@ -40,18 +40,18 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "create")
-			l.Log(ctx, "start",
+			l.Log(ctx, "coordination node create starting...",
 				kv.String("path", info.Path),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationCreateNodeDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "done",
+					l.Log(WithLevel(ctx, INFO), "coordination node create done",
 						kv.Latency(start),
 					)
 				} else {
-					l.Log(WithLevel(ctx, ERROR), "fail",
+					l.Log(WithLevel(ctx, ERROR), "coordination node create failed",
 						kv.Latency(start),
 						kv.Version(),
 					)
@@ -63,18 +63,18 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "alter")
-			l.Log(ctx, "start",
+			l.Log(ctx, "coordination alter node starting...",
 				kv.String("path", info.Path),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationAlterNodeDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "done",
+					l.Log(WithLevel(ctx, INFO), "coordination alter node done",
 						kv.Latency(start),
 					)
 				} else {
-					l.Log(WithLevel(ctx, ERROR), "fail",
+					l.Log(WithLevel(ctx, ERROR), "coordination alter node failed",
 						kv.Latency(start),
 						kv.Version(),
 					)
@@ -86,18 +86,18 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "drop")
-			l.Log(ctx, "start",
+			l.Log(ctx, "drop coordination node starting...",
 				kv.String("path", info.Path),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationDropNodeDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "done",
+					l.Log(WithLevel(ctx, INFO), "drop coordination node done",
 						kv.Latency(start),
 					)
 				} else {
-					l.Log(WithLevel(ctx, ERROR), "fail",
+					l.Log(WithLevel(ctx, ERROR), "drop coordination node failed",
 						kv.Latency(start),
 						kv.Version(),
 					)
@@ -109,18 +109,18 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "describe")
-			l.Log(ctx, "start",
+			l.Log(ctx, "describe coordination node starting...",
 				kv.String("path", info.Path),
 			)
 			start := time.Now()
 
 			return func(info trace.CoordinationDescribeNodeDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "done",
+					l.Log(WithLevel(ctx, INFO), "describe coordination node done",
 						kv.Latency(start),
 					)
 				} else {
-					l.Log(WithLevel(ctx, ERROR), "fail",
+					l.Log(WithLevel(ctx, ERROR), "describe coordination node failed",
 						kv.Latency(start),
 						kv.Version(),
 					)
@@ -132,16 +132,16 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "describe")
-			l.Log(ctx, "start")
+			l.Log(ctx, "create coordination session starting...")
 			start := time.Now()
 
 			return func(info trace.CoordinationSessionDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "done",
+					l.Log(WithLevel(ctx, INFO), "create coordination session done",
 						kv.Latency(start),
 					)
 				} else {
-					l.Log(WithLevel(ctx, ERROR), "fail",
+					l.Log(WithLevel(ctx, ERROR), "create coordination session failed",
 						kv.Latency(start),
 						kv.Version(),
 					)
@@ -153,16 +153,16 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "close")
-			l.Log(ctx, "start")
+			l.Log(ctx, "close coordination client starting...")
 			start := time.Now()
 
 			return func(info trace.CoordinationCloseDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "done",
+					l.Log(WithLevel(ctx, INFO), "close coordination client done",
 						kv.Latency(start),
 					)
 				} else {
-					l.Log(WithLevel(ctx, ERROR), "fail",
+					l.Log(WithLevel(ctx, ERROR), "close coordination client failed",
 						kv.Latency(start),
 						kv.Version(),
 					)
@@ -178,11 +178,11 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "stream", "new")
-			l.Log(ctx, "stream")
+			l.Log(ctx, "new coordination session stream starting...")
 			start := time.Now()
 
 			return func(info trace.CoordinationSessionNewStreamDoneInfo) {
-				l.Log(ctx, "done",
+				l.Log(ctx, "new coordination session stream done",
 					kv.Latency(start),
 					kv.Error(info.Error),
 					kv.Version(),
@@ -194,7 +194,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "started")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session started",
 				kv.String("sessionID", strconv.FormatUint(info.SessionID, 10)),
 				kv.String("expectedSessionID", strconv.FormatUint(info.SessionID, 10)),
 			)
@@ -204,7 +204,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "start", "timeout")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session start timeout",
 				kv.Stringer("timeout", info.Timeout),
 			)
 		},
@@ -213,7 +213,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "keepAlive", "timeout")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session keep alive timeout",
 				kv.Stringer("timeout", info.Timeout),
 				kv.Stringer("lastGoodResponseTime", info.LastGoodResponseTime),
 			)
@@ -223,7 +223,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "stopped")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session stopped",
 				kv.String("sessionID", strconv.FormatUint(info.SessionID, 10)),
 				kv.String("expectedSessionID", strconv.FormatUint(info.SessionID, 10)),
 			)
@@ -233,7 +233,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "stop", "timeout")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session stop timeout",
 				kv.Stringer("timeout", info.Timeout),
 			)
 		},
@@ -242,7 +242,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "client", "timeout")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session client timeout",
 				kv.Stringer("timeout", info.Timeout),
 				kv.Stringer("lastGoodResponseTime", info.LastGoodResponseTime),
 			)
@@ -252,7 +252,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "server", "expire")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session server expire",
 				kv.Stringer("failure", info.Failure),
 			)
 		},
@@ -261,7 +261,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "server", "error")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session server error",
 				kv.Stringer("failure", info.Failure),
 			)
 		},
@@ -274,11 +274,11 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "receive")
-			l.Log(ctx, "receive")
+			l.Log(ctx, "coordination session receive starting...")
 			start := time.Now()
 
 			return func(info trace.CoordinationSessionReceiveDoneInfo) {
-				l.Log(ctx, "done",
+				l.Log(ctx, "coordination session receive done",
 					kv.Latency(start),
 					kv.Error(info.Error),
 					kv.Stringer("response", info.Response),
@@ -291,7 +291,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "receive", "unexpected")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session received unexpected",
 				kv.Stringer("response", info.Response),
 			)
 		},
@@ -300,7 +300,7 @@ func internalCoordination(
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "stop")
-			l.Log(ctx, "",
+			l.Log(ctx, "coordination session stopped",
 				kv.String("sessionID", strconv.FormatUint(info.SessionID, 10)),
 			)
 		},
@@ -313,11 +313,11 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "start")
-			l.Log(ctx, "start")
+			l.Log(ctx, "coordination session start starting...")
 			start := time.Now()
 
 			return func(info trace.CoordinationSessionStartDoneInfo) {
-				l.Log(ctx, "done",
+				l.Log(ctx, "coordination session start done",
 					kv.Latency(start),
 					kv.Error(info.Error),
 					kv.Version(),

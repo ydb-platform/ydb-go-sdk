@@ -126,7 +126,7 @@ func (w *SingleStreamWriter) start() {
 
 func (w *SingleStreamWriter) initStream() (err error) {
 	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.Tracer, w.cfg.reconnectorInstanceID, w.cfg.topic, w.cfg.producerID)
-	defer traceOnDone(w.SessionID, err)
+	defer func() { traceOnDone(w.SessionID, err) }()
 
 	req := w.createInitRequest()
 	if err = w.cfg.stream.Send(&req); err != nil {
