@@ -1,3 +1,4 @@
+## v3.99.8
 * Added details to all log messages
 * Fixed sometime panic on stats receive in query service
 
