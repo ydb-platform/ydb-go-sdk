@@ -99,15 +99,15 @@ func TestAny(t *testing.T) {
 		},
 		{
 			src: dateValue(123),
-			exp: time.Unix(int64(123*time.Hour*24/time.Second), 0).UTC(),
+			exp: time.Unix(int64(123*time.Hour*24/time.Second), 0).Local(),
 		},
 		{
 			src: datetimeValue(123),
-			exp: time.Unix(int64(123), 0).UTC(),
+			exp: time.Unix(int64(123), 0).Local(),
 		},
 		{
 			src: timestampValue(123),
-			exp: time.Unix(0, int64(123*time.Microsecond)).UTC(),
+			exp: time.Unix(0, int64(123*time.Microsecond)).Local(),
 		},
 		{
 			src: intervalValue(123),

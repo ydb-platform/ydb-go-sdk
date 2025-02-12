@@ -1,3 +1,5 @@
+* Returned legacy behaviour for interpret as `time.Time` YDB types `Date`, `Datetime` and `Timestamp` 
+
 ## v3.99.9
 * Fixed broken compatibility `database/sql` driver which worked on query engine (usnig `ydb.WithQueryService(true)` connector option):
   - fixed list of valid data types for `database/sql.Row.Scan()`
