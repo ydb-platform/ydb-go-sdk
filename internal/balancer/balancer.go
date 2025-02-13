@@ -190,7 +190,7 @@ func makeDiscoveryFunc(
 			)
 		}
 
-		//nolint:staticcheck
+		//nolint:staticcheck,nolintlint
 		cc, err := grpc.DialContext(ctx,
 			"ydb:///"+driverConfig.Endpoint(),
 			append(
@@ -198,7 +198,7 @@ func makeDiscoveryFunc(
 				grpc.WithResolvers(
 					xresolver.New("ydb", driverConfig.Trace()),
 				),
-				grpc.WithBlock(), //nolint:staticcheck
+				grpc.WithBlock(), //nolint:staticcheck,nolintlint
 				grpc.WithDefaultServiceConfig(`{
 					"loadBalancingPolicy": "pick_first"
 				}`),
