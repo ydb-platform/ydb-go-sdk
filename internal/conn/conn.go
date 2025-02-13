@@ -226,6 +226,7 @@ func (c *conn) dial(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		dialOpts = append(dialOpts, grpc.WithAuthority(overrideHost))
 	}
 
+	//nolint:staticcheck,nolintlint
 	cc, err = grpc.DialContext(ctx, address, dialOpts...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
