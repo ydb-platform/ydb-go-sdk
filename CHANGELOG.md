@@ -1,3 +1,5 @@
+* Added virtualtimestamps field to cdc description
+
 ## v3.99.10
 * Returned legacy behaviour for interpret as `time.Time` YDB types `Date`, `Datetime` and `Timestamp` 
 

@@ -167,3 +167,34 @@ func TestCreateTableDescription(sourceTest *testing.T) {
 		})
 	}
 }
+
+func TestTableDescriptionWithCDC(t *testing.T) {
+	scope := newScope(t)
+	escapedTablePath := "`" + scope.TablePath() + "`"
+	err := scope.Driver().Query().Exec(scope.Ctx, "ALTER TABLE "+escapedTablePath+`
+ADD CHANGEFEED test WITH (
+	MODE='NEW_AND_OLD_IMAGES',
+	FORMAT='JSON',
+	VIRTUAL_TIMESTAMPS = TRUE
+)`)
+	scope.Require.NoError(err)
+
+	var description options.Description
+	err = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+		desc, err := s.DescribeTable(ctx, scope.TablePath())
+		if err == nil {
+			description = desc
+		}
+		return err
+	})
+
+	scope.Require.NoError(err)
+	expectedCDC := options.ChangefeedDescription{
+		Name:             "test",
+		Mode:             options.ChangefeedModeNewAndOldImages,
+		Format:           options.ChangefeedFormatJSON,
+		State:            options.ChangefeedStateEnabled,
+		VirtualTimestamp: true,
+	}
+	scope.Require.Equal([]options.ChangefeedDescription{expectedCDC}, description.Changefeeds)
+}
