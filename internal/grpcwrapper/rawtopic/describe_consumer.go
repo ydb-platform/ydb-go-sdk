@@ -147,5 +147,9 @@ func (pi *DescribeConsumerResultPartitionInfo) FromProto(proto *Ydb_Topic.Descri
 	pi.ChildPartitionIDs = clone.Int64Slice(proto.GetChildPartitionIds())
 	pi.ParentPartitionIDs = clone.Int64Slice(proto.GetParentPartitionIds())
 
+	if err := pi.PartitionConsumerStats.FromProto(proto.GetPartitionConsumerStats()); err != nil {
+		return err
+	}
+
 	return pi.PartitionStats.FromProto(proto.GetPartitionStats())
 }
