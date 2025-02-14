@@ -96,7 +96,7 @@ func (v *Time) MustFromProto(proto *timestamppb.Timestamp) {
 }
 
 func (v *Time) ToTime() *time.Time {
-	if v.HasValue {
+	if !v.HasValue {
 		return nil
 	}
 
