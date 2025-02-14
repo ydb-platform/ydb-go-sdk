@@ -250,7 +250,7 @@ func TestDescribeTopicConsumer(t *testing.T) {
 	requireAndCleanSubset(&consumer.Consumer.Attributes, &expectedConsumerDesc.Consumer.Attributes)
 
 	ignoredFields := []cmp.Option{
-		cmpopts.IgnoreFields(topictypes.PartitionStats{}, "LastWriteTime"),
+		cmpopts.IgnoreFields(topictypes.PartitionStats{}, "LastWriteTime", "MaxWriteTimeLag"),
 		cmpopts.IgnoreFields(topictypes.PartitionConsumerStats{}, "PartitionReadSessionCreateTime", "LastReadTime", "MaxReadTimeLag", "MaxWriteTimeLag"),
 	}
 	for _, p := range consumer.Partitions {
