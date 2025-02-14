@@ -5,6 +5,8 @@ package integration
 
 import (
 	"context"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"io"
 	"os"
 	"path"
@@ -247,7 +249,18 @@ func TestDescribeTopicConsumer(t *testing.T) {
 
 	requireAndCleanSubset(&consumer.Consumer.Attributes, &expectedConsumerDesc.Consumer.Attributes)
 
-	require.Equal(t, expectedConsumerDesc, consumer)
+	ignoredFields := []cmp.Option{
+		cmpopts.IgnoreFields(topictypes.PartitionConsumerStats{}, "PartitionReadSessionCreateTime", "LastReadTime", "MaxReadTimeLag", "MaxWriteTimeLag"),
+	}
+	for _, p := range consumer.Partitions {
+		require.NotNil(t, p.PartitionConsumerStats.PartitionReadSessionCreateTime)
+		require.NotNil(t, p.PartitionConsumerStats.LastReadTime)
+		require.NotNil(t, p.PartitionConsumerStats.MaxReadTimeLag)
+		require.NotNil(t, p.PartitionConsumerStats.MaxWriteTimeLag)
+	}
+	if diff := cmp.Diff(expectedConsumerDesc, consumer, ignoredFields...); diff != "" {
+		t.Errorf("Mismatch (-expected +actual):\n%s", diff)
+	}
 }
 
 func TestSchemeList(t *testing.T) {
