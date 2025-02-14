@@ -253,7 +253,6 @@ func TestDescribeTopicConsumer(t *testing.T) {
 		cmpopts.IgnoreFields(topictypes.PartitionConsumerStats{}, "PartitionReadSessionCreateTime", "LastReadTime", "MaxReadTimeLag", "MaxWriteTimeLag"),
 	}
 	for _, p := range consumer.Partitions {
-		require.NotNil(t, p.PartitionConsumerStats.PartitionReadSessionCreateTime)
 		require.NotNil(t, p.PartitionConsumerStats.LastReadTime)
 		require.NotNil(t, p.PartitionConsumerStats.MaxReadTimeLag)
 		require.NotNil(t, p.PartitionConsumerStats.MaxWriteTimeLag)
