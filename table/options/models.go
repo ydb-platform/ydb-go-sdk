@@ -562,18 +562,20 @@ func (unit *TimeToLiveUnit) ToYDB() Ydb_Table.ValueSinceUnixEpochModeSettings_Un
 }
 
 type ChangefeedDescription struct {
-	Name   string
-	Mode   ChangefeedMode
-	Format ChangefeedFormat
-	State  ChangefeedState
+	Name             string
+	Mode             ChangefeedMode
+	Format           ChangefeedFormat
+	State            ChangefeedState
+	VirtualTimestamp bool
 }
 
 func NewChangefeedDescription(proto *Ydb_Table.ChangefeedDescription) ChangefeedDescription {
 	return ChangefeedDescription{
-		Name:   proto.GetName(),
-		Mode:   ChangefeedMode(proto.GetMode()),
-		Format: ChangefeedFormat(proto.GetFormat()),
-		State:  ChangefeedState(proto.GetState()),
+		Name:             proto.GetName(),
+		Mode:             ChangefeedMode(proto.GetMode()),
+		Format:           ChangefeedFormat(proto.GetFormat()),
+		State:            ChangefeedState(proto.GetState()),
+		VirtualTimestamp: proto.GetVirtualTimestamps(),
 	}
 }
 
