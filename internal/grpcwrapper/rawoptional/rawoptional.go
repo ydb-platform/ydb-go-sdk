@@ -48,7 +48,7 @@ func (v *Duration) MustFromProto(proto *durationpb.Duration) {
 }
 
 func (v *Duration) ToDuration() *time.Duration {
-	if v.HasValue {
+	if !v.HasValue {
 		return nil
 	}
 
