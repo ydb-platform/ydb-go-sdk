@@ -1,3 +1,4 @@
+* Supported pool of decoders
 * Added virtualtimestamps field to cdc description
 
 ## v3.99.10
