@@ -17,7 +17,7 @@ type decoderPool struct {
 
 func (p *decoderPool) Get() io.Reader {
 	dec, _ := p.pool.Get().(io.Reader)
-	
+
 	return dec
 }
 
@@ -26,7 +26,6 @@ func (p *decoderPool) Put(dec io.Reader) {
 }
 
 func newDecoderPool() *decoderPool {
-
 	return &decoderPool{
 		pool: sync.Pool{},
 	}
@@ -44,10 +43,12 @@ func NewDecoderMap() DecoderMap {
 	}
 
 	dm.AddDecoder(rawtopiccommon.CodecRaw, func(input io.Reader) (io.Reader, error) {
+
 		return input, nil
 	})
 
 	dm.AddDecoder(rawtopiccommon.CodecGzip, func(input io.Reader) (io.Reader, error) {
+
 		return gzip.NewReader(input)
 	})
 
@@ -66,9 +67,11 @@ func (m *DecoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Rea
 			var err error
 			decoder, err = f(input)
 			if err != nil {
+
 				return nil, err
 			}
 		}
+
 		return decoder, nil
 	}
 
