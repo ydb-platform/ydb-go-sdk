@@ -17,6 +17,7 @@ type decoderPool struct {
 
 func (p *decoderPool) Get() io.Reader {
 	dec, _ := p.pool.Get().(io.Reader)
+	
 	return dec
 }
 
@@ -25,6 +26,7 @@ func (p *decoderPool) Put(dec io.Reader) {
 }
 
 func newDecoderPool() *decoderPool {
+
 	return &decoderPool{
 		pool: sync.Pool{},
 	}
