@@ -325,7 +325,7 @@ func TestTopicConsumerDescriptionFromRaw(t *testing.T) {
 			v.testName, func(t *testing.T) {
 				d := TopicConsumerDescription{}
 				d.FromRaw(v.rawConsumerDescription)
-				if !reflect.DeepEqual(d.Consumer, v.expectedDescription.Consumer) {
+				if !reflect.DeepEqual(d, v.expectedDescription) {
 					t.Errorf("got\n%+v\nexpected\n%+v", d, v.expectedDescription)
 				}
 			},

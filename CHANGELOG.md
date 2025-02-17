@@ -1,3 +1,4 @@
+* Fixed DescribeConsumer ignoring PartitionConsumerStats
 * Added virtualtimestamps field to cdc description
 
 ## v3.99.10
