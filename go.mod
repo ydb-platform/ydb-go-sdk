@@ -16,7 +16,6 @@ require (
 
 // requires for tests only
 require (
-	github.com/google/go-cmp v0.6.0
 	github.com/rekby/fixenv v0.6.1
 	github.com/stretchr/testify v1.7.1
 	go.uber.org/mock v0.4.0
