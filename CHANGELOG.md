@@ -1,3 +1,4 @@
+* Added stacktrace call to row scan errors for detect broken client code
 * Fixed DescribeConsumer ignoring PartitionConsumerStats
 * Added virtualtimestamps field to cdc description
 
