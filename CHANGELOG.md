@@ -1,3 +1,4 @@
+## v3.99.12
 * Internal debug improved
 
 ## v3.99.11
