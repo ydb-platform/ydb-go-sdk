@@ -3,6 +3,7 @@ package topicwriterinternal
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -15,14 +16,24 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+func NewTestEncoderSelector(
+	m *MultiEncoder,
+	allowedCodecs rawtopiccommon.SupportedCodecs,
+	parallelCompressors int,
+	tracer *trace.Topic,
+	writerReconnectorID, sessionID string,
+) EncoderSelector {
+	return NewEncoderSelector(m, allowedCodecs, parallelCompressors, tracer, writerReconnectorID, sessionID, context.Background())
+}
+
 func TestEncoderSelector_CodecMeasure(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		s := NewEncoderSelector(testCommonEncoders, nil, 1, &trace.Topic{}, "", "")
+		s := NewTestEncoderSelector(testCommonEncoders, nil, 1, &trace.Topic{}, "", "")
 		_, err := s.measureCodecs(nil)
 		require.Error(t, err)
 	})
 	t.Run("One", func(t *testing.T) {
-		s := NewEncoderSelector(
+		s := NewTestEncoderSelector(
 			NewMultiEncoder(),
 			rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
 			1,
@@ -44,7 +55,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 		)
 
 		testSelectCodec := func(t testing.TB, targetCodec rawtopiccommon.Codec, smallCount, largeCount int) {
-			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{
+			s := NewTestEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{
 				rawtopiccommon.CodecRaw,
 				rawtopiccommon.CodecGzip,
 			}, 4,

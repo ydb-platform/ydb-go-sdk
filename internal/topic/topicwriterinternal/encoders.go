@@ -3,6 +3,7 @@ package topicwriterinternal
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -164,6 +165,7 @@ type EncoderSelector struct {
 	parallelCompressors    int
 	batchCounter           int
 	measureIntervalBatches int
+	logContext             context.Context
 }
 
 func NewEncoderSelector(
@@ -172,6 +174,7 @@ func NewEncoderSelector(
 	parallelCompressors int,
 	tracer *trace.Topic,
 	writerReconnectorID, sessionID string,
+	logContext context.Context,
 ) EncoderSelector {
 	if parallelCompressors <= 0 {
 		panic("ydb: need leas one allowed compressor")
@@ -184,6 +187,7 @@ func NewEncoderSelector(
 		tracer:                 tracer,
 		writerReconnectorID:    writerReconnectorID,
 		sessionID:              sessionID,
+		logContext:             logContext,
 	}
 	res.ResetAllowedCodecs(allowedCodecs)
 
@@ -193,8 +197,10 @@ func NewEncoderSelector(
 func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
 	codec, err := s.selectCodec(messages)
 	if err == nil {
+		logCtx := s.logContext
 		onCompressDone := trace.TopicOnWriterCompressMessages(
 			s.tracer,
+			&logCtx,
 			s.writerReconnectorID,
 			s.sessionID,
 			codec.ToInt32(),
@@ -204,6 +210,7 @@ func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (r
 		)
 		err = cacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
+		s.logContext = logCtx
 	}
 
 	return codec, err
@@ -263,8 +270,10 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 		if len(messages) > 0 {
 			firstSeqNo = messages[0].SeqNo
 		}
+		logCtx := s.logContext
 		onCompressDone := trace.TopicOnWriterCompressMessages(
 			s.tracer,
+			&logCtx,
 			s.writerReconnectorID,
 			s.sessionID,
 			codec.ToInt32(),
@@ -274,6 +283,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 		)
 		err := cacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
+		s.logContext = logCtx
 		if err != nil {
 			return codecUnknown, err
 		}

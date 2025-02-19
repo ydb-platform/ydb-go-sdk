@@ -112,6 +112,22 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		WithProducerID(uuid.NewString())(&cfg)
 	}
 
+	if cfg.Connect == nil {
+		logContext := context.Background()
+		if cfg.LogContext != nil {
+			logContext = cfg.LogContext
+		}
+
+		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
+			RawTopicWriterStream,
+			error,
+		) {
+			return cfg.rawTopicClient.StreamWrite(ctx, tracer, &logContext)
+		}
+
+		cfg.Connect = connector
+	}
+
 	return cfg
 }
 
@@ -323,8 +339,10 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	w.m.WithRLock(func() {
 		sessionID = w.sessionID
 	})
+	logCtx := w.cfg.LogContext
 	onCompressDone := trace.TopicOnWriterCompressMessages(
 		w.cfg.Tracer,
+		&logCtx,
 		w.writerInstanceID,
 		sessionID,
 		w.cfg.forceCodec.ToInt32(),
@@ -339,6 +357,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	}
 	err := cacheMessages(res, targetCodec, w.cfg.compressorCount)
 	onCompressDone(err)
+	w.cfg.LogContext = logCtx
 	if err != nil {
 		return nil, err
 	}
@@ -365,9 +384,11 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 }
 
 func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
-	onDone := trace.TopicOnWriterClose(w.cfg.Tracer, w.writerInstanceID, reason)
+	logCtx := w.cfg.LogContext
+	onDone := trace.TopicOnWriterClose(w.cfg.Tracer, &logCtx, w.writerInstanceID, reason)
 	defer func() {
 		onDone(resErr)
+		w.cfg.LogContext = logCtx
 	}()
 
 	// stop background work and single stream writer
@@ -424,8 +445,10 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			}
 		}
 
+		logCtx := w.cfg.LogContext
 		onWriterStarted := trace.TopicOnWriterReconnect(
 			w.cfg.Tracer,
+			&logCtx,
 			w.writerInstanceID,
 			w.cfg.topic,
 			w.cfg.producerID,
@@ -442,6 +465,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			reconnectReason = err
 		}
 		onStreamError(reconnectReason)
+		w.cfg.LogContext = logCtx
 	}
 }
 

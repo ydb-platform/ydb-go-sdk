@@ -124,9 +124,20 @@ func (w *SingleStreamWriter) start() {
 	w.background.Start("topic writer receive messages", w.receiveMessagesLoop)
 }
 
+//nolint:funlen
 func (w *SingleStreamWriter) initStream() (err error) {
-	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.Tracer, w.cfg.reconnectorInstanceID, w.cfg.topic, w.cfg.producerID)
-	defer func() { traceOnDone(w.SessionID, err) }()
+	logCtx := w.cfg.LogContext
+	traceOnDone := trace.TopicOnWriterInitStream(
+		w.cfg.Tracer,
+		&logCtx,
+		w.cfg.reconnectorInstanceID,
+		w.cfg.topic,
+		w.cfg.producerID,
+	)
+	defer func() {
+		traceOnDone(w.SessionID, err)
+		w.cfg.LogContext = logCtx
+	}()
 
 	req := w.createInitRequest()
 	if err = w.cfg.stream.Send(&req); err != nil {
@@ -155,6 +166,7 @@ func (w *SingleStreamWriter) initStream() (err error) {
 		w.cfg.Tracer,
 		w.cfg.reconnectorInstanceID,
 		w.SessionID,
+		w.cfg.LogContext,
 	)
 
 	w.SessionID = result.SessionID
@@ -203,15 +215,20 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 		case *rawtopicwriter.UpdateTokenResponse:
 			// pass
 		default:
-			trace.TopicOnWriterReadUnknownGrpcMessage(
-				w.cfg.Tracer,
-				w.cfg.reconnectorInstanceID,
-				w.SessionID,
-				xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-					"ydb: unexpected message type in stream reader: %v",
-					reflect.TypeOf(m),
-				))),
-			)
+			{
+				logCtx := w.cfg.LogContext
+				trace.TopicOnWriterReadUnknownGrpcMessage(
+					w.cfg.Tracer,
+					&logCtx,
+					w.cfg.reconnectorInstanceID,
+					w.SessionID,
+					xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+						"ydb: unexpected message type in stream reader: %v",
+						reflect.TypeOf(m),
+					))),
+				)
+				w.cfg.LogContext = logCtx
+			}
 		}
 	}
 }
@@ -232,8 +249,10 @@ func (w *SingleStreamWriter) sendMessagesFromQueueToStreamLoop(ctx context.Conte
 			return
 		}
 
+		logCtx := w.cfg.LogContext
 		onSentComplete := trace.TopicOnWriterSendMessages(
 			w.cfg.Tracer,
+			&logCtx,
 			w.cfg.reconnectorInstanceID,
 			w.SessionID,
 			targetCodec.ToInt32(),
@@ -242,6 +261,7 @@ func (w *SingleStreamWriter) sendMessagesFromQueueToStreamLoop(ctx context.Conte
 		)
 		err = sendMessagesToStream(w.cfg.stream, targetCodec, messages)
 		onSentComplete(err)
+		w.cfg.LogContext = logCtx
 		if err != nil {
 			err = xerrors.WithStackTrace(fmt.Errorf("ydb: error send message to topic stream: %w", err))
 			_ = w.close(ctx, err)

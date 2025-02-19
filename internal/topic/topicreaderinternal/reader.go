@@ -35,6 +35,13 @@ type Reader struct {
 	readerID           int64
 }
 
+func (r *Reader) GetLogContext() context.Context {
+	return r.reader.GetLogContext()
+}
+func (r *Reader) SetLogContext(ctx context.Context) {
+	r.reader.SetLogContext(ctx)
+}
+
 type ReadMessageBatchOptions struct {
 	batcherGetOptions
 }
@@ -89,14 +96,17 @@ func NewReader(
 		return newTopicStreamReader(client, readerID, stream, cfg.topicStreamReaderConfig)
 	}
 
+	reader := newReaderReconnector(
+		readerID,
+		readerConnector,
+		cfg.OperationTimeout(),
+		cfg.BaseContext,
+		cfg.RetrySettings,
+		cfg.Trace,
+	)
+
 	res := Reader{
-		reader: newReaderReconnector(
-			readerID,
-			readerConnector,
-			cfg.OperationTimeout(),
-			cfg.RetrySettings,
-			cfg.Trace,
-		),
+		reader:             reader,
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Trace,
 		readerID:           readerID,

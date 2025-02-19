@@ -34,6 +34,7 @@ type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
 type readerReconnector struct {
 	background                 background.Worker
 	clock                      clockwork.Clock
+	logContext                 context.Context
 	retrySettings              topic.RetrySettings
 	streamVal                  batchedStreamReader
 	streamContextCancel        context.CancelCauseFunc
@@ -55,6 +56,7 @@ func newReaderReconnector(
 	readerID int64,
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
+	logContext context.Context,
 	retrySettings topic.RetrySettings,
 	tracer *trace.Topic,
 ) *readerReconnector {
@@ -64,6 +66,7 @@ func newReaderReconnector(
 		readerConnect:  connector,
 		streamErr:      errUnconnected,
 		connectTimeout: connectTimeout,
+		logContext:     logContext,
 		tracer:         tracer,
 		retrySettings:  retrySettings,
 	}
@@ -76,6 +79,14 @@ func newReaderReconnector(
 	res.start()
 
 	return res
+}
+
+func (r *readerReconnector) GetLogContext() context.Context {
+	return r.logContext
+}
+
+func (r *readerReconnector) SetLogContext(ctx context.Context) {
+	r.logContext = ctx
 }
 
 func (r *readerReconnector) PopMessagesBatchTx(
@@ -263,7 +274,9 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			}
 		}
 
-		onReconnectionDone := trace.TopicOnReaderReconnect(r.tracer, request.reason)
+		logCtx := r.logContext
+		onReconnectionDone := trace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)
+		r.logContext = logCtx
 
 		if request.reason != nil {
 			retryBackoff, stopRetryReason := r.checkErrRetryMode(
@@ -299,8 +312,12 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 
 //nolint:funlen
 func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
-	onDone := trace.TopicOnReaderReconnect(r.tracer, reason)
-	defer func() { onDone(err) }()
+	logCtx := r.logContext
+	onDone := trace.TopicOnReaderReconnect(r.tracer, &logCtx, reason)
+	defer func() {
+		onDone(err)
+		r.logContext = logCtx
+	}()
 
 	if err = ctx.Err(); err != nil {
 		return err
@@ -339,9 +356,17 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 		r.background.Start("ydb topic reader send reconnect message", func(ctx context.Context) {
 			select {
 			case r.reconnectFromBadStream <- newReconnectRequest(oldReader, sendReason):
-				trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
+				{
+					logCtx := r.logContext
+					trace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, true)
+					r.logContext = logCtx
+				}
 			case <-ctx.Done():
-				trace.TopicOnReaderReconnectRequest(r.tracer, ctx.Err(), false)
+				{
+					logCtx := r.logContext
+					trace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, ctx.Err(), false)
+					r.logContext = logCtx
+				}
 			}
 		})
 	default:
@@ -440,11 +465,19 @@ func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamRe
 
 	select {
 	case r.reconnectFromBadStream <- newReconnectRequest(stream, err):
-		// send signal
-		trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
+		{
+			// send signal
+			logCtx := r.logContext
+			trace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, true)
+			r.logContext = logCtx
+		}
 	default:
-		// previous reconnect signal in process, no need sent signal more
-		trace.TopicOnReaderReconnectRequest(r.tracer, err, false)
+		{
+			// previous reconnect signal in process, no need sent signal more
+			logCtx := r.logContext
+			trace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, false)
+			r.logContext = logCtx
+		}
 	}
 }
 
