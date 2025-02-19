@@ -163,7 +163,6 @@ func Open(
 		attachRes := make(chan error)
 		pprof.Do(ctx, pprof.Labels(
 			"node_id", strconv.Itoa(int(core.NodeID())),
-			"session_id", core.id,
 		), func(ctx context.Context) {
 			go func() {
 				attachRes <- core.attach(ctx)
