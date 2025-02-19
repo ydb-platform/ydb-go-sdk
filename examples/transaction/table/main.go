@@ -54,11 +54,12 @@ func main() {
 	}
 	defer db.Close(ctx)
 
-	if words, err := txWithRetries(ctx, db); err != nil {
+	words, err := txWithRetries(ctx, db)
+	if err != nil {
 		panic(err)
-	} else {
-		fmt.Printf("SUCCESS: %q\n", strings.Join(words, " "))
 	}
+	
+	fmt.Printf("SUCCESS: %q\n", strings.Join(words, " "))
 }
 
 func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error) {

@@ -65,15 +65,21 @@ func main() {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	if words, err := txWithoutRetries(ctx, db); err != nil {
-		panic(err)
-	} else {
+	{
+		words, err := txWithoutRetries(ctx, db)
+		if err != nil {
+			panic(err)
+		}
+
 		fmt.Printf("SUCCESS: %q\n", strings.Join(words, " "))
 	}
 
-	if words, err := txWithRetries(ctx, db); err != nil {
-		panic(err)
-	} else {
+	{
+		words, err := txWithRetries(ctx, db)
+		if err != nil {
+			panic(err)
+		}
+
 		fmt.Printf("SUCCESS: %q\n", strings.Join(words, " "))
 	}
 }
