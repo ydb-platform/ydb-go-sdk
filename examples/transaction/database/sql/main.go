@@ -86,7 +86,7 @@ func txWithoutRetries(ctx context.Context, db *sql.DB) (words []string, _ error)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck
 
 	row := tx.QueryRowContext(ctx, "SELECT 'execute';")
 
@@ -117,6 +117,8 @@ func txWithoutRetries(ctx context.Context, db *sql.DB) (words []string, _ error)
 	if err != nil {
 		return nil, err
 	}
+
+	defer rows.Close() //nolint:errcheck
 
 	for rows.Next() {
 		var (
@@ -177,6 +179,8 @@ func txWithRetries(ctx context.Context, db *sql.DB) (words []string, _ error) {
 		if err != nil {
 			return err
 		}
+
+		defer rows.Close() //nolint:errcheck
 
 		for rows.Next() {
 			var (
