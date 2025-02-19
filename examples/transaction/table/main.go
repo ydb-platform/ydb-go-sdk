@@ -58,7 +58,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	fmt.Printf("SUCCESS: %q\n", strings.Join(words, " "))
 }
 
