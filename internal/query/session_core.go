@@ -2,6 +2,9 @@ package query
 
 import (
 	"context"
+	"os"
+	"runtime/pprof"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +24,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+var setGoroutineLabelForAttachStream = os.Getenv("YDB_QUERY_SESSION_ATTACH_STREAM_GOROUTINE_LABEL") == "1"
 
 type (
 	Core interface {
@@ -110,6 +116,7 @@ func WithTrace(t *trace.Query) Option {
 	}
 }
 
+//nolint:funlen
 func Open(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...Option,
 ) (_ *sessionCore, finalErr error) {
@@ -152,7 +159,19 @@ func Open(
 	core.id = response.GetSessionId()
 	core.nodeID = uint32(response.GetNodeId())
 
-	err = core.attach(ctx)
+	if setGoroutineLabelForAttachStream {
+		attachRes := make(chan error)
+		pprof.Do(ctx, pprof.Labels(
+			"node_id", strconv.Itoa(int(core.NodeID())),
+		), func(ctx context.Context) {
+			go func() {
+				attachRes <- core.attach(ctx)
+			}()
+		})
+		err = <-attachRes
+	} else {
+		err = core.attach(ctx)
+	}
 	if err != nil {
 		_ = core.deleteSession(ctx)
 
