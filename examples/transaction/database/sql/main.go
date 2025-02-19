@@ -118,7 +118,7 @@ func txWithoutRetries(ctx context.Context, db *sql.DB) (words []string, _ error)
 		return nil, err
 	}
 
-	defer rows.Close() //nolint:errcheck
+	defer rows.Close() //nolint:errcheck,nolintlint
 
 	for rows.Next() {
 		var (
@@ -180,7 +180,7 @@ func txWithRetries(ctx context.Context, db *sql.DB) (words []string, _ error) {
 			return err
 		}
 
-		defer rows.Close() //nolint:errcheck
+		defer rows.Close() //nolint:errcheck,nolintlint
 
 		for rows.Next() {
 			var (
