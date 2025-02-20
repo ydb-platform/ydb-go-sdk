@@ -1,3 +1,5 @@
+* Added checking errors for conditionally delete item from pool
+
 ## v3.99.12
 * Internal debug improved
 
