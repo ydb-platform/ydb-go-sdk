@@ -33,7 +33,7 @@ jobs:
         options: '-h localhost'
     env:
       OS: ubuntu-latest
-      GO: 1.23.x
+      GO: 1.24.x
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
       YDB_VERSION: ${{ matrix.ydb-version }}
@@ -74,7 +74,7 @@ jobs:
         options: '-h localhost'
     env:
       OS: ubuntu-latest
-      GO: 1.23.x
+      GO: 1.24.x
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
       YDB_VERSION: ${{ matrix.ydb-version }}
@@ -113,7 +113,7 @@ jobs:
           - 5432:5432
     env:
       OS: ubuntu-latest
-      GO: 1.23.x
+      GO: 1.24.x
       POSTGRES_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/basic?sslmode=disable
     steps:
       - name: Checkout code
@@ -136,7 +136,7 @@ jobs:
         application: [ gorm, xorm ]
     env:
       OS: ubuntu-latest
-      GO: 1.23.x
+      GO: 1.24.x
       SQLITE_CONNECTION_STRING: ${{ matrix.application }}.db
     steps:
       - name: Checkout code
