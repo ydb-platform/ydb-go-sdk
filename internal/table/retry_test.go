@@ -96,7 +96,6 @@ func TestDoBadSession(t *testing.T) {
 
 				return s, nil
 			}),
-			pool.WithSyncCloseItem[*Session, Session](),
 		)
 		var (
 			i          int
@@ -142,7 +141,6 @@ func TestDoCreateSessionError(t *testing.T) {
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 			}),
-			pool.WithSyncCloseItem[*Session, Session](),
 		)
 		err := do(ctx, p, config.New(),
 			func(ctx context.Context, s table.Session) error {
@@ -311,7 +309,6 @@ func TestDoContextDeadline(t *testing.T) {
 		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 			return newTableSession(ctx, client.cc, config.New())
 		}),
-		pool.WithSyncCloseItem[*Session, Session](),
 	)
 	r := xrand.New(xrand.WithLock())
 	for i := range timeouts {
@@ -361,7 +358,6 @@ func TestDoWithCustomErrors(t *testing.T) {
 				return simpleSession(t), nil
 			}),
 			pool.WithLimit[*Session, Session](limit),
-			pool.WithSyncCloseItem[*Session, Session](),
 		)
 	)
 	for _, test := range []struct {
