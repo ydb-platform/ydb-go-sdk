@@ -116,7 +116,6 @@ func WithTrace(t *trace.Query) Option {
 	}
 }
 
-//nolint:funlen
 func Open(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...Option,
 ) (_ *sessionCore, finalErr error) {
