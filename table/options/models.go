@@ -607,43 +607,10 @@ const (
 	ChangefeedFormatDynamoDBStreamsJSON = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_DYNAMODB_STREAMS_JSON)
 )
 
-type StoreType byte
+type StoreType int
 
 const (
-	StoreTypeUnspecified StoreType = iota
-	StoreTypeRow
-	StoreTypeColumn
+	StoreTypeUnspecified = StoreType(Ydb_Table.StoreType_STORE_TYPE_UNSPECIFIED)
+	StoreTypeRow         = StoreType(Ydb_Table.StoreType_STORE_TYPE_ROW)
+	StoreTypeColumn      = StoreType(Ydb_Table.StoreType_STORE_TYPE_COLUMN)
 )
-
-func (s StoreType) String() string {
-	switch s {
-	case StoreTypeRow:
-		return "row"
-	case StoreTypeColumn:
-		return "column"
-	default:
-		return fmt.Sprintf("unknown_store_type_%d", s)
-	}
-}
-
-func (s StoreType) toYdb() Ydb_Table.StoreType {
-	switch s {
-	case StoreTypeRow:
-		return Ydb_Table.StoreType_STORE_TYPE_ROW
-	case StoreTypeColumn:
-		return Ydb_Table.StoreType_STORE_TYPE_COLUMN
-	default:
-		return Ydb_Table.StoreType_STORE_TYPE_UNSPECIFIED
-	}
-}
-
-func storeType(s Ydb_Table.StoreType) StoreType {
-	switch s {
-	case Ydb_Table.StoreType_STORE_TYPE_ROW:
-		return StoreTypeRow
-	case Ydb_Table.StoreType_STORE_TYPE_COLUMN:
-		return StoreTypeColumn
-	default:
-		return StoreTypeUnspecified
-	}
-}
