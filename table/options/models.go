@@ -59,6 +59,7 @@ type Description struct {
 	TimeToLiveSettings   *TimeToLiveSettings
 	Changefeeds          []ChangefeedDescription
 	Tiering              string
+	StoreType            StoreType
 }
 
 type TableStats struct {
@@ -605,3 +606,44 @@ const (
 	ChangefeedFormatJSON                = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_JSON)
 	ChangefeedFormatDynamoDBStreamsJSON = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_DYNAMODB_STREAMS_JSON)
 )
+
+type StoreType byte
+
+const (
+	StoreTypeUnspecified StoreType = iota
+	StoreTypeRow
+	StoreTypeColumn
+)
+
+func (s StoreType) String() string {
+	switch s {
+	case StoreTypeRow:
+		return "row"
+	case StoreTypeColumn:
+		return "column"
+	default:
+		return fmt.Sprintf("unknown_store_type_%d", s)
+	}
+}
+
+func (s StoreType) toYdb() Ydb_Table.StoreType {
+	switch s {
+	case StoreTypeRow:
+		return Ydb_Table.StoreType_STORE_TYPE_ROW
+	case StoreTypeColumn:
+		return Ydb_Table.StoreType_STORE_TYPE_COLUMN
+	default:
+		return Ydb_Table.StoreType_STORE_TYPE_UNSPECIFIED
+	}
+}
+
+func storeType(s Ydb_Table.StoreType) StoreType {
+	switch s {
+	case Ydb_Table.StoreType_STORE_TYPE_ROW:
+		return StoreTypeRow
+	case Ydb_Table.StoreType_STORE_TYPE_COLUMN:
+		return StoreTypeColumn
+	default:
+		return StoreTypeUnspecified
+	}
+}
