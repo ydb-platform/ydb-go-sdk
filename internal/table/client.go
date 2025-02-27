@@ -21,7 +21,7 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*Session, error)
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client { //nolint:funlen
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
@@ -39,6 +39,13 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
 			pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
+			pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
+				if !s.IsAlive() {
+					return true
+				}
+
+				return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
+			}),
 			pool.WithClock[*Session, Session](config.Clock()),
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				return newSession(ctx, cc, config)
@@ -210,7 +217,9 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 		onDone(attempts, finalErr)
 	}()
 
-	err := do(ctx, c.pool, c.config, op, func(err error) {
+	err := do(ctx, c.pool, c.config, func(ctx context.Context, s *Session) error {
+		return op(ctx, s)
+	}, func(err error) {
 		attempts++
 	}, config.RetryOptions...)
 	if err != nil {
@@ -239,7 +248,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		onDone(attempts, finalErr)
 	}()
 
-	return retryBackoff(ctx, c.pool, func(ctx context.Context, s table.Session) (err error) {
+	return retryBackoff(ctx, c.pool, func(ctx context.Context, s *Session) (err error) {
 		attempts++
 
 		tx, err := s.BeginTransaction(ctx, config.TxSettings)
@@ -248,9 +257,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		}
 
 		defer func() {
-			if err != nil && !xerrors.IsOperationError(err) {
-				_ = tx.Rollback(ctx)
-			}
+			_ = tx.Rollback(ctx)
 		}()
 
 		if err = executeTxOperation(ctx, c, op, tx); err != nil {

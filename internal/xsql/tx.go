@@ -144,7 +144,11 @@ func (tx *Tx) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, fi
 		onDone(finalErr)
 	}()
 	if !tx.conn.cc.IsValid() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(tx),
+			xerrors.Invalid(tx.conn),
+			xerrors.Invalid(tx.conn.cc),
+		)))
 	}
 
 	return &Stmt{

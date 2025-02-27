@@ -30,7 +30,6 @@ func TestRetryModes(t *testing.T) {
 					require.Equal(t, tt.canRetry[idempotent], m.MustRetry(true))
 					require.Equal(t, tt.canRetry[nonIdempotent], m.MustRetry(false))
 					require.Equal(t, tt.backoff, m.BackoffType())
-					require.Equal(t, tt.deleteSession, m.MustDeleteSession())
 				})
 			}
 		})

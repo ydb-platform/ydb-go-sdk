@@ -47,7 +47,7 @@ func TestCreateNode(t *testing.T) {
 		)
 		err := createNode(ctx, client, &Ydb_Coordination.CreateNodeRequest{})
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.ResourceExhausted))
-		require.True(t, xerrors.IsRetryObjectValid(err))
+		require.False(t, mustDeleteSession(err))
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -58,7 +58,7 @@ func TestCreateNode(t *testing.T) {
 		)
 		err := createNode(ctx, client, &Ydb_Coordination.CreateNodeRequest{})
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
-		require.True(t, xerrors.IsRetryObjectValid(err))
+		require.False(t, mustDeleteSession(err))
 	})
 }
 
@@ -306,7 +306,7 @@ func TestAlterNode(t *testing.T) {
 		)
 		err := alterNode(ctx, client, &Ydb_Coordination.AlterNodeRequest{})
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.ResourceExhausted))
-		require.True(t, xerrors.IsRetryObjectValid(err))
+		require.False(t, mustDeleteSession(err))
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -317,7 +317,7 @@ func TestAlterNode(t *testing.T) {
 		)
 		err := alterNode(ctx, client, &Ydb_Coordination.AlterNodeRequest{})
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
-		require.True(t, xerrors.IsRetryObjectValid(err))
+		require.False(t, mustDeleteSession(err))
 	})
 }
 
@@ -372,7 +372,7 @@ func TestDropNode(t *testing.T) {
 		)
 		err := dropNode(ctx, client, &Ydb_Coordination.DropNodeRequest{})
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.ResourceExhausted))
-		require.True(t, xerrors.IsRetryObjectValid(err))
+		require.False(t, mustDeleteSession(err))
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -383,6 +383,6 @@ func TestDropNode(t *testing.T) {
 		)
 		err := dropNode(ctx, client, &Ydb_Coordination.DropNodeRequest{})
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
-		require.True(t, xerrors.IsRetryObjectValid(err))
+		require.False(t, mustDeleteSession(err))
 	})
 }

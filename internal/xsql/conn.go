@@ -118,7 +118,10 @@ func (c *Conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, f
 	}()
 
 	if !c.cc.IsValid() {
-		return nil, xerrors.WithStackTrace(errNotReadyConn)
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.cc),
+		))
 	}
 
 	return &Stmt{

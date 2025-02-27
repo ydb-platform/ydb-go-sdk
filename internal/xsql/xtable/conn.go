@@ -51,7 +51,10 @@ func (c *Conn) NodeID() uint32 {
 
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (result driver.Result, err error) {
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		)))
 	}
 
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
@@ -72,7 +75,10 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	result driver.RowsNextResultSet, finalErr error,
 ) {
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		)))
 	}
 
 	switch queryMode := queryModeFromContext(ctx, c.defaultQueryMode); queryMode {
@@ -237,7 +243,10 @@ func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *param
 
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	if !c.isReady() {
-		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		)))
 	}
 	if err := c.session.KeepAlive(ctx); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
@@ -248,7 +257,10 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 
 func (c *Conn) Close() (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
-		return badconn.Map(xerrors.WithStackTrace(errConnClosedEarly))
+		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		)))
 	}
 
 	defer func() {

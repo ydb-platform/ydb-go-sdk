@@ -47,7 +47,11 @@ func beginTxFake(ctx context.Context, c *Conn) common.Tx {
 
 func (t *txFake) Commit(ctx context.Context) (err error) {
 	if !t.conn.isReady() {
-		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(t),
+			xerrors.Invalid(t.conn),
+			xerrors.Invalid(t.conn.session),
+		)))
 	}
 
 	return nil
@@ -55,7 +59,11 @@ func (t *txFake) Commit(ctx context.Context) (err error) {
 
 func (t *txFake) Rollback(ctx context.Context) (err error) {
 	if !t.conn.isReady() {
-		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(t),
+			xerrors.Invalid(t.conn),
+			xerrors.Invalid(t.conn.session),
+		)))
 	}
 
 	return err

@@ -151,7 +151,7 @@ func New[PT ItemConstraint[T], T any](
 			createTimeout: defaultCreateTimeout,
 			closeTimeout:  defaultCloseTimeout,
 			mustDeleteItemFunc: func(item PT, err error) bool {
-				return !xerrors.IsRetryObjectValid(err)
+				return !item.IsAlive()
 			},
 		},
 		index: make(map[PT]itemInfo[PT, T]),
@@ -417,14 +417,14 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	}
 
 	defer func() {
-		if finalErr == nil || !p.config.mustDeleteItemFunc(item, finalErr) {
-			_ = p.putItem(ctx, item)
-		} else {
+		if !item.IsAlive() || (finalErr != nil && p.config.mustDeleteItemFunc(item, finalErr)) {
 			p.closeItem(ctx, item,
 				closeItemWithLock(),
 				closeItemNotifyStats(),
 				closeItemWithDeleteFromPool(),
 			)
+		} else {
+			_ = p.putItem(ctx, item)
 		}
 	}()
 

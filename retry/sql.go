@@ -3,6 +3,7 @@ package retry
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -85,7 +86,7 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 			opt.ApplyDoOption(&options)
 		}
 	}
-	v, err := RetryWithResult(ctx, func(ctx context.Context) (T, error) {
+	v, err := RetryWithResult(ctx, func(ctx context.Context) (_ T, finalErr error) {
 		attempts++
 		cc, err := db.Conn(ctx)
 		if err != nil {
@@ -230,4 +231,12 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	}
 
 	return v, nil
+}
+
+func mustDeleteConn(err error, conn *sql.Conn) bool {
+	if xerrors.Is(err, driver.ErrBadConn) {
+		return true
+	}
+
+	return xerrors.IsValid(err, conn)
 }

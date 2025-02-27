@@ -25,12 +25,12 @@ func do(
 	ctx context.Context,
 	pool sessionPool,
 	config *config.Config,
-	op table.Operation,
+	op func(ctx context.Context, s *Session) error,
 	onAttempt func(err error),
 	opts ...retry.Option,
 ) (err error) {
 	return retryBackoff(ctx, pool,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s *Session) (err error) {
 			defer func() {
 				if onAttempt != nil {
 					onAttempt(err)
@@ -61,13 +61,11 @@ func do(
 func retryBackoff(
 	ctx context.Context,
 	pool sessionPool,
-	op table.Operation,
+	op func(ctx context.Context, s *Session) error,
 	opts ...retry.Option,
 ) error {
-	return pool.With(ctx, func(ctx context.Context, s *Session) error {
+	return pool.With(ctx, func(ctx context.Context, s *Session) (err error) {
 		if err := op(ctx, s); err != nil {
-			s.checkError(err)
-
 			return xerrors.WithStackTrace(err)
 		}
 

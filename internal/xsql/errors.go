@@ -3,13 +3,11 @@ package xsql
 import (
 	"database/sql/driver"
 	"errors"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var (
 	ErrUnsupported         = driver.ErrSkip
 	errDeprecated          = driver.ErrSkip
 	errWrongQueryProcessor = errors.New("wrong query processor")
-	errNotReadyConn        = xerrors.Retryable(errors.New("conn not ready"), xerrors.InvalidObject())
+	errNotReadyConn        = errors.New("conn not ready")
 )

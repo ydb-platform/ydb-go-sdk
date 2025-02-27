@@ -36,7 +36,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -760,16 +759,6 @@ func (s *Session) DropTable(
 	_, err = s.client.DropTable(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
-}
-
-func (s *Session) checkError(err error) {
-	if err == nil {
-		return
-	}
-	m := retry.Check(err)
-	if m.MustDeleteSession() {
-		s.SetStatus(table.SessionClosing)
-	}
 }
 
 // AlterTable modifies schema of table at given path with given options.
