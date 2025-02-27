@@ -18,3 +18,4 @@ changes.txt
 examples/.golangci.yml
 tests/slo/.golangci.yml
 tests/slo/.bin
+ydb_certs

@@ -580,6 +580,7 @@ func DescribeTable(
 		TimeToLiveSettings:   NewTimeToLiveSettings(result.GetTtlSettings()),
 		Changefeeds:          processChangefeeds(result.GetChangefeeds()),
 		Tiering:              result.GetTiering(),
+		StoreType:            options.StoreType(result.GetStoreType()),
 	}
 
 	return desc, nil
