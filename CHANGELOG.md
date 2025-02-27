@@ -1,3 +1,5 @@
+* Added new topic reader and writer options, `WithReaderLogContext` and `WithWriterLogContext`, which provide a `context.Context` instance to be used in topic event logs.
+
 ## v3.100.0
 * Added `table.DescribeTable.StoreType` to table description result from `table.Session.DescribeTable` request
 
