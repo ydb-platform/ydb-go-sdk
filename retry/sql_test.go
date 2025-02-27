@@ -221,7 +221,7 @@ func TestDoTx(t *testing.T) {
 					if tt.canRetry[idempotentType] {
 						require.NoError(t, err)
 						require.NotEmpty(t, attempts)
-						if mustDeleteConn(m.queryErr) {
+						if xerrors.Is(m.queryErr, driver.ErrBadConn) {
 							require.Greater(t, m.conns, uint32(1))
 						} else {
 							require.Equal(t, uint32(1), m.conns)

@@ -36,7 +36,11 @@ func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 	}()
 
 	if !stmt.conn.cc.IsValid() {
-		return nil, xerrors.WithStackTrace(errNotReadyConn)
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(stmt),
+			xerrors.Invalid(stmt.conn),
+			xerrors.Invalid(stmt.conn.cc),
+		))
 	}
 
 	sql, params, err := stmt.conn.toYdb(stmt.sql, args...)
@@ -57,7 +61,11 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 	}()
 
 	if !stmt.conn.cc.IsValid() {
-		return nil, xerrors.WithStackTrace(errNotReadyConn)
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(stmt),
+			xerrors.Invalid(stmt.conn),
+			xerrors.Invalid(stmt.conn.cc),
+		))
 	}
 
 	sql, params, err := stmt.conn.toYdb(stmt.sql, args...)

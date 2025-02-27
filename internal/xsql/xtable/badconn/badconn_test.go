@@ -45,12 +45,10 @@ var errsToCheck = []error{
 	xerrors.Retryable(
 		xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 		xerrors.WithBackoff(backoff.TypeFast),
-		xerrors.InvalidObject(),
 	),
 	xerrors.Retryable(
 		grpcStatus.Error(grpcCodes.Unavailable, ""),
 		xerrors.WithBackoff(backoff.TypeFast),
-		xerrors.InvalidObject(),
 	),
 	xerrors.Transport(grpcStatus.Error(grpcCodes.DataLoss, "")),
 	xerrors.Transport(grpcStatus.Error(grpcCodes.Unauthenticated, "")),
@@ -112,7 +110,6 @@ var errsToCheck = []error{
 		xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
 	),
 	xerrors.Retryable(errors.New("retryable error")),
-	xerrors.Retryable(errors.New("retryable error"), xerrors.InvalidObject()),
 	io.EOF,
 	xerrors.WithStackTrace(io.EOF),
 }

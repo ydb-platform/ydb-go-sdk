@@ -189,7 +189,6 @@ var errsToCheck = []struct {
 		err: xerrors.Retryable(
 			xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 			xerrors.WithBackoff(backoff.TypeFast),
-			xerrors.InvalidObject(),
 		),
 		backoff: backoff.TypeFast,
 		canRetry: map[idempotency]bool{
@@ -201,7 +200,6 @@ var errsToCheck = []struct {
 		err: xerrors.Retryable(
 			grpcStatus.Error(grpcCodes.Unavailable, ""),
 			xerrors.WithBackoff(backoff.TypeFast),
-			xerrors.InvalidObject(),
 		),
 		backoff: backoff.TypeFast,
 		canRetry: map[idempotency]bool{

@@ -38,12 +38,10 @@ func TestMustDeleteTableOrQuerySession(t *testing.T) {
 			Retryable(
 				Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 				WithBackoff(backoff.TypeFast),
-				InvalidObject(),
 			),
 			Retryable(
 				grpcStatus.Error(grpcCodes.Unavailable, ""),
 				WithBackoff(backoff.TypeFast),
-				InvalidObject(),
 			),
 			Transport(grpcStatus.Error(grpcCodes.DataLoss, "")),
 			Transport(grpcStatus.Error(grpcCodes.Unauthenticated, "")),

@@ -14,6 +14,7 @@ type retryableError struct {
 	backoffType backoff.Type
 	code        int32
 	traceID     string
+	invalidObjs []any
 }
 
 func (re *retryableError) Code() int32 {
@@ -81,16 +82,25 @@ func WithName(name string) nameOption {
 	return nameOption(name)
 }
 
-type invalidObjectOption struct{}
+type invalidObjectOption struct {
+	obj any
+}
 
-func (invalidObjectOption) applyToRetryableError(re *retryableError) {
+func (opt invalidObjectOption) applyToRetryableError(re *retryableError) {
+	re.invalidObjs = append(re.invalidObjs, opt.obj)
 }
 
 // InvalidObject deprecated option
 //
-// Deprecated
+// Deprecated: use Invalid instead
 func InvalidObject() invalidObjectOption {
 	return invalidObjectOption{}
+}
+
+func Invalid(obj any) invalidObjectOption {
+	return invalidObjectOption{
+		obj: obj,
+	}
 }
 
 func Retryable(err error, opts ...RetryableErrorOption) error {
@@ -157,4 +167,23 @@ func IsRetryableError(err error) bool {
 	}
 
 	return false
+}
+
+func IsValid[T comparable](err error, obj T) bool {
+	if err == nil {
+		return true
+	}
+
+	var e *retryableError
+	if !errors.As(err, &e) {
+		return true
+	}
+
+	for _, o := range e.invalidObjs {
+		if invalidObj, has := o.(T); has && invalidObj == obj {
+			return false
+		}
+	}
+
+	return true
 }

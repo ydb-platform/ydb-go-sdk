@@ -22,7 +22,7 @@ func WithBackoff(t backoff.Type) retryableErrorOption {
 //
 // Deprecated
 func WithDeleteSession() retryableErrorOption {
-	return retryableErrorOption(xerrors.InvalidObject())
+	return nil
 }
 
 // RetryableError makes retryable error from options
