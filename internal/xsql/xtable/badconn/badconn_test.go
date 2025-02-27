@@ -122,7 +122,7 @@ func Test_badConnError_Is(t *testing.T) {
 		t.Run(err.Error(), func(t *testing.T) {
 			err = Map(err)
 			require.Equal(t,
-				!xerrors.IsRetryObjectValid(err),
+				xerrors.MustDeleteTableOrQuerySession(err),
 				xerrors.Is(err, driver.ErrBadConn),
 			)
 		})

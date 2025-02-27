@@ -9,12 +9,11 @@ import (
 )
 
 type retryableError struct {
-	name               string
-	err                error
-	backoffType        backoff.Type
-	isRetryObjectValid bool
-	code               int32
-	traceID            string
+	name        string
+	err         error
+	backoffType backoff.Type
+	code        int32
+	traceID     string
 }
 
 func (re *retryableError) Code() int32 {
@@ -31,10 +30,6 @@ func (re *retryableError) Type() Type {
 
 func (re *retryableError) BackoffType() backoff.Type {
 	return re.backoffType
-}
-
-func (re *retryableError) IsRetryObjectValid() bool {
-	return re.isRetryObjectValid
 }
 
 func (re *retryableError) Error() string {
@@ -89,9 +84,11 @@ func WithName(name string) nameOption {
 type invalidObjectOption struct{}
 
 func (invalidObjectOption) applyToRetryableError(re *retryableError) {
-	re.isRetryObjectValid = false
 }
 
+// InvalidObject deprecated option
+//
+// Deprecated
 func InvalidObject() invalidObjectOption {
 	return invalidObjectOption{}
 }
@@ -103,15 +100,13 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 	var (
 		e  Error
 		re = &retryableError{
-			err:                err,
-			name:               "CUSTOM",
-			code:               -1,
-			isRetryObjectValid: true,
+			err:  err,
+			name: "CUSTOM",
+			code: -1,
 		}
 	)
 	if As(err, &e) {
 		re.backoffType = e.BackoffType()
-		re.isRetryObjectValid = e.IsRetryObjectValid()
 		re.code = e.Code()
 		re.name = e.Name()
 	}

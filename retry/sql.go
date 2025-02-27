@@ -3,6 +3,7 @@ package retry
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -230,4 +231,8 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	}
 
 	return v, nil
+}
+
+func mustDeleteConn(err error) bool {
+	return xerrors.Is(err, driver.ErrBadConn)
 }

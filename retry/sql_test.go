@@ -107,7 +107,7 @@ func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 
 func (m *mockConn) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Rows, error) {
 	m.t.Log(stack.Record(0))
-	if !xerrors.IsRetryObjectValid(m.execErr) {
+	if xerrors.MustDeleteTableOrQuerySession(m.execErr) {
 		m.closed = true
 	}
 
@@ -116,7 +116,7 @@ func (m *mockConn) QueryContext(ctx context.Context, sql string, args []driver.N
 
 func (m *mockConn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (driver.Result, error) {
 	m.t.Log(stack.Record(0))
-	if !xerrors.IsRetryObjectValid(m.execErr) {
+	if xerrors.MustDeleteTableOrQuerySession(m.execErr) {
 		m.closed = true
 	}
 
@@ -221,7 +221,7 @@ func TestDoTx(t *testing.T) {
 					if tt.canRetry[idempotentType] {
 						require.NoError(t, err)
 						require.NotEmpty(t, attempts)
-						if tt.deleteSession {
+						if mustDeleteConn(m.queryErr) {
 							require.Greater(t, m.conns, uint32(1))
 						} else {
 							require.Equal(t, uint32(1), m.conns)
