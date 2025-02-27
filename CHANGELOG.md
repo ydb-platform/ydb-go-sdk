@@ -1,4 +1,4 @@
-* Added StoreType to table description
+* Added `table.DescribeTable.StoreType` to table description result from `table.Session.DescribeTable` request
 
 ## v3.99.13
 * Added checking errors for conditionally delete item from pool
