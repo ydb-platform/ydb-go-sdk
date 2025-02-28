@@ -23,6 +23,14 @@ type Conn struct {
 	lastUsage xsync.LastUsage
 }
 
+func (c *Conn) ID() string {
+	return c.cc.ID()
+}
+
+func (c *Conn) NodeID() uint32 {
+	return c.cc.NodeID()
+}
+
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	onDone := trace.DatabaseSQLOnConnPing(c.connector.trace, &c.ctx,
 		stack.FunctionID("database/sql.(*Conn).Ping", stack.Package("database/sql")),

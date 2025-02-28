@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -93,6 +94,12 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
+			if finalErr != nil && mustDeleteConn(finalErr, cc) {
+				_ = cc.Raw(func(driverConn any) error {
+					return xerrors.WithStackTrace(badconn.Errorf("close connection because: %w", finalErr))
+				})
+			}
+
 			_ = cc.Close()
 		}()
 		v, err := op(xcontext.MarkRetryCall(ctx), cc)
@@ -233,10 +240,12 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	return v, nil
 }
 
-func mustDeleteConn(err error, conn *sql.Conn) bool {
+func mustDeleteConn[T interface {
+	*sql.Conn
+}](err error, conn T) bool {
 	if xerrors.Is(err, driver.ErrBadConn) {
 		return true
 	}
 
-	return xerrors.IsValid(err, conn)
+	return !xerrors.IsValid(err, conn)
 }

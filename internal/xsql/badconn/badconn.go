@@ -2,6 +2,7 @@ package badconn
 
 import (
 	"database/sql/driver"
+	"fmt"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -9,6 +10,10 @@ import (
 
 type Error struct {
 	err error
+}
+
+func Errorf(format string, args ...interface{}) error {
+	return &Error{err: fmt.Errorf(format, args...)}
 }
 
 func (e Error) Origin() error {
