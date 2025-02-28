@@ -828,6 +828,76 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
+		h1 := t.OnTxCommit
+		h2 := x.OnTxCommit
+		ret.OnTxCommit = func(q QueryTxCommitStartInfo) func(QueryTxCommitDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryTxCommitDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryTxCommitDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnTxRollback
+		h2 := x.OnTxRollback
+		ret.OnTxRollback = func(q QueryTxRollbackStartInfo) func(QueryTxRollbackDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryTxRollbackDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryTxRollbackDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnTxExec
 		h2 := x.OnTxExec
 		ret.OnTxExec = func(q QueryTxExecStartInfo) func(QueryTxExecDoneInfo) {
@@ -1446,6 +1516,36 @@ func (t *Query) onSessionBegin(q QuerySessionBeginStartInfo) func(info QuerySess
 	}
 	return res
 }
+func (t *Query) onTxCommit(q QueryTxCommitStartInfo) func(info QueryTxCommitDoneInfo) {
+	fn := t.OnTxCommit
+	if fn == nil {
+		return func(QueryTxCommitDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryTxCommitDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onTxRollback(q QueryTxRollbackStartInfo) func(info QueryTxRollbackDoneInfo) {
+	fn := t.OnTxRollback
+	if fn == nil {
+		return func(QueryTxRollbackDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryTxRollbackDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Query) onTxExec(q QueryTxExecStartInfo) func(info QueryTxExecDoneInfo) {
 	fn := t.OnTxExec
 	if fn == nil {
@@ -1859,6 +1959,34 @@ func QueryOnSessionBegin(t *Query, c *context.Context, call call, session sessio
 		var p QuerySessionBeginDoneInfo
 		p.Error = e
 		p.Tx = tx
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnTxCommit(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo) func(error) {
+	var p QueryTxCommitStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	p.Tx = tx
+	res := t.onTxCommit(p)
+	return func(e error) {
+		var p QueryTxCommitDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnTxRollback(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo) func(error) {
+	var p QueryTxRollbackStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	p.Tx = tx
+	res := t.onTxRollback(p)
+	return func(e error) {
+		var p QueryTxRollbackDoneInfo
+		p.Error = e
 		res(p)
 	}
 }

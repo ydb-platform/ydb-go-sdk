@@ -192,21 +192,21 @@ func (tx *transaction) CommitTx(
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *transaction) Rollback(ctx context.Context) (err error) {
-	onDone := trace.TableOnTxRollback(
-		tx.s.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).Rollback"),
-		tx.s, tx,
-	)
-	defer func() {
-		onDone(err)
-	}()
-
 	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil // nop for committed tx
 	case txStateRollbacked:
 		return xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
+		onDone := trace.TableOnTxRollback(
+			tx.s.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).Rollback"),
+			tx.s, tx,
+		)
+		defer func() {
+			onDone(err)
+		}()
+
 		_, err = tx.s.client.RollbackTransaction(ctx,
 			&Ydb_Table.RollbackTransactionRequest{
 				SessionId: tx.s.id,

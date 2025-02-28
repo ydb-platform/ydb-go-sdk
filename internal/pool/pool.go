@@ -380,6 +380,26 @@ func (p *Pool[PT, T]) changeState(changeState func() Stats) {
 	}
 }
 
+func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
+	if !item.IsAlive() {
+		return errItemIsNotAlive
+	}
+
+	if err == nil {
+		return nil
+	}
+
+	if p.config.mustDeleteItemFunc(item, err) {
+		return err
+	}
+
+	if !xerrors.IsValid(err, item) {
+		return err
+	}
+
+	return nil
+}
+
 func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
 	if onTry := p.config.trace.OnTry; onTry != nil {
 		onDone := onTry(&ctx,
@@ -417,7 +437,7 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	}
 
 	defer func() {
-		if !item.IsAlive() || (finalErr != nil && p.config.mustDeleteItemFunc(item, finalErr)) {
+		if err := p.checkItemAndError(item, finalErr); err != nil {
 			p.closeItem(ctx, item,
 				closeItemWithLock(),
 				closeItemNotifyStats(),
