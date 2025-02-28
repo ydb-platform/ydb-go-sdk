@@ -1,3 +1,4 @@
+## v3.100.2
 * Fixed bug in `internal/xcontext.WithDone` (not listening chan done)
 
 ## v3.100.1
