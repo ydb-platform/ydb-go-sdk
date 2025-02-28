@@ -1,3 +1,5 @@
+* Fixed bug in `internal/xcontext.WithDone` (not listening chan done)
+
 ## v3.100.1
 * Refactored behaviour on `retry.Retryable` error for retry object (such as session, connection or transaction)
 
