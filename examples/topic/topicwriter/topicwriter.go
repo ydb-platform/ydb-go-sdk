@@ -58,7 +58,7 @@ func SendMessageWithMessageGroupID(ctx context.Context, db *ydb.Driver) {
 		"topic-path",
 
 		// explicit enable - for force check
-		topicoptions.WithWriterMessageUseMessageGroupID(true),
+		topicoptions.WithWriterKeyID(true),
 
 		// optional
 		topicoptions.WithWriterMessageGroupHashFunc(func(messageGroupID string) [32]byte {
@@ -66,9 +66,14 @@ func SendMessageWithMessageGroupID(ctx context.Context, db *ydb.Driver) {
 		}),
 	)
 
+	// сохранение барьера по seqno, получение min/max seqno при реконнектах или старте автоинткрементного писателя
+
+	// возможность писать одним producer_id в разные партиции
+
 	mess := topicwriter.Message{
 		Data:         strings.NewReader("sdf"),
-		Partitioning: topicwriter.PartitionByMessageGroupID("my-client"),
+		Partitioning: topicwriter.PartitionByKey("my-client"),
+		Partitioning: topicwriter.ParitioningByKeyHash("", "dhdhdjdjdd"),
 	}
 	_ = w.Write(ctx, mess)
 }

@@ -429,7 +429,7 @@ func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
 func WithCertificate(cert *x509.Certificate) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.options = append(d.options, config.WithCertificate(cert))
-
+		f
 		return nil
 	}
 }

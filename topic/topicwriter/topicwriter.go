@@ -134,6 +134,6 @@ func ExplicitPartitionID(partitionID int64) topicwriterinternal.PublicFuturePart
 	return topicwriterinternal.NewPartitioningWithPartitionID(partitionID)
 }
 
-func PartitionByMessageGroupID(groupID string) topicwriterinternal.PublicFuturePartitioning {
+func PartitionByKey(groupID string) topicwriterinternal.PublicFuturePartitioning {
 	return topicwriterinternal.NewPartitioningWithMessageGroupID(groupID)
 }

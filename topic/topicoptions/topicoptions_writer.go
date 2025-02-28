@@ -222,7 +222,7 @@ func WithWriterMessageGroupHashFunc(f func(messageGroupID string) [32]byte) Writ
 	panic("implement me")
 }
 
-func WithWriterMessageUseMessageGroupID(val bool) WriterOption {
+func WithWriterKeyID(val bool) WriterOption {
 	//TODO implement me
 	panic("implement me")
 }
