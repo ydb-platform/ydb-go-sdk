@@ -1,3 +1,5 @@
+* Refactored behaviour on `retry.Retryable` error for retry object (such as session, connection or transaction)
+
 ## v3.100.0
 * Added `table.DescribeTable.StoreType` to table description result from `table.Session.DescribeTable` request
 
