@@ -2,40 +2,25 @@ package xcontext
 
 import (
 	"context"
-	"time"
 )
 
-type doneCtx <-chan struct{}
-
-func (done doneCtx) Deadline() (deadline time.Time, ok bool) {
-	return
-}
-
-func (done doneCtx) Done() <-chan struct{} {
-	return done
-}
-
-func (done doneCtx) Err() error {
+func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
+	ctx, cancel := WithCancel(parent)
 	select {
 	case <-done:
-		return context.Canceled
+		cancel()
+
+		return ctx, cancel
 	default:
-		return nil
 	}
-}
 
-func (done doneCtx) Value(key any) any {
-	return nil
-}
+	go func() {
+		select {
+		case <-done:
+			cancel()
+		case <-parent.Done():
+		}
+	}()
 
-func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(parent)
-	stop := context.AfterFunc(doneCtx(done), func() {
-		cancel()
-	})
-
-	return ctx, func() {
-		stop()
-		cancel()
-	}
+	return ctx, cancel
 }
