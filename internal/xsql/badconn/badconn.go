@@ -2,6 +2,7 @@ package badconn
 
 import (
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 
@@ -10,6 +11,10 @@ import (
 
 type Error struct {
 	err error
+}
+
+func New(msg string) error {
+	return &Error{err: errors.New(msg)}
 }
 
 func Errorf(format string, args ...interface{}) error {

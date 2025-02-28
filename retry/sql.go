@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	budget "github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )

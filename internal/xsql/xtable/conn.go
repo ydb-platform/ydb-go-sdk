@@ -51,7 +51,7 @@ func (c *Conn) NodeID() uint32 {
 
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (result driver.Result, err error) {
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
+		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
 		)))
@@ -243,7 +243,7 @@ func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *param
 
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	if !c.isReady() {
-		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
+		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
 		)))
