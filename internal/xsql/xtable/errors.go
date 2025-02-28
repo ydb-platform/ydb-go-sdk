@@ -4,12 +4,12 @@ import (
 	"database/sql/driver"
 	"errors"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 )
 
 var (
 	ErrUnsupported     = driver.ErrSkip
-	errConnClosedEarly = xerrors.Retryable(errors.New("conn closed early"), xerrors.InvalidObject())
-	errNotReadyConn    = xerrors.Retryable(errors.New("conn not ready"), xerrors.InvalidObject())
+	errConnClosedEarly = badconn.New("conn closed early")
+	errNotReadyConn    = badconn.New("conn not ready")
 	ErrWrongQueryMode  = errors.New("wrong query mode")
 )

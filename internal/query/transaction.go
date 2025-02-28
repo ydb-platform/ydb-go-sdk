@@ -322,10 +322,13 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
+	onDone := trace.QueryOnTxCommit(tx.s.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).CommitTx"), tx.s, tx)
 	defer func() {
 		if finalErr != nil {
 			applyStatusByError(tx.s, finalErr)
 		}
+		onDone(finalErr)
 	}()
 
 	if tx.ID() == baseTx.LazyTxID {
@@ -367,12 +370,6 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
-	defer func() {
-		if finalErr != nil {
-			applyStatusByError(tx.s, finalErr)
-		}
-	}()
-
 	if tx.ID() == baseTx.LazyTxID {
 		// https://github.com/ydb-platform/ydb-go-sdk/issues/1456
 		return tx.s.Close(ctx)
@@ -381,6 +378,15 @@ func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 	if tx.completed {
 		return nil
 	}
+
+	onDone := trace.QueryOnTxRollback(tx.s.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Rollback"), tx.s, tx)
+	defer func() {
+		if finalErr != nil {
+			applyStatusByError(tx.s, finalErr)
+		}
+		onDone(finalErr)
+	}()
 
 	tx.completed = true
 

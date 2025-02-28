@@ -849,7 +849,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				var (
 					newItems    atomic.Int64
 					deleteItems atomic.Int64
-					expErr      = xerrors.Retryable(errors.New("expected error"), xerrors.InvalidObject())
+					expErr      = errors.New("expected error")
 				)
 				p := New(rootCtx,
 					WithLimit[*testItem, testItem](1),
@@ -874,7 +874,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				)
 				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					if newItems.Load() < 10 {
-						return expErr
+						return xerrors.Retryable(expErr, xerrors.Invalid(testItem))
 					}
 
 					return nil

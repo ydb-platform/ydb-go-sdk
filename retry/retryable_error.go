@@ -19,8 +19,10 @@ func WithBackoff(t backoff.Type) retryableErrorOption {
 }
 
 // WithDeleteSession makes retryable error option with delete session flag
+//
+// Deprecated
 func WithDeleteSession() retryableErrorOption {
-	return retryableErrorOption(xerrors.InvalidObject())
+	return nil
 }
 
 // RetryableError makes retryable error from options

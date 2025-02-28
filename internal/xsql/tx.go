@@ -6,8 +6,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -144,7 +144,11 @@ func (tx *Tx) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, fi
 		onDone(finalErr)
 	}()
 	if !tx.conn.cc.IsValid() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(tx),
+			xerrors.Invalid(tx.conn),
+			xerrors.Invalid(tx.conn.cc),
+		)))
 	}
 
 	return &Stmt{
