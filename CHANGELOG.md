@@ -1,3 +1,5 @@
+* Fixed bug with concurrent rewrites source slice of `grpc.DialOption` on dial step
+
 ## v3.100.2
 * Fixed bug in `internal/xcontext.WithDone` (not listening chan done)
 
