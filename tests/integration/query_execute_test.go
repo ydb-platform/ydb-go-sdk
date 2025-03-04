@@ -47,6 +47,8 @@ func TestQueryExecute(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
+
 	t.Run("Query", func(t *testing.T) {
 		var (
 			p1 string
@@ -301,6 +303,7 @@ func TestIssue1456TooManyUnknownTransactions(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
 
 	const (
 		tableSize = 10000
@@ -428,6 +431,7 @@ SELECT * FROM AS_TABLE($arg);
 			if err != nil {
 				return err
 			}
+			defer rs.Close(ctx)
 
 			for i := 0; i < targetCount; i++ {
 				row, err := rs.NextRow(ctx)
@@ -454,6 +458,7 @@ SELECT * FROM AS_TABLE($arg);
 			if err != nil {
 				return err
 			}
+			defer rs.Close(ctx)
 
 			_, err = rs.NextRow(ctx)
 			if err != nil {

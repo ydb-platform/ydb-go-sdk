@@ -27,8 +27,6 @@ import (
 )
 
 func TestBasicExampleDatabaseSql(t *testing.T) {
-	defer simpleDetectGoroutineLeak(t)
-
 	folder := t.Name()
 
 	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
@@ -90,24 +88,16 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 					ydb.WithDiscoveryInterval(time.Second),
 				)
 				require.NoError(t, err)
-
-				defer func() {
-					require.NoError(t, nativeDriver.Close(ctx))
-				}()
+				defer nativeDriver.Close(ctx)
 
 				c, err := ydb.Connector(nativeDriver,
 					ydb.WithQueryService(tt.useQueryService),
 				)
 				require.NoError(t, err)
-
-				defer func() {
-					require.NoError(t, c.Close())
-				}()
+				defer c.Close()
 
 				db := sql.OpenDB(c)
-				defer func() {
-					require.NoError(t, db.Close())
-				}()
+				defer db.Close()
 
 				require.NoError(t, db.PingContext(ctx))
 

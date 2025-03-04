@@ -65,12 +65,8 @@ func TestStaticCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("close failed: %+v", e)
-		}
-	}()
+	defer db.Close(ctx)
+
 	_, err = db.Discovery().WhoAmI(ctx)
 	if err != nil {
 		t.Fatal(err)

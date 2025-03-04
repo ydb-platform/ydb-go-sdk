@@ -39,10 +39,7 @@ func TestRetryBudget(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	defer func() {
-		// cleanup
-		_ = nativeDriver.Close(ctx)
-	}()
+	defer nativeDriver.Close(ctx)
 
 	c, err := ydb.Connector(nativeDriver)
 	require.NoError(t, err)
@@ -53,10 +50,7 @@ func TestRetryBudget(t *testing.T) {
 	}()
 
 	db := sql.OpenDB(c)
-	defer func() {
-		// cleanup
-		_ = db.Close()
-	}()
+	defer db.Close()
 
 	retryBudget := noQuota{}
 

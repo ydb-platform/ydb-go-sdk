@@ -29,6 +29,7 @@ func TestTableTxLazy(t *testing.T) {
 	})
 
 	require.NotNil(t, db)
+	defer db.Close(ctx)
 
 	t.Run("tx", func(t *testing.T) {
 		t.Run("lazy", func(t *testing.T) {

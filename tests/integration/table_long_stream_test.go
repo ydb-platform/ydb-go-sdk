@@ -50,10 +50,7 @@ func TestLongStream(sourceTest *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func(db *ydb.Driver) {
-		// cleanup
-		_ = db.Close(ctx)
-	}(db)
+	defer db.Close(ctx)
 
 	t.Run("creating", func(t *testing.T) {
 		t.Run("stream", func(t *testing.T) {

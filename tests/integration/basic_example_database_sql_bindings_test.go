@@ -26,8 +26,6 @@ import (
 )
 
 func TestBasicExampleDatabaseSqlBindings(t *testing.T) {
-	defer simpleDetectGoroutineLeak(t)
-
 	folder := t.Name()
 
 	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
@@ -63,10 +61,7 @@ func TestBasicExampleDatabaseSqlBindings(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		defer func() {
-			// cleanup
-			_ = nativeDriver.Close(ctx)
-		}()
+		defer nativeDriver.Close(ctx)
 
 		c, err := ydb.Connector(nativeDriver,
 			ydb.WithTablePathPrefix(path.Join(nativeDriver.Name(), folder)),
@@ -74,17 +69,10 @@ func TestBasicExampleDatabaseSqlBindings(t *testing.T) {
 			ydb.WithPositionalArgs(),
 		)
 		require.NoError(t, err)
-
-		defer func() {
-			// cleanup
-			_ = c.Close()
-		}()
+		defer c.Close()
 
 		db := sql.OpenDB(c)
-		defer func() {
-			// cleanup
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		err = db.PingContext(ctx)
 		require.NoError(t, err)

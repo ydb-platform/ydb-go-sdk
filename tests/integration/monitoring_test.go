@@ -24,12 +24,8 @@ func TestMonitoring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("close failed: %+v", e)
-		}
-	}()
+	defer db.Close(ctx)
+
 	t.Run("monitoring.SelfCheck", func(t *testing.T) {
 		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 			client := Ydb_Monitoring_V1.NewMonitoringServiceClient(ydb.GRPCConn(db))

@@ -35,6 +35,8 @@ func TestOperationList(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
+
 	operations, err := db.Operation().ListBuildIndex(ctx)
 	require.NoError(t, err)
 

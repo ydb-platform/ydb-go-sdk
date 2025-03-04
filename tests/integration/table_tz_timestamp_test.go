@@ -22,9 +22,8 @@ func TestTzTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		_ = db.Close(ctx)
-	}()
+	defer db.Close(ctx)
+
 	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
 		microseconds := int64(1680021427000000)
 		res, err := tx.Execute(ctx, fmt.Sprintf(`SELECT CAST(CAST(%d AS Timestamp) AS TzTimestamp);`, microseconds), nil)

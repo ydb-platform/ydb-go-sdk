@@ -71,10 +71,7 @@ func TestDatabaseSqlStaticCredentials(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		defer func() {
-			// cleanup
-			_ = cc.Close(ctx)
-		}()
+		defer cc.Close(ctx)
 
 		c, err := ydb.Connector(cc)
 		require.NoError(t, err)
@@ -85,10 +82,7 @@ func TestDatabaseSqlStaticCredentials(t *testing.T) {
 		}()
 
 		db := sql.OpenDB(c)
-		defer func() {
-			// cleanup
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		err = db.PingContext(ctx)
 		require.NoError(t, err)

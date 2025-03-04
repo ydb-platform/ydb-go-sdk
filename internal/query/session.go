@@ -2,7 +2,6 @@ package query
 
 import (
 	"context"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"

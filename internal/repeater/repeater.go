@@ -8,7 +8,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -29,8 +28,8 @@ type repeater struct {
 	// Task is a function that must be executed periodically.
 	task func(context.Context) error
 
-	cancel  context.CancelFunc
-	stopped chan struct{}
+	done          chan struct{}
+	workerStopped chan struct{}
 
 	force chan struct{}
 	clock clockwork.Clock
@@ -96,16 +95,14 @@ func New(
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) *repeater {
-	ctx, cancel := xcontext.WithCancel(ctx)
-
 	r := &repeater{
-		interval: interval,
-		task:     task,
-		cancel:   cancel,
-		stopped:  make(chan struct{}),
-		force:    make(chan struct{}, 1),
-		clock:    clockwork.NewRealClock(),
-		trace:    &trace.Driver{},
+		interval:      interval,
+		task:          task,
+		done:          make(chan struct{}),
+		workerStopped: make(chan struct{}),
+		force:         make(chan struct{}, 1),
+		clock:         clockwork.NewRealClock(),
+		trace:         &trace.Driver{},
 	}
 
 	for _, opt := range opts {
@@ -114,17 +111,17 @@ func New(
 		}
 	}
 
-	go r.worker(ctx, r.clock.NewTicker(interval))
+	go r.worker(r.clock.NewTicker(interval))
 
 	return r
 }
 
 func (r *repeater) stop(onCancel func()) {
-	r.cancel()
+	close(r.done)
 	if onCancel != nil {
 		onCancel()
 	}
-	<-r.stopped
+	<-r.workerStopped
 }
 
 // Stop stops to execute its task.
@@ -162,11 +159,9 @@ func (r *repeater) wakeUp(e Event) (err error) {
 	return r.task(ctx)
 }
 
-func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
-	defer func() {
-		close(r.stopped)
-		tick.Stop()
-	}()
+func (r *repeater) worker(tick clockwork.Ticker) {
+	defer close(r.workerStopped)
+	defer tick.Stop()
 
 	// force returns backoff with delays [500ms...32s]
 	force := backoff.New(
@@ -187,7 +182,7 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 		defer force.Stop()
 
 		select {
-		case <-ctx.Done():
+		case <-r.done:
 			return EventCancel
 		case <-tick.Chan():
 			return EventTick
@@ -210,7 +205,7 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-r.done:
 			return
 
 		case <-tick.Chan():

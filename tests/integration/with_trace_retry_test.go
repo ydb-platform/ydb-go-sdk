@@ -70,6 +70,8 @@ func TestWithTraceRetry(t *testing.T) {
 			)
 			db = sql.OpenDB(ydb.MustConnector(nativeDb))
 		)
+		defer db.Close()
+
 		require.NoError(t, retry.Do(ctx, db,
 			func(ctx context.Context, cc *sql.Conn) error {
 				return nil

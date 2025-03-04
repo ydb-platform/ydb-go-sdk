@@ -35,9 +35,8 @@ func TestCreateTableDescription(sourceTest *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		_ = db.Close(ctx)
-	}()
+	defer db.Close(ctx)
+
 	for _, tt := range []struct {
 		opts        []options.CreateTableOption
 		description options.Description

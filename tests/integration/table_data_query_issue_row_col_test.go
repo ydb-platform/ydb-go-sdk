@@ -28,6 +28,7 @@ func TestDataQueryIssueRowCol(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
 	exists, err := sugar.IsTableExists(ctx, db.Scheme(), path.Join(db.Name(), "users"))
 	require.NoError(t, err)
 	if exists {

@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xruntime"
 	"io"
 	"time"
 
@@ -145,6 +146,10 @@ func execute(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
+	xruntime.AddCleanup(r, func(cancelStream context.CancelFunc) {
+		cancelStream()
+	}, executeCancel)
 
 	return r, nil
 }

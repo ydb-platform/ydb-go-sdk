@@ -38,6 +38,7 @@ func TestQueryReadRow(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
 
 	row, err := db.Query().QueryRow(ctx, `
 		DECLARE $p1 AS Text;

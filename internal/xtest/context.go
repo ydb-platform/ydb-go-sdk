@@ -2,10 +2,9 @@ package xtest
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"runtime/pprof"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
 func Context(t testing.TB) context.Context {

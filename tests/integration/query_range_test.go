@@ -28,6 +28,8 @@ func TestQueryRange(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
+
 	t.Run("Execute", func(t *testing.T) {
 		listItems := make([]value.Value, 1000)
 		for i := range make([]struct{}, 1000) {
