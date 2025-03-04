@@ -5,26 +5,20 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
+func goroutineStack(all bool) []byte {
+	for i := 1 << 16; ; i *= 2 {
+		bb := make([]byte, i)
+		if n := runtime.Stack(bb, all); n < i {
+			return bb[:n]
+		}
+	}
+}
+
 func checkGoroutinesLeak(onLeak func(goroutines []string)) {
-	var (
-		bb               = make([]byte, 2<<32)
-		currentGoroutine string
-	)
-
-	time.Sleep(time.Millisecond)
-
-	if n := runtime.Stack(bb, false); n < len(bb) {
-		currentGoroutine = string(regexp.MustCompile(`^goroutine \d+ `).Find(bb[:n]))
-	}
-
-	if n := runtime.Stack(bb, true); n < len(bb) {
-		bb = bb[:n]
-	}
-
-	goroutines := strings.Split(string(bb), "\n\n")
+	currentGoroutine := string(regexp.MustCompile(`^goroutine \d+ `).Find(goroutineStack(false)))
+	goroutines := strings.Split(string(goroutineStack(true)), "\n\n")
 	unexpectedGoroutines := make([]string, 0, len(goroutines))
 
 	for _, g := range goroutines {
@@ -67,8 +61,11 @@ func checkGoroutinesLeak(onLeak func(goroutines []string)) {
 
 func CheckGoroutinesLeak(tb testing.TB) {
 	tb.Helper()
-	checkGoroutinesLeak(func(stacks []string) {
+	checkGoroutinesLeak(func(goroutines []string) {
 		tb.Helper()
-		tb.Errorf("found %d unexpected goroutines:\n%s", len(stacks), strings.Join(stacks, "\n"))
+		tb.Errorf("found %d unexpected goroutines:\n%s",
+			len(goroutines),
+			strings.Join(goroutines, "\n"),
+		)
 	})
 }

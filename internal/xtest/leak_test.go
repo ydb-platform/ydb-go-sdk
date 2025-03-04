@@ -2,7 +2,6 @@ package xtest
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -13,22 +12,22 @@ func TestCheckGoroutinesLeak(t *testing.T) {
 			ch := make(chan struct{})
 			require.Panics(t, func() {
 				defer checkGoroutinesLeak(func(goroutines []string) {
-					panic("panic")
+					panic(goroutines)
 				})
 				go func() {
 					<-ch
 				}()
 			})
 			close(ch)
-		}, StopAfter(13*time.Second))
+		})
 	})
 	t.Run("NoLeak", func(t *testing.T) {
 		TestManyTimes(t, func(t testing.TB) {
-			ch := make(chan struct{})
 			require.NotPanics(t, func() {
 				defer checkGoroutinesLeak(func(goroutines []string) {
-					panic("panic")
+					panic(goroutines)
 				})
+				ch := make(chan struct{})
 				defer func() {
 					<-ch
 				}()
@@ -36,6 +35,6 @@ func TestCheckGoroutinesLeak(t *testing.T) {
 					close(ch)
 				}()
 			})
-		}, StopAfter(13*time.Second))
+		})
 	})
 }
