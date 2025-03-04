@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func checkGoroutinesLeak(onLeak func(stacks []string)) {
+func checkGoroutinesLeak(onLeak func(goroutines []string)) {
 	var (
 		bb               = make([]byte, 2<<32)
 		currentGoroutine string
