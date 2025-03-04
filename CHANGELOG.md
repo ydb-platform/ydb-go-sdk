@@ -1,3 +1,4 @@
+## v3.100.3
 * Fixed bug with concurrent rewrites source slice of `grpc.DialOption` on dial step
 
 ## v3.100.2
