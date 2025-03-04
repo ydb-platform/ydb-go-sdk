@@ -17,7 +17,7 @@ func checkGoroutinesLeak(onLeak func(stacks []string)) {
 	time.Sleep(time.Millisecond)
 
 	if n := runtime.Stack(bb, false); n < len(bb) {
-		currentGoroutine = string(regexp.MustCompile("^goroutine \\d+ ").Find(bb[:n]))
+		currentGoroutine = string(regexp.MustCompile(`^goroutine \d+ `).Find(bb[:n]))
 	}
 
 	if n := runtime.Stack(bb, true); n < len(bb) {
@@ -33,7 +33,11 @@ func checkGoroutinesLeak(onLeak func(stacks []string)) {
 		}
 		stack := strings.Split(g, "\n")
 		firstFunction := stack[1]
-		state := strings.Trim(regexp.MustCompile("\\[.*\\]").FindString(regexp.MustCompile("^goroutine \\d+ \\[.*\\]").FindString(stack[0])), "[]")
+		state := strings.Trim(
+			regexp.MustCompile(`\[.*\]`).FindString(
+				regexp.MustCompile(`^goroutine \d+ \[.*\]`).FindString(stack[0]),
+			), "[]",
+		)
 		switch {
 		case strings.HasPrefix(firstFunction, "testing.RunTests"),
 			strings.HasPrefix(firstFunction, "testing.(*T).Run"),
@@ -52,11 +56,6 @@ func checkGoroutinesLeak(onLeak func(stacks []string)) {
 			if strings.Contains(g, "runtime.ensureSigM") {
 				continue
 			}
-
-			//case strings.HasPrefix(firstFunction, "syscall.syscall"):
-			//	if strings.Contains(state, "syscall") {
-			//		continue
-			//	}
 		}
 
 		unexpectedGoroutines = append(unexpectedGoroutines, g)
