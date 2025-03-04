@@ -153,13 +153,11 @@ func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
 
 		db := sql.OpenDB(connector)
 
-		scope.Logf("Ping db")
-		err = db.PingContext(scope.Ctx)
-		if err != nil {
-			return nil, err
+		clean := func() {
+			scope.Require.NoError(db.Close())
 		}
 
-		return fixenv.NewGenericResult(db), nil
+		return fixenv.NewGenericResultWithCleanup(db, clean), nil
 	}
 	return fixenv.CacheResult(scope.Env, f)
 }
