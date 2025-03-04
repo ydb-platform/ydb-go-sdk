@@ -7,22 +7,21 @@ import (
 	"testing"
 )
 
-func goroutineStack(all bool) []byte {
-	for i := 1 << 16; ; i *= 2 {
-		bb := make([]byte, i)
-		if n := runtime.Stack(bb, all); n < i {
-			return bb[:n]
+func checkGoroutinesLeak(onLeak func(goroutines []string)) {
+	var bb []byte
+	for size := 1 << 16; ; size *= 2 {
+		bb = make([]byte, size)
+		if n := runtime.Stack(bb, true); n < size {
+			bb = bb[:n]
+
+			break
 		}
 	}
-}
-
-func checkGoroutinesLeak(onLeak func(goroutines []string)) {
-	currentGoroutine := string(regexp.MustCompile(`^goroutine \d+ `).Find(goroutineStack(false)))
-	goroutines := strings.Split(string(goroutineStack(true)), "\n\n")
+	goroutines := strings.Split(string(bb), "\n\n")
 	unexpectedGoroutines := make([]string, 0, len(goroutines))
 
-	for _, g := range goroutines {
-		if strings.HasPrefix(g, currentGoroutine) {
+	for i, g := range goroutines {
+		if i == 0 {
 			continue
 		}
 		stack := strings.Split(g, "\n")
@@ -42,14 +41,21 @@ func checkGoroutinesLeak(onLeak func(goroutines []string)) {
 				continue
 			}
 
-		case strings.HasPrefix(firstFunction, "runtime.goexit") && state == "syscall":
-			continue
+		case strings.HasPrefix(firstFunction, "runtime.goexit"):
+			switch state {
+			case "syscall", "runnable":
+				continue
+			}
 
 		case strings.HasPrefix(firstFunction, "os/signal.signal_recv"),
 			strings.HasPrefix(firstFunction, "os/signal.loop"):
-			if strings.Contains(g, "runtime.ensureSigM") {
-				continue
-			}
+			continue
+
+		case strings.Contains(g, "runtime.ensureSigM"):
+			continue
+
+		case strings.Contains(g, "runtime.ReadTrace"):
+			continue
 		}
 
 		unexpectedGoroutines = append(unexpectedGoroutines, g)
@@ -63,9 +69,6 @@ func CheckGoroutinesLeak(tb testing.TB) {
 	tb.Helper()
 	checkGoroutinesLeak(func(goroutines []string) {
 		tb.Helper()
-		tb.Errorf("found %d unexpected goroutines:\n%s",
-			len(goroutines),
-			strings.Join(goroutines, "\n"),
-		)
+		tb.Errorf("found %d unexpected goroutines:\n%s", len(goroutines), strings.Join(goroutines, "\n"))
 	})
 }

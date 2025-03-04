@@ -11,8 +11,8 @@ func TestCheckGoroutinesLeak(t *testing.T) {
 		TestManyTimes(t, func(t testing.TB) {
 			ch := make(chan struct{})
 			require.Panics(t, func() {
-				defer checkGoroutinesLeak(func(goroutines []string) {
-					panic(goroutines)
+				defer checkGoroutinesLeak(func([]string) {
+					panic("test")
 				})
 				go func() {
 					<-ch
@@ -24,8 +24,8 @@ func TestCheckGoroutinesLeak(t *testing.T) {
 	t.Run("NoLeak", func(t *testing.T) {
 		TestManyTimes(t, func(t testing.TB) {
 			require.NotPanics(t, func() {
-				defer checkGoroutinesLeak(func(goroutines []string) {
-					panic(goroutines)
+				defer checkGoroutinesLeak(func([]string) {
+					panic("test")
 				})
 				ch := make(chan struct{})
 				defer func() {
