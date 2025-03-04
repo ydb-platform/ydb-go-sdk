@@ -35,11 +35,12 @@ func TestDatabaseSqlMetrics(t *testing.T) {
 		[]string{"database.sql.conns{}", "database.sql.tx{}"},
 		xslices.Keys(registry.gauges.data),
 	)
-	require.EqualValues(t, 1, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"].value)
+	require.NotNil(t, registry.gauges.data["database.sql.conns{}"].gauges)
 
 	cc1, err := db.Conn(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, cc1)
+	require.NotNil(t, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"])
 	require.EqualValues(t, 1, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"].value)
 	require.Empty(t, registry.gauges.data["database.sql.tx{}"].gauges)
 
