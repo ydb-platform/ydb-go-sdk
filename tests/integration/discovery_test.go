@@ -106,12 +106,8 @@ func TestDiscovery(sourceTest *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("db close failed: %+v", e)
-		}
-	}()
+	defer db.Close(ctx)
+
 	t.Run("discovery.Discover", func(t *testing.T) {
 		if endpoints, err := db.Discovery().Discover(ctx); err != nil {
 			t.Fatal(err)

@@ -21,11 +21,12 @@ import (
 )
 
 type Pool struct {
-	usages      int64
-	config      Config
-	dialOptions []grpc.DialOption
-	conns       xsync.Map[string, *conn]
-	done        chan struct{}
+	usages       int64
+	config       Config
+	dialOptions  []grpc.DialOption
+	conns        xsync.Map[string, *conn]
+	done         chan struct{}
+	parkerStoped chan struct{}
 }
 
 func (p *Pool) DialTimeout() time.Duration {
@@ -160,6 +161,7 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	)
 
 	wg.Add(cap(errCh))
+
 	p.conns.Range(func(_ string, c *conn) bool {
 		go func(c closer.Closer) {
 			defer wg.Done()
@@ -170,6 +172,9 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 
 		return true
 	})
+
+	<-p.parkerStoped
+
 	wg.Wait()
 	close(errCh)
 
@@ -186,8 +191,11 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 }
 
 func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
+	defer close(p.parkerStoped)
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-p.done:
@@ -216,10 +224,11 @@ func NewPool(ctx context.Context, config Config) *Pool {
 	defer onDone()
 
 	p := &Pool{
-		usages:      1,
-		config:      config,
-		dialOptions: config.GrpcDialOptions(),
-		done:        make(chan struct{}),
+		usages:       1,
+		config:       config,
+		dialOptions:  config.GrpcDialOptions(),
+		done:         make(chan struct{}),
+		parkerStoped: make(chan struct{}),
 	}
 
 	p.dialOptions = append(p.dialOptions,
@@ -248,6 +257,8 @@ func NewPool(ctx context.Context, config Config) *Pool {
 
 	if ttl := config.ConnectionTTL(); ttl > 0 {
 		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2) //nolint:gomnd
+	} else {
+		close(p.parkerStoped)
 	}
 
 	return p

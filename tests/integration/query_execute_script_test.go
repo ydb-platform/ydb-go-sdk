@@ -41,10 +41,7 @@ func TestQueryExecuteScript(sourceTest *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func(db *ydb.Driver) {
-		// cleanup
-		_ = db.Close(ctx)
-	}(db)
+	defer db.Close(ctx)
 
 	err = db.Query().Exec(ctx,
 		"CREATE TABLE IF NOT EXISTS `"+path.Join(db.Name(), folder, tableName)+"` (val Int64, PRIMARY KEY (val))",

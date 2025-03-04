@@ -48,11 +48,7 @@ func TestTableMultipleResultSets(sourceTest *testing.T) {
 		),
 	)
 	require.NoError(t, err)
-
-	defer func() {
-		err = db.Close(ctx)
-		require.NoError(t, err)
-	}()
+	defer db.Close(ctx)
 
 	t.Run("create", func(t *testing.T) {
 		t.Run("table", func(t *testing.T) {

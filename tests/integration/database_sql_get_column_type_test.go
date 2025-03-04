@@ -24,10 +24,6 @@ func TestDatabaseSqlGetColumnType(t *testing.T) {
 		db    = scope.SQLDriverWithFolder()
 	)
 
-	defer func() {
-		_ = db.Close()
-	}()
-
 	t.Run("create-tables", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			_, err = cc.ExecContext(
@@ -129,10 +125,6 @@ func TestDatabaseSqlColumnTypes(t *testing.T) {
 		scope = newScope(t)
 		db    = scope.SQLDriverWithFolder()
 	)
-
-	defer func() {
-		_ = db.Close()
-	}()
 
 	columns := []struct {
 		YQL      string

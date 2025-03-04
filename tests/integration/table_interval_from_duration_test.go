@@ -27,6 +27,7 @@ func TestIssue259IntervalFromDuration(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
 
 	t.Run("Check about interval work with microseconds", func(t *testing.T) {
 		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {

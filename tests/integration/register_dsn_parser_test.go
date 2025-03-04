@@ -30,9 +30,7 @@ func TestRegisterDsnParser(t *testing.T) {
 		db, err := ydb.Open(context.Background(), os.Getenv("YDB_CONNECTION_STRING"))
 		require.NoError(t, err)
 		require.True(t, visited)
-		defer func() {
-			_ = db.Close(context.Background())
-		}()
+		defer db.Close(context.Background())
 	})
 	t.Run("database/sql", func(t *testing.T) {
 		var visited bool

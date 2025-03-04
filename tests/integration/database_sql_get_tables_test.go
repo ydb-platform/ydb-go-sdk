@@ -25,10 +25,6 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 		folder = t.Name()
 	)
 
-	defer func() {
-		_ = db.Close()
-	}()
-
 	t.Run("prepare-sub-folder", func(t *testing.T) {
 		cc, err := ydb.Unwrap(db)
 		require.NoError(t, err)
@@ -192,10 +188,6 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 		db     = scope.SQLDriverWithFolder()
 		folder = t.Name()
 	)
-
-	defer func() {
-		_ = db.Close()
-	}()
 
 	t.Run("prepare-sub-folder", func(t *testing.T) {
 		cc, err := ydb.Unwrap(db)

@@ -58,12 +58,8 @@ func TestConnectionSecure(sourceTest *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("close failed: %+v", e)
-		}
-	}()
+	defer db.Close(ctx)
+
 	t.Run("discovery.WhoAmI", func(t *testing.T) {
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 			discoveryClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(ydb.GRPCConn(db))

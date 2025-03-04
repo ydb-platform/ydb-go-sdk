@@ -25,6 +25,8 @@ func TestContainers(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
+
 	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
 		res, err := tx.Execute(ctx, `
 			SELECT

@@ -44,7 +44,9 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				table.SerializableReadWriteTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
-				_, err := db.QueryContext(ctx, "SELECT 1")
+				rows, err := db.QueryContext(ctx, "SELECT 1")
+				defer rows.Close()
+
 				return err
 			},
 		))
@@ -62,7 +64,9 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				table.SerializableReadWriteTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
-				_, err := db.QueryContext(ctx, "SELECT 1")
+				rows, err := db.QueryContext(ctx, "SELECT 1")
+				defer rows.Close()
+
 				return err
 			},
 		))
@@ -80,7 +84,9 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				table.SnapshotReadOnlyTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
-				_, err := db.QueryContext(ctx, "SELECT 1")
+				rows, err := db.QueryContext(ctx, "SELECT 1")
+				defer rows.Close()
+
 				return err
 			},
 		))
@@ -98,7 +104,9 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				table.StaleReadOnlyTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
-				_, err := db.QueryContext(ctx, "SELECT 1")
+				rows, err := db.QueryContext(ctx, "SELECT 1")
+				defer rows.Close()
+
 				return err
 			},
 		))
@@ -116,7 +124,9 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				table.OnlineReadOnlyTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
-				_, err := db.QueryContext(ctx, "SELECT 1")
+				rows, err := db.QueryContext(ctx, "SELECT 1")
+				defer rows.Close()
+
 				return err
 			},
 		))
@@ -134,7 +144,9 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				table.OnlineReadOnlyTxControl(table.WithInconsistentReads()),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
-				_, err := db.QueryContext(ctx, "SELECT 1")
+				rows, err := db.QueryContext(ctx, "SELECT 1")
+				defer rows.Close()
+
 				return err
 			},
 		))

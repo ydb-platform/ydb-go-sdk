@@ -228,20 +228,20 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.closeOnce()
 
-	if r.trace != nil {
-		onDone := trace.QueryOnResultClose(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
-		)
-		defer func() {
-			onDone(finalErr)
-		}()
-	}
-
 	for {
 		select {
 		case <-r.closed:
 			return nil
 		default:
+			if r.trace != nil {
+				onDone := trace.QueryOnResultClose(r.trace, &ctx,
+					stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
+				)
+				defer func() {
+					onDone(finalErr)
+				}()
+			}
+
 			_, err := r.nextPart(ctx)
 			if err != nil {
 				if xerrors.Is(err, io.EOF) {

@@ -201,6 +201,8 @@ func assertIdValueImpl(ctx context.Context, t *testing.T, tableName string, id i
 		// ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
+
 	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
 		res, err := tx.Execute(ctx, fmt.Sprintf("SELECT val FROM `%s` WHERE id = %d", tableName, id), nil)
 		if err != nil {

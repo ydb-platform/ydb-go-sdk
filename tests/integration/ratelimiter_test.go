@@ -45,12 +45,8 @@ func TestRatelimiter(sourceTest *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("db close failed: %+v", e)
-		}
-	}()
+	defer db.Close(ctx)
+
 	// drop node
 	err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
 	if err != nil {

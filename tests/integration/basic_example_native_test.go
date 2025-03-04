@@ -103,11 +103,7 @@ func TestBasicExampleNative(sourceTest *testing.T) { //nolint:gocyclo
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	defer func() {
-		// cleanup
-		_ = db.Close(ctx)
-	}()
+	defer db.Close(ctx)
 
 	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
 		// hack for wait pool initializing

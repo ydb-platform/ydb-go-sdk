@@ -20,10 +20,6 @@ func TestDatabaseSqlDDLInTransaction(t *testing.T) {
 		db    = scope.SQLDriverWithFolder()
 	)
 
-	defer func() {
-		_ = db.Close()
-	}()
-
 	f := func(ctx context.Context, tx *sql.Tx) (err error) {
 		_, err = tx.ExecContext(
 			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
@@ -80,6 +76,7 @@ func TestDatabaseSqlDDLInTransaction(t *testing.T) {
 			require.NoError(t, err)
 
 			db := sql.OpenDB(connector)
+			defer db.Close()
 
 			err = db.PingContext(scope.Ctx)
 			require.NoError(t, err)

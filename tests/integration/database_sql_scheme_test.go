@@ -19,10 +19,6 @@ func TestDatabaseSqlScheme(t *testing.T) {
 		db    = scope.SQLDriverWithFolder()
 	)
 
-	defer func() {
-		_ = db.Close()
-	}()
-
 	t.Run("drop-tables", func(t *testing.T) {
 		cc, err := db.Conn(scope.Ctx)
 		require.NoError(t, err)

@@ -223,6 +223,8 @@ func TestIssue798TruncatedError(t *testing.T) {
 		scope.Require.NoError(err)
 
 		db = sql.OpenDB(ydb.MustConnector(driver))
+		defer db.Close()
+
 		err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 			rows, err := cc.QueryContext(ctx, fmt.Sprintf("SELECT * FROM `%s`;", tablePath))
 			if err != nil {
@@ -436,6 +438,8 @@ func TestIssue798NoTruncatedErrorOverQueryService(t *testing.T) {
 		scope.Require.NoError(err)
 
 		db = sql.OpenDB(ydb.MustConnector(driver))
+		defer db.Close()
+
 		err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 			rows, err := cc.QueryContext(ctx, fmt.Sprintf("SELECT * FROM `%s`;", tablePath))
 			if err != nil {

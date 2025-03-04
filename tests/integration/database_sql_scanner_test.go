@@ -37,9 +37,7 @@ func TestDatabaseSqlScanner(t *testing.T) {
 			ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		)
 		require.NoError(t, err)
-		defer func() {
-			_ = nativeDriver.Close(ctx)
-		}()
+		defer nativeDriver.Close(ctx)
 
 		connector, err := ydb.Connector(nativeDriver,
 			ydb.WithQueryService(false),
@@ -51,6 +49,7 @@ func TestDatabaseSqlScanner(t *testing.T) {
 		}()
 
 		db1 = sql.OpenDB(connector)
+		defer db1.Close()
 	}
 	{
 		nativeDriver, err := ydb.Open(ctx,
@@ -58,9 +57,7 @@ func TestDatabaseSqlScanner(t *testing.T) {
 			ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		)
 		require.NoError(t, err)
-		defer func() {
-			_ = nativeDriver.Close(ctx)
-		}()
+		defer nativeDriver.Close(ctx)
 
 		connector, err := ydb.Connector(nativeDriver,
 			ydb.WithQueryService(true),
@@ -72,6 +69,7 @@ func TestDatabaseSqlScanner(t *testing.T) {
 		}()
 
 		db2 = sql.OpenDB(connector)
+		defer db2.Close()
 	}
 	for _, ttt := range []struct {
 		name string

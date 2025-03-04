@@ -24,6 +24,8 @@ func TestQueryMultiResultSets(t *testing.T) {
 		if err != nil {
 			return fmt.Errorf("can't get result: %w", err)
 		}
+		defer res.Close(ctx)
+		
 		set, err := res.NextResultSet(ctx)
 		if err != nil {
 			return fmt.Errorf("set 0: get next result set: %w", err)

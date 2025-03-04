@@ -28,9 +28,7 @@ func TestDatabaseSqlContainers(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
-	defer func() {
-		_ = nativeDriver.Close(ctx)
-	}()
+	defer nativeDriver.Close(ctx)
 
 	connector, err := ydb.Connector(nativeDriver)
 	require.NoError(t, err)
@@ -39,6 +37,7 @@ func TestDatabaseSqlContainers(t *testing.T) {
 	}()
 
 	db := sql.OpenDB(connector)
+	defer db.Close()
 
 	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 		rows, err := cc.QueryContext(ctx, `

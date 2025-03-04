@@ -3,8 +3,6 @@ package query
 import (
 	"context"
 	"os"
-	"runtime/pprof"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -38,10 +36,11 @@ type (
 		SetStatus(code Status)
 	}
 	sessionCore struct {
-		cc     grpc.ClientConnInterface
-		Client Ydb_Query_V1.QueryServiceClient
-		Trace  *trace.Query
-		done   chan struct{}
+		cc                 grpc.ClientConnInterface
+		Client             Ydb_Query_V1.QueryServiceClient
+		Trace              *trace.Query
+		done               chan struct{}
+		attachStreamExited chan struct{}
 
 		deleteTimeout  time.Duration
 		id             string
@@ -120,9 +119,10 @@ func Open(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...Option,
 ) (_ *sessionCore, finalErr error) {
 	core := &sessionCore{
-		Client: client,
-		Trace:  &trace.Query{},
-		done:   make(chan struct{}),
+		Client:             client,
+		Trace:              &trace.Query{},
+		done:               make(chan struct{}),
+		attachStreamExited: make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -200,6 +200,8 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 	core.closeOnce = xsync.OnceFunc(func(ctx context.Context) error {
 		defer cancelAttach()
 
+		<-core.attachStreamExited
+
 		core.SetStatus(StatusClosing)
 		defer core.SetStatus(StatusClosed)
 
@@ -210,31 +212,18 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		return nil
 	})
 
-	if markGoroutineWithLabelNodeIDForAttachStream {
-		pprof.Do(ctx, pprof.Labels(
-			"node_id", strconv.Itoa(int(core.NodeID())),
-		), func(context.Context) {
-			go core.listenAttachStream(attachStream)
-		})
-	} else {
-		go core.listenAttachStream(attachStream)
-	}
+	go core.listenAttachStream(attachStream)
 
 	return nil
 }
 
 func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryService_AttachSessionClient) {
 	defer func() {
-		select {
-		case <-core.done:
-			return
-		default:
-			close(core.done)
-		}
+		close(core.attachStreamExited)
 	}()
 
 	for core.IsAlive() {
-		if _, recvErr := attachStream.Recv(); recvErr != nil {
+		if s, recvErr := attachStream.Recv(); recvErr != nil || s.GetStatus() != Ydb.StatusIds_SUCCESS {
 			return
 		}
 	}

@@ -21,10 +21,6 @@ func TestDatabaseSqlIsTableExists(t *testing.T) {
 		db    = scope.SQLDriverWithFolder()
 	)
 
-	defer func() {
-		_ = db.Close()
-	}()
-
 	t.Run("drop-if-exists", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			exists := true

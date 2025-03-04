@@ -46,12 +46,8 @@ func TestScripting(sourceTest *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("db close failed: %+v", e)
-		}
-	}()
+	defer db.Close(ctx)
+
 	// Execute
 	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().Execute(

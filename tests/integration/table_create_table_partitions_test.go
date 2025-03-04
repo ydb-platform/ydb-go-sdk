@@ -34,9 +34,7 @@ func TestTableCreateTablePartitions(sourceTest *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		_ = db.Close(ctx)
-	}()
+	defer db.Close(ctx)
 
 	t.Run("uniform partitions", func(t *testing.T) {
 		err := db.Table().Do(ctx,

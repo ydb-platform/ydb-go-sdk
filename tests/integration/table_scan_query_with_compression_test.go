@@ -29,6 +29,8 @@ func TestScanQueryWithCompression(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
+	defer db.Close(ctx)
+
 	err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		res, err := s.StreamExecuteScanQuery(ctx, `SELECT 1 as abc, 2 as def;`, nil, options.WithCallOptions(
 			grpc.UseCompressor(gzip.Name),
