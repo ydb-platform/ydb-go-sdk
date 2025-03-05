@@ -122,17 +122,21 @@ func (r *NaiveReader) ReadMessageBatch(ctx context.Context) (batch *topicreader.
 	traceCtx := ctx
 	onDone := trace.TopicOnReaderReadMessages(r.tracer, &traceCtx, -1, -1, -1)
 	defer func() {
-		cr := topicreadercommon.GetCommitRange(batch)
-		onDone(
-			len(batch.Messages),
-			batch.Topic(),
-			batch.PartitionID(),
-			topicreadercommon.BatchGetPartitionSession(batch).StreamPartitionSessionID.ToInt64(),
-			cr.CommitOffsetStart.ToInt64(),
-			cr.CommitOffsetEnd.ToInt64(),
-			-1,
-			resErr,
-		)
+		if batch == nil {
+			onDone(0, "", -1, -1, -1, -1, r.getRestBufferBytes(), err)
+		} else {
+			cr := topicreadercommon.GetCommitRange(batch)
+			onDone(
+				len(batch.Messages),
+				batch.Topic(),
+				batch.PartitionID(),
+				topicreadercommon.BatchGetPartitionSession(batch).StreamPartitionSessionID.ToInt64(),
+				cr.CommitOffsetStart.ToInt64(),
+				cr.CommitOffsetEnd.ToInt64(),
+				-1,
+				resErr,
+			)
+		}
 	}()
 	ctx = traceCtx
 	attempt := 0
