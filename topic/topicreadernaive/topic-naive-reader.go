@@ -123,7 +123,7 @@ func (r *NaiveReader) ReadMessageBatch(ctx context.Context) (batch *topicreader.
 	onDone := trace.TopicOnReaderReadMessages(r.tracer, &traceCtx, -1, -1, -1)
 	defer func() {
 		if batch == nil {
-			onDone(0, "", -1, -1, -1, -1, r.getRestBufferBytes(), err)
+			onDone(0, "", -1, -1, -1, -1, -1, resErr)
 		} else {
 			cr := topicreadercommon.GetCommitRange(batch)
 			onDone(
