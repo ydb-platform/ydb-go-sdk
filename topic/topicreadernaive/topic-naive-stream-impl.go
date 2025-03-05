@@ -269,7 +269,10 @@ func (r *topicNaiveStreamReader) sendLoop(ctx context.Context) {
 		case <-done:
 			return
 		case m := <-r.sendMessages:
-			err := r.stream.Send(m)
+			var err error
+			r.m.WithLock(func() {
+				err = r.stream.Send(m)
+			})
 			if err != nil {
 				_ = r.worker.Close(ctx, xerrors.WithStackTrace(
 					fmt.Errorf("ydb naive reader failed write message to stream: %w", err)),
@@ -431,7 +434,9 @@ func (r *topicNaiveStreamReader) Commit(ctx context.Context, cr topicreadercommo
 }
 
 func (r *topicNaiveStreamReader) Close(reason error) error {
-	_ = r.stream.CloseSend()
+	r.m.WithLock(func() {
+		_ = r.stream.CloseSend()
+	})
 
 	return r.worker.Close(context.Background(), xerrors.WithStackTrace(reason))
 }
