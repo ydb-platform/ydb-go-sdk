@@ -31,6 +31,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreadernaive"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -252,6 +253,20 @@ func (scope *scopeT) TopicReaderNamed(name string) *topicreader.Reader {
 	}
 
 	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
+}
+
+func (scope *scopeT) TopicNaiveReader() *topicreadernaive.NaiveReader {
+	f := func() (*fixenv.GenericResult[*topicreadernaive.NaiveReader], error) {
+		reader := topicreadernaive.NewNaiveReader(scope.Driver(), scope.TopicConsumerName(), topicoptions.ReadTopic(scope.TopicPath()))
+		cleanup := func() {
+			if reader != nil {
+				_ = reader.Close()
+			}
+		}
+		return fixenv.NewGenericResultWithCleanup(reader, cleanup), nil
+	}
+
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) TopicWriter() *topicwriter.Writer {

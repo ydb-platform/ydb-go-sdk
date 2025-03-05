@@ -375,3 +375,11 @@ func (c *Client) createWriterConfig(
 
 	return topicwriterinternal.NewWriterReconnectorConfig(options...)
 }
+
+func GetCred(c *Client) credentials.Credentials {
+	return c.cred
+}
+
+func GetTracer(c *Client) *trace.Topic {
+	return c.cfg.Trace
+}

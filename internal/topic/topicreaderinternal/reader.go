@@ -69,7 +69,7 @@ func NewReader(
 	readSelectors []topicreadercommon.PublicReadSelector,
 	opts ...PublicReaderOption,
 ) (Reader, error) {
-	cfg := convertNewParamsToStreamConfig(consumer, readSelectors, opts...)
+	cfg := TmpPublicConvertNewParamsToStreamConfig(consumer, readSelectors, opts...)
 
 	if errs := cfg.Validate(); len(errs) > 0 {
 		return Reader{}, xerrors.WithStackTrace(fmt.Errorf(
@@ -260,7 +260,7 @@ func WithTrace(tracer *trace.Topic) PublicReaderOption {
 	}
 }
 
-func convertNewParamsToStreamConfig(
+func TmpPublicConvertNewParamsToStreamConfig(
 	consumer string,
 	readSelectors []topicreadercommon.PublicReadSelector,
 	opts ...PublicReaderOption,

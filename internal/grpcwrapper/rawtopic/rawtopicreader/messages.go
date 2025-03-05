@@ -95,7 +95,7 @@ type InitRequest struct {
 	Consumer string
 }
 
-func (r *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
+func (r *InitRequest) TmpPublicToProto() *Ydb_Topic.StreamReadMessage_InitRequest {
 	p := &Ydb_Topic.StreamReadMessage_InitRequest{
 		Consumer: r.Consumer,
 	}
@@ -196,7 +196,7 @@ func (r *ReadResponse) GetPartitionBatchMessagesCounts() (partitionDataCount, ba
 	return partitionDataCount, batchCount, messagesCount
 }
 
-func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) error {
+func (r *ReadResponse) TmpPublicFromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) error {
 	if p == nil {
 		return xerrors.WithStackTrace(errUnexpectedNilStreamReadMessageReadResponse)
 	}

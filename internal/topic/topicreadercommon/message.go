@@ -259,6 +259,15 @@ func (pmb *PublicMessageBuilder) Build() *PublicMessage {
 	return mess
 }
 
+func GetBatchSizeBytes(b *PublicBatch) int {
+	size := 0
+	for i := range b.Messages {
+		size += b.Messages[i].bufferBytesAccount
+	}
+
+	return size
+}
+
 func MessageGetBufferBytesAccount(m *PublicMessage) int {
 	return m.bufferBytesAccount
 }

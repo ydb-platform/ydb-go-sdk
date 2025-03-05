@@ -61,7 +61,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_ReadResponse:
 		resp := &ReadResponse{}
 		resp.ServerMessageMetadata = meta
-		if err = resp.fromProto(m.ReadResponse); err != nil {
+		if err = resp.TmpPublicFromProto(m.ReadResponse); err != nil {
 			return nil, err
 		}
 
@@ -120,7 +120,7 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 	switch m := msg.(type) {
 	case *InitRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_InitRequest{InitRequest: m.toProto()},
+			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_InitRequest{InitRequest: m.TmpPublicToProto()},
 		}
 
 		return s.Stream.Send(grpcMess)
