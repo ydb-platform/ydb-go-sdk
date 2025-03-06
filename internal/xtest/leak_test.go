@@ -1,6 +1,7 @@
 package xtest
 
 import (
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,32 +10,44 @@ import (
 func TestCheckGoroutinesLeak(t *testing.T) {
 	t.Run("Leak", func(t *testing.T) {
 		TestManyTimes(t, func(t testing.TB) {
-			ch := make(chan struct{})
-			require.Panics(t, func() {
-				defer checkGoroutinesLeak(func([]string) {
-					panic("test")
-				})
+			var (
+				leakDetected atomic.Bool
+				ch           = make(chan struct{})
+			)
+			func() {
+				defer func() {
+					if err := findGoroutinesLeak(); err != nil {
+						leakDetected.Store(true)
+					}
+				}()
 				go func() {
 					<-ch
 				}()
-			})
+			}()
 			close(ch)
+			require.True(t, leakDetected.Load())
 		})
 	})
 	t.Run("NoLeak", func(t *testing.T) {
 		TestManyTimes(t, func(t testing.TB) {
-			require.NotPanics(t, func() {
-				defer checkGoroutinesLeak(func([]string) {
-					panic("test")
-				})
-				ch := make(chan struct{})
+			var (
+				leakDetected atomic.Bool
+				ch           = make(chan struct{})
+			)
+			func() {
+				defer func() {
+					if err := findGoroutinesLeak(); err != nil {
+						leakDetected.Store(true)
+					}
+				}()
 				defer func() {
 					<-ch
 				}()
 				go func() {
 					close(ch)
 				}()
-			})
+			}()
+			require.False(t, leakDetected.Load())
 		})
 	})
 }

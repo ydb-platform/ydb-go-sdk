@@ -1,13 +1,14 @@
 package xtest
 
 import (
+	"fmt"
 	"regexp"
 	"runtime"
 	"strings"
 	"testing"
 )
 
-func checkGoroutinesLeak(onLeak func(goroutines []string)) {
+func findGoroutinesLeak() error {
 	var bb []byte
 	for size := 1 << 16; ; size *= 2 {
 		bb = make([]byte, size)
@@ -61,14 +62,14 @@ func checkGoroutinesLeak(onLeak func(goroutines []string)) {
 		unexpectedGoroutines = append(unexpectedGoroutines, g)
 	}
 	if l := len(unexpectedGoroutines); l > 0 {
-		onLeak(goroutines)
+		return fmt.Errorf("found %d unexpected goroutines:\n%s", len(goroutines), strings.Join(goroutines, "\n"))
 	}
+
+	return nil
 }
 
 func CheckGoroutinesLeak(tb testing.TB) {
-	tb.Helper()
-	checkGoroutinesLeak(func(goroutines []string) {
-		tb.Helper()
-		tb.Errorf("found %d unexpected goroutines:\n%s", len(goroutines), strings.Join(goroutines, "\n"))
-	})
+	if err := findGoroutinesLeak(); err != nil {
+		tb.Errorf("leak goroutines detected: %v", err)
+	}
 }
