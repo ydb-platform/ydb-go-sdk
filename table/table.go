@@ -79,7 +79,8 @@ type Client interface {
 
 	// ReadRows reads a batch of rows non-transactionally.
 	ReadRows(
-		ctx context.Context, path string, keys value.Value, opts ...options.ReadRowsOption,
+		ctx context.Context, path string, keys value.Value,
+		readRowOpts []options.ReadRowsOption, retryOptions ...Option,
 	) (_ result.Result, err error)
 }
 

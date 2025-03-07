@@ -84,7 +84,7 @@ func TestKeyValue(t *testing.T) {
 		types.ListValue(types.StructValue(
 			types.StructFieldValue("id", types.Int64Value(id)),
 		)),
-		options.ReadColumn("val"),
+		[]options.ReadRowsOption{options.ReadColumn("val")},
 	)
 	err = checkResult(scope.Ctx, rows, err)
 	scope.Require.NoError(err)
