@@ -1383,7 +1383,18 @@ func (s *Session) ReadRows(
 	keys value.Value,
 	opts ...options.ReadRowsOption,
 ) (_ result.Result, err error) {
-	return readRows(ctx, s.client, s.id, s.config.IgnoreTruncated(), path, keys, opts...)
+	var (
+		a        = allocator.New()
+		request  = makeReadRowsRequest(a, path, keys, opts)
+		response *Ydb_Table.ReadRowsResponse
+	)
+	defer func() {
+		a.Free()
+	}()
+
+	response, err = s.client.ReadRows(ctx, request)
+
+	return makeReadRowsResponse(response, err, s.config.IgnoreTruncated())
 }
 
 // StreamExecuteScanQuery scan-reads table at given path with given options.

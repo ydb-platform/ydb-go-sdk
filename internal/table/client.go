@@ -331,35 +331,25 @@ func (c *Client) BulkUpsert(
 	return nil
 }
 
-func readRows(
-	ctx context.Context,
-	client Ydb_Table_V1.TableServiceClient,
-	sessionId string,
-	ignoreTruncated bool,
+func makeReadRowsRequest(
+	a *allocator.Allocator,
 	path string,
 	keys value.Value,
-	opts ...options.ReadRowsOption,
-) (_ result.Result, err error) {
-	var (
-		a       = allocator.New()
-		request = Ydb_Table.ReadRowsRequest{
-			SessionId: sessionId,
-			Path:      path,
-			Keys:      value.ToYDB(keys, a),
-		}
-		response *Ydb_Table.ReadRowsResponse
-	)
-	defer func() {
-		a.Free()
-	}()
-
-	for _, opt := range opts {
+	readRowOpts []options.ReadRowsOption,
+) *Ydb_Table.ReadRowsRequest {
+	request := Ydb_Table.ReadRowsRequest{
+		Path: path,
+		Keys: value.ToYDB(keys, a),
+	}
+	for _, opt := range readRowOpts {
 		if opt != nil {
 			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request), a)
 		}
 	}
+	return &request
+}
 
-	response, err = client.ReadRows(ctx, &request)
+func makeReadRowsResponse(response *Ydb_Table.ReadRowsResponse, err error, isTruncated bool) (result.Result, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -373,7 +363,7 @@ func readRows(
 	return scanner.NewUnary(
 		[]*Ydb.ResultSet{response.GetResultSet()},
 		nil,
-		scanner.WithIgnoreTruncated(ignoreTruncated),
+		scanner.WithIgnoreTruncated(isTruncated),
 	), nil
 }
 
@@ -381,9 +371,42 @@ func (c *Client) ReadRows(
 	ctx context.Context,
 	path string,
 	keys value.Value,
-	opts ...options.ReadRowsOption,
+	readRowOpts []options.ReadRowsOption,
+	retryOptions ...table.Option,
 ) (_ result.Result, err error) {
-	return readRows(ctx, Ydb_Table_V1.NewTableServiceClient(c.cc), "", c.config.IgnoreTruncated(), path, keys, opts...)
+	var (
+		a        = allocator.New()
+		request  = makeReadRowsRequest(a, path, keys, readRowOpts)
+		response *Ydb_Table.ReadRowsResponse
+	)
+	defer func() {
+		a.Free()
+	}()
+
+	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+
+	attempts, config := 0, c.retryOptions(retryOptions...)
+	config.RetryOptions = append(config.RetryOptions,
+		retry.WithIdempotent(true),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+	)
+	err = retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			attempts++
+			response, err = client.ReadRows(ctx, request)
+
+			return err
+		},
+		config.RetryOptions...,
+	)
+
+	return makeReadRowsResponse(response, err, c.config.IgnoreTruncated())
 }
 
 func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx table.Transaction) (err error) {

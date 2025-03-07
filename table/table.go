@@ -78,7 +78,10 @@ type Client interface {
 	BulkUpsert(ctx context.Context, table string, data BulkUpsertData, opts ...Option) error
 
 	// ReadRows reads a batch of rows non-transactionally.
-	ReadRows(ctx context.Context, path string, keys value.Value, opts ...options.ReadRowsOption) (_ result.Result, err error)
+	ReadRows(
+		ctx context.Context, path string, keys value.Value,
+		readRowOpts []options.ReadRowsOption, retryOptions ...Option,
+	) (_ result.Result, err error)
 }
 
 type SessionStatus = string
