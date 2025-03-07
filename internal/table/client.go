@@ -5,16 +5,22 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -330,6 +336,87 @@ func (c *Client) BulkUpsert(
 	}
 
 	return nil
+}
+
+func makeReadRowsRequest(
+	a *allocator.Allocator,
+	sessionID string,
+	path string,
+	keys value.Value,
+	readRowOpts []options.ReadRowsOption,
+) *Ydb_Table.ReadRowsRequest {
+	request := Ydb_Table.ReadRowsRequest{
+		SessionId: sessionID,
+		Path:      path,
+		Keys:      value.ToYDB(keys, a),
+	}
+	for _, opt := range readRowOpts {
+		if opt != nil {
+			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request), a)
+		}
+	}
+
+	return &request
+}
+
+func makeReadRowsResponse(response *Ydb_Table.ReadRowsResponse, err error, isTruncated bool) (result.Result, error) {
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
+		return nil, xerrors.WithStackTrace(
+			xerrors.FromOperation(response),
+		)
+	}
+
+	return scanner.NewUnary(
+		[]*Ydb.ResultSet{response.GetResultSet()},
+		nil,
+		scanner.WithIgnoreTruncated(isTruncated),
+	), nil
+}
+
+func (c *Client) ReadRows(
+	ctx context.Context,
+	path string,
+	keys value.Value,
+	readRowOpts []options.ReadRowsOption,
+	retryOptions ...table.Option,
+) (_ result.Result, err error) {
+	var (
+		a        = allocator.New()
+		request  = makeReadRowsRequest(a, "", path, keys, readRowOpts)
+		response *Ydb_Table.ReadRowsResponse
+	)
+	defer func() {
+		a.Free()
+	}()
+
+	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+
+	attempts, config := 0, c.retryOptions(retryOptions...)
+	config.RetryOptions = append(config.RetryOptions,
+		retry.WithIdempotent(true),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+	)
+	err = retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			attempts++
+			response, err = client.ReadRows(ctx, request)
+
+			return err
+		},
+		config.RetryOptions...,
+	)
+
+	return makeReadRowsResponse(response, err, c.config.IgnoreTruncated())
 }
 
 func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx table.Transaction) (err error) {
