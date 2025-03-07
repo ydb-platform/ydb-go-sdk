@@ -6,13 +6,13 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"os"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
