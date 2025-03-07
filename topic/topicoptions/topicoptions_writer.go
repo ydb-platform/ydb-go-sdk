@@ -49,6 +49,14 @@ func WithWriterCompressorCount(num int) WriterOption {
 	return topicwriterinternal.WithCompressorCount(num)
 }
 
+// WithWriterMaxSizeOfDataGrpcMessageBytes set max len of grpc message with topic messages
+// in bytes. With any values it will be least one topic message.
+//
+// It must be not more, then with grpc limitation of the ydb driver.
+func WithWriterMaxSizeOfDataGrpcMessageBytes(num int) WriterOption {
+	return topicwriterinternal.WithMaxGrpcMessageBytes(num)
+}
+
 // WithWriterMaxQueueLen set max len of queue for wait ack
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental

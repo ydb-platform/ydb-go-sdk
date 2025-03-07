@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -169,6 +170,32 @@ func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_Wri
 	return res, nil
 }
 
+var writeRequestClientMessageSize = proto.Size(&Ydb_Topic.StreamWriteMessage_FromClient{
+	ClientMessage: &Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest{},
+})
+
+func (r *WriteRequest) Size() int {
+	if mess, err := r.toProto(); err == nil {
+		size := proto.Size(mess.WriteRequest) + writeRequestClientMessageSize
+
+		return size
+	}
+
+	return 0
+}
+
+func (r *WriteRequest) Cut(count int) (head *WriteRequest, rest *WriteRequest) {
+	if count >= len(r.Messages) {
+		return r, nil
+	}
+
+	rest = &WriteRequest{}
+	*rest = *r
+	r.Messages, rest.Messages = r.Messages[:count], r.Messages[count:]
+
+	return r, rest
+}
+
 type MessageData struct {
 	SeqNo            int64
 	CreatedAt        time.Time
@@ -176,9 +203,16 @@ type MessageData struct {
 	Partitioning     Partitioning
 	MetadataItems    []rawtopiccommon.MetadataItem
 	Data             []byte
+
+	size  int
+	proto *Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData
 }
 
 func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData, error) {
+	if d.proto != nil {
+		return d.proto, nil
+	}
+
 	res := &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData{
 		SeqNo:            d.SeqNo,
 		CreatedAt:        timestamppb.New(d.CreatedAt),
@@ -197,7 +231,19 @@ func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_Mess
 		})
 	}
 
-	return res, nil
+	d.proto = res
+
+	return d.proto, nil
+}
+
+func (d *MessageData) ProtoWireSizeBytes() int {
+	if d.size == 0 {
+		if p, err := d.ToProto(); err == nil {
+			d.size = proto.Size(p)
+		}
+	}
+
+	return d.size
 }
 
 type WriteResult struct {

@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"io"
 	"os"
 	"runtime/pprof"
@@ -518,6 +520,44 @@ func TestWriterFlushMessagesBeforeClose(t *testing.T) {
 		messBodyString := string(messBody)
 		require.Equal(t, strconv.Itoa(i), messBodyString)
 		cancel()
+	}
+}
+
+func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
+	scope := newScope(t)
+
+	const maxGrpcMsgSize = 10000 // bytes
+	const topicMessageSize = maxGrpcMsgSize / 3
+
+	scope.Driver(ydb.With(config.WithGrpcOptions(grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(maxGrpcMsgSize)))))
+	writer, err := scope.Driver().Topic().StartWriter(
+		scope.TopicPath(),
+		topicoptions.WithWriterCodec(topictypes.CodecRaw),
+		topicoptions.WithWriterMaxSizeOfDataGrpcMessageBytes(maxGrpcMsgSize),
+	)
+	scope.Require.NoError(err)
+	defer writer.Close(scope.Ctx)
+
+	const messageCount = 50
+	messages := make([]topicwriter.Message, messageCount)
+	for i := range messages {
+		messages[i] = topicwriter.Message{Data: bytes.NewReader(make([]byte, topicMessageSize))}
+	}
+
+	err = writer.Write(scope.Ctx, messages...)
+	scope.Require.NoError(err)
+
+	for i := 1; i <= messageCount; i++ {
+		err = scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+			batch, err := scope.TopicReader().PopMessagesBatchTx(scope.Ctx, tx, topicreader.WithBatchMaxCount(1))
+			if err != nil {
+				return err
+			}
+			scope.Require.Equal(int64(i), batch.Messages[0].SeqNo)
+			return nil
+		})
+
+		scope.Require.NoError(err)
 	}
 }
 

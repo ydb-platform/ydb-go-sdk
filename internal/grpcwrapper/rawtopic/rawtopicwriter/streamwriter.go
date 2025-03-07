@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
-	"google.golang.org/grpc/codes"
-	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -127,7 +125,7 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 			return writeErr
 		}
 
-		return sendWriteRequest(w.Stream.Send, writeReqProto)
+		return w.Stream.Send(&Ydb_Topic.StreamWriteMessage_FromClient{ClientMessage: writeReqProto})
 	case *UpdateTokenRequest:
 		protoMsg.ClientMessage = &Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest{
 			UpdateTokenRequest: v.ToProto(),
@@ -148,8 +146,6 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 
 	return nil
 }
-
-type sendFunc func(req *Ydb_Topic.StreamWriteMessage_FromClient) error
 
 func (w *StreamWriter) CloseSend() error {
 	w.sendCloseMtx.Lock()
@@ -175,40 +171,3 @@ type ServerMessage interface {
 type serverMessageImpl struct{}
 
 func (*serverMessageImpl) isServerMessage() {}
-
-func sendWriteRequest(send sendFunc, req *Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest) error {
-	sendErr := send(&Ydb_Topic.StreamWriteMessage_FromClient{
-		ClientMessage: req,
-	})
-
-	if sendErr == nil {
-		return nil
-	}
-
-	grpcStatus, ok := grpcStatus.FromError(sendErr)
-	if !ok {
-		return sendErr
-	}
-
-	grpcMessages := req.WriteRequest.GetMessages()
-	if grpcStatus.Code() != codes.ResourceExhausted || len(grpcMessages) < 2 {
-		return sendErr
-	}
-
-	//nolint:gomnd
-	splitIndex := len(grpcMessages) / 2
-	firstMessages, lastMessages := grpcMessages[:splitIndex], grpcMessages[splitIndex:]
-	defer func() {
-		req.WriteRequest.Messages = grpcMessages
-	}()
-
-	req.WriteRequest.Messages = firstMessages
-	err := sendWriteRequest(send, req)
-	if err != nil {
-		return err
-	}
-
-	req.WriteRequest.Messages = lastMessages
-
-	return sendWriteRequest(send, req)
-}

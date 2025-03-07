@@ -45,6 +45,12 @@ func WithCompressorCount(num int) PublicWriterOption {
 	}
 }
 
+func WithMaxGrpcMessageBytes(num int) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.maxBytesPerMessage = num
+	}
+}
+
 func WithTokenUpdateInterval(interval time.Duration) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.credUpdateInterval = interval

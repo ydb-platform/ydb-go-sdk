@@ -83,6 +83,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 			clock:              clockwork.NewRealClock(),
 			compressorCount:    runtime.NumCPU(),
 			Tracer:             &trace.Topic{},
+			maxBytesPerMessage: *config.DefaultGRPCMessageSizeAddr,
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
@@ -207,7 +208,7 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 
 func (w *WriterReconnector) start() {
 	name := fmt.Sprintf("writer %q", w.cfg.topic)
-	w.background.Start(name+", sendloop", w.connectionLoop)
+	w.background.Start(name+", connectionLoop", w.connectionLoop)
 }
 
 func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) (resErr error) {
@@ -643,27 +644,6 @@ func (w *WriterReconnector) GetSessionID() (sessionID string) {
 	return sessionID
 }
 
-func sendMessagesToStream(
-	stream RawTopicWriterStream,
-	targetCodec rawtopiccommon.Codec,
-	messages []messageWithDataContent,
-) error {
-	if len(messages) == 0 {
-		return nil
-	}
-
-	request, err := createWriteRequest(messages, targetCodec)
-	if err != nil {
-		return err
-	}
-	err = stream.Send(&request)
-	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: failed send write request: %w", err))
-	}
-
-	return nil
-}
-
 func allMessagesHasSameBufCodec(messages []messageWithDataContent) bool {
 	if len(messages) <= 1 {
 		return true
@@ -699,14 +679,16 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 }
 
 func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopiccommon.Codec) (
-	res rawtopicwriter.WriteRequest,
+	res *rawtopicwriter.WriteRequest,
 	err error,
 ) {
 	for i := 1; i < len(messages); i++ {
 		if messages[i-1].tx != messages[i].tx {
-			return res, xerrors.WithStackTrace(errDiffetentTransactions)
+			return nil, xerrors.WithStackTrace(errDiffetentTransactions)
 		}
 	}
+
+	res = &rawtopicwriter.WriteRequest{}
 
 	if len(messages) > 0 && messages[0].tx != nil {
 		res.Tx.ID = messages[0].tx.ID()
@@ -718,7 +700,7 @@ func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopicc
 	for i := range messages {
 		res.Messages[i], err = createRawMessageData(res.Codec, &messages[i])
 		if err != nil {
-			return res, err
+			return nil, err
 		}
 	}
 

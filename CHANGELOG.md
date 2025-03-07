@@ -1,5 +1,4 @@
-## v3.101.0
-* Added `table.Client.ReadRows` method with internal retries
+* Fixed hangup when try to send batch of messages with size more, then grpc limits from topic writer internals
 
 ## v3.100.3
 * Fixed bug with concurrent rewrites source slice of `grpc.DialOption` on dial step
