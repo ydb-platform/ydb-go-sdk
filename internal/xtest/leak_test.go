@@ -30,24 +30,15 @@ func TestCheckGoroutinesLeak(t *testing.T) {
 	})
 	t.Run("NoLeak", func(t *testing.T) {
 		TestManyTimes(t, func(t testing.TB) {
-			var (
-				leakDetected atomic.Bool
-				ch           = make(chan struct{})
-			)
-			func() {
-				defer func() {
-					if err := findGoroutinesLeak(); err != nil {
-						leakDetected.Store(true)
-					}
-				}()
-				defer func() {
-					<-ch
-				}()
-				go func() {
-					close(ch)
-				}()
+			defer func() {
+				require.NoError(t, findGoroutinesLeak())
 			}()
-			require.False(t, leakDetected.Load())
+
+			ch := make(chan struct{})
+			go func() {
+				close(ch)
+			}()
+			<-ch
 		})
 	})
 }
