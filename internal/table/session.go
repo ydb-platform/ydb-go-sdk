@@ -1375,7 +1375,7 @@ func (s *Session) ReadRows(
 ) (_ result.Result, err error) {
 	var (
 		a        = allocator.New()
-		request  = makeReadRowsRequest(a, path, keys, opts)
+		request  = makeReadRowsRequest(a, s.id, path, keys, opts)
 		response *Ydb_Table.ReadRowsResponse
 	)
 	defer func() {

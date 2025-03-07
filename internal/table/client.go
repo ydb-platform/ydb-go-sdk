@@ -340,13 +340,15 @@ func (c *Client) BulkUpsert(
 
 func makeReadRowsRequest(
 	a *allocator.Allocator,
+	sessionID string,
 	path string,
 	keys value.Value,
 	readRowOpts []options.ReadRowsOption,
 ) *Ydb_Table.ReadRowsRequest {
 	request := Ydb_Table.ReadRowsRequest{
-		Path: path,
-		Keys: value.ToYDB(keys, a),
+		SessionId: sessionID,
+		Path:      path,
+		Keys:      value.ToYDB(keys, a),
 	}
 	for _, opt := range readRowOpts {
 		if opt != nil {
@@ -383,7 +385,7 @@ func (c *Client) ReadRows(
 ) (_ result.Result, err error) {
 	var (
 		a        = allocator.New()
-		request  = makeReadRowsRequest(a, path, keys, readRowOpts)
+		request  = makeReadRowsRequest(a, "", path, keys, readRowOpts)
 		response *Ydb_Table.ReadRowsResponse
 	)
 	defer func() {
