@@ -1,4 +1,4 @@
-* Added ReadRows method for table.Client
+* Added `table.Client.ReadRows` method with internal retries
 
 ## v3.100.3
 * Fixed bug with concurrent rewrites source slice of `grpc.DialOption` on dial step
