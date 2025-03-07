@@ -2,6 +2,11 @@ package table
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -15,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -330,6 +336,61 @@ func (c *Client) BulkUpsert(
 	}
 
 	return nil
+}
+
+func readRows(
+	ctx context.Context,
+	client Ydb_Table_V1.TableServiceClient,
+	sessionId string,
+	ignoreTruncated bool,
+	path string,
+	keys value.Value,
+	opts ...options.ReadRowsOption,
+) (_ result.Result, err error) {
+	var (
+		a       = allocator.New()
+		request = Ydb_Table.ReadRowsRequest{
+			SessionId: sessionId,
+			Path:      path,
+			Keys:      value.ToYDB(keys, a),
+		}
+		response *Ydb_Table.ReadRowsResponse
+	)
+	defer func() {
+		a.Free()
+	}()
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request), a)
+		}
+	}
+
+	response, err = client.ReadRows(ctx, &request)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
+		return nil, xerrors.WithStackTrace(
+			xerrors.FromOperation(response),
+		)
+	}
+
+	return scanner.NewUnary(
+		[]*Ydb.ResultSet{response.GetResultSet()},
+		nil,
+		scanner.WithIgnoreTruncated(ignoreTruncated),
+	), nil
+}
+
+func (c *Client) ReadRows(
+	ctx context.Context,
+	path string,
+	keys value.Value,
+	opts ...options.ReadRowsOption,
+) (_ result.Result, err error) {
+	return readRows(ctx, Ydb_Table_V1.NewTableServiceClient(c.cc), "", c.config.IgnoreTruncated(), path, keys, opts...)
 }
 
 func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx table.Transaction) (err error) {

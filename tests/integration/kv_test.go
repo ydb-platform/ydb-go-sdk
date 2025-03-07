@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"os"
 	"testing"
 
@@ -39,13 +40,7 @@ func TestKeyValue(t *testing.T) {
 	scope.Require.NoError(err)
 
 	// get
-	err = driver.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
-		rows, err := s.ReadRows(ctx, tablePath,
-			types.ListValue(types.StructValue(
-				types.StructFieldValue("id", types.Int64Value(id)),
-			)),
-			options.ReadColumn("val"),
-		)
+	checkResult := func(ctx context.Context, rows result.Result, err error) error {
 		if err != nil {
 			return err
 		}
@@ -70,6 +65,27 @@ func TestKeyValue(t *testing.T) {
 		}
 		t.Logf("%s[%d] = %q", tablePath, id, actualValue)
 		return rows.Err()
+	}
+
+	// session read rows
+	err = driver.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+		rows, err := s.ReadRows(ctx, tablePath,
+			types.ListValue(types.StructValue(
+				types.StructFieldValue("id", types.Int64Value(id)),
+			)),
+			options.ReadColumn("val"),
+		)
+		return checkResult(ctx, rows, err)
 	})
+	scope.Require.NoError(err)
+
+	// table client read rows
+	rows, err := driver.Table().ReadRows(scope.Ctx, tablePath,
+		types.ListValue(types.StructValue(
+			types.StructFieldValue("id", types.Int64Value(id)),
+		)),
+		options.ReadColumn("val"),
+	)
+	err = checkResult(scope.Ctx, rows, err)
 	scope.Require.NoError(err)
 }
