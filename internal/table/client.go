@@ -355,6 +355,7 @@ func makeReadRowsRequest(
 			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request), a)
 		}
 	}
+
 	return &request
 }
 
