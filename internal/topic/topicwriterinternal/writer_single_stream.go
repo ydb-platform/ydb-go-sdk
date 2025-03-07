@@ -330,7 +330,7 @@ func cutRequestBytes(req *rawtopicwriter.WriteRequest, maxBytes int) (head, rest
 	requestMessagesCount := len(req.Messages)
 
 	// it needs 1 message minimum for request
-	// reverse order needs:
+	// reverse order reason:
 	// 1. Fast process messages less, than maxBytes, without special way
 	// 2. Prevent difficult for account bytes of encode messages count
 	for requestSize > maxBytes && requestMessagesCount > 1 {
