@@ -341,7 +341,7 @@ func (c *Client) BulkUpsert(
 func readRows(
 	ctx context.Context,
 	client Ydb_Table_V1.TableServiceClient,
-	sessionId string,
+	sessionID string,
 	ignoreTruncated bool,
 	path string,
 	keys value.Value,
@@ -350,7 +350,7 @@ func readRows(
 	var (
 		a       = allocator.New()
 		request = Ydb_Table.ReadRowsRequest{
-			SessionId: sessionId,
+			SessionId: sessionID,
 			Path:      path,
 			Keys:      value.ToYDB(keys, a),
 		}
