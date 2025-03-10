@@ -139,14 +139,14 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "driver", "conn", "state", "change")
 			endpoint := info.Endpoint
-			l.Log(ctx, "driver state change starting...",
+			l.Log(ctx, "driver connection state change starting...",
 				kv.Stringer("endpoint", endpoint),
 				kv.Stringer("state", info.State),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnStateChangeDoneInfo) {
-				l.Log(ctx, "driver state change done",
+				l.Log(ctx, "driver connection state change done",
 					kv.Stringer("endpoint", endpoint),
 					kv.Latency(start),
 					kv.Stringer("state", info.State),

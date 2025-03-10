@@ -204,18 +204,6 @@ func (e *operationError) BackoffType() backoff.Type {
 	}
 }
 
-func (e *operationError) IsRetryObjectValid() bool {
-	switch e.code {
-	case
-		Ydb.StatusIds_BAD_SESSION,
-		Ydb.StatusIds_SESSION_EXPIRED,
-		Ydb.StatusIds_SESSION_BUSY:
-		return false
-	default:
-		return true
-	}
-}
-
 func OperationError(err error) Error {
 	var o *operationError
 	if errors.As(err, &o) {

@@ -43,11 +43,17 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	result driver.Result, finalErr error,
 ) {
 	if !c.IsValid() {
-		return nil, xerrors.WithStackTrace(errNotReadyConn)
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		))
 	}
 
 	if !c.isReady() {
-		return nil, xerrors.WithStackTrace(errNotReadyConn)
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		))
 	}
 
 	opts := []options.Execute{
@@ -70,11 +76,10 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	result driver.RowsNextResultSet, finalErr error,
 ) {
 	if !c.isReady() {
-		return nil, xerrors.WithStackTrace(errNotReadyConn)
-	}
-
-	if !c.isReady() {
-		return nil, xerrors.WithStackTrace(errNotReadyConn)
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		))
 	}
 
 	opts := []options.Execute{
@@ -155,11 +160,17 @@ func (c *Conn) IsValid() bool {
 
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	if !c.isReady() {
-		return xerrors.WithStackTrace(errNotReadyConn)
+		return xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		))
 	}
 
 	if !c.session.IsAlive() {
-		return xerrors.WithStackTrace(errNotReadyConn)
+		return xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		))
 	}
 
 	err := c.session.Exec(ctx, "select 1")
@@ -178,7 +189,10 @@ func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (common.
 
 func (c *Conn) Close() (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
-		return xerrors.WithStackTrace(errConnClosedEarly)
+		return xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		))
 	}
 
 	defer func() {

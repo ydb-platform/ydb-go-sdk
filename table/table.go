@@ -76,6 +76,12 @@ type Client interface {
 	// Returns success only when all rows were successfully upserted. In case of an error some rows might
 	// be upserted and some might not.
 	BulkUpsert(ctx context.Context, table string, data BulkUpsertData, opts ...Option) error
+
+	// ReadRows reads a batch of rows non-transactionally.
+	ReadRows(
+		ctx context.Context, path string, keys value.Value,
+		readRowOpts []options.ReadRowsOption, retryOptions ...Option,
+	) (_ result.Result, err error)
 }
 
 type SessionStatus = string
@@ -161,6 +167,7 @@ type Session interface {
 		opts ...options.BulkUpsertOption,
 	) (err error)
 
+	// Deprecated: use Client instance instead.
 	ReadRows(ctx context.Context, path string, keys value.Value,
 		opts ...options.ReadRowsOption,
 	) (_ result.Result, err error)

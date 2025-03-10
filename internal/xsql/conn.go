@@ -23,6 +23,14 @@ type Conn struct {
 	lastUsage xsync.LastUsage
 }
 
+func (c *Conn) ID() string {
+	return c.cc.ID()
+}
+
+func (c *Conn) NodeID() uint32 {
+	return c.cc.NodeID()
+}
+
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	onDone := trace.DatabaseSQLOnConnPing(c.connector.trace, &c.ctx,
 		stack.FunctionID("database/sql.(*Conn).Ping", stack.Package("database/sql")),
@@ -118,7 +126,10 @@ func (c *Conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, f
 	}()
 
 	if !c.cc.IsValid() {
-		return nil, xerrors.WithStackTrace(errNotReadyConn)
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.cc),
+		))
 	}
 
 	return &Stmt{

@@ -33,7 +33,7 @@ import (
 
 type (
 	testItem struct {
-		v uint32
+		v int32
 
 		closed bytes.Buffer
 
@@ -185,11 +185,11 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
 			nextNodeID := uint32(0)
-			var newSessionCalled uint32
+			var newItemCalled uint32
 			p := New[*testItem, testItem](rootCtx,
 				WithTrace[*testItem, testItem](defaultTrace),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
-					newSessionCalled++
+					newItemCalled++
 					var (
 						nodeID = nextNodeID
 						v      = testItem{
@@ -264,14 +264,14 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			mustPutItem(t, p, item2)
 			mustPutItem(t, p, item3)
 
-			require.EqualValues(t, 3, newSessionCalled)
+			require.EqualValues(t, 3, newItemCalled)
 		})
-		t.Run("CreateSessionOnGivenNode", func(t *testing.T) {
-			var newSessionCalled uint32
+		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
+			var newItemCalled uint32
 			p := New[*testItem, testItem](rootCtx,
 				WithTrace[*testItem, testItem](defaultTrace),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
-					newSessionCalled++
+					newItemCalled++
 					v := testItem{
 						v: 0,
 						onNodeID: func() uint32 {
@@ -295,7 +295,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.EqualValues(t, 32, item.NodeID())
 			mustPutItem(t, p, item)
 
-			require.EqualValues(t, 1, newSessionCalled)
+			require.EqualValues(t, 1, newItemCalled)
 		})
 		t.Run("WithLimit", func(t *testing.T) {
 			p := New[*testItem, testItem](rootCtx, WithLimit[*testItem, testItem](1),
@@ -383,8 +383,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 					return &v, nil
 				}),
-				// replace default async closer for sync testing
-				WithSyncCloseItem[*testItem, testItem](),
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
 
@@ -453,8 +451,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						},
 					}
 					p := New[*testItem, testItem](rootCtx,
-						// replace default async closer for sync testing
-						WithSyncCloseItem[*testItem, testItem](),
 						WithLimit[*testItem, testItem](1),
 						WithTrace[*testItem, testItem](&Trace{
 							onWait: func() func(item any, err error) {
@@ -487,18 +483,18 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					}()
 
 					regWait := waitChPool.whenWantWaitCh()
-					<-get     // Await for getter blocked on awaiting session.
+					<-get     // Await for getter blocked on awaiting item.
 					<-regWait // Let the getter register itself in the wait queue.
 
 					if test.racy {
-						// We are testing the case, when session consumer registered
+						// We are testing the case, when item consumer registered
 						// himself in the wait queue, but not ready to receive the
-						// session when session arrives (that is, stuck between
+						// item when item arrives (that is, stuck between
 						// pushing channel in the list and reading from the channel).
 						_ = p.Close(context.Background())
 						<-wait
 					} else {
-						// We are testing the normal case, when session consumer registered
+						// We are testing the normal case, when item consumer registered
 						// himself in the wait queue and successfully blocked on
 						// reading from signaling channel.
 						<-wait
@@ -521,7 +517,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				})
 			}
 		})
-		t.Run("IdleSessions", func(t *testing.T) {
+		t.Run("IdleItems", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var (
 					idleThreshold = 4 * time.Second
@@ -544,8 +540,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						return &v, nil
 					}),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-					// replace default async closer for sync testing
-					WithSyncCloseItem[*testItem, testItem](),
 					WithClock[*testItem, testItem](fakeClock),
 					WithIdleTimeToLive[*testItem, testItem](idleThreshold),
 					WithTrace[*testItem, testItem](defaultTrace),
@@ -707,10 +701,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						55*time.Second,
 					)
 					defer cancel()
-					p := New[*testItem, testItem](rootCtx,
-						// replace default async closer for sync testing
-						WithSyncCloseItem[*testItem, testItem](),
-					)
+					p := New[*testItem, testItem](rootCtx)
 					defer func() {
 						_ = p.Close(context.Background())
 					}()
@@ -723,7 +714,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							time.Duration(r.Int64(int64(time.Second))),
 						)
 						defer childCancel()
-						s, err := p.createItem(childCtx)
+						s, err := p.createItemFunc(childCtx)
 						if s == nil && err == nil {
 							errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
 						}
@@ -842,8 +833,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 						return v, nil
 					}),
-					// replace default async closer for sync testing
-					WithSyncCloseItem[*testItem, testItem](),
 				)
 				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					return nil
@@ -860,7 +849,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				var (
 					newItems    atomic.Int64
 					deleteItems atomic.Int64
-					expErr      = xerrors.Retryable(errors.New("expected error"), xerrors.InvalidObject())
+					expErr      = errors.New("expected error")
 				)
 				p := New(rootCtx,
 					WithLimit[*testItem, testItem](1),
@@ -882,12 +871,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 						return v, nil
 					}),
-					// replace default async closer for sync testing
-					WithSyncCloseItem[*testItem, testItem](),
 				)
 				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					if newItems.Load() < 10 {
-						return expErr
+						return xerrors.Retryable(expErr, xerrors.Invalid(testItem))
 					}
 
 					return nil
@@ -902,7 +889,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 	})
 	t.Run("With", func(t *testing.T) {
-		t.Run("ExplicitSessionClose", func(t *testing.T) {
+		t.Run("ExplicitItemClose", func(t *testing.T) {
 			var (
 				created atomic.Int32
 				closed  atomic.Int32
@@ -940,8 +927,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 					return &v, nil
 				}),
-				// replace default async closer for sync testing
-				WithSyncCloseItem[*testItem, testItem](),
 			)
 			defer func() {
 				_ = p.Close(context.Background())
@@ -963,6 +948,51 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			mustGetItem(t, p)
 			assertCreated(2)
 		})
+		t.Run("OnErrorWithDeleteItem", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				var (
+					created           atomic.Int32
+					errMustDeleteItem = errors.New("item must be deleted")
+				)
+				p := New[*testItem, testItem](rootCtx,
+					WithLimit[*testItem, testItem](1),
+					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
+					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
+					WithCreateItemFunc(func(context.Context) (*testItem, error) {
+						v := testItem{
+							v: created.Add(1),
+						}
+
+						return &v, nil
+					}),
+					WithMustDeleteItemFunc[*testItem, testItem](func(item *testItem, err error) bool {
+						return errors.Is(err, errMustDeleteItem)
+					}),
+				)
+				defer func() {
+					_ = p.Close(context.Background())
+				}()
+
+				errThrown := false
+				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+					if errThrown {
+						require.EqualValues(t, 2, testItem.v)
+
+						return nil
+					}
+
+					require.EqualValues(t, 1, testItem.v)
+
+					defer func() {
+						errThrown = true
+					}()
+
+					return xerrors.Retryable(errMustDeleteItem)
+				})
+
+				require.NoError(t, err)
+			}, xtest.StopAfter(5*time.Second))
+		})
 		t.Run("Racy", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				trace := &Trace{
@@ -972,8 +1002,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}
 				p := New[*testItem, testItem](rootCtx,
 					WithTrace[*testItem, testItem](trace),
-					// replace default async closer for sync testing
-					WithSyncCloseItem[*testItem, testItem](),
 				)
 				r := xrand.New(xrand.WithLock())
 				var wg sync.WaitGroup
@@ -1040,12 +1068,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithLimit[*testItem, testItem](1),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				// replace default async closer for sync testing
-				WithSyncCloseItem[*testItem, testItem](),
 			)
 			item := mustGetItem(t, p)
 			if err := p.putItem(context.Background(), item); err != nil {
-				t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
+				t.Fatalf("unexpected error on put item into non-full client: %v, wand: %v", err, nil)
 			}
 
 			if err := p.putItem(context.Background(), &testItem{}); !xerrors.Is(err, errPoolIsOverflow) {
@@ -1057,8 +1083,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithLimit[*testItem, testItem](2),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-				// replace default async closer for sync testing
-				WithSyncCloseItem[*testItem, testItem](),
 			)
 			item := mustGetItem(t, p)
 			mustPutItem(t, p, item)

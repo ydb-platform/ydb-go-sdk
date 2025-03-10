@@ -561,6 +561,13 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
 			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
+			pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
+				if !s.IsAlive() {
+					return true
+				}
+
+				return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
+			}),
 			pool.WithIdleTimeToLive[*Session, Session](cfg.SessionIdleTimeToLive()),
 			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 				var (

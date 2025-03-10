@@ -19,7 +19,6 @@ type Error interface {
 	Name() string
 	Type() Type
 	BackoffType() backoff.Type
-	IsRetryObjectValid() bool
 }
 
 func IsTimeoutError(err error) bool {

@@ -36,7 +36,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -580,6 +579,7 @@ func DescribeTable(
 		TimeToLiveSettings:   NewTimeToLiveSettings(result.GetTtlSettings()),
 		Changefeeds:          processChangefeeds(result.GetChangefeeds()),
 		Tiering:              result.GetTiering(),
+		StoreType:            options.StoreType(result.GetStoreType()),
 	}
 
 	return desc, nil
@@ -759,16 +759,6 @@ func (s *Session) DropTable(
 	_, err = s.client.DropTable(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
-}
-
-func (s *Session) checkError(err error) {
-	if err == nil {
-		return
-	}
-	m := retry.Check(err)
-	if m.MustDeleteSession() {
-		s.SetStatus(table.SessionClosing)
-	}
 }
 
 // AlterTable modifies schema of table at given path with given options.
@@ -1384,40 +1374,17 @@ func (s *Session) ReadRows(
 	opts ...options.ReadRowsOption,
 ) (_ result.Result, err error) {
 	var (
-		a       = allocator.New()
-		request = Ydb_Table.ReadRowsRequest{
-			SessionId: s.id,
-			Path:      path,
-			Keys:      value.ToYDB(keys, a),
-		}
+		a        = allocator.New()
+		request  = makeReadRowsRequest(a, s.id, path, keys, opts)
 		response *Ydb_Table.ReadRowsResponse
 	)
 	defer func() {
 		a.Free()
 	}()
 
-	for _, opt := range opts {
-		if opt != nil {
-			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request), a)
-		}
-	}
+	response, err = s.client.ReadRows(ctx, request)
 
-	response, err = s.client.ReadRows(ctx, &request)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
-		return nil, xerrors.WithStackTrace(
-			xerrors.FromOperation(response),
-		)
-	}
-
-	return scanner.NewUnary(
-		[]*Ydb.ResultSet{response.GetResultSet()},
-		nil,
-		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
-	), nil
+	return makeReadRowsResponse(response, err, s.config.IgnoreTruncated())
 }
 
 // StreamExecuteScanQuery scan-reads table at given path with given options.

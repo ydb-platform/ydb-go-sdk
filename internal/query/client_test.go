@@ -1601,7 +1601,6 @@ func testPool(
 	return pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session, Session](1),
 		pool.WithCreateItemFunc(createSession),
-		pool.WithSyncCloseItem[*Session, Session](),
 	)
 }
 

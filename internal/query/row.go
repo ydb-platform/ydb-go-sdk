@@ -4,15 +4,22 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 var _ query.Row = (*Row)(nil)
 
 type Row struct {
-	indexedScanner scanner.IndexedScanner
-	namedScanner   scanner.NamedScanner
-	structScanner  scanner.StructScanner
+	indexedScanner interface {
+		Scan(dst ...interface{}) error
+	}
+	namedScanner interface {
+		ScanNamed(dst ...scanner.NamedDestination) error
+	}
+	structScanner interface {
+		ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error
+	}
 }
 
 func NewRow(columns []*Ydb.Column, v *Ydb.Value) *Row {
@@ -25,14 +32,38 @@ func NewRow(columns []*Ydb.Column, v *Ydb.Value) *Row {
 	}
 }
 
-func (r Row) Scan(dst ...interface{}) (err error) {
-	return r.indexedScanner.Scan(dst...)
+func (r Row) Scan(dst ...interface{}) error {
+	err := r.indexedScanner.Scan(dst...)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			xerrors.WithStackTrace(err),
+			xerrors.WithSkipDepth(1),
+		)
+	}
+
+	return nil
 }
 
-func (r Row) ScanNamed(dst ...scanner.NamedDestination) (err error) {
-	return r.namedScanner.ScanNamed(dst...)
+func (r Row) ScanNamed(dst ...scanner.NamedDestination) error {
+	err := r.namedScanner.ScanNamed(dst...)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			xerrors.WithStackTrace(err),
+			xerrors.WithSkipDepth(1),
+		)
+	}
+
+	return nil
 }
 
-func (r Row) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) (err error) {
-	return r.structScanner.ScanStruct(dst, opts...)
+func (r Row) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error {
+	err := r.structScanner.ScanStruct(dst, opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			xerrors.WithStackTrace(err),
+			xerrors.WithSkipDepth(1),
+		)
+	}
+
+	return nil
 }

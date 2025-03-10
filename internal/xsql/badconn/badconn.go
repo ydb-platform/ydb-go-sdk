@@ -2,6 +2,8 @@ package badconn
 
 import (
 	"database/sql/driver"
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -9,6 +11,14 @@ import (
 
 type Error struct {
 	err error
+}
+
+func New(msg string) error {
+	return &Error{err: errors.New(msg)}
+}
+
+func Errorf(format string, args ...interface{}) error {
+	return &Error{err: fmt.Errorf(format, args...)}
 }
 
 func (e Error) Origin() error {
@@ -43,7 +53,7 @@ func Map(err error) error {
 		return nil
 	case xerrors.Is(err, io.EOF):
 		return io.EOF
-	case !xerrors.IsRetryObjectValid(err):
+	case xerrors.MustDeleteTableOrQuerySession(err):
 		return Error{err: err}
 	default:
 		return err

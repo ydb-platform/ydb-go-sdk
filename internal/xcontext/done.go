@@ -30,6 +30,15 @@ func (done doneCtx) Value(key any) any {
 
 func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
+
+	select {
+	case <-done:
+		cancel()
+
+		return ctx, cancel
+	default:
+	}
+
 	stop := context.AfterFunc(doneCtx(done), func() {
 		cancel()
 	})
