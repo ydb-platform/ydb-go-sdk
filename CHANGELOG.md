@@ -1,6 +1,6 @@
 * Supported pool of decoders
 
-* ## v3.101.0
+## v3.101.0
 * Added `table.Client.ReadRows` method with internal retries
 
 ## v3.100.3
