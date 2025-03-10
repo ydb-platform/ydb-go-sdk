@@ -1,4 +1,29 @@
 * Supported pool of decoders
+
+* ## v3.101.0
+* Added `table.Client.ReadRows` method with internal retries
+
+## v3.100.3
+* Fixed bug with concurrent rewrites source slice of `grpc.DialOption` on dial step
+
+## v3.100.2
+* Fixed bug in `internal/xcontext.WithDone` (not listening chan done)
+
+## v3.100.1
+* Refactored behaviour on `retry.Retryable` error for retry object (such as session, connection or transaction)
+
+## v3.100.0
+* Added `table.DescribeTable.StoreType` to table description result from `table.Session.DescribeTable` request
+
+## v3.99.13
+* Added checking errors for conditionally delete item from pool
+
+## v3.99.12
+* Internal debug improved
+
+## v3.99.11
+* Added stacktrace record to row scan errors for detect broken client code
+* Fixed DescribeConsumer ignoring PartitionConsumerStats
 * Added virtualtimestamps field to cdc description
 
 ## v3.99.10
