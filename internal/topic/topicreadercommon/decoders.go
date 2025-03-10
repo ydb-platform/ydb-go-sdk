@@ -56,6 +56,7 @@ func NewDecoderMap() DecoderMap {
 		if err != nil {
 			return nil, err
 		}
+
 		return gz, nil
 	})
 
