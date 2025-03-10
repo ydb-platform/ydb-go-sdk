@@ -71,3 +71,16 @@ func TestUnretryableUnwrap(t *testing.T) {
 	wrapped := Unretryable(test)
 	require.ErrorIs(t, wrapped, test)
 }
+
+func TestIsValid(t *testing.T) {
+	type myType struct{}
+	obj := &myType{}
+	err := Retryable(fmt.Errorf("test"), Invalid(obj))
+	require.False(t, IsValid(err, obj))
+	require.True(t, IsValid(err, &myType{}))
+	var objAsInterface any
+	objAsInterface = obj
+	require.False(t, IsValid(err, objAsInterface))
+	objAsInterface = &myType{}
+	require.True(t, IsValid(err, objAsInterface))
+}

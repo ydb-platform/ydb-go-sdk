@@ -115,17 +115,6 @@ func (e *transportError) BackoffType() backoff.Type {
 	}
 }
 
-func (e *transportError) IsRetryObjectValid() bool {
-	switch e.status.Code() {
-	case
-		grpcCodes.ResourceExhausted,
-		grpcCodes.OutOfRange:
-		return true
-	default:
-		return false
-	}
-}
-
 // IsTransportError reports whether err is transportError with given grpc codes
 func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	if err == nil {

@@ -247,6 +247,26 @@ func TestDescribeTopicConsumer(t *testing.T) {
 
 	requireAndCleanSubset(&consumer.Consumer.Attributes, &expectedConsumerDesc.Consumer.Attributes)
 
+	for i := range consumer.Partitions {
+		// Fields that are checked here are dynamic and they change with time, so we need to set them to expected values
+		// to make the comparison possible.
+		p := &consumer.Partitions[i]
+
+		require.NotNil(t, p.PartitionStats.LastWriteTime)
+
+		p.PartitionStats.LastWriteTime = expectedConsumerDesc.Partitions[i].PartitionStats.LastWriteTime
+		p.PartitionStats.MaxWriteTimeLag = expectedConsumerDesc.Partitions[i].PartitionStats.MaxWriteTimeLag
+
+		require.NotNil(t, p.PartitionConsumerStats.LastReadTime)
+		require.NotNil(t, p.PartitionConsumerStats.MaxReadTimeLag)
+		require.NotNil(t, p.PartitionConsumerStats.MaxWriteTimeLag)
+
+		p.PartitionConsumerStats.PartitionReadSessionCreateTime = expectedConsumerDesc.Partitions[i].PartitionConsumerStats.PartitionReadSessionCreateTime
+		p.PartitionConsumerStats.LastReadTime = expectedConsumerDesc.Partitions[i].PartitionConsumerStats.LastReadTime
+		p.PartitionConsumerStats.MaxReadTimeLag = expectedConsumerDesc.Partitions[i].PartitionConsumerStats.MaxReadTimeLag
+		p.PartitionConsumerStats.MaxWriteTimeLag = expectedConsumerDesc.Partitions[i].PartitionConsumerStats.MaxWriteTimeLag
+	}
+
 	require.Equal(t, expectedConsumerDesc, consumer)
 }
 

@@ -27,7 +27,7 @@ import (
 )
 
 func TestBasicExampleDatabaseSql(t *testing.T) {
-	defer simpleDetectGoroutineLeak(t)
+	defer xtest.CheckGoroutinesLeak(t)
 
 	folder := t.Name()
 

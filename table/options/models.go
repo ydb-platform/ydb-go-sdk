@@ -59,6 +59,7 @@ type Description struct {
 	TimeToLiveSettings   *TimeToLiveSettings
 	Changefeeds          []ChangefeedDescription
 	Tiering              string
+	StoreType            StoreType
 }
 
 type TableStats struct {
@@ -604,4 +605,12 @@ const (
 	ChangefeedFormatUnspecified         = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_UNSPECIFIED)
 	ChangefeedFormatJSON                = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_JSON)
 	ChangefeedFormatDynamoDBStreamsJSON = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_DYNAMODB_STREAMS_JSON)
+)
+
+type StoreType int
+
+const (
+	StoreTypeUnspecified = StoreType(Ydb_Table.StoreType_STORE_TYPE_UNSPECIFIED)
+	StoreTypeRow         = StoreType(Ydb_Table.StoreType_STORE_TYPE_ROW)
+	StoreTypeColumn      = StoreType(Ydb_Table.StoreType_STORE_TYPE_COLUMN)
 )

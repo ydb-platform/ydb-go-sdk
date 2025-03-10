@@ -218,7 +218,7 @@ func (c *conn) dial(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	address := c.endpoint.Address()
 
-	dialOpts := c.config.GrpcDialOptions()
+	dialOpts := append([]grpc.DialOption{}, c.config.GrpcDialOptions()...)
 
 	dialOpts = append(dialOpts, grpc.WithStatsHandler(statsHandler{}))
 

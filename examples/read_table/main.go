@@ -7,9 +7,11 @@ import (
 	"log"
 	"os"
 	"path"
+	"sync"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -204,4 +206,35 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("read table error: %w", err))
 	}
+
+	log.Println("Parallel read all rows from shards")
+	var description options.Description
+	err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+		description, err = s.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		panic(fmt.Errorf("describe table error: %w", err))
+	}
+	var wg sync.WaitGroup
+	wg.Add(len(description.KeyRanges))
+	for _, shard := range description.KeyRanges {
+		go func(options.KeyRange) {
+			defer wg.Done()
+			err = readTable(
+				ctx,
+				db.Table(),
+				path.Join(prefix, tableName),
+				options.ReadKeyRange(shard),
+			)
+			if err != nil {
+				panic(fmt.Errorf("shard %q read error: %w", shard.String(), err))
+			}
+		}(shard)
+	}
+	wg.Wait()
 }

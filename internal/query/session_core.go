@@ -2,6 +2,9 @@ package query
 
 import (
 	"context"
+	"os"
+	"runtime/pprof"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +24,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+var markGoroutineWithLabelNodeIDForAttachStream = os.Getenv("YDB_QUERY_SESSION_ATTACH_STREAM_GOROUTINE_LABEL") == "1"
 
 type (
 	Core interface {
@@ -152,8 +158,7 @@ func Open(
 	core.id = response.GetSessionId()
 	core.nodeID = uint32(response.GetNodeId())
 
-	err = core.attach(ctx)
-	if err != nil {
+	if err = core.attach(ctx); err != nil {
 		_ = core.deleteSession(ctx)
 
 		return nil, xerrors.WithStackTrace(err)
@@ -180,14 +185,14 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		}
 	}()
 
-	attach, err := core.Client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
+	attachStream, err := core.Client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
 		SessionId: core.id,
 	})
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	_, err = attach.Recv()
+	_, err = attachStream.Recv()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -205,24 +210,34 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		return nil
 	})
 
-	go func() {
-		defer func() {
-			select {
-			case <-core.done:
-				return
-			default:
-				close(core.done)
-			}
-		}()
+	if markGoroutineWithLabelNodeIDForAttachStream {
+		pprof.Do(ctx, pprof.Labels(
+			"node_id", strconv.Itoa(int(core.NodeID())),
+		), func(context.Context) {
+			go core.listenAttachStream(attachStream)
+		})
+	} else {
+		go core.listenAttachStream(attachStream)
+	}
 
-		for core.IsAlive() {
-			if _, recvErr := attach.Recv(); recvErr != nil {
-				return
-			}
+	return nil
+}
+
+func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryService_AttachSessionClient) {
+	defer func() {
+		select {
+		case <-core.done:
+			return
+		default:
+			close(core.done)
 		}
 	}()
 
-	return nil
+	for core.IsAlive() {
+		if _, recvErr := attachStream.Recv(); recvErr != nil {
+			return
+		}
+	}
 }
 
 func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
