@@ -184,6 +184,12 @@ func (r *WriteRequest) Size() int {
 	return 0
 }
 
+func (r *WriteRequest) FillCache() *WriteRequest {
+	r.Size()
+
+	return r
+}
+
 func (r *WriteRequest) Cut(count int) (head *WriteRequest, rest *WriteRequest) {
 	if count >= len(r.Messages) {
 		return r, nil

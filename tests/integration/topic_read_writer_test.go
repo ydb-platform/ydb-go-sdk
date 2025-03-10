@@ -18,9 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
-
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -30,7 +27,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
