@@ -8,8 +8,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"io"
 	"os"
 	"runtime/pprof"
@@ -19,6 +17,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -524,6 +525,9 @@ func TestWriterFlushMessagesBeforeClose(t *testing.T) {
 }
 
 func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
+		t.Skip()
+	}
 	scope := newScope(t)
 
 	const maxGrpcMsgSize = 10000 // bytes
