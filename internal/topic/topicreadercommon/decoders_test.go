@@ -52,7 +52,7 @@ func TestDecoderMap(t *testing.T) {
 	t.Run("DecodeCustomCodec", func(t *testing.T) {
 		dm := NewDecoderMap()
 		customCodec := rawtopiccommon.Codec(1001)
-		dm.AddDecoder(customCodec, func(input io.Reader) (io.Reader, error) {
+		dm.AddDecoder(customCodec, func(input io.Reader) (ReadResetter, error) {
 			return gzip.NewReader(input)
 		})
 		require.Len(t, dm.dp, 3)

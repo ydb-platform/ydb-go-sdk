@@ -47,11 +47,11 @@ func NewDecoderMap() DecoderMap {
 		dp: make(map[rawtopiccommon.Codec]*decoderPool),
 	}
 
-	dm.AddDecoder(rawtopiccommon.CodecRaw, func(input io.Reader) (io.Reader, error) {
+	dm.AddDecoder(rawtopiccommon.CodecRaw, func(input io.Reader) (ReadResetter, error) {
 		return &nopResetter{Reader: input}, nil
 	})
 
-	dm.AddDecoder(rawtopiccommon.CodecGzip, func(input io.Reader) (io.Reader, error) {
+	dm.AddDecoder(rawtopiccommon.CodecGzip, func(input io.Reader) (ReadResetter, error) {
 		gz, err := gzip.NewReader(input)
 		if err != nil {
 			return nil, err
@@ -61,11 +61,6 @@ func NewDecoderMap() DecoderMap {
 	})
 
 	return dm
-}
-
-func (m *DecoderMap) AddDecoder(codec rawtopiccommon.Codec, createFunc func(io.Reader) (io.Reader, error)) {
-	m.m[codec] = createFunc
-	m.dp[codec] = newDecoderPool()
 }
 
 type pooledDecoder struct {
@@ -92,27 +87,27 @@ func (m *DecoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Rea
 
 	pool := m.dp[codec]
 	decoder := pool.Get()
-	if decoder != nil {
-		if resetter, ok := decoder.(ReadResetter); ok {
-			if err := resetter.Reset(input); err != nil {
-				return nil, err
-			}
-
-			return &pooledDecoder{ReadResetter: resetter, pool: pool}, nil
+	if decoder == nil {
+		var err error
+		decoder, err = createFunc(input)
+		if err != nil {
+			return nil, err
 		}
-
-		return decoder, nil
+	} else {
+		if err := decoder.Reset(input); err != nil {
+			return nil, err
+		}
 	}
 
-	newDecoder, err := createFunc(input)
-	if err != nil {
-		return nil, err
-	}
-	if resetter, ok := newDecoder.(ReadResetter); ok {
-		return &pooledDecoder{ReadResetter: resetter, pool: pool}, nil
-	}
+	return &pooledDecoder{
+		ReadResetter: decoder,
+		pool:         pool,
+	}, nil
+}
 
-	return newDecoder, nil
+func (m *DecoderMap) AddDecoder(codec rawtopiccommon.Codec, createFunc func(io.Reader) (ReadResetter, error)) {
+	m.m[codec] = createFunc
+	m.dp[codec] = newDecoderPool()
 }
 
 type nopResetter struct {
@@ -125,7 +120,7 @@ func (n *nopResetter) Reset(r io.Reader) error {
 	return nil
 }
 
-type PublicCreateDecoderFunc func(input io.Reader) (io.Reader, error)
+type PublicCreateDecoderFunc func(input io.Reader) (ReadResetter, error)
 
 // ErrPublicUnexpectedCodec return when try to read message content with unknown codec
 var ErrPublicUnexpectedCodec = xerrors.Wrap(errors.New("ydb: unexpected codec"))
