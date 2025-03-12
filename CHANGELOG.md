@@ -1,3 +1,5 @@
+* Changed allowBanned=false for preferred node connections
+
 ## v3.101.0
 * Added `table.Client.ReadRows` method with internal retries
 
