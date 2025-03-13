@@ -126,7 +126,7 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	executeCtx, executeCancel := xcontext.WithCancel(ctx)
 	defer func() {
 		if finalErr != nil {
 			executeCancel()
