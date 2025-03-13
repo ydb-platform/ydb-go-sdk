@@ -538,3 +538,87 @@ SELECT * FROM AS_TABLE($arg);
 	require.Equal(t, 1, partsWithBigSize)
 	require.Greater(t, partsWithLittleSize, 1)
 }
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1685
+func TestIssue1685PreliminaryPrelimaryStreamClose(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+	)
+	require.NoError(t, err)
+
+	const (
+		tableSize = 10
+	)
+
+	tableName := path.Join(db.Name(), t.Name(), "test")
+
+	err = db.Query().Exec(ctx, "DROP TABLE IF EXISTS `"+tableName+"`;")
+	require.NoError(t, err)
+
+	err = db.Query().Exec(ctx, `CREATE TABLE `+"`"+tableName+"`"+` (
+			id Utf8,
+			value Uint64,
+			PRIMARY KEY(id)
+			)`,
+	)
+	require.NoError(t, err)
+
+	var vals []types.Value
+	for i := 0; i < tableSize; i++ {
+		vals = append(vals, types.StructValue(
+			types.StructFieldValue("id", types.UTF8Value(uuid.NewString())),
+			types.StructFieldValue("value", types.Uint64Value(rand.Uint64())),
+		))
+	}
+	err = db.Query().Do(context.Background(), func(ctx context.Context, s query.Session) error {
+		return s.Exec(ctx, `
+				PRAGMA AnsiInForEmptyOrNullableItemsCollections;
+				DECLARE $vals AS List<Struct<
+					id: Utf8,
+					value: Uint64
+				>>;
+				
+				INSERT INTO `+"`"+tableName+"`"+` 
+				SELECT id, value FROM AS_TABLE($vals);`,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$vals").BeginList().AddItems(vals...).EndList().Build(),
+			),
+		)
+	})
+	require.NoError(t, err)
+
+	err = db.Query().Do(ctx, func(ctx context.Context, session query.Session) error {
+		var (
+			id string
+			v  uint64
+		)
+
+		streamResult, err := session.Query(ctx, `SELECT id, value FROM `+"`"+tableName+"`")
+		if err != nil {
+			return err
+		}
+
+		set, err := streamResult.NextResultSet(ctx)
+		require.NoError(t, err)
+
+		row, err := set.NextRow(ctx)
+		require.NoError(t, err)
+
+		// read only one row
+		err = row.Scan(&id, &v)
+		require.NoError(t, err)
+
+		// this must hang, but it doesn't
+		err = streamResult.Close(ctx)
+		require.NoError(t, err)
+
+		return nil
+	}, query.WithIdempotent())
+
+	require.NoError(t, err)
+}
