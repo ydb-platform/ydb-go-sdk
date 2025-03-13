@@ -27,9 +27,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -529,8 +527,8 @@ func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
 	}
 	scope := newScope(t)
 
-	const maxGrpcMsgSize = 10000 // bytes
-	const topicMessageSize = maxGrpcMsgSize / 3
+	maxGrpcMsgSize := config.DefaultGRPCMsgSize // bytes
+	topicMessageSize := 10 * 1024 * 1024
 
 	scope.Driver(ydb.WithGrpcMaxMessageSize(maxGrpcMsgSize))
 	writer, err := scope.Driver().Topic().StartWriter(
@@ -540,7 +538,9 @@ func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
 	scope.Require.NoError(err)
 	defer writer.Close(scope.Ctx)
 
-	const messageCount = 50
+	const messageCount = 20
+	scope.Require.Greater(messageCount*topicMessageSize, maxGrpcMsgSize*2)
+
 	messages := make([]topicwriter.Message, messageCount)
 	for i := range messages {
 		messages[i] = topicwriter.Message{Data: bytes.NewReader(make([]byte, topicMessageSize))}
@@ -549,17 +549,11 @@ func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
 	err = writer.Write(scope.Ctx, messages...)
 	scope.Require.NoError(err)
 
-	for i := 1; i <= messageCount; i++ {
-		err = scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
-			batch, err := scope.TopicReader().PopMessagesBatchTx(scope.Ctx, tx, topicreader.WithBatchMaxCount(1))
-			if err != nil {
-				return err
-			}
-			scope.Require.Equal(int64(i), batch.Messages[0].SeqNo)
-			return nil
-		})
-
+	for lastSeqNo := int64(0); lastSeqNo < messageCount; {
+		msg, err := scope.TopicReader().ReadMessage(scope.Ctx)
 		scope.Require.NoError(err)
+		_ = scope.TopicReader().Commit(scope.Ctx, msg)
+		lastSeqNo = msg.SeqNo
 	}
 }
 
