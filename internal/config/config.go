@@ -7,14 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// InitDefaultGRPCMessageSize used for init value only
-// don't use it in any place, other than initial get values for addr and config
-var InitDefaultGRPCMessageSize = 64 * 1024 * 1024 // 64MB
-
-// DefaultGRPCMessageSizeAddr pointer to public DefaultGRPCMessageSize value
-// the scheme needs for prevent import public package from internal (and prevent import cycle)
-var DefaultGRPCMessageSizeAddr = &InitDefaultGRPCMessageSize
-
 var defaultRetryBudget = budget.Limited(-1)
 
 type Common struct {

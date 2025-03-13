@@ -83,7 +83,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 			clock:              clockwork.NewRealClock(),
 			compressorCount:    runtime.NumCPU(),
 			Tracer:             &trace.Topic{},
-			maxBytesPerMessage: *config.DefaultGRPCMessageSizeAddr,
+			maxBytesPerMessage: config.DefaultGRPCMsgSize,
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,

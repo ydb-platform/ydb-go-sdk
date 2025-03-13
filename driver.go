@@ -34,6 +34,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	internalTopic "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -588,6 +589,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 				[]topicoptions.TopicOption{
 					topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
 					topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
+					internalTopic.WithGrpcMessageSize(d.config.GrpcMaxMessageSize()),
 				},
 				d.topicOptions...,
 			)...,

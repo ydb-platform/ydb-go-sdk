@@ -532,11 +532,10 @@ func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
 	const maxGrpcMsgSize = 10000 // bytes
 	const topicMessageSize = maxGrpcMsgSize / 3
 
-	scope.Driver(ydb.With(config.WithGrpcOptions(grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(maxGrpcMsgSize)))))
+	scope.Driver(ydb.WithGrpcMaxMessageSize(maxGrpcMsgSize))
 	writer, err := scope.Driver().Topic().StartWriter(
 		scope.TopicPath(),
 		topicoptions.WithWriterCodec(topictypes.CodecRaw),
-		topicoptions.WithWriterMaxSizeOfDataGrpcMessageBytes(maxGrpcMsgSize),
 	)
 	scope.Require.NoError(err)
 	defer writer.Close(scope.Ctx)
