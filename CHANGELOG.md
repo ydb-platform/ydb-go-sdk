@@ -1,4 +1,4 @@
-* Add a new metric ydb_go_sdk_ydb_info with the current version of the SDK
+* Added a new metric `ydb_go_sdk_ydb_info` with the current version of the SDK
 
 ## v3.101.1
 * Changed allowBanned=false for preferred node connections
