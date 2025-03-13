@@ -89,7 +89,7 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
 	if nodeID, hasPreferEndpoint := endpoint.ContextNodeID(ctx); hasPreferEndpoint {
 		c := s.connByNodeID[nodeID]
-		if c != nil && isOkConnection(c, true) {
+		if c != nil && isOkConnection(c, false) {
 			return c
 		}
 	}
