@@ -127,7 +127,7 @@ func TestWriterImpl_Write(t *testing.T) {
 			const seqNo = 31
 
 			writeMessageReceived := make(empty.Chan)
-			e.stream.EXPECT().Send(&rawtopicwriter.WriteRequest{
+			e.stream.EXPECT().Send((&rawtopicwriter.WriteRequest{
 				Messages: []rawtopicwriter.MessageData{
 					{
 						SeqNo:            seqNo,
@@ -138,7 +138,7 @@ func TestWriterImpl_Write(t *testing.T) {
 					},
 				},
 				Codec: rawtopiccommon.CodecRaw,
-			}).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
+			}).FillCache()).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 				close(writeMessageReceived)
 
 				return nil
@@ -523,24 +523,24 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		}
 
 		strm2 := newStream("strm2")
-		strm2.EXPECT().Send(&rawtopicwriter.WriteRequest{
+		strm2.EXPECT().Send((&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
+		}).FillCache()).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 			t.Logf("strm2 sent message and return retriable error")
 
 			return xerrors.Retryable(errors.New("retriable on strm2"))
 		})
 
 		strm3 := newStream("strm3")
-		strm3.EXPECT().Send(&rawtopicwriter.WriteRequest{
+		strm3.EXPECT().Send((&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
+		}).FillCache()).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 			t.Logf("strm3 sent message and return unretriable error")
 
 			return errors.New("strm3")
@@ -599,7 +599,7 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 		const seqNo = 36
 
 		writeCompleted := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicwriter.WriteRequest{
+		e.stream.EXPECT().Send((&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{
 					SeqNo:            seqNo,
@@ -610,7 +610,7 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 				},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
+		}).FillCache()).DoAndReturn(func(_ rawtopicwriter.ClientMessage) error {
 			close(writeCompleted)
 
 			return nil
@@ -720,7 +720,7 @@ func TestCreateRawMessageData(t *testing.T) {
 		req, err := createWriteRequest(newTestMessagesWithContent(), rawtopiccommon.CodecRaw)
 		require.NoError(t, err)
 		require.Equal(t,
-			rawtopicwriter.WriteRequest{
+			&rawtopicwriter.WriteRequest{
 				Messages: []rawtopicwriter.MessageData{},
 				Codec:    rawtopiccommon.CodecRaw,
 			},
@@ -740,7 +740,7 @@ func TestCreateRawMessageData(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Equal(t, rawtopicwriter.WriteRequest{
+		require.Equal(t, &rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{
 					SeqNo: 1,
@@ -763,7 +763,7 @@ func TestCreateRawMessageData(t *testing.T) {
 		req, err := createWriteRequest(newTestMessagesWithContent(1, 2, 3), rawtopiccommon.CodecRaw)
 		require.NoError(t, err)
 		require.Equal(t,
-			rawtopicwriter.WriteRequest{
+			&rawtopicwriter.WriteRequest{
 				Messages: []rawtopicwriter.MessageData{
 					{
 						SeqNo: 1,

@@ -1,3 +1,5 @@
+* Fixed hangup when try to send batch of messages with size more, then grpc limits from topic writer internals
+
 ## v3.101.2
 * Added a new metric `ydb_go_sdk_ydb_info` with the current version of the SDK
 
