@@ -1,3 +1,4 @@
+## v3.101.2
 * Added a new metric `ydb_go_sdk_ydb_info` with the current version of the SDK
 
 ## v3.101.1
