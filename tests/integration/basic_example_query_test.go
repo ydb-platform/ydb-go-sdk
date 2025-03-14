@@ -5,6 +5,8 @@ package integration
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -312,20 +314,20 @@ func TestBasicExampleQuery(sourceTest *testing.T) { //nolint:gocyclo
 	t.Run("lookup", func(t *testing.T) {
 		t.Run("views", func(t *testing.T) {
 			row, err := db.Query().QueryRow(ctx, `
-						PRAGMA TablePathPrefix("`+path.Join(db.Name(), folder)+`");
+				PRAGMA TablePathPrefix("`+path.Join(db.Name(), folder)+`");
 
-						DECLARE $seriesID AS Uint64;
-						DECLARE $seasonID AS Uint64;
-						DECLARE $episodeID AS Uint64;
+				DECLARE $seriesID AS Uint64;
+				DECLARE $seasonID AS Uint64;
+				DECLARE $episodeID AS Uint64;
 
-						SELECT
-							views
-						FROM
-							episodes
-						WHERE
-							series_id = $seriesID AND 
-							season_id = $seasonID AND 
-							episode_id = $episodeID;`,
+				SELECT
+					views
+				FROM
+					episodes
+				WHERE
+					series_id = $seriesID AND 
+					season_id = $seasonID AND 
+					episode_id = $episodeID;`,
 				query.WithParameters(ydb.ParamsBuilder().
 					Param("$seriesID").Uint64(1).
 					Param("$seasonID").Uint64(1).
@@ -409,12 +411,22 @@ func TestBasicExampleQuery(sourceTest *testing.T) { //nolint:gocyclo
 				_ = res.Close(ctx)
 			}()
 			t.Logf("> scan_query_select:\n")
-			for rs, err := range res.ResultSets(ctx) {
+			for {
+				rs, err := res.NextResultSet(ctx)
 				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
 					return err
 				}
-				for row, err := range rs.Rows(ctx) {
+				for {
+					row, err := rs.NextRow(ctx)
 					if err != nil {
+						if errors.Is(err, io.EOF) {
+							break
+						}
+
 						return err
 					}
 					var v struct {
