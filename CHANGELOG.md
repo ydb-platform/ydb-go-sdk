@@ -1,3 +1,4 @@
+## v3.102.0
 * Supported wide `Date32`, `Datetime64` and `Timestamp64` types
 
 ## v3.101.4
