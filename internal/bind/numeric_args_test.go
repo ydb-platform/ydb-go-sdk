@@ -17,58 +17,58 @@ func TestNumericArgsBindRewriteQuery(t *testing.T) {
 	)
 	for _, tt := range []struct {
 		sql    string
-		args   []interface{}
+		args   []any
 		yql    string
-		params []interface{}
+		params []any
 		err    error
 	}{
 		{
 			sql: `SELECT $123abc, $2`,
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
 			sql: `SELECT $123abc, $1`,
-			args: []interface{}{
+			args: []any{
 				200,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $123abc, $p0`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: `SELECT $1, $2`,
-			args: []interface{}{
+			args: []any{
 				table.ValueParam("$name1", types.Int32Value(100)),
 				table.ValueParam("$name2", types.Int32Value(200)),
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $name1, $name2`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$name1", types.Int32Value(100)),
 				table.ValueParam("$name2", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: `SELECT $1, $2`,
-			args: []interface{}{
+			args: []any{
 				table.ValueParam("$namedArg", types.Int32Value(100)),
 				200,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $namedArg, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$namedArg", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: `SELECT $0, $1`,
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -76,64 +76,64 @@ SELECT $namedArg, $p1`,
 		},
 		{
 			sql: `SELECT $1, $2`,
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: `SELECT $1, $2`,
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
 			sql: `SELECT $1, "$2"`,
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, "$2"`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
 		{
 			sql: `SELECT $1, '$2'`,
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, '$2'`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
 		{
 			sql: "SELECT $1, `$2`",
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			yql: "-- origin query with numeric args replacement\nSELECT $p0, `$2`",
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
 		{
 			sql:    "SELECT ?, $1, $p0",
-			params: []interface{}{},
+			params: []any{},
 			err:    ErrInconsistentArgs,
 		},
 		{
 			sql: "SELECT $1, $2, $3",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -144,7 +144,7 @@ SELECT $p0, '$2'`,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1, $p2`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(1)),
 				table.ValueParam("$p1", types.TextValue("test")),
 				table.ValueParam("$p2", types.ListValue(
@@ -156,7 +156,7 @@ SELECT $p0, $p1, $p2`,
 		},
 		{
 			sql: "SELECT $1, $2, $3, $1, $2",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -167,7 +167,7 @@ SELECT $p0, $p1, $p2`,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1, $p2, $p0, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(1)),
 				table.ValueParam("$p1", types.TextValue("test")),
 				table.ValueParam("$p2", types.ListValue(
@@ -179,7 +179,7 @@ SELECT $p0, $p1, $p2, $p0, $p1`,
 		},
 		{
 			sql: "SELECT $1, $2, $3",
-			args: []interface{}{
+			args: []any{
 				types.Int32Value(1),
 				types.TextValue("test"),
 				types.ListValue(
@@ -190,7 +190,7 @@ SELECT $p0, $p1, $p2, $p0, $p1`,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1, $p2`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(1)),
 				table.ValueParam("$p1", types.TextValue("test")),
 				table.ValueParam("$p2", types.ListValue(
@@ -202,12 +202,12 @@ SELECT $p0, $p1, $p2`,
 		},
 		{
 			sql: "SELECT $1, a, b, c WHERE id = $1 AND date < $2 AND value IN ($3)",
-			args: []interface{}{
+			args: []any{
 				1, now, []string{"3"},
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, a, b, c WHERE id = $p0 AND date < $p1 AND value IN ($p2)`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(1)),
 				table.ValueParam("$p1", types.TimestampValueFromTime(now)),
 				table.ValueParam("$p2", types.ListValue(types.TextValue("3"))),
@@ -225,47 +225,47 @@ SELECT 1`,
 		},
 		{
 			sql: "SELECT $1, $2",
-			args: []interface{}{
+			args: []any{
 				1,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
 			sql: "SELECT $1, $2 -- some comment with $3",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1 -- some comment with $3`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: "SELECT $1 /* some comment with $3 */, $2",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0 /* some comment with $3 */, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: "SELECT $1, $2 -- some comment with $3",
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
 			sql: "SELECT $1, $2, $3",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -274,40 +274,40 @@ SELECT $p0 /* some comment with $3 */, $p1`,
 		{
 			sql: `
 SELECT $1 /* some comment with $3 */, $2`,
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with numeric args replacement
 
 SELECT $p0 /* some comment with $3 */, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: "SELECT $1, $2",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: "SELECT $1, $2",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
