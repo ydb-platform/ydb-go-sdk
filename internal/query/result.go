@@ -125,7 +125,12 @@ func newResult(
 	var (
 		closed = make(chan struct{})
 		r      = streamResult{
-			stream:         stream,
+			stream: stream,
+			onClose: []func(){
+				func() {
+					close(closed)
+				},
+			},
 			closed:         closed,
 			resultSetIndex: -1,
 		}
@@ -138,9 +143,7 @@ func newResult(
 	}
 
 	r.closeOnce = sync.OnceFunc(func() {
-		close(closed)
-
-		for i := range r.onClose {
+		for i := range r.onClose { // descending call for LIFO
 			r.onClose[len(r.onClose)-i-1]()
 		}
 	})
@@ -226,6 +229,8 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
+	defer r.closeOnce()
+
 	if r.trace != nil {
 		onDone := trace.QueryOnResultClose(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
@@ -234,8 +239,6 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 			onDone(finalErr)
 		}()
 	}
-
-	defer r.closeOnce()
 
 	for {
 		select {
