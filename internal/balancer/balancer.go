@@ -186,10 +186,12 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 		previous = b.connections().All()
 	)
+
+	_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
+		return strings.Compare(lhs.Address(), rhs.Address())
+	})
+
 	defer func() {
-		_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
-			return strings.Compare(lhs.Address(), rhs.Address())
-		})
 		onDone(
 			xslices.Transform(newest, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
 			xslices.Transform(added, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
@@ -202,6 +204,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
 		c.Endpoint().Touch()
+		_ = c.Ping(ctx)
 	}
 
 	info := balancerConfig.Info{SelfLocation: localDC}
@@ -213,6 +216,13 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 	}
 
 	b.connectionsState.Store(state)
+
+	for _, e := range dropped {
+		c := b.pool.GetIfPresent(e)
+		if c != nil {
+			_ = c.Close(ctx)
+		}
+	}
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
