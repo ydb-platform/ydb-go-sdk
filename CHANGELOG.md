@@ -1,3 +1,4 @@
+## v3.101.3
 * Added `query.TransactionActor` type alias to `query.TxActor` for compatibility with `table.Client` API's 
 * Removed comment `experimental` from `ydb.ParamsBuilder` and `ydb.ParamsFromMap`
 * Fixed panic on closing `internal/query/sessionCore.done` channel twice
