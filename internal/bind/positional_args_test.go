@@ -17,60 +17,60 @@ func TestPositionalArgsBindRewriteQuery(t *testing.T) {
 	)
 	for _, tt := range []struct {
 		sql    string
-		args   []interface{}
+		args   []any
 		yql    string
-		params []interface{}
+		params []any
 		err    error
 	}{
 		{
 			sql: `SELECT ?, ?`,
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: `SELECT ?, ?`,
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
 			sql: `SELECT ?, "?"`,
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0, "?"`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
 		{
 			sql: `SELECT ?, '?'`,
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0, '?'`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
 		{
 			sql: "SELECT ?, `?`",
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			yql: "-- origin query with positional args replacement\nSELECT $p0, `?`",
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
@@ -80,7 +80,7 @@ SELECT $p0, '?'`,
 		},
 		{
 			sql: "SELECT ?, ?, ?",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -91,7 +91,7 @@ SELECT $p0, '?'`,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0, $p1, $p2`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(1)),
 				table.ValueParam("$p1", types.TextValue("test")),
 				table.ValueParam("$p2", types.ListValue(
@@ -103,7 +103,7 @@ SELECT $p0, $p1, $p2`,
 		},
 		{
 			sql: "SELECT ?, ?, ?",
-			args: []interface{}{
+			args: []any{
 				types.Int32Value(1),
 				types.TextValue("test"),
 				types.ListValue(
@@ -114,7 +114,7 @@ SELECT $p0, $p1, $p2`,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0, $p1, $p2`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(1)),
 				table.ValueParam("$p1", types.TextValue("test")),
 				table.ValueParam("$p2", types.ListValue(
@@ -126,12 +126,12 @@ SELECT $p0, $p1, $p2`,
 		},
 		{
 			sql: "SELECT a, b, c WHERE id = ? AND date < ? AND value IN (?)",
-			args: []interface{}{
+			args: []any{
 				1, now, []string{"3"},
 			},
 			yql: `-- origin query with positional args replacement
 SELECT a, b, c WHERE id = $p0 AND date < $p1 AND value IN ($p2)`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(1)),
 				table.ValueParam("$p1", types.TimestampValueFromTime(now)),
 				table.ValueParam("$p2", types.ListValue(types.TextValue("3"))),
@@ -149,47 +149,47 @@ SELECT 1`,
 		},
 		{
 			sql: "SELECT ?, ?",
-			args: []interface{}{
+			args: []any{
 				1,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
 			sql: "SELECT ?, ? -- some comment with ?",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0, $p1 -- some comment with ?`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: "SELECT ? /* some comment with ? */, ?",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0 /* some comment with ? */, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: "SELECT ?, ? -- some comment with ?",
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
 			sql: "SELECT ?, ?, ?",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -198,40 +198,40 @@ SELECT $p0 /* some comment with ? */, $p1`,
 		{
 			sql: `
 SELECT ? /* some comment with ? */, ?`,
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with positional args replacement
 
 SELECT $p0 /* some comment with ? */, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: "SELECT ?, ?",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
 			sql: "SELECT ?, ?",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
 			yql: `-- origin query with positional args replacement
 SELECT $p0, $p1`,
-			params: []interface{}{
+			params: []any{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},

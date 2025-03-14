@@ -189,6 +189,10 @@ func WithPositionalArgs() QueryBindConnectorOption {
 	return xsql.WithQueryBind(bind.PositionalArgs{})
 }
 
+func WithWideTimeTypes() QueryBindConnectorOption {
+	return xsql.WithQueryBind(bind.WideTimeTypes{})
+}
+
 func WithNumericArgs() QueryBindConnectorOption {
 	return xsql.WithQueryBind(bind.NumericArgs{})
 }

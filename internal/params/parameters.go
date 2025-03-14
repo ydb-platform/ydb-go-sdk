@@ -170,177 +170,202 @@ func (p *Parameter) BeginVariant() *variant {
 
 func (p *Parameter) Text(v string) Builder {
 	p.value = value.TextValue(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Bytes(v []byte) Builder {
 	p.value = value.BytesValue(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Bool(v bool) Builder {
 	p.value = value.BoolValue(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Uint64(v uint64) Builder {
 	p.value = value.Uint64Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Int64(v int64) Builder {
 	p.value = value.Int64Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Uint32(v uint32) Builder {
 	p.value = value.Uint32Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Int32(v int32) Builder {
 	p.value = value.Int32Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Uint16(v uint16) Builder {
 	p.value = value.Uint16Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Int16(v int16) Builder {
 	p.value = value.Int16Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Uint8(v uint8) Builder {
 	p.value = value.Uint8Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Int8(v int8) Builder {
 	p.value = value.Int8Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Float(v float32) Builder {
 	p.value = value.FloatValue(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Double(v float64) Builder {
 	p.value = value.DoubleValue(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Decimal(v [16]byte, precision, scale uint32) Builder {
 	p.value = value.DecimalValue(v, precision, scale)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Timestamp(v time.Time) Builder {
 	p.value = value.TimestampValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Timestamp64(v time.Time) Builder {
 	p.value = value.Timestamp64ValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Date(v time.Time) Builder {
 	p.value = value.DateValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Date32(v time.Time) Builder {
 	p.value = value.Date32ValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Datetime(v time.Time) Builder {
 	p.value = value.DatetimeValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Datetime64(v time.Time) Builder {
 	p.value = value.Datetime64ValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Interval(v time.Duration) Builder {
 	p.value = value.IntervalValueFromDuration(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Interval64(v time.Duration) Builder {
 	p.value = value.Interval64ValueFromDuration(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) JSON(v string) Builder {
 	p.value = value.JSONValue(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) JSONDocument(v string) Builder {
 	p.value = value.JSONDocumentValue(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) YSON(v []byte) Builder {
 	p.value = value.YSONValue(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 //// removed for https://github.com/ydb-platform/ydb-go-sdk/issues/1501
@@ -353,51 +378,58 @@ func (p *Parameter) YSON(v []byte) Builder {
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1501
 func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
 	p.value = value.UUIDWithIssue1501Value(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Uuid(val uuid.UUID) Builder { //nolint:revive,stylecheck
 	p.value = value.Uuid(val)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Any(v types.Value) Builder {
 	p.value = v
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) TzDate(v time.Time) Builder {
 	p.value = value.TzDateValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) TzTimestamp(v time.Time) Builder {
 	p.value = value.TzTimestampValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) TzDatetime(v time.Time) Builder {
 	p.value = value.TzDatetimeValueFromTime(v)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func (p *Parameter) Raw(pb *Ydb.TypedValue) Builder {
 	p.value = value.FromProtobuf(pb)
-	p.parent.params = append(p.parent.params, p)
 
-	return p.parent
+	return Builder{
+		params: append(p.parent.params, p),
+	}
 }
 
 func Declare(p *Parameter) string {

@@ -29,7 +29,7 @@ var (
 	uuidPtrType = reflect.TypeOf((*uuid.UUID)(nil))
 )
 
-func asUUID(v interface{}) (value.Value, bool) {
+func asUUID(v any) (value.Value, bool) {
 	switch reflect.TypeOf(v) {
 	case uuidType:
 		return value.Uuid(v.(uuid.UUID)), true //nolint:forcetypeassert
@@ -45,7 +45,7 @@ func asUUID(v interface{}) (value.Value, bool) {
 	return nil, false
 }
 
-func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
+func toType(v any) (_ types.Type, err error) { //nolint:funlen
 	switch x := v.(type) {
 	case bool:
 		return types.Bool, nil
@@ -156,7 +156,7 @@ func toType(v interface{}) (_ types.Type, err error) { //nolint:funlen
 }
 
 //nolint:gocyclo,funlen
-func toValue(v interface{}) (_ value.Value, err error) {
+func toValue(v any) (_ value.Value, err error) {
 	if x, ok := asUUID(v); ok {
 		return x, nil
 	}
@@ -338,7 +338,7 @@ func toValue(v interface{}) (_ value.Value, err error) {
 	}
 }
 
-func supportNewTypeLink(x interface{}) string {
+func supportNewTypeLink(x any) string {
 	v := url.Values{}
 	v.Add("labels", "enhancement,database/sql")
 	v.Add("template", "02_FEATURE_REQUEST.md")
@@ -347,7 +347,7 @@ func supportNewTypeLink(x interface{}) string {
 	return "https://github.com/ydb-platform/ydb-go-sdk/issues/new?" + v.Encode()
 }
 
-func toYdbParam(name string, value interface{}) (*params.Parameter, error) {
+func toYdbParam(name string, value any) (*params.Parameter, error) {
 	switch tv := value.(type) {
 	case driver.NamedValue:
 		n, v := tv.Name, tv.Value
@@ -373,7 +373,7 @@ func toYdbParam(name string, value interface{}) (*params.Parameter, error) {
 	return params.Named(name, v), nil
 }
 
-func Params(args ...interface{}) ([]*params.Parameter, error) {
+func Params(args ...any) ([]*params.Parameter, error) {
 	parameters := make([]*params.Parameter, 0, len(args))
 	for i, arg := range args {
 		var newParam *params.Parameter
