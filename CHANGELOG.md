@@ -1,3 +1,4 @@
+## v3.101.4
 * Switched internal type of result `ydb.Driver.Query()` from `*internal/query.Client` to `query.Client` interface 
 
 ## v3.101.3
