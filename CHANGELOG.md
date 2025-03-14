@@ -1,3 +1,4 @@
+## v3.104.0
 * Added binding `ydb.WithWideTimeTypes()` which interprets `time.Time` and `time.Duration` as `Timestamp64` and `Interval64` YDB types
 
 ## v3.103.0
