@@ -171,6 +171,21 @@ func TestParse(t *testing.T) {
 			},
 			err: nil,
 		},
+		{
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_query_bind=positional,declare,wide_time_types", //nolint:lll
+			opts: []config.Option{
+				config.WithSecure(false),
+				config.WithEndpoint("localhost:2135"),
+				config.WithDatabase("/local"),
+			},
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(xtable.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.PositionalArgs{}),
+				xsql.WithQueryBind(bind.AutoDeclare{}),
+				xsql.WithQueryBind(bind.WideTimeTypes{}),
+			},
+			err: nil,
+		},
 	} {
 		t.Run("", func(t *testing.T) {
 			opts, err := parseConnectionString(tt.dsn)
