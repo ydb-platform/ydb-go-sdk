@@ -110,10 +110,16 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 		return Double
 	case Ydb.Type_DATE:
 		return Date
+	case Ydb.Type_DATE32:
+		return Date32
 	case Ydb.Type_DATETIME:
 		return Datetime
+	case Ydb.Type_DATETIME64:
+		return Datetime64
 	case Ydb.Type_TIMESTAMP:
 		return Timestamp
+	case Ydb.Type_TIMESTAMP64:
+		return Timestamp64
 	case Ydb.Type_INTERVAL:
 		return Interval
 	case Ydb.Type_TZ_DATE:
@@ -137,7 +143,7 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 	case Ydb.Type_DYNUMBER:
 		return DyNumber
 	default:
-		panic("ydb: unexpected type")
+		panic(fmt.Sprintf("ydb: unexpected type %v", t))
 	}
 }
 
@@ -527,8 +533,11 @@ const (
 	Float
 	Double
 	Date
+	Date32
 	Datetime
+	Datetime64
 	Timestamp
+	Timestamp64
 	Interval
 	TzDate
 	TzDatetime
@@ -555,8 +564,11 @@ var primitive = [...]*Ydb.Type{
 	Float:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT}},
 	Double:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE}},
 	Date:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE}},
+	Date32:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE32}},
 	Datetime:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME}},
+	Datetime64:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME64}},
 	Timestamp:    {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP}},
+	Timestamp64:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP64}},
 	Interval:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL}},
 	TzDate:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE}},
 	TzDatetime:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME}},
@@ -584,8 +596,11 @@ var primitiveString = [...]string{
 	Float:        "Float",
 	Double:       "Double",
 	Date:         "Date",
+	Date32:       "Date32",
 	Datetime:     "Datetime",
+	Datetime64:   "Datetime64",
 	Timestamp:    "Timestamp",
+	Timestamp64:  "Timestamp64",
 	Interval:     "Interval",
 	TzDate:       "TzDate",
 	TzDatetime:   "TzDatetime",
