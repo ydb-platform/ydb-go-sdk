@@ -316,6 +316,62 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 	})
 }
 
+func TestBatcher_PopFlushed(t *testing.T) {
+	ctx := context.Background()
+	//rnd := rand.New(rand.NewSource(0))
+
+	s1 := topicreadercommon.NewPartitionSession(ctx,
+		"test",
+		1,
+		-1,
+		"test",
+		partitionSessionID(1),
+		1,
+		0,
+	)
+	s2 := topicreadercommon.NewPartitionSession(ctx,
+		"test",
+		2,
+		-1,
+		"test",
+		partitionSessionID(1),
+		1,
+		0,
+	)
+
+	sessions := []*topicreadercommon.PartitionSession{s1, s2}
+	for flushIndex := range sessions {
+		b := newBatcher()
+		err := b.PushBatches(
+			xtest.Must(
+				topicreadercommon.NewBatch(
+					s1,
+					[]*topicreadercommon.PublicMessage{
+						topicreadercommon.NewPublicMessageBuilder().PartitionSession(s1).Build(),
+					},
+				),
+			),
+			xtest.Must(
+				topicreadercommon.NewBatch(
+					s2,
+					[]*topicreadercommon.PublicMessage{
+						topicreadercommon.NewPublicMessageBuilder().PartitionSession(s2).Build(),
+					},
+				),
+			),
+		)
+		require.NoError(t, err)
+
+		s := sessions[flushIndex]
+		b.FlushPartitionSession(s)
+
+		res, err := b.Pop(ctx, batcherGetOptions{})
+		require.NoError(t, err)
+
+		require.Same(t, s, topicreadercommon.BatchGetPartitionSession(res.Batch))
+	}
+}
+
 func TestBatcherConcurency(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "OneBatch", func(tb testing.TB) {
 		b := newBatcher()
