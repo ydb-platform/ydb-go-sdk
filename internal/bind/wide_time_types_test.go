@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
-func TestWideTypesBindRewriteQuery(t *testing.T) {
+func TestWideTimeTypesBind(t *testing.T) {
 	for _, tt := range []struct {
 		bind   Bind
 		sql    string
@@ -58,7 +58,7 @@ func TestWideTypesBindRewriteQuery(t *testing.T) {
 			},
 		},
 		{
-			bind: WideTypes{},
+			bind: WideTimeTypes{},
 			sql:  `SELECT ?, ?`,
 			args: []any{
 				100,
@@ -71,7 +71,7 @@ func TestWideTypesBindRewriteQuery(t *testing.T) {
 			},
 		},
 		{
-			bind: WideTypes{},
+			bind: WideTimeTypes{},
 			sql:  `SELECT ?, ?`,
 			args: []any{
 				time.Unix(123, 456),
@@ -84,7 +84,7 @@ func TestWideTypesBindRewriteQuery(t *testing.T) {
 			},
 		},
 		{
-			bind: WideTypes{},
+			bind: WideTimeTypes{},
 			sql:  `SELECT ?, ?`,
 			args: []any{
 				time.Duration(123) * time.Millisecond,

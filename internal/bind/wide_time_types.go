@@ -6,9 +6,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
-type WideTypes struct{}
+type WideTimeTypes struct{}
 
-func (m WideTypes) ToYdb(sql string, args ...any) (yql string, newArgs []any, _ error) {
+func (m WideTimeTypes) ToYdb(sql string, args ...any) (yql string, newArgs []any, _ error) {
 	newArgs = make([]any, 0, len(args))
 	for _, arg := range args {
 		switch t := arg.(type) {
@@ -24,6 +24,6 @@ func (m WideTypes) ToYdb(sql string, args ...any) (yql string, newArgs []any, _ 
 	return sql, newArgs, nil
 }
 
-func (m WideTypes) blockID() blockID {
+func (m WideTimeTypes) blockID() blockID {
 	return blockCastArgs
 }

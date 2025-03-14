@@ -583,7 +583,7 @@ SELECT $p0;`,
 			b: testutil.QueryBind(
 				ydb.WithAutoDeclare(),
 				ydb.WithPositionalArgs(),
-				ydb.WithWideTypes(),
+				ydb.WithWideTimeTypes(),
 			),
 			sql:  `SELECT ?;`,
 			args: []interface{}{time.Unix(123, 456)},

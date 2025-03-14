@@ -486,7 +486,7 @@ func (v date32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-// Date32Value returns ydb date value by given days since Epoch
+// Date32Value returns ydb date value from days around epoch time
 func Date32Value(v int32) date32Value {
 	return date32Value(v)
 }
@@ -596,7 +596,7 @@ func (v datetime64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-// Datetime64Value makes ydb datetime value from seconds since Epoch
+// Datetime64Value makes ydb datetime value from seconds around epoch time
 func Datetime64Value(v int64) datetime64Value {
 	return datetime64Value(v)
 }
@@ -1385,7 +1385,7 @@ func (v interval64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-// Interval64Value makes Value from given microseconds value
+// Interval64Value makes Value from given nanoseconds around epoch time
 func Interval64Value(v int64) interval64Value {
 	return interval64Value(v)
 }
@@ -2011,7 +2011,7 @@ func (v timestamp64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-// Timestamp64Value makes ydb timestamp value by given microseconds since Epoch
+// Timestamp64Value makes ydb timestamp value by given signed microseconds around Epoch
 func Timestamp64Value(v int64) timestamp64Value {
 	return timestamp64Value(v)
 }
