@@ -82,6 +82,15 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		}
 
 		return req, nil
+
+	case *Ydb_Topic.StreamReadMessage_FromServer_EndPartitionSession:
+		req := &EndPartitionSession{}
+		req.ServerMessageMetadata = meta
+		if err = req.fromProto(m.EndPartitionSession); err != nil {
+			return nil, err
+		}
+		return req, nil
+
 	case *Ydb_Topic.StreamReadMessage_FromServer_CommitOffsetResponse:
 		resp := &CommitOffsetResponse{}
 		resp.ServerMessageMetadata = meta

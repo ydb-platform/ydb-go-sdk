@@ -35,12 +35,15 @@ type (
 		) func(
 			TopicReaderPartitionReadStartResponseDoneInfo,
 		)
+
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderPartitionReadStopResponse func(
 			TopicReaderPartitionReadStopResponseStartInfo,
 		) func(
 			TopicReaderPartitionReadStopResponseDoneInfo,
 		)
+
+		OnReaderEndPartitionSession func(TopicReaderEndPartitionSessionInfo)
 
 		// TopicReaderStreamEvents
 
@@ -179,6 +182,16 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStopResponseDoneInfo struct {
 		Error error
+	}
+
+	TopicReaderEndPartitionSessionInfo struct {
+		ReaderConnectionID   string
+		PartitionContext     context.Context //nolint:containedctx
+		Topic                string
+		PartitionID          int64
+		PartitionSessionID   int64
+		AdjacentPartitionIDs []int64
+		ChildPartitionIDs    []int64
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
