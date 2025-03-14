@@ -273,6 +273,13 @@ func (p *Parameter) Timestamp(v time.Time) Builder {
 	return p.parent
 }
 
+func (p *Parameter) Timestamp64(v time.Time) Builder {
+	p.value = value.Timestamp64ValueFromTime(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
 func (p *Parameter) Date(v time.Time) Builder {
 	p.value = value.DateValueFromTime(v)
 	p.parent.params = append(p.parent.params, p)
@@ -289,6 +296,13 @@ func (p *Parameter) Date32(v time.Time) Builder {
 
 func (p *Parameter) Datetime(v time.Time) Builder {
 	p.value = value.DatetimeValueFromTime(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) Datetime64(v time.Time) Builder {
+	p.value = value.Datetime64ValueFromTime(v)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent
