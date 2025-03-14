@@ -99,6 +99,11 @@ type (
 			TopicReaderTransactionRollbackDoneInfo,
 		)
 
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderSentGRPCMessage func(TopicReaderSentGRPCMessageInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderReceiveGRPCMessage func(TopicReaderReceiveGRPCMessageInfo)
+
 		// TopicReaderMessageEvents
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -429,6 +434,24 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderTransactionRollbackDoneInfo struct {
 		RollbackError error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderSentGRPCMessageInfo struct {
+		ReaderID      int64
+		SessionID     string
+		MessageNumber int
+		Message       *Ydb_Topic.StreamReadMessage_FromClient // may be nil if err != nil
+		Error         error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderReceiveGRPCMessageInfo struct {
+		ReaderID      int64
+		SessionID     string
+		MessageNumber int
+		Message       *Ydb_Topic.StreamReadMessage_FromServer // may be nil if err != nil
+		Error         error
 	}
 
 	////////////

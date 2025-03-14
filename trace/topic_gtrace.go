@@ -605,6 +605,44 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 		}
 	}
 	{
+		h1 := t.OnReaderSentGRPCMessage
+		h2 := x.OnReaderSentGRPCMessage
+		ret.OnReaderSentGRPCMessage = func(t TopicReaderSentGRPCMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnReaderReceiveGRPCMessage
+		h2 := x.OnReaderReceiveGRPCMessage
+		ret.OnReaderReceiveGRPCMessage = func(t TopicReaderReceiveGRPCMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
 		h1 := t.OnReaderSentDataRequest
 		h2 := x.OnReaderSentDataRequest
 		ret.OnReaderSentDataRequest = func(t TopicReaderSentDataRequestInfo) {
@@ -1293,6 +1331,20 @@ func (t *Topic) onReaderTransactionRollback(t1 TopicReaderTransactionRollbackSta
 	}
 	return res
 }
+func (t *Topic) onReaderSentGRPCMessage(t1 TopicReaderSentGRPCMessageInfo) {
+	fn := t.OnReaderSentGRPCMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onReaderReceiveGRPCMessage(t1 TopicReaderReceiveGRPCMessageInfo) {
+	fn := t.OnReaderReceiveGRPCMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
 func (t *Topic) onReaderSentDataRequest(t1 TopicReaderSentDataRequestInfo) {
 	fn := t.OnReaderSentDataRequest
 	if fn == nil {
@@ -1734,6 +1786,28 @@ func TopicOnReaderTransactionRollback(t *Topic, c *context.Context, readerID int
 		p.RollbackError = rollbackError
 		res(p)
 	}
+}
+
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderSentGRPCMessage(t *Topic, readerID int64, sessionID string, messageNumber int, message *Ydb_Topic.StreamReadMessage_FromClient, e error) {
+	var p TopicReaderSentGRPCMessageInfo
+	p.ReaderID = readerID
+	p.SessionID = sessionID
+	p.MessageNumber = messageNumber
+	p.Message = message
+	p.Error = e
+	t.onReaderSentGRPCMessage(p)
+}
+
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderReceiveGRPCMessage(t *Topic, readerID int64, sessionID string, messageNumber int, message *Ydb_Topic.StreamReadMessage_FromServer, e error) {
+	var p TopicReaderReceiveGRPCMessageInfo
+	p.ReaderID = readerID
+	p.SessionID = sessionID
+	p.MessageNumber = messageNumber
+	p.Message = message
+	p.Error = e
+	t.onReaderReceiveGRPCMessage(p)
 }
 
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
