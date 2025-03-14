@@ -223,7 +223,7 @@ type SQLConnector interface {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	c, err := xsql.Open(parent, parent.metaBalancer,
+	c, err := xsql.Open(parent, parent.metaBalancer, parent.query.Must().Config(),
 		append(
 			append(
 				parent.databaseSQLOptions,

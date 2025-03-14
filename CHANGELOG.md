@@ -1,3 +1,5 @@
+* Switched internal type of result `ydb.Driver.Query()` from `*internal/query.Client` to `query.Client` interface 
+
 ## v3.101.3
 * Added `query.TransactionActor` type alias to `query.TxActor` for compatibility with `table.Client` API's 
 * Removed comment `experimental` from `ydb.ParamsBuilder` and `ydb.ParamsFromMap`

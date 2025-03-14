@@ -27,8 +27,8 @@ type (
 	Conn struct {
 		ctx context.Context //nolint:containedctx
 
-		parent  Parent
-		session table.ClosableSession // Immutable and r/o usage.
+		scriptingClient scripting.Client
+		session         table.ClosableSession // Immutable and r/o usage.
 
 		fakeTxModes []QueryMode
 
@@ -116,10 +116,10 @@ type resultNoRows struct{}
 func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
-func New(ctx context.Context, parent Parent, s table.ClosableSession, opts ...Option) *Conn {
+func New(ctx context.Context, scriptingClient scripting.Client, s table.ClosableSession, opts ...Option) *Conn {
 	cc := &Conn{
 		ctx:              ctx,
-		parent:           parent,
+		scriptingClient:  scriptingClient,
 		session:          s,
 		defaultQueryMode: DataQueryMode,
 		defaultTxControl: table.DefaultTxControl(),
@@ -169,7 +169,7 @@ func (c *Conn) executeSchemeQuery(ctx context.Context, sql string) (driver.Resul
 func (c *Conn) executeScriptingQuery(ctx context.Context, sql string, params *params.Params) (
 	driver.Result, error,
 ) {
-	res, err := c.parent.Scripting().StreamExecute(ctx, sql, params)
+	res, err := c.scriptingClient.StreamExecute(ctx, sql, params)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -227,7 +227,7 @@ func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Par
 func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *params.Params) (
 	driver.RowsNextResultSet, error,
 ) {
-	res, err := c.parent.Scripting().StreamExecute(ctx, sql, params)
+	res, err := c.scriptingClient.StreamExecute(ctx, sql, params)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
