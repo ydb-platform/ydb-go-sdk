@@ -5,7 +5,6 @@ package integration
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"net/http"
 	"os"
 	"path"
@@ -26,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
