@@ -143,7 +143,7 @@ func newResult(
 	}
 
 	r.closeOnce = sync.OnceFunc(func() {
-		for i := range r.onClose { // descending call for LIFO
+		for i := range r.onClose { // descending calls for LIFO
 			r.onClose[len(r.onClose)-i-1]()
 		}
 	})
