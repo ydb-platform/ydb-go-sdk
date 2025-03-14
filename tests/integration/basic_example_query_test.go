@@ -5,8 +5,6 @@ package integration
 
 import (
 	"context"
-	"errors"
-	"io"
 	"net/http"
 	"os"
 	"path"
