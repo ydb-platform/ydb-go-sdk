@@ -122,6 +122,8 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 		return Timestamp64
 	case Ydb.Type_INTERVAL:
 		return Interval
+	case Ydb.Type_INTERVAL64:
+		return Interval64
 	case Ydb.Type_TZ_DATE:
 		return TzDate
 	case Ydb.Type_TZ_DATETIME:
@@ -539,6 +541,7 @@ const (
 	Timestamp
 	Timestamp64
 	Interval
+	Interval64
 	TzDate
 	TzDatetime
 	TzTimestamp
@@ -570,6 +573,7 @@ var primitive = [...]*Ydb.Type{
 	Timestamp:    {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP}},
 	Timestamp64:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP64}},
 	Interval:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL}},
+	Interval64:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL64}},
 	TzDate:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE}},
 	TzDatetime:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME}},
 	TzTimestamp:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP}},
@@ -602,6 +606,7 @@ var primitiveString = [...]string{
 	Timestamp:    "Timestamp",
 	Timestamp64:  "Timestamp64",
 	Interval:     "Interval",
+	Interval64:   "Interval64",
 	TzDate:       "TzDate",
 	TzDatetime:   "TzDatetime",
 	TzTimestamp:  "TzTimestamp",

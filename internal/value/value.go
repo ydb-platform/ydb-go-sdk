@@ -124,6 +124,9 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 	case types.Interval:
 		return IntervalValue(v.GetInt64Value()), nil
 
+	case types.Interval64:
+		return Interval64Value(v.GetInt64Value()), nil
+
 	case types.Timestamp:
 		return TimestampValue(v.GetUint64Value()), nil
 
@@ -1300,6 +1303,95 @@ func IntervalValue(v int64) intervalValue {
 
 func IntervalValueFromDuration(v time.Duration) intervalValue {
 	return intervalValue(durationToMicroseconds(v))
+}
+
+type interval64Value int64
+
+func (v interval64Value) castTo(dst any) error {
+	switch vv := dst.(type) {
+	case *time.Duration:
+		*vv = Interval64ToDuration(int64(v))
+
+		return nil
+	case *driver.Value:
+		*vv = Interval64ToDuration(int64(v))
+
+		return nil
+	case *int64:
+		*vv = int64(v)
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, vv,
+		))
+	}
+}
+
+func (v interval64Value) Yql() string {
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	buffer.WriteString(v.Type().Yql())
+	buffer.WriteByte('(')
+	buffer.WriteByte('"')
+	d := IntervalToDuration(int64(v))
+	if d < 0 {
+		buffer.WriteByte('-')
+		d = -d
+	}
+	buffer.WriteByte('P')
+	//nolint:gomnd
+	if days := d / time.Hour / 24; days > 0 {
+		d -= days * time.Hour * 24 //nolint:durationcheck
+		buffer.WriteString(strconv.FormatInt(int64(days), 10))
+		buffer.WriteByte('D')
+	}
+	if d > 0 {
+		buffer.WriteByte('T')
+	}
+	if hours := d / time.Hour; hours > 0 {
+		d -= hours * time.Hour //nolint:durationcheck
+		buffer.WriteString(strconv.FormatInt(int64(hours), 10))
+		buffer.WriteByte('H')
+	}
+	if minutes := d / time.Minute; minutes > 0 {
+		d -= minutes * time.Minute //nolint:durationcheck
+		buffer.WriteString(strconv.FormatInt(int64(minutes), 10))
+		buffer.WriteByte('M')
+	}
+	if d > 0 {
+		seconds := float64(d) / float64(time.Second)
+		fmt.Fprintf(buffer, "%0.6f", seconds)
+		buffer.WriteByte('S')
+	}
+	buffer.WriteByte('"')
+	buffer.WriteByte(')')
+
+	return buffer.String()
+}
+
+func (interval64Value) Type() types.Type {
+	return types.Interval64
+}
+
+func (v interval64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int64()
+	vv.Int64Value = int64(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+// Interval64Value makes Value from given microseconds value
+func Interval64Value(v int64) interval64Value {
+	return interval64Value(v)
+}
+
+func Interval64ValueFromDuration(v time.Duration) interval64Value {
+	return interval64Value(durationToNanoseconds(v))
 }
 
 type jsonValue string
