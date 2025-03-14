@@ -62,7 +62,9 @@ func findGoroutinesLeak() error {
 		unexpectedGoroutines = append(unexpectedGoroutines, g)
 	}
 	if l := len(unexpectedGoroutines); l > 0 {
-		return fmt.Errorf("found %d unexpected goroutines:\n%s", len(goroutines), strings.Join(goroutines, "\n"))
+		return fmt.Errorf("found %d unexpected goroutines:\n\n%s",
+			len(goroutines), strings.Join(goroutines, "\n\n"),
+		)
 	}
 
 	return nil
