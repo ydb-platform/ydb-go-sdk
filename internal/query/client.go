@@ -49,6 +49,10 @@ type (
 	}
 )
 
+func (c *Client) Config() *config.Config {
+	return c.config
+}
+
 func fetchScriptResults(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	opID string, opts ...options.FetchScriptOption,
@@ -511,28 +515,28 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
-func CreateSession(ctx context.Context, c *Client) (*Session, error) {
+func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config) (*Session, error) {
 	s, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Session, error) {
 		var (
 			createCtx    context.Context
 			cancelCreate context.CancelFunc
 		)
-		if d := c.config.SessionCreateTimeout(); d > 0 {
+		if d := cfg.SessionCreateTimeout(); d > 0 {
 			createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
 		} else {
 			createCtx, cancelCreate = xcontext.WithCancel(ctx)
 		}
 		defer cancelCreate()
 
-		s, err := createSession(createCtx, c.client,
-			WithDeleteTimeout(c.config.SessionDeleteTimeout()),
-			WithTrace(c.config.Trace()),
+		s, err := createSession(createCtx, client,
+			WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+			WithTrace(cfg.Trace()),
 		)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		s.lazyTx = c.config.LazyTx()
+		s.lazyTx = cfg.LazyTx()
 
 		return s, nil
 	})

@@ -10,16 +10,19 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -35,8 +38,9 @@ var (
 type (
 	Engine    uint8
 	Connector struct {
-		parent   ydbDriver
-		balancer grpc.ClientConnInterface
+		parent      ydbDriver
+		balancer    grpc.ClientConnInterface
+		queryConfig *config.Config
 
 		processor Engine
 
@@ -58,7 +62,7 @@ type (
 	ydbDriver interface {
 		Name() string
 		Table() table.Client
-		Query() *query.Client
+		Query() query.Client
 		Scripting() scripting.Client
 		Scheme() scheme.Client
 	}
@@ -73,6 +77,10 @@ func (e Engine) String() string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+func (c *Connector) Parent() ydbDriver {
+	return c.parent
 }
 
 func (c *Connector) RetryBudget() budget.Budget {
@@ -95,26 +103,6 @@ func (c *Connector) TraceRetry() *trace.Retry {
 	return c.traceRetry
 }
 
-func (c *Connector) Query() *query.Client {
-	return c.parent.Query()
-}
-
-func (c *Connector) Name() string {
-	return c.parent.Name()
-}
-
-func (c *Connector) Table() table.Client {
-	return c.parent.Table()
-}
-
-func (c *Connector) Scripting() scripting.Client {
-	return c.parent.Scripting()
-}
-
-func (c *Connector) Scheme() scheme.Client {
-	return c.parent.Scheme()
-}
-
 const (
 	QUERY = iota + 1
 	TABLE
@@ -131,7 +119,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 	switch c.processor {
 	case QUERY:
-		s, err := query.CreateSession(ctx, c.Query())
+		s, err := internalQuery.CreateSession(ctx, Ydb_Query_V1.NewQueryServiceClient(c.balancer), c.queryConfig)
 		defer func() {
 			onDone(s, finalErr)
 		}()
@@ -143,7 +131,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		conn := &Conn{
 			processor: QUERY,
-			cc: xquery.New(ctx, c, s, append(
+			cc: xquery.New(ctx, s, append(
 				c.QueryOpts,
 				xquery.WithOnClose(func() {
 					c.conns.Delete(id)
@@ -159,7 +147,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 		return conn, nil
 
 	case TABLE:
-		s, err := c.Table().CreateSession(ctx) //nolint:staticcheck
+		s, err := c.parent.Table().CreateSession(ctx) //nolint:staticcheck
 		defer func() {
 			onDone(s, finalErr)
 		}()
@@ -171,7 +159,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		conn := &Conn{
 			processor: TABLE,
-			cc: xtable.New(ctx, c, s, append(c.TableOpts,
+			cc: xtable.New(ctx, c.parent.Scripting(), s, append(c.TableOpts,
 				xtable.WithOnClose(func() {
 					c.conns.Delete(id)
 				}))...,
@@ -193,10 +181,6 @@ func (c *Connector) Driver() driver.Driver {
 	return c
 }
 
-func (c *Connector) Parent() ydbDriver {
-	return c.parent
-}
-
 func (c *Connector) Close() error {
 	select {
 	case <-c.done:
@@ -212,10 +196,16 @@ func (c *Connector) Close() error {
 	}
 }
 
-func Open(parent ydbDriver, balancer grpc.ClientConnInterface, opts ...Option) (_ *Connector, err error) {
+func Open(
+	parent ydbDriver,
+	balancer grpc.ClientConnInterface,
+	queryConfig *config.Config,
+	opts ...Option,
+) (_ *Connector, err error) {
 	c := &Connector{
-		parent:   parent,
-		balancer: balancer,
+		parent:      parent,
+		balancer:    balancer,
+		queryConfig: queryConfig,
 		processor: func() Engine {
 			if overQueryService, _ := strconv.ParseBool(os.Getenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE")); overQueryService {
 				return QUERY
