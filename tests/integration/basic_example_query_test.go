@@ -1,5 +1,5 @@
-//go:build integration
-// +build integration
+//go:build integration && go1.23
+// +build integration,go1.23
 
 package integration
 
@@ -24,6 +24,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
@@ -33,6 +34,10 @@ import (
 )
 
 func TestBasicExampleQuery(sourceTest *testing.T) { //nolint:gocyclo
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "24.3") {
+		sourceTest.Skip("query service has been production ready since 24.3")
+	}
+
 	t := xtest.MakeSyncedTest(sourceTest)
 	folder := t.Name()
 
@@ -411,22 +416,12 @@ func TestBasicExampleQuery(sourceTest *testing.T) { //nolint:gocyclo
 				_ = res.Close(ctx)
 			}()
 			t.Logf("> scan_query_select:\n")
-			for {
-				rs, err := res.NextResultSet(ctx)
+			for rs, err := range res.ResultSets(ctx) {
 				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
 					return err
 				}
-				for {
-					row, err := rs.NextRow(ctx)
+				for row, err := range rs.Rows(ctx) {
 					if err != nil {
-						if errors.Is(err, io.EOF) {
-							break
-						}
-
 						return err
 					}
 					var v struct {
