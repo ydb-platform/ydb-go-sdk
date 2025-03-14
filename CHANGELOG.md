@@ -1,4 +1,9 @@
 * Switched internal type of result `ydb.Driver.Query()` from `*internal/query.Client` to `query.Client` interface 
+
+## v3.101.3
+* Added `query.TransactionActor` type alias to `query.TxActor` for compatibility with `table.Client` API's 
+* Removed comment `experimental` from `ydb.ParamsBuilder` and `ydb.ParamsFromMap`
+* Fixed panic on closing `internal/query/sessionCore.done` channel twice
 * Fixed hangup when try to send batch of messages with size more, then grpc limits from topic writer internals
 
 ## v3.101.2
