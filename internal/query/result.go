@@ -243,14 +243,13 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		case <-r.closed:
 			return nil
 		default:
-			if r.stream != nil {
-				if _, err := r.nextPart(ctx); err != nil {
-					if xerrors.Is(err, io.EOF) {
-						return nil
-					}
-
-					return xerrors.WithStackTrace(err)
+			_, err := r.nextPart(ctx)
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					return nil
 				}
+
+				return xerrors.WithStackTrace(err)
 			}
 		}
 	}
