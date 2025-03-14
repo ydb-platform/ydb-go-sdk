@@ -18,5 +18,4 @@ var (
 	ErrOptionNotForTxExecute   = errors.New("option is not for execute on transaction")
 	errExecuteOnCompletedTx    = errors.New("execute on completed transaction")
 	errSessionClosed           = errors.New("session is closed")
-	errStreamResultClosed      = errors.New("stream result is closed")
 )

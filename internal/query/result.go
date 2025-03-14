@@ -192,13 +192,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	case <-r.closed:
 		return nil, xerrors.WithStackTrace(io.EOF)
 	default:
-		if r.stream == nil {
-			return nil, xerrors.WithStackTrace(io.EOF)
-		}
-
 		part, err = nextPart(r.stream)
 		if err != nil {
-			r.stream = nil
+			r.closeOnce()
 
 			for _, callback := range r.onNextPartErr {
 				callback(err)
@@ -245,15 +241,16 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		case <-ctx.Done():
 			return xerrors.WithStackTrace(ctx.Err())
 		case <-r.closed:
-			return xerrors.WithStackTrace(errStreamResultClosed)
+			return nil
 		default:
-			_, err := r.nextPart(ctx)
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					return nil
-				}
+			if r.stream != nil {
+				if _, err := r.nextPart(ctx); err != nil {
+					if xerrors.Is(err, io.EOF) {
+						return nil
+					}
 
-				return xerrors.WithStackTrace(err)
+					return xerrors.WithStackTrace(err)
+				}
 			}
 		}
 	}
@@ -284,7 +281,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 				r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
-				r.stream = nil
+				r.closeOnce()
 
 				if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
 					return nil, xerrors.WithStackTrace(io.EOF)
