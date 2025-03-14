@@ -1,3 +1,4 @@
+* Removed comment `experimental` from `ydb.ParamsBuilder` and `ydb.ParamsFromMap`
 * Fixed hangup when try to send batch of messages with size more, then grpc limits from topic writer internals
 
 ## v3.101.2
