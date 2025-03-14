@@ -139,6 +139,10 @@ func newResult(
 
 	r.closeOnce = sync.OnceFunc(func() {
 		close(closed)
+
+		for i := range r.onClose {
+			r.onClose[len(r.onClose)-i-1]()
+		}
 	})
 
 	if r.trace != nil {
@@ -231,13 +235,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		}()
 	}
 
-	defer func() {
-		r.closeOnce()
-
-		for i := range r.onClose {
-			r.onClose[len(r.onClose)-i-1]()
-		}
-	}()
+	defer r.closeOnce()
 
 	for {
 		select {
