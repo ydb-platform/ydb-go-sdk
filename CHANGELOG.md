@@ -1,3 +1,5 @@
+* Pinged new connections on discovery attempt, closed dropped ones, so `ydb_go_sdk_ydb_driver_conns` metric is correct
+
 ## v3.110.1
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
 
