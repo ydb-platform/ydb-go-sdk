@@ -280,6 +280,13 @@ func (p *Parameter) Date(v time.Time) Builder {
 	return p.parent
 }
 
+func (p *Parameter) Date32(v time.Time) Builder {
+	p.value = value.Date32ValueFromTime(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
 func (p *Parameter) Datetime(v time.Time) Builder {
 	p.value = value.DatetimeValueFromTime(v)
 	p.parent.params = append(p.parent.params, p)

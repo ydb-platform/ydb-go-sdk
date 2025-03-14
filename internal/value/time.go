@@ -46,10 +46,21 @@ func DateToTime(n uint32) time.Time {
 	return time.Unix(0, 0).Add(time.Hour * 24 * time.Duration(n))
 }
 
+// Date32ToTime up to 11761191-01-20 00:00:00 +0000 UTC.
+func Date32ToTime(days int32) time.Time {
+	return time.Unix(int64(days)*24*60*60, 0)
+}
+
 // DatetimeToTime converts seconds to time.Time
 // Up to 2106-02-07 06:28:15 +0000 UTC.
 func DatetimeToTime(n uint32) time.Time {
 	return time.Unix(int64(n), 0)
+}
+
+// Datetime64ToTime converts seconds to time.Time
+// Up to 2106-02-07 06:28:15 +0000 UTC.
+func Datetime64ToTime(n int64) time.Time {
+	return time.Unix(n, 0)
 }
 
 // TimestampToTime converts given microseconds to time.Time
@@ -59,6 +70,15 @@ func TimestampToTime(n uint64) time.Time {
 	nsec := (n - (sec * microsecondsPerSecond)) * nanosecondsPerMicrosecond
 
 	return time.Unix(int64(sec), int64(nsec))
+}
+
+// Timestamp64ToTime converts given microseconds to time.Time
+// Up to 586524-01-19 08:01:49.000551615 +0000 UTC.
+func Timestamp64ToTime(n int64) time.Time {
+	sec := n / microsecondsPerSecond
+	nsec := (n - (sec * microsecondsPerSecond)) * nanosecondsPerMicrosecond
+
+	return time.Unix(sec, nsec)
 }
 
 func TzDateToTime(s string) (t time.Time, err error) {

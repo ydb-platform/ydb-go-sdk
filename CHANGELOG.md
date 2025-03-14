@@ -1,3 +1,5 @@
+* Supported wide `Date32`, `Datetime64` and `Timestamp64` types
+
 ## v3.101.4
 * Switched internal type of result `ydb.Driver.Query()` from `*internal/query.Client` to `query.Client` interface 
 
