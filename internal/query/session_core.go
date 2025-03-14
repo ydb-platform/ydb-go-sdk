@@ -5,6 +5,7 @@ import (
 	"os"
 	"runtime/pprof"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -48,7 +48,7 @@ type (
 		nodeID         uint32
 		status         atomic.Uint32
 		onChangeStatus []func(status Status)
-		closeOnce      func(ctx context.Context) error
+		closeOnce      func()
 	}
 )
 
@@ -197,17 +197,9 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	core.closeOnce = xsync.OnceFunc(func(ctx context.Context) error {
+	core.closeOnce = sync.OnceFunc(func() {
+		defer close(core.done)
 		defer cancelAttach()
-
-		core.SetStatus(StatusClosing)
-		defer core.SetStatus(StatusClosed)
-
-		if err = core.deleteSession(ctx); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return nil
 	})
 
 	if markGoroutineWithLabelNodeIDForAttachStream {
@@ -224,17 +216,10 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 }
 
 func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryService_AttachSessionClient) {
-	defer func() {
-		select {
-		case <-core.done:
-			return
-		default:
-			close(core.done)
-		}
-	}()
-
 	for core.IsAlive() {
 		if _, recvErr := attachStream.Recv(); recvErr != nil {
+			core.closeOnce()
+
 			return
 		}
 	}
@@ -281,14 +266,21 @@ func (core *sessionCore) IsAlive() bool {
 }
 
 func (core *sessionCore) Close(ctx context.Context) (err error) {
+	defer core.closeOnce()
+
 	select {
 	case <-core.done:
 		return nil
 	default:
-		close(core.done)
+		core.SetStatus(StatusClosing)
+		defer core.SetStatus(StatusClosed)
+
+		if err = core.deleteSession(ctx); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
 	}
 
-	return core.closeOnce(ctx)
+	return nil
 }
 
 func StatusFromErr(err error) Status {

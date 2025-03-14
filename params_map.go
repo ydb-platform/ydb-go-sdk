@@ -20,8 +20,6 @@ func (p wrongParameters) ToYDB(a *allocator.Allocator) (map[string]*Ydb.TypedVal
 }
 
 // ParamsFromMap build parameters from named map
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func ParamsFromMap(m map[string]any) params.Parameters {
 	namedParameters := make([]any, 0, len(m))
 	for name, val := range m {
