@@ -1,3 +1,5 @@
+* Pinged new connections on discovery attempt, closed dropped ones, so `ydb_go_sdk_ydb_driver_conns` metric is correct
+
 ## v3.108.3
 * Fixed handling of zero values for DyNumber
 * Fixed the decimal yql slice bounds out of range

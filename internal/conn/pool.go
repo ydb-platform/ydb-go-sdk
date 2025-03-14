@@ -40,6 +40,20 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 	return p.dialOptions
 }
 
+func (p *Pool) GetIfPresent(endpoint endpoint.Endpoint) Conn {
+	var (
+		address = endpoint.Address()
+		cc      *conn
+		has     bool
+	)
+
+	if cc, has = p.conns.Get(address); has {
+		return cc
+	}
+
+	return nil
+}
+
 func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 	var (
 		address = endpoint.Address()
@@ -251,4 +265,13 @@ func NewPool(ctx context.Context, config Config) *Pool {
 	}
 
 	return p
+}
+
+func (p *Pool) EndpointsToConnections(endpoints []endpoint.Endpoint) []Conn {
+	conns := make([]Conn, 0, len(endpoints))
+	for _, e := range endpoints {
+		conns = append(conns, p.Get(e))
+	}
+
+	return conns
 }
