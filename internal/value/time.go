@@ -36,9 +36,19 @@ func IntervalToDuration(n int64) time.Duration {
 	return time.Duration(n) * time.Microsecond
 }
 
+// Interval64ToDuration returns time.Duration from given nanoseconds
+func Interval64ToDuration(n int64) time.Duration {
+	return time.Duration(n) * time.Nanosecond
+}
+
 // durationToMicroseconds returns microseconds from given time.Duration
 func durationToMicroseconds(d time.Duration) int64 {
 	return int64(d / time.Microsecond)
+}
+
+// durationToNanoseconds returns nanoseconds from given time.Duration
+func durationToNanoseconds(d time.Duration) int64 {
+	return int64(d / time.Nanosecond)
 }
 
 // DateToTime up to 11761191-01-20 00:00:00 +0000 UTC.

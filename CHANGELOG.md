@@ -1,3 +1,5 @@
+* Supported wide `Interval64` type
+
 ## v3.102.0
 * Supported wide `Date32`, `Datetime64` and `Timestamp64` types
 
