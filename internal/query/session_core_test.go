@@ -55,7 +55,7 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 		<-stopRecv
 		require.Equal(t, uint32(2), recvMsgCounter.Load())
 		<-startRecv
-		close(done)
+		core.closeOnce()
 		require.GreaterOrEqual(t, recvMsgCounter.Load(), uint32(2))
 		require.LessOrEqual(t, recvMsgCounter.Load(), uint32(3))
 	}, xtest.StopAfter(time.Second))
