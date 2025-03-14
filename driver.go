@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -228,7 +229,7 @@ func (d *Driver) Table() table.Client {
 }
 
 // Query returns query client
-func (d *Driver) Query() *internalQuery.Client {
+func (d *Driver) Query() query.Client {
 	return d.query.Must()
 }
 
