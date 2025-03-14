@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -14,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -33,13 +33,13 @@ type (
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-		closeOnce      func(ctx context.Context) error
+		closeOnce      func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
 		closed         chan struct{}
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
-		onClose        []func(ctx context.Context) error
+		onClose        []func()
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 	}
@@ -99,7 +99,7 @@ func withStatsCallback(callback func(queryStats stats.QueryStats)) resultOption 
 	}
 }
 
-func withOnClose(onClose func(ctx context.Context) error) resultOption {
+func withOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
 		s.onClose = append(s.onClose, onClose)
 	}
@@ -117,7 +117,7 @@ func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
 	}
 }
 
-func newResult( //nolint:funlen
+func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	opts ...resultOption,
@@ -137,20 +137,8 @@ func newResult( //nolint:funlen
 		}
 	}
 
-	r.closeOnce = xsync.OnceFunc(func(ctx context.Context) error {
-		defer func() {
-			close(closed)
-
-			r.stream = nil
-		}()
-
-		for i := range r.onClose {
-			if err := r.onClose[len(r.onClose)-i-1](ctx); err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-		}
-
-		return nil
+	r.closeOnce = sync.OnceFunc(func() {
+		close(closed)
 	})
 
 	if r.trace != nil {
@@ -197,9 +185,13 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	case <-r.closed:
 		return nil, xerrors.WithStackTrace(io.EOF)
 	default:
+		if r.stream == nil {
+			return nil, xerrors.WithStackTrace(io.EOF)
+		}
+
 		part, err = nextPart(r.stream)
 		if err != nil {
-			_ = r.closeOnce(ctx)
+			r.stream = nil
 
 			for _, callback := range r.onNextPartErr {
 				callback(err)
@@ -239,11 +231,31 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		}()
 	}
 
-	if err := r.closeOnce(ctx); err != nil {
-		return xerrors.WithStackTrace(err)
-	}
+	defer func() {
+		r.closeOnce()
 
-	return nil
+		for i := range r.onClose {
+			r.onClose[len(r.onClose)-i-1]()
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return xerrors.WithStackTrace(ctx.Err())
+		case <-r.closed:
+			return xerrors.WithStackTrace(errStreamResultClosed)
+		default:
+			_, err := r.nextPart(ctx)
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					return nil
+				}
+
+				return xerrors.WithStackTrace(err)
+			}
+		}
+	}
 }
 
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
@@ -271,7 +283,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 				r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
-				_ = r.closeOnce(ctx)
+				r.stream = nil
 
 				if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
 					return nil, xerrors.WithStackTrace(io.EOF)

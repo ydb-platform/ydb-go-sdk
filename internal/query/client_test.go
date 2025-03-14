@@ -1386,6 +1386,7 @@ func TestClient(t *testing.T) {
 						},
 					},
 				}, nil)
+				stream.EXPECT().Recv().Return(nil, io.EOF)
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
@@ -1525,6 +1526,7 @@ func TestClient(t *testing.T) {
 						},
 					},
 				}, nil)
+				stream.EXPECT().Recv().Return(nil, io.EOF)
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
