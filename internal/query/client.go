@@ -421,8 +421,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
-		q,
-		settings.Label(),
+		q, settings.Label(),
 	)
 	defer func() {
 		onDone(err)
@@ -438,7 +437,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 
 func clientQueryResultSet(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
-) (rs result.ClosableResultSet, finalErr error) {
+) (rs result.ClosableResultSet, rowsCount int, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
 		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
 		if err != nil {
@@ -448,7 +447,7 @@ func clientQueryResultSet(
 			_ = streamResult.Close(ctx)
 		}()
 
-		rs, err = readMaterializedResultSet(ctx, streamResult)
+		rs, rowsCount, err = readMaterializedResultSet(ctx, streamResult)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -456,10 +455,10 @@ func clientQueryResultSet(
 		return nil
 	}, settings.RetryOpts()...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, 0, xerrors.WithStackTrace(err)
 	}
 
-	return rs, nil
+	return rs, rowsCount, nil
 }
 
 // QueryResultSet is a helper which read all rows from first result set in result
@@ -469,17 +468,21 @@ func (c *Client) QueryResultSet(
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
-	settings := options.ExecuteSettings(opts...)
+	var (
+		settings  = options.ExecuteSettings(opts...)
+		rowsCount int
+		err       error
+	)
 
 	onDone := trace.QueryOnQueryResultSet(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryResultSet"),
 		q, settings.Label(),
 	)
 	defer func() {
-		onDone(finalErr)
+		onDone(finalErr, rowsCount)
 	}()
 
-	rs, err := clientQueryResultSet(ctx, c.pool, q, settings, withTrace(c.config.Trace()))
+	rs, rowsCount, err = clientQueryResultSet(ctx, c.pool, q, settings, withTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

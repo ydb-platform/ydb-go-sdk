@@ -162,7 +162,8 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryResultSetDoneInfo struct {
-		Error error
+		Error     error
+		RowsCount int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionQueryResultSetStartInfo struct {
@@ -191,6 +192,7 @@ type (
 
 		Tx    txInfo
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryResultSetDoneInfo struct {
@@ -239,6 +241,7 @@ type (
 
 		Tx    txInfo
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryRowDoneInfo struct {

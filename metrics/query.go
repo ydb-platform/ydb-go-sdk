@@ -161,6 +161,7 @@ func query(config Config) (t trace.Query) {
 				qqConfig := queryConfig.WithSystem("result").WithSystem("set")
 				errs := qqConfig.CounterVec("errs", "status", "label")
 				latency := qqConfig.TimerVec("latency", "label")
+				rowsCount := qqConfig.GaugeVec("rows", "label")
 				t.OnQueryResultSet = func(info trace.QueryQueryResultSetStartInfo) func(trace.QueryQueryResultSetDoneInfo) {
 					start := time.Now()
 					label := info.Label
@@ -177,6 +178,9 @@ func query(config Config) (t trace.Query) {
 								"label":  label,
 							}).Inc()
 							latency.With(labels).Record(time.Since(start))
+							if info.Error == nil {
+								rowsCount.With(labels).Set(float64(info.RowsCount))
+							}
 						}
 					}
 				}
@@ -320,6 +324,46 @@ func query(config Config) (t trace.Query) {
 							"label":  label,
 						}).Inc()
 						latency.With(labels).Record(time.Since(start))
+					}
+				}
+			}
+			{
+				txQueryConfig := txConfig.WithSystem("row")
+				errs := txQueryConfig.CounterVec("errs", "status", "label")
+				latency := txQueryConfig.TimerVec("latency", "label")
+				t.OnTxQueryRow = func(info trace.QueryTxQueryRowStartInfo) func(trace.QueryTxQueryRowDoneInfo) {
+					start := time.Now()
+					label := info.Label
+
+					return func(info trace.QueryTxQueryRowDoneInfo) {
+						labels := map[string]string{"label": label}
+						if txQueryConfig.Details()&trace.QuerySessionEvents != 0 {
+							errs.With(map[string]string{
+								"status": errorBrief(info.Error),
+								"label":  label,
+							}).Inc()
+							latency.With(labels).Record(time.Since(start))
+						}
+					}
+				}
+			}
+			{
+				txQueryConfig := txConfig.WithSystem("result").WithSystem("set")
+				errs := txQueryConfig.CounterVec("errs", "status", "label")
+				latency := txQueryConfig.TimerVec("latency", "label")
+				t.OnTxQueryResultSet = func(info trace.QueryTxQueryResultSetStartInfo) func(trace.QueryTxQueryResultSetDoneInfo) {
+					start := time.Now()
+					label := info.Label
+
+					return func(info trace.QueryTxQueryResultSetDoneInfo) {
+						labels := map[string]string{"label": label}
+						if txQueryConfig.Details()&trace.QuerySessionEvents != 0 {
+							errs.With(map[string]string{
+								"status": errorBrief(info.Error),
+								"label":  label,
+							}).Inc()
+							latency.With(labels).Record(time.Since(start))
+						}
 					}
 				}
 			}
