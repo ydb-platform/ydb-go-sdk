@@ -46,6 +46,7 @@ type (
 		txControl              TxControl
 		retryOptions           []retry.Option
 		responsePartLimitBytes int64
+		label                  string
 	}
 
 	// Execute is an interface for execute method options
@@ -164,6 +165,7 @@ func defaultExecuteSettings() executeSettings {
 		statsMode: StatsModeNone,
 		txControl: tx.DefaultTxControl(),
 		params:    &params.Params{},
+		label:     "undefined",
 	}
 }
 
@@ -209,6 +211,10 @@ func (s *executeSettings) Params() params.Parameters {
 
 func (s *executeSettings) ResponsePartLimitSizeBytes() int64 {
 	return s.responsePartLimitBytes
+}
+
+func (s *executeSettings) Label() string {
+	return s.label
 }
 
 func WithParameters(params params.Parameters) parametersOption {
