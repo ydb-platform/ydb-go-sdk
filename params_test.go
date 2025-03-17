@@ -3,6 +3,7 @@ package ydb_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -216,5 +218,85 @@ func BenchmarkParams(b *testing.B) {
 			_, _ = params.ToYDB(a)
 			a.Free()
 		}
+	})
+}
+
+func TestParamsFromMap(t *testing.T) {
+	t.Run("DefaultTimeTypes", func(t *testing.T) {
+		params := ydb.ParamsFromMap(map[string]any{
+			"a": time.Unix(123, 456),
+			"b": time.Duration(123) * time.Microsecond,
+		})
+		pp, err := params.ToYDB(&allocator.Allocator{})
+		require.NoError(t, err)
+		require.EqualValues(t, map[string]*Ydb.TypedValue{
+			"$a": {
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_TIMESTAMP,
+					},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Uint64Value{
+						Uint64Value: 123000000,
+					},
+				},
+			},
+			"$b": {
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_INTERVAL,
+					},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 123,
+					},
+				},
+			},
+		}, pp)
+	})
+	t.Run("BindWideTimeTypes", func(t *testing.T) {
+		params := ydb.ParamsFromMap(map[string]any{
+			"a": time.Date(1900, 1, 1, 0, 0, 0, 123456, time.UTC),
+			"b": time.Duration(123) * time.Nanosecond,
+		}, ydb.WithWideTimeTypes())
+		pp, err := params.ToYDB(&allocator.Allocator{})
+		require.NoError(t, err)
+		require.EqualValues(t, map[string]*Ydb.TypedValue{
+			"$a": {
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_TIMESTAMP64,
+					},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: -2208988799999877,
+					},
+				},
+			},
+			"$b": {
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_INTERVAL64,
+					},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 123,
+					},
+				},
+			},
+		}, pp)
+	})
+	t.Run("WrongBindings", func(t *testing.T) {
+		params := ydb.ParamsFromMap(map[string]any{
+			"a": time.Unix(123, 456),
+			"b": time.Duration(123),
+		}, ydb.WithTablePathPrefix(""))
+		pp, err := params.ToYDB(&allocator.Allocator{})
+		require.ErrorIs(t, err, bind.ErrUnsupportedBindingType)
+		require.Nil(t, pp)
 	})
 }

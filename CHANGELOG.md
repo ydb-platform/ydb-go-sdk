@@ -1,3 +1,5 @@
+* Added bindings elipsis into `ydb.ParamsFromMap` for bind wide time types
+
 ## v3.104.1
 * Added export of advanced metric information for QueryService calls
 

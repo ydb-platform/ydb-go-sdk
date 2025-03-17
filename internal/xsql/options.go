@@ -38,7 +38,7 @@ type (
 	retryBudgetOption           struct {
 		budget budget.Budget
 	}
-	bindOption struct {
+	BindOption struct {
 		bind.Bind
 	}
 	queryProcessorOption Engine
@@ -57,7 +57,7 @@ func (processor queryProcessorOption) Apply(c *Connector) error {
 	return nil
 }
 
-func (opt bindOption) Apply(c *Connector) error {
+func (opt BindOption) Apply(c *Connector) error {
 	c.bindings = bind.Sort(append(c.bindings, opt.Bind))
 
 	return nil
@@ -141,7 +141,7 @@ func WithTablePathPrefix(tablePathPrefix string) QueryBindOption {
 }
 
 func WithQueryBind(bind bind.Bind) QueryBindOption {
-	return bindOption{
+	return BindOption{
 		Bind: bind,
 	}
 }

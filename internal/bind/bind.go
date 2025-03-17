@@ -44,10 +44,10 @@ func (bindings Bindings) ToYdb(sql string, args ...any) (
 	defer buffer.Free()
 
 	for i := range bindings {
-		var e error
-		sql, args, e = bindings[len(bindings)-1-i].ToYdb(sql, args...)
-		if e != nil {
-			return "", nil, xerrors.WithStackTrace(e)
+		var err error
+		sql, args, err = bindings[len(bindings)-1-i].ToYdb(sql, args...)
+		if err != nil {
+			return "", nil, xerrors.WithStackTrace(err)
 		}
 	}
 
