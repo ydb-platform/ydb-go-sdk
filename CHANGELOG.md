@@ -1,3 +1,4 @@
+## v3.104.2
 * Added bindings options into `ydb.ParamsFromMap` for bind wide time types
 * Changed `ydb.WithWideTimeTypes(bool)` for allow boolean argument
 
