@@ -229,32 +229,35 @@ func TestParamsFromMap(t *testing.T) {
 		})
 		pp, err := params.ToYDB(&allocator.Allocator{})
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]*Ydb.TypedValue{
-			"$a": {
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_TIMESTAMP,
+		require.EqualValues(t,
+			fmt.Sprintf("%+v", map[string]*Ydb.TypedValue{
+				"$a": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_TIMESTAMP,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Uint64Value{
+							Uint64Value: 123000000,
+						},
 					},
 				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123000000,
+				"$b": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_INTERVAL,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Int64Value{
+							Int64Value: 123,
+						},
 					},
 				},
-			},
-			"$b": {
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_INTERVAL,
-					},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int64Value{
-						Int64Value: 123,
-					},
-				},
-			},
-		}, pp)
+			}),
+			fmt.Sprintf("%+v", pp),
+		)
 	})
 	t.Run("BindWideTimeTypes", func(t *testing.T) {
 		params := ydb.ParamsFromMap(map[string]any{
@@ -263,32 +266,35 @@ func TestParamsFromMap(t *testing.T) {
 		}, ydb.WithWideTimeTypes(true))
 		pp, err := params.ToYDB(&allocator.Allocator{})
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]*Ydb.TypedValue{
-			"$a": {
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_TIMESTAMP64,
+		require.EqualValues(t,
+			fmt.Sprintf("%+v", map[string]*Ydb.TypedValue{
+				"$a": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_TIMESTAMP64,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Int64Value{
+							Int64Value: -2208988799999877,
+						},
 					},
 				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int64Value{
-						Int64Value: -2208988799999877,
+				"$b": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_INTERVAL64,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Int64Value{
+							Int64Value: 123,
+						},
 					},
 				},
-			},
-			"$b": {
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_INTERVAL64,
-					},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int64Value{
-						Int64Value: 123,
-					},
-				},
-			},
-		}, pp)
+			}),
+			fmt.Sprintf("%+v", pp),
+		)
 	})
 	t.Run("WrongBindings", func(t *testing.T) {
 		params := ydb.ParamsFromMap(map[string]any{
