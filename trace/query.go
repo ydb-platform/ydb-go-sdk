@@ -158,6 +158,7 @@ type (
 		Call    call
 
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryResultSetDoneInfo struct {
@@ -205,6 +206,7 @@ type (
 		Call    call
 
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryRowDoneInfo struct {
@@ -555,7 +557,6 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolWithDoneInfo struct {

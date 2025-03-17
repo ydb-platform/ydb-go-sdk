@@ -322,15 +322,17 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
+	settings := options.ExecuteSettings(opts...)
+
 	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
-		q,
+		q, settings.Label(),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	row, err := clientQueryRow(ctx, c.pool, q, options.ExecuteSettings(opts...), withTrace(c.config.Trace()))
+	row, err := clientQueryRow(ctx, c.pool, q, settings, withTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -467,15 +469,17 @@ func (c *Client) QueryResultSet(
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
+	settings := options.ExecuteSettings(opts...)
+
 	onDone := trace.QueryOnQueryResultSet(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryResultSet"),
-		q,
+		q, settings.Label(),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	rs, err := clientQueryResultSet(ctx, c.pool, q, options.ExecuteSettings(opts...), withTrace(c.config.Trace()))
+	rs, err := clientQueryResultSet(ctx, c.pool, q, settings, withTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

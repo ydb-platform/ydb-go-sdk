@@ -133,6 +133,54 @@ func query(config Config) (t trace.Query) {
 					}
 				}
 			}
+			{
+				qqConfig := queryConfig.WithSystem("row")
+				errs := qqConfig.CounterVec("errs", "status", "label")
+				latency := qqConfig.TimerVec("latency", "label")
+				t.OnQueryRow = func(info trace.QueryQueryRowStartInfo) func(trace.QueryQueryRowDoneInfo) {
+					start := time.Now()
+					label := info.Label
+
+					if label == "" {
+						return nil
+					}
+
+					return func(info trace.QueryQueryRowDoneInfo) {
+						labels := map[string]string{"label": label}
+						if qqConfig.Details()&trace.QueryEvents != 0 {
+							errs.With(map[string]string{
+								"status": errorBrief(info.Error),
+								"label":  label,
+							}).Inc()
+							latency.With(labels).Record(time.Since(start))
+						}
+					}
+				}
+			}
+			{
+				qqConfig := queryConfig.WithSystem("result").WithSystem("set")
+				errs := qqConfig.CounterVec("errs", "status", "label")
+				latency := qqConfig.TimerVec("latency", "label")
+				t.OnQueryResultSet = func(info trace.QueryQueryResultSetStartInfo) func(trace.QueryQueryResultSetDoneInfo) {
+					start := time.Now()
+					label := info.Label
+
+					if label == "" {
+						return nil
+					}
+
+					return func(info trace.QueryQueryResultSetDoneInfo) {
+						labels := map[string]string{"label": label}
+						if qqConfig.Details()&trace.QueryEvents != 0 {
+							errs.With(map[string]string{
+								"status": errorBrief(info.Error),
+								"label":  label,
+							}).Inc()
+							latency.With(labels).Record(time.Since(start))
+						}
+					}
+				}
+			}
 		}
 	}
 	{
