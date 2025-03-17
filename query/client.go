@@ -144,7 +144,7 @@ func WithTrace(t *trace.Query) options.TraceOption {
 	return options.WithTrace(t)
 }
 
-func WithLabel(lbl string) options.RetryOptionsOption {
+func WithLabel(lbl string) options.LabelOption {
 	return options.WithLabel(lbl)
 }
 

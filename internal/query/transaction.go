@@ -191,11 +191,15 @@ func (tx *Transaction) txControl() *queryTx.Control {
 	)
 }
 
-func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execute) (
-	finalErr error,
-) {
+func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
+	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnTxExec(tx.s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Exec"), tx.s, tx, q)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Exec"),
+		tx.s,
+		tx,
+		q,
+		settings.Label(),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -204,7 +208,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		return xerrors.WithStackTrace(errExecuteOnCompletedTx)
 	}
 
-	settings, err := tx.executeSettings(opts...)
+	txSettings, err := tx.executeSettings(opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -215,7 +219,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
-	if settings.TxControl().Commit() {
+	if txSettings.TxControl().Commit() {
 		err = tx.waitOnBeforeCommit(ctx)
 		if err != nil {
 			return err
@@ -230,7 +234,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		)
 	}
 
-	r, err := tx.s.execute(ctx, q, settings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -263,11 +267,15 @@ func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettin
 	}, opts...)...), nil
 }
 
-func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Execute) (
-	_ query.Result, finalErr error,
-) {
+func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Execute) (_ query.Result, finalErr error) {
+	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnTxQuery(tx.s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"), tx.s, tx, q)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"),
+		tx.s,
+		tx,
+		q,
+		settings.Label(),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -276,7 +284,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
 	}
 
-	settings, err := tx.executeSettings(opts...)
+	txSettings, err := tx.executeSettings(opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -287,7 +295,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			tx.SetTxID(txMeta.GetId())
 		}),
 	}
-	if settings.TxControl().Commit() {
+	if txSettings.TxControl().Commit() {
 		err = tx.waitOnBeforeCommit(ctx)
 		if err != nil {
 			return nil, err
@@ -301,7 +309,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			}),
 		)
 	}
-	r, err := tx.s.execute(ctx, q, settings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

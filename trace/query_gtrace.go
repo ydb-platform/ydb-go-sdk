@@ -1776,10 +1776,11 @@ func QueryOnPoolChange(t *Query, limit int, index int, idle int, wait int, creat
 	t.onPoolChange(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnDo(t *Query, c *context.Context, call call) func(attempts int, _ error) {
+func QueryOnDo(t *Query, c *context.Context, call call, label string) func(attempts int, _ error) {
 	var p QueryDoStartInfo
 	p.Context = c
 	p.Call = call
+	p.Label = label
 	res := t.onDo(p)
 	return func(attempts int, e error) {
 		var p QueryDoDoneInfo
@@ -1789,10 +1790,11 @@ func QueryOnDo(t *Query, c *context.Context, call call) func(attempts int, _ err
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnDoTx(t *Query, c *context.Context, call call) func(attempts int, _ error) {
+func QueryOnDoTx(t *Query, c *context.Context, call call, label string) func(attempts int, _ error) {
 	var p QueryDoTxStartInfo
 	p.Context = c
 	p.Call = call
+	p.Label = label
 	res := t.onDoTx(p)
 	return func(attempts int, e error) {
 		var p QueryDoTxDoneInfo
@@ -1802,11 +1804,12 @@ func QueryOnDoTx(t *Query, c *context.Context, call call) func(attempts int, _ e
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnExec(t *Query, c *context.Context, call call, query string) func(error) {
+func QueryOnExec(t *Query, c *context.Context, call call, query string, label string) func(error) {
 	var p QueryExecStartInfo
 	p.Context = c
 	p.Call = call
 	p.Query = query
+	p.Label = label
 	res := t.onExec(p)
 	return func(e error) {
 		var p QueryExecDoneInfo
@@ -1815,11 +1818,12 @@ func QueryOnExec(t *Query, c *context.Context, call call, query string) func(err
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnQuery(t *Query, c *context.Context, call call, query string) func(error) {
+func QueryOnQuery(t *Query, c *context.Context, call call, query string, label string) func(error) {
 	var p QueryQueryStartInfo
 	p.Context = c
 	p.Call = call
 	p.Query = query
+	p.Label = label
 	res := t.onQuery(p)
 	return func(e error) {
 		var p QueryQueryDoneInfo
@@ -1893,12 +1897,13 @@ func QueryOnSessionDelete(t *Query, c *context.Context, call call, session sessi
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionExec(t *Query, c *context.Context, call call, session sessionInfo, query string) func(error) {
+func QueryOnSessionExec(t *Query, c *context.Context, call call, session sessionInfo, query string, label string) func(error) {
 	var p QuerySessionExecStartInfo
 	p.Context = c
 	p.Call = call
 	p.Session = session
 	p.Query = query
+	p.Label = label
 	res := t.onSessionExec(p)
 	return func(e error) {
 		var p QuerySessionExecDoneInfo
@@ -1907,12 +1912,13 @@ func QueryOnSessionExec(t *Query, c *context.Context, call call, session session
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionQuery(t *Query, c *context.Context, call call, session sessionInfo, query string) func(error) {
+func QueryOnSessionQuery(t *Query, c *context.Context, call call, session sessionInfo, query string, label string) func(error) {
 	var p QuerySessionQueryStartInfo
 	p.Context = c
 	p.Call = call
 	p.Session = session
 	p.Query = query
+	p.Label = label
 	res := t.onSessionQuery(p)
 	return func(e error) {
 		var p QuerySessionQueryDoneInfo
@@ -1991,13 +1997,14 @@ func QueryOnTxRollback(t *Query, c *context.Context, call call, session sessionI
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxExec(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo, query string) func(error) {
+func QueryOnTxExec(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo, query string, label string) func(error) {
 	var p QueryTxExecStartInfo
 	p.Context = c
 	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	p.Query = query
+	p.Label = label
 	res := t.onTxExec(p)
 	return func(e error) {
 		var p QueryTxExecDoneInfo
@@ -2006,13 +2013,14 @@ func QueryOnTxExec(t *Query, c *context.Context, call call, session sessionInfo,
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxQuery(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo, query string) func(error) {
+func QueryOnTxQuery(t *Query, c *context.Context, call call, session sessionInfo, tx txInfo, query string, label string) func(error) {
 	var p QueryTxQueryStartInfo
 	p.Context = c
 	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	p.Query = query
+	p.Label = label
 	res := t.onTxQuery(p)
 	return func(e error) {
 		var p QueryTxQueryDoneInfo

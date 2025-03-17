@@ -94,6 +94,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryDoDoneInfo struct {
@@ -108,6 +109,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryDoTxDoneInfo struct {
@@ -124,6 +126,7 @@ type (
 		Call    call
 
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryExecDoneInfo struct {
@@ -139,6 +142,7 @@ type (
 		Call    call
 
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryDoneInfo struct {
@@ -293,6 +297,7 @@ type (
 
 		Session sessionInfo
 		Query   string
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionExecDoneInfo struct {
@@ -309,6 +314,7 @@ type (
 
 		Session sessionInfo
 		Query   string
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionQueryDoneInfo struct {
@@ -326,6 +332,7 @@ type (
 		Session sessionInfo
 		Tx      txInfo
 		Query   string
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxExecDoneInfo struct {
@@ -375,6 +382,7 @@ type (
 		Session sessionInfo
 		Tx      txInfo
 		Query   string
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryDoneInfo struct {
@@ -547,6 +555,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolWithDoneInfo struct {
