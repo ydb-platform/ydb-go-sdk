@@ -115,7 +115,7 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 			case "numeric":
 				binders = append(binders, xsql.WithQueryBind(bind.NumericArgs{}))
 			case "wide_time_types":
-				binders = append(binders, xsql.WithQueryBind(bind.WideTimeTypes{}))
+				binders = append(binders, xsql.WithQueryBind(bind.WideTimeTypes(true)))
 			default:
 				if strings.HasPrefix(transformer, tablePathPrefixTransformer) {
 					prefix, err := extractTablePathPrefixFromBinderName(transformer)

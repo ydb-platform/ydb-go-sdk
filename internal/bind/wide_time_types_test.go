@@ -58,7 +58,7 @@ func TestWideTimeTypesBind(t *testing.T) {
 			},
 		},
 		{
-			bind: WideTimeTypes{},
+			bind: WideTimeTypes(true),
 			sql:  `SELECT ?, ?`,
 			args: []any{
 				100,
@@ -71,7 +71,7 @@ func TestWideTimeTypesBind(t *testing.T) {
 			},
 		},
 		{
-			bind: WideTimeTypes{},
+			bind: WideTimeTypes(true),
 			sql:  `SELECT ?, ?`,
 			args: []any{
 				time.Unix(123, 456),
@@ -84,7 +84,7 @@ func TestWideTimeTypesBind(t *testing.T) {
 			},
 		},
 		{
-			bind: WideTimeTypes{},
+			bind: WideTimeTypes(true),
 			sql:  `SELECT ?, ?`,
 			args: []any{
 				time.Duration(123) * time.Millisecond,

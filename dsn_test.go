@@ -182,7 +182,7 @@ func TestParse(t *testing.T) {
 				xsql.WithDefaultQueryMode(xtable.ScriptingQueryMode),
 				xsql.WithQueryBind(bind.PositionalArgs{}),
 				xsql.WithQueryBind(bind.AutoDeclare{}),
-				xsql.WithQueryBind(bind.WideTimeTypes{}),
+				xsql.WithQueryBind(bind.WideTimeTypes(true)),
 			},
 			err: nil,
 		},
