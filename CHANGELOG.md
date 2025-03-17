@@ -1,4 +1,5 @@
 * Added bindings options into `ydb.ParamsFromMap` for bind wide time types
+* Changed `ydb.WithWideTimeTypes(bool)` for allow boolean argument
 
 ## v3.104.1
 * Added export of advanced metric information for QueryService calls

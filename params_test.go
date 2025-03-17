@@ -260,7 +260,7 @@ func TestParamsFromMap(t *testing.T) {
 		params := ydb.ParamsFromMap(map[string]any{
 			"a": time.Date(1900, 1, 1, 0, 0, 0, 123456, time.UTC),
 			"b": time.Duration(123) * time.Nanosecond,
-		}, ydb.WithWideTimeTypes())
+		}, ydb.WithWideTimeTypes(true))
 		pp, err := params.ToYDB(&allocator.Allocator{})
 		require.NoError(t, err)
 		require.EqualValues(t, map[string]*Ydb.TypedValue{
