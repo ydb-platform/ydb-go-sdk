@@ -1,3 +1,4 @@
+## v3.104.4
 * Fixed bug with session query latency metric collector
 
 ## v3.104.3
