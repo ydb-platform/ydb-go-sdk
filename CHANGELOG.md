@@ -1,3 +1,5 @@
+* Added `WithReaderLogContext`, `WithWriterLogContext` options to topic reader/writer to supply log entries with user context fields
+
 ## v3.104.4
 * Fixed bug with session query latency metric collector
 

@@ -37,5 +37,9 @@ func NamesFromContext(ctx context.Context) []string {
 }
 
 func with(ctx context.Context, lvl Level, names ...string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	return WithLevel(WithNames(ctx, names...), lvl)
 }
