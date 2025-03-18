@@ -251,7 +251,7 @@ func query(config Config) (t trace.Query) {
 		{
 			sessionQueryConfig := sessionConfig.WithSystem("query")
 			errs := sessionQueryConfig.CounterVec("errs", "status", "label")
-			latency := sessionQueryConfig.TimerVec("latency")
+			latency := sessionQueryConfig.TimerVec("latency", "label")
 			t.OnSessionQuery = func(info trace.QuerySessionQueryStartInfo) func(trace.QuerySessionQueryDoneInfo) {
 				start := time.Now()
 				label := info.Label
