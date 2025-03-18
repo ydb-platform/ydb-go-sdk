@@ -1,6 +1,7 @@
 package topicoptions
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
@@ -279,5 +280,13 @@ func WithReaderWithoutConsumer(saveStateOnReconnection bool) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.ReadWithoutConsumer = true
 		cfg.CommitMode = CommitModeNone
+	}
+}
+
+// WithReaderLogContext allows providing a context.Context instance which will be used
+// in log/topic events.
+func WithReaderLogContext(ctx context.Context) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.BaseContext = ctx
 	}
 }

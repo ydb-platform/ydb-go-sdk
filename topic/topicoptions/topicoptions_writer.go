@@ -1,6 +1,7 @@
 package topicoptions
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -213,4 +214,12 @@ func WithWriterTrace(t trace.Topic) WriterOption { //nolint:gocritic
 // WithWriterUpdateTokenInterval set time interval between send auth token to the server
 func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
 	return topicwriterinternal.WithTokenUpdateInterval(interval)
+}
+
+// WithWriterLogContext allows providing a context.Context instance which will be used
+// in log/topic events.
+func WithWriterLogContext(ctx context.Context) WriterOption {
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.LogContext = ctx
+	}
 }
