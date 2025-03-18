@@ -1,3 +1,5 @@
+* Fixed bug with session query latency metric collector
+
 ## v3.104.3
 * Changed argument types in `table.Client.ReadRows` to public types for compatibility with mock-generation 
 
