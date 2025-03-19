@@ -108,17 +108,13 @@ func TestPublicMessage(t *testing.T) {
 		reader1, err := dm.Decode(customCodec, &buf1)
 		require.NoError(t, err)
 
-		data1, err := io.ReadAll(reader1)
+		msg1 := &PublicMessage{data: newOneTimeReaderFromReader(reader1)}
+
+		data1, err := io.ReadAll(msg1)
 		require.NoError(t, err)
 		require.Equal(t, "message", string(data1))
 
-		require.NoError(t, reader1.(io.Closer).Close())
-
-		pool := dm.dp[customCodec]
-		reusedDecoder := pool.Get()
-		require.NotNil(t, reusedDecoder, "Decoder should be retrieved from pool after Close")
-
-		pool.Put(reusedDecoder)
+		require.NoError(t, msg1.Close())
 
 		var buf2 bytes.Buffer
 		gw2 := gzip.NewWriter(&buf2)
@@ -129,10 +125,12 @@ func TestPublicMessage(t *testing.T) {
 		reader2, err := dm.Decode(customCodec, &buf2)
 		require.NoError(t, err)
 
-		data2, err := io.ReadAll(reader2)
+		msg2 := &PublicMessage{data: newOneTimeReaderFromReader(reader2)}
+
+		data2, err := io.ReadAll(msg2)
 		require.NoError(t, err)
 		require.Equal(t, "message2", string(data2))
 
-		require.NoError(t, reader2.(io.Closer).Close())
+		require.NoError(t, msg2.Close())
 	})
 }

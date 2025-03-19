@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"io"
 	"testing"
 	"testing/iotest"
@@ -144,7 +145,8 @@ func TestOneTimeReader(t *testing.T) {
 	})
 
 	t.Run("GzipDecoderReturnedToPoolAfterClose", func(t *testing.T) {
-		pool := newDecoderPool()
+		dm := NewDecoderMap()
+		codec := rawtopiccommon.CodecGzip
 
 		data := []byte("pool reuse test")
 		var buf bytes.Buffer
@@ -153,16 +155,18 @@ func TestOneTimeReader(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, gzipWriter.Close())
 
-		decoder, err := gzip.NewReader(&buf)
+		decoder, err := dm.Decode(codec, &buf)
 		require.NoError(t, err)
 
 		reader := newOneTimeReaderFromReader(decoder)
+		_, err = io.ReadAll(&reader)
+		require.NoError(t, err)
+
 		require.NoError(t, reader.Close(), "Close() should not return error")
 
-		pool.Put(decoder)
-
-		reusedDecoder := pool.Get()
+		reusedDecoder := dm.dp[codec].Get()
 		require.NotNil(t, reusedDecoder, "Decoder should be retrieved from pool after Close")
+		dm.dp[codec].Put(reusedDecoder)
 
 		var buf2 bytes.Buffer
 		gzipWriter2 := gzip.NewWriter(&buf2)
@@ -170,11 +174,13 @@ func TestOneTimeReader(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, gzipWriter2.Close())
 
-		err = reusedDecoder.Reset(&buf2)
-		require.NoError(t, err, "Decoder Reset() должен выполняться успешно")
+		reader2, err := dm.Decode(codec, &buf2)
+		require.NoError(t, err)
 
-		result, err := io.ReadAll(reusedDecoder)
+		result, err := io.ReadAll(reader2)
 		require.NoError(t, err)
 		require.Equal(t, "next message", string(result))
+
+		require.NoError(t, reader2.(io.Closer).Close())
 	})
 }
