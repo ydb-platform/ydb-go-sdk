@@ -1,3 +1,4 @@
+## v3.104.5
 * Added query client session pool metrics: create_in_progress, in_use, waiters_queue
 * Added pool item closing for not-alived item
 
