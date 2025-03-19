@@ -21,9 +21,10 @@ type decoderPool struct {
 }
 
 func (p *decoderPool) Get() ReadResetter {
-	dec, _ := p.pool.Get().(ReadResetter)
-
-	return dec
+	if v := p.pool.Get(); v != nil {
+		return v.(ReadResetter)
+	}
+	return nil
 }
 
 func (p *decoderPool) Put(dec ReadResetter) {

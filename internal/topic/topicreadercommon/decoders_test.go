@@ -108,7 +108,7 @@ func TestDecoderMap(t *testing.T) {
 		result, err := io.ReadAll(decodedReader)
 		require.NoError(t, err)
 		require.Equal(t, string(data), string(result))
-		require.NoError(t, decodedReader.(io.Closer).Close()) // Явный вызов Close вместо defer
+		require.NoError(t, decodedReader.(io.Closer).Close())
 
 		data2 := []byte("second test data")
 		var buf2 bytes.Buffer
@@ -122,7 +122,7 @@ func TestDecoderMap(t *testing.T) {
 		result2, err := io.ReadAll(decodedReader2)
 		require.NoError(t, err)
 		require.Equal(t, string(data2), string(result2))
-		require.NoError(t, decodedReader2.(io.Closer).Close()) // Явный вызов Close вместо defer
+		require.NoError(t, decodedReader2.(io.Closer).Close())
 	})
 
 	t.Run("PoolReuse", func(t *testing.T) {
