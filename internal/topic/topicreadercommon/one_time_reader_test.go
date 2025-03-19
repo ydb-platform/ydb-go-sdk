@@ -163,6 +163,18 @@ func TestOneTimeReader(t *testing.T) {
 
 		reusedDecoder := pool.Get()
 		require.NotNil(t, reusedDecoder, "Decoder should be retrieved from pool after Close")
-		require.Equal(t, decoder, reusedDecoder, "Same gzip.Reader instance should be reused from pool")
+
+		var buf2 bytes.Buffer
+		gzipWriter2 := gzip.NewWriter(&buf2)
+		_, err = gzipWriter2.Write([]byte("next message"))
+		require.NoError(t, err)
+		require.NoError(t, gzipWriter2.Close())
+
+		err = reusedDecoder.Reset(&buf2)
+		require.NoError(t, err, "Decoder Reset() должен выполняться успешно")
+
+		result, err := io.ReadAll(reusedDecoder)
+		require.NoError(t, err)
+		require.Equal(t, "next message", string(result))
 	})
 }

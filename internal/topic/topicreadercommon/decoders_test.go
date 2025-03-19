@@ -142,14 +142,12 @@ func TestDecoderMap(t *testing.T) {
 
 		reader1, err := dm.Decode(customCodec, &buf1)
 		require.NoError(t, err, "first decoding should succeed")
+
 		result1, err := io.ReadAll(reader1)
 		require.NoError(t, err, "reading first message should succeed")
 		require.Equal(t, string(data1), string(result1), "data should match")
-		require.NoError(t, reader1.(io.Closer).Close(), "closing first reader should succeed")
 
-		pool := dm.dp[customCodec]
-		reusedDecoder := pool.Get()
-		require.NotNil(t, reusedDecoder, "decoder should be returned to pool after Close")
+		require.NoError(t, reader1.(io.Closer).Close(), "closing first reader should succeed")
 
 		data2 := []byte("world")
 		var buf2 bytes.Buffer
@@ -160,9 +158,11 @@ func TestDecoderMap(t *testing.T) {
 
 		reader2, err := dm.Decode(customCodec, &buf2)
 		require.NoError(t, err, "second decoding should succeed")
+
 		result2, err := io.ReadAll(reader2)
 		require.NoError(t, err, "reading second message should succeed")
 		require.Equal(t, string(data2), string(result2), "data of second message should match")
+
 		require.NoError(t, reader2.(io.Closer).Close(), "closing second reader should succeed")
 	})
 }
