@@ -116,7 +116,7 @@ func TestPublicMessage(t *testing.T) {
 
 		pool := dm.dp[customCodec]
 		reusedDecoder := pool.Get()
-		require.NotNil(t, reusedDecoder, "Decoder должен вернуться в пул после Close")
+		require.NotNil(t, reusedDecoder, "Decoder should be retrieved from pool after Close")
 
 		pool.Put(reusedDecoder)
 
@@ -135,5 +135,4 @@ func TestPublicMessage(t *testing.T) {
 
 		require.NoError(t, reader2.(io.Closer).Close())
 	})
-
 }

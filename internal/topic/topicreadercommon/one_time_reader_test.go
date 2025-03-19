@@ -165,5 +165,4 @@ func TestOneTimeReader(t *testing.T) {
 		require.NotNil(t, reusedDecoder, "Decoder should be retrieved from pool after Close")
 		require.Equal(t, decoder, reusedDecoder, "Same gzip.Reader instance should be reused from pool")
 	})
-
 }

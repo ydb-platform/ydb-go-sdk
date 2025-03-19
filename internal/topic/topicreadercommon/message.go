@@ -61,6 +61,7 @@ func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 	m.dataConsumed = true
 	err := callbackOnReaderContent(globalReadMessagePool, m, m.UncompressedSize, dst)
 	m.data.Close()
+
 	return err
 }
 
