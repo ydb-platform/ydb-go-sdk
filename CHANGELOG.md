@@ -1,3 +1,6 @@
+* Added query client session pool metrics: create_in_progress, in_use, waiters_queue
+* Added pool item closing for not-alived item
+
 ## v3.104.4
 * Fixed bug with session query latency metric collector
 
