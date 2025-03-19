@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"io"
 	"testing"
 	"testing/iotest"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 )
 
 func TestOneTimeReader(t *testing.T) {

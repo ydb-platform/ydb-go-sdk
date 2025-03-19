@@ -1,6 +1,46 @@
 
 * Supported pool of decoders
 
+## v3.104.5
+* Added query client session pool metrics: create_in_progress, in_use, waiters_queue
+* Added pool item closing for not-alived item
+
+## v3.104.4
+* Fixed bug with session query latency metric collector
+
+## v3.104.3
+* Changed argument types in `table.Client.ReadRows` to public types for compatibility with mock-generation
+
+## v3.104.2
+* Added bindings options into `ydb.ParamsFromMap` for bind wide time types
+* Changed `ydb.WithWideTimeTypes(bool)` for allow boolean argument
+
+## v3.104.1
+* Added export of advanced metric information for QueryService calls
+
+## v3.104.0
+* Added binding `ydb.WithWideTimeTypes()` which interprets `time.Time` and `time.Duration` as `Timestamp64` and `Interval64` YDB types
+
+## v3.103.0
+* Supported wide `Interval64` type
+
+## v3.102.0
+* Supported wide `Date32`, `Datetime64` and `Timestamp64` types
+
+## v3.101.4
+* Switched internal type of result `ydb.Driver.Query()` from `*internal/query.Client` to `query.Client` interface
+
+## v3.101.3
+* Added `query.TransactionActor` type alias to `query.TxActor` for compatibility with `table.Client` API's
+* Removed comment `experimental` from `ydb.ParamsBuilder` and `ydb.ParamsFromMap`
+* Fixed panic on closing `internal/query/sessionCore.done` channel twice
+* Fixed hangup when try to send batch of messages with size more, then grpc limits from topic writer internals
+
+## v3.101.2
+* Added a new metric `ydb_go_sdk_ydb_info` with the current version of the SDK
+
+## v3.101.1
+* Changed allowBanned=false for preferred node connections
 
 ## v3.101.0
 * Added `table.Client.ReadRows` method with internal retries
