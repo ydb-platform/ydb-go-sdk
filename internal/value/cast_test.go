@@ -2,6 +2,7 @@ package value
 
 import (
 	"database/sql/driver"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -30,6 +31,19 @@ func loadLocation(t *testing.T, name string) *time.Location {
 	require.NoError(t, err)
 
 	return loc
+}
+
+type testStringSQLScanner string
+
+func (s *testStringSQLScanner) Scan(value any) error {
+	ts, ok := value.(string)
+	if !ok {
+		return errors.New("can't cast from " + reflect.TypeOf(value).String() + " to string")
+	}
+
+	*s = testStringSQLScanner(ts)
+
+	return nil
 }
 
 func TestCastTo(t *testing.T) {
@@ -426,6 +440,13 @@ func TestCastTo(t *testing.T) {
 			value: DateValueFromTime(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
 			dst:   ptr[Value](),
 			exp:   DateValueFromTime(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: TextValue("text-string"),
+			dst:   ptr[testStringSQLScanner](),
+			exp:   testStringSQLScanner("text-string"),
 			err:   nil,
 		},
 	}

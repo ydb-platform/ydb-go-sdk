@@ -1,3 +1,5 @@
+* Added support of custom types to row.ScanStruct using sql.Scanner interface
+
 ## v3.104.5
 * Added query client session pool metrics: create_in_progress, in_use, waiters_queue
 * Added pool item closing for not-alived item
