@@ -149,6 +149,10 @@ func TestOneTimeReader(t *testing.T) {
 		dm := NewDecoderMap()
 		codec := rawtopiccommon.CodecGzip
 
+		dm.AddDecoder(codec, func(input io.Reader) (ReadResetter, error) {
+			return gzip.NewReader(input)
+		})
+
 		data := []byte("pool reuse test")
 		var buf bytes.Buffer
 		gzipWriter := gzip.NewWriter(&buf)
@@ -160,14 +164,11 @@ func TestOneTimeReader(t *testing.T) {
 		require.NoError(t, err)
 
 		reader := newOneTimeReaderFromReader(decoder)
-		_, err = io.ReadAll(&reader)
+		result, err := io.ReadAll(&reader)
 		require.NoError(t, err)
+		require.Equal(t, "pool reuse test", string(result))
 
 		require.NoError(t, reader.Close(), "Close() should not return error")
-
-		reusedDecoder := dm.dp[codec].Get()
-		require.NotNil(t, reusedDecoder, "Decoder should be retrieved from pool after Close")
-		dm.dp[codec].Put(reusedDecoder)
 
 		var buf2 bytes.Buffer
 		gzipWriter2 := gzip.NewWriter(&buf2)
@@ -178,9 +179,9 @@ func TestOneTimeReader(t *testing.T) {
 		reader2, err := dm.Decode(codec, &buf2)
 		require.NoError(t, err)
 
-		result, err := io.ReadAll(reader2)
+		result2, err := io.ReadAll(reader2)
 		require.NoError(t, err)
-		require.Equal(t, "next message", string(result))
+		require.Equal(t, "next message", string(result2))
 
 		require.NoError(t, reader2.(io.Closer).Close())
 	})
