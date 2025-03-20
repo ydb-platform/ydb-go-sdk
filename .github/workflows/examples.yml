@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 jobs:
   basic-ydb:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no examples'))
     concurrency:
       group: basic-ydb-${{ github.ref }}-${{ matrix.ydb-version }}-${{ matrix.application }}
       cancel-in-progress: true
@@ -48,6 +49,7 @@ jobs:
         working-directory: ./examples/basic/${{ matrix.application }}
         run: go run .
   basic-ydb-database-sql:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no examples'))
     concurrency:
       group: basic-ydb-${{ github.ref }}-${{ matrix.ydb-version }}-${{ matrix.application }}-${{ matrix.query_service }}
       cancel-in-progress: true
@@ -90,6 +92,7 @@ jobs:
         working-directory: ./examples/basic/${{ matrix.application }}
         run: go run .
   basic-postgres:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no examples'))
     concurrency:
       group: basic-postgres-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: true
@@ -126,6 +129,7 @@ jobs:
         working-directory: ./examples/basic/${{ matrix.application }}
         run: go run .
   basic-sqlite:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no examples'))
     concurrency:
       group: basic-sqlite-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: true
