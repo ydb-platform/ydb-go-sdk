@@ -11,14 +11,16 @@ import (
 type blockID int
 
 const (
-	blockPragma = blockID(iota)
+	blockDefault = blockID(iota)
+	blockPragma
 	blockDeclare
 	blockYQL
+	blockCastArgs
 )
 
 type Bind interface {
-	ToYdb(sql string, args ...interface{}) (
-		yql string, newArgs []interface{}, _ error,
+	ToYdb(sql string, args ...any) (
+		yql string, newArgs []any, _ error,
 	)
 
 	blockID() blockID
@@ -26,7 +28,7 @@ type Bind interface {
 
 type Bindings []Bind
 
-func (bindings Bindings) ToYdb(sql string, args ...interface{}) (
+func (bindings Bindings) ToYdb(sql string, args ...any) (
 	yql string, params params.Params, err error,
 ) {
 	if len(bindings) == 0 {
@@ -42,10 +44,10 @@ func (bindings Bindings) ToYdb(sql string, args ...interface{}) (
 	defer buffer.Free()
 
 	for i := range bindings {
-		var e error
-		sql, args, e = bindings[len(bindings)-1-i].ToYdb(sql, args...)
-		if e != nil {
-			return "", nil, xerrors.WithStackTrace(e)
+		var err error
+		sql, args, err = bindings[len(bindings)-1-i].ToYdb(sql, args...)
+		if err != nil {
+			return "", nil, xerrors.WithStackTrace(err)
 		}
 	}
 

@@ -35,7 +35,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestBasicExampleNative(sourceTest *testing.T) { //nolint:gocyclo
+func TestBasicExampleTable(sourceTest *testing.T) { //nolint:gocyclo
 	t := xtest.MakeSyncedTest(sourceTest)
 	folder := t.Name()
 

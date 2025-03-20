@@ -28,7 +28,7 @@ func (v testValuer) Value() (driver.Value, error) {
 func TestToValue(t *testing.T) {
 	for _, tt := range []struct {
 		name string
-		src  interface{}
+		src  any
 		dst  value.Value
 		err  error
 	}{
@@ -649,7 +649,7 @@ func TestToValue(t *testing.T) {
 	}
 }
 
-func named(name string, value interface{}) driver.NamedValue {
+func named(name string, value any) driver.NamedValue {
 	return driver.NamedValue{
 		Name:  name,
 		Value: value,
@@ -659,7 +659,7 @@ func named(name string, value interface{}) driver.NamedValue {
 func TestYdbParam(t *testing.T) {
 	for _, tt := range []struct {
 		name string
-		src  interface{}
+		src  any
 		dst  *params.Parameter
 		err  error
 	}{
@@ -708,19 +708,19 @@ func TestYdbParam(t *testing.T) {
 func TestArgsToParams(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
-		args   []interface{}
+		args   []any
 		params []*params.Parameter
 		err    error
 	}{
 		{
 			name:   xtest.CurrentFileLine(),
-			args:   []interface{}{},
+			args:   []any{},
 			params: []*params.Parameter{},
 			err:    nil,
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				1, uint64(2), "3",
 			},
 			params: []*params.Parameter{
@@ -732,7 +732,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				table.NewQueryParameters(
 					params.Named("$p0", value.Int32Value(1)),
 					params.Named("$p1", value.Uint64Value(2)),
@@ -748,7 +748,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				params.Named("$p0", value.Int32Value(1)),
 				params.Named("$p1", value.Uint64Value(2)),
 				params.Named("$p2", value.TextValue("3")),
@@ -762,7 +762,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				sql.Named("$p0", value.Int32Value(1)),
 				sql.Named("$p1", value.Uint64Value(2)),
 				sql.Named("$p2", value.TextValue("3")),
@@ -776,7 +776,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				driver.NamedValue{Name: "$p0", Value: value.Int32Value(1)},
 				driver.NamedValue{Name: "$p1", Value: value.Uint64Value(2)},
 				driver.NamedValue{Name: "$p2", Value: value.TextValue("3")},
@@ -790,7 +790,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				driver.NamedValue{Value: params.Named("$p0", value.Int32Value(1))},
 				driver.NamedValue{Value: params.Named("$p1", value.Uint64Value(2))},
 				driver.NamedValue{Value: params.Named("$p2", value.TextValue("3"))},
@@ -804,7 +804,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				driver.NamedValue{Value: 1},
 				driver.NamedValue{Value: uint64(2)},
 				driver.NamedValue{Value: "3"},
@@ -818,7 +818,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				driver.NamedValue{Value: table.NewQueryParameters(
 					params.Named("$p0", value.Int32Value(1)),
 					params.Named("$p1", value.Uint64Value(2)),
@@ -834,7 +834,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			args: []interface{}{
+			args: []any{
 				driver.NamedValue{Value: table.NewQueryParameters(
 					params.Named("$p0", value.Int32Value(1)),
 					params.Named("$p1", value.Uint64Value(2)),
@@ -898,7 +898,7 @@ func TestAsUUIDCastToInterface(t *testing.T) {
 	})
 }
 
-func asUUIDCastToInterface(v interface{}) (value.Value, bool) {
+func asUUIDCastToInterface(v any) (value.Value, bool) {
 	// explicit casting of type [16]byte to uuid.UUID will success,
 	// but casting of [16]byte to some interface with  methods from uuid.UUID will failed
 	if _, ok := v.(interface {
@@ -921,7 +921,7 @@ func asUUIDCastToInterface(v interface{}) (value.Value, bool) {
 	}
 }
 
-func asUUIDForceTypeCast(v interface{}) (value.Value, bool) {
+func asUUIDForceTypeCast(v any) (value.Value, bool) {
 	return value.Uuid(v.(uuid.UUID)), true
 }
 
@@ -948,7 +948,7 @@ var (
 	expUUIDValue = value.Uuid(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 )
 
-func asUUIDUsingReflect(v interface{}) (value.Value, bool) {
+func asUUIDUsingReflect(v any) (value.Value, bool) {
 	switch reflect.TypeOf(v) {
 	case uuidType:
 		return value.Uuid(v.(uuid.UUID)), true

@@ -94,6 +94,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryDoDoneInfo struct {
@@ -108,6 +109,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryDoTxDoneInfo struct {
@@ -124,6 +126,7 @@ type (
 		Call    call
 
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryExecDoneInfo struct {
@@ -139,6 +142,7 @@ type (
 		Call    call
 
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryDoneInfo struct {
@@ -154,10 +158,12 @@ type (
 		Call    call
 
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryResultSetDoneInfo struct {
-		Error error
+		Error     error
+		RowsCount int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionQueryResultSetStartInfo struct {
@@ -186,6 +192,7 @@ type (
 
 		Tx    txInfo
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryResultSetDoneInfo struct {
@@ -201,6 +208,7 @@ type (
 		Call    call
 
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryQueryRowDoneInfo struct {
@@ -233,6 +241,7 @@ type (
 
 		Tx    txInfo
 		Query string
+		Label string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryRowDoneInfo struct {
@@ -293,6 +302,7 @@ type (
 
 		Session sessionInfo
 		Query   string
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionExecDoneInfo struct {
@@ -309,6 +319,7 @@ type (
 
 		Session sessionInfo
 		Query   string
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QuerySessionQueryDoneInfo struct {
@@ -326,6 +337,7 @@ type (
 		Session sessionInfo
 		Tx      txInfo
 		Query   string
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxExecDoneInfo struct {
@@ -375,6 +387,7 @@ type (
 		Session sessionInfo
 		Tx      txInfo
 		Query   string
+		Label   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryDoneInfo struct {

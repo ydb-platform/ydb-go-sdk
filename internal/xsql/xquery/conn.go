@@ -28,7 +28,6 @@ type Parent interface {
 
 type Conn struct {
 	ctx     context.Context //nolint:containedctx
-	parent  Parent
 	session *query.Session
 	onClose []func()
 	closed  atomic.Bool
@@ -117,10 +116,9 @@ func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast s
 	return ast, plan, nil
 }
 
-func New(ctx context.Context, parent Parent, s *query.Session, opts ...Option) *Conn {
+func New(ctx context.Context, s *query.Session, opts ...Option) *Conn {
 	cc := &Conn{
 		ctx:     ctx,
-		parent:  parent,
 		session: s,
 	}
 

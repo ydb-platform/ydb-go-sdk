@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -537,4 +538,170 @@ SELECT * FROM AS_TABLE($arg);
 
 	require.Equal(t, 1, partsWithBigSize)
 	require.Greater(t, partsWithLittleSize, 1)
+}
+
+func TestQueryWideDateTimeTypes(t *testing.T) {
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.1") {
+		t.Skip("require enables transactions for topics")
+	}
+
+	scope := newScope(t)
+
+	for _, tt := range []struct {
+		name        string
+		sql         string
+		expYdbValue value.Value
+		expGoValue  time.Time
+	}{
+		{
+			name: "Date",
+			sql: `SELECT 
+					CAST("2000-01-01" AS Date),
+					CAST("2000-01-01" AS Date),
+			;`,
+			expYdbValue: value.OptionalValue(value.DateValueFromTime(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))),
+			expGoValue:  time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "Datetime",
+			sql: `SELECT 
+				CAST("2000-01-01T00:00:00Z" AS Datetime),
+				CAST("2000-01-01T00:00:00Z" AS Datetime),
+			;`,
+			expYdbValue: value.OptionalValue(value.DatetimeValueFromTime(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))),
+			expGoValue:  time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "Timestamp",
+			sql: `SELECT
+				CAST("2000-01-01T00:00:00.123456789Z" AS Timestamp),
+				CAST("2000-01-01T00:00:00.123456789Z" AS Timestamp),
+			;`,
+			expYdbValue: value.OptionalValue(value.TimestampValueFromTime(time.Date(2000, 1, 1, 0, 0, 0, 123456789, time.UTC))),
+			expGoValue:  time.Date(2000, 1, 1, 0, 0, 0, 123456000, time.UTC),
+		},
+		{
+			name: "Date32",
+			sql: `SELECT 
+					CAST("1000-01-01" AS Date32),
+					CAST("1000-01-01" AS Date32),
+			;`,
+			expYdbValue: value.OptionalValue(value.Date32ValueFromTime(time.Date(1000, 1, 1, 0, 0, 0, 0, time.UTC))),
+			expGoValue:  time.Date(1000, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "Datetime64",
+			sql: `SELECT 
+				CAST("1000-01-01T00:00:00Z" AS Datetime64),
+				CAST("1000-01-01T00:00:00Z" AS Datetime64),
+			;`,
+			expYdbValue: value.OptionalValue(value.Datetime64ValueFromTime(time.Date(1000, 1, 1, 0, 0, 0, 0, time.UTC))),
+			expGoValue:  time.Date(1000, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "Timestamp64",
+			sql: `SELECT
+				CAST("1000-01-01T00:00:00.123456789Z" AS Timestamp64),
+				CAST("1000-01-01T00:00:00.123456789Z" AS Timestamp64),
+			;`,
+			expYdbValue: value.OptionalValue(value.Timestamp64ValueFromTime(time.Date(1000, 1, 1, 0, 0, 0, 123456789, time.UTC))),
+			expGoValue:  time.Date(1000, 1, 1, 0, 0, 0, 123456000, time.UTC),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			row, err := scope.Driver().Query().QueryRow(scope.Ctx, tt.sql)
+			require.NoError(t, err)
+			var (
+				actValue value.Value
+				actTime  time.Time
+			)
+			err = row.Scan(&actValue, &actTime)
+			require.NoError(t, err)
+			require.Equal(t, tt.expYdbValue, actValue)
+			require.Equal(t, tt.expGoValue, actTime.UTC())
+			row, err = scope.Driver().Query().QueryRow(scope.Ctx,
+				fmt.Sprintf(`
+					DECLARE $p1 AS %s;
+					DECLARE $p2 AS %s;
+					SELECT $p1, $p2`,
+					tt.expYdbValue.Type().Yql(),
+					tt.expYdbValue.Type().Yql(),
+				),
+				query.WithParameters(ydb.ParamsBuilder().
+					Param("$p1").Any(tt.expYdbValue).
+					Param("$p2").Any(tt.expYdbValue).
+					Build(),
+				),
+			)
+			require.NoError(t, err)
+			err = row.Scan(&actValue, &actTime)
+			require.Equal(t, tt.expYdbValue, actValue)
+			require.Equal(t, tt.expGoValue, actTime.UTC())
+		})
+	}
+}
+
+func TestQueryWideIntervalTypes(t *testing.T) {
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.1") {
+		t.Skip("require enables transactions for topics")
+	}
+
+	scope := newScope(t)
+
+	for _, tt := range []struct {
+		name        string
+		sql         string
+		expYdbValue value.Value
+		expGoValue  time.Duration
+	}{
+		{
+			name: "Interval",
+			sql: `SELECT 
+				CAST("PT20M34.56789S" AS Interval),
+				CAST("PT20M34.56789S" AS Interval),
+			;`,
+			expYdbValue: value.OptionalValue(value.IntervalValueFromDuration(1234567890 * time.Microsecond)),
+			expGoValue:  1234567890 * time.Microsecond,
+		},
+		{
+			name: "Interval64",
+			sql: `SELECT 
+				CAST("PT20M34.56789S" AS Interval64),
+				CAST("PT20M34.56789S" AS Interval64),
+			;`,
+			expYdbValue: value.OptionalValue(value.Interval64ValueFromDuration(time.Duration(1234567890))),
+			expGoValue:  time.Duration(1234567890),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			row, err := scope.Driver().Query().QueryRow(scope.Ctx, tt.sql)
+			require.NoError(t, err)
+			var (
+				actValue    value.Value
+				actInterval time.Duration
+			)
+			err = row.Scan(&actValue, &actInterval)
+			require.NoError(t, err)
+			require.Equal(t, tt.expYdbValue, actValue)
+			require.Equal(t, tt.expGoValue, actInterval)
+			row, err = scope.Driver().Query().QueryRow(scope.Ctx,
+				fmt.Sprintf(`
+					DECLARE $p1 AS %s;
+					DECLARE $p2 AS %s;
+					SELECT $p1, $p2`,
+					tt.expYdbValue.Type().Yql(),
+					tt.expYdbValue.Type().Yql(),
+				),
+				query.WithParameters(ydb.ParamsBuilder().
+					Param("$p1").Any(tt.expYdbValue).
+					Param("$p2").Any(tt.expYdbValue).
+					Build(),
+				),
+			)
+			require.NoError(t, err)
+			err = row.Scan(&actValue, &actInterval)
+			require.Equal(t, tt.expYdbValue, actValue)
+			require.Equal(t, tt.expGoValue, actInterval)
+		})
+	}
 }

@@ -250,6 +250,21 @@ func TestBuilder(t *testing.T) {
 			},
 		},
 		{
+			method: "Datetime64",
+			args:   []any{time.Unix(123456789, 456)},
+
+			expected: expected{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME64},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 123456789,
+					},
+				},
+			},
+		},
+		{
 			method: "Date",
 			args:   []any{time.Unix(123456789, 456)},
 
@@ -265,6 +280,21 @@ func TestBuilder(t *testing.T) {
 			},
 		},
 		{
+			method: "Date32",
+			args:   []any{time.Unix(123456789, 456)},
+
+			expected: expected{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE32},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int32Value{
+						Int32Value: 1428,
+					},
+				},
+			},
+		},
+		{
 			method: "Timestamp",
 			args:   []any{time.Unix(123456789, 456)},
 
@@ -275,6 +305,21 @@ func TestBuilder(t *testing.T) {
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint64Value{
 						Uint64Value: 123456789000000,
+					},
+				},
+			},
+		},
+		{
+			method: "Timestamp64",
+			args:   []any{time.Unix(123456789, 456)},
+
+			expected: expected{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP64},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 123456789000000,
 					},
 				},
 			},

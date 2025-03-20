@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -58,8 +59,10 @@ func New(
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 	c := topic.Config{
-		Trace: &trace.Topic{},
+		Trace:              &trace.Topic{},
+		MaxGrpcMessageSize: config.DefaultGRPCMsgSize,
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&c)
@@ -322,7 +325,9 @@ func (c *Client) StartReader(
 
 // StartWriter create new topic writer wrapper
 func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
-	cfg := c.createWriterConfig(topicPath, opts)
+	cfg := c.createWriterConfig(topicPath, append(opts, topicwriterinternal.WithMaxGrpcMessageBytes(
+		c.cfg.MaxGrpcMessageSize,
+	)))
 	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
 	if err != nil {
 		return nil, err

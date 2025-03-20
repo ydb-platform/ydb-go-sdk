@@ -303,12 +303,28 @@ func TestValueYql(t *testing.T) {
 			literal: `Date("2022-06-17")`,
 		},
 		{
+			value: Date32Value(func() int32 {
+				v, _ := time.Parse("2006-01-02", "2022-06-17")
+
+				return int32(v.Sub(time.Unix(0, 0)) / time.Hour / 24)
+			}()),
+			literal: `Date32("2022-06-17")`,
+		},
+		{
 			value: DatetimeValue(func() uint32 {
 				v, _ := time.Parse("2006-01-02 15:04:05", "2022-06-17 05:19:20")
 
 				return uint32(v.UTC().Sub(time.Unix(0, 0)).Seconds())
 			}()),
 			literal: `Datetime("2022-06-17T05:19:20Z")`,
+		},
+		{
+			value: Datetime64Value(func() int64 {
+				v, _ := time.Parse("2006-01-02 15:04:05", "2022-06-17 05:19:20")
+
+				return int64(v.UTC().Sub(time.Unix(0, 0)).Seconds())
+			}()),
+			literal: `Datetime64("2022-06-17T05:19:20Z")`,
 		},
 		{
 			value:   TzDateValue("2022-06-17,Europe/Berlin"),
@@ -330,6 +346,15 @@ func TestValueYql(t *testing.T) {
 				return tt.UTC()
 			}()),
 			literal: `Timestamp("1997-12-14T03:09:42.123456Z")`,
+		},
+		{
+			value: Timestamp64ValueFromTime(func() time.Time {
+				tt, err := time.Parse(LayoutTimestamp, "1997-12-14T03:09:42.123456Z")
+				require.NoError(t, err)
+
+				return tt.UTC()
+			}()),
+			literal: `Timestamp64("1997-12-14T03:09:42.123456Z")`,
 		},
 		{
 			value:   TzTimestampValue("1997-12-14T03:09:42.123456,Europe/Berlin"),

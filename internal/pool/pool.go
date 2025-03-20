@@ -762,6 +762,12 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 
 				return item, nil
 			}
+
+			p.closeItem(ctx, item,
+				closeItemWithLock(),
+				closeItemNotifyStats(),
+				closeItemWithDeleteFromPool(),
+			)
 		}
 
 		item, err := p.createItemFunc(ctx)
@@ -773,7 +779,9 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			return nil, xerrors.WithStackTrace(xerrors.Join(err, lastErr))
 		}
 
-		lastErr = err
+		if err != nil {
+			lastErr = err
+		}
 
 		item, err = p.waitFromCh(ctx)
 		if item != nil {
@@ -784,7 +792,13 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			return nil, xerrors.WithStackTrace(xerrors.Join(err, lastErr))
 		}
 
-		lastErr = err
+		if err != nil {
+			lastErr = err
+		}
+	}
+
+	if lastErr == nil {
+		lastErr = errNoProgress
 	}
 
 	p.mu.RLock()

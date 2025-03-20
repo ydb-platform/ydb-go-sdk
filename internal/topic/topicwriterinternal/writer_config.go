@@ -17,6 +17,7 @@ type WritersCommonConfig struct {
 	writerMeta          map[string]string
 	defaultPartitioning rawtopicwriter.Partitioning
 	compressorCount     int
+	maxBytesPerMessage  int
 
 	Tracer             *trace.Topic
 	cred               credentials.Credentials

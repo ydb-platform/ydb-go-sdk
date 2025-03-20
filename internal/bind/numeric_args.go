@@ -17,7 +17,7 @@ func (m NumericArgs) blockID() blockID {
 	return blockYQL
 }
 
-func (m NumericArgs) ToYdb(sql string, args ...interface{}) (yql string, newArgs []interface{}, err error) {
+func (m NumericArgs) ToYdb(sql string, args ...any) (yql string, newArgs []any, err error) {
 	l := &sqlLexer{
 		src:        sql,
 		stateFn:    numericArgsStateFn,
@@ -36,7 +36,7 @@ func (m NumericArgs) ToYdb(sql string, args ...interface{}) (yql string, newArgs
 		if err != nil {
 			return "", nil, err
 		}
-		newArgs = make([]interface{}, len(parameters))
+		newArgs = make([]any, len(parameters))
 		for i, param := range parameters {
 			newArgs[i] = param
 		}
@@ -119,7 +119,7 @@ func numericArgsStateFn(l *sqlLexer) stateFn {
 	}
 }
 
-func parsePositionalParameters(args []interface{}) ([]*params.Parameter, error) {
+func parsePositionalParameters(args []any) ([]*params.Parameter, error) {
 	newArgs := make([]*params.Parameter, len(args))
 	for i, arg := range args {
 		paramName := fmt.Sprintf("$p%d", i)

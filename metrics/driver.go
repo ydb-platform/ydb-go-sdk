@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -13,6 +14,7 @@ import (
 //
 //nolint:funlen
 func driver(config Config) (t trace.Driver) {
+	config.GaugeVec("info", "version").With(map[string]string{"version": version.Version}).Set(1)
 	config = config.WithSystem("driver")
 	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "az")
 	balancersDiscoveries := config.WithSystem("balancer").CounterVec("discoveries", "status", "cause")
