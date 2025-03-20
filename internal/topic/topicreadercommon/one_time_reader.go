@@ -1,6 +1,7 @@
 package topicreadercommon
 
 import (
+	"errors"
 	"io"
 )
 
@@ -43,4 +44,26 @@ func (s *oneTimeReader) Read(p []byte) (n int, err error) {
 	}
 
 	return n, err
+}
+
+func (s *oneTimeReader) Close() error {
+	if s.err != nil && !errors.Is(s.err, io.EOF) {
+		return s.err
+	}
+	if s.reader == nil {
+		s.reader = s.readerMaker()
+	}
+	if closer, ok := s.reader.(io.Closer); ok {
+		err := closer.Close()
+		if err != nil {
+			s.err = err
+			s.reader = nil
+
+			return err
+		}
+	}
+	s.reader = nil
+	s.err = io.EOF
+
+	return nil
 }
