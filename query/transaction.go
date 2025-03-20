@@ -12,7 +12,8 @@ type (
 		tx.Identifier
 		Executor
 	}
-	Transaction interface {
+	TransactionActor = TxActor
+	Transaction      interface {
 		TxActor
 
 		CommitTx(ctx context.Context) (err error)

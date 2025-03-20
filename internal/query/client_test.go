@@ -1083,7 +1083,7 @@ func TestClient(t *testing.T) {
 	t.Run("QueryResultSet", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			rs, err := clientQueryResultSet(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			rs, rowsCount, err := clientQueryResultSet(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status: Ydb.StatusIds_SUCCESS,
@@ -1185,6 +1185,7 @@ func TestClient(t *testing.T) {
 			}), "", options.ExecuteSettings())
 			require.NoError(t, err)
 			require.NotNil(t, rs)
+			require.Equal(t, 5, rowsCount)
 			{
 				require.NoError(t, err)
 				r1, err := rs.NextRow(ctx)
@@ -1228,7 +1229,7 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("MoreThanOneResultSet", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			rs, err := clientQueryResultSet(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			rs, rowsCount, err := clientQueryResultSet(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status: Ydb.StatusIds_SUCCESS,
@@ -1394,6 +1395,7 @@ func TestClient(t *testing.T) {
 			}), "", options.ExecuteSettings())
 			require.ErrorIs(t, err, errMoreThanOneResultSet)
 			require.Nil(t, rs)
+			require.Equal(t, 0, rowsCount)
 		})
 	})
 	t.Run("QueryRow", func(t *testing.T) {

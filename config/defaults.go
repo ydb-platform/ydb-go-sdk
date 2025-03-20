@@ -3,30 +3,58 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"time"
 
 	"google.golang.org/grpc"
 	grpcCredentials "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/keepalive"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
 	// DefaultKeepaliveInterval contains default duration between grpc keepalive
-	DefaultKeepaliveInterval    = 10 * time.Second
-	MinKeepaliveInterval        = 10 * time.Second
-	DefaultDialTimeout          = 5 * time.Second
-	DefaultGRPCMsgSize          = 64 * 1024 * 1024 // 64MB
-	DefaultGrpcConnectionPolicy = keepalive.ClientParameters{
-		Time:                DefaultKeepaliveInterval,
-		Timeout:             MinKeepaliveInterval,
-		PermitWithoutStream: true,
-	}
+	//
+	// Will be removed after Aug 2024.
+	// Write Issue if you need the variable https://github.com/ydb-platform/ydb-go-sdk/issues/new/choose
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	DefaultKeepaliveInterval = config.DefaultKeepaliveInterval // 10 * time.Second
+
+	// MinKeepaliveInterval
+	//
+	// Will be removed after Aug 2024.
+	// Write Issue if you need the variable https://github.com/ydb-platform/ydb-go-sdk/issues/new/choose
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	MinKeepaliveInterval = config.MinKeepaliveInterval // 10 * time.Second
+
+	// DefaultDialTimeout
+	//
+	// Will be removed after Aug 2024.
+	// Write Issue if you need the variable https://github.com/ydb-platform/ydb-go-sdk/issues/new/choose
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	DefaultDialTimeout = config.DefaultDialTimeout // 5 * time.Second
+
+	// DefaultGRPCMsgSize
+	//
+	// Will be removed after Aug 2024.
+	// Write Issue if you need the variable https://github.com/ydb-platform/ydb-go-sdk/issues/new/choose
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	DefaultGRPCMsgSize = config.DefaultGRPCMsgSize // 64 * 1024 * 1024 // 64MB
+
+	// DefaultGrpcConnectionPolicy
+	//
+	// Will be removed after Aug 2024.
+	// Write Issue if you need the variable https://github.com/ydb-platform/ydb-go-sdk/issues/new/choose
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	DefaultGrpcConnectionPolicy = config.DefaultGrpcConnectionPolicy
+	//DefaultGrpcConnectionPolicy = keepalive.ClientParameters{
+	//	Time:                DefaultKeepaliveInterval,
+	//	Timeout:             MinKeepaliveInterval,
+	//	PermitWithoutStream: true,
+	//}
 )
 
 func defaultGrpcOptions(secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
@@ -79,9 +107,10 @@ func defaultConfig() (c *Config) {
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo(stack.Record(0)),
 		),
-		balancerConfig: balancers.Default(),
-		tlsConfig:      defaultTLSConfig(),
-		dialTimeout:    DefaultDialTimeout,
-		trace:          &trace.Driver{},
+		balancerConfig:     balancers.Default(),
+		tlsConfig:          defaultTLSConfig(),
+		dialTimeout:        DefaultDialTimeout,
+		trace:              &trace.Driver{},
+		grpcMaxMessageSize: DefaultGRPCMsgSize,
 	}
 }

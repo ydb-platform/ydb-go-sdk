@@ -49,6 +49,10 @@ type (
 	}
 )
 
+func (c *Client) Config() *config.Config {
+	return c.config
+}
+
 func fetchScriptResults(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	opID string, opts ...options.FetchScriptOption,
@@ -233,6 +237,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 		settings = options.ParseDoOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDo(settings.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Do"),
+			settings.Label(),
 		)
 		attempts = 0
 	)
@@ -317,15 +322,17 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
+	settings := options.ExecuteSettings(opts...)
+
 	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
-		q,
+		q, settings.Label(),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	row, err := clientQueryRow(ctx, c.pool, q, options.ExecuteSettings(opts...), withTrace(c.config.Trace()))
+	row, err := clientQueryRow(ctx, c.pool, q, settings, withTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -362,9 +369,11 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
+	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnExec(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
 		q,
+		settings.Label(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -409,9 +418,10 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
+	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
-		q,
+		q, settings.Label(),
 	)
 	defer func() {
 		onDone(err)
@@ -427,7 +437,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 
 func clientQueryResultSet(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
-) (rs result.ClosableResultSet, finalErr error) {
+) (rs result.ClosableResultSet, rowsCount int, finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
 		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
 		if err != nil {
@@ -437,7 +447,7 @@ func clientQueryResultSet(
 			_ = streamResult.Close(ctx)
 		}()
 
-		rs, err = readMaterializedResultSet(ctx, streamResult)
+		rs, rowsCount, err = readMaterializedResultSet(ctx, streamResult)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -445,10 +455,10 @@ func clientQueryResultSet(
 		return nil
 	}, settings.RetryOpts()...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, 0, xerrors.WithStackTrace(err)
 	}
 
-	return rs, nil
+	return rs, rowsCount, nil
 }
 
 // QueryResultSet is a helper which read all rows from first result set in result
@@ -458,15 +468,21 @@ func (c *Client) QueryResultSet(
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
+	var (
+		settings  = options.ExecuteSettings(opts...)
+		rowsCount int
+		err       error
+	)
+
 	onDone := trace.QueryOnQueryResultSet(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryResultSet"),
-		q,
+		q, settings.Label(),
 	)
 	defer func() {
-		onDone(finalErr)
+		onDone(finalErr, rowsCount)
 	}()
 
-	rs, err := clientQueryResultSet(ctx, c.pool, q, options.ExecuteSettings(opts...), withTrace(c.config.Trace()))
+	rs, rowsCount, err = clientQueryResultSet(ctx, c.pool, q, settings, withTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -482,6 +498,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 		settings = options.ParseDoTxOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDoTx(settings.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).DoTx"),
+			settings.Label(),
 		)
 		attempts = 0
 	)
@@ -511,28 +528,28 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
-func CreateSession(ctx context.Context, c *Client) (*Session, error) {
+func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config) (*Session, error) {
 	s, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Session, error) {
 		var (
 			createCtx    context.Context
 			cancelCreate context.CancelFunc
 		)
-		if d := c.config.SessionCreateTimeout(); d > 0 {
+		if d := cfg.SessionCreateTimeout(); d > 0 {
 			createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
 		} else {
 			createCtx, cancelCreate = xcontext.WithCancel(ctx)
 		}
 		defer cancelCreate()
 
-		s, err := createSession(createCtx, c.client,
-			WithDeleteTimeout(c.config.SessionDeleteTimeout()),
-			WithTrace(c.config.Trace()),
+		s, err := createSession(createCtx, client,
+			WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+			WithTrace(cfg.Trace()),
 		)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		s.lazyTx = c.config.LazyTx()
+		s.lazyTx = cfg.LazyTx()
 
 		return s, nil
 	})

@@ -46,7 +46,7 @@ func (c *Conn) Engine() Engine {
 }
 
 func (c *Conn) GetDatabaseName() string {
-	return c.connector.Name()
+	return c.connector.parent.Name()
 }
 
 func (c *Conn) normalizePath(tableName string) string {
@@ -153,11 +153,11 @@ func isSysDir(databaseName, dirAbsPath string) bool {
 func (c *Conn) getTables(ctx context.Context, absPath string, recursive, excludeSysDirs bool) (
 	tables []string, _ error,
 ) {
-	if excludeSysDirs && isSysDir(c.connector.Name(), absPath) {
+	if excludeSysDirs && isSysDir(c.connector.parent.Name(), absPath) {
 		return nil, nil
 	}
 
-	d, err := c.connector.Scheme().ListDirectory(ctx, absPath)
+	d, err := c.connector.parent.Scheme().ListDirectory(ctx, absPath)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -189,7 +189,7 @@ func (c *Conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 ) {
 	absPath := c.normalizePath(folder)
 
-	e, err := c.connector.Scheme().DescribePath(ctx, absPath)
+	e, err := c.connector.parent.Scheme().DescribePath(ctx, absPath)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

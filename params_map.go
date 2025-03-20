@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"database/sql/driver"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 )
 
 type wrongParameters struct {
@@ -20,17 +22,32 @@ func (p wrongParameters) ToYDB(a *allocator.Allocator) (map[string]*Ydb.TypedVal
 }
 
 // ParamsFromMap build parameters from named map
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func ParamsFromMap(m map[string]any) params.Parameters {
+func ParamsFromMap(m map[string]any, bindings ...bind.Bind) params.Parameters {
+	for _, b := range bindings {
+		switch bb := b.(type) {
+		case xsql.BindOption:
+			switch bb.Bind.(type) {
+			case bind.WideTimeTypes:
+				continue
+			default:
+				return wrongParameters{
+					err: xerrors.WithStackTrace(fmt.Errorf("%T: %w", b, bind.ErrUnsupportedBindingType)),
+				}
+			}
+		default:
+			return wrongParameters{
+				err: xerrors.WithStackTrace(fmt.Errorf("%T: %w", b, bind.ErrUnsupportedBindingType)),
+			}
+		}
+	}
 	namedParameters := make([]any, 0, len(m))
 	for name, val := range m {
 		namedParameters = append(namedParameters, driver.NamedValue{Name: name, Value: val})
 	}
-	p, err := bind.Params(namedParameters...)
+	_, pp, err := bind.Bindings(bindings).ToYdb("", namedParameters...)
 	if err != nil {
 		return wrongParameters{err: xerrors.WithStackTrace(err)}
 	}
 
-	return (*params.Params)(&p)
+	return &pp
 }

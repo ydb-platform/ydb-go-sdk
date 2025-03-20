@@ -521,6 +521,42 @@ func TestWriterFlushMessagesBeforeClose(t *testing.T) {
 	}
 }
 
+func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
+		t.Skip()
+	}
+	scope := newScope(t)
+
+	maxGrpcMsgSize := config.DefaultGRPCMsgSize // bytes
+	topicMessageSize := 10 * 1024 * 1024
+
+	scope.Driver(ydb.WithGrpcMaxMessageSize(maxGrpcMsgSize))
+	writer, err := scope.Driver().Topic().StartWriter(
+		scope.TopicPath(),
+		topicoptions.WithWriterCodec(topictypes.CodecRaw),
+	)
+	scope.Require.NoError(err)
+	defer writer.Close(scope.Ctx)
+
+	const messageCount = 20
+	scope.Require.Greater(messageCount*topicMessageSize, maxGrpcMsgSize*2)
+
+	messages := make([]topicwriter.Message, messageCount)
+	for i := range messages {
+		messages[i] = topicwriter.Message{Data: bytes.NewReader(make([]byte, topicMessageSize))}
+	}
+
+	err = writer.Write(scope.Ctx, messages...)
+	scope.Require.NoError(err)
+
+	for lastSeqNo := int64(0); lastSeqNo < messageCount; {
+		msg, err := scope.TopicReader().ReadMessage(scope.Ctx)
+		scope.Require.NoError(err)
+		_ = scope.TopicReader().Commit(scope.Ctx, msg)
+		lastSeqNo = msg.SeqNo
+	}
+}
+
 var topicCounter int
 
 func createTopic(ctx context.Context, t testing.TB, db *ydb.Driver) (topicPath string) {

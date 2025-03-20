@@ -11,12 +11,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -79,7 +79,7 @@ type Client interface {
 
 	// ReadRows reads a batch of rows non-transactionally.
 	ReadRows(
-		ctx context.Context, path string, keys value.Value,
+		ctx context.Context, path string, keys types.Value,
 		readRowOpts []options.ReadRowsOption, retryOptions ...Option,
 	) (_ result.Result, err error)
 }
@@ -163,12 +163,12 @@ type Session interface {
 	) (_ result.StreamResult, err error)
 
 	// Deprecated: use Client instance instead.
-	BulkUpsert(ctx context.Context, table string, rows value.Value,
+	BulkUpsert(ctx context.Context, table string, rows types.Value,
 		opts ...options.BulkUpsertOption,
 	) (err error)
 
 	// Deprecated: use Client instance instead.
-	ReadRows(ctx context.Context, path string, keys value.Value,
+	ReadRows(ctx context.Context, path string, keys types.Value,
 		opts ...options.ReadRowsOption,
 	) (_ result.Result, err error)
 
@@ -450,7 +450,7 @@ func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
 	return &qp
 }
 
-func ValueParam(name string, v value.Value) ParameterOption {
+func ValueParam(name string, v types.Value) ParameterOption {
 	switch len(name) {
 	case 0:
 		panic("empty name")
@@ -558,7 +558,7 @@ type BulkUpsertData interface {
 }
 
 type bulkUpsertRows struct {
-	rows value.Value
+	rows types.Value
 }
 
 func (data bulkUpsertRows) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
@@ -568,7 +568,7 @@ func (data bulkUpsertRows) ToYDB(a *allocator.Allocator, tableName string) (*Ydb
 	}, nil
 }
 
-func BulkUpsertDataRows(rows value.Value) bulkUpsertRows {
+func BulkUpsertDataRows(rows types.Value) bulkUpsertRows {
 	return bulkUpsertRows{
 		rows: rows,
 	}

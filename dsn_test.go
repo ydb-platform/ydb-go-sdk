@@ -30,7 +30,7 @@ func TestParse(t *testing.T) {
 		return xtable.New(context.Background(), nil, nil, opts...)
 	}
 	newQueryConn := func(opts ...xquery.Option) *xquery.Conn {
-		return xquery.New(context.Background(), nil, nil, opts...)
+		return xquery.New(context.Background(), nil, opts...)
 	}
 	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {
 		require.Equal(t, lhs.Secure(), rhs.Secure())
@@ -168,6 +168,21 @@ func TestParse(t *testing.T) {
 			connectorOpts: []xsql.Option{
 				WithFakeTx(ScriptingQueryMode),
 				WithFakeTx(SchemeQueryMode),
+			},
+			err: nil,
+		},
+		{
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_query_bind=positional,declare,wide_time_types", //nolint:lll
+			opts: []config.Option{
+				config.WithSecure(false),
+				config.WithEndpoint("localhost:2135"),
+				config.WithDatabase("/local"),
+			},
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultQueryMode(xtable.ScriptingQueryMode),
+				xsql.WithQueryBind(bind.PositionalArgs{}),
+				xsql.WithQueryBind(bind.AutoDeclare{}),
+				xsql.WithQueryBind(bind.WideTimeTypes(true)),
 			},
 			err: nil,
 		},

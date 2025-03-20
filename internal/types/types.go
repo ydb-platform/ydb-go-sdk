@@ -110,12 +110,20 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 		return Double
 	case Ydb.Type_DATE:
 		return Date
+	case Ydb.Type_DATE32:
+		return Date32
 	case Ydb.Type_DATETIME:
 		return Datetime
+	case Ydb.Type_DATETIME64:
+		return Datetime64
 	case Ydb.Type_TIMESTAMP:
 		return Timestamp
+	case Ydb.Type_TIMESTAMP64:
+		return Timestamp64
 	case Ydb.Type_INTERVAL:
 		return Interval
+	case Ydb.Type_INTERVAL64:
+		return Interval64
 	case Ydb.Type_TZ_DATE:
 		return TzDate
 	case Ydb.Type_TZ_DATETIME:
@@ -137,7 +145,7 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 	case Ydb.Type_DYNUMBER:
 		return DyNumber
 	default:
-		panic("ydb: unexpected type")
+		panic(fmt.Sprintf("ydb: unexpected type %v", t))
 	}
 }
 
@@ -527,9 +535,13 @@ const (
 	Float
 	Double
 	Date
+	Date32
 	Datetime
+	Datetime64
 	Timestamp
+	Timestamp64
 	Interval
+	Interval64
 	TzDate
 	TzDatetime
 	TzTimestamp
@@ -555,9 +567,13 @@ var primitive = [...]*Ydb.Type{
 	Float:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT}},
 	Double:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE}},
 	Date:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE}},
+	Date32:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE32}},
 	Datetime:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME}},
+	Datetime64:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME64}},
 	Timestamp:    {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP}},
+	Timestamp64:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP64}},
 	Interval:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL}},
+	Interval64:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL64}},
 	TzDate:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE}},
 	TzDatetime:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME}},
 	TzTimestamp:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP}},
@@ -584,9 +600,13 @@ var primitiveString = [...]string{
 	Float:        "Float",
 	Double:       "Double",
 	Date:         "Date",
+	Date32:       "Date32",
 	Datetime:     "Datetime",
+	Datetime64:   "Datetime64",
 	Timestamp:    "Timestamp",
+	Timestamp64:  "Timestamp64",
 	Interval:     "Interval",
+	Interval64:   "Interval64",
 	TzDate:       "TzDate",
 	TzDatetime:   "TzDatetime",
 	TzTimestamp:  "TzTimestamp",

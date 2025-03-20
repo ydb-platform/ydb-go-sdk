@@ -20,18 +20,19 @@ import (
 type Config struct {
 	config.Common
 
-	trace          *trace.Driver
-	dialTimeout    time.Duration
-	connectionTTL  time.Duration
-	balancerConfig *balancerConfig.Config
-	secure         bool
-	endpoint       string
-	database       string
-	metaOptions    []meta.Option
-	grpcOptions    []grpc.DialOption
-	credentials    credentials.Credentials
-	tlsConfig      *tls.Config
-	meta           *meta.Meta
+	trace              *trace.Driver
+	dialTimeout        time.Duration
+	connectionTTL      time.Duration
+	balancerConfig     *balancerConfig.Config
+	secure             bool
+	endpoint           string
+	database           string
+	metaOptions        []meta.Option
+	grpcOptions        []grpc.DialOption
+	grpcMaxMessageSize int
+	credentials        credentials.Credentials
+	tlsConfig          *tls.Config
+	meta               *meta.Meta
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
 }
@@ -51,6 +52,11 @@ func (c *Config) GrpcDialOptions() []grpc.DialOption {
 		defaultGrpcOptions(c.secure, c.tlsConfig),
 		c.grpcOptions...,
 	)
+}
+
+// GrpcMaxMessageSize return client settings for max grpc message size
+func (c *Config) GrpcMaxMessageSize() int {
+	return c.grpcMaxMessageSize
 }
 
 // Meta reports meta information about database connection
@@ -242,6 +248,19 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(c *Config) {
 		c.dialTimeout = timeout
+	}
+}
+
+func WithGrpcMaxMessageSize(sizeBytes int) Option {
+	return func(c *Config) {
+		c.grpcMaxMessageSize = sizeBytes
+		c.grpcOptions = append(c.grpcOptions,
+			// limit size of outgoing and incoming packages
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(c.grpcMaxMessageSize),
+				grpc.MaxCallSendMsgSize(c.grpcMaxMessageSize),
+			),
+		)
 	}
 }
 
