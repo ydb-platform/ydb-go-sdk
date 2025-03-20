@@ -541,7 +541,7 @@ SELECT * FROM AS_TABLE($arg);
 }
 
 func TestQueryWideDateTimeTypes(t *testing.T) {
-	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.1") {
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "24.4") {
 		t.Skip("require enables transactions for topics")
 	}
 
