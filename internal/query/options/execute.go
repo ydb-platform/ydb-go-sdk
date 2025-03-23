@@ -1,8 +1,6 @@
 package options
 
 import (
-	"fmt"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
@@ -43,7 +41,7 @@ type (
 		resourcePool           string
 		statsCallback          func(queryStats stats.QueryStats)
 		callOptions            []grpc.CallOption
-		txControl              TxControl
+		txControl              *tx.Control
 		retryOptions           []retry.Option
 		responsePartLimitBytes int64
 		label                  string
@@ -65,10 +63,7 @@ type (
 	parametersOption  struct {
 		params params.Parameters
 	}
-	txControlOption    tx.Control
-	txControlRawOption struct {
-		raw *Ydb_Query.TransactionControl
-	}
+	txControlOption tx.Control
 	syntaxOption    = Syntax
 	statsModeOption struct {
 		mode     StatsMode
@@ -77,18 +72,6 @@ type (
 	execModeOption         = ExecMode
 	responsePartLimitBytes int64
 )
-
-func (ctrl txControlRawOption) ToYdbQueryTransactionControl(a *allocator.Allocator) *Ydb_Query.TransactionControl {
-	return ctrl.raw
-}
-
-func (ctrl txControlRawOption) Commit() bool {
-	return ctrl.raw.GetCommitTx()
-}
-
-func (ctrl txControlRawOption) applyExecuteOption(s *executeSettings) {
-	s.txControl = ctrl
-}
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
 	s.resourcePool = string(poolID)
@@ -103,14 +86,7 @@ func (s *executeSettings) StatsCallback() func(stats.QueryStats) {
 }
 
 func (t txCommitOption) applyExecuteOption(s *executeSettings) {
-	switch tt := s.txControl.(type) {
-	case *tx.Control:
-		s.txControl = tx.WithCommit(tt)
-	case txControlRawOption:
-		tt.raw.CommitTx = true
-	default:
-		panic(fmt.Sprintf("unknown tx control type: %T", tt))
-	}
+	s.txControl = tx.WithCommit(s.txControl)
 }
 
 func (txControl *txControlOption) applyExecuteOption(s *executeSettings) {
@@ -275,8 +251,4 @@ func WithCallOptions(opts ...grpc.CallOption) callOptionsOption {
 
 func WithTxControl(txControl *tx.Control) *txControlOption {
 	return (*txControlOption)(txControl)
-}
-
-func WithTxControlRaw(txControl *Ydb_Query.TransactionControl) *txControlRawOption {
-	return &txControlRawOption{raw: txControl}
 }
