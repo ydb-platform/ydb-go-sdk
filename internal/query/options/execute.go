@@ -29,7 +29,7 @@ type (
 	StatsMode Ydb_Query.StatsMode
 
 	TxControl interface {
-		ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl
+		ToYdbQueryTransactionControl(a *allocator.Allocator) *Ydb_Query.TransactionControl
 
 		Commit() bool
 	}
@@ -78,7 +78,7 @@ type (
 	responsePartLimitBytes int64
 )
 
-func (ctrl txControlRawOption) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl {
+func (ctrl txControlRawOption) ToYdbQueryTransactionControl(a *allocator.Allocator) *Ydb_Query.TransactionControl {
 	return ctrl.raw
 }
 

@@ -2,42 +2,70 @@ package tx
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
 var (
-	serializableReadWrite = &Ydb_Query.TransactionSettings_SerializableReadWrite{
+	querySerializableReadWrite = &Ydb_Query.TransactionSettings_SerializableReadWrite{
 		SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
 	}
-	staleReadOnly = &Ydb_Query.TransactionSettings_StaleReadOnly{
+	queryStaleReadOnly = &Ydb_Query.TransactionSettings_StaleReadOnly{
 		StaleReadOnly: &Ydb_Query.StaleModeSettings{},
 	}
-	snapshotReadOnly = &Ydb_Query.TransactionSettings_SnapshotReadOnly{
+	querySnapshotReadOnly = &Ydb_Query.TransactionSettings_SnapshotReadOnly{
 		SnapshotReadOnly: &Ydb_Query.SnapshotModeSettings{},
 	}
-	onlineReadOnlyAllowInconsistentReads = &Ydb_Query.TransactionSettings_OnlineReadOnly{
+	queryOnlineReadOnlyAllowInconsistentReads = &Ydb_Query.TransactionSettings_OnlineReadOnly{
 		OnlineReadOnly: &Ydb_Query.OnlineModeSettings{AllowInconsistentReads: true},
 	}
-	onlineReadOnlyForbidInconsistentReads = &Ydb_Query.TransactionSettings_OnlineReadOnly{
+	queryOnlineReadOnlyForbidInconsistentReads = &Ydb_Query.TransactionSettings_OnlineReadOnly{
 		OnlineReadOnly: &Ydb_Query.OnlineModeSettings{AllowInconsistentReads: false},
+	}
+	tableSerializableReadWrite = &Ydb_Table.TransactionSettings_SerializableReadWrite{
+		SerializableReadWrite: &Ydb_Table.SerializableModeSettings{},
+	}
+	tableStaleReadOnly = &Ydb_Table.TransactionSettings_StaleReadOnly{
+		StaleReadOnly: &Ydb_Table.StaleModeSettings{},
+	}
+	tableSnapshotReadOnly = &Ydb_Table.TransactionSettings_SnapshotReadOnly{
+		SnapshotReadOnly: &Ydb_Table.SnapshotModeSettings{},
+	}
+	tableOnlineReadOnlyAllowInconsistentReads = &Ydb_Table.TransactionSettings_OnlineReadOnly{
+		OnlineReadOnly: &Ydb_Table.OnlineModeSettings{AllowInconsistentReads: true},
+	}
+	tableOnlineReadOnlyForbidInconsistentReads = &Ydb_Table.TransactionSettings_OnlineReadOnly{
+		OnlineReadOnly: &Ydb_Table.OnlineModeSettings{AllowInconsistentReads: false},
 	}
 )
 
 // Transaction settings options
 type (
 	Option interface {
-		ApplyTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
+		ApplyQueryTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
+		ApplyTableTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Table.TransactionSettings)
 	}
 	Settings []Option
 )
 
-func (opts Settings) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
+func (opts Settings) applyTableTxSelector(a *allocator.Allocator, txControl *Ydb_Table.TransactionControl) {
+	beginTx := a.TableTransactionControlBeginTx()
+	beginTx.BeginTx = a.TableTransactionSettings()
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyTableTxSettingsOption(a, beginTx.BeginTx)
+		}
+	}
+	txControl.TxSelector = beginTx
+}
+
+func (opts Settings) applyQueryTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
 	beginTx := a.QueryTransactionControlBeginTx()
 	beginTx.BeginTx = a.QueryTransactionSettings()
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyTxSettingsOption(a, beginTx.BeginTx)
+			opt.ApplyQueryTxSettingsOption(a, beginTx.BeginTx)
 		}
 	}
 	txControl.TxSelector = beginTx
@@ -47,7 +75,7 @@ func (opts Settings) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionSetting
 	txSettings := a.QueryTransactionSettings()
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyTxSettingsOption(a, txSettings)
+			opt.ApplyQueryTxSettingsOption(a, txSettings)
 		}
 	}
 
@@ -67,10 +95,16 @@ var _ Option = serializableReadWriteTxSettingsOption{}
 
 type serializableReadWriteTxSettingsOption struct{}
 
-func (o serializableReadWriteTxSettingsOption) ApplyTxSettingsOption(
-	a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings,
+func (serializableReadWriteTxSettingsOption) ApplyTableTxSettingsOption(
+	a *allocator.Allocator, settings *Ydb_Table.TransactionSettings,
 ) {
-	txSettings.TxMode = serializableReadWrite
+	settings.TxMode = tableSerializableReadWrite
+}
+
+func (serializableReadWriteTxSettingsOption) ApplyQueryTxSettingsOption(
+	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
+) {
+	settings.TxMode = querySerializableReadWrite
 }
 
 func WithSerializableReadWrite() Option {
@@ -81,10 +115,16 @@ var _ Option = snapshotReadOnlyTxSettingsOption{}
 
 type snapshotReadOnlyTxSettingsOption struct{}
 
-func (snapshotReadOnlyTxSettingsOption) ApplyTxSettingsOption(
+func (snapshotReadOnlyTxSettingsOption) ApplyTableTxSettingsOption(
+	a *allocator.Allocator, settings *Ydb_Table.TransactionSettings,
+) {
+	settings.TxMode = tableSnapshotReadOnly
+}
+
+func (snapshotReadOnlyTxSettingsOption) ApplyQueryTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
 ) {
-	settings.TxMode = snapshotReadOnly
+	settings.TxMode = querySnapshotReadOnly
 }
 
 func WithSnapshotReadOnly() Option {
@@ -95,10 +135,16 @@ var _ Option = staleReadOnlySettingsOption{}
 
 type staleReadOnlySettingsOption struct{}
 
-func (staleReadOnlySettingsOption) ApplyTxSettingsOption(
+func (staleReadOnlySettingsOption) ApplyTableTxSettingsOption(
+	a *allocator.Allocator, settings *Ydb_Table.TransactionSettings,
+) {
+	settings.TxMode = tableStaleReadOnly
+}
+
+func (staleReadOnlySettingsOption) ApplyQueryTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
 ) {
-	settings.TxMode = staleReadOnly
+	settings.TxMode = queryStaleReadOnly
 }
 
 func WithStaleReadOnly() Option {
@@ -128,7 +174,7 @@ var _ Option = onlineReadOnlySettingsOption{}
 
 type onlineReadOnlySettingsOption []OnlineReadOnlyOption
 
-func (opts onlineReadOnlySettingsOption) ApplyTxSettingsOption(
+func (opts onlineReadOnlySettingsOption) ApplyQueryTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
 ) {
 	var ro onlineReadOnly
@@ -138,9 +184,25 @@ func (opts onlineReadOnlySettingsOption) ApplyTxSettingsOption(
 		}
 	}
 	if ro {
-		settings.TxMode = onlineReadOnlyAllowInconsistentReads
+		settings.TxMode = queryOnlineReadOnlyAllowInconsistentReads
 	} else {
-		settings.TxMode = onlineReadOnlyForbidInconsistentReads
+		settings.TxMode = queryOnlineReadOnlyForbidInconsistentReads
+	}
+}
+
+func (opts onlineReadOnlySettingsOption) ApplyTableTxSettingsOption(
+	a *allocator.Allocator, settings *Ydb_Table.TransactionSettings,
+) {
+	var ro onlineReadOnly
+	for _, opt := range opts {
+		if opt != nil {
+			opt.applyTxOnlineReadOnlyOption(&ro)
+		}
+	}
+	if ro {
+		settings.TxMode = tableOnlineReadOnlyAllowInconsistentReads
+	} else {
+		settings.TxMode = tableOnlineReadOnlyForbidInconsistentReads
 	}
 }
 

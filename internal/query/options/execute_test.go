@@ -151,7 +151,10 @@ func TestExecuteSettings(t *testing.T) {
 			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
 			require.Equal(t, tt.settings.ResourcePool(), settings.ResourcePool())
-			require.Equal(t, tt.settings.TxControl().ToYDB(a).String(), settings.TxControl().ToYDB(a).String())
+			require.Equal(t,
+				tt.settings.TxControl().ToYdbQueryTransactionControl(a).String(),
+				settings.TxControl().ToYdbQueryTransactionControl(a).String(),
+			)
 			require.Equal(t, must(tt.settings.Params().ToYDB(a)), must(settings.Params().ToYDB(a)))
 			require.Equal(t, tt.settings.CallOptions(), settings.CallOptions())
 		})
