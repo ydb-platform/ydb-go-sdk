@@ -1,7 +1,7 @@
 package options
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
