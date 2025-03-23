@@ -8,17 +8,17 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
-type txMock func() *internal.Control
+type txMock func() *tx.Control
 
-func (tx txMock) txControl() *internal.Control {
-	if tx == nil {
-		return internal.NewControl(internal.WithTxID(""))
+func (f txMock) txControl() *tx.Control {
+	if f == nil {
+		return tx.NewControl(tx.WithTxID(""))
 	}
 
-	return tx()
+	return f()
 }
 
 func TestExecuteSettings(t *testing.T) {
@@ -30,13 +30,13 @@ func TestExecuteSettings(t *testing.T) {
 	}{
 		{
 			name: "WithTxID",
-			tx: func() *internal.Control {
-				return internal.NewControl(internal.WithTxID("test"))
+			tx: func() *tx.Control {
+				return tx.NewControl(tx.WithTxID("test"))
 			},
 			settings: executeSettings{
 				execMode:  ExecModeExecute,
 				statsMode: StatsModeNone,
-				txControl: internal.NewControl(internal.WithTxID("test")),
+				txControl: tx.NewControl(tx.WithTxID("test")),
 				syntax:    SyntaxYQL,
 				params:    &params.Params{},
 			},
@@ -49,7 +49,7 @@ func TestExecuteSettings(t *testing.T) {
 			settings: executeSettings{
 				execMode:  ExecModeExecute,
 				statsMode: StatsModeFull,
-				txControl: internal.NewControl(internal.WithTxID("")),
+				txControl: tx.NewControl(tx.WithTxID("")),
 				syntax:    SyntaxYQL,
 				params:    &params.Params{},
 			},
@@ -62,7 +62,7 @@ func TestExecuteSettings(t *testing.T) {
 			settings: executeSettings{
 				execMode:  ExecModeExplain,
 				statsMode: StatsModeNone,
-				txControl: internal.NewControl(internal.WithTxID("")),
+				txControl: tx.NewControl(tx.WithTxID("")),
 				syntax:    SyntaxYQL,
 				params:    &params.Params{},
 			},
@@ -75,7 +75,7 @@ func TestExecuteSettings(t *testing.T) {
 			settings: executeSettings{
 				execMode:  ExecModeExecute,
 				statsMode: StatsModeNone,
-				txControl: internal.NewControl(internal.WithTxID("")),
+				txControl: tx.NewControl(tx.WithTxID("")),
 				syntax:    SyntaxPostgreSQL,
 				params:    &params.Params{},
 			},
@@ -88,7 +88,7 @@ func TestExecuteSettings(t *testing.T) {
 			settings: executeSettings{
 				execMode:  ExecModeExecute,
 				statsMode: StatsModeNone,
-				txControl: internal.NewControl(internal.WithTxID("")),
+				txControl: tx.NewControl(tx.WithTxID("")),
 				syntax:    SyntaxYQL,
 				params:    &params.Params{},
 				callOptions: []grpc.CallOption{
@@ -106,7 +106,7 @@ func TestExecuteSettings(t *testing.T) {
 			settings: executeSettings{
 				execMode:  ExecModeExecute,
 				statsMode: StatsModeNone,
-				txControl: internal.NewControl(internal.WithTxID("")),
+				txControl: tx.NewControl(tx.WithTxID("")),
 				syntax:    SyntaxYQL,
 				params:    params.Builder{}.Param("$a").Text("A").Build(),
 			},
@@ -119,7 +119,7 @@ func TestExecuteSettings(t *testing.T) {
 			settings: executeSettings{
 				execMode:  ExecModeExecute,
 				statsMode: StatsModeNone,
-				txControl: internal.NewControl(internal.WithTxID(""), internal.CommitTx()),
+				txControl: tx.NewControl(tx.WithTxID(""), tx.CommitTx()),
 				syntax:    SyntaxYQL,
 				params:    &params.Params{},
 			},
@@ -132,7 +132,7 @@ func TestExecuteSettings(t *testing.T) {
 			settings: executeSettings{
 				execMode:     ExecModeExecute,
 				statsMode:    StatsModeNone,
-				txControl:    internal.NewControl(internal.WithTxID("")),
+				txControl:    tx.NewControl(tx.WithTxID("")),
 				syntax:       SyntaxYQL,
 				params:       &params.Params{},
 				resourcePool: "test-pool-id",
@@ -151,7 +151,10 @@ func TestExecuteSettings(t *testing.T) {
 			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
 			require.Equal(t, tt.settings.ResourcePool(), settings.ResourcePool())
-			require.Equal(t, tt.settings.TxControl().ToYDB(a).String(), settings.TxControl().ToYDB(a).String())
+			require.Equal(t,
+				tt.settings.TxControl().ToYdbQueryTransactionControl(a).String(),
+				settings.TxControl().ToYdbQueryTransactionControl(a).String(),
+			)
 			require.Equal(t, must(tt.settings.Params().ToYDB(a)), must(settings.Params().ToYDB(a)))
 			require.Equal(t, tt.settings.CallOptions(), settings.CallOptions())
 		})

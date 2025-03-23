@@ -10,7 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
-	queryTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -49,7 +48,7 @@ func begin(
 	response, err := client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
 			SessionId:  sessionID,
-			TxSettings: txSettings.ToYDB(a),
+			TxSettings: txSettings.ToYdbQuerySettings(a),
 		},
 	)
 	if err != nil {
@@ -183,13 +182,13 @@ func (tx *Transaction) SessionID() string {
 	return tx.s.ID()
 }
 
-func (tx *Transaction) txControl() *queryTx.Control {
+func (tx *Transaction) txControl() *baseTx.Control {
 	if tx.ID() != baseTx.LazyTxID {
-		return queryTx.NewControl(queryTx.WithTxID(tx.ID()))
+		return baseTx.NewControl(baseTx.WithTxID(tx.ID()))
 	}
 
-	return queryTx.NewControl(
-		queryTx.BeginTx(tx.txSettings...),
+	return baseTx.NewControl(
+		baseTx.BeginTx(tx.txSettings...),
 	)
 }
 

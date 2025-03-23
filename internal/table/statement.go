@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -47,7 +48,7 @@ func (s *statement) Execute(
 	}
 
 	request.SessionId = s.session.id
-	request.TxControl = txControl.Desc()
+	request.TxControl = txControl.ToYdbTableTransactionControl(a)
 	request.Parameters = params
 	request.Query = s.query.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
@@ -74,18 +75,19 @@ func (s *statement) Execute(
 		onDone(txr, true, r, err)
 	}()
 
-	return s.execute(ctx, a, &request, callOptions...)
+	return s.execute(ctx, a, txControl, &request, callOptions...)
 }
 
 // execute executes prepared query without any tracing.
 func (s *statement) execute(
 	ctx context.Context, a *allocator.Allocator,
+	txControl *tx.Control,
 	request *options.ExecuteDataQueryDesc,
 	callOptions ...grpc.CallOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	t, r, err := s.session.dataQuery.execute(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+	t, r, err := s.session.dataQuery.execute(ctx, a, txControl, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}

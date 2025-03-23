@@ -85,7 +85,7 @@ func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg execut
 
 	request.SessionId = sessionID
 	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
-	request.TxControl = cfg.TxControl().ToYDB(a)
+	request.TxControl = cfg.TxControl().ToYdbQueryTransactionControl(a)
 	request.Query = queryFromText(a, q, Ydb_Query.Syntax(cfg.Syntax()))
 	request.Parameters = params
 	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())

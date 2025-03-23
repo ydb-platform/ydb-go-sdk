@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -94,8 +94,12 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 	}
 }
 
-func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
-	return common.WithTxControl(ctx, txc)
+// WithTxControl modifies context for explicit define transaction control for a single query execute
+//
+// Allowed the table.TransactionControl and the query.TransactionControl
+// table.TransactionControl and query.TransactionControl are the type aliases to internal tx.Control
+func WithTxControl(ctx context.Context, txControl *tx.Control) context.Context {
+	return tx.WithTxControl(ctx, txControl)
 }
 
 type ConnectorOption = xsql.Option

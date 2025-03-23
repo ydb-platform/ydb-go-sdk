@@ -32,7 +32,7 @@ func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Para
 	if m != DataQueryMode {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("%q: %w", m.String(), ErrWrongQueryMode))
 	}
-	_, err := tx.tx.Execute(ctx, sql, params, tx.conn.dataQueryOptions(ctx)...)
+	_, err := tx.tx.Execute(ctx, sql, params, tx.conn.dataOpts...)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -48,7 +48,7 @@ func (tx *transaction) Query(ctx context.Context, sql string, params *params.Par
 		)
 	}
 	res, err := tx.tx.Execute(ctx,
-		sql, params, tx.conn.dataQueryOptions(ctx)...,
+		sql, params, tx.conn.dataOpts...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
