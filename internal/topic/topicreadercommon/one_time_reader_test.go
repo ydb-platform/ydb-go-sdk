@@ -2,12 +2,15 @@ package topicreadercommon
 
 import (
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"io"
 	"testing"
 	"testing/iotest"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 )
 
 func TestOneTimeReader(t *testing.T) {
@@ -68,7 +71,6 @@ func TestOneTimeReader(t *testing.T) {
 		}
 		r.reader = iotest.TimeoutReader(bytes.NewReader(preparedData))
 
-		// first read is ok
 		firstBuf := make([]byte, bufSize)
 		n, err := r.Read(firstBuf)
 		require.NoError(t, err)
@@ -76,16 +78,111 @@ func TestOneTimeReader(t *testing.T) {
 		require.Equal(t, preparedData[:bufSize], firstBuf)
 		require.NoError(t, err)
 
-		// iotest.TimeoutReader return timeout for second read
 		secondBuf := make([]byte, bufSize)
 		n, err = r.Read(secondBuf)
 		require.Equal(t, err, iotest.ErrTimeout)
 		require.Equal(t, 0, n)
 		require.Equal(t, make([]byte, bufSize), secondBuf)
 
-		// Next read again
 		n, err = r.Read(secondBuf)
 		require.Equal(t, err, iotest.ErrTimeout)
 		require.Equal(t, 0, n)
+	})
+
+	t.Run("CloseWithoutRead", func(t *testing.T) {
+		reader := newOneTimeReaderFromReader(bytes.NewReader([]byte("test")))
+		err := reader.Close()
+		require.NoError(t, err)
+	})
+
+	t.Run("CloseTwice", func(t *testing.T) {
+		reader := newOneTimeReaderFromReader(bytes.NewReader([]byte("test")))
+		require.NoError(t, reader.Close())
+		require.NoError(t, reader.Close())
+	})
+
+	t.Run("CloseReleasesResourcesWithGzipDecoder", func(t *testing.T) {
+		data := []byte("test data for gzip")
+		var buf bytes.Buffer
+		gzWriter := gzip.NewWriter(&buf)
+		_, err := gzWriter.Write(data)
+		require.NoError(t, err)
+		require.NoError(t, gzWriter.Close())
+
+		gzReader, err := gzip.NewReader(&buf)
+		require.NoError(t, err)
+
+		reader := newOneTimeReaderFromReader(gzReader)
+
+		tmpBuf := make([]byte, 4)
+		_, err = reader.Read(tmpBuf)
+		require.NoError(t, err)
+
+		err = reader.Close()
+		require.NoError(t, err, "Close() should not return error for gzip.Reader")
+
+		n, err := reader.Read(tmpBuf)
+		require.Equal(t, 0, n, "After Close(), read should return 0 bytes")
+		require.ErrorIs(t, err, io.EOF, "After Close(), read should return EOF")
+	})
+
+	t.Run("ReadAfterCloseReturnsEOFWithGzip", func(t *testing.T) {
+		var buf bytes.Buffer
+		gzipWriter := gzip.NewWriter(&buf)
+		_, err := gzipWriter.Write([]byte("gzip data"))
+		require.NoError(t, err)
+		require.NoError(t, gzipWriter.Close())
+
+		gzipReader, err := gzip.NewReader(&buf)
+		require.NoError(t, err)
+
+		r := newOneTimeReaderFromReader(gzipReader)
+		require.NoError(t, r.Close(), "Close() should succeed")
+
+		readBuf := make([]byte, 2)
+		n, err := r.Read(readBuf)
+		require.Equal(t, 0, n, "Read() after Close() should return 0 bytes")
+		require.Equal(t, io.EOF, err, "Read() after Close() should return EOF")
+	})
+
+	t.Run("GzipDecoderReturnedToPoolAfterClose", func(t *testing.T) {
+		dm := NewDecoderMap()
+		codec := rawtopiccommon.CodecGzip
+
+		dm.AddDecoder(codec, func(input io.Reader) (ReadResetter, error) {
+			return gzip.NewReader(input)
+		})
+
+		data := []byte("pool reuse test")
+		var buf bytes.Buffer
+		gzipWriter := gzip.NewWriter(&buf)
+		_, err := gzipWriter.Write(data)
+		require.NoError(t, err)
+		require.NoError(t, gzipWriter.Close())
+
+		decoder, err := dm.Decode(codec, &buf)
+		require.NoError(t, err)
+
+		reader := newOneTimeReaderFromReader(decoder)
+		result, err := io.ReadAll(&reader)
+		require.NoError(t, err)
+		require.Equal(t, "pool reuse test", string(result))
+
+		require.NoError(t, reader.Close(), "Close() should not return error")
+
+		var buf2 bytes.Buffer
+		gzipWriter2 := gzip.NewWriter(&buf2)
+		_, err = gzipWriter2.Write([]byte("next message"))
+		require.NoError(t, err)
+		require.NoError(t, gzipWriter2.Close())
+
+		reader2, err := dm.Decode(codec, &buf2)
+		require.NoError(t, err)
+
+		result2, err := io.ReadAll(reader2)
+		require.NoError(t, err)
+		require.Equal(t, "next message", string(result2))
+
+		require.NoError(t, reader2.(io.Closer).Close())
 	})
 }

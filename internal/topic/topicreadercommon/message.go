@@ -58,10 +58,11 @@ func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 	if m.dataConsumed {
 		return xerrors.WithStackTrace(errMessageWasReadEarly)
 	}
-
 	m.dataConsumed = true
+	err := callbackOnReaderContent(globalReadMessagePool, m, m.UncompressedSize, dst)
+	m.data.Close()
 
-	return callbackOnReaderContent(globalReadMessagePool, m, m.UncompressedSize, dst)
+	return err
 }
 
 // Read implements io.Reader
@@ -73,7 +74,16 @@ func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 func (m *PublicMessage) Read(p []byte) (n int, err error) {
 	m.dataConsumed = true
 
-	return m.data.Read(p)
+	n, err = m.data.Read(p)
+	if err != nil {
+		m.data.Close()
+	}
+
+	return n, err
+}
+
+func (m *PublicMessage) Close() error {
+	return m.data.Close()
 }
 
 // PublicMessageContentUnmarshaler is interface for unmarshal message content
