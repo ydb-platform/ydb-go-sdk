@@ -42,11 +42,11 @@ var (
 
 // Transaction settings options
 type (
-	Option interface {
+	SettingsOption interface {
 		ApplyQueryTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
 		ApplyTableTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Table.TransactionSettings)
 	}
-	Settings []Option
+	Settings []SettingsOption
 )
 
 func (opts Settings) applyTableTxSelector(a *allocator.Allocator, txControl *Ydb_Table.TransactionControl) {
@@ -71,7 +71,7 @@ func (opts Settings) applyQueryTxSelector(a *allocator.Allocator, txControl *Ydb
 	txControl.TxSelector = beginTx
 }
 
-func (opts Settings) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionSettings {
+func (opts Settings) ToYdbQuerySettings(a *allocator.Allocator) *Ydb_Query.TransactionSettings {
 	txSettings := a.QueryTransactionSettings()
 	for _, opt := range opts {
 		if opt != nil {
@@ -82,16 +82,27 @@ func (opts Settings) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionSetting
 	return txSettings
 }
 
+func (opts Settings) ToYdbTableSettings(a *allocator.Allocator) *Ydb_Table.TransactionSettings {
+	txSettings := a.TableTransactionSettings()
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyTableTxSettingsOption(a, txSettings)
+		}
+	}
+
+	return txSettings
+}
+
 // NewSettings returns transaction settings
-func NewSettings(opts ...Option) Settings {
+func NewSettings(opts ...SettingsOption) Settings {
 	return opts
 }
 
-func WithDefaultTxMode() Option {
+func WithDefaultTxMode() SettingsOption {
 	return WithSerializableReadWrite()
 }
 
-var _ Option = serializableReadWriteTxSettingsOption{}
+var _ SettingsOption = serializableReadWriteTxSettingsOption{}
 
 type serializableReadWriteTxSettingsOption struct{}
 
@@ -107,11 +118,11 @@ func (serializableReadWriteTxSettingsOption) ApplyQueryTxSettingsOption(
 	settings.TxMode = querySerializableReadWrite
 }
 
-func WithSerializableReadWrite() Option {
+func WithSerializableReadWrite() SettingsOption {
 	return serializableReadWriteTxSettingsOption{}
 }
 
-var _ Option = snapshotReadOnlyTxSettingsOption{}
+var _ SettingsOption = snapshotReadOnlyTxSettingsOption{}
 
 type snapshotReadOnlyTxSettingsOption struct{}
 
@@ -127,11 +138,11 @@ func (snapshotReadOnlyTxSettingsOption) ApplyQueryTxSettingsOption(
 	settings.TxMode = querySnapshotReadOnly
 }
 
-func WithSnapshotReadOnly() Option {
+func WithSnapshotReadOnly() SettingsOption {
 	return snapshotReadOnlyTxSettingsOption{}
 }
 
-var _ Option = staleReadOnlySettingsOption{}
+var _ SettingsOption = staleReadOnlySettingsOption{}
 
 type staleReadOnlySettingsOption struct{}
 
@@ -147,7 +158,7 @@ func (staleReadOnlySettingsOption) ApplyQueryTxSettingsOption(
 	settings.TxMode = queryStaleReadOnly
 }
 
-func WithStaleReadOnly() Option {
+func WithStaleReadOnly() SettingsOption {
 	return staleReadOnlySettingsOption{}
 }
 
@@ -170,7 +181,7 @@ func WithInconsistentReads() OnlineReadOnlyOption {
 	return inconsistentReadsTxOnlineReadOnlyOption{}
 }
 
-var _ Option = onlineReadOnlySettingsOption{}
+var _ SettingsOption = onlineReadOnlySettingsOption{}
 
 type onlineReadOnlySettingsOption []OnlineReadOnlyOption
 

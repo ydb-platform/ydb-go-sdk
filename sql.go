@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -95,7 +95,7 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
-	return common.WithTxControl(ctx, txc)
+	return tx.WithTxControl(ctx, txc)
 }
 
 type ConnectorOption = xsql.Option

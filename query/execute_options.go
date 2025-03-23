@@ -5,7 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	tx2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
 type ExecuteOption = options.Execute
@@ -33,11 +33,11 @@ func WithParameters(parameters params.Parameters) ExecuteOption {
 	return options.WithParameters(parameters)
 }
 
-func WithTxControl(txControl *tx2.Control) ExecuteOption {
+func WithTxControl(txControl *tx.Control) ExecuteOption {
 	return options.WithTxControl(txControl)
 }
 
-func WithTxSettings(txSettings tx2.Settings) options.DoTxOption {
+func WithTxSettings(txSettings tx.Settings) options.DoTxOption {
 	return options.WithTxSettings(txSettings)
 }
 

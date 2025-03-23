@@ -48,7 +48,7 @@ func begin(
 	response, err := client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
 			SessionId:  sessionID,
-			TxSettings: txSettings.ToYDB(a),
+			TxSettings: txSettings.ToYdbQuerySettings(a),
 		},
 	)
 	if err != nil {

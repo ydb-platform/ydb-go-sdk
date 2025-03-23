@@ -79,7 +79,7 @@ func (tx *transaction) Execute(ctx context.Context, sql string, params *params.P
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		if tx.control.Desc().GetCommitTx() {
+		if tx.control.Commit() {
 			tx.state.Store(txStateCommitted)
 		}
 
@@ -121,7 +121,7 @@ func (tx *transaction) ExecuteStatement(
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		if tx.control.Desc().GetCommitTx() {
+		if tx.control.Commit() {
 			tx.state.Store(txStateCommitted)
 		}
 

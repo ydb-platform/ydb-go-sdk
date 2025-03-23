@@ -58,7 +58,7 @@ var (
 	_ Selector      = beginTxOptions{}
 )
 
-type beginTxOptions []Option
+type beginTxOptions []SettingsOption
 
 func (opts beginTxOptions) applyTxControlOption(txControl *Control) {
 	txControl.selector = opts
@@ -87,7 +87,7 @@ func (opts beginTxOptions) applyTableTxSelector(a *allocator.Allocator, txContro
 }
 
 // BeginTx returns selector transaction control option
-func BeginTx(opts ...Option) beginTxOptions {
+func BeginTx(opts ...SettingsOption) beginTxOptions {
 	return opts
 }
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -140,8 +141,8 @@ func (c *Conn) isReady() bool {
 
 func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
 	_, res, err := c.session.Execute(ctx,
-		common.TxControl(ctx, c.defaultTxControl),
-		sql, params, c.dataQueryOptions(ctx)...,
+		tx.ControlFromContext(ctx, c.defaultTxControl),
+		sql, params, c.dataOpts...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -189,8 +190,8 @@ func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Par
 	driver.RowsNextResultSet, error,
 ) {
 	_, res, err := c.session.Execute(ctx,
-		common.TxControl(ctx, c.defaultTxControl),
-		sql, params, c.dataQueryOptions(ctx)...,
+		tx.ControlFromContext(ctx, c.defaultTxControl),
+		sql, params, c.dataOpts...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -303,12 +304,4 @@ func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (common.
 	}
 
 	return tx, nil
-}
-
-func (c *Conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
-	if common.IsPreparedStatement(ctx) {
-		return append(c.dataOpts, options.WithKeepInCache(true))
-	}
-
-	return c.dataOpts
 }

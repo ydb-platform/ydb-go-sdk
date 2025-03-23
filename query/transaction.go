@@ -20,7 +20,7 @@ type (
 	}
 	TransactionControl  = tx.Control
 	TransactionSettings = tx.Settings
-	TransactionOption   = tx.Option
+	TransactionOption   = tx.SettingsOption
 )
 
 // BeginTx returns selector transaction control option
@@ -85,7 +85,7 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 }
 
 // TxSettings returns transaction settings
-func TxSettings(opts ...tx.Option) TransactionSettings {
+func TxSettings(opts ...tx.SettingsOption) TransactionSettings {
 	return opts
 }
 
