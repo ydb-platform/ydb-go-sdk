@@ -1,3 +1,4 @@
+## v3.104.6
 * Refactored `table.TransactionControl` and `query.TransactionControl` for use single implementation in `internal/tx`
 * Changed `ydb.WithTxControl` context modifier for allow both `table.TransactionControl` and `query.TransactionControl`
 
