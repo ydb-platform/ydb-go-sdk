@@ -4,14 +4,17 @@
 package integration
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -145,5 +148,113 @@ func TestNoEffectsIfForgetCommitTx(t *testing.T) {
 		_, err = cc.BeginTx(ctx, &sql.TxOptions{})
 		require.Error(t, err)
 		require.True(t, xerrors.IsAlreadyHasTx(err))
+	})
+}
+
+func TestInteractiveTx(t *testing.T) {
+	var (
+		ctx   = xtest.Context(t)
+		scope = newScope(t)
+		db    = scope.Driver()
+	)
+
+	t.Run("table", func(t *testing.T) {
+		for _, tt := range []struct {
+			name      string
+			txControl *table.TransactionSettings
+			valid     bool
+		}{
+			{
+				name:      "SerializableRW",
+				txControl: table.TxSettings(table.WithSerializableReadWrite()),
+				valid:     true,
+			},
+			{
+				name:      "SnapshotRO",
+				txControl: table.TxSettings(table.WithSnapshotReadOnly()),
+				valid:     true,
+			},
+			{
+				name:      "OnlineRO",
+				txControl: table.TxSettings(table.WithOnlineReadOnly()),
+				valid:     false,
+			},
+			{
+				name:      "StaleRO",
+				txControl: table.TxSettings(table.WithStaleReadOnly()),
+				valid:     false,
+			},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+					tx, err := s.BeginTransaction(ctx, tt.txControl)
+					if err != nil {
+						return err
+					}
+					_, err = tx.CommitTx(ctx)
+					if err != nil {
+						return err
+					}
+
+					return nil
+				})
+				if tt.valid {
+					require.NoError(t, err)
+				} else {
+					require.Error(t, err)
+					require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
+				}
+			})
+		}
+	})
+
+	t.Run("query", func(t *testing.T) {
+		for _, tt := range []struct {
+			name      string
+			txControl query.TransactionSettings
+			valid     bool
+		}{
+			{
+				name:      "SerializableRW",
+				txControl: query.TxSettings(query.WithSerializableReadWrite()),
+				valid:     true,
+			},
+			{
+				name:      "SnapshotRO",
+				txControl: query.TxSettings(query.WithSnapshotReadOnly()),
+				valid:     true,
+			},
+			{
+				name:      "OnlineRO",
+				txControl: query.TxSettings(query.WithOnlineReadOnly()),
+				valid:     false,
+			},
+			{
+				name:      "StaleRO",
+				txControl: query.TxSettings(query.WithStaleReadOnly()),
+				valid:     false,
+			},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+					tx, err := s.Begin(ctx, tt.txControl)
+					if err != nil {
+						return err
+					}
+					err = tx.CommitTx(ctx)
+					if err != nil {
+						return err
+					}
+
+					return nil
+				})
+				if tt.valid {
+					require.NoError(t, err)
+				} else {
+					require.Error(t, err)
+					require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
+				}
+			})
+		}
 	})
 }
