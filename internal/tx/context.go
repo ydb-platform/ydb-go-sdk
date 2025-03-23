@@ -5,8 +5,8 @@ import (
 )
 
 type (
-	ctxTransactionControlKey struct{}
-	ctxTxControlHookKey      struct{}
+	ctxTxControlKey     struct{}
+	ctxTxControlHookKey struct{}
 
 	txControlHook func(txControl *Control)
 )
@@ -15,8 +15,8 @@ func WithTxControlHook(ctx context.Context, hook txControlHook) context.Context 
 	return context.WithValue(ctx, ctxTxControlHookKey{}, hook)
 }
 
-func WithTxControl(ctx context.Context, txc *Control) context.Context {
-	return context.WithValue(ctx, ctxTransactionControlKey{}, txc)
+func WithTxControl(ctx context.Context, txControl *Control) context.Context {
+	return context.WithValue(ctx, ctxTxControlKey{}, txControl)
 }
 
 func ControlFromContext(ctx context.Context, defaultTxControl *Control) (txControl *Control) {
@@ -25,7 +25,7 @@ func ControlFromContext(ctx context.Context, defaultTxControl *Control) (txContr
 			hook(txControl)
 		}
 	}()
-	if txc, ok := ctx.Value(ctxTransactionControlKey{}).(*Control); ok {
+	if txc, ok := ctx.Value(ctxTxControlKey{}).(*Control); ok {
 		return txc
 	}
 
