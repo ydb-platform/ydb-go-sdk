@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 func TestDatabaseSqlWithTxControl(t *testing.T) {
@@ -37,11 +36,11 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tx.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				tx.WithTxControlHook(ctx, func(txControl *tx.Control) {
 					hookCalled = true
-					require.Equal(t, table.SerializableReadWriteTxControl(), txControl)
+					require.Equal(t, tx.SerializableReadWriteTxControl(), txControl)
 				}),
-				table.SerializableReadWriteTxControl(),
+				tx.SerializableReadWriteTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
 				_, err := db.QueryContext(ctx, "SELECT 1")
@@ -55,11 +54,11 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tx.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				tx.WithTxControlHook(ctx, func(txControl *tx.Control) {
 					hookCalled = true
-					require.Equal(t, table.SerializableReadWriteTxControl(), txControl)
+					require.Equal(t, tx.SerializableReadWriteTxControl(), txControl)
 				}),
-				table.SerializableReadWriteTxControl(),
+				tx.SerializableReadWriteTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
 				_, err := db.QueryContext(ctx, "SELECT 1")
@@ -73,11 +72,11 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tx.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				tx.WithTxControlHook(ctx, func(txControl *tx.Control) {
 					hookCalled = true
-					require.Equal(t, table.SnapshotReadOnlyTxControl(), txControl)
+					require.Equal(t, tx.SnapshotReadOnlyTxControl(), txControl)
 				}),
-				table.SnapshotReadOnlyTxControl(),
+				tx.SnapshotReadOnlyTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
 				_, err := db.QueryContext(ctx, "SELECT 1")
@@ -91,11 +90,11 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tx.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				tx.WithTxControlHook(ctx, func(txControl *tx.Control) {
 					hookCalled = true
-					require.Equal(t, table.StaleReadOnlyTxControl(), txControl)
+					require.Equal(t, tx.StaleReadOnlyTxControl(), txControl)
 				}),
-				table.StaleReadOnlyTxControl(),
+				tx.StaleReadOnlyTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
 				_, err := db.QueryContext(ctx, "SELECT 1")
@@ -109,11 +108,11 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tx.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				tx.WithTxControlHook(ctx, func(txControl *tx.Control) {
 					hookCalled = true
-					require.Equal(t, table.OnlineReadOnlyTxControl(), txControl)
+					require.Equal(t, tx.OnlineReadOnlyTxControl(), txControl)
 				}),
-				table.OnlineReadOnlyTxControl(),
+				tx.OnlineReadOnlyTxControl(),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
 				_, err := db.QueryContext(ctx, "SELECT 1")
@@ -127,11 +126,11 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		var hookCalled bool
 		require.NoError(t, retry.Do(
 			ydb.WithTxControl(
-				tx.WithTxControlHook(ctx, func(txControl *table.TransactionControl) {
+				tx.WithTxControlHook(ctx, func(txControl *tx.Control) {
 					hookCalled = true
-					require.Equal(t, table.OnlineReadOnlyTxControl(table.WithInconsistentReads()), txControl)
+					require.Equal(t, tx.OnlineReadOnlyTxControl(tx.WithInconsistentReads()), txControl)
 				}),
-				table.OnlineReadOnlyTxControl(table.WithInconsistentReads()),
+				tx.OnlineReadOnlyTxControl(tx.WithInconsistentReads()),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
 				_, err := db.QueryContext(ctx, "SELECT 1")
