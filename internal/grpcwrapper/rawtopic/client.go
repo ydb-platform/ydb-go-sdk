@@ -101,7 +101,7 @@ func (c *Client) StreamRead(ctxStreamLifeTime context.Context, readerID int64, t
 	return rawtopicreader.StreamReader{
 		Stream:   protoResp,
 		ReaderID: readerID,
-		Tracer:   *tracer,
+		Tracer:   tracer,
 	}, nil
 }
 

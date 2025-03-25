@@ -10,7 +10,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errUnexpectedNilPartitioningSettings = xerrors.Wrap(errors.New("ydb: unexpected nil partitioning settings"))
+var (
+	errUnexpectedNilPartitioningSettings     = xerrors.Wrap(errors.New("ydb: unexpected nil partitioning settings"))
+	errUnexpecredNilAutoPartitioningSettings = xerrors.Wrap(errors.New("ydb: unexpected nil auto-partitioning settings"))
+	errUnexpectedNilAutoPartitionWriteSpeed  = xerrors.Wrap(errors.New("ydb: unexpected nil auto-partition write speed"))
+)
 
 type Consumer struct {
 	Name            string
@@ -47,8 +51,10 @@ const (
 )
 
 type PartitioningSettings struct {
-	MinActivePartitions int64
-	PartitionCountLimit int64
+	MinActivePartitions      int64
+	MaxActivePartitions      int64
+	PartitionCountLimit      int64
+	AutoPartitioningSettings AutoPartitioningSettings
 }
 
 func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) error {
@@ -57,6 +63,7 @@ func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) 
 	}
 
 	s.MinActivePartitions = proto.GetMinActivePartitions()
+	s.MaxActivePartitions = proto.GetMaxActivePartitions()
 	s.PartitionCountLimit = proto.GetPartitionCountLimit() //nolint:staticcheck
 
 	return nil
@@ -64,19 +71,93 @@ func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) 
 
 func (s *PartitioningSettings) ToProto() *Ydb_Topic.PartitioningSettings {
 	return &Ydb_Topic.PartitioningSettings{
-		MinActivePartitions: s.MinActivePartitions,
-		PartitionCountLimit: s.PartitionCountLimit,
+		MinActivePartitions:      s.MinActivePartitions,
+		MaxActivePartitions:      s.MaxActivePartitions,
+		PartitionCountLimit:      s.PartitionCountLimit,
+		AutoPartitioningSettings: s.AutoPartitioningSettings.ToProto(),
 	}
+}
+
+type AutoPartitioningSettings struct {
+	AutoPartitioningStrategy           AutoPartitioningStrategy
+	AutoPartitioningWriteSpeedStrategy AutoPartitioningWriteSpeedStrategy
+}
+
+func (s *AutoPartitioningSettings) ToProto() *Ydb_Topic.AutoPartitioningSettings {
+	if s == nil {
+		return nil
+	}
+
+	return &Ydb_Topic.AutoPartitioningSettings{
+		Strategy:            s.AutoPartitioningStrategy.ToProto(),
+		PartitionWriteSpeed: s.AutoPartitioningWriteSpeedStrategy.ToProto(),
+	}
+}
+
+func (s *AutoPartitioningSettings) FromProto(proto *Ydb_Topic.AutoPartitioningSettings) error {
+	if proto == nil {
+		return xerrors.WithStackTrace(errUnexpecredNilAutoPartitioningSettings)
+	}
+	s.AutoPartitioningStrategy = AutoPartitioningStrategy(proto.GetStrategy())
+
+	if proto.GetPartitionWriteSpeed() != nil {
+		if err := s.AutoPartitioningWriteSpeedStrategy.FromProto(proto.GetPartitionWriteSpeed()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type AutoPartitioningStrategy int32
+
+const (
+	AutoPartitioningStrategyUnspecified    = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_UNSPECIFIED)
+	AutoPartitioningStrategyDisabled       = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_DISABLED)
+	AutoPartitioningStrategyScaleUpAndDown = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_SCALE_UP_AND_DOWN)
+	AutoPartitioningStrategyPaused         = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_PAUSED)
+)
+
+func (s AutoPartitioningStrategy) ToProto() Ydb_Topic.AutoPartitioningStrategy {
+	return Ydb_Topic.AutoPartitioningStrategy(s)
+}
+
+type AutoPartitioningWriteSpeedStrategy struct {
+	StabilizationWindow    rawoptional.Duration
+	UpUtilizationPercent   int32
+	DownUtilizationPercent int32
+}
+
+func (s *AutoPartitioningWriteSpeedStrategy) ToProto() *Ydb_Topic.AutoPartitioningWriteSpeedStrategy {
+	return &Ydb_Topic.AutoPartitioningWriteSpeedStrategy{
+		StabilizationWindow:    s.StabilizationWindow.ToProto(),
+		UpUtilizationPercent:   s.UpUtilizationPercent,
+		DownUtilizationPercent: s.DownUtilizationPercent,
+	}
+}
+
+func (s *AutoPartitioningWriteSpeedStrategy) FromProto(speed *Ydb_Topic.AutoPartitioningWriteSpeedStrategy) error {
+	if speed == nil {
+		return xerrors.WithStackTrace(errUnexpectedNilAutoPartitionWriteSpeed)
+	}
+
+	s.StabilizationWindow.MustFromProto(speed.StabilizationWindow)
+	s.UpUtilizationPercent = speed.UpUtilizationPercent
+	s.DownUtilizationPercent = speed.DownUtilizationPercent
+
+	return nil
 }
 
 type AlterPartitioningSettings struct {
 	SetMinActivePartitions rawoptional.Int64
+	SetMaxActivePartitions rawoptional.Int64
 	SetPartitionCountLimit rawoptional.Int64
 }
 
 func (s *AlterPartitioningSettings) ToProto() *Ydb_Topic.AlterPartitioningSettings {
 	return &Ydb_Topic.AlterPartitioningSettings{
 		SetMinActivePartitions: s.SetMinActivePartitions.ToProto(),
+		SetMaxActivePartitions: s.SetMaxActivePartitions.ToProto(),
 		SetPartitionCountLimit: s.SetPartitionCountLimit.ToProto(),
 	}
 }
