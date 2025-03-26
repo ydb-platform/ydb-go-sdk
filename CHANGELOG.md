@@ -1,3 +1,4 @@
+## v3.104.7
 * Added public type alias `ydb.Params` to `internal/params.Parameters` for external usage
 
 ## v3.104.6
