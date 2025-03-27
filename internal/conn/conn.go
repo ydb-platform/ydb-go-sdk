@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,6 +37,7 @@ var (
 
 type Conn interface {
 	grpc.ClientConnInterface
+	closer.Closer
 
 	Endpoint() endpoint.Endpoint
 
