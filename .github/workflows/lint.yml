@@ -10,6 +10,7 @@ env:
   GOLANGCI_LINT_VERSION: v1.60.3
 jobs:
   golangci:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no lint'))
     name: golangci-lint
     concurrency:
       group: lint-golangci-${{ github.ref }}
@@ -39,6 +40,7 @@ jobs:
           args: --timeout=5m
           working-directory: examples
   golangci-slo:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no lint'))
     name: golangci-lint-slo
     concurrency:
       group: lint-golangci-slo-${{ github.ref }}
@@ -55,6 +57,7 @@ jobs:
           args: --timeout=5m
           working-directory: tests/slo
   autoformatter:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no lint'))
     name: autoformat check
     concurrency:
       group: lint-autoformat-${{ github.ref }}
