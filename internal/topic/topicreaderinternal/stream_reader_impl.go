@@ -702,6 +702,10 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 
 				return
 			}
+		case *rawtopicreader.EndPartitionSession:
+			if err = r.onEndPartitionSession(m); err != nil {
+				_ = r.CloseWithError(ctx, err)
+			}
 		case *rawtopicreader.CommitOffsetResponse:
 			if err = r.onCommitResponse(m); err != nil {
 				_ = r.CloseWithError(ctx, err)
@@ -971,9 +975,31 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequest(m *rawtopicreader.
 		return err
 	}
 
+	session.SetNoMoreMessages()
 	if !m.Graceful {
 		session.Close()
 	}
 
 	return r.batcher.PushRawMessage(session, m)
+}
+
+func (r *topicStreamReaderImpl) onEndPartitionSession(m *rawtopicreader.EndPartitionSession) error {
+	if session, err := r.sessionController.Get(m.PartitionSessionID); err == nil {
+		trace.TopicOnReaderEndPartitionSession(
+			r.cfg.Trace,
+			r.readConnectionID,
+			session.Context(),
+			session.Topic,
+			session.PartitionID,
+			m.PartitionSessionID.ToInt64(),
+			m.AdjacentPartitionIDs,
+			m.ChildPartitionIDs,
+		)
+		session.SetNoMoreMessages()
+		r.batcher.FlushPartitionSession(session)
+
+		return nil
+	} else {
+		return xerrors.Retryable(xerrors.Wrap(fmt.Errorf("ydb: unknown partition for end partition session: %w", err)))
+	}
 }

@@ -4,7 +4,8 @@ import "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawt
 
 func CreateInitMessage(consumer string, selectors []*PublicReadSelector) *rawtopicreader.InitRequest {
 	res := &rawtopicreader.InitRequest{
-		Consumer: consumer,
+		Consumer:                consumer,
+		AutoPartitioningSupport: true,
 	}
 
 	res.TopicsReadSettings = make([]rawtopicreader.TopicReadSettings, len(selectors))

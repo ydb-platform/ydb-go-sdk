@@ -20,6 +20,7 @@ var (
 	errUnexpectedProtoNilStartPartitionSessionRequest = xerrors.Wrap(errors.New("ydb: unexpected proto nil start partition session request"))                      //nolint:lll
 	errUnexpectedNilPartitionSession                  = xerrors.Wrap(errors.New("ydb: unexpected proto nil partition session in start partition session request")) //nolint:lll
 	errUnexpectedGrpcNilStopPartitionSessionRequest   = xerrors.Wrap(errors.New("ydb: unexpected grpc nil stop partition session request"))                        //nolint:lll
+	errUnexpectedGrpcNilEndPartitionSession           = xerrors.Wrap(errors.New("ydb: unexpected grpc nil end partition session"))                                 //nolint:lll
 )
 
 type PartitionSessionID int64
@@ -92,12 +93,14 @@ type InitRequest struct {
 
 	TopicsReadSettings []TopicReadSettings
 
-	Consumer string
+	Consumer                string
+	AutoPartitioningSupport bool
 }
 
 func (r *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
 	p := &Ydb_Topic.StreamReadMessage_InitRequest{
-		Consumer: r.Consumer,
+		Consumer:                r.Consumer,
+		AutoPartitioningSupport: r.AutoPartitioningSupport,
 	}
 
 	p.TopicsReadSettings = make([]*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings, len(r.TopicsReadSettings))
@@ -476,4 +479,26 @@ func (r *StopPartitionSessionResponse) toProto() *Ydb_Topic.StreamReadMessage_St
 	return &Ydb_Topic.StreamReadMessage_StopPartitionSessionResponse{
 		PartitionSessionId: r.PartitionSessionID.ToInt64(),
 	}
+}
+
+type EndPartitionSession struct {
+	serverMessageImpl
+
+	rawtopiccommon.ServerMessageMetadata
+
+	PartitionSessionID   PartitionSessionID
+	AdjacentPartitionIDs []int64
+	ChildPartitionIDs    []int64
+}
+
+func (r *EndPartitionSession) fromProto(proto *Ydb_Topic.StreamReadMessage_EndPartitionSession) error {
+	if proto == nil {
+		return xerrors.WithStackTrace(errUnexpectedGrpcNilEndPartitionSession)
+	}
+
+	r.PartitionSessionID.FromInt64(proto.GetPartitionSessionId())
+	r.AdjacentPartitionIDs = proto.GetAdjacentPartitionIds()
+	r.ChildPartitionIDs = proto.GetChildPartitionIds()
+
+	return nil
 }

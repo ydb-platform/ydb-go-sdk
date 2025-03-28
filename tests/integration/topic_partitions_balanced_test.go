@@ -5,6 +5,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -106,4 +107,19 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 	firstReaderStopRead()
 	xtest.WaitChannelClosed(t, firstReaderReadStopped)
 	require.NoError(t, firstReader.Close(ctx))
+}
+
+func TestTopicSplitPartitions(t *testing.T) {
+	scope := newScope(t)
+
+	params := `
+max_active_partitions=100, 
+partition_write_burst_bytes=1,
+auto_partitioning_strategy=scale_up,
+auto_partitioning_up_utilization_percent=1,
+auto_partitioning_stabilization_window=Interval('PT1S')
+`
+	err := scope.Driver().Query().Exec(scope.Ctx, fmt.Sprintf("ALTER TOPIC `%v` SET (%v)", scope.TopicPath(), params))
+	scope.Require.NoError(err)
+
 }

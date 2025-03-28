@@ -23,6 +23,7 @@ type PartitionSession struct {
 
 	lastReceivedOffsetEndVal atomic.Int64
 	committedOffsetVal       atomic.Int64
+	noMoreMessages           atomic.Bool
 }
 
 func NewPartitionSession(
@@ -100,6 +101,14 @@ func (s *PartitionSession) LastReceivedMessageOffset() rawtopiccommon.Offset {
 
 func (s *PartitionSession) SetLastReceivedMessageOffset(v rawtopiccommon.Offset) {
 	s.lastReceivedOffsetEndVal.Store(v.ToInt64())
+}
+
+func (s *PartitionSession) NoMoreMessages() bool {
+	return s.noMoreMessages.Load()
+}
+
+func (s *PartitionSession) SetNoMoreMessages() {
+	s.noMoreMessages.Store(true)
 }
 
 func (s *PartitionSession) ToPublic() PublicPartitionSession {
