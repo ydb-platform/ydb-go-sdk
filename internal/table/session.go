@@ -47,6 +47,7 @@ type (
 		execute(
 			ctx context.Context,
 			a *allocator.Allocator,
+			txControl *tx.Control,
 			request *Ydb_Table.ExecuteDataQueryRequest,
 			callOptions ...grpc.CallOption,
 		) (*transaction, result.Result, error)
@@ -132,6 +133,7 @@ func queryExecuteStreamResultToTableResult(
 func (e queryClientExecutor) execute(
 	ctx context.Context,
 	a *allocator.Allocator,
+	txControl *tx.Control,
 	executeDataQueryRequest *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (_ *transaction, _ result.Result, finalErr error) {
@@ -139,7 +141,7 @@ func (e queryClientExecutor) execute(
 
 	request.SessionId = executeDataQueryRequest.GetSessionId()
 	request.ExecMode = Ydb_Query.ExecMode_EXEC_MODE_EXECUTE
-	request.TxControl = tx.ToQueryTxControl(executeDataQueryRequest.GetTxControl())
+	request.TxControl = txControl.ToYdbQueryTransactionControl(a)
 	request.Query = &Ydb_Query.ExecuteQueryRequest_QueryContent{
 		QueryContent: &Ydb_Query.QueryContent{
 			Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -168,9 +170,12 @@ func (e queryClientExecutor) execute(
 func (e tableClientExecutor) execute(
 	ctx context.Context,
 	a *allocator.Allocator,
+	txControl *tx.Control,
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (*transaction, result.Result, error) {
+	request.TxControl = txControl.ToYdbTableTransactionControl(a)
+
 	r, err := executeDataQuery(ctx, e.client, a, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
@@ -1042,7 +1047,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 	}
 
 	request.SessionId = s.id
-	request.TxControl = txControl.Desc()
+	request.TxControl = txControl.ToYdbTableTransactionControl(a)
 	request.Parameters = parameters
 	request.Query = q.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
@@ -1069,7 +1074,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 		onDone(txr, false, r, err)
 	}()
 
-	t, r, err := s.dataQuery.execute(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+	t, r, err := s.dataQuery.execute(ctx, a, txControl, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -1525,6 +1530,7 @@ func (s *Session) BeginTransaction(
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).BeginTransaction"),
 			s,
 		)
+		a = allocator.New()
 	)
 	defer func() {
 		onDone(x, err)
@@ -1533,7 +1539,7 @@ func (s *Session) BeginTransaction(
 	response, err = s.client.BeginTransaction(ctx,
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
-			TxSettings: txSettings.Settings(),
+			TxSettings: txSettings.ToYdbTableSettings(a),
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),

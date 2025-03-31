@@ -60,7 +60,71 @@ type (
 		queryTransactionControlTxIDAllocator
 		queryTransactionSettingsAllocator
 		queryTransactionSettingsSerializableReadWriteAllocator
+		tableTransactionControlAllocator
+		tableTransactionControlBeginTxAllocator
+		tableTransactionControlTxIDAllocator
+		tableTransactionSettingsAllocator
+		tableTransactionSettingsSerializableReadWriteAllocator
 	}
+)
+
+var (
+	allocatorPool                                     xsync.Pool[Allocator]
+	valuePool                                         xsync.Pool[Ydb.Value]
+	typePool                                          xsync.Pool[Ydb.Type]
+	typeDecimalPool                                   xsync.Pool[Ydb.Type_DecimalType]
+	typeListPool                                      xsync.Pool[Ydb.Type_ListType]
+	typeEmptyListPool                                 xsync.Pool[Ydb.Type_EmptyListType]
+	typeEmptyDictPool                                 xsync.Pool[Ydb.Type_EmptyDictType]
+	typeTuplePool                                     xsync.Pool[Ydb.Type_TupleType]
+	typeStructPool                                    xsync.Pool[Ydb.Type_StructType]
+	typeDictPool                                      xsync.Pool[Ydb.Type_DictType]
+	typeVariantPool                                   xsync.Pool[Ydb.Type_VariantType]
+	decimalPool                                       xsync.Pool[Ydb.DecimalType]
+	listPool                                          xsync.Pool[Ydb.ListType]
+	tuplePool                                         xsync.Pool[Ydb.TupleType]
+	structPool                                        xsync.Pool[Ydb.StructType]
+	dictPool                                          xsync.Pool[Ydb.DictType]
+	variantPool                                       xsync.Pool[Ydb.VariantType]
+	variantTupleItemsPool                             xsync.Pool[Ydb.VariantType_TupleItems]
+	variantStructItemsPool                            xsync.Pool[Ydb.VariantType_StructItems]
+	structMemberPool                                  xsync.Pool[Ydb.StructMember]
+	typeOptionalPool                                  xsync.Pool[Ydb.Type_OptionalType]
+	optionalPool                                      xsync.Pool[Ydb.OptionalType]
+	typedValuePool                                    xsync.Pool[Ydb.TypedValue]
+	boolPool                                          xsync.Pool[Ydb.Value_BoolValue]
+	bytesPool                                         xsync.Pool[Ydb.Value_BytesValue]
+	textPool                                          xsync.Pool[Ydb.Value_TextValue]
+	int32Pool                                         xsync.Pool[Ydb.Value_Int32Value]
+	uint32Pool                                        xsync.Pool[Ydb.Value_Uint32Value]
+	low128Pool                                        xsync.Pool[Ydb.Value_Low_128]
+	int64Pool                                         xsync.Pool[Ydb.Value_Int64Value]
+	uint64Pool                                        xsync.Pool[Ydb.Value_Uint64Value]
+	floatPool                                         xsync.Pool[Ydb.Value_FloatValue]
+	doublePool                                        xsync.Pool[Ydb.Value_DoubleValue]
+	nestedPool                                        xsync.Pool[Ydb.Value_NestedValue]
+	nullFlagPool                                      xsync.Pool[Ydb.Value_NullFlagValue]
+	pairPool                                          xsync.Pool[Ydb.ValuePair]
+	tableExecuteQueryResultPool                       xsync.Pool[Ydb_Table.ExecuteQueryResult]
+	tableExecuteDataQueryRequestPool                  xsync.Pool[Ydb_Table.ExecuteDataQueryRequest]
+	tableQueryCachePolicyPool                         xsync.Pool[Ydb_Table.QueryCachePolicy]
+	tableQueryPool                                    xsync.Pool[Ydb_Table.Query]
+	tableQueryYqlTextPool                             xsync.Pool[Ydb_Table.Query_YqlText]
+	tableQueryIDPool                                  xsync.Pool[Ydb_Table.Query_Id]
+	queryExecuteQueryRequestPool                      xsync.Pool[Ydb_Query.ExecuteQueryRequest]
+	queryExecuteQueryRequestQueryContentPool          xsync.Pool[Ydb_Query.ExecuteQueryRequest_QueryContent]
+	queryExecuteQueryResponsePartPool                 xsync.Pool[Ydb_Query.ExecuteQueryResponsePart]
+	queryQueryContentPool                             xsync.Pool[Ydb_Query.QueryContent]
+	queryTransactionControlPool                       xsync.Pool[Ydb_Query.TransactionControl]
+	queryTransactionControlBeginTxPool                xsync.Pool[Ydb_Query.TransactionControl_BeginTx]
+	queryTransactionControlTxIDPool                   xsync.Pool[Ydb_Query.TransactionControl_TxId]
+	queryTransactionSettingsPool                      xsync.Pool[Ydb_Query.TransactionSettings]
+	queryTransactionSettingsSerializableReadWritePool xsync.Pool[Ydb_Query.TransactionSettings_SerializableReadWrite]
+	tableTransactionControlPool                       xsync.Pool[Ydb_Table.TransactionControl]
+	tableTransactionControlBeginTxPool                xsync.Pool[Ydb_Table.TransactionControl_BeginTx]
+	tableTransactionControlTxIDPool                   xsync.Pool[Ydb_Table.TransactionControl_TxId]
+	tableTransactionSettingsPool                      xsync.Pool[Ydb_Table.TransactionSettings]
+	tableTransactionSettingsSerializableReadWritePool xsync.Pool[Ydb_Table.TransactionSettings_SerializableReadWrite]
 )
 
 func New() (v *Allocator) {
@@ -119,6 +183,11 @@ func (a *Allocator) Free() {
 	a.queryTransactionControlTxIDAllocator.free()
 	a.queryTransactionSettingsAllocator.free()
 	a.queryTransactionSettingsSerializableReadWriteAllocator.free()
+	a.tableTransactionControlAllocator.free()
+	a.tableTransactionControlBeginTxAllocator.free()
+	a.tableTransactionControlTxIDAllocator.free()
+	a.tableTransactionSettingsAllocator.free()
+	a.tableTransactionSettingsSerializableReadWriteAllocator.free()
 
 	allocatorPool.Put(a)
 }
@@ -1099,56 +1168,98 @@ func (a *queryQueryContentAllocator) free() {
 	a.allocations = a.allocations[:0]
 }
 
-var (
-	allocatorPool                                     xsync.Pool[Allocator]
-	valuePool                                         xsync.Pool[Ydb.Value]
-	typePool                                          xsync.Pool[Ydb.Type]
-	typeDecimalPool                                   xsync.Pool[Ydb.Type_DecimalType]
-	typeListPool                                      xsync.Pool[Ydb.Type_ListType]
-	typeEmptyListPool                                 xsync.Pool[Ydb.Type_EmptyListType]
-	typeEmptyDictPool                                 xsync.Pool[Ydb.Type_EmptyDictType]
-	typeTuplePool                                     xsync.Pool[Ydb.Type_TupleType]
-	typeStructPool                                    xsync.Pool[Ydb.Type_StructType]
-	typeDictPool                                      xsync.Pool[Ydb.Type_DictType]
-	typeVariantPool                                   xsync.Pool[Ydb.Type_VariantType]
-	decimalPool                                       xsync.Pool[Ydb.DecimalType]
-	listPool                                          xsync.Pool[Ydb.ListType]
-	tuplePool                                         xsync.Pool[Ydb.TupleType]
-	structPool                                        xsync.Pool[Ydb.StructType]
-	dictPool                                          xsync.Pool[Ydb.DictType]
-	variantPool                                       xsync.Pool[Ydb.VariantType]
-	variantTupleItemsPool                             xsync.Pool[Ydb.VariantType_TupleItems]
-	variantStructItemsPool                            xsync.Pool[Ydb.VariantType_StructItems]
-	structMemberPool                                  xsync.Pool[Ydb.StructMember]
-	typeOptionalPool                                  xsync.Pool[Ydb.Type_OptionalType]
-	optionalPool                                      xsync.Pool[Ydb.OptionalType]
-	typedValuePool                                    xsync.Pool[Ydb.TypedValue]
-	boolPool                                          xsync.Pool[Ydb.Value_BoolValue]
-	bytesPool                                         xsync.Pool[Ydb.Value_BytesValue]
-	textPool                                          xsync.Pool[Ydb.Value_TextValue]
-	int32Pool                                         xsync.Pool[Ydb.Value_Int32Value]
-	uint32Pool                                        xsync.Pool[Ydb.Value_Uint32Value]
-	low128Pool                                        xsync.Pool[Ydb.Value_Low_128]
-	int64Pool                                         xsync.Pool[Ydb.Value_Int64Value]
-	uint64Pool                                        xsync.Pool[Ydb.Value_Uint64Value]
-	floatPool                                         xsync.Pool[Ydb.Value_FloatValue]
-	doublePool                                        xsync.Pool[Ydb.Value_DoubleValue]
-	nestedPool                                        xsync.Pool[Ydb.Value_NestedValue]
-	nullFlagPool                                      xsync.Pool[Ydb.Value_NullFlagValue]
-	pairPool                                          xsync.Pool[Ydb.ValuePair]
-	tableExecuteQueryResultPool                       xsync.Pool[Ydb_Table.ExecuteQueryResult]
-	tableExecuteDataQueryRequestPool                  xsync.Pool[Ydb_Table.ExecuteDataQueryRequest]
-	tableQueryCachePolicyPool                         xsync.Pool[Ydb_Table.QueryCachePolicy]
-	tableQueryPool                                    xsync.Pool[Ydb_Table.Query]
-	tableQueryYqlTextPool                             xsync.Pool[Ydb_Table.Query_YqlText]
-	tableQueryIDPool                                  xsync.Pool[Ydb_Table.Query_Id]
-	queryExecuteQueryRequestPool                      xsync.Pool[Ydb_Query.ExecuteQueryRequest]
-	queryExecuteQueryRequestQueryContentPool          xsync.Pool[Ydb_Query.ExecuteQueryRequest_QueryContent]
-	queryExecuteQueryResponsePartPool                 xsync.Pool[Ydb_Query.ExecuteQueryResponsePart]
-	queryQueryContentPool                             xsync.Pool[Ydb_Query.QueryContent]
-	queryTransactionControlPool                       xsync.Pool[Ydb_Query.TransactionControl]
-	queryTransactionControlBeginTxPool                xsync.Pool[Ydb_Query.TransactionControl_BeginTx]
-	queryTransactionControlTxIDPool                   xsync.Pool[Ydb_Query.TransactionControl_TxId]
-	queryTransactionSettingsPool                      xsync.Pool[Ydb_Query.TransactionSettings]
-	queryTransactionSettingsSerializableReadWritePool xsync.Pool[Ydb_Query.TransactionSettings_SerializableReadWrite]
-)
+type tableTransactionControlAllocator struct {
+	allocations []*Ydb_Table.TransactionControl
+}
+
+func (a *tableTransactionControlAllocator) TableTransactionControl() (v *Ydb_Table.TransactionControl) {
+	v = tableTransactionControlPool.GetOrNew()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *tableTransactionControlAllocator) free() {
+	for _, v := range a.allocations {
+		v.Reset()
+		tableTransactionControlPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type tableTransactionControlBeginTxAllocator struct {
+	allocations []*Ydb_Table.TransactionControl_BeginTx
+}
+
+func (a *tableTransactionControlBeginTxAllocator) TableTransactionControlBeginTx() (
+	v *Ydb_Table.TransactionControl_BeginTx,
+) {
+	v = tableTransactionControlBeginTxPool.GetOrNew()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *tableTransactionControlBeginTxAllocator) free() {
+	for _, v := range a.allocations {
+		tableTransactionControlBeginTxPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type tableTransactionControlTxIDAllocator struct {
+	allocations []*Ydb_Table.TransactionControl_TxId
+}
+
+func (a *tableTransactionControlTxIDAllocator) TableTransactionControlTxID() (v *Ydb_Table.TransactionControl_TxId) {
+	v = tableTransactionControlTxIDPool.GetOrNew()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *tableTransactionControlTxIDAllocator) free() {
+	for _, v := range a.allocations {
+		tableTransactionControlTxIDPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type tableTransactionSettingsAllocator struct {
+	allocations []*Ydb_Table.TransactionSettings
+}
+
+func (a *tableTransactionSettingsAllocator) TableTransactionSettings() (v *Ydb_Table.TransactionSettings) {
+	v = tableTransactionSettingsPool.GetOrNew()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *tableTransactionSettingsAllocator) free() {
+	for _, v := range a.allocations {
+		v.Reset()
+		tableTransactionSettingsPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type tableTransactionSettingsSerializableReadWriteAllocator struct {
+	allocations []*Ydb_Table.TransactionSettings_SerializableReadWrite
+}
+
+func (a *tableTransactionSettingsSerializableReadWriteAllocator) TableTransactionSettingsSerializableReadWrite() (
+	v *Ydb_Table.TransactionSettings_SerializableReadWrite,
+) {
+	v = tableTransactionSettingsSerializableReadWritePool.GetOrNew()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *tableTransactionSettingsSerializableReadWriteAllocator) free() {
+	for _, v := range a.allocations {
+		tableTransactionSettingsSerializableReadWritePool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}

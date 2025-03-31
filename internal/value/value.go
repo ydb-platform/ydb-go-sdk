@@ -79,7 +79,7 @@ func nullValueFromYDB(x *Ydb.Value, t types.Type) (_ Value, ok bool) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen,gocyclo
 func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 	switch t {
 	case types.Bool:
@@ -112,14 +112,26 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 	case types.Date:
 		return DateValue(v.GetUint32Value()), nil
 
+	case types.Date32:
+		return Date32Value(v.GetInt32Value()), nil
+
 	case types.Datetime:
 		return DatetimeValue(v.GetUint32Value()), nil
+
+	case types.Datetime64:
+		return Datetime64Value(v.GetInt64Value()), nil
 
 	case types.Interval:
 		return IntervalValue(v.GetInt64Value()), nil
 
+	case types.Interval64:
+		return Interval64Value(v.GetInt64Value()), nil
+
 	case types.Timestamp:
 		return TimestampValue(v.GetUint64Value()), nil
+
+	case types.Timestamp64:
+		return Timestamp64Value(v.GetInt64Value()), nil
 
 	case types.Float:
 		return FloatValue(v.GetFloatValue()), nil
@@ -423,6 +435,66 @@ func DateValueFromTime(t time.Time) dateValue {
 	return dateValue(uint64(t.Sub(epoch)/time.Second) / secondsPerDay)
 }
 
+type date32Value int32
+
+func (v date32Value) castTo(dst any) error {
+	switch vv := dst.(type) {
+	case *time.Time:
+		*vv = Date32ToTime(int32(v)).UTC()
+
+		return nil
+	case *driver.Value:
+		*vv = Date32ToTime(int32(v)).UTC()
+
+		return nil
+	case *int64:
+		*vv = int64(v)
+
+		return nil
+	case *int32:
+		*vv = int32(v)
+
+		return nil
+	case *int:
+		*vv = int(v)
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, vv,
+		))
+	}
+}
+
+func (v date32Value) Yql() string {
+	return fmt.Sprintf("%s(%q)", v.Type().Yql(), Date32ToTime(int32(v)).UTC().Format(LayoutDate))
+}
+
+func (date32Value) Type() types.Type {
+	return types.Date32
+}
+
+func (v date32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int32()
+
+	vv.Int32Value = int32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+// Date32Value returns ydb date value from days around epoch time
+func Date32Value(v int32) date32Value {
+	return date32Value(v)
+}
+
+func Date32ValueFromTime(t time.Time) date32Value {
+	return date32Value(uint64(t.Unix() / 24 / 60 / 60))
+}
+
 type datetimeValue uint32
 
 func (v datetimeValue) castTo(dst any) error {
@@ -480,6 +552,57 @@ func DatetimeValue(v uint32) datetimeValue {
 
 func DatetimeValueFromTime(t time.Time) datetimeValue {
 	return datetimeValue(t.Unix())
+}
+
+type datetime64Value int64
+
+func (v datetime64Value) castTo(dst any) error {
+	switch vv := dst.(type) {
+	case *time.Time:
+		*vv = Datetime64ToTime(int64(v))
+
+		return nil
+	case *driver.Value:
+		*vv = Datetime64ToTime(int64(v))
+
+		return nil
+	case *int64:
+		*vv = int64(v)
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, vv,
+		))
+	}
+}
+
+func (v datetime64Value) Yql() string {
+	return fmt.Sprintf("%s(%q)", v.Type().Yql(), Datetime64ToTime(int64(v)).UTC().Format(LayoutDatetime))
+}
+
+func (datetime64Value) Type() types.Type {
+	return types.Datetime64
+}
+
+func (v datetime64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int64()
+	vv.Int64Value = int64(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+// Datetime64Value makes ydb datetime value from seconds around epoch time
+func Datetime64Value(v int64) datetime64Value {
+	return datetime64Value(v)
+}
+
+func Datetime64ValueFromTime(t time.Time) datetime64Value {
+	return datetime64Value(t.Unix())
 }
 
 var _ DecimalValuer = (*decimalValue)(nil)
@@ -1182,6 +1305,95 @@ func IntervalValueFromDuration(v time.Duration) intervalValue {
 	return intervalValue(durationToMicroseconds(v))
 }
 
+type interval64Value int64
+
+func (v interval64Value) castTo(dst any) error {
+	switch vv := dst.(type) {
+	case *time.Duration:
+		*vv = Interval64ToDuration(int64(v))
+
+		return nil
+	case *driver.Value:
+		*vv = Interval64ToDuration(int64(v))
+
+		return nil
+	case *int64:
+		*vv = int64(v)
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, vv,
+		))
+	}
+}
+
+func (v interval64Value) Yql() string {
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	buffer.WriteString(v.Type().Yql())
+	buffer.WriteByte('(')
+	buffer.WriteByte('"')
+	d := IntervalToDuration(int64(v))
+	if d < 0 {
+		buffer.WriteByte('-')
+		d = -d
+	}
+	buffer.WriteByte('P')
+	//nolint:gomnd
+	if days := d / time.Hour / 24; days > 0 {
+		d -= days * time.Hour * 24 //nolint:durationcheck
+		buffer.WriteString(strconv.FormatInt(int64(days), 10))
+		buffer.WriteByte('D')
+	}
+	if d > 0 {
+		buffer.WriteByte('T')
+	}
+	if hours := d / time.Hour; hours > 0 {
+		d -= hours * time.Hour //nolint:durationcheck
+		buffer.WriteString(strconv.FormatInt(int64(hours), 10))
+		buffer.WriteByte('H')
+	}
+	if minutes := d / time.Minute; minutes > 0 {
+		d -= minutes * time.Minute //nolint:durationcheck
+		buffer.WriteString(strconv.FormatInt(int64(minutes), 10))
+		buffer.WriteByte('M')
+	}
+	if d > 0 {
+		seconds := float64(d) / float64(time.Second)
+		fmt.Fprintf(buffer, "%0.6f", seconds)
+		buffer.WriteByte('S')
+	}
+	buffer.WriteByte('"')
+	buffer.WriteByte(')')
+
+	return buffer.String()
+}
+
+func (interval64Value) Type() types.Type {
+	return types.Interval64
+}
+
+func (v interval64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int64()
+	vv.Int64Value = int64(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+// Interval64Value makes Value from given nanoseconds around epoch time
+func Interval64Value(v int64) interval64Value {
+	return interval64Value(v)
+}
+
+func Interval64ValueFromDuration(v time.Duration) interval64Value {
+	return interval64Value(durationToNanoseconds(v))
+}
+
 type jsonValue string
 
 func (v jsonValue) castTo(dst any) error {
@@ -1755,6 +1967,57 @@ func TimestampValue(v uint64) timestampValue {
 
 func TimestampValueFromTime(t time.Time) timestampValue {
 	return timestampValue(t.Sub(epoch) / time.Microsecond)
+}
+
+type timestamp64Value int64
+
+func (v timestamp64Value) castTo(dst any) error {
+	switch vv := dst.(type) {
+	case *time.Time:
+		*vv = Timestamp64ToTime(int64(v))
+
+		return nil
+	case *driver.Value:
+		*vv = Timestamp64ToTime(int64(v))
+
+		return nil
+	case *int64:
+		*vv = int64(v)
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%w '%s(%+v)' to '%T' destination",
+			ErrCannotCast, v.Type().Yql(), v, vv,
+		))
+	}
+}
+
+func (v timestamp64Value) Yql() string {
+	return fmt.Sprintf("%s(%q)", v.Type().Yql(), Timestamp64ToTime(int64(v)).UTC().Format(LayoutTimestamp))
+}
+
+func (timestamp64Value) Type() types.Type {
+	return types.Timestamp64
+}
+
+func (v timestamp64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int64()
+	vv.Int64Value = int64(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+// Timestamp64Value makes ydb timestamp value by given signed microseconds around Epoch
+func Timestamp64Value(v int64) timestamp64Value {
+	return timestamp64Value(v)
+}
+
+func Timestamp64ValueFromTime(t time.Time) timestamp64Value {
+	return timestamp64Value(t.UnixMicro())
 }
 
 type tupleValue struct {

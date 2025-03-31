@@ -274,6 +274,10 @@ func TestTxOnCompleted(t *testing.T) {
 
 			res, err := tx.Query(sf.Context(e), "")
 			require.NoError(t, err)
+			_, err = res.NextResultSet(sf.Context(e))
+			require.NoError(t, err)
+			_, err = res.NextResultSet(sf.Context(e))
+			require.ErrorIs(t, err, io.EOF)
 			_ = res.Close(sf.Context(e))
 			time.Sleep(time.Millisecond) // time for reaction for closing channel
 			require.Empty(t, completed)
@@ -332,7 +336,12 @@ func TestTxOnCompleted(t *testing.T) {
 			})
 
 			res, err := tx.Query(sf.Context(e), "", options.WithCommit())
-			_ = res.Close(sf.Context(e))
+			require.NoError(t, err)
+			_, err = res.NextResultSet(sf.Context(e))
+			require.NoError(t, err)
+			_, err = res.NextResultSet(sf.Context(e))
+			require.ErrorIs(t, err, io.EOF)
+			err = res.Close(sf.Context(e))
 			require.NoError(t, err)
 			xtest.SpinWaitCondition(t, &completedMutex, func() bool {
 				return len(completed) != 0
@@ -384,7 +393,10 @@ func TestTxOnCompleted(t *testing.T) {
 			_, err = res.NextResultSet(sf.Context(e))
 			require.NoError(t, err)
 
-			_ = res.Close(sf.Context(e))
+			_, err = res.NextResultSet(sf.Context(e))
+			require.ErrorIs(t, err, io.EOF)
+
+			err = res.Close(sf.Context(e))
 			require.NoError(t, err)
 			xtest.SpinWaitCondition(t, &completedMutex, func() bool {
 				return len(completed) != 0

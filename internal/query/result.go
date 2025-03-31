@@ -143,10 +143,9 @@ func newResult(
 	}
 
 	r.closeOnce = sync.OnceFunc(func() {
-		for _, onClose := range r.onClose {
-			onClose()
+		for i := range r.onClose { // descending calls for LIFO
+			r.onClose[len(r.onClose)-i-1]()
 		}
-		r.stream = nil
 	})
 
 	if r.trace != nil {
@@ -239,6 +238,8 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return xerrors.WithStackTrace(ctx.Err())
 		case <-r.closed:
 			return nil
 		default:
@@ -280,6 +281,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
 				r.closeOnce()
+
 				if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
 					return nil, xerrors.WithStackTrace(io.EOF)
 				}

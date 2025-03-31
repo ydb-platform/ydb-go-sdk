@@ -11,12 +11,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -79,7 +79,7 @@ type Client interface {
 
 	// ReadRows reads a batch of rows non-transactionally.
 	ReadRows(
-		ctx context.Context, path string, keys value.Value,
+		ctx context.Context, path string, keys types.Value,
 		readRowOpts []options.ReadRowsOption, retryOptions ...Option,
 	) (_ result.Result, err error)
 }
@@ -163,12 +163,12 @@ type Session interface {
 	) (_ result.StreamResult, err error)
 
 	// Deprecated: use Client instance instead.
-	BulkUpsert(ctx context.Context, table string, rows value.Value,
+	BulkUpsert(ctx context.Context, table string, rows types.Value,
 		opts ...options.BulkUpsertOption,
 	) (err error)
 
 	// Deprecated: use Client instance instead.
-	ReadRows(ctx context.Context, path string, keys value.Value,
+	ReadRows(ctx context.Context, path string, keys types.Value,
 		opts ...options.ReadRowsOption,
 	) (_ result.Result, err error)
 
@@ -177,17 +177,11 @@ type Session interface {
 	KeepAlive(ctx context.Context) error
 }
 
-type TransactionSettings struct {
-	settings Ydb_Table.TransactionSettings
-}
-
-func (t *TransactionSettings) Settings() *Ydb_Table.TransactionSettings {
-	if t == nil {
-		return nil
-	}
-
-	return &t.settings
-}
+type (
+	TransactionSettings = tx.Settings
+	// Transaction control options
+	TxOption = tx.SettingsOption
+)
 
 // Explanation is a result of Explain calls.
 type Explanation struct {
@@ -257,139 +251,63 @@ type Statement interface {
 	Text() string
 }
 
-var (
-	serializableReadWrite = &Ydb_Table.TransactionSettings_SerializableReadWrite{
-		SerializableReadWrite: &Ydb_Table.SerializableModeSettings{},
-	}
-	staleReadOnly = &Ydb_Table.TransactionSettings_StaleReadOnly{
-		StaleReadOnly: &Ydb_Table.StaleModeSettings{},
-	}
-	snapshotReadOnly = &Ydb_Table.TransactionSettings_SnapshotReadOnly{
-		SnapshotReadOnly: &Ydb_Table.SnapshotModeSettings{},
-	}
-)
-
-// Transaction control options
-type (
-	txDesc   Ydb_Table.TransactionSettings
-	TxOption func(*txDesc)
-)
-
 // TxSettings returns transaction settings
 func TxSettings(opts ...TxOption) *TransactionSettings {
-	s := new(TransactionSettings)
-	for _, opt := range opts {
-		if opt != nil {
-			opt((*txDesc)(&s.settings))
-		}
-	}
+	settings := tx.NewSettings(opts...)
 
-	return s
+	return &settings
 }
 
 // BeginTx returns begin transaction control option
 func BeginTx(opts ...TxOption) TxControlOption {
-	return func(d *txControlDesc) {
-		s := TxSettings(opts...)
-		d.TxSelector = &Ydb_Table.TransactionControl_BeginTx{
-			BeginTx: &s.settings,
-		}
-	}
+	return tx.BeginTx(opts...)
 }
 
 func WithTx(t TransactionIdentifier) TxControlOption {
-	return func(d *txControlDesc) {
-		d.TxSelector = &Ydb_Table.TransactionControl_TxId{
-			TxId: t.ID(),
-		}
-	}
+	return tx.WithTx(t)
 }
 
 func WithTxID(txID string) TxControlOption {
-	return func(d *txControlDesc) {
-		d.TxSelector = &Ydb_Table.TransactionControl_TxId{
-			TxId: txID,
-		}
-	}
+	return tx.WithTxID(txID)
 }
 
 // CommitTx returns commit transaction control option
 func CommitTx() TxControlOption {
-	return func(d *txControlDesc) {
-		d.CommitTx = true
-	}
+	return tx.CommitTx()
 }
 
 func WithSerializableReadWrite() TxOption {
-	return func(d *txDesc) {
-		d.TxMode = serializableReadWrite
-	}
+	return tx.WithSerializableReadWrite()
 }
 
 func WithSnapshotReadOnly() TxOption {
-	return func(d *txDesc) {
-		d.TxMode = snapshotReadOnly
-	}
+	return tx.WithSnapshotReadOnly()
 }
 
 func WithStaleReadOnly() TxOption {
-	return func(d *txDesc) {
-		d.TxMode = staleReadOnly
-	}
+	return tx.WithStaleReadOnly()
 }
 
 func WithOnlineReadOnly(opts ...TxOnlineReadOnlyOption) TxOption {
-	return func(d *txDesc) {
-		var ro txOnlineReadOnly
-		for _, opt := range opts {
-			if opt != nil {
-				opt(&ro)
-			}
-		}
-		d.TxMode = &Ydb_Table.TransactionSettings_OnlineReadOnly{
-			OnlineReadOnly: (*Ydb_Table.OnlineModeSettings)(&ro),
-		}
-	}
+	return tx.WithOnlineReadOnly(opts...)
 }
 
 type (
-	txOnlineReadOnly       Ydb_Table.OnlineModeSettings
-	TxOnlineReadOnlyOption func(*txOnlineReadOnly)
+	TxOnlineReadOnlyOption = tx.OnlineReadOnlyOption
 )
 
 func WithInconsistentReads() TxOnlineReadOnlyOption {
-	return func(d *txOnlineReadOnly) {
-		d.AllowInconsistentReads = true
-	}
+	return tx.WithInconsistentReads()
 }
 
 type (
-	txControlDesc   Ydb_Table.TransactionControl
-	TxControlOption func(*txControlDesc)
+	TxControlOption    = tx.ControlOption
+	TransactionControl = tx.Control
 )
-
-type TransactionControl struct {
-	desc Ydb_Table.TransactionControl
-}
-
-func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
-	if t == nil {
-		return nil
-	}
-
-	return &t.desc
-}
 
 // TxControl makes transaction control from given options
 func TxControl(opts ...TxControlOption) *TransactionControl {
-	c := new(TransactionControl)
-	for _, opt := range opts {
-		if opt != nil {
-			opt((*txControlDesc)(&c.desc))
-		}
-	}
-
-	return c
+	return tx.NewControl(opts...)
 }
 
 // DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
@@ -450,7 +368,7 @@ func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
 	return &qp
 }
 
-func ValueParam(name string, v value.Value) ParameterOption {
+func ValueParam(name string, v types.Value) ParameterOption {
 	switch len(name) {
 	case 0:
 		panic("empty name")
@@ -558,7 +476,7 @@ type BulkUpsertData interface {
 }
 
 type bulkUpsertRows struct {
-	rows value.Value
+	rows types.Value
 }
 
 func (data bulkUpsertRows) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
@@ -568,7 +486,7 @@ func (data bulkUpsertRows) ToYDB(a *allocator.Allocator, tableName string) (*Ydb
 	}, nil
 }
 
-func BulkUpsertDataRows(rows value.Value) bulkUpsertRows {
+func BulkUpsertDataRows(rows types.Value) bulkUpsertRows {
 	return bulkUpsertRows{
 		rows: rows,
 	}

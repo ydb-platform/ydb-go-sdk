@@ -26,8 +26,8 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 		options.WithParameters(params),
 	}
 
-	if txControl := common.TxControl(ctx, nil); txControl != nil {
-		opts = append(opts, options.WithTxControlRaw(tx.ToQueryTxControl(txControl.Desc())))
+	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
+		opts = append(opts, options.WithTxControl(txControl))
 	}
 
 	err := t.tx.Exec(ctx, sql, opts...)
@@ -43,8 +43,8 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 		options.WithParameters(params),
 	}
 
-	if txControl := common.TxControl(ctx, nil); txControl != nil {
-		opts = append(opts, options.WithTxControlRaw(tx.ToQueryTxControl(txControl.Desc())))
+	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
+		opts = append(opts, options.WithTxControl(txControl))
 	}
 
 	res, err := t.tx.Query(ctx, sql, opts...)

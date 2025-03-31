@@ -28,7 +28,6 @@ type Parent interface {
 
 type Conn struct {
 	ctx     context.Context //nolint:containedctx
-	parent  Parent
 	session *query.Session
 	onClose []func()
 	closed  atomic.Bool
@@ -60,8 +59,8 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		options.WithParameters(params),
 	}
 
-	if txControl := common.TxControl(ctx, nil); txControl != nil {
-		opts = append(opts, options.WithTxControlRaw(tx.ToQueryTxControl(txControl.Desc())))
+	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
+		opts = append(opts, options.WithTxControl(txControl))
 	}
 
 	err := c.session.Exec(ctx, sql, opts...)
@@ -86,8 +85,8 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 		options.WithParameters(params),
 	}
 
-	if txControl := common.TxControl(ctx, nil); txControl != nil {
-		opts = append(opts, options.WithTxControlRaw(tx.ToQueryTxControl(txControl.Desc())))
+	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
+		opts = append(opts, options.WithTxControl(txControl))
 	}
 
 	res, err := c.session.Query(ctx, sql, opts...)
@@ -117,10 +116,9 @@ func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast s
 	return ast, plan, nil
 }
 
-func New(ctx context.Context, parent Parent, s *query.Session, opts ...Option) *Conn {
+func New(ctx context.Context, s *query.Session, opts ...Option) *Conn {
 	cc := &Conn{
 		ctx:     ctx,
-		parent:  parent,
 		session: s,
 	}
 

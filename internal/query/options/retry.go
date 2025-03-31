@@ -1,7 +1,7 @@
 package options
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,6 +24,7 @@ type (
 	doSettings struct {
 		retryOpts []retry.Option
 		trace     *trace.Query
+		label     string
 	}
 
 	DoTxOption interface {
@@ -44,6 +45,22 @@ type (
 	}
 )
 
+type LabelOption string
+
+func (label LabelOption) applyDoOption(s *doSettings) {
+	s.label = string(label)
+	RetryOptionsOption{retry.WithLabel(s.label)}.applyDoOption(s)
+}
+
+func (label LabelOption) applyDoTxOption(s *doTxSettings) {
+	s.label = string(label)
+	RetryOptionsOption{retry.WithLabel(s.label)}.applyDoTxOption(s)
+}
+
+func (label LabelOption) applyExecuteOption(s *executeSettings) {
+	s.label = string(label)
+}
+
 func (opts RetryOptionsOption) applyExecuteOption(s *executeSettings) {
 	s.retryOptions = append(s.retryOptions, opts...)
 }
@@ -54,6 +71,10 @@ func (s *doSettings) Trace() *trace.Query {
 
 func (s *doSettings) RetryOpts() []retry.Option {
 	return s.retryOpts
+}
+
+func (s *doSettings) Label() string {
+	return s.label
 }
 
 func (s *doTxSettings) TxSettings() tx.Settings {
@@ -88,8 +109,8 @@ func WithIdempotent() RetryOptionsOption {
 	return []retry.Option{retry.WithIdempotent(true)}
 }
 
-func WithLabel(lbl string) RetryOptionsOption {
-	return []retry.Option{retry.WithLabel(lbl)}
+func WithLabel(lbl string) LabelOption {
+	return LabelOption(lbl)
 }
 
 func WithTrace(t *trace.Query) TraceOption {
@@ -103,6 +124,7 @@ func WithRetryBudget(b budget.Budget) RetryOptionsOption {
 func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 	s = &doSettings{
 		trace: t,
+		label: "undefined",
 	}
 
 	for _, opt := range opts {

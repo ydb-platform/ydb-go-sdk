@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -26,7 +27,7 @@ import (
 )
 
 func TestBasicExampleDatabaseSqlBindings(t *testing.T) {
-	defer xtest.CheckGoroutinesLeak(t)
+	defer goleak.VerifyNone(t)
 
 	folder := t.Name()
 

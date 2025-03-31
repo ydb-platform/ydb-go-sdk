@@ -9,7 +9,7 @@ type sqlLexer struct {
 	nested     int // multiline comment nesting level.
 	stateFn    stateFn
 	rawStateFn stateFn
-	parts      []interface{}
+	parts      []any
 }
 
 type (

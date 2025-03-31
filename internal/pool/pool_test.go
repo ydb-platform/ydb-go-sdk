@@ -1,13 +1,11 @@
 package pool
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"path"
 	"runtime"
-	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -35,7 +33,7 @@ type (
 	testItem struct {
 		v int32
 
-		closed bytes.Buffer
+		closed bool
 
 		onClose   func() error
 		onIsAlive func() bool
@@ -104,6 +102,10 @@ func (p *testWaitChPool) whenWantWaitCh() <-chan struct{} {
 func (p *testWaitChPool) Put(ch *chan *testItem) {}
 
 func (t *testItem) IsAlive() bool {
+	if t.closed {
+		return false
+	}
+
 	if t.onIsAlive != nil {
 		return t.onIsAlive()
 	}
@@ -124,13 +126,9 @@ func (t *testItem) NodeID() uint32 {
 }
 
 func (t *testItem) Close(context.Context) error {
-	if t.closed.Len() > 0 {
-		debug.PrintStack()
-		fmt.Println(t.closed.String())
-		panic("item already closed")
-	}
-
-	t.closed.Write(debug.Stack())
+	defer func() {
+		t.closed = true
+	}()
 
 	if t.onClose != nil {
 		return t.onClose()
@@ -889,6 +887,99 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 	})
 	t.Run("With", func(t *testing.T) {
+		t.Run("ItemFromPoolIsNotAlive", func(t *testing.T) {
+			var (
+				created atomic.Int32
+				closed  atomic.Int32
+				nextID  atomic.Int32
+			)
+			assertCreated := func(exp int32) {
+				if act := created.Load(); act != exp {
+					t.Errorf(
+						"unexpected number of created items: %v; want %v",
+						act, exp,
+					)
+				}
+			}
+			assertClosed := func(exp int32) {
+				if act := closed.Load(); act != exp {
+					t.Errorf(
+						"unexpected number of closed items: %v; want %v",
+						act, exp,
+					)
+				}
+			}
+			p := New[*testItem, testItem](rootCtx,
+				WithLimit[*testItem, testItem](1),
+				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
+				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					created.Add(1)
+					alived := true
+					v := testItem{
+						v: nextID.Add(1),
+						onIsAlive: func() bool {
+							defer func() {
+								alived = false
+							}()
+
+							return alived
+						},
+						onClose: func() error {
+							closed.Add(1)
+
+							return nil
+						},
+					}
+
+					return &v, nil
+				}),
+			)
+			defer func() {
+				_ = p.Close(context.Background())
+			}()
+
+			s1 := mustGetItem(t, p)
+			assertClosed(0)
+			assertCreated(1)
+			require.Len(t, p.index, 1)
+
+			mustPutItem(t, p, s1)
+			assertClosed(0)
+			assertCreated(1)
+			require.Len(t, p.index, 1)
+			require.Equal(t, 1, p.idle.Len())
+
+			s2, err := p.getItem(context.Background())
+			require.NoError(t, err)
+			assertCreated(2)
+			assertClosed(1)
+			require.Len(t, p.index, 1)
+			require.Equal(t, 0, p.idle.Len())
+
+			_, err = p.getItem(context.Background())
+			require.ErrorIs(t, err, errPoolIsOverflow)
+			assertCreated(2)
+			assertClosed(1)
+			require.Len(t, p.index, 1)
+			require.Equal(t, 0, p.idle.Len())
+
+			require.NoError(t, p.Close(context.Background()))
+			assertCreated(2)
+			assertClosed(1)
+
+			require.Len(t, p.index, 1)
+			require.Equal(t, 0, p.idle.Len())
+
+			require.ErrorIs(t, p.putItem(context.Background(), s2), errClosedPool)
+			assertClosed(2)
+
+			require.True(t, s2.closed)
+			require.False(t, s2.IsAlive())
+
+			require.Len(t, p.index, 0)
+			require.Equal(t, 0, p.idle.Len())
+		})
 		t.Run("ExplicitItemClose", func(t *testing.T) {
 			var (
 				created atomic.Int32

@@ -157,7 +157,7 @@ func TestToYDB(t *testing.T) {
 			toYDB, err := toYDB(tt.txOptions)
 			if !tt.err {
 				require.NoError(t, err)
-				require.Equal(t, table.TxSettings(tt.txControl).Settings(), table.TxSettings(toYDB).Settings())
+				require.Equal(t, table.TxSettings(tt.txControl), table.TxSettings(toYDB))
 			} else {
 				require.Error(t, err)
 			}
