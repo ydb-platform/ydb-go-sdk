@@ -55,7 +55,9 @@ func newStreamListener(
 		handler:          eventListener,
 		background:       *background.NewWorker(xcontext.ValueOnly(connectionCtx), "topic reader stream listener"),
 		sessionIDCounter: sessionIDCounter,
-		tracer:           &trace.Topic{}, // TODO: add read tracer
+
+		//nolint:godox
+		tracer: &trace.Topic{}, // TODO: add read tracer
 	}
 
 	res.initVars(sessionIDCounter)

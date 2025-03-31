@@ -984,6 +984,8 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequest(m *rawtopicreader.
 }
 
 func (r *topicStreamReaderImpl) onEndPartitionSession(m *rawtopicreader.EndPartitionSession) error {
+	// need err value in else block
+	//nolint:revive
 	if session, err := r.sessionController.Get(m.PartitionSessionID); err == nil {
 		trace.TopicOnReaderEndPartitionSession(
 			r.cfg.Trace,
@@ -1000,6 +1002,8 @@ func (r *topicStreamReaderImpl) onEndPartitionSession(m *rawtopicreader.EndParti
 
 		return nil
 	} else {
-		return xerrors.Retryable(xerrors.Wrap(fmt.Errorf("ydb: unknown partition for end partition session: %w", err)))
+		return xerrors.Retryable(xerrors.Wrap(fmt.Errorf(
+			"ydb: unknown partition for end partition session: %w", err,
+		)))
 	}
 }

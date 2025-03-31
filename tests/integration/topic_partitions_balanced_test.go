@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -113,13 +115,69 @@ func TestTopicSplitPartitions(t *testing.T) {
 	scope := newScope(t)
 
 	params := `
-max_active_partitions=100, 
-partition_write_burst_bytes=1,
-auto_partitioning_strategy=scale_up,
+max_active_partitions=2, 
+partition_write_speed_bytes_per_second=1,
+auto_partitioning_strategy='scale_up',
 auto_partitioning_up_utilization_percent=1,
 auto_partitioning_stabilization_window=Interval('PT1S')
 `
-	err := scope.Driver().Query().Exec(scope.Ctx, fmt.Sprintf("ALTER TOPIC `%v` SET (%v)", scope.TopicPath(), params))
+	err := scope.Driver().Topic().Drop(scope.Ctx, scope.TopicPath())
 	scope.Require.NoError(err)
+
+	err = scope.Driver().Query().Exec(scope.Ctx, fmt.Sprintf("CREATE TOPIC `%v` (consumer `%v`) WITH (%v)",
+		scope.TopicPath(), scope.TopicConsumerName(), params))
+	scope.Require.NoError(err)
+
+	t.Log("Start writers")
+	var messagesCounter atomic.Int64
+	var writersStop atomic.Bool
+	var writers sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		writers.Add(1)
+		go func(index int) {
+			defer writers.Done()
+
+			writer, err := scope.Driver().Topic().StartWriter(scope.TopicPath(), topicoptions.WithWriterWaitServerAck(false))
+			scope.Require.NoError(err)
+
+			for !writersStop.Load() {
+				err = writer.Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader("-")})
+				scope.Require.NoError(err)
+				messagesCounter.Add(1)
+			}
+			err = writer.Close(scope.Ctx)
+			scope.Require.NoError(err)
+		}(i)
+	}
+
+	msg, err := scope.TopicReader().ReadMessage(scope.Ctx)
+	scope.Require.NoError(err)
+
+	firstPartitionID := msg.PartitionID()
+	messagesCounter.Add(-1)
+
+	t.Log("Read first partition id:", firstPartitionID)
+
+readFromFirstPartition:
+	for {
+		msg, err = scope.TopicReader().ReadMessage(scope.Ctx)
+		scope.Require.NoError(err)
+		messagesCounter.Add(-1)
+		if msg.PartitionID() != firstPartitionID {
+			t.Log("Read first partition id:", msg.PartitionID())
+			break readFromFirstPartition
+		}
+	}
+
+	writersStop.Store(true)
+	writers.Wait()
+	t.Log("Writers stopped, need to read messages: ", messagesCounter.Load())
+
+	for messagesCounter.Load() > 0 {
+		msg, err = scope.TopicReader().ReadMessage(scope.Ctx)
+		scope.Require.NoError(err)
+		scope.Require.NotEqual(firstPartitionID, msg.PartitionID())
+		messagesCounter.Add(-1)
+	}
 
 }

@@ -112,10 +112,10 @@ func (s *AutoPartitioningSettings) FromProto(proto *Ydb_Topic.AutoPartitioningSe
 type AutoPartitioningStrategy int32
 
 const (
-	AutoPartitioningStrategyUnspecified    = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_UNSPECIFIED)
-	AutoPartitioningStrategyDisabled       = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_DISABLED)
-	AutoPartitioningStrategyScaleUpAndDown = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_SCALE_UP_AND_DOWN)
-	AutoPartitioningStrategyPaused         = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_PAUSED)
+	AutoPartitioningStrategyUnspecified    = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_UNSPECIFIED)       //nolint:lll
+	AutoPartitioningStrategyDisabled       = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_DISABLED)          //nolint:lll
+	AutoPartitioningStrategyScaleUpAndDown = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_SCALE_UP_AND_DOWN) //nolint:lll
+	AutoPartitioningStrategyPaused         = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_PAUSED)            //nolint:lll
 )
 
 func (s AutoPartitioningStrategy) ToProto() Ydb_Topic.AutoPartitioningStrategy {
@@ -141,9 +141,9 @@ func (s *AutoPartitioningWriteSpeedStrategy) FromProto(speed *Ydb_Topic.AutoPart
 		return xerrors.WithStackTrace(errUnexpectedNilAutoPartitionWriteSpeed)
 	}
 
-	s.StabilizationWindow.MustFromProto(speed.StabilizationWindow)
-	s.UpUtilizationPercent = speed.UpUtilizationPercent
-	s.DownUtilizationPercent = speed.DownUtilizationPercent
+	s.StabilizationWindow.MustFromProto(speed.GetStabilizationWindow())
+	s.UpUtilizationPercent = speed.GetUpUtilizationPercent()
+	s.DownUtilizationPercent = speed.GetDownUtilizationPercent()
 
 	return nil
 }

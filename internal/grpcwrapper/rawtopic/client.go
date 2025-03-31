@@ -88,7 +88,11 @@ func (c *Client) DropTopic(
 	return res, err
 }
 
-func (c *Client) StreamRead(ctxStreamLifeTime context.Context, readerID int64, tracer *trace.Topic) (rawtopicreader.StreamReader, error) {
+func (c *Client) StreamRead(
+	ctxStreamLifeTime context.Context,
+	readerID int64,
+	tracer *trace.Topic,
+) (rawtopicreader.StreamReader, error) {
 	protoResp, err := c.service.StreamRead(ctxStreamLifeTime)
 	if err != nil {
 		return rawtopicreader.StreamReader{}, xerrors.WithStackTrace(

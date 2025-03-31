@@ -3,7 +3,6 @@ package rawtopicreader
 import (
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"reflect"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var ErrUnexpectedMessageType = errors.New("unexpected message type")
@@ -112,6 +112,7 @@ func (s StreamReader) Recv() (_ ServerMessage, resErr error) {
 		if err = req.fromProto(m.EndPartitionSession); err != nil {
 			return nil, err
 		}
+
 		return req, nil
 
 	case *Ydb_Topic.StreamReadMessage_FromServer_CommitOffsetResponse:
@@ -145,6 +146,7 @@ func (s StreamReader) Recv() (_ ServerMessage, resErr error) {
 	}
 }
 
+//nolint:funlen
 func (s StreamReader) Send(msg ClientMessage) (resErr error) {
 	defer func() {
 		resErr = xerrors.Transport(resErr)
