@@ -475,6 +475,175 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 	})
 }
 
+func TestStreamReaderImpl_TestEndSessionForSplitMergePartitions(t *testing.T) {
+	t.Run("Split", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			e := newTopicReaderTestEnv(t)
+
+			// doesn't check sends
+			e.stream.EXPECT().Send(gomock.Any()).Return(nil).MinTimes(0)
+
+			e.Start()
+
+			activePartitionID := e.partitionSession.PartitionID
+
+			e.SendFromServer(&rawtopicreader.ReadResponse{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionData: []rawtopicreader.PartitionData{
+					{
+						PartitionSessionID: e.partitionSessionID,
+						Batches: []rawtopicreader.Batch{{
+							Codec:       rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{{Offset: 1, Data: []byte("OK")}},
+						}},
+					},
+				},
+			})
+
+			e.SendFromServer(&rawtopicreader.EndPartitionSession{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionSessionID:    e.partitionSessionID,
+				ChildPartitionIDs:     []int64{activePartitionID + 1, activePartitionID + 2},
+			})
+
+			e.SendFromServer(&rawtopicreader.StartPartitionSessionRequest{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionSession: rawtopicreader.PartitionSession{
+					PartitionSessionID: e.partitionSessionID + 1,
+					Path:               e.partitionSession.Topic,
+					PartitionID:        activePartitionID + 1,
+				},
+			})
+
+			e.SendFromServer(&rawtopicreader.StartPartitionSessionRequest{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionSession: rawtopicreader.PartitionSession{
+					PartitionSessionID: e.partitionSessionID + 2,
+					Path:               e.partitionSession.Topic,
+					PartitionID:        activePartitionID + 2,
+				},
+			})
+
+			e.SendFromServer(&rawtopicreader.ReadResponse{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionData: []rawtopicreader.PartitionData{
+					{
+						PartitionSessionID: e.partitionSessionID + 1,
+						Batches: []rawtopicreader.Batch{{
+							Codec:       rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{{Offset: 1, Data: []byte("BAD-1")}},
+						}},
+					},
+				},
+			})
+
+			allMessagesSent := make(empty.Chan)
+			e.SendFromServerAndSetNextCallback(&rawtopicreader.ReadResponse{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionData: []rawtopicreader.PartitionData{
+					{
+						PartitionSessionID: e.partitionSessionID + 2,
+						Batches: []rawtopicreader.Batch{{
+							Codec:       rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{{Offset: 1, Data: []byte("BAD-2")}},
+						}},
+					},
+				},
+			}, func() {
+				close(allMessagesSent)
+			})
+
+			<-allMessagesSent
+			batch, err := e.reader.ReadMessageBatch(e.ctx, newReadMessageBatchOptions())
+			require.NoError(t, err)
+			require.Same(t, e.partitionSession, topicreadercommon.BatchGetPartitionSession(batch))
+		})
+	})
+	t.Run("Merge", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			e := newTopicReaderTestEnv(t)
+
+			// doesn't check sends
+			e.stream.EXPECT().Send(gomock.Any()).Return(nil).MinTimes(0)
+
+			e.Start()
+
+			activePartitionID := e.partitionSession.PartitionID
+
+			e.SendFromServer(&rawtopicreader.ReadResponse{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionData: []rawtopicreader.PartitionData{
+					{
+						PartitionSessionID: e.partitionSessionID,
+						Batches: []rawtopicreader.Batch{{
+							Codec:       rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{{Offset: 1, Data: []byte("OK")}},
+						}},
+					},
+				},
+			})
+
+			e.SendFromServer(&rawtopicreader.EndPartitionSession{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionSessionID:    e.partitionSessionID,
+				ChildPartitionIDs:     []int64{activePartitionID + 1, activePartitionID + 2},
+			})
+
+			e.SendFromServer(&rawtopicreader.StartPartitionSessionRequest{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionSession: rawtopicreader.PartitionSession{
+					PartitionSessionID: e.partitionSessionID + 1,
+					Path:               e.partitionSession.Topic,
+					PartitionID:        activePartitionID + 1,
+				},
+			})
+
+			e.SendFromServer(&rawtopicreader.StartPartitionSessionRequest{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionSession: rawtopicreader.PartitionSession{
+					PartitionSessionID: e.partitionSessionID + 2,
+					Path:               e.partitionSession.Topic,
+					PartitionID:        activePartitionID + 2,
+				},
+			})
+
+			e.SendFromServer(&rawtopicreader.ReadResponse{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionData: []rawtopicreader.PartitionData{
+					{
+						PartitionSessionID: e.partitionSessionID + 1,
+						Batches: []rawtopicreader.Batch{{
+							Codec:       rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{{Offset: 1, Data: []byte("BAD-1")}},
+						}},
+					},
+				},
+			})
+
+			allMessagesSent := make(empty.Chan)
+			e.SendFromServerAndSetNextCallback(&rawtopicreader.ReadResponse{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				PartitionData: []rawtopicreader.PartitionData{
+					{
+						PartitionSessionID: e.partitionSessionID + 2,
+						Batches: []rawtopicreader.Batch{{
+							Codec:       rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{{Offset: 1, Data: []byte("BAD-2")}},
+						}},
+					},
+				},
+			}, func() {
+				close(allMessagesSent)
+			})
+
+			<-allMessagesSent
+			batch, err := e.reader.ReadMessageBatch(e.ctx, newReadMessageBatchOptions())
+			require.NoError(t, err)
+			require.Same(t, e.partitionSession, topicreadercommon.BatchGetPartitionSession(batch))
+		})
+	})
+}
+
 func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 	t.Run("BufferSize", func(t *testing.T) {
 		waitChangeRestBufferSizeBytes := func(r *topicStreamReaderImpl, old int64) {

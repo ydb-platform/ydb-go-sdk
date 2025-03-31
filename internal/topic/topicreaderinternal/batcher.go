@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
@@ -26,6 +27,7 @@ type batcher struct {
 	closed                                        bool
 	closeChan                                     empty.Chan
 	messages                                      batcherMessagesMap
+	sessionsForFlush                              []*topicreadercommon.PartitionSession
 }
 
 func newBatcher() *batcher {
@@ -79,6 +81,20 @@ func (b *batcher) PushRawMessage(session *topicreadercommon.PartitionSession, m 
 	}
 
 	return b.addNeedLock(session, newBatcherItemRawMessage(m))
+}
+
+func (b *batcher) FlushPartitionSession(session *topicreadercommon.PartitionSession) {
+	b.m.WithLock(func() {
+		if b.closed {
+			return
+		}
+
+		if _, ok := b.messages[session]; !ok {
+			return
+		}
+
+		b.sessionsForFlush = append(b.sessionsForFlush, session)
+	})
 }
 
 func (b *batcher) addNeedLock(session *topicreadercommon.PartitionSession, item batcherMessageOrderItem) error {
@@ -250,29 +266,57 @@ func (b *batcher) findNeedLock(filter batcherGetOptions) batcherResultCandidate 
 		return batcherResultCandidate{}
 	}
 
-	rawMessageOpts := batcherGetOptions{rawMessagesOnly: true}
-
 	var batchResult batcherResultCandidate
 	needBatchResult := true
 
-	for k, items := range b.messages {
-		head, rest, ok := rawMessageOpts.cutBatchItemsHead(items)
-		if ok {
-			return newBatcherResultCandidate(k, head, rest, true)
+	for _, session := range b.sessionsForFlush {
+		items := b.messages[session]
+		candidate := b.findNeedLockProcessItem(filter, session, items, true)
+		if !candidate.Result.IsEmpty() {
+			return candidate
+		}
+	}
+
+	for session, items := range b.messages {
+		candidate := b.findNeedLockProcessItem(filter, session, items, needBatchResult)
+
+		if candidate.Result.IsRawMessage() {
+			return candidate
 		}
 
-		if needBatchResult {
-			head, rest, ok = b.applyForceFlagToOptions(filter).cutBatchItemsHead(items)
-			if !ok {
-				continue
-			}
-
+		if candidate.Result.IsBatch() {
+			batchResult = candidate
 			needBatchResult = false
-			batchResult = newBatcherResultCandidate(k, head, rest, true)
 		}
 	}
 
 	return batchResult
+}
+
+func (b *batcher) findNeedLockProcessItem(
+	filter batcherGetOptions,
+	k *topicreadercommon.PartitionSession,
+	items batcherMessageOrderItems,
+	needBatchResult bool,
+) (
+	result batcherResultCandidate,
+) {
+	rawMessageOpts := batcherGetOptions{rawMessagesOnly: true}
+	head, rest, ok := rawMessageOpts.cutBatchItemsHead(items)
+	if ok {
+		return newBatcherResultCandidate(k, head, rest, true)
+	}
+
+	if needBatchResult {
+		head, rest, ok = b.applyForceFlagToOptions(filter).cutBatchItemsHead(items)
+		if !ok {
+			return batcherResultCandidate{}
+		}
+
+		return newBatcherResultCandidate(k, head, rest, true)
+	}
+
+	return batcherResultCandidate{}
 }
 
 func (b *batcher) applyForceFlagToOptions(options batcherGetOptions) batcherGetOptions {
@@ -289,6 +333,9 @@ func (b *batcher) applyForceFlagToOptions(options batcherGetOptions) batcherGetO
 func (b *batcher) applyNeedLock(res *batcherResultCandidate) {
 	if res.Rest.IsEmpty() && res.WaiterIndex >= 0 {
 		delete(b.messages, res.Key)
+		if len(b.sessionsForFlush) > 0 && b.sessionsForFlush[0] == res.Key {
+			b.sessionsForFlush = xslices.Delete(b.sessionsForFlush, 0, 1)
+		}
 	} else {
 		b.messages[res.Key] = res.Rest
 	}

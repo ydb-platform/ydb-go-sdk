@@ -1,3 +1,5 @@
+* Supported topic split merge server feature for topic reader (no api changed)
+
 ## v3.104.7
 * Added public type alias `ydb.Params` to `internal/params.Parameters` for external usage
 

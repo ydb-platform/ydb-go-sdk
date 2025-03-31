@@ -26,7 +26,11 @@ var (
 
 // TopicSteamReaderConnect connect to grpc stream
 // when connectionCtx closed stream must stop work and return errors for all methods
-type TopicSteamReaderConnect func(connectionCtx context.Context) (topicreadercommon.RawTopicReaderStream, error)
+type TopicSteamReaderConnect func(
+	connectionCtx context.Context,
+	readerID int64,
+	tracer *trace.Topic,
+) (topicreadercommon.RawTopicReaderStream, error)
 
 type Reader struct {
 	reader             batchedStreamReader
@@ -81,7 +85,7 @@ func NewReader(
 	readerID := topicreadercommon.NextReaderID()
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
-		stream, err := connector(ctx)
+		stream, err := connector(ctx, readerID, cfg.Trace)
 		if err != nil {
 			return nil, err
 		}

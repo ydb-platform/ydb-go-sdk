@@ -35,12 +35,15 @@ type (
 		) func(
 			TopicReaderPartitionReadStartResponseDoneInfo,
 		)
+
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderPartitionReadStopResponse func(
 			TopicReaderPartitionReadStopResponseStartInfo,
 		) func(
 			TopicReaderPartitionReadStopResponseDoneInfo,
 		)
+
+		OnReaderEndPartitionSession func(TopicReaderEndPartitionSessionInfo)
 
 		// TopicReaderStreamEvents
 
@@ -95,6 +98,11 @@ type (
 		) func(
 			TopicReaderTransactionRollbackDoneInfo,
 		)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderSentGRPCMessage func(TopicReaderSentGRPCMessageInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderReceiveGRPCMessage func(TopicReaderReceiveGRPCMessageInfo)
 
 		// TopicReaderMessageEvents
 
@@ -179,6 +187,16 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStopResponseDoneInfo struct {
 		Error error
+	}
+
+	TopicReaderEndPartitionSessionInfo struct {
+		ReaderConnectionID   string
+		PartitionContext     context.Context //nolint:containedctx
+		Topic                string
+		PartitionID          int64
+		PartitionSessionID   int64
+		AdjacentPartitionIDs []int64
+		ChildPartitionIDs    []int64
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -416,6 +434,24 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderTransactionRollbackDoneInfo struct {
 		RollbackError error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderSentGRPCMessageInfo struct {
+		ReaderID      int64
+		SessionID     string
+		MessageNumber int
+		Message       *Ydb_Topic.StreamReadMessage_FromClient // may be nil if err != nil
+		Error         error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderReceiveGRPCMessageInfo struct {
+		ReaderID      int64
+		SessionID     string
+		MessageNumber int
+		Message       *Ydb_Topic.StreamReadMessage_FromServer // may be nil if err != nil
+		Error         error
 	}
 
 	////////////

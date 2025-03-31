@@ -300,10 +300,14 @@ func (c *Client) StartReader(
 	readSelectors topicoptions.ReadSelectors,
 	opts ...topicoptions.ReaderOption,
 ) (*topicreader.Reader, error) {
-	var connector topicreaderinternal.TopicSteamReaderConnect = func(ctx context.Context) (
+	var connector topicreaderinternal.TopicSteamReaderConnect = func(
+		ctx context.Context,
+		readerID int64,
+		tracer *trace.Topic,
+	) (
 		topicreadercommon.RawTopicReaderStream, error,
 	) {
-		return c.rawClient.StreamRead(ctx)
+		return c.rawClient.StreamRead(ctx, readerID, tracer)
 	}
 
 	defaultOpts := []topicoptions.ReaderOption{

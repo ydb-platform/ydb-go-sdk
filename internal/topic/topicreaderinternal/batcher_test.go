@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -314,6 +315,62 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 		require.Len(t, batch.Batch.Messages, 1)
 		require.False(t, b.forceIgnoreMinRestrictionsOnNextMessagesBatch)
 	})
+}
+
+func TestBatcher_PopFlushed(t *testing.T) {
+	ctx := context.Background()
+	rnd := rand.New(rand.NewSource(0))
+
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		b := newBatcher()
+		s1 := topicreadercommon.NewPartitionSession(ctx,
+			"test",
+			1,
+			-1,
+			"test",
+			partitionSessionID(1),
+			1,
+			0,
+		)
+		s2 := topicreadercommon.NewPartitionSession(ctx,
+			"test",
+			2,
+			-1,
+			"test",
+			partitionSessionID(1),
+			1,
+			0,
+		)
+
+		err := b.PushBatches(
+			xtest.Must(
+				topicreadercommon.NewBatch(
+					s1,
+					[]*topicreadercommon.PublicMessage{
+						topicreadercommon.NewPublicMessageBuilder().PartitionSession(s1).Build(),
+					},
+				),
+			),
+			xtest.Must(
+				topicreadercommon.NewBatch(
+					s2,
+					[]*topicreadercommon.PublicMessage{
+						topicreadercommon.NewPublicMessageBuilder().PartitionSession(s2).Build(),
+					},
+				),
+			),
+		)
+		require.NoError(t, err)
+
+		sessions := []*topicreadercommon.PartitionSession{s1, s2}
+		s := sessions[rnd.Intn(len(sessions))]
+		b.FlushPartitionSession(s)
+
+		res, err := b.Pop(ctx, batcherGetOptions{})
+		require.NoError(t, err)
+
+		require.Same(t, s, topicreadercommon.BatchGetPartitionSession(res.Batch))
+	}, xtest.StopAfter(time.Millisecond))
 }
 
 func TestBatcherConcurency(t *testing.T) {
