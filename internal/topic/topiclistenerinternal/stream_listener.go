@@ -37,6 +37,7 @@ type streamListener struct {
 	syncCommitter        *topicreadercommon.Committer
 
 	closing atomic.Bool
+	tracer  *trace.Topic
 
 	m              xsync.Mutex
 	messagesToSend []rawtopicreader.ClientMessage
@@ -54,6 +55,7 @@ func newStreamListener(
 		handler:          eventListener,
 		background:       *background.NewWorker(xcontext.ValueOnly(connectionCtx), "topic reader stream listener"),
 		sessionIDCounter: sessionIDCounter,
+		tracer:           &trace.Topic{}, // TODO: add read tracer
 	}
 
 	res.initVars(sessionIDCounter)
@@ -161,7 +163,7 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 		}
 	}()
 
-	stream, err := client.StreamRead(streamCtx)
+	stream, err := client.StreamRead(streamCtx, -1, l.tracer)
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: topic listener failed connect to a stream: %w",

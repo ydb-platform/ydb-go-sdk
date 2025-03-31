@@ -1159,6 +1159,132 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 	})
 }
 
+func TestTopicSplitPartitions(t *testing.T) {
+	t.Run("SplitPartition", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+
+		// Create initial partition session
+		initialSession := newTestPartitionSessionReaderID(e.reader.readerID, e.partitionSessionID)
+		require.NoError(t, e.reader.sessionController.Add(initialSession))
+
+		// Create split sessions
+		splitSession1 := newTestPartitionSessionReaderID(e.reader.readerID, e.partitionSessionID+1)
+		splitSession2 := newTestPartitionSessionReaderID(e.reader.readerID, e.partitionSessionID+2)
+
+		// Send split partition request
+		splitRequestReceived := make(empty.Chan)
+		e.stream.EXPECT().Send(&rawtopicreader.SplitPartitionSessionRequest{
+			PartitionSessionID: e.partitionSessionID,
+		}).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
+			close(splitRequestReceived)
+			return nil
+		})
+
+		// Send split response
+		e.SendFromServer(&rawtopicreader.SplitPartitionSessionResponse{
+			PartitionSessionID: e.partitionSessionID,
+			SplitSession1:      e.partitionSessionID + 1,
+			SplitSession2:      e.partitionSessionID + 2,
+		})
+
+		// Wait for split request to be sent
+		xtest.WaitChannelClosed(t, splitRequestReceived)
+
+		// Verify split sessions are added to storage
+		session1, err := e.reader.sessionController.Get(e.partitionSessionID + 1)
+		require.NoError(t, err)
+		require.Equal(t, splitSession1, session1)
+
+		session2, err := e.reader.sessionController.Get(e.partitionSessionID + 2)
+		require.NoError(t, err)
+		require.Equal(t, splitSession2, session2)
+
+		// Verify initial session is removed
+		_, err = e.reader.sessionController.Get(e.partitionSessionID)
+		require.Error(t, err)
+	})
+
+	t.Run("SplitPartitionError", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+
+		// Create initial partition session
+		initialSession := newTestPartitionSessionReaderID(e.reader.readerID, e.partitionSessionID)
+		require.NoError(t, e.reader.sessionController.Add(initialSession))
+
+		// Send split partition request with error
+		splitRequestReceived := make(empty.Chan)
+		testErr := errors.New("test error")
+		e.stream.EXPECT().Send(&rawtopicreader.SplitPartitionSessionRequest{
+			PartitionSessionID: e.partitionSessionID,
+		}).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
+			close(splitRequestReceived)
+			return testErr
+		})
+
+		// Send split response
+		e.SendFromServer(&rawtopicreader.SplitPartitionSessionResponse{
+			PartitionSessionID: e.partitionSessionID,
+			SplitSession1:      e.partitionSessionID + 1,
+			SplitSession2:      e.partitionSessionID + 2,
+		})
+
+		// Wait for split request to be sent
+		xtest.WaitChannelClosed(t, splitRequestReceived)
+
+		// Verify initial session is still present
+		session, err := e.reader.sessionController.Get(e.partitionSessionID)
+		require.NoError(t, err)
+		require.Equal(t, initialSession, session)
+
+		// Verify split sessions are not added
+		_, err = e.reader.sessionController.Get(e.partitionSessionID + 1)
+		require.Error(t, err)
+		_, err = e.reader.sessionController.Get(e.partitionSessionID + 2)
+		require.Error(t, err)
+	})
+
+	t.Run("SplitPartitionFromOtherReader", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+
+		// Create initial partition session from different reader
+		initialSession := newTestPartitionSessionReaderID(e.reader.readerID+1, e.partitionSessionID)
+		require.NoError(t, e.reader.sessionController.Add(initialSession))
+
+		// Send split partition request
+		splitRequestReceived := make(empty.Chan)
+		e.stream.EXPECT().Send(&rawtopicreader.SplitPartitionSessionRequest{
+			PartitionSessionID: e.partitionSessionID,
+		}).DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
+			close(splitRequestReceived)
+			return nil
+		})
+
+		// Send split response
+		e.SendFromServer(&rawtopicreader.SplitPartitionSessionResponse{
+			PartitionSessionID: e.partitionSessionID,
+			SplitSession1:      e.partitionSessionID + 1,
+			SplitSession2:      e.partitionSessionID + 2,
+		})
+
+		// Wait for split request to be sent
+		xtest.WaitChannelClosed(t, splitRequestReceived)
+
+		// Verify initial session is still present
+		session, err := e.reader.sessionController.Get(e.partitionSessionID)
+		require.NoError(t, err)
+		require.Equal(t, initialSession, session)
+
+		// Verify split sessions are not added
+		_, err = e.reader.sessionController.Get(e.partitionSessionID + 1)
+		require.Error(t, err)
+		_, err = e.reader.sessionController.Get(e.partitionSessionID + 2)
+		require.Error(t, err)
+	})
+}
+
 type streamEnv struct {
 	TopicClient             *MockTopicClient
 	ctx                     context.Context //nolint:containedctx
