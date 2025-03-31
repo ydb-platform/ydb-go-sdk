@@ -158,13 +158,15 @@ auto_partitioning_stabilization_window=Interval('PT1S')
 
 	t.Log("Read first partition id:", firstPartitionID)
 
+	readFromFirstPartition := 1
 readFromFirstPartition:
 	for {
 		msg, err = scope.TopicReader().ReadMessage(scope.Ctx)
 		scope.Require.NoError(err)
 		messagesCounter.Add(-1)
+		readFromFirstPartition++
 		if msg.PartitionID() != firstPartitionID {
-			t.Log("Read first partition id:", msg.PartitionID())
+			t.Log("Read first partition id:", msg.PartitionID(), "read from first partition:", readFromFirstPartition)
 			break readFromFirstPartition
 		}
 	}
