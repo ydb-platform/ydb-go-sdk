@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -112,6 +114,9 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 }
 
 func TestTopicSplitPartitions(t *testing.T) {
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
+		t.Skip("require support autosplit for topics")
+	}
 	scope := newScope(t)
 
 	params := `
@@ -181,5 +186,4 @@ readFromFirstPartition:
 		scope.Require.NotEqual(firstPartitionID, msg.PartitionID())
 		messagesCounter.Add(-1)
 	}
-
 }
