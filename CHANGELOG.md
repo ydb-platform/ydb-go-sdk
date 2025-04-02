@@ -1,3 +1,4 @@
+## v3.105.1
 * Changed the gRPC DNS balancer policy to `round_robin` for internal `discovery/ListEndpoints` call (reverted v3.90.2 changes)
 
 ## v3.105.0
