@@ -200,7 +200,7 @@ func makeDiscoveryFunc(
 				),
 				grpc.WithBlock(), //nolint:staticcheck,nolintlint
 				grpc.WithDefaultServiceConfig(`{
-					"loadBalancingPolicy": "pick_first"
+					"loadBalancingPolicy": "round_robin"
 				}`),
 			)...,
 		)
