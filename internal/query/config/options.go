@@ -34,9 +34,17 @@ func WithPoolLimit(size int) Option {
 	}
 }
 
-func WithPoolSessionUsageLimit(sessionUsageLimit uint64) Option {
+// WithSessionPoolSessionUsageLimit set pool session max usage:
+// - if argument type is uint64 - WithSessionPoolSessionUsageLimit limits max usage count of pool session
+// - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session
+func WithSessionPoolSessionUsageLimit[T interface{ uint64 | time.Duration }](limit T) Option {
 	return func(c *Config) {
-		c.poolSessionUsageLimit = sessionUsageLimit
+		switch v := any(limit).(type) {
+		case uint64:
+			c.poolSessionUsageLimit = v
+		case time.Duration:
+			c.poolSessionUsageTTL = v
+		}
 	}
 }
 

@@ -531,11 +531,13 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	}
 }
 
-// WithSessionPoolSessionUsageLimit set max count for use session
-func WithSessionPoolSessionUsageLimit(sessionUsageLimit uint64) Option {
+// WithSessionPoolSessionUsageLimit set pool session max usage:
+// - if argument type is uint64 - WithSessionPoolSessionUsageLimit limits max usage count of pool session
+// - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session
+func WithSessionPoolSessionUsageLimit[T interface{ uint64 | time.Duration }](limit T) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.WithPoolSessionUsageLimit(sessionUsageLimit))
-		d.queryOptions = append(d.queryOptions, queryConfig.WithPoolSessionUsageLimit(sessionUsageLimit))
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolSessionUsageLimit(limit))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolSessionUsageLimit(limit))
 
 		return nil
 	}

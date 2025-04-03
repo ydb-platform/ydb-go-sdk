@@ -42,9 +42,11 @@ type (
 		closeItemFunc      func(ctx context.Context, item PT)
 		idleTimeToLive     time.Duration
 		itemUsageLimit     uint64
+		itemUsageTTL       time.Duration
 	}
 	itemInfo[PT ItemConstraint[T], T any] struct {
 		idle       *xlist.Element[PT]
+		created    time.Time
 		lastUsage  time.Time
 		useCounter *uint64
 	}
@@ -110,6 +112,12 @@ func WithLimit[PT ItemConstraint[T], T any](size int) Option[PT, T] {
 func WithItemUsageLimit[PT ItemConstraint[T], T any](itemUsageLimit uint64) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.itemUsageLimit = itemUsageLimit
+	}
+}
+
+func WithItemUsageTTL[PT ItemConstraint[T], T any](ttl time.Duration) Option[PT, T] {
+	return func(c *Config[PT, T]) {
+		c.itemUsageTTL = ttl
 	}
 }
 
@@ -235,9 +243,13 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 			newItem, err := p.config.createItemFunc(createCtx)
 			if newItem != nil {
 				p.mu.WithLock(func() {
-					var useCounter uint64
+					var (
+						useCounter uint64
+						now        = p.config.clock.Now()
+					)
 					p.index[newItem] = itemInfo[PT, T]{
-						lastUsage:  p.config.clock.Now(),
+						created:    now,
+						lastUsage:  now,
 						useCounter: &useCounter,
 					}
 				})
@@ -695,6 +707,53 @@ func (p *Pool[PT, T]) pushIdle(item PT, now time.Time) {
 
 const maxAttempts = 100
 
+func needCloseItemByMaxUsage[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
+	if c.itemUsageLimit <= 0 {
+		return false
+	}
+	if *info.useCounter < c.itemUsageLimit {
+		return false
+	}
+
+	return true
+}
+
+func needCloseItemByTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
+	if c.itemUsageTTL <= 0 {
+		return false
+	}
+	if c.clock.Since(info.created) < c.itemUsageTTL {
+		return false
+	}
+
+	return true
+}
+
+func needCloseItemByIdleTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
+	if c.idleTimeToLive <= 0 {
+		return false
+	}
+	if c.clock.Since(info.lastUsage) < c.idleTimeToLive {
+		return false
+	}
+
+	return true
+}
+
+func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
+	if needCloseItemByMaxUsage(c, info) {
+		return true
+	}
+	if needCloseItemByTTL(c, info) {
+		return true
+	}
+	if needCloseItemByIdleTTL(c, info) {
+		return true
+	}
+
+	return false
+}
+
 func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { //nolint:funlen
 	var (
 		start   = p.config.clock.Now()
@@ -749,8 +808,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 					return info
 				})
 
-				if (p.config.itemUsageLimit > 0 && *info.useCounter > p.config.itemUsageLimit) ||
-					(p.config.idleTimeToLive > 0 && p.config.clock.Since(info.lastUsage) > p.config.idleTimeToLive) {
+				if needCloseItem(&p.config, info) {
 					p.closeItem(ctx, item,
 						closeItemWithLock(),
 						closeItemNotifyStats(),

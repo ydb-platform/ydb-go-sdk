@@ -575,6 +575,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 		pool: pool.New(ctx,
 			pool.WithLimit[*Session, Session](cfg.PoolLimit()),
 			pool.WithItemUsageLimit[*Session, Session](cfg.PoolSessionUsageLimit()),
+			pool.WithItemUsageTTL[*Session, Session](cfg.PoolSessionUsageTTL()),
 			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
 			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
