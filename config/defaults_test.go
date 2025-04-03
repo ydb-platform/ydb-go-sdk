@@ -66,6 +66,10 @@ var simpleServiceServiceDesc = grpc.ServiceDesc{
 	Metadata: "simple.proto",
 }
 
+// simpleServicePingHandler handles ping requests
+// This function must follow gRPC's required signature, where context is the second parameter.
+//
+//nolint:revive // context-as-argument: gRPC handler requires this signature
 func simpleServicePingHandler(
 	srv interface{},
 	ctx context.Context,
@@ -103,6 +107,7 @@ type simpleServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
+// NewSimpleServiceClient creates a new client
 func NewSimpleServiceClient(cc grpc.ClientConnInterface) SimpleServiceClient {
 	return &simpleServiceClient{cc}
 }
@@ -121,6 +126,11 @@ func (c *simpleServiceClient) Ping(
 	return out, nil
 }
 
+// TestGRPCLoadBalancingPolicies tests how different load balancing policies behave
+// This is a test function, so we can ignore the staticcheck warnings about deprecated methods
+// as we need to use these specific gRPC APIs for testing the load balancing behavior.
+//
+//nolint:staticcheck
 func TestGRPCLoadBalancingPolicies(t *testing.T) {
 	// Start several real gRPC servers with different characteristics
 	servers := make([]*simpleServer, 3)
