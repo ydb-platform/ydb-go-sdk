@@ -1,3 +1,5 @@
+* Improved the `ydb.WithSessionPoolSessionUsageLimit` option for allow `time.Duration` as argument type for limit max session time to live since create time 
+
 ## v3.105.1
 * Changed the gRPC DNS balancer policy to `round_robin` for internal `discovery/ListEndpoints` call (reverted v3.90.2 changes)
 

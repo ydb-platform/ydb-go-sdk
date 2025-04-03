@@ -19,6 +19,7 @@ type Config struct {
 
 	poolLimit             int
 	poolSessionUsageLimit uint64
+	poolSessionUsageTTL   time.Duration
 
 	sessionCreateTimeout   time.Duration
 	sessionDeleteTimeout   time.Duration
@@ -63,6 +64,10 @@ func (c *Config) PoolLimit() int {
 
 func (c *Config) PoolSessionUsageLimit() uint64 {
 	return c.poolSessionUsageLimit
+}
+
+func (c *Config) PoolSessionUsageTTL() time.Duration {
+	return c.poolSessionUsageTTL
 }
 
 // SessionCreateTimeout limits maximum time spent on Create session request

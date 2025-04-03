@@ -52,19 +52,27 @@ func With(config config.Common) Option {
 }
 
 // WithSizeLimit defines upper bound of pooled sessions.
-// If sizeLimit is less than or equal to zero then the
+// If poolLimit is less than or equal to zero then the
 // DefaultSessionPoolSizeLimit variable is used as a limit.
 func WithSizeLimit(sizeLimit int) Option {
 	return func(c *Config) {
 		if sizeLimit > 0 {
-			c.sizeLimit = sizeLimit
+			c.poolLimit = sizeLimit
 		}
 	}
 }
 
-func WithPoolSessionUsageLimit(sessionUsageLimit uint64) Option {
+// WithSessionPoolSessionUsageLimit set pool session max usage:
+// - if argument type is uint64 - WithSessionPoolSessionUsageLimit limits max usage count of pool session
+// - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session
+func WithSessionPoolSessionUsageLimit[T interface{ uint64 | time.Duration }](limit T) Option {
 	return func(c *Config) {
-		c.sessionUsageLimit = sessionUsageLimit
+		switch v := any(limit).(type) {
+		case uint64:
+			c.poolSessionUsageLimit = v
+		case time.Duration:
+			c.poolSessionUsageTTL = v
+		}
 	}
 }
 
@@ -182,8 +190,9 @@ func WithClock(clock clockwork.Clock) Option {
 type Config struct {
 	config.Common
 
-	sizeLimit         int
-	sessionUsageLimit uint64
+	poolLimit             int
+	poolSessionUsageLimit uint64
+	poolSessionUsageTTL   time.Duration
 
 	createSessionTimeout time.Duration
 	deleteTimeout        time.Duration
@@ -212,11 +221,15 @@ func (c *Config) Clock() clockwork.Clock {
 // If SizeLimit is less than or equal to zero then the
 // DefaultSessionPoolSizeLimit variable is used as a limit.
 func (c *Config) SizeLimit() int {
-	return c.sizeLimit
+	return c.poolLimit
 }
 
 func (c *Config) SessionUsageLimit() uint64 {
-	return c.sessionUsageLimit
+	return c.poolSessionUsageLimit
+}
+
+func (c *Config) SessionUsageTTL() time.Duration {
+	return c.poolSessionUsageTTL
 }
 
 // KeepAliveMinSize is a lower bound for sessions in the pool. If there are more sessions open, then
@@ -293,7 +306,7 @@ func (c *Config) DeleteTimeout() time.Duration {
 
 func defaults() *Config {
 	return &Config{
-		sizeLimit:            DefaultSessionPoolSizeLimit,
+		poolLimit:            DefaultSessionPoolSizeLimit,
 		createSessionTimeout: DefaultSessionPoolCreateSessionTimeout,
 		deleteTimeout:        DefaultSessionPoolDeleteTimeout,
 		idleThreshold:        DefaultSessionPoolIdleThreshold,
