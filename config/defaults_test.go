@@ -126,27 +126,80 @@ func (c *simpleServiceClient) Ping(
 	return out, nil
 }
 
+// CustomDialer implements the dialer function with controlled delays
+type CustomDialer struct {
+	// Map of address to delay before connection
+	delays map[string]time.Duration
+	// Mutex for thread safety
+	mu sync.Mutex
+	// Keeps track of dial attempt count
+	dialAttempts map[string]int
+}
+
+// DialContext is used by gRPC to establish connections
+func (d *CustomDialer) DialContext(ctx context.Context, addr string) (net.Conn, error) {
+	d.mu.Lock()
+	delay, exists := d.delays[addr]
+	d.dialAttempts[addr]++
+	attemptCount := d.dialAttempts[addr]
+	d.mu.Unlock()
+
+	// Log the dial attempt
+	fmt.Printf("Attempting to dial %s (attempt #%d)\n", addr, attemptCount)
+
+	if exists && delay > 0 {
+		// Simulating connection delay or timeout
+		fmt.Printf("Simulating delay of %v for %s\n", delay, addr)
+
+		select {
+		case <-time.After(delay):
+			// If this is a simulated failure, return error
+			if delay >= 2*time.Second {
+				fmt.Printf("Connection to %s timed out after %v\n", addr, delay)
+
+				return nil, fmt.Errorf("connection timeout")
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	// Establish a real connection to the address
+	dialer := &net.Dialer{}
+
+	return dialer.DialContext(ctx, "tcp", addr)
+}
+
+// GetDialAttempts returns the number of dial attempts for an address
+func (d *CustomDialer) GetDialAttempts(addr string) int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.dialAttempts[addr]
+}
+
 // TestGRPCLoadBalancingPolicies tests how different load balancing policies behave
 // This is a test function, so we can ignore the staticcheck warnings about deprecated methods
 // as we need to use these specific gRPC APIs for testing the load balancing behavior.
-//
-//nolint:staticcheck
 func TestGRPCLoadBalancingPolicies(t *testing.T) {
-	// Start several real gRPC servers with different characteristics
-	servers := make([]*simpleServer, 3)
-	listeners := make([]net.Listener, 3)
-	grpcServers := make([]*grpc.Server, 3)
-	addresses := make([]string, 3)
+	// Total number of servers to test
+	const totalServers = 6
 
-	// Create servers with different behaviors
-	for i := 0; i < 3; i++ {
-		// First server has a delay, others respond immediately
-		delay := time.Duration(0)
-		if i == 0 {
-			delay = 500 * time.Millisecond
-		}
+	// Setup servers
+	servers := make([]*simpleServer, totalServers)
+	listeners := make([]net.Listener, totalServers)
+	grpcServers := make([]*grpc.Server, totalServers)
+	addresses := make([]string, totalServers)
 
-		servers[i] = &simpleServer{delay: delay}
+	// Custom dialer with controlled delays
+	dialer := &CustomDialer{
+		delays:       make(map[string]time.Duration),
+		dialAttempts: make(map[string]int),
+	}
+
+	// Start all servers
+	for i := 0; i < totalServers; i++ {
+		servers[i] = &simpleServer{}
 		grpcServers[i] = grpc.NewServer()
 		RegisterSimpleServiceServer(grpcServers[i], servers[i])
 
@@ -158,6 +211,16 @@ func TestGRPCLoadBalancingPolicies(t *testing.T) {
 		listeners[i] = lis
 		addresses[i] = lis.Addr().String()
 
+		// First 4 servers will have a "connection delay" of 2.5 seconds, simulating timeout
+		if i < 4 {
+			dialer.delays[addresses[i]] = 2500 * time.Millisecond
+		} else {
+			// Last two servers connect quickly
+			dialer.delays[addresses[i]] = 50 * time.Millisecond
+		}
+
+		t.Logf("Started server %d at %s with delay %v", i, addresses[i], dialer.delays[addresses[i]])
+
 		go func(gs *grpc.Server, l net.Listener) {
 			_ = gs.Serve(l)
 		}(grpcServers[i], lis)
@@ -165,7 +228,7 @@ func TestGRPCLoadBalancingPolicies(t *testing.T) {
 
 	// Cleanup after test
 	defer func() {
-		for i := 0; i < 3; i++ {
+		for i := 0; i < totalServers; i++ {
 			if grpcServers[i] != nil {
 				grpcServers[i].Stop()
 			}
@@ -180,38 +243,56 @@ func TestGRPCLoadBalancingPolicies(t *testing.T) {
 	resolver.Register(r)
 
 	// Prepare addresses for the resolver
-	addrs := make([]resolver.Address, 0, len(addresses))
-	for _, addr := range addresses {
+	addrs := make([]resolver.Address, 0, totalServers)
+	for i, addr := range addresses {
+		t.Logf("Adding server %d at address %s to resolver", i, addr)
 		addrs = append(addrs, resolver.Address{Addr: addr})
 	}
 	r.InitialState(resolver.State{Addresses: addrs})
 
 	// Test different load balancing policies
 	tests := []struct {
-		name            string
-		balancingPolicy string
+		name                string
+		balancingPolicy     string
+		minExpectedDuration time.Duration
+		maxExpectedDuration time.Duration
 	}{
-		{"RoundRobin", "round_robin"},
-		{"PickFirst", "pick_first"},
+		{
+			name:                "RoundRobin",
+			balancingPolicy:     "round_robin",
+			minExpectedDuration: 50 * time.Millisecond, // Should connect to a fast server quickly
+			maxExpectedDuration: 1 * time.Second,       // Should not take too long
+		},
+		{
+			name:                "PickFirst",
+			balancingPolicy:     "pick_first",
+			minExpectedDuration: 8 * time.Second,  // Should try first 4 slow servers (4 * 2.5s with some overhead)
+			maxExpectedDuration: 15 * time.Second, // Upper bound
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			// Reset dial attempts for this test
+			dialer.dialAttempts = make(map[string]int)
+
 			// Monitor connection establishment time
 			dialStart := time.Now()
 
 			// Create context with timeout for connection establishment
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 
-			// #nosec G402 - Using insecure credentials is acceptable for testing
+			t.Logf("Attempting to connect with %s balancing policy", tc.balancingPolicy)
+
 			// Establish connection with our balancing policy
 			conn, err := grpc.DialContext(
 				ctx,
-				"test:///unused", // Address doesn't matter as we use manual resolver
+				"test:///unused",
+				grpc.WithContextDialer(dialer.DialContext),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithDefaultServiceConfig(fmt.Sprintf(`{"loadBalancingPolicy": "%s"}`, tc.balancingPolicy)),
-				grpc.WithBlock(), // Wait for connection establishment to complete
+				grpc.WithBlock(),
 			)
 
 			dialDuration := time.Since(dialStart)
@@ -220,6 +301,13 @@ func TestGRPCLoadBalancingPolicies(t *testing.T) {
 				t.Fatalf("Failed to dial: %v", err)
 			}
 			defer conn.Close()
+
+			// Log all dial attempts
+			t.Logf("Connection established in %v", dialDuration)
+			for i, addr := range addresses {
+				attempts := dialer.GetDialAttempts(addr)
+				t.Logf("Server %d at %s: %d dial attempts", i, addr, attempts)
+			}
 
 			// Create client and make a request
 			client := NewSimpleServiceClient(conn)
@@ -231,39 +319,58 @@ func TestGRPCLoadBalancingPolicies(t *testing.T) {
 			// Analyze behavior based on balancing policy
 			switch tc.balancingPolicy {
 			case "round_robin":
-				// For round_robin, we expect fast connection as it connects
-				// to all servers in parallel and should quickly find working ones
-				if dialDuration >= 400*time.Millisecond {
-					t.Logf("round_robin dial took %v, expected less than 400ms", dialDuration)
+				if dialDuration < tc.minExpectedDuration || dialDuration > tc.maxExpectedDuration {
+					t.Errorf("round_robin dial took %v, expected between %v and %v",
+						dialDuration, tc.minExpectedDuration, tc.maxExpectedDuration)
 				}
 
-				// Verify that requests execute successfully
-				for i := 0; i < 10; i++ {
-					_, err = client.Ping(context.Background(), &emptypb.Empty{})
-					if err != nil {
-						t.Fatalf("Ping failed: %v", err)
+				// Check if multiple servers were attempted
+				attemptedServers := 0
+				for _, addr := range addresses {
+					if dialer.GetDialAttempts(addr) > 0 {
+						attemptedServers++
 					}
 				}
 
-				t.Logf("round_robin successfully established connection in %v", dialDuration)
+				// round_robin should try multiple servers in parallel
+				if attemptedServers < 2 {
+					t.Errorf("Expected round_robin to attempt multiple servers, but only %d were attempted", attemptedServers)
+				}
+
+				t.Logf("round_robin successfully established connection")
 
 			case "pick_first":
-				// For pick_first, connection time is important - if the first server is unavailable,
-				// connection might take longer
-				if servers[0].delay > 0 {
-					t.Logf("pick_first dial took %v (expected to be affected by the delay)", dialDuration)
+				if dialDuration < tc.minExpectedDuration {
+					t.Errorf("pick_first connected too quickly: %v, expected at least %v",
+						dialDuration, tc.minExpectedDuration)
 				}
 
-				// Verify that requests execute successfully
-				for i := 0; i < 10; i++ {
-					_, err = client.Ping(context.Background(), &emptypb.Empty{})
-					if err != nil {
-						t.Fatalf("Ping failed: %v", err)
+				// Check sequential dialing pattern
+				for i := 1; i < totalServers; i++ {
+					prevAddr := addresses[i-1]
+					currAddr := addresses[i]
+
+					prevAttempts := dialer.GetDialAttempts(prevAddr)
+					currAttempts := dialer.GetDialAttempts(currAddr)
+
+					if currAttempts > 0 && prevAttempts == 0 {
+						t.Errorf("pick_first should try servers sequentially, but server %d was attempted before server %d",
+							i, i-1)
 					}
 				}
 
-				t.Logf("pick_first successfully established connection in %v", dialDuration)
+				t.Logf("pick_first eventually found a working server after trying slow ones")
 			}
+
+			// Make additional ping requests to verify connection works
+			for i := 0; i < 3; i++ {
+				_, err = client.Ping(context.Background(), &emptypb.Empty{})
+				if err != nil {
+					t.Fatalf("Ping %d failed: %v", i, err)
+				}
+			}
+
+			t.Logf("Successfully completed ping requests with %s policy", tc.balancingPolicy)
 		})
 	}
 }
