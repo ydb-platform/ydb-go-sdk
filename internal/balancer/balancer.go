@@ -199,9 +199,6 @@ func makeDiscoveryFunc(
 					xresolver.New("ydb", driverConfig.Trace()),
 				),
 				grpc.WithBlock(), //nolint:staticcheck,nolintlint
-				grpc.WithDefaultServiceConfig(`{
-					"loadBalancingPolicy": "round_robin"
-				}`),
 			)...,
 		)
 		if err != nil {
