@@ -492,7 +492,7 @@ func initScanner() *valueScanner {
 	return &res
 }
 
-func PrepareScannerPerformanceTest(count int) *valueScanner {
+func generateScannerData(count int) *valueScanner {
 	res := initScanner()
 	res.set.Columns = []*Ydb.Column{{
 		Name: "series_id",
