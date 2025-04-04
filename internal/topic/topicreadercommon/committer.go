@@ -167,6 +167,13 @@ func (c *Committer) waitSendTrigger(ctx context.Context) {
 	case <-c.commitLoopSignal:
 	}
 
+	// In sync mode, ignore time lag trigger and send immediately,
+	// because we need to wait for commit ack from the server and can't get
+	// more commit messages until the ack is received.
+	if c.mode == CommitModeSync {
+		return
+	}
+
 	if c.BufferTimeLagTrigger == 0 {
 		return
 	}
