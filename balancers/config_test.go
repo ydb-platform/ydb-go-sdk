@@ -25,19 +25,19 @@ func TestFromConfig(t *testing.T) {
 		{
 			name:   "disable",
 			config: `disable`,
-			res:    balancerConfig.Config{SingleConn: true},
+			res:    balancerConfig.Config{NoDiscovery: true},
 		},
 		{
 			name:   "single",
 			config: `single`,
-			res:    balancerConfig.Config{SingleConn: true},
+			res:    balancerConfig.Config{NoDiscovery: true},
 		},
 		{
 			name: "single/JSON",
 			config: `{
 				"type": "single"
 			}`,
-			res: balancerConfig.Config{SingleConn: true},
+			res: balancerConfig.Config{NoDiscovery: true},
 		},
 		{
 			name:   "round_robin",

@@ -1,8 +1,10 @@
-package config
+package config_test
 
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"net"
 	"sync"
 	"testing"
@@ -145,11 +147,11 @@ func (d *CustomDialer) DialContext(ctx context.Context, addr string) (net.Conn, 
 	d.mu.Unlock()
 
 	// Log the dial attempt
-	fmt.Printf("Attempting to dial %s (attempt #%d)\n", addr, attemptCount)
+	fmt.Printf("Attempting to dial '%s' (attempt #%d)\n", addr, attemptCount)
 
 	if exists && delay > 0 {
 		// Simulating connection delay or timeout
-		fmt.Printf("Simulating delay of %v for %s\n", delay, addr)
+		fmt.Printf("Simulating delay of %v for '%s'\n", delay, addr)
 
 		select {
 		case <-time.After(delay):
@@ -286,13 +288,15 @@ func TestGRPCLoadBalancingPolicies(t *testing.T) {
 			t.Logf("Attempting to connect with %s balancing policy", tc.balancingPolicy)
 
 			// Establish connection with our balancing policy
-			conn, err := grpc.DialContext(
-				ctx,
-				"test:///unused",
-				grpc.WithContextDialer(dialer.DialContext),
-				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				grpc.WithDefaultServiceConfig(fmt.Sprintf(`{"loadBalancingPolicy": "%s"}`, tc.balancingPolicy)),
-				grpc.WithBlock(),
+			db, err := ydb.Open(ctx, "test://localhost:12345/local", // Используем схему test: которую мы зарегистрировали для manual resolver
+				//ydb.WithBalancer(balancers.NoDiscovery()),
+				ydb.With(config.WithGrpcOptions(
+					grpc.WithResolvers(r),
+					grpc.WithContextDialer(dialer.DialContext),
+					grpc.WithTransportCredentials(insecure.NewCredentials()),
+					grpc.WithDefaultServiceConfig(fmt.Sprintf(`{"loadBalancingPolicy": "%s"}`, tc.balancingPolicy)),
+					//grpc.WithBlock(),
+				)),
 			)
 
 			dialDuration := time.Since(dialStart)
@@ -300,7 +304,7 @@ func TestGRPCLoadBalancingPolicies(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to dial: %v", err)
 			}
-			defer conn.Close()
+			defer db.Close(ctx)
 
 			// Log all dial attempts
 			t.Logf("Connection established in %v", dialDuration)
@@ -310,7 +314,7 @@ func TestGRPCLoadBalancingPolicies(t *testing.T) {
 			}
 
 			// Create client and make a request
-			client := NewSimpleServiceClient(conn)
+			client := NewSimpleServiceClient(ydb.GRPCConn(db))
 			_, err = client.Ping(context.Background(), &emptypb.Empty{})
 			if err != nil {
 				t.Fatalf("Ping failed: %v", err)

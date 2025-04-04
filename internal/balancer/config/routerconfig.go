@@ -12,13 +12,13 @@ import (
 type Config struct {
 	Filter          Filter
 	AllowFallback   bool
-	SingleConn      bool
+	NoDiscovery     bool
 	DetectNearestDC bool
 }
 
 func (c Config) String() string {
-	if c.SingleConn {
-		return "SingleConn"
+	if c.NoDiscovery {
+		return "NoDiscovery"
 	}
 
 	buffer := xstring.Buffer()
