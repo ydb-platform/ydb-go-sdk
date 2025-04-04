@@ -283,35 +283,38 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := xtest.Context(t)
+		maxQueueLen := int64(2)
 		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(
 			WithAutoSetSeqNo(false),
-			WithMaxQueueLen(2),
+			WithMaxQueueLen(int(maxQueueLen)),
 		))
 		w.firstConnectionHandled.Store(true)
 
-		waitStartQueueWait := func(targetWaiters int) {
+		waitSemaphoreFull := func() {
 			xtest.SpinWaitCondition(t, nil, func() bool {
-				res := getWaitersCount(w.semaphore) == targetWaiters
-
-				return res
+				// Semaphore is fully acquired when no tokens are available
+				return w.semaphore.TryAcquire(1) == false
 			})
 		}
 
+		// Test normal case within queue limit
 		err := w.Write(ctx, newTestMessages(1, 2))
 		require.NoError(t, err)
+		waitSemaphoreFull()
 
+		// Test queue overflow with context cancellation
 		ctxNoQueueSpace, ctxNoQueueSpaceCancel := xcontext.WithCancel(ctx)
-
 		go func() {
-			waitStartQueueWait(1)
+			waitSemaphoreFull()
 			ctxNoQueueSpaceCancel()
 		}()
 		err = w.Write(ctxNoQueueSpace, newTestMessages(3))
 		require.Error(t, err)
 		require.NotErrorIs(t, err, PublicErrMessagesPutToInternalQueueBeforeError)
 
+		// Test queue space becomes available after ack
 		go func() {
-			waitStartQueueWait(1)
+			waitSemaphoreFull()
 			ackErr := w.queue.AcksReceived([]rawtopicwriter.WriteAck{
 				{
 					SeqNo: 1,
@@ -319,9 +322,105 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 			})
 			require.NoError(t, ackErr)
 		}()
-
 		err = w.Write(ctx, newTestMessages(3))
 		require.NoError(t, err)
+	})
+}
+
+// TestWriterReconnector_Write_SoftQueueLimit tests the soft queue limit functionality
+func TestWriterReconnector_Write_SoftQueueLimit(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx := xtest.Context(t)
+		maxQueueLen := int64(2)
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(
+			WithAutoSetSeqNo(false),
+			WithMaxQueueLen(int(maxQueueLen)),
+		))
+		w.firstConnectionHandled.Store(true)
+
+		// First write should succeed even if it exceeds queue limit
+		// because semaphore is completely free
+		err := w.Write(ctx, newTestMessages(1, 2, 3)) // 3 messages > maxQueueLen (2)
+		require.NoError(t, err, "first write with overflow should succeed")
+
+		// Second write should fail with timeout because semaphore is already acquired
+		ctxTimeout, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+		defer cancel()
+		err = w.Write(ctxTimeout, newTestMessages(4))
+		require.Error(t, err, "second write should fail when queue is full")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		// Release messages and wait for semaphore to be released
+		ackErr := w.queue.AcksReceived([]rawtopicwriter.WriteAck{
+			{SeqNo: 1},
+			{SeqNo: 2},
+			{SeqNo: 3},
+		})
+		require.NoError(t, ackErr)
+
+		// Now we should be able to write up to maxQueueLen messages
+		err = w.Write(ctx, newTestMessages(4, 5))
+		require.NoError(t, err, "write should succeed after release")
+
+		// But we still can't write more than maxQueueLen when semaphore is not empty
+		ctxTimeout2, cancel2 := context.WithTimeout(ctx, 100*time.Millisecond)
+		defer cancel2()
+		err = w.Write(ctxTimeout2, newTestMessages(6, 7, 8))
+		require.Error(t, err, "write should fail when exceeding queue limit")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		// Cleanup: release remaining messages
+		ackErr = w.queue.AcksReceived([]rawtopicwriter.WriteAck{
+			{SeqNo: 4},
+			{SeqNo: 5},
+		})
+		require.NoError(t, ackErr)
+	})
+}
+
+// TestWriterReconnector_Write_SoftQueueLimitPartialRelease tests partial release behavior
+func TestWriterReconnector_Write_SoftQueueLimitPartialRelease(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx := xtest.Context(t)
+		maxQueueLen := int64(2)
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(
+			WithAutoSetSeqNo(false),
+			WithMaxQueueLen(int(maxQueueLen)),
+		))
+		w.firstConnectionHandled.Store(true)
+
+		// Write more than queue limit when semaphore is free
+		err := w.Write(ctx, newTestMessages(1, 2, 3)) // 3 messages > maxQueueLen (2)
+		require.NoError(t, err, "first write with overflow should succeed")
+
+		// Release two messages, one place is enough to write one message
+		ackErr := w.queue.AcksReceived([]rawtopicwriter.WriteAck{
+			{SeqNo: 1},
+			{SeqNo: 2},
+		})
+		require.NoError(t, ackErr)
+
+		// We should be able to write one message now
+		err = w.Write(ctx, newTestMessages(4))
+		require.NoError(t, err, "write should succeed after partial release")
+
+		// But we can't write two messages due to remaining tokens
+		ctxTimeout, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+		defer cancel()
+		err = w.Write(ctxTimeout, newTestMessages(5, 6))
+		require.Error(t, err, "write should fail when exceeding available space")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		// Release all remaining messages
+		ackErr = w.queue.AcksReceived([]rawtopicwriter.WriteAck{
+			{SeqNo: 3},
+			{SeqNo: 4},
+		})
+		require.NoError(t, ackErr)
+
+		// Now we can write up to maxQueueLen again
+		err = w.Write(ctx, newTestMessages(5, 6))
+		require.NoError(t, err, "write should succeed after full release")
 	})
 }
 

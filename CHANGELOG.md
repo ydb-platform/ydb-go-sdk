@@ -1,3 +1,4 @@
+* Allowed overflow queue limit for one goroutine at time for topic writer
 * Added option WithReaderDisableSplitMergePartitionsSupport for topic reader
 
 ## v3.105.2
