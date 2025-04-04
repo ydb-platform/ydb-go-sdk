@@ -2,10 +2,14 @@ package topicreadercommon
 
 import "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 
-func CreateInitMessage(consumer string, selectors []*PublicReadSelector) *rawtopicreader.InitRequest {
+func CreateInitMessage(
+	consumer string,
+	supportAutoPartition bool,
+	selectors []*PublicReadSelector,
+) *rawtopicreader.InitRequest {
 	res := &rawtopicreader.InitRequest{
 		Consumer:                consumer,
-		AutoPartitioningSupport: true,
+		AutoPartitioningSupport: supportAutoPartition,
 	}
 
 	res.TopicsReadSettings = make([]rawtopicreader.TopicReadSettings, len(selectors))
