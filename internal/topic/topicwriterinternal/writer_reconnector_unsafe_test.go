@@ -1,29 +1,25 @@
 package topicwriterinternal
 
 import (
-	"container/list"
 	"reflect"
 	"runtime"
-	"sync"
 	"unsafe"
 
-	"golang.org/x/sync/semaphore"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
-func getWaitersCount(sem *semaphore.Weighted) int {
+// getWaitersCount returns number of goroutines waiting for semaphore acquisition
+// by checking overflow state. This is unsafe function which uses reflection
+// and unsafe pointers to access internal fields. It should be used only in tests.
+func getWaitersCount(sem *xsync.SoftWeightedSemaphore) int64 {
+	// Prevent garbage collection of the semaphore while we work with its fields
 	defer runtime.KeepAlive(sem)
 
+	// Get access to overflow field through reflection
 	semVal := reflect.ValueOf(sem).Elem()
-	mutexField := semVal.FieldByName("mu")
+	overflowField := semVal.FieldByName("overflow")
+	overflowAddr := unsafe.Pointer(overflowField.UnsafeAddr())
+	overflow := (*int64)(overflowAddr)
 
-	mutexAddr := unsafe.Pointer(mutexField.UnsafeAddr())
-	mutex := (*sync.Mutex)(mutexAddr)
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	waitersField := semVal.FieldByName("waiters")
-	waitersPointer := unsafe.Pointer(waitersField.UnsafeAddr())
-	waiters := (*list.List)(waitersPointer)
-
-	return waiters.Len()
+	return *overflow
 }
