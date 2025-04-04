@@ -13,22 +13,19 @@ func Params(
 	cancelAfter time.Duration,
 	mode Mode,
 ) *Ydb_Operations.OperationParams {
+	b := Ydb_Operations.OperationParams_builder{}
 	if d, ok := ctxTimeout(ctx); ok {
-		timeout = d
-	}
-	if d, ok := ctxCancelAfter(ctx); ok {
-		cancelAfter = d
+		b.OperationTimeout = timeoutParam(d)
 	}
 	if d, ok := ctxUntilDeadline(ctx); mode == ModeSync && ok && d < timeout {
-		timeout = d
+		b.OperationTimeout = timeoutParam(d)
 	}
-	if timeout == 0 && cancelAfter == 0 && mode == 0 {
-		return nil
+	if d := cancelAfter; d > 0 {
+		b.CancelAfter = timeoutParam(d)
+	}
+	if d, ok := ctxCancelAfter(ctx); ok && d < cancelAfter {
+		b.CancelAfter = timeoutParam(d)
 	}
 
-	return &Ydb_Operations.OperationParams{
-		OperationMode:    mode.toYDB(),
-		OperationTimeout: timeoutParam(timeout),
-		CancelAfter:      timeoutParam(cancelAfter),
-	}
+	return b.Build()
 }
