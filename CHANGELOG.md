@@ -1,3 +1,5 @@
+* Removed delay before send commit in sync mode of a topic reader
+
 ## v3.105.2
 * Improved the `ydb.WithSessionPoolSessionUsageLimit` option for allow `time.Duration` as argument type for limit max session time to live since create time 
 
