@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
+//nolint:gocyclo
 func TestSoftWeightedSemaphore(t *testing.T) {
 	t.Run("NormalAcquireWithinCapacity", func(t *testing.T) {
 		sem := NewSoftWeightedSemaphore(5)
