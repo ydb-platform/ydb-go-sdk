@@ -80,7 +80,6 @@ type topicStreamReaderConfig struct {
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
 	CommitMode                      topicreadercommon.PublicCommitMode
 	Decoders                        topicreadercommon.DecoderMap
-	DisableSplitMergeSupport        bool
 }
 
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
@@ -612,8 +611,7 @@ func (r *topicStreamReaderImpl) setStarted() error {
 }
 
 func (r *topicStreamReaderImpl) initSession() (err error) {
-	supportAutoPartition := !r.cfg.DisableSplitMergeSupport
-	initMessage := topicreadercommon.CreateInitMessage(r.cfg.Consumer, supportAutoPartition, r.cfg.ReadSelectors)
+	initMessage := topicreadercommon.CreateInitMessage(r.cfg.Consumer, r.cfg.ReadSelectors)
 
 	onDone := trace.TopicOnReaderInit(r.cfg.Trace, r.readConnectionID, initMessage)
 	defer func() {

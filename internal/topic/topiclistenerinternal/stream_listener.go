@@ -174,7 +174,7 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 	}
 	l.stream = topicreadercommon.NewSyncedStream(stream)
 
-	initMessage := topicreadercommon.CreateInitMessage(l.cfg.Consumer, false, l.cfg.Selectors)
+	initMessage := topicreadercommon.CreateInitMessage(l.cfg.Consumer, l.cfg.Selectors)
 	err = stream.Send(initMessage)
 	if err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: failed to send init request for read stream in the listener: %w", err))

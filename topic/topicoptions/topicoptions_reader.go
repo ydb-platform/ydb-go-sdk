@@ -281,11 +281,3 @@ func WithReaderWithoutConsumer(saveStateOnReconnection bool) ReaderOption {
 		cfg.CommitMode = CommitModeNone
 	}
 }
-
-// WithReaderDisableSplitMergePartitionsSupport turn off support split-merge reorder messages
-// on client side.
-func WithReaderDisableSplitMergePartitionsSupport(disableSupport bool) ReaderOption {
-	return func(cfg *topicreaderinternal.ReaderConfig) {
-		cfg.DisableSplitMergeSupport = disableSupport
-	}
-}
