@@ -69,7 +69,7 @@ jobs:
           YDB_USE_IN_MEMORY_PDISKS: true
           YDB_TABLE_ENABLE_PREPARED_DDL: true
           YDB_ENABLE_COLUMN_TABLES: true
-        options: '-h localhost'
+        options: '-h localhost --name ydb'
     env:
       OS: ubuntu-latest
       GO: ${{ matrix.go-version }}
@@ -87,6 +87,8 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
+      - name: show YDB version
+        run: docker exec ydb /ydbd -V
       - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile integration.txt -covermode atomic ./tests/integration
       - name: Upload integration-tests coverage report to Codecov
