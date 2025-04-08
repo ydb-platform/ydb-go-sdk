@@ -11,6 +11,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 )
 
+var (
+	fourPM = time.Date(2024, 0o1, 0o1, 16, 0, 0, 0, time.UTC)
+	hour   = time.Hour
+)
+
 func TestTopicDescriptionFromRaw(t *testing.T) {
 	testData := []struct {
 		testName            string
@@ -64,6 +69,20 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 						ParentPartitionIDs: []int64{
 							1, 2, 3,
 						},
+						PartitionStats: PartitionStats{
+							PartitionsOffset: OffsetRange{
+								Start: 10,
+								End:   20,
+							},
+							StoreSizeBytes:  1024,
+							LastWriteTime:   &fourPM,
+							MaxWriteTimeLag: &hour,
+							BytesWritten: MultipleWindowsStat{
+								PerMinute: 1,
+								PerHour:   60,
+								PerDay:    1440,
+							},
+						},
 					},
 					{
 						PartitionID: 43,
@@ -103,6 +122,26 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 						},
 						ParentPartitionIDs: []int64{
 							1, 2, 3,
+						},
+						PartitionStats: rawtopic.PartitionStats{
+							PartitionsOffset: rawtopiccommon.OffsetRange{
+								Start: 10,
+								End:   20,
+							},
+							StoreSizeBytes: 1024,
+							LastWriteTime: rawoptional.Time{
+								Value:    fourPM,
+								HasValue: true,
+							},
+							MaxWriteTimeLag: rawoptional.Duration{
+								Value:    hour,
+								HasValue: true,
+							},
+							BytesWritten: rawtopic.MultipleWindowsStat{
+								PerMinute: 1,
+								PerHour:   60,
+								PerDay:    1440,
+							},
 						},
 					},
 					{
@@ -165,8 +204,6 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 }
 
 func TestTopicConsumerDescriptionFromRaw(t *testing.T) {
-	fourPM := time.Date(2024, 0o1, 0o1, 16, 0, 0, 0, time.UTC)
-	hour := time.Hour
 	testData := []struct {
 		testName               string
 		expectedDescription    TopicConsumerDescription

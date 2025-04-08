@@ -169,6 +169,7 @@ type PartitionInfo struct {
 	Active             bool
 	ChildPartitionIDs  []int64
 	ParentPartitionIDs []int64
+	PartitionStats     PartitionStats
 }
 
 // FromRaw convert from internal format to public. Used internally only.
@@ -178,6 +179,7 @@ func (p *PartitionInfo) FromRaw(raw *rawtopic.PartitionInfo) {
 
 	p.ChildPartitionIDs = clone.Int64Slice(raw.ChildPartitionIDs)
 	p.ParentPartitionIDs = clone.Int64Slice(raw.ParentPartitionIDs)
+	p.PartitionStats.FromRaw(&raw.PartitionStats)
 }
 
 type MultipleWindowsStat struct {

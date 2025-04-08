@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -136,6 +137,95 @@ func TestTopicDescribe(t *testing.T) {
 		requireAndCleanSubset(&topicDesc.Consumers[i].Attributes, &expected.Consumers[i].Attributes)
 	}
 
+	require.Equal(t, expected, topicDesc)
+}
+
+func TestTopicDescribePartitionStats(t *testing.T) {
+	ctx := xtest.Context(t)
+	db := connect(t)
+	topicName := "test-topic-" + t.Name()
+
+	var (
+		supportedCodecs     = []topictypes.Codec{topictypes.CodecRaw}
+		minActivePartitions = int64(1)
+	)
+
+	_ = db.Topic().Drop(ctx, topicName)
+	err := db.Topic().Create(ctx, topicName,
+		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
+		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
+	)
+	require.NoError(t, err)
+
+	writer, err := db.Topic().StartWriter(topicName, topicoptions.WithWriterWaitServerAck(true))
+	require.NoError(t, err)
+	topicMessage := topicwriter.Message{
+		Data: bytes.NewReader([]byte{128}),
+	}
+	err = writer.Write(ctx, topicMessage)
+	require.NoError(t, err)
+
+	topicDesc, err := db.Topic().Describe(ctx, topicName, topicoptions.IncludePartitionStats())
+	require.NoError(t, err)
+
+	expected := topictypes.TopicDescription{
+		Path: topicName,
+		PartitionSettings: topictypes.PartitionSettings{
+			MinActivePartitions: minActivePartitions,
+		},
+		Partitions: []topictypes.PartitionInfo{
+			{
+				PartitionID: 0,
+				Active:      true,
+				PartitionStats: topictypes.PartitionStats{
+					PartitionsOffset: topictypes.OffsetRange{
+						Start: 0,
+						End:   1,
+					},
+					BytesWritten: topictypes.MultipleWindowsStat{
+						PerMinute: 1,
+						PerHour:   1,
+						PerDay:    1,
+					},
+				},
+			},
+		},
+		RetentionPeriod:                   86400000000000,
+		RetentionStorageMB:                0,
+		SupportedCodecs:                   supportedCodecs,
+		PartitionWriteBurstBytes:          1048576,
+		PartitionWriteSpeedBytesPerSecond: 1048576,
+		Attributes:                        nil,
+		Consumers:                         []topictypes.Consumer{},
+		MeteringMode:                      topictypes.MeteringModeUnspecified,
+	}
+
+	requireAndCleanSubset := func(checked *map[string]string, subset *map[string]string) {
+		t.Helper()
+		for k, subValue := range *subset {
+			checkedValue, ok := (*checked)[k]
+			require.True(t, ok, k)
+			require.Equal(t, subValue, checkedValue)
+		}
+		*checked = nil
+		*subset = nil
+	}
+
+	topicDesc.Partitions[0].PartitionStats.LastWriteTime = nil
+	bw := &topicDesc.Partitions[0].PartitionStats.BytesWritten
+	sign := func(x int64) int64 {
+		if x > 0 {
+			return 1
+		}
+		return 0
+	}
+	topicDesc.Partitions[0].PartitionStats.BytesWritten = topictypes.MultipleWindowsStat{
+		PerMinute: sign(bw.PerMinute),
+		PerHour:   sign(bw.PerHour),
+		PerDay:    sign(bw.PerDay),
+	}
+
+	requireAndCleanSubset(&topicDesc.Attributes, &expected.Attributes)
 	require.Equal(t, expected, topicDesc)
 }
 

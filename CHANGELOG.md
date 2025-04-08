@@ -1,3 +1,5 @@
+* Added `topicoptions.IncludePartitionStats()` for `Topic().Describe()` in order to get partition stats from server
+
 ## v3.106.1
 * Dropped `internal/allocator` package and all usages of it for further switch (test) protobuf opaque API
 
