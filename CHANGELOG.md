@@ -1,3 +1,4 @@
+* Allowed overflow queue limit for one goroutine at time for topic writer
 * Removed delay before send commit in sync mode of a topic reader
 
 ## v3.105.2
