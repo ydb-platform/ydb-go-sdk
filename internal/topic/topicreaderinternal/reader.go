@@ -150,9 +150,7 @@ func (r *Reader) ReadMessage(ctx context.Context) (*topicreadercommon.PublicMess
 func (r *Reader) ReadMessageBatch(
 	ctx context.Context,
 	opts ...PublicReadBatchOption,
-) (
-	batch *topicreadercommon.PublicBatch,
-	err error) {
+) (batch *topicreadercommon.PublicBatch, err error) {
 	batchOptions := r.getBatchOptions(opts)
 
 	for {

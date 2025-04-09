@@ -92,7 +92,6 @@ func (tx *transaction) ExecuteStatement(
 	stmt table.Statement, parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-
 	val, ok := stmt.(*statement)
 	if !ok {
 		panic(fmt.Sprintf("unsupported type conversion from %T to *statement", val))

@@ -135,7 +135,6 @@ func TestControl(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-
 			require.Equal(t,
 				fmt.Sprintf("%+v", tt.tableTxControl),
 				fmt.Sprintf("%+v", tt.ctrl.ToYdbTableTransactionControl()),

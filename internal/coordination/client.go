@@ -236,10 +236,7 @@ func dropNode(
 func (c *Client) DescribeNode(
 	ctx context.Context,
 	path string,
-) (
-	entry *scheme.Entry,
-	config *coordination.NodeConfig,
-	finalErr error) {
+) (entry *scheme.Entry, config *coordination.NodeConfig, finalErr error) {
 	if c == nil {
 		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}
@@ -293,10 +290,7 @@ func describeNode(
 	ctx context.Context,
 	client Ydb_Coordination_V1.CoordinationServiceClient,
 	request *Ydb_Coordination.DescribeNodeRequest,
-) (
-	_ *scheme.Entry,
-	_ *coordination.NodeConfig,
-	err error) {
+) (_ *scheme.Entry, _ *coordination.NodeConfig, err error) {
 	var (
 		response *Ydb_Coordination.DescribeNodeResponse
 		result   Ydb_Coordination.DescribeNodeResult

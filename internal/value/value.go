@@ -36,6 +36,7 @@ func ToYDB(v Value) *Ydb.TypedValue {
 	if v == nil {
 		return nil
 	}
+
 	return &Ydb.TypedValue{
 		Type:  v.Type().ToYDB(),
 		Value: v.toYDB(),
@@ -644,6 +645,7 @@ func (v *decimalValue) toYDB() *Ydb.Value {
 	if v != nil {
 		bytes = v.value
 	}
+
 	return &Ydb.Value{
 		High_128: binary.BigEndian.Uint64(bytes[0:8]),
 		Value: &Ydb.Value_Low_128{
@@ -744,6 +746,7 @@ func (v *dictValue) toYDB() *Ydb.Value {
 			Payload: values[i].V.toYDB(),
 		})
 	}
+
 	return &Ydb.Value{
 		Pairs: pairs,
 	}
@@ -810,6 +813,7 @@ func (v *doubleValue) toYDB() *Ydb.Value {
 	if v != nil {
 		value = v.value
 	}
+
 	return &Ydb.Value{
 		Value: &Ydb.Value_DoubleValue{
 			DoubleValue: value,
@@ -908,6 +912,7 @@ func (v *floatValue) toYDB() *Ydb.Value {
 	if v != nil {
 		value = v.value
 	}
+
 	return &Ydb.Value{
 		Value: &Ydb.Value_FloatValue{
 			FloatValue: value,
@@ -1750,6 +1755,7 @@ func (v *optionalValue) toYDB() *Ydb.Value {
 	if v.value != nil {
 		return v.value.toYDB()
 	}
+
 	return &Ydb.Value{
 		Value: &Ydb.Value_NullFlagValue{},
 	}
@@ -1884,6 +1890,7 @@ func (v timestampValue) castTo(dst any) error {
 
 		return nil
 	default:
+
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
 			ErrCannotCast, v.Type().Yql(), v, vv,
@@ -2597,6 +2604,7 @@ func (v *uuidValue) toYDBWithBug() *Ydb.Value {
 	if v != nil {
 		bytes = v.value
 	}
+
 	return &Ydb.Value{
 		High_128: binary.BigEndian.Uint64(bytes[0:8]),
 		Value: &Ydb.Value_Low_128{

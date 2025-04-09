@@ -38,7 +38,9 @@ func Params(
 	b.OperationMode = mode.toYDB()
 
 	// If no fields are set, return nil
-	if b.OperationTimeout == nil && b.CancelAfter == nil && b.OperationMode == Ydb_Operations.OperationParams_OPERATION_MODE_UNSPECIFIED {
+	if b.GetOperationTimeout() == nil &&
+		b.GetCancelAfter() == nil &&
+		b.GetOperationMode() == Ydb_Operations.OperationParams_OPERATION_MODE_UNSPECIFIED {
 		return nil
 	}
 

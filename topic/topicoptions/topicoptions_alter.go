@@ -114,12 +114,9 @@ func AlterConsumerWithAttributes(name string, attributes map[string]string) Alte
 	}
 }
 
-func ensureAlterConsumer(
-	consumers []rawtopic.AlterConsumer,
-	name string,
-) (
-	newConsumers []rawtopic.AlterConsumer,
-	index int) {
+func ensureAlterConsumer(consumers []rawtopic.AlterConsumer, name string) (
+	newConsumers []rawtopic.AlterConsumer, index int,
+) {
 	for i := range consumers {
 		if consumers[i].Name == name {
 			return consumers, i

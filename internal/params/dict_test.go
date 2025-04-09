@@ -428,7 +428,6 @@ func TestDict(t *testing.T) {
 	for _, key := range tests {
 		for _, val := range tests {
 			t.Run(fmt.Sprintf("%s:%s", key.method, val.method), func(t *testing.T) {
-
 				item := Builder{}.Param("$x").BeginDict().Add()
 
 				addedKey, ok := xtest.CallMethod(item, key.method, key.args...)[0].(*dictValue)
@@ -465,7 +464,6 @@ func TestDict(t *testing.T) {
 }
 
 func TestDict_AddPairs(t *testing.T) {
-
 	pairs := []value.DictValueField{
 		{
 			K: value.Int64Value(123),

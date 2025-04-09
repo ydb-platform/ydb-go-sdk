@@ -115,7 +115,8 @@ func mode2mode(mode scripting.ExplainMode) Ydb_Scripting.ExplainYqlRequest_Mode 
 }
 
 func (c *Client) Explain(ctx context.Context, sql string, mode scripting.ExplainMode) (
-	e table.ScriptingYQLExplanation, err error) {
+	e table.ScriptingYQLExplanation, err error,
+) {
 	if c == nil {
 		return e, xerrors.WithStackTrace(errNilClient)
 	}
@@ -140,7 +141,8 @@ func (c *Client) Explain(ctx context.Context, sql string, mode scripting.Explain
 }
 
 func (c *Client) explain(ctx context.Context, sql string, mode scripting.ExplainMode) (
-	e table.ScriptingYQLExplanation, err error) {
+	e table.ScriptingYQLExplanation, err error,
+) {
 	var (
 		onDone = trace.ScriptingOnExplain(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).explain"),
@@ -185,7 +187,8 @@ func (c *Client) explain(ctx context.Context, sql string, mode scripting.Explain
 }
 
 func (c *Client) StreamExecute(ctx context.Context, sql string, params *params.Params) (
-	r result.StreamResult, err error) {
+	r result.StreamResult, err error,
+) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
@@ -210,7 +213,8 @@ func (c *Client) StreamExecute(ctx context.Context, sql string, params *params.P
 
 //nolint:funlen
 func (c *Client) streamExecute(ctx context.Context, sql string, parameters *params.Params) (
-	r result.StreamResult, err error) {
+	r result.StreamResult, err error,
+) {
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).streamExecute"),

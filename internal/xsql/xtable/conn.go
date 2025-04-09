@@ -73,7 +73,8 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (res
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
-	result driver.RowsNextResultSet, finalErr error) {
+	result driver.RowsNextResultSet, finalErr error,
+) {
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
@@ -167,7 +168,8 @@ func (c *Conn) executeSchemeQuery(ctx context.Context, sql string) (driver.Resul
 }
 
 func (c *Conn) executeScriptingQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.Result, error) {
+	driver.Result, error,
+) {
 	res, err := c.scriptingClient.StreamExecute(ctx, sql, params)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -185,7 +187,8 @@ func (c *Conn) executeScriptingQuery(ctx context.Context, sql string, params *pa
 }
 
 func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error) {
+	driver.RowsNextResultSet, error,
+) {
 	_, res, err := c.session.Execute(ctx,
 		tx.ControlFromContext(ctx, c.defaultTxControl),
 		sql, params, c.dataOpts...,
@@ -204,7 +207,8 @@ func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Par
 }
 
 func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error) {
+	driver.RowsNextResultSet, error,
+) {
 	res, err := c.session.StreamExecuteScanQuery(ctx,
 		sql, params, c.scanOpts...,
 	)
@@ -222,7 +226,8 @@ func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Par
 }
 
 func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error) {
+	driver.RowsNextResultSet, error,
+) {
 	res, err := c.scriptingClient.StreamExecute(ctx, sql, params)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))

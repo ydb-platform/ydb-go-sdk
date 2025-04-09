@@ -454,7 +454,6 @@ func TestVariantTuple(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.method, func(t *testing.T) {
-
 			item := Builder{}.Param("$x").BeginVariant().BeginTuple().Types()
 
 			types, ok := xtest.CallMethod(item, tc.method, tc.typeArgs...)[0].(*variantTupleTypes)
@@ -493,7 +492,6 @@ func TestVariantTuple(t *testing.T) {
 }
 
 func TestVariantTuple_AddTypes(t *testing.T) {
-
 	params := Builder{}.Param("$x").BeginVariant().BeginTuple().
 		Types().AddTypes(types.Int64, types.Bool).
 		Index(1).

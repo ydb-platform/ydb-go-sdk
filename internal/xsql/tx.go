@@ -79,7 +79,8 @@ func (tx *Tx) Rollback() (finalErr error) {
 }
 
 func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
-	_ driver.Rows, finalErr error) {
+	_ driver.Rows, finalErr error,
+) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Tx).QueryContext", stack.Package("database/sql")),
 		tx.ctx, tx, sql,
@@ -111,7 +112,8 @@ func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedV
 }
 
 func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
-	_ driver.Result, finalErr error) {
+	_ driver.Result, finalErr error,
+) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Tx).ExecContext", stack.Package("database/sql")),
 		tx.ctx, tx, sql,

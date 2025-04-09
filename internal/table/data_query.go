@@ -37,6 +37,7 @@ func (q textQuery) toYDB() *Ydb_Table.Query {
 			YqlText: string(q),
 		},
 	}
+
 	return query
 }
 
@@ -58,6 +59,7 @@ func (q preparedQuery) toYDB() *Ydb_Table.Query {
 			YqlText: q.sql,
 		},
 	}
+
 	return query
 }
 

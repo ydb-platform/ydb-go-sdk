@@ -176,8 +176,7 @@ func newResult(
 	}
 }
 
-func (r *streamResult) nextPart(ctx context.Context) (
-	part *Ydb_Query.ExecuteQueryResponsePart, err error) {
+func (r *streamResult) nextPart(ctx context.Context) (part *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart"),
@@ -213,7 +212,8 @@ func (r *streamResult) nextPart(ctx context.Context) (
 }
 
 func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
-	part *Ydb_Query.ExecuteQueryResponsePart, err error) {
+	part *Ydb_Query.ExecuteQueryResponsePart, err error,
+) {
 	part, err = stream.Recv()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

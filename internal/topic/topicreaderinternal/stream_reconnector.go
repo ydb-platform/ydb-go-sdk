@@ -82,9 +82,7 @@ func (r *readerReconnector) PopMessagesBatchTx(
 	ctx context.Context,
 	tx tx.Transaction,
 	opts ReadMessageBatchOptions,
-) (
-	*topicreadercommon.PublicBatch,
-	error) {
+) (*topicreadercommon.PublicBatch, error) {
 	return r.readWithReconnections(
 		ctx,
 		func(
@@ -102,9 +100,7 @@ func (r *readerReconnector) PopMessagesBatchTx(
 func (r *readerReconnector) ReadMessageBatch(
 	ctx context.Context,
 	opts ReadMessageBatchOptions,
-) (
-	*topicreadercommon.PublicBatch,
-	error) {
+) (*topicreadercommon.PublicBatch, error) {
 	return r.readWithReconnections(
 		ctx,
 		func(
@@ -125,9 +121,7 @@ func (r *readerReconnector) readWithReconnections(
 		ctx context.Context,
 		stream batchedStreamReader,
 	) (*topicreadercommon.PublicBatch, error),
-) (
-	*topicreadercommon.PublicBatch,
-	error) {
+) (*topicreadercommon.PublicBatch, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -368,8 +362,8 @@ func (r *readerReconnector) isRetriableError(err error) bool {
 }
 
 func (r *readerReconnector) checkErrRetryMode(err error, retriesDuration time.Duration) (
-	backoffType backoff.Backoff,
-	stopRetryReason error) {
+	backoffType backoff.Backoff, stopRetryReason error,
+) {
 	return topic.RetryDecision(err, r.retrySettings, retriesDuration)
 }
 

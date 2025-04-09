@@ -627,7 +627,8 @@ type (
 type partitioningBySizePartitioningSettingsOption FeatureFlag
 
 func (flag partitioningBySizePartitioningSettingsOption) ApplyPartitioningSettingsOption(
-	settings *ydbPartitioningSettings) {
+	settings *ydbPartitioningSettings,
+) {
 	settings.PartitioningBySize = FeatureFlag(flag).ToYDB()
 }
 
@@ -638,7 +639,8 @@ func WithPartitioningBySize(flag FeatureFlag) PartitioningSettingsOption {
 type partitionSizeMbPartitioningSettingsOption uint64
 
 func (partitionSizeMb partitionSizeMbPartitioningSettingsOption) ApplyPartitioningSettingsOption(
-	settings *ydbPartitioningSettings) {
+	settings *ydbPartitioningSettings,
+) {
 	settings.PartitionSizeMb = uint64(partitionSizeMb)
 }
 
@@ -649,7 +651,8 @@ func WithPartitionSizeMb(partitionSizeMb uint64) PartitioningSettingsOption {
 type partitioningByLoadPartitioningSettingsOption FeatureFlag
 
 func (flag partitioningByLoadPartitioningSettingsOption) ApplyPartitioningSettingsOption(
-	settings *ydbPartitioningSettings) {
+	settings *ydbPartitioningSettings,
+) {
 	settings.PartitioningByLoad = FeatureFlag(flag).ToYDB()
 }
 
@@ -660,7 +663,8 @@ func WithPartitioningByLoad(flag FeatureFlag) PartitioningSettingsOption {
 type partitioningByPartitioningSettingsOption []string
 
 func (columns partitioningByPartitioningSettingsOption) ApplyPartitioningSettingsOption(
-	settings *ydbPartitioningSettings) {
+	settings *ydbPartitioningSettings,
+) {
 	settings.PartitionBy = columns
 }
 
@@ -671,7 +675,8 @@ func WithPartitioningBy(columns []string) PartitioningSettingsOption {
 type minPartitionsCountPartitioningSettingsOption uint64
 
 func (minPartitionsCount minPartitionsCountPartitioningSettingsOption) ApplyPartitioningSettingsOption(
-	settings *ydbPartitioningSettings) {
+	settings *ydbPartitioningSettings,
+) {
 	settings.MinPartitionsCount = uint64(minPartitionsCount)
 }
 
@@ -682,7 +687,8 @@ func WithMinPartitionsCount(minPartitionsCount uint64) PartitioningSettingsOptio
 type maxPartitionsCountPartitioningSettingsOption uint64
 
 func (maxPartitionsCount maxPartitionsCountPartitioningSettingsOption) ApplyPartitioningSettingsOption(
-	settings *ydbPartitioningSettings) {
+	settings *ydbPartitioningSettings,
+) {
 	settings.MaxPartitionsCount = uint64(maxPartitionsCount)
 }
 

@@ -88,9 +88,7 @@ func (r *Reader) PopMessagesBatchTx(
 	ctx context.Context,
 	transaction tx.Identifier,
 	opts ...ReadBatchOption,
-) (
-	resBatch *Batch,
-	resErr error) {
+) (resBatch *Batch, resErr error) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err
 	}

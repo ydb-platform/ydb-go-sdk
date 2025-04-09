@@ -29,8 +29,7 @@ func (s *statement) Execute(
 	ctx context.Context, txControl *table.TransactionControl,
 	parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
-) (
-	txr table.Transaction, r result.Result, err error) {
+) (txr table.Transaction, r result.Result, err error) {
 	var (
 		request = options.ExecuteDataQueryDesc{
 			ExecuteDataQueryRequest: &Ydb_Table.ExecuteDataQueryRequest{
@@ -38,6 +37,7 @@ func (s *statement) Execute(
 				TxControl: txControl.ToYdbTableTransactionControl(),
 				Parameters: func() map[string]*Ydb.TypedValue {
 					p, _ := parameters.ToYDB()
+
 					return p
 				}(),
 				Query: s.query.toYDB(),
@@ -82,8 +82,7 @@ func (s *statement) execute(
 	txControl *tx.Control,
 	request *options.ExecuteDataQueryDesc,
 	callOptions ...grpc.CallOption,
-) (
-	txr table.Transaction, r result.Result, err error) {
+) (txr table.Transaction, r result.Result, err error) {
 	t, r, err := s.session.dataQuery.execute(ctx, txControl, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)

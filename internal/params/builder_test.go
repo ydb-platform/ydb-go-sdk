@@ -453,7 +453,6 @@ func TestBuilder(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.method, func(t *testing.T) {
-
 			item := Builder{}.Param("$x")
 
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(Builder)

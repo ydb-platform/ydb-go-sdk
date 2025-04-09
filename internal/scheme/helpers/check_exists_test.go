@@ -21,7 +21,8 @@ func (c isDirectoryExistsSchemeClient) Database() string {
 }
 
 func (c isDirectoryExistsSchemeClient) ListDirectory(ctx context.Context, path string) (
-	d scheme.Directory, err error) {
+	d scheme.Directory, err error,
+) {
 	if c.existingPath == path {
 		return scheme.Directory{
 			Entry: scheme.Entry{
@@ -134,7 +135,8 @@ func (c isTableExistsSchemeClient) Database() string {
 }
 
 func (c isTableExistsSchemeClient) ListDirectory(ctx context.Context, path string) (
-	d scheme.Directory, err error) {
+	d scheme.Directory, err error,
+) {
 	if strings.HasPrefix(c.tablePath, path) {
 		children := strings.Split(strings.TrimLeft(c.tablePath, path), "/")
 		switch {

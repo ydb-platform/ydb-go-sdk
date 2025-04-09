@@ -455,7 +455,6 @@ func TestVariantStruct(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.method, func(t *testing.T) {
-
 			item := Builder{}.Param("$x").BeginVariant().BeginStruct().Field("key")
 
 			vs, ok := xtest.CallMethod(item, tc.method, tc.typeArgs...)[0].(*variantStruct)
@@ -498,7 +497,6 @@ func TestVariantStruct(t *testing.T) {
 }
 
 func TestVariantStruct_AddFields(t *testing.T) {
-
 	params := Builder{}.Param("$x").BeginVariant().BeginStruct().
 		AddFields([]types.StructField{
 			{

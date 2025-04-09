@@ -408,7 +408,8 @@ func (s *session) receiveLoop( //nolint:funlen
 	sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient,
 	cancelStream context.CancelFunc,
 	sessionStarted chan *Ydb_Coordination.SessionResponse_SessionStarted,
-	sessionStopped chan *Ydb_Coordination.SessionResponse_SessionStopped) {
+	sessionStopped chan *Ydb_Coordination.SessionResponse_SessionStopped,
+) {
 	// If the sendLoop is done, make sure the stream is also canceled to make the receiveLoop finish its work and cause
 	// reconnect.
 	defer wg.Done()
@@ -482,11 +483,9 @@ func (s *session) receiveLoop( //nolint:funlen
 
 //nolint:revive
 func (s *session) sendLoop(
-	wg *sync.WaitGroup,
-	sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient,
-	streamCtx context.Context,
-	cancelStream context.CancelFunc,
-	startSending chan struct{}) {
+	wg *sync.WaitGroup, sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient,
+	streamCtx context.Context, cancelStream context.CancelFunc, startSending chan struct{},
+) {
 	// If the sendLoop is done, make sure the stream is also canceled to make the receiveLoop finish its work and cause
 	// reconnect.
 	defer wg.Done()

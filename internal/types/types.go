@@ -193,15 +193,14 @@ func (v *Decimal) equalsTo(rhs Type) bool {
 }
 
 func (v *Decimal) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	decimal := &Ydb.DecimalType{
-		Scale:     v.scale,
-		Precision: v.precision,
+	return &Ydb.Type{
+		Type: &Ydb.Type_DecimalType{
+			DecimalType: &Ydb.DecimalType{
+				Precision: v.precision,
+				Scale:     v.scale,
+			},
+		},
 	}
-	t.Type = &Ydb.Type_DecimalType{
-		DecimalType: decimal,
-	}
-	return t
 }
 
 func NewDecimal(precision, scale uint32) *Decimal {
@@ -264,6 +263,7 @@ func (v *Dict) ToYDB() *Ydb.Type {
 		},
 	}
 	t.Type = typeDict
+
 	return t
 }
 
@@ -293,6 +293,7 @@ func (EmptyList) equalsTo(rhs Type) bool {
 func (v EmptyList) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	t.Type = &Ydb.Type_EmptyListType{}
+
 	return t
 }
 
@@ -319,6 +320,7 @@ func (EmptyDict) equalsTo(rhs Type) bool {
 func (v EmptyDict) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	t.Type = &Ydb.Type_EmptyDictType{}
+
 	return t
 }
 
@@ -363,6 +365,7 @@ func (v *List) ToYDB() *Ydb.Type {
 	t.Type = &Ydb.Type_ListType{
 		ListType: list,
 	}
+
 	return t
 }
 
@@ -406,6 +409,7 @@ func (v *Set) ToYDB() *Ydb.Type {
 	t.Type = &Ydb.Type_DictType{
 		DictType: dict,
 	}
+
 	return t
 }
 
@@ -450,6 +454,7 @@ func (v Optional) ToYDB() *Ydb.Type {
 	t.Type = &Ydb.Type_OptionalType{
 		OptionalType: optional,
 	}
+
 	return t
 }
 
@@ -683,6 +688,7 @@ func (v *Struct) ToYDB() *Ydb.Type {
 	t.Type = &Ydb.Type_StructType{
 		StructType: structType,
 	}
+
 	return t
 }
 
@@ -765,6 +771,7 @@ func (v *Tuple) ToYDB() *Ydb.Type {
 	t.Type = &Ydb.Type_TupleType{
 		TupleType: tupleType,
 	}
+
 	return t
 }
 
@@ -816,6 +823,7 @@ func (v *VariantStruct) ToYDB() *Ydb.Type {
 	t.Type = &Ydb.Type_VariantType{
 		VariantType: variantType,
 	}
+
 	return t
 }
 
@@ -865,6 +873,7 @@ func (v *VariantTuple) ToYDB() *Ydb.Type {
 	t.Type = &Ydb.Type_VariantType{
 		VariantType: variantType,
 	}
+
 	return t
 }
 

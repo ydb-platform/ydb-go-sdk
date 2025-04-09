@@ -16,7 +16,8 @@ type schemeClient interface {
 }
 
 func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
-	exists bool, _ error) {
+	exists bool, _ error,
+) {
 	if !strings.HasPrefix(directory, c.Database()) {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"path '%s' must be inside database '%s'",
@@ -57,7 +58,8 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 }
 
 func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTypes ...scheme.EntryType) (
-	exists bool, _ error) {
+	exists bool, _ error,
+) {
 	if !strings.HasPrefix(absPath, c.Database()) {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"entry path '%s' must be inside database '%s'",

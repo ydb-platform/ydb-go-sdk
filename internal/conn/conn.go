@@ -354,10 +354,7 @@ func invoke(
 	address string,
 	nodeID uint32,
 	opts ...grpc.CallOption,
-) (
-	opID string,
-	issues []trace.Issue,
-	_ error) {
+) (opID string, issues []trace.Issue, _ error) {
 	useWrapping := UseWrapping(ctx)
 
 	ctx, traceID, err := meta.TraceID(ctx)

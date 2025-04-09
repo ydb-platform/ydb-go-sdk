@@ -160,8 +160,8 @@ func executeScript(ctx context.Context,
 func (c *Client) ExecuteScript(
 	ctx context.Context, q string, ttl time.Duration, opts ...options.Execute,
 ) (
-	op *options.ExecuteScriptOperation, err error) {
-
+	op *options.ExecuteScriptOperation, err error,
+) {
 	settings := &executeScriptSettings{
 		executeSettings: options.ExecuteSettings(opts...),
 		ttl:             ttl,
@@ -384,7 +384,8 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 }
 
 func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (
-	r query.Result, err error) {
+	r query.Result, err error,
+) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))

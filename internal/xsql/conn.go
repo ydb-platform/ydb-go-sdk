@@ -141,7 +141,8 @@ func (c *Conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, f
 }
 
 func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
-	_ driver.Rows, finalErr error) {
+	_ driver.Rows, finalErr error,
+) {
 	onDone := trace.DatabaseSQLOnConnQuery(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).QueryContext", stack.Package("database/sql")),
 		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), c.connector.clock.Since(c.lastUsage.Get()),
@@ -175,7 +176,8 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 }
 
 func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
-	_ driver.Result, finalErr error) {
+	_ driver.Result, finalErr error,
+) {
 	onDone := trace.DatabaseSQLOnConnExec(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).ExecContext", stack.Package("database/sql")),
 		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), c.connector.clock.Since(c.lastUsage.Get()),

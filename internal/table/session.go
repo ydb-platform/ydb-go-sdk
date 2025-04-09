@@ -258,7 +258,8 @@ func (s *Session) SetStatus(status table.SessionStatus) {
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (
-	s *Session, finalErr error) {
+	s *Session, finalErr error,
+) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.newSession"),
 	)
@@ -511,18 +512,16 @@ func (s *Session) CreateTable(
 	path string,
 	opts ...options.CreateTableOption,
 ) (err error) {
-	var (
-		request = Ydb_Table.CreateTableRequest{
-			SessionId: s.id,
-			Path:      path,
-			OperationParams: operation.Params(
-				ctx,
-				s.config.OperationTimeout(),
-				s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		}
-	)
+	request := Ydb_Table.CreateTableRequest{
+		SessionId: s.id,
+		Path:      path,
+		OperationParams: operation.Params(
+			ctx,
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request))
@@ -765,18 +764,16 @@ func (s *Session) AlterTable(
 	path string,
 	opts ...options.AlterTableOption,
 ) (err error) {
-	var (
-		request = Ydb_Table.AlterTableRequest{
-			SessionId: s.id,
-			Path:      path,
-			OperationParams: operation.Params(
-				ctx,
-				s.config.OperationTimeout(),
-				s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		}
-	)
+	request := Ydb_Table.AlterTableRequest{
+		SessionId: s.id,
+		Path:      path,
+		OperationParams: operation.Params(
+			ctx,
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request))
@@ -1018,8 +1015,7 @@ func (s *Session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 // Execute executes given data query represented by text.
 func (s *Session) Execute(ctx context.Context, txControl *table.TransactionControl, sql string, params *params.Params,
 	opts ...options.ExecuteDataQueryOption,
-) (
-	txr table.Transaction, r result.Result, err error) {
+) (txr table.Transaction, r result.Result, err error) {
 	var (
 		q       = queryFromText(sql)
 		request = options.ExecuteDataQueryDesc{
@@ -1028,6 +1024,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 				TxControl: txControl.ToYdbTableTransactionControl(),
 				Parameters: func() map[string]*Ydb.TypedValue {
 					p, _ := params.ToYDB()
+
 					return p
 				}(),
 				Query: q.toYDB(),
@@ -1080,8 +1077,7 @@ func executeQueryResult(
 	res *Ydb_Table.ExecuteQueryResult,
 	txControl *Ydb_Table.TransactionControl,
 	ignoreTruncated bool,
-) (
-	*transaction, result.Result, error) {
+) (*transaction, result.Result, error) {
 	tx := &transaction{
 		Identifier: tx.ID(res.GetTxMeta().GetId()),
 	}
@@ -1104,9 +1100,7 @@ func executeDataQuery(
 	ctx context.Context, client Ydb_Table_V1.TableServiceClient,
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
-) (
-	_ *Ydb_Table.ExecuteQueryResult,
-	err error) {
+) (_ *Ydb_Table.ExecuteQueryResult, err error) {
 	var (
 		result   = &Ydb_Table.ExecuteQueryResult{}
 		response *Ydb_Table.ExecuteDataQueryResponse
@@ -1153,8 +1147,8 @@ func (s *Session) ExecuteSchemeQuery(ctx context.Context, sql string,
 //
 //nolint:funlen
 func (s *Session) DescribeTableOptions(ctx context.Context) (
-	desc options.TableOptionsDescription,
-	err error) {
+	desc options.TableOptionsDescription, err error,
+) {
 	var (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult

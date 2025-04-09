@@ -44,7 +44,8 @@ type executeScriptConfig interface {
 func executeQueryScriptRequest(q string, cfg executeScriptConfig) (
 	*Ydb_Query.ExecuteScriptRequest,
 	[]grpc.CallOption,
-	error) {
+	error,
+) {
 	params, err := cfg.Params().ToYDB()
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
@@ -72,7 +73,8 @@ func executeQueryScriptRequest(q string, cfg executeScriptConfig) (
 func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
-	error) {
+	error,
+) {
 	params, err := cfg.Params().ToYDB()
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
@@ -103,23 +105,14 @@ func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryConten
 		Syntax: syntax,
 		Text:   q,
 	}
-	return content
-}
 
-func queryFromText(q string, syntax Ydb_Query.Syntax,
-) *Ydb_Query.ExecuteQueryRequest_QueryContent {
-	content := &Ydb_Query.ExecuteQueryRequest_QueryContent{
-		QueryContent: queryQueryContent(syntax, q),
-	}
 	return content
 }
 
 func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
 	q string, settings executeSettings, opts ...resultOption,
-) (
-	_ *streamResult, finalErr error) {
-
+) (_ *streamResult, finalErr error) {
 	request, callOptions, err := executeQueryRequest(sessionID, q, settings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -179,7 +172,8 @@ func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose,
 }
 
 func readMaterializedResultSet(ctx context.Context, r *streamResult) (
-	_ *materializedResultSet, rowsCount int, finalErr error) {
+	_ *materializedResultSet, rowsCount int, finalErr error,
+) {
 	defer func() {
 		_ = r.Close(ctx)
 	}()
