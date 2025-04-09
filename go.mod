@@ -6,13 +6,13 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jonboulle/clockwork v0.3.0
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20241112172322-ea1f63298f77
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20250409112045-819ed71a6b95
 	go.uber.org/goleak v1.3.0
 	golang.org/x/net v0.33.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/grpc v1.62.1
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.36.5
 )
 
 // requires for tests only
