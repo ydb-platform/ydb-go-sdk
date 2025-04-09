@@ -6,7 +6,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jonboulle/clockwork v0.3.0
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20250409112045-819ed71a6b95
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20250409114505-92ae98e27807
 	go.uber.org/goleak v1.3.0
 	golang.org/x/net v0.33.0
 	golang.org/x/sync v0.10.0

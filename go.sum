@@ -27,8 +27,8 @@ github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSS
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
-github.com/ydb-platform/ydb-go-genproto v0.0.0-20250409112045-819ed71a6b95 h1:rHfC+uc4ot0HPDo0AqlO/jSKihdK8g/t/kcqZMlFSoU=
-github.com/ydb-platform/ydb-go-genproto v0.0.0-20250409112045-819ed71a6b95/go.mod h1:6GuAiQtaR+aOHn5F5xT67n1IEfI1K/q4hb1P5vrgCDI=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20250409114505-92ae98e27807 h1:OiJeJGnPmKYlkItykGJ1jq+uSpqyqA4ZzQUJ0XRDoew=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20250409114505-92ae98e27807/go.mod h1:6GuAiQtaR+aOHn5F5xT67n1IEfI1K/q4hb1P5vrgCDI=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
 go.uber.org/mock v0.4.0 h1:VcM4ZOtdbR4f6VXfiOpwpVJDL6lCReaZ6mw31wqh7KU=
