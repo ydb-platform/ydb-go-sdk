@@ -281,3 +281,11 @@ func WithReaderWithoutConsumer(saveStateOnReconnection bool) ReaderOption {
 		cfg.CommitMode = CommitModeNone
 	}
 }
+
+// WithReaderSupportSplitMergePartitions set support of split and merge partitions on client side.
+// Default is true, set false for disable the support.
+func WithReaderSupportSplitMergePartitions(enableSupport bool) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.EnableSplitMergeSupport = enableSupport
+	}
+}
