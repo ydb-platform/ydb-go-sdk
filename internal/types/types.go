@@ -194,17 +194,14 @@ func (v *Decimal) equalsTo(rhs Type) bool {
 }
 
 func (v *Decimal) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	decimal := a.Decimal()
-
-	decimal.Scale = v.scale
-	decimal.Precision = v.precision
-
-	typeDecimal := a.TypeDecimal()
-	typeDecimal.DecimalType = decimal
-
-	t := a.Type()
-	t.Type = typeDecimal
-
+	t := &Ydb.Type{}
+	decimal := &Ydb.DecimalType{
+		Scale:     v.scale,
+		Precision: v.precision,
+	}
+	t.Type = &Ydb.Type_DecimalType{
+		DecimalType: decimal,
+	}
 	return t
 }
 
@@ -260,17 +257,14 @@ func (v *Dict) equalsTo(rhs Type) bool {
 }
 
 func (v *Dict) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	typeDict := a.TypeDict()
-
-	typeDict.DictType = a.Dict()
-
-	typeDict.DictType.Key = v.keyType.ToYDB(a)
-	typeDict.DictType.Payload = v.valueType.ToYDB(a)
-
+	t := &Ydb.Type{}
+	typeDict := &Ydb.Type_DictType{
+		DictType: &Ydb.DictType{
+			Key:     v.keyType.ToYDB(a),
+			Payload: v.valueType.ToYDB(a),
+		},
+	}
 	t.Type = typeDict
-
 	return t
 }
 
@@ -297,11 +291,9 @@ func (EmptyList) equalsTo(rhs Type) bool {
 	return ok
 }
 
-func (EmptyList) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	t.Type = a.TypeEmptyList()
-
+func (v EmptyList) ToYDB(a *allocator.Allocator) *Ydb.Type {
+	t := &Ydb.Type{}
+	t.Type = &Ydb.Type_EmptyListType{}
 	return t
 }
 
@@ -325,11 +317,9 @@ func (EmptyDict) equalsTo(rhs Type) bool {
 	return ok
 }
 
-func (EmptyDict) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	t.Type = a.TypeEmptyDict()
-
+func (v EmptyDict) ToYDB(a *allocator.Allocator) *Ydb.Type {
+	t := &Ydb.Type{}
+	t.Type = &Ydb.Type_EmptyDictType{}
 	return t
 }
 
@@ -367,17 +357,13 @@ func (v *List) equalsTo(rhs Type) bool {
 }
 
 func (v *List) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	list := a.List()
-
-	list.Item = v.itemType.ToYDB(a)
-
-	typeList := a.TypeList()
-	typeList.ListType = list
-
-	t.Type = typeList
-
+	t := &Ydb.Type{}
+	list := &Ydb.ListType{
+		Item: v.itemType.ToYDB(a),
+	}
+	t.Type = &Ydb.Type_ListType{
+		ListType: list,
+	}
 	return t
 }
 
@@ -413,17 +399,14 @@ func (v *Set) equalsTo(rhs Type) bool {
 }
 
 func (v *Set) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	typeDict := a.TypeDict()
-
-	typeDict.DictType = a.Dict()
-
-	typeDict.DictType.Key = v.itemType.ToYDB(a)
-	typeDict.DictType.Payload = _voidType
-
-	t.Type = typeDict
-
+	t := &Ydb.Type{}
+	dict := &Ydb.DictType{
+		Key:     v.itemType.ToYDB(a),
+		Payload: _voidType,
+	}
+	t.Type = &Ydb.Type_DictType{
+		DictType: dict,
+	}
 	return t
 }
 
@@ -461,16 +444,13 @@ func (v Optional) equalsTo(rhs Type) bool {
 }
 
 func (v Optional) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	typeOptional := a.TypeOptional()
-
-	typeOptional.OptionalType = a.Optional()
-
-	typeOptional.OptionalType.Item = v.innerType.ToYDB(a)
-
-	t.Type = typeOptional
-
+	t := &Ydb.Type{}
+	optional := &Ydb.OptionalType{
+		Item: v.innerType.ToYDB(a),
+	}
+	t.Type = &Ydb.Type_OptionalType{
+		OptionalType: optional,
+	}
 	return t
 }
 
@@ -692,24 +672,18 @@ func (v *Struct) equalsTo(rhs Type) bool {
 }
 
 func (v *Struct) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	typeStruct := a.TypeStruct()
-
-	typeStruct.StructType = a.Struct()
-
+	t := &Ydb.Type{}
+	structType := &Ydb.StructType{}
 	for i := range v.fields {
-		structMember := a.StructMember()
-		structMember.Name = v.fields[i].Name
-		structMember.Type = v.fields[i].T.ToYDB(a)
-		typeStruct.StructType.Members = append(
-			typeStruct.StructType.GetMembers(),
-			structMember,
-		)
+		member := &Ydb.StructMember{
+			Name: v.fields[i].Name,
+			Type: v.fields[i].T.ToYDB(a),
+		}
+		structType.Members = append(structType.Members, member)
 	}
-
-	t.Type = typeStruct
-
+	t.Type = &Ydb.Type_StructType{
+		StructType: structType,
+	}
 	return t
 }
 
@@ -784,18 +758,14 @@ func (v *Tuple) ToYDB(a *allocator.Allocator) *Ydb.Type {
 	if v != nil {
 		items = v.innerTypes
 	}
-	t := a.Type()
-
-	typeTuple := a.TypeTuple()
-
-	typeTuple.TupleType = a.Tuple()
-
+	t := &Ydb.Type{}
+	tupleType := &Ydb.TupleType{}
 	for _, vv := range items {
-		typeTuple.TupleType.Elements = append(typeTuple.TupleType.GetElements(), vv.ToYDB(a))
+		tupleType.Elements = append(tupleType.Elements, vv.ToYDB(a))
 	}
-
-	t.Type = typeTuple
-
+	t.Type = &Ydb.Type_TupleType{
+		TupleType: tupleType,
+	}
 	return t
 }
 
@@ -838,24 +808,15 @@ func (v *VariantStruct) equalsTo(rhs Type) bool {
 }
 
 func (v *VariantStruct) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	typeVariant := a.TypeVariant()
-
-	typeVariant.VariantType = a.Variant()
-
-	structItems := a.VariantStructItems()
-
-	val, ok := v.Struct.ToYDB(a).GetType().(*Ydb.Type_StructType)
-	if !ok {
-		panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_StructType", val))
+	t := &Ydb.Type{}
+	variantType := &Ydb.VariantType{}
+	structItems := &Ydb.VariantType_StructItems{
+		StructItems: v.Struct.ToYDB(a).GetStructType(),
 	}
-	structItems.StructItems = val.StructType
-
-	typeVariant.VariantType.Type = structItems
-
-	t.Type = typeVariant
-
+	variantType.Type = structItems
+	t.Type = &Ydb.Type_VariantType{
+		VariantType: variantType,
+	}
 	return t
 }
 
@@ -896,24 +857,15 @@ func (v *VariantTuple) equalsTo(rhs Type) bool {
 }
 
 func (v *VariantTuple) ToYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
-
-	typeVariant := a.TypeVariant()
-
-	typeVariant.VariantType = a.Variant()
-
-	tupleItems := a.VariantTupleItems()
-
-	val, ok := v.Tuple.ToYDB(a).GetType().(*Ydb.Type_TupleType)
-	if !ok {
-		panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_TupleType", val))
+	t := &Ydb.Type{}
+	variantType := &Ydb.VariantType{}
+	tupleItems := &Ydb.VariantType_TupleItems{
+		TupleItems: v.Tuple.ToYDB(a).GetTupleType(),
 	}
-	tupleItems.TupleItems = val.TupleType
-
-	typeVariant.VariantType.Type = tupleItems
-
-	t.Type = typeVariant
-
+	variantType.Type = tupleItems
+	t.Type = &Ydb.Type_VariantType{
+		VariantType: variantType,
+	}
 	return t
 }
 

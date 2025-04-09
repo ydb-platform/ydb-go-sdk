@@ -941,8 +941,9 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		if d.QueryCachePolicy == nil {
-			d.QueryCachePolicy = a.TableQueryCachePolicy()
-			d.QueryCachePolicy.KeepInCache = true
+			d.QueryCachePolicy = &Ydb_Table.QueryCachePolicy{
+				KeepInCache: true,
+			}
 		}
 		for _, opt := range opts {
 			if opt != nil {

@@ -50,8 +50,9 @@ type (
 )
 
 func (opts Settings) applyTableTxSelector(a *allocator.Allocator, txControl *Ydb_Table.TransactionControl) {
-	beginTx := a.TableTransactionControlBeginTx()
-	beginTx.BeginTx = a.TableTransactionSettings()
+	beginTx := &Ydb_Table.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Table.TransactionSettings{},
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyTableTxSettingsOption(a, beginTx.BeginTx)
@@ -61,8 +62,9 @@ func (opts Settings) applyTableTxSelector(a *allocator.Allocator, txControl *Ydb
 }
 
 func (opts Settings) applyQueryTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
-	beginTx := a.QueryTransactionControlBeginTx()
-	beginTx.BeginTx = a.QueryTransactionSettings()
+	beginTx := &Ydb_Query.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Query.TransactionSettings{},
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyQueryTxSettingsOption(a, beginTx.BeginTx)
@@ -72,7 +74,7 @@ func (opts Settings) applyQueryTxSelector(a *allocator.Allocator, txControl *Ydb
 }
 
 func (opts Settings) ToYdbQuerySettings(a *allocator.Allocator) *Ydb_Query.TransactionSettings {
-	txSettings := a.QueryTransactionSettings()
+	txSettings := &Ydb_Query.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyQueryTxSettingsOption(a, txSettings)
@@ -83,7 +85,7 @@ func (opts Settings) ToYdbQuerySettings(a *allocator.Allocator) *Ydb_Query.Trans
 }
 
 func (opts Settings) ToYdbTableSettings(a *allocator.Allocator) *Ydb_Table.TransactionSettings {
-	txSettings := a.TableTransactionSettings()
+	txSettings := &Ydb_Table.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyTableTxSettingsOption(a, txSettings)

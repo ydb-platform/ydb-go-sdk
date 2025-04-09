@@ -137,7 +137,7 @@ func (e queryClientExecutor) execute(
 	executeDataQueryRequest *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (_ *transaction, _ result.Result, finalErr error) {
-	request := a.QueryExecuteQueryRequest()
+	request := &Ydb_Query.ExecuteQueryRequest{}
 
 	request.SessionId = executeDataQueryRequest.GetSessionId()
 	request.ExecMode = Ydb_Query.ExecMode_EXEC_MODE_EXECUTE
@@ -1031,27 +1031,25 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
-		a       = allocator.New()
 		q       = queryFromText(sql)
 		request = options.ExecuteDataQueryDesc{
-			ExecuteDataQueryRequest: a.TableExecuteDataQueryRequest(),
-			IgnoreTruncated:         s.config.IgnoreTruncated(),
+			ExecuteDataQueryRequest: &Ydb_Table.ExecuteDataQueryRequest{
+				SessionId: s.id,
+				TxControl: txControl.ToYdbTableTransactionControl(nil),
+				Parameters: func() map[string]*Ydb.TypedValue {
+					p, _ := params.ToYDB(nil)
+					return p
+				}(),
+				Query: q.toYDB(nil),
+				QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
+					KeepInCache: true,
+				},
+			},
+			IgnoreTruncated: s.config.IgnoreTruncated(),
 		}
 		callOptions []grpc.CallOption
 	)
-	defer a.Free()
 
-	parameters, err := params.ToYDB(a)
-	if err != nil {
-		return nil, nil, xerrors.WithStackTrace(err)
-	}
-
-	request.SessionId = s.id
-	request.TxControl = txControl.ToYdbTableTransactionControl(a)
-	request.Parameters = parameters
-	request.Query = q.toYDB(a)
-	request.QueryCachePolicy = a.TableQueryCachePolicy()
-	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
 	request.OperationParams = operation.Params(ctx,
 		s.config.OperationTimeout(),
 		s.config.OperationCancelAfter(),
@@ -1060,7 +1058,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 
 	for _, opt := range opts {
 		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, a)...)
+			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, nil)...)
 		}
 	}
 
@@ -1074,7 +1072,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 		onDone(txr, false, r, err)
 	}()
 
-	t, r, err := s.dataQuery.execute(ctx, a, txControl, request.ExecuteDataQueryRequest, callOptions...)
+	t, r, err := s.dataQuery.execute(ctx, nil, txControl, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -1122,7 +1120,7 @@ func executeDataQuery(
 	err error,
 ) {
 	var (
-		result   = a.TableExecuteQueryResult()
+		result   = &Ydb_Table.ExecuteQueryResult{}
 		response *Ydb_Table.ExecuteDataQueryResponse
 	)
 

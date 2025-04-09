@@ -81,35 +81,40 @@ func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg execut
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	request := a.QueryExecuteQueryRequest()
-
-	request.SessionId = sessionID
-	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
-	request.TxControl = cfg.TxControl().ToYdbQueryTransactionControl(a)
-	request.Query = queryFromText(a, q, Ydb_Query.Syntax(cfg.Syntax()))
-	request.Parameters = params
-	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
-	request.ConcurrentResultSets = false
-	request.PoolId = cfg.ResourcePool()
-	request.ResponsePartLimitBytes = cfg.ResponsePartLimitSizeBytes()
+	request := &Ydb_Query.ExecuteQueryRequest{
+		SessionId: sessionID,
+		ExecMode:  Ydb_Query.ExecMode(cfg.ExecMode()),
+		TxControl: cfg.TxControl().ToYdbQueryTransactionControl(a),
+		Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
+			QueryContent: &Ydb_Query.QueryContent{
+				Syntax: Ydb_Query.Syntax(cfg.Syntax()),
+				Text:   q,
+			},
+		},
+		Parameters:             params,
+		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
+		ConcurrentResultSets:   false,
+		PoolId:                 cfg.ResourcePool(),
+		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
+	}
 
 	return request, cfg.CallOptions(), nil
 }
 
 func queryQueryContent(a *allocator.Allocator, syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
-	content := a.QueryQueryContent()
-	content.Syntax = syntax
-	content.Text = q
-
+	content := &Ydb_Query.QueryContent{
+		Syntax: syntax,
+		Text:   q,
+	}
 	return content
 }
 
 func queryFromText(
 	a *allocator.Allocator, q string, syntax Ydb_Query.Syntax,
 ) *Ydb_Query.ExecuteQueryRequest_QueryContent {
-	content := a.QueryExecuteQueryRequestQueryContent()
-	content.QueryContent = queryQueryContent(a, syntax, q)
-
+	content := &Ydb_Query.ExecuteQueryRequest_QueryContent{
+		QueryContent: queryQueryContent(a, syntax, q),
+	}
 	return content
 }
 

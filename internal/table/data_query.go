@@ -34,9 +34,11 @@ func (q textQuery) YQL() string {
 }
 
 func (q textQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
-	query := a.TableQuery()
-	query.Query = a.TableQueryYqlText(string(q))
-
+	query := &Ydb_Table.Query{
+		Query: &Ydb_Table.Query_YqlText{
+			YqlText: string(q),
+		},
+	}
 	return query
 }
 
@@ -53,9 +55,11 @@ func (q preparedQuery) YQL() string {
 }
 
 func (q preparedQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
-	query := a.TableQuery()
-	query.Query = a.TableQueryYqlText(q.sql)
-
+	query := &Ydb_Table.Query{
+		Query: &Ydb_Table.Query_YqlText{
+			YqlText: q.sql,
+		},
+	}
 	return query
 }
 

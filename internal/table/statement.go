@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
@@ -33,26 +34,25 @@ func (s *statement) Execute(
 	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
-		a       = allocator.New()
 		request = options.ExecuteDataQueryDesc{
-			ExecuteDataQueryRequest: a.TableExecuteDataQueryRequest(),
-			IgnoreTruncated:         s.session.config.IgnoreTruncated(),
+			ExecuteDataQueryRequest: &Ydb_Table.ExecuteDataQueryRequest{
+				SessionId: s.session.id,
+				TxControl: txControl.ToYdbTableTransactionControl(nil),
+				Parameters: func() map[string]*Ydb.TypedValue {
+					p, _ := parameters.ToYDB(nil)
+					return p
+				}(),
+				Query: s.query.toYDB(nil),
+			},
+			IgnoreTruncated: s.session.config.IgnoreTruncated(),
 		}
 		callOptions []grpc.CallOption
 	)
-	defer a.Free()
 
-	params, err := parameters.ToYDB(a)
-	if err != nil {
-		return nil, nil, xerrors.WithStackTrace(err)
+	request.QueryCachePolicy = &Ydb_Table.QueryCachePolicy{
+		KeepInCache: len(request.Parameters) > 0,
 	}
 
-	request.SessionId = s.session.id
-	request.TxControl = txControl.ToYdbTableTransactionControl(a)
-	request.Parameters = params
-	request.Query = s.query.toYDB(a)
-	request.QueryCachePolicy = a.TableQueryCachePolicy()
-	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
 	request.OperationParams = operation.Params(ctx,
 		s.session.config.OperationTimeout(),
 		s.session.config.OperationCancelAfter(),
@@ -61,7 +61,7 @@ func (s *statement) Execute(
 
 	for _, opt := range opts {
 		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, a)...)
+			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, nil)...)
 		}
 	}
 
@@ -75,7 +75,7 @@ func (s *statement) Execute(
 		onDone(txr, true, r, err)
 	}()
 
-	return s.execute(ctx, a, txControl, &request, callOptions...)
+	return s.execute(ctx, nil, nil, &request, callOptions...)
 }
 
 // execute executes prepared query without any tracing.

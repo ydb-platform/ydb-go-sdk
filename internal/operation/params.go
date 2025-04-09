@@ -13,19 +13,34 @@ func Params(
 	cancelAfter time.Duration,
 	mode Mode,
 ) *Ydb_Operations.OperationParams {
-	b := Ydb_Operations.OperationParams_builder{}
+	b := &Ydb_Operations.OperationParams{}
+
+	// Set operation timeout from context or parameter
 	if d, ok := ctxTimeout(ctx); ok {
 		b.OperationTimeout = timeoutParam(d)
+	} else if timeout > 0 {
+		b.OperationTimeout = timeoutParam(timeout)
 	}
+
+	// Override with context deadline if available and less than timeout
 	if d, ok := ctxUntilDeadline(ctx); mode == ModeSync && ok && d < timeout {
 		b.OperationTimeout = timeoutParam(d)
 	}
-	if d := cancelAfter; d > 0 {
+
+	// Set cancel after from context or parameter
+	if d, ok := ctxCancelAfter(ctx); ok {
 		b.CancelAfter = timeoutParam(d)
-	}
-	if d, ok := ctxCancelAfter(ctx); ok && d < cancelAfter {
-		b.CancelAfter = timeoutParam(d)
+	} else if cancelAfter > 0 {
+		b.CancelAfter = timeoutParam(cancelAfter)
 	}
 
-	return b.Build()
+	// Set operation mode
+	b.OperationMode = mode.toYDB()
+
+	// If no fields are set, return nil
+	if b.OperationTimeout == nil && b.CancelAfter == nil && b.OperationMode == Ydb_Operations.OperationParams_OPERATION_MODE_UNSPECIFIED {
+		return nil
+	}
+
+	return b
 }
