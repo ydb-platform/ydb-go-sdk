@@ -60,8 +60,7 @@ func (c *Client) DescribeTopic(ctx context.Context, req DescribeTopicRequest) (r
 }
 
 func (c *Client) DescribeConsumer(ctx context.Context, req DescribeConsumerRequest) (
-	res DescribeConsumerResult, err error,
-) {
+	res DescribeConsumerResult, err error) {
 	resp, err := c.service.DescribeConsumer(ctx, req.ToProto())
 	if err != nil {
 		return DescribeConsumerResult{}, xerrors.WithStackTrace(

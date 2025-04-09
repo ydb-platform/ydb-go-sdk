@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -161,10 +160,7 @@ func executeScript(ctx context.Context,
 func (c *Client) ExecuteScript(
 	ctx context.Context, q string, ttl time.Duration, opts ...options.Execute,
 ) (
-	op *options.ExecuteScriptOperation, err error,
-) {
-	a := allocator.New()
-	defer a.Free()
+	op *options.ExecuteScriptOperation, err error) {
 
 	settings := &executeScriptSettings{
 		executeSettings: options.ExecuteSettings(opts...),
@@ -177,7 +173,7 @@ func (c *Client) ExecuteScript(
 		),
 	}
 
-	request, grpcOpts, err := executeQueryScriptRequest(a, q, settings)
+	request, grpcOpts, err := executeQueryScriptRequest(q, settings)
 	if err != nil {
 		return op, xerrors.WithStackTrace(err)
 	}
@@ -388,8 +384,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 }
 
 func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (
-	r query.Result, err error,
-) {
+	r query.Result, err error) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))

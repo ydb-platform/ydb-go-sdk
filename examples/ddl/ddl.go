@@ -16,7 +16,7 @@ CREATE TABLE small_table (
     b Uint64,
     c Text,
 	d Date,
-    PRIMARY KEY (a, b)
+    PRIMARY KEY (b)
 );
 `
 	familyCreateQuery = `
@@ -26,7 +26,7 @@ CREATE TABLE small_table2 (
     b Uint64,
     c Text FAMILY family_large,
 	d Date,
-    PRIMARY KEY (a, b),
+    PRIMARY KEY (b),
     FAMILY family_large (
         COMPRESSION = "lz4"
     )
@@ -39,7 +39,7 @@ CREATE TABLE small_table3 (
     b Uint64,
     c Text,
 	d Date,
-    PRIMARY KEY (a, b)
+    PRIMARY KEY (b)
 )
 WITH (
     AUTO_PARTITIONING_BY_SIZE = ENABLED, --Automatic positioning mode by the size of the partition

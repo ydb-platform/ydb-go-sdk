@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -427,15 +426,13 @@ func TestTuple(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.method, func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
 
 			item := Builder{}.Param("$x").BeginTuple().Add()
 
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(*tuple)
 			require.True(t, ok)
 
-			params := result.EndTuple().build().toYDB(a)
+			params := result.EndTuple().build().toYDB()
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
@@ -460,11 +457,9 @@ func TestTuple(t *testing.T) {
 }
 
 func TestTuple_AddItems(t *testing.T) {
-	a := allocator.New()
-	defer a.Free()
 	params := Builder{}.Param("$x").BeginTuple().
 		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
-		EndTuple().build().toYDB(a)
+		EndTuple().build().toYDB()
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {

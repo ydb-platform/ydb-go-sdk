@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -429,8 +428,6 @@ func TestDict(t *testing.T) {
 	for _, key := range tests {
 		for _, val := range tests {
 			t.Run(fmt.Sprintf("%s:%s", key.method, val.method), func(t *testing.T) {
-				a := allocator.New()
-				defer a.Free()
 
 				item := Builder{}.Param("$x").BeginDict().Add()
 
@@ -440,7 +437,7 @@ func TestDict(t *testing.T) {
 				d, ok := xtest.CallMethod(addedKey, val.method, val.args...)[0].(*dict)
 				require.True(t, ok)
 
-				params := d.EndDict().build().toYDB(a)
+				params := d.EndDict().build().toYDB()
 				require.Equal(t, xtest.ToJSON(
 					map[string]*Ydb.TypedValue{
 						"$x": {
@@ -468,8 +465,6 @@ func TestDict(t *testing.T) {
 }
 
 func TestDict_AddPairs(t *testing.T) {
-	a := allocator.New()
-	defer a.Free()
 
 	pairs := []value.DictValueField{
 		{
@@ -482,7 +477,7 @@ func TestDict_AddPairs(t *testing.T) {
 		},
 	}
 
-	params := Builder{}.Param("$x").BeginDict().AddPairs(pairs...).EndDict().build().toYDB(a)
+	params := Builder{}.Param("$x").BeginDict().AddPairs(pairs...).EndDict().build().toYDB()
 
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{

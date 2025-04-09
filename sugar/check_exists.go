@@ -27,8 +27,7 @@ func IsColumnTableExists(ctx context.Context, c scheme.Client, absTablePath stri
 }
 
 func IsEntryExists(ctx context.Context, c scheme.Client, absPath string, entryTypes ...scheme.EntryType) (
-	exists bool, _ error,
-) {
+	exists bool, _ error) {
 	exists, err := helpers.IsEntryExists(ctx, c, absPath, entryTypes...)
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)

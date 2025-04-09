@@ -151,8 +151,7 @@ func isSysDir(databaseName, dirAbsPath string) bool {
 }
 
 func (c *Conn) getTables(ctx context.Context, absPath string, recursive, excludeSysDirs bool) (
-	tables []string, _ error,
-) {
+	tables []string, _ error) {
 	if excludeSysDirs && isSysDir(c.connector.parent.Name(), absPath) {
 		return nil, nil
 	}
@@ -185,8 +184,7 @@ func (c *Conn) getTables(ctx context.Context, absPath string, recursive, exclude
 }
 
 func (c *Conn) GetTables(ctx context.Context, folder string, recursive, excludeSysDirs bool) (
-	tables []string, _ error,
-) {
+	tables []string, _ error) {
 	absPath := c.normalizePath(folder)
 
 	e, err := c.connector.parent.Scheme().DescribePath(ctx, absPath)

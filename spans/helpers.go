@@ -34,8 +34,7 @@ func childSpan(
 func finish(
 	s Span,
 	err error,
-	fields ...KeyValue,
-) {
+	fields ...KeyValue) {
 	if err != nil {
 		s.Error(err)
 	}
@@ -45,8 +44,7 @@ func finish(
 func logError(
 	s Span,
 	err error,
-	fields ...KeyValue,
-) {
+	fields ...KeyValue) {
 	var ydbErr ydb.Error
 	if xerrors.As(err, &ydbErr) {
 		fields = append(fields,
@@ -61,8 +59,7 @@ func logToParentSpan(
 	cfg Adapter,
 	ctx context.Context, //nolint:revive
 	msg string,
-	fields ...KeyValue,
-) {
+	fields ...KeyValue) {
 	parent := cfg.SpanFromContext(ctx)
 	parent.Log(msg, fields...)
 }
@@ -71,8 +68,7 @@ func logToParentSpanError(
 	cfg Adapter,
 	ctx context.Context, //nolint:revive
 	err error,
-	fields ...KeyValue,
-) {
+	fields ...KeyValue) {
 	parent := cfg.SpanFromContext(ctx)
 	logError(parent, err, fields...)
 }

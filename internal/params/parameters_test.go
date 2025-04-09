@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -62,9 +61,7 @@ func TestNil(t *testing.T) {
 				visited[name] = v
 			})
 			require.Empty(t, visited)
-			a := allocator.New()
-			defer a.Free()
-			require.Empty(t, tt.p.toYDB(a))
+			require.Empty(t, tt.p.toYDB())
 		})
 	}
 }

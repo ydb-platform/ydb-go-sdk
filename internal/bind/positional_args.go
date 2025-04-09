@@ -17,8 +17,7 @@ func (m PositionalArgs) blockID() blockID {
 }
 
 func (m PositionalArgs) ToYdb(sql string, args ...any) (
-	yql string, newArgs []any, err error,
-) {
+	yql string, newArgs []any, err error) {
 	l := &sqlLexer{
 		src:        sql,
 		stateFn:    positionalArgsStateFn,

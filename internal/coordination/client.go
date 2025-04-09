@@ -239,8 +239,7 @@ func (c *Client) DescribeNode(
 ) (
 	entry *scheme.Entry,
 	config *coordination.NodeConfig,
-	finalErr error,
-) {
+	finalErr error) {
 	if c == nil {
 		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}
@@ -297,8 +296,7 @@ func describeNode(
 ) (
 	_ *scheme.Entry,
 	_ *coordination.NodeConfig,
-	err error,
-) {
+	err error) {
 	var (
 		response *Ydb_Coordination.DescribeNodeResponse
 		result   Ydb_Coordination.DescribeNodeResult

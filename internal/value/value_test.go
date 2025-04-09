@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -94,9 +93,7 @@ func BenchmarkMemory(b *testing.B) {
 		ZeroValue(types.NewTuple()),
 	)
 	for i := 0; i < b.N; i++ {
-		a := allocator.New()
-		_ = ToYDB(v, a)
-		a.Free()
+		_ = ToYDB(v)
 	}
 }
 
@@ -181,13 +178,11 @@ func TestToYDBFromYDB(t *testing.T) {
 		PgValue(pg.OIDInt4, "123"),
 	} {
 		t.Run(strconv.Itoa(i)+"."+v.Yql(), func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
-			value := ToYDB(v, a)
+			value := ToYDB(v)
 			dualConversedValue, err := fromYDB(value.GetType(), value.GetValue())
 			require.NoError(t, err)
-			if !proto.Equal(value, ToYDB(dualConversedValue, a)) {
-				t.Errorf("dual conversion failed:\n\n - got:  %v\n\n - want: %v", ToYDB(dualConversedValue, a), value)
+			if !proto.Equal(value, ToYDB(dualConversedValue)) {
+				t.Errorf("dual conversion failed:\n\n - got:  %v\n\n - want: %v", ToYDB(dualConversedValue), value)
 			}
 		})
 	}
@@ -589,7 +584,7 @@ func TestValueYql(t *testing.T) {
 		},
 	} {
 		t.Run(strconv.Itoa(i)+"."+tt.literal, func(t *testing.T) {
-			pb := tt.value.toYDB(allocator.New())
+			pb := tt.value.toYDB()
 			fmt.Println(pb)
 			require.Equal(t, tt.literal, tt.value.Yql())
 		})
@@ -1014,10 +1009,8 @@ func TestNullable(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
 			v := Nullable(test.t, test.v)
-			if !proto.Equal(ToYDB(v, a), ToYDB(test.exp, a)) {
+			if !proto.Equal(ToYDB(v), ToYDB(test.exp)) {
 				t.Fatalf("unexpected value: %v, exp: %v", v, test.exp)
 			}
 		})

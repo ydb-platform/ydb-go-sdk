@@ -4,7 +4,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -27,7 +26,7 @@ type (
 	StatsMode Ydb_Query.StatsMode
 
 	TxControl interface {
-		ToYdbQueryTransactionControl(a *allocator.Allocator) *Ydb_Query.TransactionControl
+		ToYdbQueryTransactionControl() *Ydb_Query.TransactionControl
 
 		Commit() bool
 	}

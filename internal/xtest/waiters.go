@@ -91,8 +91,7 @@ func SpinWaitProgress(tb testing.TB, progress func() (progressValue interface{},
 func SpinWaitProgressWithTimeout(
 	tb testing.TB,
 	timeout time.Duration,
-	progress func() (progressValue interface{}, finished bool),
-) {
+	progress func() (progressValue interface{}, finished bool)) {
 	tb.Helper()
 
 	for {

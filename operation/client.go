@@ -222,8 +222,7 @@ func (c *Client) Close(ctx context.Context) error {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) ListBuildIndex(ctx context.Context) (
-	*listOperations[*metadata.BuildIndex, metadata.BuildIndex], error,
-) {
+	*listOperations[*metadata.BuildIndex, metadata.BuildIndex], error) {
 	request := &options.ListOperationsRequest{
 		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
 			Kind: kindBuildIndex,
@@ -244,8 +243,7 @@ func (c *Client) ListBuildIndex(ctx context.Context) (
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) ListImportFromS3(ctx context.Context) (
-	*listOperations[*metadata.ImportFromS3, metadata.ImportFromS3], error,
-) {
+	*listOperations[*metadata.ImportFromS3, metadata.ImportFromS3], error) {
 	request := &options.ListOperationsRequest{
 		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
 			Kind: kindImportFromS3,
@@ -266,8 +264,7 @@ func (c *Client) ListImportFromS3(ctx context.Context) (
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) ListExportToS3(ctx context.Context) (
-	*listOperations[*metadata.ExportToS3, metadata.ExportToS3], error,
-) {
+	*listOperations[*metadata.ExportToS3, metadata.ExportToS3], error) {
 	request := &options.ListOperationsRequest{
 		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
 			Kind: kindExportToS3,
@@ -288,8 +285,7 @@ func (c *Client) ListExportToS3(ctx context.Context) (
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) ListExportToYT(ctx context.Context) (
-	*listOperations[*metadata.ExportToYT, metadata.ExportToYT], error,
-) {
+	*listOperations[*metadata.ExportToYT, metadata.ExportToYT], error) {
 	request := &options.ListOperationsRequest{
 		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
 			Kind: kindExportToYT,
@@ -310,8 +306,7 @@ func (c *Client) ListExportToYT(ctx context.Context) (
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (c *Client) ListExecuteQuery(ctx context.Context, opts ...options.List) (
-	*listOperationsWithNextToken[*metadata.ExecuteQuery, metadata.ExecuteQuery], error,
-) {
+	*listOperationsWithNextToken[*metadata.ExecuteQuery, metadata.ExecuteQuery], error) {
 	request := &options.ListOperationsRequest{
 		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
 			Kind: kindExecuteQuery,

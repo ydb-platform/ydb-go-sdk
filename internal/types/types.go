@@ -6,7 +6,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
@@ -14,12 +13,12 @@ type Type interface {
 	Yql() string
 	String() string
 
-	ToYDB(a *allocator.Allocator) *Ydb.Type
+	ToYDB() *Ydb.Type
 	equalsTo(rhs Type) bool
 }
 
-func TypeToYDB(t Type, a *allocator.Allocator) *Ydb.Type {
-	return t.ToYDB(a)
+func TypeToYDB(t Type) *Ydb.Type {
+	return t.ToYDB()
 }
 
 func TypeFromYDB(x *Ydb.Type) Type {
@@ -158,8 +157,8 @@ func FromYDB(es []*Ydb.Type) []Type {
 	return ts
 }
 
-func Equal(a, b Type) bool {
-	return a.equalsTo(b)
+func Equal(lhs, rhs Type) bool {
+	return lhs.equalsTo(rhs)
 }
 
 type Decimal struct {
@@ -193,7 +192,7 @@ func (v *Decimal) equalsTo(rhs Type) bool {
 	return ok && *v == *vv
 }
 
-func (v *Decimal) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *Decimal) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	decimal := &Ydb.DecimalType{
 		Scale:     v.scale,
@@ -256,12 +255,12 @@ func (v *Dict) equalsTo(rhs Type) bool {
 	return true
 }
 
-func (v *Dict) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *Dict) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	typeDict := &Ydb.Type_DictType{
 		DictType: &Ydb.DictType{
-			Key:     v.keyType.ToYDB(a),
-			Payload: v.valueType.ToYDB(a),
+			Key:     v.keyType.ToYDB(),
+			Payload: v.valueType.ToYDB(),
 		},
 	}
 	t.Type = typeDict
@@ -291,7 +290,7 @@ func (EmptyList) equalsTo(rhs Type) bool {
 	return ok
 }
 
-func (v EmptyList) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v EmptyList) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	t.Type = &Ydb.Type_EmptyListType{}
 	return t
@@ -317,7 +316,7 @@ func (EmptyDict) equalsTo(rhs Type) bool {
 	return ok
 }
 
-func (v EmptyDict) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v EmptyDict) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	t.Type = &Ydb.Type_EmptyDictType{}
 	return t
@@ -356,10 +355,10 @@ func (v *List) equalsTo(rhs Type) bool {
 	return v.itemType.equalsTo(vv.itemType)
 }
 
-func (v *List) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *List) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	list := &Ydb.ListType{
-		Item: v.itemType.ToYDB(a),
+		Item: v.itemType.ToYDB(),
 	}
 	t.Type = &Ydb.Type_ListType{
 		ListType: list,
@@ -398,10 +397,10 @@ func (v *Set) equalsTo(rhs Type) bool {
 	return v.itemType.equalsTo(vv.itemType)
 }
 
-func (v *Set) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *Set) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	dict := &Ydb.DictType{
-		Key:     v.itemType.ToYDB(a),
+		Key:     v.itemType.ToYDB(),
 		Payload: _voidType,
 	}
 	t.Type = &Ydb.Type_DictType{
@@ -443,10 +442,10 @@ func (v Optional) equalsTo(rhs Type) bool {
 	return v.innerType.equalsTo(vv.innerType)
 }
 
-func (v Optional) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v Optional) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	optional := &Ydb.OptionalType{
-		Item: v.innerType.ToYDB(a),
+		Item: v.innerType.ToYDB(),
 	}
 	t.Type = &Ydb.Type_OptionalType{
 		OptionalType: optional,
@@ -472,7 +471,7 @@ func (v PgType) Yql() string {
 	return fmt.Sprintf("PgType(%v)", v.OID)
 }
 
-func (v PgType) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v PgType) ToYDB() *Ydb.Type {
 	//nolint:godox
 	// TODO: make allocator
 	return &Ydb.Type{Type: &Ydb.Type_PgType{
@@ -608,7 +607,7 @@ func (v Primitive) equalsTo(rhs Type) bool {
 	return v == vv
 }
 
-func (v Primitive) ToYDB(*allocator.Allocator) *Ydb.Type {
+func (v Primitive) ToYDB() *Ydb.Type {
 	return primitive[v]
 }
 
@@ -671,13 +670,13 @@ func (v *Struct) equalsTo(rhs Type) bool {
 	return true
 }
 
-func (v *Struct) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *Struct) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	structType := &Ydb.StructType{}
 	for i := range v.fields {
 		member := &Ydb.StructMember{
 			Name: v.fields[i].Name,
-			Type: v.fields[i].T.ToYDB(a),
+			Type: v.fields[i].T.ToYDB(),
 		}
 		structType.Members = append(structType.Members, member)
 	}
@@ -753,7 +752,7 @@ func (v *Tuple) equalsTo(rhs Type) bool {
 	return true
 }
 
-func (v *Tuple) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *Tuple) ToYDB() *Ydb.Type {
 	var items []Type
 	if v != nil {
 		items = v.innerTypes
@@ -761,7 +760,7 @@ func (v *Tuple) ToYDB(a *allocator.Allocator) *Ydb.Type {
 	t := &Ydb.Type{}
 	tupleType := &Ydb.TupleType{}
 	for _, vv := range items {
-		tupleType.Elements = append(tupleType.Elements, vv.ToYDB(a))
+		tupleType.Elements = append(tupleType.Elements, vv.ToYDB())
 	}
 	t.Type = &Ydb.Type_TupleType{
 		TupleType: tupleType,
@@ -807,11 +806,11 @@ func (v *VariantStruct) equalsTo(rhs Type) bool {
 	}
 }
 
-func (v *VariantStruct) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *VariantStruct) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	variantType := &Ydb.VariantType{}
 	structItems := &Ydb.VariantType_StructItems{
-		StructItems: v.Struct.ToYDB(a).GetStructType(),
+		StructItems: v.Struct.ToYDB().GetStructType(),
 	}
 	variantType.Type = structItems
 	t.Type = &Ydb.Type_VariantType{
@@ -856,11 +855,11 @@ func (v *VariantTuple) equalsTo(rhs Type) bool {
 	}
 }
 
-func (v *VariantTuple) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *VariantTuple) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
 	variantType := &Ydb.VariantType{}
 	tupleItems := &Ydb.VariantType_TupleItems{
-		TupleItems: v.Tuple.ToYDB(a).GetTupleType(),
+		TupleItems: v.Tuple.ToYDB().GetTupleType(),
 	}
 	variantType.Type = tupleItems
 	t.Type = &Ydb.Type_VariantType{
@@ -895,7 +894,7 @@ func (v Void) equalsTo(rhs Type) bool {
 	return ok
 }
 
-func (Void) ToYDB(*allocator.Allocator) *Ydb.Type {
+func (Void) ToYDB() *Ydb.Type {
 	return _voidType
 }
 
@@ -923,7 +922,7 @@ func (v Null) equalsTo(rhs Type) bool {
 	return ok
 }
 
-func (Null) ToYDB(*allocator.Allocator) *Ydb.Type {
+func (Null) ToYDB() *Ydb.Type {
 	return _nullType
 }
 
@@ -947,7 +946,7 @@ func (v protobufType) String() string {
 	return v.Yql()
 }
 
-func (v protobufType) ToYDB(a *allocator.Allocator) *Ydb.Type {
+func (v protobufType) ToYDB() *Ydb.Type {
 	return v.pb
 }
 

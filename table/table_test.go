@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -197,8 +196,7 @@ func TestBulkUpsertData(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			a := allocator.New()
-			request, err := tt.data.ToYDB(a, "test")
+			request, err := tt.data.ToYDB("test")
 			require.NoError(t, err)
 			require.Equal(t,
 				tt.request.String(),

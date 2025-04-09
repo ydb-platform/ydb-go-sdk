@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -42,12 +41,11 @@ type executeScriptConfig interface {
 	OperationParams() *Ydb_Operations.OperationParams
 }
 
-func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScriptConfig) (
+func executeQueryScriptRequest(q string, cfg executeScriptConfig) (
 	*Ydb_Query.ExecuteScriptRequest,
 	[]grpc.CallOption,
-	error,
-) {
-	params, err := cfg.Params().ToYDB(a)
+	error) {
+	params, err := cfg.Params().ToYDB()
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -61,7 +59,7 @@ func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScri
 			ReportCostInfo:   0,
 		},
 		ExecMode:      Ydb_Query.ExecMode(cfg.ExecMode()),
-		ScriptContent: queryQueryContent(a, Ydb_Query.Syntax(cfg.Syntax()), q),
+		ScriptContent: queryQueryContent(Ydb_Query.Syntax(cfg.Syntax()), q),
 		Parameters:    params,
 		StatsMode:     Ydb_Query.StatsMode(cfg.StatsMode()),
 		ResultsTtl:    durationpb.New(cfg.ResultsTTL()),
@@ -71,12 +69,11 @@ func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScri
 	return request, cfg.CallOptions(), nil
 }
 
-func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeSettings) (
+func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
-	error,
-) {
-	params, err := cfg.Params().ToYDB(a)
+	error) {
+	params, err := cfg.Params().ToYDB()
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -84,7 +81,7 @@ func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg execut
 	request := &Ydb_Query.ExecuteQueryRequest{
 		SessionId: sessionID,
 		ExecMode:  Ydb_Query.ExecMode(cfg.ExecMode()),
-		TxControl: cfg.TxControl().ToYdbQueryTransactionControl(a),
+		TxControl: cfg.TxControl().ToYdbQueryTransactionControl(),
 		Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 			QueryContent: &Ydb_Query.QueryContent{
 				Syntax: Ydb_Query.Syntax(cfg.Syntax()),
@@ -101,7 +98,7 @@ func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg execut
 	return request, cfg.CallOptions(), nil
 }
 
-func queryQueryContent(a *allocator.Allocator, syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
+func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
 	content := &Ydb_Query.QueryContent{
 		Syntax: syntax,
 		Text:   q,
@@ -109,11 +106,10 @@ func queryQueryContent(a *allocator.Allocator, syntax Ydb_Query.Syntax, q string
 	return content
 }
 
-func queryFromText(
-	a *allocator.Allocator, q string, syntax Ydb_Query.Syntax,
+func queryFromText(q string, syntax Ydb_Query.Syntax,
 ) *Ydb_Query.ExecuteQueryRequest_QueryContent {
 	content := &Ydb_Query.ExecuteQueryRequest_QueryContent{
-		QueryContent: queryQueryContent(a, syntax, q),
+		QueryContent: queryQueryContent(syntax, q),
 	}
 	return content
 }
@@ -122,12 +118,9 @@ func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
 	q string, settings executeSettings, opts ...resultOption,
 ) (
-	_ *streamResult, finalErr error,
-) {
-	a := allocator.New()
-	defer a.Free()
+	_ *streamResult, finalErr error) {
 
-	request, callOptions, err := executeQueryRequest(a, sessionID, q, settings)
+	request, callOptions, err := executeQueryRequest(sessionID, q, settings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -186,8 +179,7 @@ func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose,
 }
 
 func readMaterializedResultSet(ctx context.Context, r *streamResult) (
-	_ *materializedResultSet, rowsCount int, finalErr error,
-) {
+	_ *materializedResultSet, rowsCount int, finalErr error) {
 	defer func() {
 		_ = r.Close(ctx)
 	}()

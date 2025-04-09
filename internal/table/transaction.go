@@ -7,7 +7,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -93,8 +92,6 @@ func (tx *transaction) ExecuteStatement(
 	stmt table.Statement, parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	a := allocator.New()
-	defer a.Free()
 
 	val, ok := stmt.(*statement)
 	if !ok {

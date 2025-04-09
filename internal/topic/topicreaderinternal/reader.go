@@ -152,8 +152,7 @@ func (r *Reader) ReadMessageBatch(
 	opts ...PublicReadBatchOption,
 ) (
 	batch *topicreadercommon.PublicBatch,
-	err error,
-) {
+	err error) {
 	batchOptions := r.getBatchOptions(opts)
 
 	for {

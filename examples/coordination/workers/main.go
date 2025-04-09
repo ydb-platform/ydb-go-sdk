@@ -173,8 +173,7 @@ func awaitSemaphore(
 	semaphoreName string,
 	leaseChan chan *LeaseInfo,
 	sem *semaphore.Weighted,
-	cancel context.CancelFunc,
-) {
+	cancel context.CancelFunc) {
 	defer done.Done()
 
 	lease, err := session.AcquireSemaphore(
@@ -207,8 +206,7 @@ func awaitSemaphore(
 
 func doWork(
 	lease coordination.Lease,
-	name string,
-) {
+	name string) {
 	fmt.Printf("worker %s: starting\n", name)
 
 	for {

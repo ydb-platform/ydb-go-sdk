@@ -39,8 +39,7 @@ func (c *Conn) NodeID() uint32 {
 }
 
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
-	result driver.Result, finalErr error,
-) {
+	result driver.Result, finalErr error) {
 	if !c.IsValid() {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
@@ -72,8 +71,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
-	result driver.RowsNextResultSet, finalErr error,
-) {
+	result driver.RowsNextResultSet, finalErr error) {
 	if !c.isReady() {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),

@@ -8,8 +8,7 @@ import (
 func Check(err error) (
 	code int64,
 	errType Type,
-	backoffType backoff.Type,
-) {
+	backoffType backoff.Type) {
 	if err == nil {
 		return -1,
 			TypeNoError,

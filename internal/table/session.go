@@ -19,7 +19,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
@@ -46,7 +45,6 @@ type (
 	dataQueryExecutor interface {
 		execute(
 			ctx context.Context,
-			a *allocator.Allocator,
 			txControl *tx.Control,
 			request *Ydb_Table.ExecuteDataQueryRequest,
 			callOptions ...grpc.CallOption,
@@ -132,7 +130,6 @@ func queryExecuteStreamResultToTableResult(
 
 func (e queryClientExecutor) execute(
 	ctx context.Context,
-	a *allocator.Allocator,
 	txControl *tx.Control,
 	executeDataQueryRequest *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
@@ -141,7 +138,7 @@ func (e queryClientExecutor) execute(
 
 	request.SessionId = executeDataQueryRequest.GetSessionId()
 	request.ExecMode = Ydb_Query.ExecMode_EXEC_MODE_EXECUTE
-	request.TxControl = txControl.ToYdbQueryTransactionControl(a)
+	request.TxControl = txControl.ToYdbQueryTransactionControl()
 	request.Query = &Ydb_Query.ExecuteQueryRequest_QueryContent{
 		QueryContent: &Ydb_Query.QueryContent{
 			Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -169,14 +166,13 @@ func (e queryClientExecutor) execute(
 
 func (e tableClientExecutor) execute(
 	ctx context.Context,
-	a *allocator.Allocator,
 	txControl *tx.Control,
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (*transaction, result.Result, error) {
-	request.TxControl = txControl.ToYdbTableTransactionControl(a)
+	request.TxControl = txControl.ToYdbTableTransactionControl()
 
-	r, err := executeDataQuery(ctx, e.client, a, request, callOptions...)
+	r, err := executeDataQuery(ctx, e.client, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -262,8 +258,7 @@ func (s *Session) SetStatus(status table.SessionStatus) {
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (
-	s *Session, finalErr error,
-) {
+	s *Session, finalErr error) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.newSession"),
 	)
@@ -527,12 +522,10 @@ func (s *Session) CreateTable(
 				operation.ModeSync,
 			),
 		}
-		a = allocator.New()
 	)
-	defer a.Free()
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
+			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request))
 		}
 	}
 	_, err = s.client.CreateTable(ctx, &request)
@@ -783,12 +776,10 @@ func (s *Session) AlterTable(
 				operation.ModeSync,
 			),
 		}
-		a = allocator.New()
 	)
-	defer a.Free()
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
+			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request))
 		}
 	}
 	_, err = s.client.AlterTable(ctx, &request)
@@ -1028,19 +1019,18 @@ func (s *Session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 func (s *Session) Execute(ctx context.Context, txControl *table.TransactionControl, sql string, params *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
-) {
+	txr table.Transaction, r result.Result, err error) {
 	var (
 		q       = queryFromText(sql)
 		request = options.ExecuteDataQueryDesc{
 			ExecuteDataQueryRequest: &Ydb_Table.ExecuteDataQueryRequest{
 				SessionId: s.id,
-				TxControl: txControl.ToYdbTableTransactionControl(nil),
+				TxControl: txControl.ToYdbTableTransactionControl(),
 				Parameters: func() map[string]*Ydb.TypedValue {
-					p, _ := params.ToYDB(nil)
+					p, _ := params.ToYDB()
 					return p
 				}(),
-				Query: q.toYDB(nil),
+				Query: q.toYDB(),
 				QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
 					KeepInCache: true,
 				},
@@ -1058,7 +1048,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 
 	for _, opt := range opts {
 		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, nil)...)
+			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request)...)
 		}
 	}
 
@@ -1072,7 +1062,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 		onDone(txr, false, r, err)
 	}()
 
-	t, r, err := s.dataQuery.execute(ctx, nil, txControl, request.ExecuteDataQueryRequest, callOptions...)
+	t, r, err := s.dataQuery.execute(ctx, txControl, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -1091,8 +1081,7 @@ func executeQueryResult(
 	txControl *Ydb_Table.TransactionControl,
 	ignoreTruncated bool,
 ) (
-	*transaction, result.Result, error,
-) {
+	*transaction, result.Result, error) {
 	tx := &transaction{
 		Identifier: tx.ID(res.GetTxMeta().GetId()),
 	}
@@ -1113,12 +1102,11 @@ func executeQueryResult(
 // executeDataQuery executes data query.
 func executeDataQuery(
 	ctx context.Context, client Ydb_Table_V1.TableServiceClient,
-	a *allocator.Allocator, request *Ydb_Table.ExecuteDataQueryRequest,
+	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (
 	_ *Ydb_Table.ExecuteQueryResult,
-	err error,
-) {
+	err error) {
 	var (
 		result   = &Ydb_Table.ExecuteQueryResult{}
 		response *Ydb_Table.ExecuteDataQueryResponse
@@ -1166,8 +1154,7 @@ func (s *Session) ExecuteSchemeQuery(ctx context.Context, sql string,
 //nolint:funlen
 func (s *Session) DescribeTableOptions(ctx context.Context) (
 	desc options.TableOptionsDescription,
-	err error,
-) {
+	err error) {
 	var (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult
@@ -1318,16 +1305,14 @@ func (s *Session) StreamReadTable(
 			Path:      path,
 		}
 		stream Ydb_Table_V1.TableService_StreamReadTableClient
-		a      = allocator.New()
 	)
 	defer func() {
-		a.Free()
 		onDone(xerrors.HideEOF(err))
 	}()
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyReadTableOption((*options.ReadTableDesc)(&request), a)
+			opt.ApplyReadTableOption((*options.ReadTableDesc)(&request))
 		}
 	}
 
@@ -1377,13 +1362,9 @@ func (s *Session) ReadRows(
 	opts ...options.ReadRowsOption,
 ) (_ result.Result, err error) {
 	var (
-		a        = allocator.New()
-		request  = makeReadRowsRequest(a, s.id, path, keys, opts)
+		request  = makeReadRowsRequest(s.id, path, keys, opts)
 		response *Ydb_Table.ReadRowsResponse
 	)
-	defer func() {
-		a.Free()
-	}()
 
 	response, err = s.client.ReadRows(ctx, request)
 
@@ -1401,7 +1382,6 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, sql string, parame
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
 	var (
-		a      = allocator.New()
 		q      = queryFromText(sql)
 		onDone = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(), &ctx,
@@ -1409,18 +1389,17 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, sql string, parame
 			s, q, parameters,
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
-			Query: q.toYDB(a),
+			Query: q.toYDB(),
 			Mode:  Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 		callOptions []grpc.CallOption
 	)
 	defer func() {
-		a.Free()
 		onDone(xerrors.HideEOF(err))
 	}()
 
-	params, err := parameters.ToYDB(a)
+	params, err := parameters.ToYDB()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -1478,14 +1457,12 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	opts ...options.BulkUpsertOption,
 ) (err error) {
 	var (
-		a           = allocator.New()
 		callOptions []grpc.CallOption
 		onDone      = trace.TableOnSessionBulkUpsert(s.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).BulkUpsert"), s,
 		)
 	)
 	defer func() {
-		defer a.Free()
 		onDone(err)
 	}()
 
@@ -1498,7 +1475,7 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	_, err = s.client.BulkUpsert(ctx,
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
-			Rows:  value.ToYDB(rows, a),
+			Rows:  value.ToYDB(rows),
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),
@@ -1528,7 +1505,6 @@ func (s *Session) BeginTransaction(
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).BeginTransaction"),
 			s,
 		)
-		a = allocator.New()
 	)
 	defer func() {
 		onDone(x, err)
@@ -1537,7 +1513,7 @@ func (s *Session) BeginTransaction(
 	response, err = s.client.BeginTransaction(ctx,
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
-			TxSettings: txSettings.ToYdbTableSettings(a),
+			TxSettings: txSettings.ToYdbTableSettings(),
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),

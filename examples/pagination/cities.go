@@ -19,8 +19,7 @@ func selectPaging(
 	lastCity *string,
 ) (
 	empty bool,
-	err error,
-) {
+	err error) {
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 

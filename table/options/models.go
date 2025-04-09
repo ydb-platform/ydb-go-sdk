@@ -7,7 +7,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -19,10 +18,10 @@ type Column struct {
 	Family string
 }
 
-func (c Column) toYDB(a *allocator.Allocator) *Ydb_Table.ColumnMeta {
+func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 	return &Ydb_Table.ColumnMeta{
 		Name:   c.Name,
-		Type:   types.TypeToYDB(c.Type, a),
+		Type:   types.TypeToYDB(c.Type),
 		Family: c.Family,
 	}
 }

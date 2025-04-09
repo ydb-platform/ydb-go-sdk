@@ -90,8 +90,7 @@ func (r *Reader) PopMessagesBatchTx(
 	opts ...ReadBatchOption,
 ) (
 	resBatch *Batch,
-	resErr error,
-) {
+	resErr error) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err
 	}

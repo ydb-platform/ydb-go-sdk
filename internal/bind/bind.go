@@ -29,8 +29,7 @@ type Bind interface {
 type Bindings []Bind
 
 func (bindings Bindings) ToYdb(sql string, args ...any) (
-	yql string, params params.Params, err error,
-) {
+	yql string, params params.Params, err error) {
 	if len(bindings) == 0 {
 		params, err = Params(args...)
 		if err != nil {

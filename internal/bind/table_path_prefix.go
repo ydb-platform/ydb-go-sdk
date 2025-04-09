@@ -25,8 +25,7 @@ func (tablePathPrefix TablePathPrefix) NormalizePath(folderOrTable string) strin
 }
 
 func (tablePathPrefix TablePathPrefix) ToYdb(sql string, args ...any) (
-	yql string, newArgs []any, err error,
-) {
+	yql string, newArgs []any, err error) {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 

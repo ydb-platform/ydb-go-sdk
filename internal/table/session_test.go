@@ -19,7 +19,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -170,8 +169,6 @@ func TestSessionDescribeTable(t *testing.T) {
 			Indexes:     []options.IndexDescription{},
 			Changefeeds: make([]options.ChangefeedDescription, 0),
 		}
-		a := allocator.New()
-		defer a.Free()
 		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{
 				Name:                 expect.Name,
@@ -183,13 +180,13 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []*Ydb_Table.ColumnMeta{
 				{
 					Name:   expect.Columns[0].Name,
-					Type:   types.TypeToYDB(expect.Columns[0].Type, a),
+					Type:   types.TypeToYDB(expect.Columns[0].Type),
 					Family: "testFamily",
 				},
 			},
 			PrimaryKey: expect.PrimaryKey,
 			ShardKeyBounds: []*Ydb.TypedValue{
-				value.ToYDB(expect.KeyRanges[0].To, a),
+				value.ToYDB(expect.KeyRanges[0].To),
 			},
 			Indexes:    nil,
 			TableStats: nil,

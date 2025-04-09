@@ -155,8 +155,7 @@ func IterateByIssues(err error, it func(message string, code Ydb.StatusIds_Statu
 
 func iterate(
 	issues []*Ydb_Issue.IssueMessage,
-	it func(message string, code Ydb.StatusIds_StatusCode, severity uint32),
-) {
+	it func(message string, code Ydb.StatusIds_StatusCode, severity uint32)) {
 	for _, issue := range issues {
 		it(issue.GetMessage(), Ydb.StatusIds_StatusCode(issue.GetIssueCode()), issue.GetSeverity())
 		iterate(issue.GetIssues(), it)

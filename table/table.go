@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -472,17 +471,16 @@ func WithTrace(t trace.Table) traceOption { //nolint:gocritic
 }
 
 type BulkUpsertData interface {
-	ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error)
+	ToYDB(tableName string) (*Ydb_Table.BulkUpsertRequest, error)
 }
-
 type bulkUpsertRows struct {
 	rows types.Value
 }
 
-func (data bulkUpsertRows) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
+func (data bulkUpsertRows) ToYDB(tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
 	return &Ydb_Table.BulkUpsertRequest{
 		Table: tableName,
-		Rows:  value.ToYDB(data.rows, a),
+		Rows:  value.ToYDB(data.rows),
 	}, nil
 }
 
@@ -501,7 +499,7 @@ type csvFormatOption interface {
 	applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) (err error)
 }
 
-func (data bulkUpsertCsv) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
+func (data bulkUpsertCsv) ToYDB(tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
 	var (
 		request = &Ydb_Table.BulkUpsertRequest{
 			Table: tableName,
@@ -593,7 +591,7 @@ type arrowFormatOption interface {
 	applyArrowFormatOption(req *Ydb_Table.BulkUpsertRequest_ArrowBatchSettings) (err error)
 }
 
-func (data bulkUpsertArrow) ToYDB(a *allocator.Allocator, tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
+func (data bulkUpsertArrow) ToYDB(tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
 	var (
 		request = &Ydb_Table.BulkUpsertRequest{
 			Table: tableName,

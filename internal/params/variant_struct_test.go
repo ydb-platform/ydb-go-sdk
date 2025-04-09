@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -456,8 +455,6 @@ func TestVariantStruct(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.method, func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
 
 			item := Builder{}.Param("$x").BeginVariant().BeginStruct().Field("key")
 
@@ -467,7 +464,7 @@ func TestVariantStruct(t *testing.T) {
 			builder, ok := xtest.CallMethod(vs.Name("key"), tc.method, tc.itemArgs...)[0].(*variantStructBuilder)
 			require.True(t, ok)
 
-			params := builder.EndStruct().EndVariant().build().toYDB(a)
+			params := builder.EndStruct().EndVariant().build().toYDB()
 
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
@@ -501,8 +498,6 @@ func TestVariantStruct(t *testing.T) {
 }
 
 func TestVariantStruct_AddFields(t *testing.T) {
-	a := allocator.New()
-	defer a.Free()
 
 	params := Builder{}.Param("$x").BeginVariant().BeginStruct().
 		AddFields([]types.StructField{
@@ -519,7 +514,7 @@ func TestVariantStruct_AddFields(t *testing.T) {
 				T:    types.Text,
 			},
 		}...).Name("key3").Text("Hello, World!").EndStruct().
-		EndVariant().build().toYDB(a)
+		EndVariant().build().toYDB()
 
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{

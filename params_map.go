@@ -6,7 +6,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -17,7 +16,7 @@ type wrongParameters struct {
 	err error
 }
 
-func (p wrongParameters) ToYDB(a *allocator.Allocator) (map[string]*Ydb.TypedValue, error) {
+func (p wrongParameters) ToYDB() (map[string]*Ydb.TypedValue, error) {
 	return nil, xerrors.WithStackTrace(p.err)
 }
 

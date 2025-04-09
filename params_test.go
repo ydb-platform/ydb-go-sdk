@@ -10,7 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -150,35 +149,27 @@ func TestParams(t *testing.T) {
 	}
 	t.Run("ParamsBuilder", func(t *testing.T) {
 		params := makeParamsUsingParamsBuilder(t)
-		a := allocator.New()
-		pb, err := params.ToYDB(a)
+		pb, err := params.ToYDB()
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
-		a.Free()
 		t.Run("Raw", func(t *testing.T) {
 			params := makeParamsUsingRawProtobuf(t)
-			a := allocator.New()
-			pb, err := params.ToYDB(a)
+			pb, err := params.ToYDB()
 			require.NoError(t, err)
 			require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
-			a.Free()
 		})
 	})
 	t.Run("ParamsFromMap", func(t *testing.T) {
 		params := makeParamsUsingParamsFromMap(t)
-		a := allocator.New()
-		pb, err := params.ToYDB(a)
+		pb, err := params.ToYDB()
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
-		a.Free()
 	})
 	t.Run("table/types", func(t *testing.T) {
 		params := makeParamsUsingTableTypes(t)
-		a := allocator.New()
-		pb, err := params.ToYDB(a)
+		pb, err := params.ToYDB()
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
-		a.Free()
 	})
 }
 
@@ -187,36 +178,28 @@ func BenchmarkParams(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			params := makeParamsUsingParamsBuilder(b)
-			a := allocator.New()
-			_, _ = params.ToYDB(a)
-			a.Free()
+			_, _ = params.ToYDB()
 		}
 	})
 	b.Run("RawProtobuf", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			params := makeParamsUsingRawProtobuf(b)
-			a := allocator.New()
-			_, _ = params.ToYDB(a)
-			a.Free()
+			_, _ = params.ToYDB()
 		}
 	})
 	b.Run("ParamsFromMap", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			params := makeParamsUsingParamsFromMap(b)
-			a := allocator.New()
-			_, _ = params.ToYDB(a)
-			a.Free()
+			_, _ = params.ToYDB()
 		}
 	})
 	b.Run("table/types", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			params := makeParamsUsingTableTypes(b)
-			a := allocator.New()
-			_, _ = params.ToYDB(a)
-			a.Free()
+			_, _ = params.ToYDB()
 		}
 	})
 }
@@ -227,7 +210,7 @@ func TestParamsFromMap(t *testing.T) {
 			"a": time.Unix(123, 456),
 			"b": time.Duration(123) * time.Microsecond,
 		})
-		pp, err := params.ToYDB(&allocator.Allocator{})
+		pp, err := params.ToYDB()
 		require.NoError(t, err)
 		require.EqualValues(t,
 			fmt.Sprintf("%+v", map[string]*Ydb.TypedValue{
@@ -264,7 +247,7 @@ func TestParamsFromMap(t *testing.T) {
 			"a": time.Date(1900, 1, 1, 0, 0, 0, 123456, time.UTC),
 			"b": time.Duration(123) * time.Nanosecond,
 		}, ydb.WithWideTimeTypes(true))
-		pp, err := params.ToYDB(&allocator.Allocator{})
+		pp, err := params.ToYDB()
 		require.NoError(t, err)
 		require.EqualValues(t,
 			fmt.Sprintf("%+v", map[string]*Ydb.TypedValue{
@@ -301,7 +284,7 @@ func TestParamsFromMap(t *testing.T) {
 			"a": time.Unix(123, 456),
 			"b": time.Duration(123),
 		}, ydb.WithTablePathPrefix(""))
-		pp, err := params.ToYDB(&allocator.Allocator{})
+		pp, err := params.ToYDB()
 		require.ErrorIs(t, err, bind.ErrUnsupportedBindingType)
 		require.Nil(t, pp)
 	})

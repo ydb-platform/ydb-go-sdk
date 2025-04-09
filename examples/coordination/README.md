@@ -127,8 +127,7 @@ func awaitSemaphore(
 	session coordination.Session, 
 	semaphoreName string,
 	capacitySemaphore *semaphore.Weighted,
-	leaseChan chan *coordination.Lease,
-) {
+	leaseChan chan *coordination.Lease) {
     lease, err := session.AcquireSemaphore(
         ctx,
         semaphoreName,

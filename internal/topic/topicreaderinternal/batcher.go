@@ -125,8 +125,7 @@ type batcherGetOptions struct {
 func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
 	head batcherMessageOrderItem,
 	rest batcherMessageOrderItems,
-	ok bool,
-) {
+	ok bool) {
 	notFound := func() (batcherMessageOrderItem, batcherMessageOrderItems, bool) {
 		return batcherMessageOrderItem{}, batcherMessageOrderItems{}, false
 	}
@@ -156,8 +155,7 @@ func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
 
 func (o batcherGetOptions) splitBatch(batch *topicreadercommon.PublicBatch) (
 	head, rest *topicreadercommon.PublicBatch,
-	ok bool,
-) {
+	ok bool) {
 	notFound := func() (*topicreadercommon.PublicBatch, *topicreadercommon.PublicBatch, bool) {
 		return nil, nil, false
 	}
@@ -299,8 +297,7 @@ func (b *batcher) findNeedLockProcessItem(
 	items batcherMessageOrderItems,
 	needBatchResult bool,
 ) (
-	result batcherResultCandidate,
-) {
+	result batcherResultCandidate) {
 	rawMessageOpts := batcherGetOptions{rawMessagesOnly: true}
 	head, rest, ok := rawMessageOpts.cutBatchItemsHead(items)
 	if ok {

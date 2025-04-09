@@ -280,8 +280,7 @@ func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
 	ctx context.Context,
 	tx tx.Transaction,
 	batch *topicreadercommon.PublicBatch,
-	updateOffesetInTransactionErr error,
-) {
+	updateOffesetInTransactionErr error) {
 	commitRange := topicreadercommon.GetCommitRange(batch)
 	tx.OnCompleted(func(transactionResult error) {
 		traceCtx := ctx
@@ -503,8 +502,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 
 func (r *topicStreamReaderImpl) onPartitionSessionStatusResponseFromBuffer(
 	ctx context.Context,
-	m *rawtopicreader.PartitionSessionStatusResponse,
-) {
+	m *rawtopicreader.PartitionSessionStatusResponse) {
 	panic("not implemented")
 }
 

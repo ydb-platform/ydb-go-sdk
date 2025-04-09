@@ -357,8 +357,7 @@ func invoke(
 ) (
 	opID string,
 	issues []trace.Issue,
-	_ error,
-) {
+	_ error) {
 	useWrapping := UseWrapping(ctx)
 
 	ctx, traceID, err := meta.TraceID(ctx)

@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -31,18 +30,17 @@ func (s *statement) Execute(
 	parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
-) {
+	txr table.Transaction, r result.Result, err error) {
 	var (
 		request = options.ExecuteDataQueryDesc{
 			ExecuteDataQueryRequest: &Ydb_Table.ExecuteDataQueryRequest{
 				SessionId: s.session.id,
-				TxControl: txControl.ToYdbTableTransactionControl(nil),
+				TxControl: txControl.ToYdbTableTransactionControl(),
 				Parameters: func() map[string]*Ydb.TypedValue {
-					p, _ := parameters.ToYDB(nil)
+					p, _ := parameters.ToYDB()
 					return p
 				}(),
-				Query: s.query.toYDB(nil),
+				Query: s.query.toYDB(),
 			},
 			IgnoreTruncated: s.session.config.IgnoreTruncated(),
 		}
@@ -61,7 +59,7 @@ func (s *statement) Execute(
 
 	for _, opt := range opts {
 		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, nil)...)
+			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request)...)
 		}
 	}
 
@@ -75,19 +73,18 @@ func (s *statement) Execute(
 		onDone(txr, true, r, err)
 	}()
 
-	return s.execute(ctx, nil, nil, &request, callOptions...)
+	return s.execute(ctx, nil, &request, callOptions...)
 }
 
 // execute executes prepared query without any tracing.
 func (s *statement) execute(
-	ctx context.Context, a *allocator.Allocator,
+	ctx context.Context,
 	txControl *tx.Control,
 	request *options.ExecuteDataQueryDesc,
 	callOptions ...grpc.CallOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
-) {
-	t, r, err := s.session.dataQuery.execute(ctx, a, txControl, request.ExecuteDataQueryRequest, callOptions...)
+	txr table.Transaction, r result.Result, err error) {
+	t, r, err := s.session.dataQuery.execute(ctx, txControl, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}

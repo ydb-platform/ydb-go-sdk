@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -30,16 +29,16 @@ type Value interface {
 	Yql() string
 
 	castTo(dst any) error
-	toYDB(a *allocator.Allocator) *Ydb.Value
+	toYDB() *Ydb.Value
 }
 
-func ToYDB(v Value, a *allocator.Allocator) *Ydb.TypedValue {
+func ToYDB(v Value) *Ydb.TypedValue {
 	if v == nil {
 		return nil
 	}
 	return &Ydb.TypedValue{
-		Type:  v.Type().ToYDB(a),
-		Value: v.toYDB(a),
+		Type:  v.Type().ToYDB(),
+		Value: v.toYDB(),
 	}
 }
 
@@ -217,10 +216,8 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *types.List:
 		return ListValue(func() []Value {
 			vv := make([]Value, len(v.GetItems()))
-			a := allocator.New()
-			defer a.Free()
 			for i, vvv := range v.GetItems() {
-				vv[i] = FromYDB(ttt.ItemType().ToYDB(a), vvv)
+				vv[i] = FromYDB(ttt.ItemType().ToYDB(), vvv)
 			}
 
 			return vv
@@ -229,10 +226,8 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *types.Tuple:
 		return TupleValue(func() []Value {
 			vv := make([]Value, len(v.GetItems()))
-			a := allocator.New()
-			defer a.Free()
 			for i, vvv := range v.GetItems() {
-				vv[i] = FromYDB(ttt.ItemType(i).ToYDB(a), vvv)
+				vv[i] = FromYDB(ttt.ItemType(i).ToYDB(), vvv)
 			}
 
 			return vv
@@ -241,12 +236,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *types.Struct:
 		return StructValue(func() []StructValueField {
 			vv := make([]StructValueField, len(v.GetItems()))
-			a := allocator.New()
-			defer a.Free()
 			for i, vvv := range v.GetItems() {
 				vv[i] = StructValueField{
 					Name: ttt.Field(i).Name,
-					V:    FromYDB(ttt.Field(i).T.ToYDB(a), vvv),
+					V:    FromYDB(ttt.Field(i).T.ToYDB(), vvv),
 				}
 			}
 
@@ -256,12 +249,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *types.Dict:
 		return DictValue(func() []DictValueField {
 			vv := make([]DictValueField, len(v.GetPairs()))
-			a := allocator.New()
-			defer a.Free()
 			for i, vvv := range v.GetPairs() {
 				vv[i] = DictValueField{
-					K: FromYDB(ttt.KeyType().ToYDB(a), vvv.GetKey()),
-					V: FromYDB(ttt.ValueType().ToYDB(a), vvv.GetPayload()),
+					K: FromYDB(ttt.KeyType().ToYDB(), vvv.GetKey()),
+					V: FromYDB(ttt.ValueType().ToYDB(), vvv.GetPayload()),
 				}
 			}
 
@@ -271,18 +262,14 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *types.Set:
 		return SetValue(func() []Value {
 			vv := make([]Value, len(v.GetPairs()))
-			a := allocator.New()
-			defer a.Free()
 			for i, vvv := range v.GetPairs() {
-				vv[i] = FromYDB(ttt.ItemType().ToYDB(a), vvv.GetKey())
+				vv[i] = FromYDB(ttt.ItemType().ToYDB(), vvv.GetKey())
 			}
 
 			return vv
 		}()...), nil
 
 	case *types.VariantStruct:
-		a := allocator.New()
-		defer a.Free()
 
 		val, ok := v.GetValue().(*Ydb.Value_NestedValue)
 		if !ok {
@@ -291,7 +278,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 		return VariantValueStruct(
 			FromYDB(
-				ttt.Struct.Field(int(v.GetVariantIndex())).T.ToYDB(a),
+				ttt.Struct.Field(int(v.GetVariantIndex())).T.ToYDB(),
 				val.NestedValue,
 			),
 			ttt.Struct.Field(int(v.GetVariantIndex())).Name,
@@ -299,8 +286,6 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		), nil
 
 	case *types.VariantTuple:
-		a := allocator.New()
-		defer a.Free()
 
 		val, ok := v.GetValue().(*Ydb.Value_NestedValue)
 		if !ok {
@@ -309,7 +294,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 		return VariantValueTuple(
 			FromYDB(
-				ttt.Tuple.ItemType(int(v.GetVariantIndex())).ToYDB(a),
+				ttt.Tuple.ItemType(int(v.GetVariantIndex())).ToYDB(),
 				val.NestedValue,
 			),
 			v.GetVariantIndex(),
@@ -361,7 +346,7 @@ func (boolValue) Type() types.Type {
 	return types.Bool
 }
 
-func (v boolValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v boolValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_BoolValue{
 			BoolValue: bool(v),
@@ -413,7 +398,7 @@ func (dateValue) Type() types.Type {
 	return types.Date
 }
 
-func (v dateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v dateValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Uint32Value{
 			Uint32Value: uint32(v),
@@ -470,7 +455,7 @@ func (date32Value) Type() types.Type {
 	return types.Date32
 }
 
-func (v date32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v date32Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int32Value{
 			Int32Value: int32(v),
@@ -527,7 +512,7 @@ func (datetimeValue) Type() types.Type {
 	return types.Datetime
 }
 
-func (v datetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v datetimeValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Uint32Value{
 			Uint32Value: uint32(v),
@@ -576,7 +561,7 @@ func (datetime64Value) Type() types.Type {
 	return types.Datetime64
 }
 
-func (v datetime64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v datetime64Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int64Value{
 			Int64Value: int64(v),
@@ -654,7 +639,7 @@ func (v *decimalValue) Type() types.Type {
 	return v.innerType
 }
 
-func (v *decimalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *decimalValue) toYDB() *Ydb.Value {
 	var bytes [16]byte
 	if v != nil {
 		bytes = v.value
@@ -747,7 +732,7 @@ func (v *dictValue) Type() types.Type {
 	return v.t
 }
 
-func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *dictValue) toYDB() *Ydb.Value {
 	var values []DictValueField
 	if v != nil {
 		values = v.values
@@ -755,8 +740,8 @@ func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	pairs := make([]*Ydb.ValuePair, 0, len(values))
 	for i := range values {
 		pairs = append(pairs, &Ydb.ValuePair{
-			Key:     values[i].K.toYDB(a),
-			Payload: values[i].V.toYDB(a),
+			Key:     values[i].K.toYDB(),
+			Payload: values[i].V.toYDB(),
 		})
 	}
 	return &Ydb.Value{
@@ -820,7 +805,7 @@ func (*doubleValue) Type() types.Type {
 	return types.Double
 }
 
-func (v *doubleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *doubleValue) toYDB() *Ydb.Value {
 	var value float64
 	if v != nil {
 		value = v.value
@@ -864,7 +849,7 @@ func (dyNumberValue) Type() types.Type {
 	return types.DyNumber
 }
 
-func (v dyNumberValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v dyNumberValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: string(v),
@@ -918,7 +903,7 @@ func (*floatValue) Type() types.Type {
 	return types.Float
 }
 
-func (v *floatValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *floatValue) toYDB() *Ydb.Value {
 	var value float32
 	if v != nil {
 		value = v.value
@@ -994,7 +979,7 @@ func (int8Value) Type() types.Type {
 	return types.Int8
 }
 
-func (v int8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v int8Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int32Value{
 			Int32Value: int32(v),
@@ -1058,7 +1043,7 @@ func (int16Value) Type() types.Type {
 	return types.Int16
 }
 
-func (v int16Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v int16Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int32Value{
 			Int32Value: int32(v),
@@ -1125,7 +1110,7 @@ func (int32Value) Type() types.Type {
 	return types.Int32
 }
 
-func (v int32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v int32Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int32Value{
 			Int32Value: int32(v),
@@ -1178,7 +1163,7 @@ func (int64Value) Type() types.Type {
 	return types.Int64
 }
 
-func (v int64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v int64Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int64Value{
 			Int64Value: int64(v),
@@ -1260,7 +1245,7 @@ func (intervalValue) Type() types.Type {
 	return types.Interval
 }
 
-func (v intervalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v intervalValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int64Value{
 			Int64Value: int64(v),
@@ -1347,7 +1332,7 @@ func (interval64Value) Type() types.Type {
 	return types.Interval64
 }
 
-func (v interval64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v interval64Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int64Value{
 			Int64Value: int64(v),
@@ -1392,7 +1377,7 @@ func (jsonValue) Type() types.Type {
 	return types.JSON
 }
 
-func (v jsonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v jsonValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: string(v),
@@ -1436,7 +1421,7 @@ func (jsonDocumentValue) Type() types.Type {
 	return types.JSONDocument
 }
 
-func (v jsonDocumentValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v jsonDocumentValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: string(v),
@@ -1517,7 +1502,7 @@ func (v *listValue) Type() types.Type {
 	return v.t
 }
 
-func (v *listValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *listValue) toYDB() *Ydb.Value {
 	var items []Value
 	if v != nil {
 		items = v.items
@@ -1527,7 +1512,7 @@ func (v *listValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	}
 
 	for _, vv := range items {
-		result.Items = append(result.Items, vv.toYDB(a))
+		result.Items = append(result.Items, vv.toYDB())
 	}
 
 	return result
@@ -1571,7 +1556,7 @@ func (v pgValue) Type() types.Type {
 	return v.t
 }
 
-func (v pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
+func (v pgValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: v.val,
@@ -1648,14 +1633,14 @@ func (v *setValue) Type() types.Type {
 	return v.t
 }
 
-func (v *setValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *setValue) toYDB() *Ydb.Value {
 	result := &Ydb.Value{
 		Pairs: make([]*Ydb.ValuePair, 0, len(v.items)),
 	}
 
 	for _, vv := range v.items {
 		result.Pairs = append(result.Pairs, &Ydb.ValuePair{
-			Key:     vv.toYDB(a),
+			Key:     vv.toYDB(),
 			Payload: _voidValue,
 		})
 	}
@@ -1754,16 +1739,16 @@ func (v *optionalValue) Type() types.Type {
 	return v.innerType
 }
 
-func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *optionalValue) toYDB() *Ydb.Value {
 	if _, opt := v.value.(*optionalValue); opt {
 		return &Ydb.Value{
 			Value: &Ydb.Value_NestedValue{
-				NestedValue: v.value.toYDB(a),
+				NestedValue: v.value.toYDB(),
 			},
 		}
 	}
 	if v.value != nil {
-		return v.value.toYDB(a)
+		return v.value.toYDB()
 	}
 	return &Ydb.Value{
 		Value: &Ydb.Value_NullFlagValue{},
@@ -1852,13 +1837,13 @@ func (v *structValue) Type() types.Type {
 	return v.t
 }
 
-func (v *structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *structValue) toYDB() *Ydb.Value {
 	result := &Ydb.Value{
 		Items: make([]*Ydb.Value, 0, len(v.fields)),
 	}
 
 	for i := range v.fields {
-		result.Items = append(result.Items, v.fields[i].V.toYDB(a))
+		result.Items = append(result.Items, v.fields[i].V.toYDB())
 	}
 
 	return result
@@ -1914,7 +1899,7 @@ func (timestampValue) Type() types.Type {
 	return types.Timestamp
 }
 
-func (v timestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v timestampValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Uint64Value{
 			Uint64Value: uint64(v),
@@ -1963,7 +1948,7 @@ func (timestamp64Value) Type() types.Type {
 	return types.Timestamp64
 }
 
-func (v timestamp64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v timestamp64Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Int64Value{
 			Int64Value: int64(v),
@@ -2026,7 +2011,7 @@ func (v *tupleValue) Type() types.Type {
 	return v.t
 }
 
-func (v *tupleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *tupleValue) toYDB() *Ydb.Value {
 	var items []Value
 	if v != nil {
 		items = v.items
@@ -2034,7 +2019,7 @@ func (v *tupleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := &Ydb.Value{}
 
 	for _, vv := range items {
-		vvv.Items = append(vvv.GetItems(), vv.toYDB(a))
+		vvv.Items = append(vvv.GetItems(), vv.toYDB())
 	}
 
 	return vvv
@@ -2080,7 +2065,7 @@ func (tzDateValue) Type() types.Type {
 	return types.TzDate
 }
 
-func (v tzDateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v tzDateValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: string(v),
@@ -2124,7 +2109,7 @@ func (tzDatetimeValue) Type() types.Type {
 	return types.TzDatetime
 }
 
-func (v tzDatetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v tzDatetimeValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: string(v),
@@ -2184,7 +2169,7 @@ func (tzTimestampValue) Type() types.Type {
 	return types.TzTimestamp
 }
 
-func (v tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v tzTimestampValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: string(v),
@@ -2268,7 +2253,7 @@ func (uint8Value) Type() types.Type {
 	return types.Uint8
 }
 
-func (v uint8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v uint8Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Uint32Value{
 			Uint32Value: uint32(v),
@@ -2340,7 +2325,7 @@ func (uint16Value) Type() types.Type {
 	return types.Uint16
 }
 
-func (v uint16Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v uint16Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Uint32Value{
 			Uint32Value: uint32(v),
@@ -2400,7 +2385,7 @@ func (uint32Value) Type() types.Type {
 	return types.Uint32
 }
 
-func (v uint32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v uint32Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Uint32Value{
 			Uint32Value: uint32(v),
@@ -2449,7 +2434,7 @@ func (uint64Value) Type() types.Type {
 	return types.Uint64
 }
 
-func (v uint64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v uint64Value) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_Uint64Value{
 			Uint64Value: uint64(v),
@@ -2493,7 +2478,7 @@ func (textValue) Type() types.Type {
 	return types.Text
 }
 
-func (v textValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v textValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: string(v),
@@ -2581,9 +2566,9 @@ func (*uuidValue) Type() types.Type {
 	return types.UUID
 }
 
-func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *uuidValue) toYDB() *Ydb.Value {
 	if v.reproduceStorageBug {
-		return v.toYDBWithBug(a)
+		return v.toYDBWithBug()
 	}
 
 	var low, high uint64
@@ -2607,7 +2592,7 @@ func UUIDToHiLoPair(id uuid.UUID) (low, high uint64) {
 	return low, high
 }
 
-func (v *uuidValue) toYDBWithBug(a *allocator.Allocator) *Ydb.Value {
+func (v *uuidValue) toYDBWithBug() *Ydb.Value {
 	var bytes [16]byte
 	if v != nil {
 		bytes = v.value
@@ -2786,10 +2771,10 @@ func (v *variantValue) Type() types.Type {
 	return v.innerType
 }
 
-func (v *variantValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *variantValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_NestedValue{
-			NestedValue: v.value.toYDB(a),
+			NestedValue: v.value.toYDB(),
 		},
 		VariantIndex: v.idx,
 	}
@@ -2867,7 +2852,7 @@ func (voidValue) Type() types.Type {
 	return _voidValueType
 }
 
-func (voidValue) toYDB(*allocator.Allocator) *Ydb.Value {
+func (voidValue) toYDB() *Ydb.Value {
 	return _voidValue
 }
 
@@ -2903,7 +2888,7 @@ func (ysonValue) Type() types.Type {
 	return types.YSON
 }
 
-func (v ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v ysonValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_BytesValue{
 			BytesValue: v,
@@ -3088,7 +3073,7 @@ func (bytesValue) Type() types.Type {
 	return types.Bytes
 }
 
-func (v bytesValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v bytesValue) toYDB() *Ydb.Value {
 	return &Ydb.Value{
 		Value: &Ydb.Value_BytesValue{
 			BytesValue: v,
@@ -3126,7 +3111,7 @@ func (v protobufValue) castTo(dst any) error {
 	}
 }
 
-func (v protobufValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v protobufValue) toYDB() *Ydb.Value {
 	return v.pb.GetValue()
 }
 

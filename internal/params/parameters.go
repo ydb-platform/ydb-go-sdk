@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -24,7 +23,7 @@ type (
 		value  value.Value
 	}
 	Parameters interface {
-		ToYDB(a *allocator.Allocator) (map[string]*Ydb.TypedValue, error)
+		ToYDB() (map[string]*Ydb.TypedValue, error)
 	}
 	Params []*Parameter
 )
@@ -67,26 +66,26 @@ func (p *Params) String() string {
 	return buffer.String()
 }
 
-func (p *Params) ToYDB(a *allocator.Allocator) (map[string]*Ydb.TypedValue, error) {
+func (p *Params) ToYDB() (map[string]*Ydb.TypedValue, error) {
 	if p == nil {
 		return nil, nil //nolint:nilnil
 	}
 
 	parameters := make(map[string]*Ydb.TypedValue, len(*p))
 	for _, param := range *p {
-		parameters[param.name] = value.ToYDB(param.value, a)
+		parameters[param.name] = value.ToYDB(param.value)
 	}
 
 	return parameters, nil
 }
 
-func (p *Params) toYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+func (p *Params) toYDB() map[string]*Ydb.TypedValue {
 	if p == nil {
 		return nil
 	}
 	parameters := make(map[string]*Ydb.TypedValue, len(*p))
 	for _, param := range *p {
-		parameters[param.name] = value.ToYDB(param.value, a)
+		parameters[param.name] = value.ToYDB(param.value)
 	}
 
 	return parameters

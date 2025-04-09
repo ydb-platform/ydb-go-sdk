@@ -66,15 +66,13 @@ func (q *messageQueue) AddMessages(messages []messageWithDataContent) error {
 
 func (q *messageQueue) AddMessagesWithWaiter(messages []messageWithDataContent) (
 	waiter MessageQueueAckWaiter,
-	err error,
-) {
+	err error) {
 	return q.addMessages(messages, true)
 }
 
 func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter bool) (
 	waiter MessageQueueAckWaiter,
-	err error,
-) {
+	err error) {
 	q.m.Lock()
 	defer q.m.Unlock()
 

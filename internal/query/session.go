@@ -102,8 +102,7 @@ func (s *Session) Begin(
 	ctx context.Context,
 	txSettings query.TransactionSettings,
 ) (
-	tx query.Transaction, finalErr error,
-) {
+	tx query.Transaction, finalErr error) {
 	onDone := trace.QueryOnSessionBegin(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
 	defer func() {

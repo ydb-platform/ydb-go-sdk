@@ -14,8 +14,7 @@ func (m AutoDeclare) blockID() blockID {
 }
 
 func (m AutoDeclare) ToYdb(sql string, args ...any) (
-	yql string, newArgs []any, err error,
-) {
+	yql string, newArgs []any, err error) {
 	params, err := Params(args...)
 	if err != nil {
 		return "", nil, xerrors.WithStackTrace(err)

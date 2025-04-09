@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	grpcStatus "google.golang.org/grpc/status"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -761,7 +760,6 @@ func TestExecute(t *testing.T) {
 }
 
 func TestExecuteQueryRequest(t *testing.T) {
-	a := allocator.New()
 	for _, tt := range []struct {
 		name        string
 		opts        []options.Execute
@@ -1008,7 +1006,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			request, callOptions, err := executeQueryRequest(a, tt.name, tt.name, options.ExecuteSettings(tt.opts...))
+			request, callOptions, err := executeQueryRequest(tt.name, tt.name, options.ExecuteSettings(tt.opts...))
 			require.NoError(t, err)
 			require.Equal(t, request.String(), tt.request.String())
 			require.Equal(t, tt.callOptions, callOptions)

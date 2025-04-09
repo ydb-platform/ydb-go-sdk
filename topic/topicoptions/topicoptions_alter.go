@@ -119,8 +119,7 @@ func ensureAlterConsumer(
 	name string,
 ) (
 	newConsumers []rawtopic.AlterConsumer,
-	index int,
-) {
+	index int) {
 	for i := range consumers {
 		if consumers[i].Name == name {
 			return consumers, i
