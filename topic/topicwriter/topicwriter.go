@@ -11,6 +11,9 @@ type (
 )
 
 var (
+	// Deprecated: the error will not be returned. Topic writer allow overflow queue for single call.
+	// Will be removed after October 2025.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	ErrQueueLimitExceed                      = topicwriterinternal.PublicErrQueueIsFull
 	ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.PublicErrMessagesPutToInternalQueueBeforeError
 )

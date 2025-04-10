@@ -80,18 +80,20 @@ type topicStreamReaderConfig struct {
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
 	CommitMode                      topicreadercommon.PublicCommitMode
 	Decoders                        topicreadercommon.DecoderMap
+	EnableSplitMergeSupport         bool
 }
 
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
 	return topicStreamReaderConfig{
-		BaseContext:           context.Background(),
-		BufferSizeProtoBytes:  topicreadercommon.DefaultBufferSize,
-		Cred:                  credentials.NewAnonymousCredentials(),
-		CredUpdateInterval:    time.Hour,
-		CommitMode:            topicreadercommon.CommitModeAsync,
-		CommitterBatchTimeLag: time.Second,
-		Decoders:              topicreadercommon.NewDecoderMap(),
-		Trace:                 &trace.Topic{},
+		BaseContext:             context.Background(),
+		BufferSizeProtoBytes:    topicreadercommon.DefaultBufferSize,
+		Cred:                    credentials.NewAnonymousCredentials(),
+		CredUpdateInterval:      time.Hour,
+		CommitMode:              topicreadercommon.CommitModeAsync,
+		CommitterBatchTimeLag:   time.Second,
+		Decoders:                topicreadercommon.NewDecoderMap(),
+		Trace:                   &trace.Topic{},
+		EnableSplitMergeSupport: true,
 	}
 }
 
@@ -611,7 +613,7 @@ func (r *topicStreamReaderImpl) setStarted() error {
 }
 
 func (r *topicStreamReaderImpl) initSession() (err error) {
-	initMessage := topicreadercommon.CreateInitMessage(r.cfg.Consumer, r.cfg.ReadSelectors)
+	initMessage := topicreadercommon.CreateInitMessage(r.cfg.Consumer, r.cfg.EnableSplitMergeSupport, r.cfg.ReadSelectors)
 
 	onDone := trace.TopicOnReaderInit(r.cfg.Trace, r.readConnectionID, initMessage)
 	defer func() {

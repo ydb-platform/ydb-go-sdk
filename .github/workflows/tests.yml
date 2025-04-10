@@ -69,7 +69,7 @@ jobs:
           YDB_USE_IN_MEMORY_PDISKS: true
           YDB_TABLE_ENABLE_PREPARED_DDL: true
           YDB_ENABLE_COLUMN_TABLES: true
-        options: '-h localhost'
+        options: '-h localhost --name ydb'
     env:
       OS: ubuntu-latest
       GO: ${{ matrix.go-version }}
@@ -80,6 +80,8 @@ jobs:
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
       HIDE_APPLICATION_OUTPUT: 1
     steps:
+      - name: Show YDB version
+        run: docker exec ydb /ydbd -V
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install Go
@@ -124,7 +126,7 @@ jobs:
           YDB_TABLE_ENABLE_PREPARED_DDL: true
           YDB_FEATURE_FLAGS: enable_topic_service_tx,enable_antlr4_parser
           YDB_ENABLE_COLUMN_TABLES: true
-        options: '-h localhost'
+        options: '-h localhost --name ydb'
     env:
       OS: ubuntu-latest
       GO: ${{ matrix.go-version }}
@@ -137,6 +139,8 @@ jobs:
       YDB_EXECUTE_DATA_QUERY_OVER_QUERY_SERVICE: 1
       HIDE_APPLICATION_OUTPUT: 1
     steps:
+      - name: Show YDB version
+        run: docker exec ydb /ydbd -V
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install Go

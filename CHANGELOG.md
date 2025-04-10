@@ -1,6 +1,11 @@
 * Updated dependency `google.golang.org/protobuf` to `v1.36.5`
 * Dropped `internal/allocator` package and all usages of it for further switch (test) protobuf opaque API
 
+## v3.106.0
+* Added option WithReaderSupportSplitMergePartitions for topic manage support of split-merge partitions on client side (enabled by default).
+* Allowed overflow queue limit for one goroutine at time for topic writer
+* Removed delay before send commit in sync mode of a topic reader
+
 ## v3.105.2
 * Improved the `ydb.WithSessionPoolSessionUsageLimit` option for allow `time.Duration` as argument type for limit max session time to live since create time 
 
