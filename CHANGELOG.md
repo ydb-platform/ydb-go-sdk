@@ -1,3 +1,6 @@
+* Updated dependency `google.golang.org/protobuf` to `v1.36.5`
+* Dropped `internal/allocator` package and all usages of it for further switch (test) protobuf opaque API
+
 ## v3.105.2
 * Improved the `ydb.WithSessionPoolSessionUsageLimit` option for allow `time.Duration` as argument type for limit max session time to live since create time 
 
