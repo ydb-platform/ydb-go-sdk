@@ -52,13 +52,11 @@ func (q preparedQuery) YQL() string {
 }
 
 func (q preparedQuery) toYDB() *Ydb_Table.Query {
-	query := &Ydb_Table.Query{
+	return &Ydb_Table.Query{
 		Query: &Ydb_Table.Query_YqlText{
 			YqlText: q.sql,
 		},
 	}
-
-	return query
 }
 
 func queryFromText(s string) Query {

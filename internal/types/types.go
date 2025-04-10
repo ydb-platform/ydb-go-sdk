@@ -255,16 +255,14 @@ func (v *Dict) equalsTo(rhs Type) bool {
 }
 
 func (v *Dict) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	typeDict := &Ydb.Type_DictType{
-		DictType: &Ydb.DictType{
-			Key:     v.keyType.ToYDB(),
-			Payload: v.valueType.ToYDB(),
-		},
+	return &Ydb.Type{
+		Type: &Ydb.Type_DictType{
+			DictType: &Ydb.DictType{
+				Key:     v.keyType.ToYDB(),
+				Payload: v.valueType.ToYDB(),
+			},
+		}
 	}
-	t.Type = typeDict
-
-	return t
 }
 
 func NewDict(key, value Type) (v *Dict) {

@@ -82,7 +82,9 @@ func (s *statement) execute(
 	txControl *tx.Control,
 	request *options.ExecuteDataQueryDesc,
 	callOptions ...grpc.CallOption,
-) (txr table.Transaction, r result.Result, err error) {
+) (
+	txr table.Transaction, r result.Result, err error,
+) {
 	t, r, err := s.session.dataQuery.execute(ctx, txControl, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
