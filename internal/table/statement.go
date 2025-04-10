@@ -73,7 +73,7 @@ func (s *statement) Execute(
 		onDone(txr, true, r, err)
 	}()
 
-	return s.execute(ctx, nil, &request, callOptions...)
+	return s.execute(ctx, txControl, &request, callOptions...)
 }
 
 // execute executes prepared query without any tracing.
