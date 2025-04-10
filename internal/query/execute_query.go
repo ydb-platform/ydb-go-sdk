@@ -101,18 +101,18 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 }
 
 func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
-	content := &Ydb_Query.QueryContent{
+	return &Ydb_Query.QueryContent{
 		Syntax: syntax,
 		Text:   q,
 	}
-
-	return content
 }
 
 func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
 	q string, settings executeSettings, opts ...resultOption,
-) (_ *streamResult, finalErr error) {
+) (
+	_ *streamResult, finalErr error,
+) {
 	request, callOptions, err := executeQueryRequest(sessionID, q, settings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

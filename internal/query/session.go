@@ -98,7 +98,10 @@ func createSession(
 	}, nil
 }
 
-func (s *Session) Begin(ctx context.Context, txSettings query.TransactionSettings) (
+func (s *Session) Begin(
+	ctx context.Context,
+	txSettings query.TransactionSettings,
+) (
 	tx query.Transaction, finalErr error,
 ) {
 	onDone := trace.QueryOnSessionBegin(s.trace, &ctx,

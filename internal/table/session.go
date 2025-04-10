@@ -1015,7 +1015,9 @@ func (s *Session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 // Execute executes given data query represented by text.
 func (s *Session) Execute(ctx context.Context, txControl *table.TransactionControl, sql string, params *params.Params,
 	opts ...options.ExecuteDataQueryOption,
-) (txr table.Transaction, r result.Result, err error) {
+) (
+	txr table.Transaction, r result.Result, err error,
+) {
 	var (
 		q       = queryFromText(sql)
 		request = options.ExecuteDataQueryDesc{
@@ -1100,7 +1102,10 @@ func executeDataQuery(
 	ctx context.Context, client Ydb_Table_V1.TableServiceClient,
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
-) (_ *Ydb_Table.ExecuteQueryResult, err error) {
+) (
+	_ *Ydb_Table.ExecuteQueryResult,
+	err error,
+) {
 	var (
 		result   = &Ydb_Table.ExecuteQueryResult{}
 		response *Ydb_Table.ExecuteDataQueryResponse
@@ -1147,7 +1152,8 @@ func (s *Session) ExecuteSchemeQuery(ctx context.Context, sql string,
 //
 //nolint:funlen
 func (s *Session) DescribeTableOptions(ctx context.Context) (
-	desc options.TableOptionsDescription, err error,
+	desc options.TableOptionsDescription,
+	err error,
 ) {
 	var (
 		response *Ydb_Table.DescribeTableOptionsResponse

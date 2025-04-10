@@ -60,7 +60,8 @@ func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout ti
 // if return non nil stopRetryReason - err is not retriable and stopRetryReason contains reason,
 // which should be used instead of err
 func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.Duration) (
-	_ backoff.Backoff, stopRetryReason error,
+	_ backoff.Backoff,
+	stopRetryReason error,
 ) {
 	// nil is not error and doesn't need retry it.
 	if checkErr == nil {

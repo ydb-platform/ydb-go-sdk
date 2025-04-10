@@ -479,7 +479,8 @@ func (w *WriterReconnector) handleReconnectRetry(
 }
 
 func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context) (
-	writer *SingleStreamWriter, err error,
+	writer *SingleStreamWriter,
+	err error,
 ) {
 	stream, err := w.connectWithTimeout(streamCtx)
 	if err != nil {
@@ -678,7 +679,8 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 }
 
 func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopiccommon.Codec) (
-	res *rawtopicwriter.WriteRequest, err error,
+	res *rawtopicwriter.WriteRequest,
+	err error,
 ) {
 	for i := 1; i < len(messages); i++ {
 		if messages[i-1].tx != messages[i].tx {

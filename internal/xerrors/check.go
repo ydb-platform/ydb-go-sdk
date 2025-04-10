@@ -5,7 +5,11 @@ import (
 )
 
 // Check returns retry mode for err.
-func Check(err error) (code int64, errType Type, backoffType backoff.Type) {
+func Check(err error) (
+	code int64,
+	errType Type,
+	backoffType backoff.Type,
+) {
 	if err == nil {
 		return -1,
 			TypeNoError,
