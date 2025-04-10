@@ -12,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -44,11 +43,9 @@ func TestResultAny(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
 			res := NewUnary(
 				[]*Ydb.ResultSet{
-					NewResultSet(a,
+					NewResultSet(
 						WithColumns(test.columns...),
 						WithValues(test.values...),
 					),
@@ -110,11 +107,9 @@ func TestResultOUint32(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
 			res := NewUnary(
 				[]*Ydb.ResultSet{
-					NewResultSet(a,
+					NewResultSet(
 						WithColumns(test.columns...),
 						WithValues(test.values...),
 					),
@@ -144,21 +139,21 @@ func TestResultOUint32(t *testing.T) {
 
 type resultSetDesc Ydb.ResultSet
 
-type ResultSetOption func(*resultSetDesc, *allocator.Allocator)
+type ResultSetOption func(*resultSetDesc)
 
 func WithColumns(cs ...options.Column) ResultSetOption {
-	return func(r *resultSetDesc, a *allocator.Allocator) {
+	return func(r *resultSetDesc) {
 		for _, c := range cs {
 			r.Columns = append(r.Columns, &Ydb.Column{
 				Name: c.Name,
-				Type: types.TypeToYDB(c.Type, a),
+				Type: types.TypeToYDB(c.Type),
 			})
 		}
 	}
 }
 
 func WithValues(vs ...value.Value) ResultSetOption {
-	return func(r *resultSetDesc, a *allocator.Allocator) {
+	return func(r *resultSetDesc) {
 		n := len(r.Columns)
 		if n == 0 {
 			panic("empty columns")
@@ -177,7 +172,7 @@ func WithValues(vs ...value.Value) ResultSetOption {
 					Items: make([]*Ydb.Value, n),
 				}
 			}
-			tv := value.ToYDB(v, a)
+			tv := value.ToYDB(v)
 			act := types.TypeFromYDB(tv.GetType())
 			exp := types.TypeFromYDB(r.Columns[j].GetType())
 			if !types.Equal(act, exp) {
@@ -194,11 +189,11 @@ func WithValues(vs ...value.Value) ResultSetOption {
 	}
 }
 
-func NewResultSet(a *allocator.Allocator, opts ...ResultSetOption) *Ydb.ResultSet {
+func NewResultSet(opts ...ResultSetOption) *Ydb.ResultSet {
 	var d resultSetDesc
 	for _, opt := range opts {
 		if opt != nil {
-			opt(&d, a)
+			opt(&d)
 		}
 	}
 

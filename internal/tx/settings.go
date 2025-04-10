@@ -3,8 +3,6 @@ package tx
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
 var (
@@ -43,50 +41,52 @@ var (
 // Transaction settings options
 type (
 	SettingsOption interface {
-		ApplyQueryTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
-		ApplyTableTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Table.TransactionSettings)
+		ApplyQueryTxSettingsOption(txSettings *Ydb_Query.TransactionSettings)
+		ApplyTableTxSettingsOption(txSettings *Ydb_Table.TransactionSettings)
 	}
 	Settings []SettingsOption
 )
 
-func (opts Settings) applyTableTxSelector(a *allocator.Allocator, txControl *Ydb_Table.TransactionControl) {
-	beginTx := a.TableTransactionControlBeginTx()
-	beginTx.BeginTx = a.TableTransactionSettings()
+func (opts Settings) applyTableTxSelector(txControl *Ydb_Table.TransactionControl) {
+	beginTx := &Ydb_Table.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Table.TransactionSettings{},
+	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyTableTxSettingsOption(a, beginTx.BeginTx)
+			opt.ApplyTableTxSettingsOption(beginTx.BeginTx)
 		}
 	}
 	txControl.TxSelector = beginTx
 }
 
-func (opts Settings) applyQueryTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
-	beginTx := a.QueryTransactionControlBeginTx()
-	beginTx.BeginTx = a.QueryTransactionSettings()
+func (opts Settings) applyQueryTxSelector(txControl *Ydb_Query.TransactionControl) {
+	beginTx := &Ydb_Query.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Query.TransactionSettings{},
+	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyQueryTxSettingsOption(a, beginTx.BeginTx)
+			opt.ApplyQueryTxSettingsOption(beginTx.BeginTx)
 		}
 	}
 	txControl.TxSelector = beginTx
 }
 
-func (opts Settings) ToYdbQuerySettings(a *allocator.Allocator) *Ydb_Query.TransactionSettings {
-	txSettings := a.QueryTransactionSettings()
+func (opts Settings) ToYdbQuerySettings() *Ydb_Query.TransactionSettings {
+	txSettings := &Ydb_Query.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyQueryTxSettingsOption(a, txSettings)
+			opt.ApplyQueryTxSettingsOption(txSettings)
 		}
 	}
 
 	return txSettings
 }
 
-func (opts Settings) ToYdbTableSettings(a *allocator.Allocator) *Ydb_Table.TransactionSettings {
-	txSettings := a.TableTransactionSettings()
+func (opts Settings) ToYdbTableSettings() *Ydb_Table.TransactionSettings {
+	txSettings := &Ydb_Table.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyTableTxSettingsOption(a, txSettings)
+			opt.ApplyTableTxSettingsOption(txSettings)
 		}
 	}
 
@@ -106,15 +106,11 @@ var _ SettingsOption = serializableReadWriteTxSettingsOption{}
 
 type serializableReadWriteTxSettingsOption struct{}
 
-func (serializableReadWriteTxSettingsOption) ApplyTableTxSettingsOption(
-	a *allocator.Allocator, settings *Ydb_Table.TransactionSettings,
-) {
+func (serializableReadWriteTxSettingsOption) ApplyTableTxSettingsOption(settings *Ydb_Table.TransactionSettings) {
 	settings.TxMode = tableSerializableReadWrite
 }
 
-func (serializableReadWriteTxSettingsOption) ApplyQueryTxSettingsOption(
-	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
-) {
+func (serializableReadWriteTxSettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
 	settings.TxMode = querySerializableReadWrite
 }
 
@@ -126,15 +122,11 @@ var _ SettingsOption = snapshotReadOnlyTxSettingsOption{}
 
 type snapshotReadOnlyTxSettingsOption struct{}
 
-func (snapshotReadOnlyTxSettingsOption) ApplyTableTxSettingsOption(
-	a *allocator.Allocator, settings *Ydb_Table.TransactionSettings,
-) {
+func (snapshotReadOnlyTxSettingsOption) ApplyTableTxSettingsOption(settings *Ydb_Table.TransactionSettings) {
 	settings.TxMode = tableSnapshotReadOnly
 }
 
-func (snapshotReadOnlyTxSettingsOption) ApplyQueryTxSettingsOption(
-	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
-) {
+func (snapshotReadOnlyTxSettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
 	settings.TxMode = querySnapshotReadOnly
 }
 
@@ -146,15 +138,11 @@ var _ SettingsOption = staleReadOnlySettingsOption{}
 
 type staleReadOnlySettingsOption struct{}
 
-func (staleReadOnlySettingsOption) ApplyTableTxSettingsOption(
-	a *allocator.Allocator, settings *Ydb_Table.TransactionSettings,
-) {
+func (staleReadOnlySettingsOption) ApplyTableTxSettingsOption(settings *Ydb_Table.TransactionSettings) {
 	settings.TxMode = tableStaleReadOnly
 }
 
-func (staleReadOnlySettingsOption) ApplyQueryTxSettingsOption(
-	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
-) {
+func (staleReadOnlySettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
 	settings.TxMode = queryStaleReadOnly
 }
 
@@ -185,9 +173,7 @@ var _ SettingsOption = onlineReadOnlySettingsOption{}
 
 type onlineReadOnlySettingsOption []OnlineReadOnlyOption
 
-func (opts onlineReadOnlySettingsOption) ApplyQueryTxSettingsOption(
-	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
-) {
+func (opts onlineReadOnlySettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
 	var ro onlineReadOnly
 	for _, opt := range opts {
 		if opt != nil {
@@ -201,9 +187,7 @@ func (opts onlineReadOnlySettingsOption) ApplyQueryTxSettingsOption(
 	}
 }
 
-func (opts onlineReadOnlySettingsOption) ApplyTableTxSettingsOption(
-	a *allocator.Allocator, settings *Ydb_Table.TransactionSettings,
-) {
+func (opts onlineReadOnlySettingsOption) ApplyTableTxSettingsOption(settings *Ydb_Table.TransactionSettings) {
 	var ro onlineReadOnly
 	for _, opt := range opts {
 		if opt != nil {

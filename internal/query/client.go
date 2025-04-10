@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -163,9 +162,6 @@ func (c *Client) ExecuteScript(
 ) (
 	op *options.ExecuteScriptOperation, err error,
 ) {
-	a := allocator.New()
-	defer a.Free()
-
 	settings := &executeScriptSettings{
 		executeSettings: options.ExecuteSettings(opts...),
 		ttl:             ttl,
@@ -177,7 +173,7 @@ func (c *Client) ExecuteScript(
 		),
 	}
 
-	request, grpcOpts, err := executeQueryScriptRequest(a, q, settings)
+	request, grpcOpts, err := executeQueryScriptRequest(q, settings)
 	if err != nil {
 		return op, xerrors.WithStackTrace(err)
 	}

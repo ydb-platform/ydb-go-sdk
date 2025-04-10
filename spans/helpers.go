@@ -42,11 +42,7 @@ func finish(
 	s.End(fields...)
 }
 
-func logError(
-	s Span,
-	err error,
-	fields ...KeyValue,
-) {
+func logError(s Span, err error, fields ...KeyValue) {
 	var ydbErr ydb.Error
 	if xerrors.As(err, &ydbErr) {
 		fields = append(fields,

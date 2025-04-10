@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -42,12 +41,12 @@ type executeScriptConfig interface {
 	OperationParams() *Ydb_Operations.OperationParams
 }
 
-func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScriptConfig) (
+func executeQueryScriptRequest(q string, cfg executeScriptConfig) (
 	*Ydb_Query.ExecuteScriptRequest,
 	[]grpc.CallOption,
 	error,
 ) {
-	params, err := cfg.Params().ToYDB(a)
+	params, err := cfg.Params().ToYDB()
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -61,7 +60,7 @@ func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScri
 			ReportCostInfo:   0,
 		},
 		ExecMode:      Ydb_Query.ExecMode(cfg.ExecMode()),
-		ScriptContent: queryQueryContent(a, Ydb_Query.Syntax(cfg.Syntax()), q),
+		ScriptContent: queryQueryContent(Ydb_Query.Syntax(cfg.Syntax()), q),
 		Parameters:    params,
 		StatsMode:     Ydb_Query.StatsMode(cfg.StatsMode()),
 		ResultsTtl:    durationpb.New(cfg.ResultsTTL()),
@@ -71,46 +70,41 @@ func executeQueryScriptRequest(a *allocator.Allocator, q string, cfg executeScri
 	return request, cfg.CallOptions(), nil
 }
 
-func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeSettings) (
+func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
 	error,
 ) {
-	params, err := cfg.Params().ToYDB(a)
+	params, err := cfg.Params().ToYDB()
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	request := a.QueryExecuteQueryRequest()
-
-	request.SessionId = sessionID
-	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
-	request.TxControl = cfg.TxControl().ToYdbQueryTransactionControl(a)
-	request.Query = queryFromText(a, q, Ydb_Query.Syntax(cfg.Syntax()))
-	request.Parameters = params
-	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
-	request.ConcurrentResultSets = false
-	request.PoolId = cfg.ResourcePool()
-	request.ResponsePartLimitBytes = cfg.ResponsePartLimitSizeBytes()
+	request := &Ydb_Query.ExecuteQueryRequest{
+		SessionId: sessionID,
+		ExecMode:  Ydb_Query.ExecMode(cfg.ExecMode()),
+		TxControl: cfg.TxControl().ToYdbQueryTransactionControl(),
+		Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
+			QueryContent: &Ydb_Query.QueryContent{
+				Syntax: Ydb_Query.Syntax(cfg.Syntax()),
+				Text:   q,
+			},
+		},
+		Parameters:             params,
+		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
+		ConcurrentResultSets:   false,
+		PoolId:                 cfg.ResourcePool(),
+		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
+	}
 
 	return request, cfg.CallOptions(), nil
 }
 
-func queryQueryContent(a *allocator.Allocator, syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
-	content := a.QueryQueryContent()
-	content.Syntax = syntax
-	content.Text = q
-
-	return content
-}
-
-func queryFromText(
-	a *allocator.Allocator, q string, syntax Ydb_Query.Syntax,
-) *Ydb_Query.ExecuteQueryRequest_QueryContent {
-	content := a.QueryExecuteQueryRequestQueryContent()
-	content.QueryContent = queryQueryContent(a, syntax, q)
-
-	return content
+func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
+	return &Ydb_Query.QueryContent{
+		Syntax: syntax,
+		Text:   q,
+	}
 }
 
 func execute(
@@ -119,10 +113,7 @@ func execute(
 ) (
 	_ *streamResult, finalErr error,
 ) {
-	a := allocator.New()
-	defer a.Free()
-
-	request, callOptions, err := executeQueryRequest(a, sessionID, q, settings)
+	request, callOptions, err := executeQueryRequest(sessionID, q, settings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

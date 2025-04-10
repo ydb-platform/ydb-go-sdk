@@ -1,3 +1,5 @@
+* Dropped `internal/allocator` package and all usages of it for further switch (test) protobuf opaque API
+
 ## v3.106.0
 * Added option WithReaderSupportSplitMergePartitions for topic manage support of split-merge partitions on client side (enabled by default).
 * Allowed overflow queue limit for one goroutine at time for topic writer

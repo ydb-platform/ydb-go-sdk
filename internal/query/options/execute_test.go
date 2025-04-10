@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
@@ -140,7 +139,6 @@ func TestExecuteSettings(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			a := allocator.New()
 			settings := ExecuteSettings(
 				append(
 					[]Execute{WithTxControl(tt.tx.txControl())},
@@ -152,10 +150,10 @@ func TestExecuteSettings(t *testing.T) {
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
 			require.Equal(t, tt.settings.ResourcePool(), settings.ResourcePool())
 			require.Equal(t,
-				tt.settings.TxControl().ToYdbQueryTransactionControl(a).String(),
-				settings.TxControl().ToYdbQueryTransactionControl(a).String(),
+				tt.settings.TxControl().ToYdbQueryTransactionControl().String(),
+				settings.TxControl().ToYdbQueryTransactionControl().String(),
 			)
-			require.Equal(t, must(tt.settings.Params().ToYDB(a)), must(settings.Params().ToYDB(a)))
+			require.Equal(t, must(tt.settings.Params().ToYDB()), must(settings.Params().ToYDB()))
 			require.Equal(t, tt.settings.CallOptions(), settings.CallOptions())
 		})
 	}

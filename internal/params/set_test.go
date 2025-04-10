@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -427,15 +426,12 @@ func TestSet(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.method, func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
-
 			item := Builder{}.Param("$x").BeginSet().Add()
 
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(*set)
 			require.True(t, ok)
 
-			params := result.EndSet().build().toYDB(a)
+			params := result.EndSet().build().toYDB()
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
@@ -466,11 +462,9 @@ func TestSet(t *testing.T) {
 }
 
 func TestSet_AddItems(t *testing.T) {
-	a := allocator.New()
-	defer a.Free()
 	params := Builder{}.Param("$x").BeginSet().
 		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
-		EndSet().build().toYDB(a)
+		EndSet().build().toYDB()
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {

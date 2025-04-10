@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -294,9 +293,6 @@ func (c *Client) BulkUpsert(
 		return xerrors.WithStackTrace(errClosedClient)
 	}
 
-	a := allocator.New()
-	defer a.Free()
-
 	attempts, config := 0, c.retryOptions(opts...)
 	config.RetryOptions = append(config.RetryOptions,
 		retry.WithIdempotent(true),
@@ -316,7 +312,7 @@ func (c *Client) BulkUpsert(
 		onDone(finalErr, attempts)
 	}()
 
-	request, err := data.ToYDB(a, tableName)
+	request, err := data.ToYDB(tableName)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -340,7 +336,6 @@ func (c *Client) BulkUpsert(
 }
 
 func makeReadRowsRequest(
-	a *allocator.Allocator,
 	sessionID string,
 	path string,
 	keys value.Value,
@@ -349,11 +344,11 @@ func makeReadRowsRequest(
 	request := Ydb_Table.ReadRowsRequest{
 		SessionId: sessionID,
 		Path:      path,
-		Keys:      value.ToYDB(keys, a),
+		Keys:      value.ToYDB(keys),
 	}
 	for _, opt := range readRowOpts {
 		if opt != nil {
-			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request), a)
+			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request))
 		}
 	}
 
@@ -386,13 +381,9 @@ func (c *Client) ReadRows(
 	retryOptions ...table.Option,
 ) (_ result.Result, err error) {
 	var (
-		a        = allocator.New()
-		request  = makeReadRowsRequest(a, "", path, keys, readRowOpts)
+		request  = makeReadRowsRequest("", path, keys, readRowOpts)
 		response *Ydb_Table.ReadRowsResponse
 	)
-	defer func() {
-		a.Free()
-	}()
 
 	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 

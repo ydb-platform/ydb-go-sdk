@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -43,12 +42,10 @@ func begin(
 	sessionID string,
 	txSettings query.TransactionSettings,
 ) (txID string, _ error) {
-	a := allocator.New()
-	defer a.Free()
 	response, err := client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
 			SessionId:  sessionID,
-			TxSettings: txSettings.ToYdbQuerySettings(a),
+			TxSettings: txSettings.ToYdbQuerySettings(),
 		},
 	)
 	if err != nil {

@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -16,14 +15,12 @@ import (
 var abc = "abc"
 
 func TestSessionOptionsProfile(t *testing.T) {
-	a := allocator.New()
-	defer a.Free()
 	{
 		opt := WithProfile(
 			WithProfilePreset(abc),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		if req.GetProfile().GetPresetName() != abc {
 			t.Errorf("Preset is not as expected")
 		}
@@ -33,7 +30,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 			WithCompactionPolicy(WithCompactionPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		if req.GetProfile().GetCompactionPolicy().GetPresetName() != abc {
 			t.Errorf("Compaction policy is not as expected")
 		}
@@ -46,7 +43,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		p := req.GetProfile().GetPartitioningPolicy()
 		if p.GetPresetName() != abc || p.GetAutoPartitioning() != Ydb_Table.PartitioningPolicy_AUTO_SPLIT {
 			t.Errorf("Partitioning policy is not as expected")
@@ -57,7 +54,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 			WithUniformPartitions(3),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		if p, ok := req.GetPartitions().(*Ydb_Table.CreateTableRequest_UniformPartitions); !ok || p.UniformPartitions != 3 {
 			t.Errorf("Uniform partitioning policy is not as expected")
 		}
@@ -69,14 +66,14 @@ func TestSessionOptionsProfile(t *testing.T) {
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		p, ok := req.GetPartitions().(*Ydb_Table.CreateTableRequest_PartitionAtKeys)
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
 			require.Equal(
 				t,
-				[]*Ydb.TypedValue{value.ToYDB(value.Int64Value(1), a)},
+				[]*Ydb.TypedValue{value.ToYDB(value.Int64Value(1))},
 				p.PartitionAtKeys.GetSplitPoints(),
 			)
 		}
@@ -86,7 +83,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 			WithExecutionPolicy(WithExecutionPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		if req.GetProfile().GetExecutionPolicy().GetPresetName() != abc {
 			t.Errorf("Execution policy is not as expected")
 		}
@@ -101,7 +98,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		p := req.GetProfile().GetReplicationPolicy()
 		if p.GetPresetName() != abc ||
 			p.GetReplicasCount() != 3 ||
@@ -115,7 +112,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 			WithCachingPolicy(WithCachingPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		if req.GetProfile().GetCachingPolicy().GetPresetName() != abc {
 			t.Errorf("Caching policy is not as expected")
 		}
@@ -123,8 +120,6 @@ func TestSessionOptionsProfile(t *testing.T) {
 }
 
 func TestStoragePolicyOptions(t *testing.T) {
-	a := allocator.New()
-	defer a.Free()
 	{
 		opt := WithProfile(
 			WithStoragePolicy(
@@ -137,7 +132,7 @@ func TestStoragePolicyOptions(t *testing.T) {
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
 		p := req.GetProfile().GetStoragePolicy()
 		if p.GetPresetName() != abc ||
 			p.GetSyslog().GetMedia() != "any1" ||
@@ -151,12 +146,10 @@ func TestStoragePolicyOptions(t *testing.T) {
 }
 
 func TestAlterTableOptions(t *testing.T) {
-	a := allocator.New()
-	defer a.Free()
 	{
 		opt := WithAddColumn("a", types.Bool)
 		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+		opt.ApplyAlterTableOption((*AlterTableDesc)(&req))
 		if len(req.GetAddColumns()) != 1 ||
 			req.GetAddColumns()[0].GetName() != "a" {
 			t.Errorf("Alter table options is not as expected")
@@ -170,10 +163,10 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 		opt := WithAddColumnMeta(column)
 		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+		opt.ApplyAlterTableOption((*AlterTableDesc)(&req))
 		if len(req.GetAddColumns()) != 1 ||
 			req.GetAddColumns()[0].GetName() != column.Name ||
-			req.GetAddColumns()[0].GetType() != types.TypeToYDB(column.Type, a) ||
+			req.GetAddColumns()[0].GetType() != types.TypeToYDB(column.Type) ||
 			req.GetAddColumns()[0].GetFamily() != column.Family {
 			t.Errorf("Alter table options is not as expected")
 		}
@@ -181,7 +174,7 @@ func TestAlterTableOptions(t *testing.T) {
 	{
 		opt := WithDropColumn("a")
 		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+		opt.ApplyAlterTableOption((*AlterTableDesc)(&req))
 		if len(req.GetDropColumns()) != 1 ||
 			req.GetDropColumns()[0] != "a" {
 			t.Errorf("Alter table options is not as expected")
@@ -198,7 +191,7 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 		opt := WithAlterColumnFamilies(cf)
 		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+		opt.ApplyAlterTableOption((*AlterTableDesc)(&req))
 		if len(req.GetAddColumnFamilies()) != 1 ||
 			req.GetAddColumnFamilies()[0].GetName() != cf.Name ||
 			req.GetAddColumnFamilies()[0].GetData().GetMedia() != cf.Data.Media ||
@@ -214,7 +207,7 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 		opt := WithAlterColumnFamilies(cf)
 		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+		opt.ApplyAlterTableOption((*AlterTableDesc)(&req))
 		if len(req.GetAddColumnFamilies()) != 1 ||
 			req.GetAddColumnFamilies()[0].GetName() != cf.Name ||
 			req.GetAddColumnFamilies()[0].GetData() != nil ||
@@ -230,7 +223,7 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 		opt := WithAlterReadReplicasSettings(rr)
 		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+		opt.ApplyAlterTableOption((*AlterTableDesc)(&req))
 		rrOut := NewReadReplicasSettings(req.GetSetReadReplicasSettings())
 		if rr != rrOut {
 			t.Errorf("Alter table set read replicas options is not as expected")
@@ -245,7 +238,7 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 		opt := WithAlterStorageSettings(ss)
 		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+		opt.ApplyAlterTableOption((*AlterTableDesc)(&req))
 		rrOut := NewStorageSettings(req.GetAlterStorageSettings())
 		if ss != rrOut {
 			t.Errorf("Alter table storage settings options is not as expected")

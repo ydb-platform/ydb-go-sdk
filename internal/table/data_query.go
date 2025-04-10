@@ -2,8 +2,6 @@ package table
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
 type (
@@ -12,7 +10,7 @@ type (
 		ID() string
 		YQL() string
 
-		toYDB(a *allocator.Allocator) *Ydb_Table.Query
+		toYDB() *Ydb_Table.Query
 	}
 	textQuery     string
 	preparedQuery struct {
@@ -33,11 +31,12 @@ func (q textQuery) YQL() string {
 	return string(q)
 }
 
-func (q textQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
-	query := a.TableQuery()
-	query.Query = a.TableQueryYqlText(string(q))
-
-	return query
+func (q textQuery) toYDB() *Ydb_Table.Query {
+	return &Ydb_Table.Query{
+		Query: &Ydb_Table.Query_YqlText{
+			YqlText: string(q),
+		},
+	}
 }
 
 func (q preparedQuery) String() string {
@@ -52,11 +51,12 @@ func (q preparedQuery) YQL() string {
 	return q.sql
 }
 
-func (q preparedQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
-	query := a.TableQuery()
-	query.Query = a.TableQueryYqlText(q.sql)
-
-	return query
+func (q preparedQuery) toYDB() *Ydb_Table.Query {
+	return &Ydb_Table.Query{
+		Query: &Ydb_Table.Query_YqlText{
+			YqlText: q.sql,
+		},
+	}
 }
 
 func queryFromText(s string) Query {

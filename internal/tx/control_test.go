@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
 func TestControl(t *testing.T) {
@@ -137,16 +135,13 @@ func TestControl(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
-
 			require.Equal(t,
 				fmt.Sprintf("%+v", tt.tableTxControl),
-				fmt.Sprintf("%+v", tt.ctrl.ToYdbTableTransactionControl(a)),
+				fmt.Sprintf("%+v", tt.ctrl.ToYdbTableTransactionControl()),
 			)
 			require.Equal(t,
 				fmt.Sprintf("%+v", tt.queryTxControl),
-				fmt.Sprintf("%+v", tt.ctrl.ToYdbQueryTransactionControl(a)),
+				fmt.Sprintf("%+v", tt.ctrl.ToYdbQueryTransactionControl()),
 			)
 		})
 	}

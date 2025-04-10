@@ -3,14 +3,12 @@ package tx
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
 type (
 	Selector interface {
-		applyQueryTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl)
-		applyTableTxSelector(a *allocator.Allocator, txControl *Ydb_Table.TransactionControl)
+		applyQueryTxSelector(txControl *Ydb_Query.TransactionControl)
+		applyTableTxSelector(txControl *Ydb_Table.TransactionControl)
 	}
 	ControlOption interface {
 		applyTxControlOption(txControl *Control)
@@ -25,26 +23,28 @@ func (ctrl *Control) Commit() bool {
 	return ctrl.commit
 }
 
-func (ctrl *Control) ToYdbQueryTransactionControl(a *allocator.Allocator) *Ydb_Query.TransactionControl {
+func (ctrl *Control) ToYdbQueryTransactionControl() *Ydb_Query.TransactionControl {
 	if ctrl == nil {
 		return nil
 	}
 
-	txControl := a.QueryTransactionControl()
-	ctrl.selector.applyQueryTxSelector(a, txControl)
-	txControl.CommitTx = ctrl.commit
+	txControl := &Ydb_Query.TransactionControl{
+		CommitTx: ctrl.commit,
+	}
+	ctrl.selector.applyQueryTxSelector(txControl)
 
 	return txControl
 }
 
-func (ctrl *Control) ToYdbTableTransactionControl(a *allocator.Allocator) *Ydb_Table.TransactionControl {
+func (ctrl *Control) ToYdbTableTransactionControl() *Ydb_Table.TransactionControl {
 	if ctrl == nil {
 		return nil
 	}
 
-	txControl := a.TableTransactionControl()
-	ctrl.selector.applyTableTxSelector(a, txControl)
-	txControl.CommitTx = ctrl.commit
+	txControl := &Ydb_Table.TransactionControl{
+		CommitTx: ctrl.commit,
+	}
+	ctrl.selector.applyTableTxSelector(txControl)
 
 	return txControl
 }
@@ -64,23 +64,25 @@ func (opts beginTxOptions) applyTxControlOption(txControl *Control) {
 	txControl.selector = opts
 }
 
-func (opts beginTxOptions) applyQueryTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
-	selector := a.QueryTransactionControlBeginTx()
-	selector.BeginTx = a.QueryTransactionSettings()
+func (opts beginTxOptions) applyQueryTxSelector(txControl *Ydb_Query.TransactionControl) {
+	selector := &Ydb_Query.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Query.TransactionSettings{},
+	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyQueryTxSettingsOption(a, selector.BeginTx)
+			opt.ApplyQueryTxSettingsOption(selector.BeginTx)
 		}
 	}
 	txControl.TxSelector = selector
 }
 
-func (opts beginTxOptions) applyTableTxSelector(a *allocator.Allocator, txControl *Ydb_Table.TransactionControl) {
-	selector := a.TableTransactionControlBeginTx()
-	selector.BeginTx = a.TableTransactionSettings()
+func (opts beginTxOptions) applyTableTxSelector(txControl *Ydb_Table.TransactionControl) {
+	selector := &Ydb_Table.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Table.TransactionSettings{},
+	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyTableTxSettingsOption(a, selector.BeginTx)
+			opt.ApplyTableTxSettingsOption(selector.BeginTx)
 		}
 	}
 	txControl.TxSelector = selector
@@ -102,16 +104,16 @@ func (id txIDTxControlOption) applyTxControlOption(txControl *Control) {
 	txControl.selector = id
 }
 
-func (id txIDTxControlOption) applyQueryTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
-	selector := a.QueryTransactionControlTxID()
-	selector.TxId = string(id)
-	txControl.TxSelector = selector
+func (id txIDTxControlOption) applyQueryTxSelector(txControl *Ydb_Query.TransactionControl) {
+	txControl.TxSelector = &Ydb_Query.TransactionControl_TxId{
+		TxId: string(id),
+	}
 }
 
-func (id txIDTxControlOption) applyTableTxSelector(a *allocator.Allocator, txControl *Ydb_Table.TransactionControl) {
-	selector := a.TableTransactionControlTxID()
-	selector.TxId = string(id)
-	txControl.TxSelector = selector
+func (id txIDTxControlOption) applyTableTxSelector(txControl *Ydb_Table.TransactionControl) {
+	txControl.TxSelector = &Ydb_Table.TransactionControl_TxId{
+		TxId: string(id),
+	}
 }
 
 func WithTx(t Identifier) txIDTxControlOption {

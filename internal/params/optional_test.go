@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -582,15 +581,12 @@ func TestOptional(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.method, func(t *testing.T) {
-			a := allocator.New()
-			defer a.Free()
-
 			item := Builder{}.Param("$x").BeginOptional()
 
 			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(*optionalBuilder)
 			require.True(t, ok)
 
-			params := result.EndOptional().build().toYDB(a)
+			params := result.EndOptional().build().toYDB()
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {

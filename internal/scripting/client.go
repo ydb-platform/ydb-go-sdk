@@ -10,7 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
@@ -68,7 +67,6 @@ func (c *Client) execute(ctx context.Context, sql string, parameters *params.Par
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).execute"),
 			sql, parameters,
 		)
-		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script: sql,
 			OperationParams: operation.Params(
@@ -82,11 +80,10 @@ func (c *Client) execute(ctx context.Context, sql string, parameters *params.Par
 		response *Ydb_Scripting.ExecuteYqlResponse
 	)
 	defer func() {
-		a.Free()
 		onDone(r, err)
 	}()
 
-	params, err := parameters.ToYDB(a)
+	params, err := parameters.ToYDB()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -223,7 +220,6 @@ func (c *Client) streamExecute(ctx context.Context, sql string, parameters *para
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).streamExecute"),
 			sql, parameters,
 		)
-		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script: sql,
 			OperationParams: operation.Params(
@@ -235,13 +231,12 @@ func (c *Client) streamExecute(ctx context.Context, sql string, parameters *para
 		}
 	)
 	defer func() {
-		a.Free()
 		if err != nil {
 			onIntermediate(err)(err)
 		}
 	}()
 
-	params, err := parameters.ToYDB(a)
+	params, err := parameters.ToYDB()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
