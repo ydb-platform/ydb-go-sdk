@@ -1,3 +1,4 @@
+## v3.106.1
 * Dropped `internal/allocator` package and all usages of it for further switch (test) protobuf opaque API
 
 ## v3.106.0
