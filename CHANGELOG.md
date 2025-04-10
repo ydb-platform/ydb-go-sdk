@@ -1,4 +1,3 @@
-* Updated dependency `google.golang.org/protobuf` to `v1.36.5`
 * Dropped `internal/allocator` package and all usages of it for further switch (test) protobuf opaque API
 
 ## v3.106.0
