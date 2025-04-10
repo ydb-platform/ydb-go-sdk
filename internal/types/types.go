@@ -261,7 +261,7 @@ func (v *Dict) ToYDB() *Ydb.Type {
 				Key:     v.keyType.ToYDB(),
 				Payload: v.valueType.ToYDB(),
 			},
-		}
+		},
 	}
 }
 
