@@ -297,7 +297,8 @@ func getWeatherStatsFromTable(ctx context.Context, db *ydb.Driver, year int) (
 	minTemperature float64,
 	avgTemperature float64,
 	maxTemperature float64,
-	_ error) {
+	_ error,
+) {
 	row, err := db.Query().QueryRow(ctx, `
 		SELECT
 		    MIN(MinTemperatureF),
