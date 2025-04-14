@@ -17,12 +17,14 @@ import (
 type DescribeTopicRequest struct {
 	OperationParams rawydb.OperationParams
 	Path            string
+	IncludeStats    bool
 }
 
 func (req *DescribeTopicRequest) ToProto() *Ydb_Topic.DescribeTopicRequest {
 	return &Ydb_Topic.DescribeTopicRequest{
 		OperationParams: req.OperationParams.ToProto(),
 		Path:            req.Path,
+		IncludeStats:    req.IncludeStats,
 	}
 }
 
@@ -63,7 +65,10 @@ func (res *DescribeTopicResult) FromProto(response operation.Response) error {
 	protoPartitions := protoResult.GetPartitions()
 	res.Partitions = make([]PartitionInfo, len(protoPartitions))
 	for i, protoPartition := range protoPartitions {
-		res.Partitions[i].mustFromProto(protoPartition)
+		err := res.Partitions[i].FromProto(protoPartition)
+		if err != nil {
+			return err
+		}
 	}
 
 	res.RetentionPeriod = protoResult.GetRetentionPeriod().AsDuration()
@@ -93,12 +98,15 @@ type PartitionInfo struct {
 	Active             bool
 	ChildPartitionIDs  []int64
 	ParentPartitionIDs []int64
+	PartitionStats     PartitionStats
 }
 
-func (pi *PartitionInfo) mustFromProto(proto *Ydb_Topic.DescribeTopicResult_PartitionInfo) {
+func (pi *PartitionInfo) FromProto(proto *Ydb_Topic.DescribeTopicResult_PartitionInfo) error {
 	pi.PartitionID = proto.GetPartitionId()
 	pi.Active = proto.GetActive()
 
 	pi.ChildPartitionIDs = clone.Int64Slice(proto.GetChildPartitionIds())
 	pi.ParentPartitionIDs = clone.Int64Slice(proto.GetParentPartitionIds())
+
+	return pi.PartitionStats.FromProto(proto.GetPartitionStats())
 }
