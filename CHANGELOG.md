@@ -1,3 +1,4 @@
+* Fixed session closing in `ydb.WithExecuteDataQueryOverQueryClient(true)` scenario
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
 
 ## v3.110.0
