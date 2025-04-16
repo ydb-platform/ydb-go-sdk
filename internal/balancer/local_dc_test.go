@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -137,7 +138,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 		driverConfig:   cfg,
 		balancerConfig: *cfg.Balancer(),
 		pool:           conn.NewPool(context.Background(), cfg),
-		discover: func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error) {
+		discover: func(ctx context.Context, _ *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
 			return []endpoint.Endpoint{
 				&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
 				&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
@@ -149,7 +150,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 		},
 	}
 
-	err := r.clusterDiscoveryAttempt(ctx)
+	err := r.clusterDiscoveryAttempt(ctx, nil)
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {

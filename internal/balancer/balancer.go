@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
@@ -40,7 +41,10 @@ type Balancer struct {
 	pool              *conn.Pool
 	discoveryRepeater repeater.Repeater
 
-	discover        func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error)
+	address string
+	cc      atomic.Pointer[grpc.ClientConn]
+
+	discover        func(context.Context, *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error)
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	connectionsState atomic.Pointer[connectionsState]
@@ -51,7 +55,7 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	return retry.Retry(
 		repeater.WithEvent(ctx, repeater.EventInit),
 		func(childCtx context.Context) (err error) {
-			if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
+			if err = b.clusterDiscoveryAttemptWithDial(childCtx); err != nil {
 				if credentials.IsAccessError(err) {
 					return credentials.AccessError("cluster discovery failed", err,
 						credentials.WithEndpoint(b.driverConfig.Endpoint()),
@@ -75,21 +79,29 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	)
 }
 
-func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
-	var (
-		address = "ydb:///" + b.driverConfig.Endpoint()
-		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
-			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).clusterDiscoveryAttempt",
-			),
-			address,
-			b.driverConfig.Database(),
+// conn is a singleton with auto reconnect logic
+func (b *Balancer) conn(ctx context.Context) (*grpc.ClientConn, error) {
+	if cc := b.cc.Load(); cc != nil {
+		if cc.GetState() == connectivity.Ready {
+			return cc, nil
+		}
+
+		if b.cc.CompareAndSwap(cc, nil) {
+			cc.Close()
+		}
+	}
+
+	ctx, traceID, err := meta.TraceID(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	ctx, err = b.driverConfig.Meta().Context(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
 		)
-	)
-	defer func() {
-		onDone(err)
-	}()
+	}
 
 	if dialTimeout := b.driverConfig.DialTimeout(); dialTimeout > 0 {
 		var cancel context.CancelFunc
@@ -97,7 +109,66 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		defer cancel()
 	}
 
-	endpoints, location, err := b.discover(ctx)
+	//nolint:staticcheck,nolintlint
+	cc, err := grpc.DialContext(ctx, b.address,
+		append(
+			b.driverConfig.GrpcDialOptions(),
+			grpc.WithResolvers(
+				xresolver.New("ydb", b.driverConfig.Trace()),
+			),
+			grpc.WithBlock(), //nolint:staticcheck,nolintlint
+		)...,
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("failed to dial %q, traceID %q: %w", b.driverConfig.Endpoint(), traceID, err),
+		)
+	}
+
+	b.cc.Store(cc)
+
+	return cc, nil
+}
+
+func (b *Balancer) clusterDiscoveryAttemptWithDial(ctx context.Context) (finalErr error) {
+	onDone := trace.DriverOnBalancerClusterDiscoveryAttempt(
+		b.driverConfig.Trace(), &ctx,
+		stack.FunctionID(
+			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).clusterDiscoveryAttemptWithDial",
+		),
+		b.address,
+		b.driverConfig.Database(),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	cc, err := b.conn(ctx)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	if err = b.clusterDiscoveryAttempt(ctx, cc); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientConn) (finalErr error) {
+	onDone := trace.DriverOnBalancerClusterDiscoveryAttempt(
+		b.driverConfig.Trace(), &ctx,
+		stack.FunctionID(
+			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).clusterDiscoveryAttempt",
+		),
+		b.address,
+		b.driverConfig.Database(),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	endpoints, location, err := b.discover(ctx, cc)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -171,16 +242,22 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		b.discoveryRepeater.Stop()
 	}
 
+	if cc := b.cc.Load(); cc != nil {
+		_ = cc.Close()
+	}
+
 	return nil
 }
 
 func makeDiscoveryFunc(
 	driverConfig *config.Config, discoveryConfig *discoveryConfig.Config,
-) func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error) {
-	return func(ctx context.Context) (endpoints []endpoint.Endpoint, location string, err error) {
+) func(ctx context.Context, cc *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
+	return func(ctx context.Context, cc *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
 		ctx, traceID, err := meta.TraceID(ctx)
 		if err != nil {
-			return endpoints, location, xerrors.WithStackTrace(err)
+			return endpoints, location, xerrors.WithStackTrace(
+				fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
+			)
 		}
 
 		ctx, err = driverConfig.Meta().Context(ctx)
@@ -190,32 +267,12 @@ func makeDiscoveryFunc(
 			)
 		}
 
-		//nolint:staticcheck,nolintlint
-		cc, err := grpc.DialContext(ctx,
-			"ydb:///"+driverConfig.Endpoint(),
-			append(
-				driverConfig.GrpcDialOptions(),
-				grpc.WithResolvers(
-					xresolver.New("ydb", driverConfig.Trace()),
-				),
-				grpc.WithBlock(), //nolint:staticcheck,nolintlint
-			)...,
-		)
-		if err != nil {
-			return endpoints, location, xerrors.WithStackTrace(
-				fmt.Errorf("failed to dial %q, traceID %q: %w", driverConfig.Endpoint(), traceID, err),
-			)
-		}
-		defer func() {
-			_ = cc.Close()
-		}()
-
 		endpoints, location, err = internalDiscovery.Discover(ctx,
 			Ydb_Discovery_V1.NewDiscoveryServiceClient(cc), discoveryConfig,
 		)
 		if err != nil {
 			return endpoints, location, xerrors.WithStackTrace(
-				fmt.Errorf("failed to discover database %q, address %q, traceID %q: %w",
+				fmt.Errorf("failed to discover database %q (address %q, traceID %q): %w",
 					driverConfig.Database(), driverConfig.Endpoint(), traceID, err,
 				),
 			)
@@ -239,6 +296,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	b = &Balancer{
 		driverConfig: driverConfig,
 		pool:         pool,
+		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
 			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
@@ -269,7 +327,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		// run background discovering
 		if d := b.discoveryConfig.Interval(); d > 0 {
 			b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
-				d, b.clusterDiscoveryAttempt,
+				d, b.clusterDiscoveryAttemptWithDial,
 				repeater.WithName("discovery"),
 				repeater.WithTrace(b.driverConfig.Trace()),
 			)

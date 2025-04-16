@@ -1,3 +1,4 @@
+* Refactored internal client balancer: added singleton for getting gRPC-connection (auto dial and auto reconnect on non-ready state) for use in discovery attempts
 * Added `topicoptions.IncludePartitionStats()` for `Topic().Describe()` in order to get partition stats from server
 
 ## v3.106.1
