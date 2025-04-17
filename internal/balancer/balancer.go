@@ -79,8 +79,8 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	)
 }
 
-// conn is a singleton with auto reconnect logic
-func (b *Balancer) conn(ctx context.Context) (*grpc.ClientConn, error) {
+// discoveryConn returns connection to database endpoint for discovery call
+func (b *Balancer) discoveryConn(ctx context.Context) (*grpc.ClientConn, error) {
 	if cc := b.cc.Load(); cc != nil {
 		if cc.GetState() == connectivity.Ready {
 			return cc, nil
@@ -89,18 +89,6 @@ func (b *Balancer) conn(ctx context.Context) (*grpc.ClientConn, error) {
 		if b.cc.CompareAndSwap(cc, nil) {
 			cc.Close()
 		}
-	}
-
-	ctx, traceID, err := meta.TraceID(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	ctx, err = b.driverConfig.Meta().Context(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
-		)
 	}
 
 	if dialTimeout := b.driverConfig.DialTimeout(); dialTimeout > 0 {
@@ -121,7 +109,7 @@ func (b *Balancer) conn(ctx context.Context) (*grpc.ClientConn, error) {
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("failed to dial %q, traceID %q: %w", b.driverConfig.Endpoint(), traceID, err),
+			fmt.Errorf("failed to dial %q: %w", b.driverConfig.Endpoint(), err),
 		)
 	}
 
@@ -143,7 +131,7 @@ func (b *Balancer) clusterDiscoveryAttemptWithDial(ctx context.Context) (finalEr
 		onDone(finalErr)
 	}()
 
-	cc, err := b.conn(ctx)
+	cc, err := b.discoveryConn(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -377,7 +365,7 @@ func (b *Balancer) NewStream(
 }
 
 func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc conn.Conn) error) (err error) {
-	cc, err := b.getConn(ctx)
+	cc, err := b.nextConn(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -415,14 +403,14 @@ func (b *Balancer) connections() *connectionsState {
 	return b.connectionsState.Load()
 }
 
-func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
+func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	if b.closed.Load() {
 		return nil, xerrors.WithStackTrace(errBalancerClosed)
 	}
 
 	onDone := trace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).getConn"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).nextConn"),
 	)
 	defer func() {
 		if err == nil {
