@@ -70,8 +70,8 @@ func (core *sessionCore) statusCode() Status {
 
 func (core *sessionCore) SetStatus(status Status) {
 	switch Status(core.status.Load()) {
-	case StatusClosed, StatusError:
-		// nop
+	//case StatusClosed, StatusError:
+	//	// nop
 	default:
 		if old := core.status.Swap(uint32(status)); old != uint32(status) {
 			for _, onChangeStatus := range core.onChangeStatus {
