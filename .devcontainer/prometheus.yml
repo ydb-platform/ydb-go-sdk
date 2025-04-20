@@ -1,0 +1,16 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: ['localhost:9093']
+
+scrape_configs:
+  - job_name: ydb-go-sdk
+    scrape_interval: 1s
+    scrape_timeout: 1s
+    static_configs:
+      - targets: ['sdk:9464']

@@ -1,0 +1,54 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/go-postgres
+{
+    "name": "Go & YDB Cluster",
+    "service": "sdk",
+    "dockerComposeFile": "compose.yml",
+    "workspaceFolder": "/workspaces/ydb-go-sdk",
+    // Allows the container to use ptrace, which is useful for debugging.
+    "capAdd": [
+        "SYS_PTRACE"
+    ],
+    // Disables seccomp, which can be necessary for some debugging tools to function correctly.
+    "securityOpt": [
+        "seccomp=unconfined"
+    ],
+    // Features to add to the dev container. More info: https://containers.dev/features.
+    "features": {
+        "ghcr.io/devcontainers/features/git": {},
+        "ghcr.io/devcontainers/features/common-utils": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    // Use 'forwardPorts' to make a list of ports inside the container available locally.
+    "forwardPorts": [
+        2136,
+        8765,
+        19001,
+        9090,
+        9464
+    ],
+    // Use 'initializeCommand' to run commands before the container is created.
+    "initializeCommand": "chmod +x .devcontainer/initialize.sh && .devcontainer/initialize.sh",
+    // Use 'postStartCommand' to run commands after the container is started.
+    "postStartCommand": "chmod +x .devcontainer/configure.sh && .devcontainer/configure.sh",
+    // Add postCreateCommand to set up SSH signing
+    "postCreateCommand": "chmod +x .devcontainer/setup-ssh-signing.sh && .devcontainer/setup-ssh-signing.sh",
+    // Configure tool-specific properties.
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go",
+                "redhat.vscode-yaml",
+                "zxh404.vscode-proto3",
+                "github.vscode-github-actions",
+                "GitHub.copilot-chat",
+                "VisualStudioExptTeam.vscodeintellicode",
+            ]
+        }
+    },
+    // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+    "remoteUser": "root",
+    "mounts": [
+        "source=${localEnv:HOME}/.config/gh/hosts.yml,target=/root/.config/gh/hosts.yml,type=bind,consistency=cached,source-exists=true"
+    ]
+}

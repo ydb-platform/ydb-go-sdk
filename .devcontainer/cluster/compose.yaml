@@ -1,0 +1,139 @@
+volumes:
+  ydb-data:
+    # driver: local
+    # driver_opts:
+    #   type: tmpfs
+    #   device: tmpfs
+    #   o: size=80g
+  ydb-certs:
+
+x-ydb-node: &ydb-node
+  image: cr.yandex/crptqonuodf51kdj7a7d/ydb:24.3.11.13
+  restart: always
+  platform: linux/amd64
+  privileged: true
+  volumes:
+    - ./ydb.yaml:/opt/ydb/cfg/config.yaml
+
+services:
+  sdk:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    hostname: sdk
+
+    volumes:
+      - ydb-certs:/ydb_certs
+      - ../../:/workspaces/ydb-go-sdk:cached
+
+    environment:
+      - YDB_VERSION=24.3.11.13
+      - YDB_CLUSTER_MODE=1
+      - YDB_CREDENTIALS_USER=root
+      - YDB_CREDENTIALS_PASSWORD=
+      - YDB_CONNECTION_STRING=grpc://ydb:2136/Root/testdb
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+    # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
+    # (Adding the "ports" property to this file will not forward from a Codespace.)
+
+  ydb-storage:
+    <<: *ydb-node
+    hostname: ydb
+    command:
+      - /opt/ydb/bin/ydbd
+      - server
+      - --grpc-port
+      - '2136'
+      - --mon-port
+      - '8765'
+      - --ic-port
+      - '19001'
+      - --yaml-config
+      - /opt/ydb/cfg/config.yaml
+      - --node
+      - static
+      - --label
+      - deployment=docker
+    ports:
+      - 8765:8765
+    volumes:
+      - ydb-data:/ydb_data
+      - ydb-certs:/ydb_certs
+      - ./ydb.yaml:/opt/ydb/cfg/config.yaml
+    healthcheck:
+      test: bash -c "exec 6<> /dev/tcp/ydb/2136"
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 1
+
+  ydb-storage-init:
+    <<: *ydb-node
+    restart: no
+    command:
+      - /bin/sh
+      - -c
+      - "/opt/ydb/bin/ydbd -s 'grpc://ydb:2136' admin blobstorage config init --yaml-file /opt/ydb/cfg/config.yaml || exit 0"
+    depends_on:
+      ydb-storage:
+        condition: service_healthy
+
+  ydb-database-init:
+    <<: *ydb-node
+    restart: no
+    command:
+      - /bin/sh
+      - -c
+      - "/opt/ydb/bin/ydbd -s 'grpc://ydb:2136' admin database '/Root/testdb' create ssd:1 || exit 0"
+    depends_on:
+      ydb-storage:
+        condition: service_healthy
+      ydb-storage-init:
+        condition: service_completed_successfully
+
+  ydb-database:
+    <<: *ydb-node
+    command:
+      - /opt/ydb/bin/ydbd
+      - server
+      - --grpc-port
+      - '2136'
+      - --mon-port
+      - '8765'
+      - --ic-port
+      - '19001'
+      - --yaml-config
+      - /opt/ydb/cfg/config.yaml
+      - --tenant
+      - '/Root/testdb'
+      - --node-broker
+      - 'grpc://ydb:2136'
+      - --label
+      - deployment=docker
+    depends_on:
+      ydb-storage:
+        condition: service_healthy
+      ydb-storage-init:
+        condition: service_completed_successfully
+      ydb-database-init:
+        condition: service_completed_successfully
+    deploy:
+      replicas: 3
+
+  prometheus:
+    image: prom/prometheus:v3.3.0
+    restart: unless-stopped
+    hostname: prometheus
+    platform: linux/amd64
+
+    volumes:
+      - ../prometheus.yml:/etc/prometheus/prometheus.yml
+      - ydb-certs:/ydb_certs
+
+    ports:
+      - 9090:9090
