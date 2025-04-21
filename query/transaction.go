@@ -54,6 +54,8 @@ func EmptyTxControl() *TransactionControl {
 // NoTx defines nil transaction control
 // This is wrong name for transaction control inference on server-side by query content
 // Deprecated: Use EmptyTxControl instead.
+// Will be removed after Oct 2025.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func NoTx() *TransactionControl {
 	return EmptyTxControl()
 }
