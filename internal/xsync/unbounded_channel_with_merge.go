@@ -31,6 +31,10 @@ func (c *UnboundedChan[T]) In() chan<- T {
 	return c.in
 }
 
+func (c *UnboundedChan[T]) Send(message T) {
+	c.in <- message
+}
+
 func (c *UnboundedChan[T]) Out() <-chan T {
 	return c.out
 }
