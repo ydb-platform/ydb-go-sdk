@@ -1,3 +1,6 @@
+* Added `query.EmptyTxControl()` for empty transaction control (server-side defines transaction control by internal logic)
+* Marked as deprecated `query.NoTx()` because this is wrong name for server-side transaction control inference
+
 ## v3.107.0
 * Refactored internal client balancer: added singleton for getting gRPC-connection (auto dial and auto reconnect on non-ready state) for use in discovery attempts
 * Added `topicoptions.IncludePartitionStats()` for `Topic().Describe()` in order to get partition stats from server

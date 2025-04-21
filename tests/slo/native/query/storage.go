@@ -216,7 +216,7 @@ func (s *Storage) CreateTable(ctx context.Context) error {
 				fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
 					s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
 				),
-				query.WithTxControl(query.NoTx()),
+				query.WithTxControl(query.EmptyTxControl()),
 			)
 		}, query.WithIdempotent(),
 		query.WithLabel("CREATE TABLE"),
@@ -235,7 +235,7 @@ func (s *Storage) DropTable(ctx context.Context) error {
 		func(ctx context.Context, session query.Session) error {
 			return session.Exec(ctx,
 				fmt.Sprintf(dropTableQuery, s.tablePath),
-				query.WithTxControl(query.NoTx()),
+				query.WithTxControl(query.EmptyTxControl()),
 			)
 		},
 		query.WithIdempotent(),

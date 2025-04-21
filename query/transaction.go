@@ -46,13 +46,23 @@ func TxControl(opts ...tx.ControlOption) *TransactionControl {
 	return tx.NewControl(opts...)
 }
 
-func NoTx() *TransactionControl {
+// EmptyTxControl defines transaction control inference on server-side by query content
+func EmptyTxControl() *TransactionControl {
 	return nil
+}
+
+// NoTx defines nil transaction control
+// This is wrong name for transaction control inference on server-side by query content
+// Deprecated: Use EmptyTxControl instead.
+// Will be removed after Oct 2025.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func NoTx() *TransactionControl {
+	return EmptyTxControl()
 }
 
 // DefaultTxControl returns default transaction control for use default tx control on server-side
 func DefaultTxControl() *TransactionControl {
-	return NoTx()
+	return EmptyTxControl()
 }
 
 // SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode
