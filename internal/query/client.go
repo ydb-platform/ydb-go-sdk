@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xreflect"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -641,9 +642,10 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 
 // checkTxControlWithCommit checks that if WithTxControl is used, it must be with WithCommit
 func checkTxControlWithCommit(txControl options.TxControl) error {
-	if txControl != nil && !txControl.Commit() {
+	if !xreflect.IsContainsNilPointer(txControl) && !txControl.Commit() {
 		return xerrors.WithStackTrace(errNoCommit)
 	}
+
 	return nil
 }
 
