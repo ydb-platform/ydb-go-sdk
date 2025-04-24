@@ -45,7 +45,7 @@ DECLARE $val AS UUID;
 SELECT CAST($val AS Utf8)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUIDWithIssue1501Value(id).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
+			query.WithTxControl(tx.SnapshotReadOnlyTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ DECLARE $val AS Text;
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
+			query.WithTxControl(tx.SnapshotReadOnlyTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -97,7 +97,7 @@ DECLARE $val AS Text;
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
+			query.WithTxControl(tx.SnapshotReadOnlyTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -125,7 +125,7 @@ DECLARE $val AS Text;
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
+			query.WithTxControl(tx.SnapshotReadOnlyTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -151,7 +151,7 @@ DECLARE $val AS Text;
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
+			query.WithTxControl(tx.SnapshotReadOnlyTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -180,7 +180,7 @@ DECLARE $val AS UUID;
 SELECT $val`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").UUIDWithIssue1501Value(id).Build()),
-			query.WithTxControl(tx.SerializableReadWriteTxControl()),
+			query.WithTxControl(tx.SnapshotReadOnlyTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -207,7 +207,7 @@ DECLARE $val AS UUID;
 
 SELECT CAST($val AS Utf8)`,
 			query.WithIdempotent(),
-			query.WithTxControl(query.SerializableReadWriteTxControl()),
+			query.WithTxControl(query.SnapshotReadOnlyTxControl()),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Uuid(id).Build()),
 		)
 
@@ -233,7 +233,7 @@ DECLARE $val AS Utf8;
 SELECT CAST($val AS UUID)`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Text(idString).Build()),
-			query.WithTxControl(query.SerializableReadWriteTxControl()),
+			query.WithTxControl(query.SnapshotReadOnlyTxControl()),
 		)
 
 		require.NoError(t, err)
@@ -261,7 +261,7 @@ DECLARE $val AS UUID;
 SELECT $val`,
 			query.WithIdempotent(),
 			query.WithParameters(ydb.ParamsBuilder().Param("$val").Uuid(id).Build()),
-			query.WithTxControl(query.SerializableReadWriteTxControl()),
+			query.WithTxControl(query.SnapshotReadOnlyTxControl()),
 		)
 
 		require.NoError(t, err)
