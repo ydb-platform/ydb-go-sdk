@@ -3,6 +3,7 @@ package bind
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 var (
@@ -164,7 +166,7 @@ func toValue(v any) (_ value.Value, err error) {
 	if valuer, ok := v.(driver.Valuer); ok {
 		v, err = valuer.Value()
 		if err != nil {
-			return nil, fmt.Errorf("ydb: driver.Valuer error: %w", err)
+			return nil, xerrors.WithStackTrace(fmt.Errorf("driver.Valuer error: %w", err))
 		}
 	}
 
@@ -255,6 +257,13 @@ func toValue(v any) (_ value.Value, err error) {
 		return value.TimestampValueFromTime(x), nil
 	case time.Duration:
 		return value.IntervalValueFromDuration(x), nil
+	case json.Marshaler:
+		bytes, err := x.MarshalJSON()
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return value.JSONValue(xstring.FromBytes(bytes)), nil
 	default:
 		kind := reflect.TypeOf(x).Kind()
 		switch kind {
@@ -266,7 +275,7 @@ func toValue(v any) (_ value.Value, err error) {
 				list[i], err = toValue(v.Index(i).Interface())
 				if err != nil {
 					return nil, xerrors.WithStackTrace(
-						fmt.Errorf("cannot parse %d item of slice %T: %w",
+						fmt.Errorf("cannot parse item #%d of slice %T: %w",
 							i, x, err,
 						),
 					)
@@ -307,8 +316,8 @@ func toValue(v any) (_ value.Value, err error) {
 				kk, has := v.Type().Field(i).Tag.Lookup("sql")
 				if !has {
 					return nil, xerrors.WithStackTrace(
-						fmt.Errorf("cannot parse %q as key field of struct: %w",
-							v.Type().Field(i).Name, errUnsupportedType,
+						fmt.Errorf("cannot parse %q as key field of struct %T: %w",
+							v.Type().Field(i).Name, x, errUnsupportedType,
 						),
 					)
 				}
@@ -348,15 +357,16 @@ func supportNewTypeLink(x any) string {
 }
 
 func toYdbParam(name string, value any) (*params.Parameter, error) {
-	switch tv := value.(type) {
-	case driver.NamedValue:
-		n, v := tv.Name, tv.Value
+	if nv, has := value.(driver.NamedValue); has {
+		n, v := nv.Name, nv.Value
 		if n != "" {
 			name = n
 		}
 		value = v
-	case *params.Parameter:
-		return tv, nil
+	}
+
+	if nv, ok := value.(params.NamedValue); ok {
+		return params.Named(nv.Name(), nv.Value()), nil
 	}
 
 	v, err := toValue(value)

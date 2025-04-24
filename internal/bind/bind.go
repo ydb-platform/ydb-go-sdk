@@ -1,10 +1,12 @@
 package bind
 
 import (
+	"database/sql/driver"
 	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
@@ -29,15 +31,25 @@ type Bind interface {
 type Bindings []Bind
 
 func (bindings Bindings) ToYdb(sql string, args ...any) (
-	yql string, params params.Params, err error,
+	yql string, pp params.Params, err error,
 ) {
 	if len(bindings) == 0 {
-		params, err = Params(args...)
+		pp, err = Params(args...)
 		if err != nil {
 			return "", nil, xerrors.WithStackTrace(err)
 		}
 
-		return sql, params, nil
+		return sql, pp, nil
+	}
+
+	if len(args) == 1 {
+		if nv, has := args[0].(driver.NamedValue); has {
+			if pp, has := nv.Value.(*params.Params); has {
+				args = xslices.Transform(*pp, func(v *params.Parameter) any {
+					return v
+				})
+			}
+		}
 	}
 
 	buffer := xstring.Buffer()
@@ -51,12 +63,12 @@ func (bindings Bindings) ToYdb(sql string, args ...any) (
 		}
 	}
 
-	params, err = Params(args...)
+	pp, err = Params(args...)
 	if err != nil {
 		return "", nil, xerrors.WithStackTrace(err)
 	}
 
-	return sql, params, nil
+	return sql, pp, nil
 }
 
 func Sort(bindings []Bind) []Bind {

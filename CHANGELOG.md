@@ -1,3 +1,5 @@
+* Supported `json.Marshaller` query parameter in `database/sql` driver
+
 ## v3.108.0
 * Added `query.EmptyTxControl()` for empty transaction control (server-side defines transaction control by internal logic)
 * Marked as deprecated `query.NoTx()` because this is wrong name for server-side transaction control inference
