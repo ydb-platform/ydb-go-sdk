@@ -45,7 +45,7 @@ func begin(
 	response, err := client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
 			SessionId:  sessionID,
-			TxSettings: txSettings.ToYdbQuerySettings(),
+			TxSettings: txSettings.ToQuerySettings(),
 		},
 	)
 	if err != nil {
@@ -185,7 +185,7 @@ func (tx *Transaction) txControl() *baseTx.Control {
 	}
 
 	return baseTx.NewControl(
-		baseTx.BeginTx(tx.txSettings...),
+		tx.txSettings,
 	)
 }
 

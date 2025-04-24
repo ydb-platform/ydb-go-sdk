@@ -18,9 +18,27 @@ type (
 		CommitTx(ctx context.Context) (err error)
 		Rollback(ctx context.Context) (err error)
 	}
-	TransactionControl  = tx.Control
+
+	// TransactionControl is a special YDB object for define how to start (TransactionSettings) and end (CommitTx flag)
+	// of transaction per each query
+	// Deprecated: doesn't exists any use cases, when CommitTx=false
+	TransactionControl = tx.Control
+
 	TransactionSettings = tx.Settings
 	TransactionOption   = tx.SettingsOption
+
+	// Isolation is well-known definition about isolation concurrent transactions
+	// The closest concept of isolation in ydb is transaction settings.
+	// Almost TransactionSettings matches to standard isolation levels (excluding OnlineReadOnly)
+	Isolation = tx.Settings
+)
+
+const (
+	SerializableRW                = tx.SerializableRW
+	SnapshotRO                    = tx.SnapshotRO
+	OnlineRO                      = tx.OnlineRO
+	OnlineROWithInconsistentReads = tx.OnlineROWithInconsistentReads
+	StaleRO                       = tx.StaleRO
 )
 
 // BeginTx returns selector transaction control option
@@ -96,7 +114,7 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 
 // TxSettings returns transaction settings
 func TxSettings(opts ...tx.SettingsOption) TransactionSettings {
-	return opts
+	return tx.NewSettings(opts...)
 }
 
 func WithDefaultTxMode() TransactionOption {
