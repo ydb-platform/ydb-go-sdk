@@ -34,7 +34,7 @@ var (
 	_ sessionPool  = (*pool.Pool[*Session, Session])(nil)
 )
 
-var errNoCommit = xerrors.Wrap(errors.New("WithTxControl option is not allowed without CommitTx() option in Client methods, as these methods are non-interactive. You can either add the CommitTx() option to TxControl or use query.*TxControl methods (e.g., query.SnapshotReadOnlyTxControl) which already include the commit flag"))
+var errNoCommit = xerrors.Wrap(errors.New("WithTxControl option is not allowed without CommitTx() option in Client methods, as these methods are non-interactive. You can either add the CommitTx() option to TxControl or use query.*TxControl methods (e.g., query.SnapshotReadOnlyTxControl) which already include the commit flag")) //nolint:lll
 
 type (
 	sessionPool interface {

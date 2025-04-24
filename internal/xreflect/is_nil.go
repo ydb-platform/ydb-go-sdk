@@ -27,5 +27,6 @@ func isValPointToNil(v reflect.Value) bool {
 		}
 		res = isValPointToNil(elem)
 	}
+
 	return res
 }
