@@ -38,9 +38,9 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 			ydb.WithTxControl(
 				tx.WithTxControlHook(ctx, func(txControl *tx.Control) {
 					hookCalled = true
-					require.Equal(t, tx.SerializableReadWriteTxControl(), txControl)
+					require.Equal(t, tx.SerializableReadWriteTxControl(tx.CommitTx()), txControl)
 				}),
-				tx.SerializableReadWriteTxControl(),
+				tx.SerializableReadWriteTxControl(tx.CommitTx()),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
 				_, err := db.QueryContext(ctx, "SELECT 1")
@@ -56,9 +56,9 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 			ydb.WithTxControl(
 				tx.WithTxControlHook(ctx, func(txControl *tx.Control) {
 					hookCalled = true
-					require.Equal(t, tx.SerializableReadWriteTxControl(), txControl)
+					require.Equal(t, tx.SerializableReadWriteTxControl(tx.CommitTx()), txControl)
 				}),
-				tx.SerializableReadWriteTxControl(),
+				tx.SerializableReadWriteTxControl(tx.CommitTx()),
 			),
 			db, func(ctx context.Context, cc *sql.Conn) error {
 				_, err := db.QueryContext(ctx, "SELECT 1")

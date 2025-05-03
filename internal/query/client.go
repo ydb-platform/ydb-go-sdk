@@ -638,7 +638,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 	}
 }
 
-// checkTxControlWithCommit checks that if WithTxControl is used, it must be with WithCommit
+// checkTxControlWithCommit validates the transaction control object to ensure it includes a commit flag.
 func checkTxControlWithCommit(txControl options.TxControl) error {
 	if !xreflect.IsContainsNilPointer(txControl) && !txControl.Commit() {
 		return xerrors.WithStackTrace(errNoCommit)
