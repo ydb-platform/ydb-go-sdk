@@ -6,7 +6,7 @@ import (
 
 func TestIsContainsNilPointer(t *testing.T) {
 	var nilIntPointer *int
-	var vInterface = nilIntPointer
+	vInterface := nilIntPointer
 
 	// Test cases for different nil and non-nil scenarios
 	tests := []struct {
