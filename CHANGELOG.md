@@ -1,3 +1,4 @@
+## v3.108.1
 * Supported `json.Marshaller` query parameter in `database/sql` driver
 
 ## v3.108.0
