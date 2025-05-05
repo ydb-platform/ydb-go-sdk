@@ -1,3 +1,5 @@
+* Added validation for the WithTxControl option in the non-interactive methods of Client and Session in the query service.
+
 ## v3.108.1
 * Supported `json.Marshaller` query parameter in `database/sql` driver
 

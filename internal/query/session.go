@@ -36,7 +36,12 @@ func (s *Session) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	settings := options.ExecuteSettings(opts...)
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return nil, err
+	}
+
+	r, err := s.execute(ctx, q, settings, withTrace(s.trace))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -75,7 +80,12 @@ func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execut
 		onDone(finalErr)
 	}()
 
-	row, err := s.queryRow(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	settings := options.ExecuteSettings(opts...)
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return nil, err
+	}
+
+	row, err := s.queryRow(ctx, q, settings, withTrace(s.trace))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -154,6 +164,11 @@ func (s *Session) execute(
 
 func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
+
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return err
+	}
+
 	onDone := trace.QueryOnSessionExec(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"),
 		s,
@@ -182,6 +197,11 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 
 func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) (_ query.Result, finalErr error) {
 	settings := options.ExecuteSettings(opts...)
+
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return nil, err
+	}
+
 	onDone := trace.QueryOnSessionQuery(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"),
 		s,

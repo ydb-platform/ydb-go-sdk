@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -20,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xreflect"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -31,6 +33,8 @@ var (
 	_ query.Client = (*Client)(nil)
 	_ sessionPool  = (*pool.Pool[*Session, Session])(nil)
 )
+
+var errNoCommit = xerrors.Wrap(errors.New("WithTxControl option is not allowed without CommitTx() option in Client methods, as these methods are non-interactive. You can either add the CommitTx() option to TxControl or use query.*TxControl methods (e.g., query.SnapshotReadOnlyTxControl) which already include the commit flag")) //nolint:lll
 
 type (
 	sessionPool interface {
@@ -171,6 +175,10 @@ func (c *Client) ExecuteScript(
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
+	}
+
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return nil, err
 	}
 
 	request, grpcOpts, err := executeQueryScriptRequest(q, settings)
@@ -320,6 +328,10 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 
 	settings := options.ExecuteSettings(opts...)
 
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return nil, err
+	}
+
 	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
 		q, settings.Label(),
@@ -366,6 +378,11 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	defer cancel()
 
 	settings := options.ExecuteSettings(opts...)
+
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return err
+	}
+
 	onDone := trace.QueryOnExec(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
 		q,
@@ -415,6 +432,11 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 	defer cancel()
 
 	settings := options.ExecuteSettings(opts...)
+
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return nil, err
+	}
+
 	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
 		q, settings.Label(),
@@ -469,6 +491,10 @@ func (c *Client) QueryResultSet(
 		rowsCount int
 		err       error
 	)
+
+	if err := checkTxControlWithCommit(settings.TxControl()); err != nil {
+		return nil, err
+	}
 
 	onDone := trace.QueryOnQueryResultSet(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryResultSet"),
@@ -610,6 +636,15 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 			}),
 		),
 	}
+}
+
+// checkTxControlWithCommit validates the transaction control object to ensure it includes a commit flag.
+func checkTxControlWithCommit(txControl options.TxControl) error {
+	if !xreflect.IsContainsNilPointer(txControl) && !txControl.Commit() {
+		return xerrors.WithStackTrace(errNoCommit)
+	}
+
+	return nil
 }
 
 func poolTrace(t *trace.Query) *pool.Trace {

@@ -25,7 +25,7 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 					FROM
 						%s
 				`, "`"+path.Join(prefix, "series")+"`"),
-				query.WithTxControl(query.TxControl(query.BeginTx(query.WithSnapshotReadOnly()))),
+				query.WithTxControl(query.SnapshotReadOnlyTxControl()),
 			)
 			if err != nil {
 				return err
