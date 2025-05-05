@@ -1,3 +1,5 @@
+* Ping new connections on discovery attempt, close dropped ones, so `ydb_go_sdk_ydb_driver_conns` metric is correct
+
 ## v3.108.1
 * Supported `json.Marshaller` query parameter in `database/sql` driver
 

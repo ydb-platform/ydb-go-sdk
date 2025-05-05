@@ -53,6 +53,10 @@ func (c *Conn) Park(ctx context.Context) (err error) {
 	panic("not implemented in mock")
 }
 
+func (c *Conn) Close(_ context.Context) error {
+	return nil
+}
+
 func (c *Conn) Ping(ctx context.Context) error {
 	return c.PingErr
 }
@@ -116,7 +120,7 @@ func (e *Endpoint) LoadFactor() float32 {
 }
 
 func (e *Endpoint) OverrideHost() string {
-	panic("not implemented in mock")
+	return ""
 }
 
 func (e *Endpoint) String() string {
