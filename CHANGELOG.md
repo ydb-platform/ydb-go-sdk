@@ -1,3 +1,5 @@
+* Added `WithReaderLogContext`, `WithWriterLogContext` options to topic reader/writer to supply log entries with user context fields
+
 ## v3.108.1
 * Supported `json.Marshaller` query parameter in `database/sql` driver
 

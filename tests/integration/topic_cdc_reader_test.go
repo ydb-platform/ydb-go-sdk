@@ -189,6 +189,17 @@ func createFeedAndReader(
 	return db, reader
 }
 
+func createFeedAndReaderForDB(
+	ctx context.Context,
+	t *testing.T,
+	db *ydb.Driver,
+	opts ...topicoptions.ReaderOption,
+) (*ydb.Driver, *topicreader.Reader) {
+	createCDCFeed(ctx, t, db)
+	reader := createFeedReader(t, db, opts...)
+	return db, reader
+}
+
 var sendCDCCounter int64
 
 func sendCDCMessage(ctx context.Context, t *testing.T, db *ydb.Driver) {
