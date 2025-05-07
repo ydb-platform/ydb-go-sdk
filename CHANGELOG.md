@@ -1,5 +1,11 @@
 * Bumped dependencies:
   - `github.com/jonboulle/clockwork` from v0.3.0 to v0.5.0
+  - `github.com/golang-jwt/jwt/v4` from v4.5.0 to v4.5.2 (see security alerts https://github.com/golang-jwt/jwt/security/advisories/GHSA-mh63-6h87-95cp and https://github.com/ydb-platform/ydb-go-sdk/security/dependabot/45)
+  - `golang.org/x/net` from v0.33.0 to v0.38.0 (see security alert https://github.com/ydb-platform/ydb-go-sdk/security/dependabot/59)
+  - `golang.org/x/crypto` from 0.31.0 to 0.36.0 (see security alerts https://github.com/ydb-platform/ydb-go-sdk/security/dependabot/56 and https://github.com/ydb-platform/ydb-go-sdk/security/dependabot/52)
+  - `golang.org/x/sync` from v0.10.0 to v0.12.0
+  - `golang.org/x/sys` from v0.28.0 to v0.31.0
+  - `golang.org/x/text` from v0.21.0 to v0.23.0
 
 ## v3.108.1
 * Supported `json.Marshaller` query parameter in `database/sql` driver
