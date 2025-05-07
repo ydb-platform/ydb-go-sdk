@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -625,6 +626,9 @@ func (v *decimalValue) Yql() string {
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
 	s := decimal.FromBytes(v.value[:], v.innerType.Precision(), v.innerType.Scale()).String()
+	if len(s) < int(v.innerType.Scale()) {
+		s = strings.Repeat("0", int(v.innerType.Scale())-len(s)) + s
+	}
 	buffer.WriteString(s[:len(s)-int(v.innerType.Scale())] + "." + s[len(s)-int(v.innerType.Scale()):])
 	buffer.WriteByte('"')
 	buffer.WriteByte(',')
