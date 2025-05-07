@@ -1,3 +1,6 @@
+* Bumped dependencies:
+  - `github.com/jonboulle/clockwork` from v0.3.0 to v0.5.0
+
 ## v3.108.1
 * Supported `json.Marshaller` query parameter in `database/sql` driver
 
