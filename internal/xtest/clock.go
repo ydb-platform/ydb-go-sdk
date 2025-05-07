@@ -10,7 +10,7 @@ import (
 
 // FastClock returns fake clock with very fast time speed advanced until end of test
 // the clock stops advance at end of test
-func FastClock(t testing.TB) clockwork.FakeClock {
+func FastClock(t testing.TB) *clockwork.FakeClock {
 	clock := clockwork.NewFakeClock()
 	var needStop atomic.Bool
 	clockStopped := make(chan struct{})
