@@ -94,7 +94,7 @@ func TestRepeaterForceLogBackoff(t *testing.T) {
 
 	for _, delay := range delays[1:] {
 		// ensure right listeners attached
-		fakeClock.BlockUntil(2)
+		fakeClock.BlockUntilContext(context.Background(), 2)
 
 		// release trash timer listeners
 		fakeClock.Advance(delay - 1)

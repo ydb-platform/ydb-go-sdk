@@ -236,7 +236,7 @@ func TestCommitterBuffer(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, isSended())
 
-		clock.BlockUntil(1)
+		clock.BlockUntilContext(ctx, 1)
 
 		clock.Advance(time.Second - 1)
 		time.Sleep(time.Millisecond)
@@ -348,7 +348,7 @@ func TestCommitterBuffer(t *testing.T) {
 		)})
 		require.NoError(t, err)
 
-		clock.BlockUntil(1)
+		clock.BlockUntilContext(ctx, 1)
 		clock.Advance(time.Second)
 		<-sendCalled
 	})
