@@ -1,5 +1,7 @@
 * Bumped dependencies:
   - `github.com/jonboulle/clockwork` from v0.3.0 to v0.5.0
+  - `google.golang.org/grpc` from v1.62.1 to v1.69.4
+  - `google.golang.org/protobuf` from v1.33.0 to v1.35.1
   - `github.com/golang-jwt/jwt/v4` from v4.5.0 to v4.5.2 (see security alerts https://github.com/golang-jwt/jwt/security/advisories/GHSA-mh63-6h87-95cp and https://github.com/ydb-platform/ydb-go-sdk/security/dependabot/45)
   - `golang.org/x/net` from v0.33.0 to v0.38.0 (see security alert https://github.com/ydb-platform/ydb-go-sdk/security/dependabot/59)
   - `golang.org/x/crypto` from 0.31.0 to 0.36.0 (see security alerts https://github.com/ydb-platform/ydb-go-sdk/security/dependabot/56 and https://github.com/ydb-platform/ydb-go-sdk/security/dependabot/52)
