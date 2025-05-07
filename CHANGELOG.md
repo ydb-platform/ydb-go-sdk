@@ -1,3 +1,4 @@
+## v3.108.2
 * Bumped dependencies:
   - `github.com/jonboulle/clockwork` from v0.3.0 to v0.5.0
   - `google.golang.org/grpc` from v1.62.1 to v1.69.4
