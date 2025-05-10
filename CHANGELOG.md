@@ -1,3 +1,4 @@
+## v3.108.3
 * Fixed handling of zero values for DyNumber
 * Fixed the decimal yql slice bounds out of range
 
