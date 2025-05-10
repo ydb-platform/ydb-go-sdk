@@ -2973,7 +2973,7 @@ func zeroPrimitiveValue(t types.Primitive) Value {
 		return JSONDocumentValue("")
 
 	case types.DyNumber:
-		return DyNumberValue("")
+		return DyNumberValue("0")
 
 	case types.TzDate:
 		return TzDateValue("")

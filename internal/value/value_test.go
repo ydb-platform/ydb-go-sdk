@@ -502,6 +502,10 @@ func TestValueYql(t *testing.T) {
 			literal: `Uuid("00000000-0000-0000-0000-000000000000")`,
 		},
 		{
+			value:   ZeroValue(types.DyNumber),
+			literal: `DyNumber("0")`,
+		},
+		{
 			value:   DecimalValueFromBigInt(big.NewInt(-1234567890123456), 22, 9),
 			literal: `Decimal("-1234567.890123456",22,9)`,
 		},
