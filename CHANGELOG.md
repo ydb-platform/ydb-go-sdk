@@ -1,3 +1,5 @@
+* Fixed the decimal yql slice bounds out of range
+
 ## v3.108.2
 * Bumped dependencies:
   - `github.com/jonboulle/clockwork` from v0.3.0 to v0.5.0
