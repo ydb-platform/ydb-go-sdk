@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -17,6 +18,8 @@ type Conn struct {
 	NodeIDField   uint32
 	State         conn.State
 	LocalDCField  bool
+	Pinged        atomic.Bool
+	Closed        atomic.Bool
 }
 
 func (c *Conn) Invoke(
@@ -53,7 +56,19 @@ func (c *Conn) Park(ctx context.Context) (err error) {
 	panic("not implemented in mock")
 }
 
+func (c *Conn) Close(ctx context.Context) error {
+	c.Closed.Store(true)
+	c.SetState(ctx, conn.Offline)
+
+	return nil
+}
+
 func (c *Conn) Ping(ctx context.Context) error {
+	c.Pinged.Store(true)
+	if c.PingErr == nil {
+		c.SetState(ctx, conn.Online)
+	}
+
 	return c.PingErr
 }
 
@@ -116,7 +131,7 @@ func (e *Endpoint) LoadFactor() float32 {
 }
 
 func (e *Endpoint) OverrideHost() string {
-	panic("not implemented in mock")
+	return ""
 }
 
 func (e *Endpoint) String() string {
