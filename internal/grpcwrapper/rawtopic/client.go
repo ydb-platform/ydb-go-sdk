@@ -126,6 +126,7 @@ func (c *Client) StreamWrite(
 		Stream:           protoResp,
 		Tracer:           tracer,
 		InternalStreamID: uuid.New().String(),
+		LogContext:       &ctxStreamLifeTime,
 	}, nil
 }
 

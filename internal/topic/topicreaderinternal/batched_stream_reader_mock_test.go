@@ -192,6 +192,42 @@ func (c *MockbatchedStreamReaderReadMessageBatchCall) DoAndReturn(f func(context
 	return c
 }
 
+// TopicOnReaderStart mocks base method.
+func (m *MockbatchedStreamReader) TopicOnReaderStart(consumer string, err error) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "TopicOnReaderStart", consumer, err)
+}
+
+// TopicOnReaderStart indicates an expected call of TopicOnReaderStart.
+func (mr *MockbatchedStreamReaderMockRecorder) TopicOnReaderStart(consumer, err any) *MockbatchedStreamReaderTopicOnReaderStartCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TopicOnReaderStart", reflect.TypeOf((*MockbatchedStreamReader)(nil).TopicOnReaderStart), consumer, err)
+	return &MockbatchedStreamReaderTopicOnReaderStartCall{Call: call}
+}
+
+// MockbatchedStreamReaderTopicOnReaderStartCall wrap *gomock.Call
+type MockbatchedStreamReaderTopicOnReaderStartCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockbatchedStreamReaderTopicOnReaderStartCall) Return() *MockbatchedStreamReaderTopicOnReaderStartCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockbatchedStreamReaderTopicOnReaderStartCall) Do(f func(string, error)) *MockbatchedStreamReaderTopicOnReaderStartCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockbatchedStreamReaderTopicOnReaderStartCall) DoAndReturn(f func(string, error)) *MockbatchedStreamReaderTopicOnReaderStartCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // WaitInit mocks base method.
 func (m *MockbatchedStreamReader) WaitInit(ctx context.Context) error {
 	m.ctrl.T.Helper()

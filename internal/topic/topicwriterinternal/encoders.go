@@ -3,6 +3,7 @@ package topicwriterinternal
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -164,9 +165,11 @@ type EncoderSelector struct {
 	parallelCompressors    int
 	batchCounter           int
 	measureIntervalBatches int
+	logContext             context.Context //nolint:containedctx
 }
 
 func NewEncoderSelector(
+	logContext context.Context,
 	m *MultiEncoder,
 	allowedCodecs rawtopiccommon.SupportedCodecs,
 	parallelCompressors int,
@@ -184,6 +187,7 @@ func NewEncoderSelector(
 		tracer:                 tracer,
 		writerReconnectorID:    writerReconnectorID,
 		sessionID:              sessionID,
+		logContext:             logContext,
 	}
 	res.ResetAllowedCodecs(allowedCodecs)
 
@@ -193,8 +197,10 @@ func NewEncoderSelector(
 func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
 	codec, err := s.selectCodec(messages)
 	if err == nil {
+		logCtx := s.logContext
 		onCompressDone := trace.TopicOnWriterCompressMessages(
 			s.tracer,
+			&logCtx,
 			s.writerReconnectorID,
 			s.sessionID,
 			codec.ToInt32(),
@@ -263,8 +269,10 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 		if len(messages) > 0 {
 			firstSeqNo = messages[0].SeqNo
 		}
+		logCtx := s.logContext
 		onCompressDone := trace.TopicOnWriterCompressMessages(
 			s.tracer,
+			&logCtx,
 			s.writerReconnectorID,
 			s.sessionID,
 			codec.ToInt32(),
