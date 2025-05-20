@@ -1,7 +1,6 @@
 package log
 
 import (
-	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
@@ -25,7 +24,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "reconnect")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "reconnect")
 		start := time.Now()
 		l.Log(ctx, "topic reader reconnect starting...")
 
@@ -40,7 +39,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "reconnect", "request")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "reconnect", "request")
 		l.Log(ctx, "topic reader reconnect request",
 			kv.NamedError("reason", info.Reason),
 			kv.Bool("was_sent", info.WasSent),
@@ -52,7 +51,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "partition", "read", "start", "response")
+		ctx := with(*info.PartitionContext, TRACE, "ydb", "topic", "reader", "partition", "read", "start", "response")
 		start := time.Now()
 		l.Log(ctx, "topic reader start partition read response starting...",
 			kv.String("topic", info.Topic),
@@ -97,7 +96,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "partition", "read", "stop", "response")
+		ctx := with(info.PartitionContext, TRACE, "ydb", "topic", "reader", "partition", "read", "stop", "response")
 		start := time.Now()
 		l.Log(ctx, "topic reader stop partition read response starting...",
 			kv.String("reader_connection_id", info.ReaderConnectionID),
@@ -133,7 +132,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.RequestContext, TRACE, "ydb", "topic", "reader", "commit")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "commit")
 		start := time.Now()
 		l.Log(ctx, "topic reader commit starting...",
 			kv.String("topic", info.Topic),
@@ -170,7 +169,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "send", "commit", "message")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "send", "commit", "message")
 		start := time.Now()
 
 		commitInfo := info.CommitsInfo.GetCommitsInfo()
@@ -211,7 +210,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "committed", "notify")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "committed", "notify")
 		l.Log(ctx, "topic reader received commit ack",
 			kv.String("reader_connection_id", info.ReaderConnectionID),
 			kv.String("topic", info.Topic),
@@ -224,7 +223,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "close")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "close")
 		start := time.Now()
 		l.Log(ctx, "topic reader close starting...",
 			kv.String("reader_connection_id", info.ReaderConnectionID),
@@ -253,7 +252,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "init")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "init")
 		start := time.Now()
 		l.Log(ctx, "topic reader init starting...",
 			kv.String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
@@ -284,7 +283,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "error")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "error")
 		l.Log(WithLevel(ctx, INFO), "topic reader has grpc stream error",
 			kv.Error(info.Error),
 			kv.String("reader_connection_id", info.ReaderConnectionID),
@@ -299,7 +298,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "update", "token")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "update", "token")
 		start := time.Now()
 		l.Log(ctx, "topic reader token update starting...",
 			kv.String("reader_connection_id", info.ReaderConnectionID),
@@ -347,7 +346,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "sent", "data", "request")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "sent", "data", "request")
 		l.Log(ctx, "topic reader sent data request",
 			kv.String("reader_connection_id", info.ReaderConnectionID),
 			kv.Int("request_bytes", info.RequestBytes),
@@ -360,7 +359,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "receive", "data", "response")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "receive", "data", "response")
 		start := time.Now()
 		partitionsCount, batchesCount, messagesCount := info.DataResponse.GetPartitionBatchMessagesCounts()
 		l.Log(ctx, "topic reader data response received, process starting...",
@@ -404,7 +403,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.RequestContext, TRACE, "ydb", "topic", "reader", "read", "messages")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "read", "messages")
 		start := time.Now()
 		l.Log(ctx, "topic read messages, waiting...",
 			kv.Int("min_count", info.MinCount),
@@ -436,7 +435,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "unknown", "grpc", "message")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "reader", "unknown", "grpc", "message")
 		l.Log(WithLevel(ctx, INFO), "topic reader received unknown grpc message",
 			kv.Error(info.Error),
 			kv.String("reader_connection_id", info.ReaderConnectionID),
@@ -648,7 +647,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "reconnect")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "reconnect")
 		start := time.Now()
 		l.Log(ctx, "connect to topic writer stream starting...",
 			kv.String("topic", info.Topic),
@@ -694,7 +693,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "stream", "init")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "stream", "init")
 		start := time.Now()
 		l.Log(ctx, "topic writer init stream starting...",
 			kv.String("topic", info.Topic),
@@ -734,7 +733,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		start := time.Now()
 
 		return func(doneInfo trace.TopicOnWriterBeforeCommitTransactionDoneInfo) {
-			ctx := with(*info.Ctx, TRACE, "ydb", "topic", "writer", "beforecommit")
+			ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "beforecommit")
 			l.Log(ctx, "topic writer wait of flush messages before commit transaction",
 				kv.String("kqp_session_id", info.KqpSessionID),
 				kv.String("topic_session_id_start", info.TopicSessionID),
@@ -750,7 +749,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		start := time.Now()
 
 		return func(doneInfo trace.TopicOnWriterAfterFinishTransactionDoneInfo) {
-			ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "beforecommit")
+			ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "beforecommit")
 			l.Log(ctx, "topic writer close writer after transaction finished",
 				kv.String("kqp_session_id", info.SessionID),
 				kv.String("tx_id", info.TransactionID),
@@ -762,7 +761,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "close")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "close")
 		start := time.Now()
 		l.Log(ctx, "topic writer close starting...",
 			kv.String("writer_instance_id", info.WriterInstanceID),
@@ -793,7 +792,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "compress", "messages")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "compress", "messages")
 		start := time.Now()
 		l.Log(ctx, "topic writer compress messages starting...",
 			kv.String("writer_instance_id", info.WriterInstanceID),
@@ -836,7 +835,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return nil
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "send", "messages")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "send", "messages")
 		start := time.Now()
 		l.Log(ctx, "topic writer send messages starting...",
 			kv.String("writer_instance_id", info.WriterInstanceID),
@@ -874,7 +873,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			return
 		}
 		acks := info.Acks.GetAcks()
-		ctx := with(context.Background(), DEBUG, "ydb", "topic", "writer", "receive", "result")
+		ctx := with(*info.Context, DEBUG, "ydb", "topic", "writer", "receive", "result")
 		l.Log(ctx, "topic writer received result from server",
 			kv.String("writer_instance_id", info.WriterInstanceID),
 			kv.String("session_id", info.SessionID),
@@ -895,7 +894,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			return
 		}
 
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "grpc")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "grpc")
 		l.Log(
 			ctx, "topic writer sent grpc message (message body and metadata are removed)",
 			kv.String("topic_stream_internal_id", info.TopicStreamInternalID),
@@ -911,7 +910,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			return
 		}
 
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "grpc")
+		ctx := with(*info.Context, TRACE, "ydb", "topic", "writer", "grpc")
 		l.Log(
 			ctx, "topic writer received grpc message (message body and metadata are removed)",
 			kv.String("topic_stream_internal_id", info.TopicStreamInternalID),
@@ -926,7 +925,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return
 		}
-		ctx := with(context.Background(), DEBUG, "ydb", "topic", "writer", "read", "unknown", "grpc", "message")
+		ctx := with(*info.Context, DEBUG, "ydb", "topic", "writer", "read", "unknown", "grpc", "message")
 		l.Log(ctx, "topic writer receive unknown grpc message from server",
 			kv.Error(info.Error),
 			kv.String("writer_instance_id", info.WriterInstanceID),

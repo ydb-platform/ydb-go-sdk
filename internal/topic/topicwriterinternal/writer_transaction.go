@@ -39,10 +39,10 @@ func (w *WriterWithTransaction) onBeforeCommitTransaction(ctx context.Context) (
 		w.streamWriter.GetSessionID(),
 		w.tx.ID(),
 	)
-	ctx = traceCtx
 
 	defer func() {
 		onDone(err, w.streamWriter.GetSessionID())
+		ctx = traceCtx
 	}()
 
 	// wait message flushing
