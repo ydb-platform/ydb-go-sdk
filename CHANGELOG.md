@@ -1,3 +1,4 @@
+* Removed `experimental` from coordination API
 * Added `WithReaderLogContext`, `WithWriterLogContext` options to topic reader/writer to supply log entries with user context fields
 
 ## v3.108.3
