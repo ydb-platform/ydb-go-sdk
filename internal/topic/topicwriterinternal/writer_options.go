@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -74,6 +75,14 @@ func WithCredentials(cred credentials.Credentials) PublicWriterOption {
 			cred = credentials.NewAnonymousCredentials()
 		}
 		cfg.cred = cred
+	}
+}
+
+// WithRawClient for internal usage only
+// no proxy to public interface
+func WithRawClient(rawClient *rawtopic.Client) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.rawTopicClient = rawClient
 	}
 }
 

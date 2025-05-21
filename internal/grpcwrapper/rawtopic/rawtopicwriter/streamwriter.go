@@ -1,6 +1,7 @@
 package rawtopicwriter
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -34,6 +35,7 @@ type StreamWriter struct {
 	readMessagesCount    int
 	writtenMessagesCount int
 	sessionID            string
+	LogContext           *context.Context
 }
 
 //nolint:funlen
@@ -50,7 +52,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 	defer func() {
 		// defer needs for set good session id on first init response before trace the message
 		trace.TopicOnWriterReceiveGRPCMessage(
-			w.Tracer, w.InternalStreamID, w.sessionID, w.readMessagesCount, grpcMsg, sendErr,
+			w.Tracer, w.LogContext, w.InternalStreamID, w.sessionID, w.readMessagesCount, grpcMsg, sendErr,
 		)
 	}()
 	if sendErr != nil {
@@ -139,7 +141,15 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 
 	err = w.Stream.Send(&protoMsg)
 	w.writtenMessagesCount++
-	trace.TopicOnWriterSentGRPCMessage(w.Tracer, w.InternalStreamID, w.sessionID, w.writtenMessagesCount, &protoMsg, err)
+	trace.TopicOnWriterSentGRPCMessage(
+		w.Tracer,
+		w.LogContext,
+		w.InternalStreamID,
+		w.sessionID,
+		w.writtenMessagesCount,
+		&protoMsg,
+		err,
+	)
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to send grpc message to writer stream: %w", err)))
 	}

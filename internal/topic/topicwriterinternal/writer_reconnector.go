@@ -100,6 +100,10 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		f(&cfg)
 	}
 
+	if cfg.LogContext == nil {
+		cfg.LogContext = context.Background()
+	}
+
 	if cfg.connectTimeout == 0 {
 		cfg.connectTimeout = cfg.Common.OperationTimeout()
 	}
@@ -110,6 +114,17 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 
 	if cfg.producerID == "" {
 		WithProducerID(uuid.NewString())(&cfg)
+	}
+
+	if cfg.Connect == nil {
+		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
+			RawTopicWriterStream,
+			error,
+		) {
+			return cfg.rawTopicClient.StreamWrite(xcontext.MergeContexts(ctx, cfg.LogContext), tracer)
+		}
+
+		cfg.Connect = connector
 	}
 
 	return cfg
@@ -312,8 +327,10 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	w.m.WithRLock(func() {
 		sessionID = w.sessionID
 	})
+	logCtx := w.cfg.LogContext
 	onCompressDone := trace.TopicOnWriterCompressMessages(
 		w.cfg.Tracer,
+		&logCtx,
 		w.writerInstanceID,
 		sessionID,
 		w.cfg.forceCodec.ToInt32(),
@@ -328,6 +345,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	}
 	err := cacheMessages(res, targetCodec, w.cfg.compressorCount)
 	onCompressDone(err)
+
 	if err != nil {
 		return nil, err
 	}
@@ -354,9 +372,9 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 }
 
 func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
-	onDone := trace.TopicOnWriterClose(w.cfg.Tracer, w.writerInstanceID, reason)
 	defer func() {
-		onDone(resErr)
+		logCtx := w.cfg.LogContext
+		trace.TopicOnWriterClose(w.cfg.Tracer, &logCtx, w.writerInstanceID, reason)
 	}()
 
 	// stop background work and single stream writer
@@ -375,7 +393,6 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	attempt := 0
-
 	createStreamContext := func() (context.Context, context.CancelFunc) {
 		// need suppress parent context cancelation for flush buffer while close writer
 		return xcontext.WithCancel(xcontext.ValueOnly(ctx))
@@ -413,8 +430,10 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			}
 		}
 
+		logCtx := w.cfg.LogContext
 		onWriterStarted := trace.TopicOnWriterReconnect(
 			w.cfg.Tracer,
+			&logCtx,
 			w.writerInstanceID,
 			w.cfg.topic,
 			w.cfg.producerID,

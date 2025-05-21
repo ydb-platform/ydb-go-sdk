@@ -541,8 +541,10 @@ SELECT * FROM AS_TABLE($arg);
 }
 
 func TestQueryWideDateTimeTypes(t *testing.T) {
-	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.1") {
-		t.Skip("require enables transactions for topics")
+	ydbVersion := os.Getenv("YDB_VERSION")
+
+	if ydbVersion == "latest" || (ydbVersion != "nightly" && version.Lt(ydbVersion, "25.1")) {
+		t.Skip("require enables wide date/interval types")
 	}
 
 	scope := newScope(t)

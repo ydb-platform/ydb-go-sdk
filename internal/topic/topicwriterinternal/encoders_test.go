@@ -3,6 +3,7 @@ package topicwriterinternal
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -17,12 +18,13 @@ import (
 
 func TestEncoderSelector_CodecMeasure(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		s := NewEncoderSelector(testCommonEncoders, nil, 1, &trace.Topic{}, "", "")
+		s := NewEncoderSelector(context.TODO(), testCommonEncoders, nil, 1, &trace.Topic{}, "", "")
 		_, err := s.measureCodecs(nil)
 		require.Error(t, err)
 	})
 	t.Run("One", func(t *testing.T) {
 		s := NewEncoderSelector(
+			context.TODO(),
 			NewMultiEncoder(),
 			rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
 			1,
@@ -44,7 +46,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 		)
 
 		testSelectCodec := func(t testing.TB, targetCodec rawtopiccommon.Codec, smallCount, largeCount int) {
-			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{
+			s := NewEncoderSelector(context.TODO(), testCommonEncoders, rawtopiccommon.SupportedCodecs{
 				rawtopiccommon.CodecRaw,
 				rawtopiccommon.CodecGzip,
 			}, 4,
