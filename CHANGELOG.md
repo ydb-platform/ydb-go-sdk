@@ -1,3 +1,5 @@
+* Pinged new connections on discovery attempt, closed dropped ones, so `ydb_go_sdk_ydb_driver_conns` metric is correct
+
 ## v3.108.4
 * Removed `experimental` from coordination API
 * Added `WithReaderLogContext`, `WithWriterLogContext` options to topic reader/writer to supply log entries with user context fields
