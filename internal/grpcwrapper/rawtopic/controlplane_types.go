@@ -65,9 +65,8 @@ func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) 
 	s.MinActivePartitions = proto.GetMinActivePartitions()
 	s.MaxActivePartitions = proto.GetMaxActivePartitions()
 	s.PartitionCountLimit = proto.GetPartitionCountLimit() //nolint:staticcheck
-	s.AutoPartitioningSettings.FromProto(proto.GetAutoPartitioningSettings())
 
-	return nil
+	return s.AutoPartitioningSettings.FromProto(proto.GetAutoPartitioningSettings())
 }
 
 func (s *PartitioningSettings) ToProto() *Ydb_Topic.PartitioningSettings {
@@ -113,9 +112,9 @@ func (s *AutoPartitioningSettings) FromProto(proto *Ydb_Topic.AutoPartitioningSe
 type AutoPartitioningStrategy int32
 
 const (
-	AutoPartitioningStrategyUnspecified    = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_UNSPECIFIED) //nolint:lll
-	AutoPartitioningStrategyDisabled       = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_DISABLED)    //nolint:lll
-	AutoPartitioningStrategyScaleUp        = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_SCALE_UP)
+	AutoPartitioningStrategyUnspecified    = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_UNSPECIFIED)       //nolint:lll
+	AutoPartitioningStrategyDisabled       = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_DISABLED)          //nolint:lll
+	AutoPartitioningStrategyScaleUp        = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_SCALE_UP)          //nolint:lll
 	AutoPartitioningStrategyScaleUpAndDown = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_SCALE_UP_AND_DOWN) //nolint:lll
 	AutoPartitioningStrategyPaused         = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_PAUSED)            //nolint:lll
 )
@@ -151,15 +150,52 @@ func (s *AutoPartitioningWriteSpeedStrategy) FromProto(speed *Ydb_Topic.AutoPart
 }
 
 type AlterPartitioningSettings struct {
-	SetMinActivePartitions rawoptional.Int64
-	SetMaxActivePartitions rawoptional.Int64
-	SetPartitionCountLimit rawoptional.Int64
+	SetMinActivePartitions        rawoptional.Int64
+	SetMaxActivePartitions        rawoptional.Int64
+	SetPartitionCountLimit        rawoptional.Int64
+	AlterAutoPartitioningSettings *AlterAutoPartitioningSettings
 }
 
 func (s *AlterPartitioningSettings) ToProto() *Ydb_Topic.AlterPartitioningSettings {
 	return &Ydb_Topic.AlterPartitioningSettings{
-		SetMinActivePartitions: s.SetMinActivePartitions.ToProto(),
-		SetMaxActivePartitions: s.SetMaxActivePartitions.ToProto(),
-		SetPartitionCountLimit: s.SetPartitionCountLimit.ToProto(),
+		SetMinActivePartitions:        s.SetMinActivePartitions.ToProto(),
+		SetMaxActivePartitions:        s.SetMaxActivePartitions.ToProto(),
+		SetPartitionCountLimit:        s.SetPartitionCountLimit.ToProto(),
+		AlterAutoPartitioningSettings: s.AlterAutoPartitioningSettings.ToProto(),
+	}
+}
+
+type AlterAutoPartitioningSettings struct {
+	SetStrategy            AutoPartitioningStrategy
+	SetPartitionWriteSpeed *AlterAutoPartitioningWriteSpeedStrategy
+}
+
+func (s *AlterAutoPartitioningSettings) ToProto() *Ydb_Topic.AlterAutoPartitioningSettings {
+	if s == nil {
+		return nil
+	}
+	strategy := s.SetStrategy.ToProto()
+
+	return &Ydb_Topic.AlterAutoPartitioningSettings{
+		SetStrategy:            &strategy,
+		SetPartitionWriteSpeed: s.SetPartitionWriteSpeed.ToProto(),
+	}
+}
+
+type AlterAutoPartitioningWriteSpeedStrategy struct {
+	SetStabilizationWindow    rawoptional.Duration
+	SetUpUtilizationPercent   rawoptional.Int32
+	SetDownUtilizationPercent rawoptional.Int32
+}
+
+func (s *AlterAutoPartitioningWriteSpeedStrategy) ToProto() *Ydb_Topic.AlterAutoPartitioningWriteSpeedStrategy {
+	if s == nil {
+		return nil
+	}
+
+	return &Ydb_Topic.AlterAutoPartitioningWriteSpeedStrategy{
+		SetStabilizationWindow:    s.SetStabilizationWindow.ToProto(),
+		SetUpUtilizationPercent:   s.SetUpUtilizationPercent.ToProto(),
+		SetDownUtilizationPercent: s.SetDownUtilizationPercent.ToProto(),
 	}
 }

@@ -78,6 +78,21 @@ func (v *Int64) ToProto() *int64 {
 	return &val
 }
 
+type Int32 struct {
+	Value    int32
+	HasValue bool
+}
+
+func (v *Int32) ToProto() *int32 {
+	if !v.HasValue {
+		return nil
+	}
+
+	val := v.Value
+
+	return &val
+}
+
 type Time struct {
 	Value    time.Time
 	HasValue bool
