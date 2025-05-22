@@ -1,3 +1,4 @@
+## v3.108.5
 * Fixed stop topic reader after TLI in transaction
 
 ## v3.108.4
