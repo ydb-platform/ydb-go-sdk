@@ -301,7 +301,7 @@ func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
 		if transactionResult == nil {
 			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
 		} else {
-			_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.RetryableError(
+			_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.Retryable(
 				fmt.Errorf("ydb: failed batch commit because transaction doesn't committed: %w", updateOffesetInTransactionErr),
 			)))
 		}

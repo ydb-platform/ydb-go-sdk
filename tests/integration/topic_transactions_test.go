@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -67,6 +68,112 @@ func TestTopicReadInTransaction(t *testing.T) {
 		require.Equal(t, "bbb", content)
 		return nil
 	}))
+}
+
+func TestTopicReaderTLIIssue1797(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+
+	tablePath := scope.TablePath()
+
+	writer := scope.TopicWriter()
+	reader := scope.TopicReader()
+
+	scope.Require.NoError(writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("1")}))
+
+	messageReaded := make(chan bool)
+	valueInserted := make(chan bool)
+
+	go func() {
+		<-messageReaded
+		db.Query().Exec(ctx, fmt.Sprintf("INSERT INTO `%s` (id) VALUES (2)", tablePath))
+		close(valueInserted)
+	}()
+
+	attempts := 0
+	scope.Require.NoError(db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		attempts++
+
+		row, err := tx.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM `%s`", tablePath))
+		scope.Require.NoError(err)
+		var cnt uint64
+		scope.Require.NoError(row.Scan(&cnt))
+		fmt.Println("table items count", cnt)
+
+		_, err = reader.PopMessagesBatchTx(ctx, tx)
+		scope.Require.NoError(err)
+		if attempts == 1 {
+			close(messageReaded)
+		}
+
+		<-valueInserted
+		err = tx.Exec(ctx, fmt.Sprintf("UPSERT INTO `%s` (id) VALUES (3)", tablePath))
+		if err != nil {
+			t.Log("UPSERT value 3 failed:", err)
+
+			return err
+		}
+
+		return nil
+	}))
+}
+
+func TestTopicWriterTLI(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+
+	tablePath := scope.TablePath()
+
+	messageWritten := make(chan bool)
+	valueInserted := make(chan bool)
+
+	go func() {
+		<-messageWritten
+		db.Query().Exec(ctx, fmt.Sprintf("INSERT INTO `%s` (id) VALUES (2)", tablePath))
+		close(valueInserted)
+	}()
+
+	attempts := 0
+	scope.Require.NoError(db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		attempts++
+
+		row, err := tx.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM `%s`", tablePath))
+		scope.Require.NoError(err)
+		var cnt uint64
+		scope.Require.NoError(row.Scan(&cnt))
+		fmt.Println("table items count", cnt)
+
+		txWriter, err := scope.Driver().Topic().StartTransactionalWriter(tx, scope.TopicPath())
+		scope.Require.NoError(err)
+
+		err = txWriter.Write(ctx, topicwriter.Message{Data: strings.NewReader("test")})
+		scope.Require.NoError(err)
+		if attempts == 1 {
+			close(messageWritten)
+		}
+
+		<-valueInserted
+		err = tx.Exec(ctx, fmt.Sprintf("UPSERT INTO `%s` (id) VALUES (3)", tablePath))
+		if err != nil {
+			t.Log("UPSERT value 3 failed:", err)
+			return err
+		}
+
+		return nil
+	}))
+
+	// Check retries
+	scope.Require.Greater(attempts, 1)
+
+	// Verify the message was written
+	batch, err := scope.TopicReader().ReadMessagesBatch(ctx)
+	scope.Require.NoError(err)
+	scope.Require.Len(batch.Messages, 1)
+	content, err := io.ReadAll(batch.Messages[0])
+	scope.Require.NoError(err)
+	scope.Require.Equal("test", string(content))
 }
 
 func TestWriteInTransaction(t *testing.T) {
