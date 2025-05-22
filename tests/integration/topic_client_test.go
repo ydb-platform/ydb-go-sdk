@@ -229,6 +229,88 @@ func TestTopicDescribePartitionStats(t *testing.T) {
 	require.Equal(t, expected, topicDesc)
 }
 
+func TestDescribePartitionSettings(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	const (
+		defaultRetentionPeriod = 24 * time.Hour
+		writeSpeed             = int64(1024)
+		burstBytes             = int64(2048)
+	)
+
+	var (
+		supportedCodecs          = []topictypes.Codec{topictypes.CodecRaw}
+		minActivePartitions      = int64(2)
+		maxActivePartitions      = int64(5)
+		topicName                = "test-topic-" + t.Name()
+		topicPath                = scope.Driver().Name() + "/" + topicName
+		autoPartitioningSettings = topictypes.AutoPartitioningSettings{
+			AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyScaleUp,
+			AutoPartitioningWriteSpeedStrategy: topictypes.AutoPartitioningWriteSpeedStrategy{
+				StabilizationWindow:    10 * time.Second,
+				UpUtilizationPercent:   80,
+				DownUtilizationPercent: 20,
+			},
+		}
+	)
+
+	_ = scope.Driver().Topic().Drop(ctx, topicPath)
+	err := scope.Driver().Topic().Create(ctx, topicPath,
+		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
+		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
+		topicoptions.CreateWithMaxActivePartitions(maxActivePartitions),
+		topicoptions.CreateWithAutoPartitioningSettings(autoPartitioningSettings),
+		topicoptions.CreateWithPartitionWriteSpeedBytesPerSecond(writeSpeed),
+		topicoptions.CreateWithPartitionWriteBurstBytes(burstBytes),
+	)
+	require.NoError(t, err)
+
+	topicDesc, err := scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+
+	expected := topictypes.TopicDescription{
+		Path: topicName,
+		PartitionSettings: topictypes.PartitionSettings{
+			MinActivePartitions:      minActivePartitions,
+			MaxActivePartitions:      maxActivePartitions,
+			AutoPartitioningSettings: autoPartitioningSettings,
+		},
+		Partitions: []topictypes.PartitionInfo{
+			{
+				PartitionID: 0,
+				Active:      true,
+			},
+			{
+				PartitionID: 1,
+				Active:      true,
+			},
+		},
+		RetentionPeriod:                   defaultRetentionPeriod,
+		RetentionStorageMB:                0,
+		SupportedCodecs:                   supportedCodecs,
+		PartitionWriteBurstBytes:          burstBytes,
+		PartitionWriteSpeedBytesPerSecond: writeSpeed,
+		Attributes:                        nil,
+		Consumers:                         []topictypes.Consumer{},
+		MeteringMode:                      topictypes.MeteringModeUnspecified,
+	}
+
+	requireAndCleanSubset := func(checked *map[string]string, subset *map[string]string) {
+		t.Helper()
+		for k, subValue := range *subset {
+			checkedValue, ok := (*checked)[k]
+			require.True(t, ok, k)
+			require.Equal(t, subValue, checkedValue)
+		}
+		*checked = nil
+		*subset = nil
+	}
+
+	requireAndCleanSubset(&topicDesc.Attributes, &expected.Attributes)
+	require.Equal(t, expected, topicDesc)
+}
+
 func TestDescribeTopicConsumer(t *testing.T) {
 	ctx := xtest.Context(t)
 	db := connect(t)
@@ -446,6 +528,139 @@ func TestReaderWithoutConsumer(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, topicReader)
 	})
+}
+
+func TestAlterTopic(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	const (
+		defaultRetentionPeriod = 24 * time.Hour
+		writeSpeed             = int64(1024)
+		burstBytes             = int64(2048)
+	)
+
+	var (
+		supportedCodecs     = []topictypes.Codec{topictypes.CodecRaw}
+		minActivePartitions = int64(2)
+		maxActivePartitions = int64(5)
+		topicName           = "test-topic-" + t.Name()
+		topicPath           = scope.Driver().Name() + "/" + topicName
+	)
+
+	_ = scope.Driver().Topic().Drop(ctx, topicPath)
+	err := scope.Driver().Topic().Create(ctx, topicPath,
+		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
+		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
+		topicoptions.CreateWithMaxActivePartitions(maxActivePartitions),
+		topicoptions.CreateWithPartitionWriteSpeedBytesPerSecond(writeSpeed),
+		topicoptions.CreateWithPartitionWriteBurstBytes(burstBytes),
+	)
+	require.NoError(t, err)
+
+	// First alter: Change auto partitioning settings
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithAutoPartitioningStrategy(topictypes.AutoPartitioningStrategyScaleUp),
+		topicoptions.AlterWithAutoPartitioningWriteSpeedStabilizationWindow(10*time.Second),
+		topicoptions.AlterWithAutoPartitioningWriteSpeedUpUtilizationPercent(80),
+		topicoptions.AlterWithAutoPartitioningWriteSpeedDownUtilizationPercent(20),
+	)
+	require.NoError(t, err)
+
+	// Second alter: Change retention period and supported codecs
+	newRetentionPeriod := 48 * time.Hour
+	newSupportedCodecs := []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip}
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithRetentionPeriod(newRetentionPeriod),
+		topicoptions.AlterWithSupportedCodecs(newSupportedCodecs...),
+	)
+	require.NoError(t, err)
+
+	// Third alter: Change write speed and burst bytes
+	newWriteSpeed := int64(2048)
+	newBurstBytes := int64(4096)
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithPartitionWriteSpeedBytesPerSecond(newWriteSpeed),
+		topicoptions.AlterWithPartitionWriteBurstBytes(newBurstBytes),
+	)
+	require.NoError(t, err)
+
+	// Verify all changes
+	topicDesc, err := scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+
+	expected := topictypes.TopicDescription{
+		Path: topicName,
+		PartitionSettings: topictypes.PartitionSettings{
+			MinActivePartitions: minActivePartitions,
+			MaxActivePartitions: maxActivePartitions,
+			AutoPartitioningSettings: topictypes.AutoPartitioningSettings{
+				AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyScaleUp,
+				AutoPartitioningWriteSpeedStrategy: topictypes.AutoPartitioningWriteSpeedStrategy{
+					StabilizationWindow:    10 * time.Second,
+					UpUtilizationPercent:   80,
+					DownUtilizationPercent: 20,
+				},
+			},
+		},
+		Partitions: []topictypes.PartitionInfo{
+			{
+				PartitionID: 0,
+				Active:      true,
+			},
+			{
+				PartitionID: 1,
+				Active:      true,
+			},
+		},
+		RetentionPeriod:                   newRetentionPeriod,
+		RetentionStorageMB:                0,
+		SupportedCodecs:                   newSupportedCodecs,
+		PartitionWriteBurstBytes:          newBurstBytes,
+		PartitionWriteSpeedBytesPerSecond: newWriteSpeed,
+		Attributes:                        nil,
+		Consumers:                         []topictypes.Consumer{},
+		MeteringMode:                      topictypes.MeteringModeUnspecified,
+	}
+
+	requireAndCleanSubset := func(checked *map[string]string, subset *map[string]string) {
+		t.Helper()
+		for k, subValue := range *subset {
+			checkedValue, ok := (*checked)[k]
+			require.True(t, ok, k)
+			require.Equal(t, subValue, checkedValue)
+		}
+		*checked = nil
+		*subset = nil
+	}
+
+	requireAndCleanSubset(&topicDesc.Attributes, &expected.Attributes)
+	require.Equal(t, expected, topicDesc)
+
+	// Test altering max active partitions
+	newMaxActivePartitions := int64(10)
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithMaxActivePartitions(newMaxActivePartitions),
+	)
+	require.NoError(t, err)
+
+	// Verify max active partitions
+	topicDesc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Equal(t, newMaxActivePartitions, topicDesc.PartitionSettings.MaxActivePartitions)
+
+	// Test altering min active partitions
+	newMinActivePartitions := int64(3)
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithMinActivePartitions(newMinActivePartitions),
+	)
+	require.NoError(t, err)
+
+	// Verify min active partitions
+	topicDesc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Equal(t, newMinActivePartitions, topicDesc.PartitionSettings.MinActivePartitions)
+	require.Equal(t, 3, len(topicDesc.Partitions), "Expected 3 active partitions after increasing min active partitions")
 }
 
 func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {

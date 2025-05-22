@@ -34,7 +34,7 @@ func (mode withMeteringMode) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 type withMinActivePartitions int64
 
 func (minActivePartitions withMinActivePartitions) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.PartitionSettings.MinActivePartitions = int64(minActivePartitions)
+	request.PartitioningSettings.MinActivePartitions = int64(minActivePartitions)
 }
 
 func (minActivePartitions withMinActivePartitions) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
@@ -45,7 +45,7 @@ func (minActivePartitions withMinActivePartitions) ApplyAlterOption(req *rawtopi
 type withPartitionCountLimit int64
 
 func (partitionCountLimit withPartitionCountLimit) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.PartitionSettings.PartitionCountLimit = int64(partitionCountLimit)
+	request.PartitioningSettings.PartitionCountLimit = int64(partitionCountLimit)
 }
 
 func (partitionCountLimit withPartitionCountLimit) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
