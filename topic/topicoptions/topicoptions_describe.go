@@ -5,7 +5,7 @@ import "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 // DescribeOption type for options of describe method.
 type DescribeOption func(req *rawtopic.DescribeTopicRequest)
 
-// IncludePartitionStats additionally fetches DescribeTopicResult.PartitionInfo.PartitionSettings from server
+// IncludePartitionStats additionally fetches DescribeTopicResult.PartitionInfo.PartitioningSettings from server
 func IncludePartitionStats() DescribeOption {
 	return func(req *rawtopic.DescribeTopicRequest) {
 		req.IncludeStats = true

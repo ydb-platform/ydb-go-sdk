@@ -229,6 +229,88 @@ func TestTopicDescribePartitionStats(t *testing.T) {
 	require.Equal(t, expected, topicDesc)
 }
 
+func TestDescribePartitionSettings(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	const (
+		defaultRetentionPeriod = 24 * time.Hour
+		writeSpeed             = int64(1024)
+		burstBytes             = int64(2048)
+	)
+
+	var (
+		supportedCodecs          = []topictypes.Codec{topictypes.CodecRaw}
+		minActivePartitions      = int64(2)
+		maxActivePartitions      = int64(5)
+		topicName                = "test-topic-" + t.Name()
+		topicPath                = scope.Driver().Name() + "/" + topicName
+		autoPartitioningSettings = topictypes.AutoPartitioningSettings{
+			AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyScaleUp,
+			AutoPartitioningWriteSpeedStrategy: topictypes.AutoPartitioningWriteSpeedStrategy{
+				StabilizationWindow:    10 * time.Second,
+				UpUtilizationPercent:   80,
+				DownUtilizationPercent: 20,
+			},
+		}
+	)
+
+	_ = scope.Driver().Topic().Drop(ctx, topicPath)
+	err := scope.Driver().Topic().Create(ctx, topicPath,
+		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
+		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
+		topicoptions.CreateWithMaxActivePartitions(maxActivePartitions),
+		topicoptions.CreateWithAutoPartitioningSettings(autoPartitioningSettings),
+		topicoptions.CreateWithPartitionWriteSpeedBytesPerSecond(writeSpeed),
+		topicoptions.CreateWithPartitionWriteBurstBytes(burstBytes),
+	)
+	require.NoError(t, err)
+
+	topicDesc, err := scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+
+	expected := topictypes.TopicDescription{
+		Path: topicName,
+		PartitionSettings: topictypes.PartitionSettings{
+			MinActivePartitions:      minActivePartitions,
+			MaxActivePartitions:      maxActivePartitions,
+			AutoPartitioningSettings: autoPartitioningSettings,
+		},
+		Partitions: []topictypes.PartitionInfo{
+			{
+				PartitionID: 0,
+				Active:      true,
+			},
+			{
+				PartitionID: 1,
+				Active:      true,
+			},
+		},
+		RetentionPeriod:                   defaultRetentionPeriod,
+		RetentionStorageMB:                0,
+		SupportedCodecs:                   supportedCodecs,
+		PartitionWriteBurstBytes:          burstBytes,
+		PartitionWriteSpeedBytesPerSecond: writeSpeed,
+		Attributes:                        nil,
+		Consumers:                         []topictypes.Consumer{},
+		MeteringMode:                      topictypes.MeteringModeUnspecified,
+	}
+
+	requireAndCleanSubset := func(checked *map[string]string, subset *map[string]string) {
+		t.Helper()
+		for k, subValue := range *subset {
+			checkedValue, ok := (*checked)[k]
+			require.True(t, ok, k)
+			require.Equal(t, subValue, checkedValue)
+		}
+		*checked = nil
+		*subset = nil
+	}
+
+	requireAndCleanSubset(&topicDesc.Attributes, &expected.Attributes)
+	require.Equal(t, expected, topicDesc)
+}
+
 func TestDescribeTopicConsumer(t *testing.T) {
 	ctx := xtest.Context(t)
 	db := connect(t)

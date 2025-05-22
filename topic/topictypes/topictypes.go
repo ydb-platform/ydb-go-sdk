@@ -107,7 +107,7 @@ func (s *PartitionSettings) ToRaw(raw *rawtopic.PartitioningSettings) {
 	raw.MinActivePartitions = s.MinActivePartitions
 	raw.MaxActivePartitions = s.MaxActivePartitions
 	raw.PartitionCountLimit = s.PartitionCountLimit
-	raw.AutoPartitioningSettings = s.AutoPartitioningSettings.ToRaw()
+	s.AutoPartitioningSettings.ToRaw(&raw.AutoPartitioningSettings)
 }
 
 // FromRaw convert internal format to public. Used internally only.
@@ -125,11 +125,9 @@ type AutoPartitioningSettings struct {
 }
 
 // ToRaw convert public format to internal. Used internally only.
-func (s *AutoPartitioningSettings) ToRaw() rawtopic.AutoPartitioningSettings {
-	return rawtopic.AutoPartitioningSettings{
-		AutoPartitioningStrategy:           rawtopic.AutoPartitioningStrategy(s.AutoPartitioningStrategy),
-		AutoPartitioningWriteSpeedStrategy: s.AutoPartitioningWriteSpeedStrategy.ToRaw(),
-	}
+func (s *AutoPartitioningSettings) ToRaw(raw *rawtopic.AutoPartitioningSettings) {
+	raw.AutoPartitioningStrategy = rawtopic.AutoPartitioningStrategy(s.AutoPartitioningStrategy)
+	raw.AutoPartitioningWriteSpeedStrategy = s.AutoPartitioningWriteSpeedStrategy.ToRaw()
 }
 
 // FromRaw convert internal format to public. Used internally only.
