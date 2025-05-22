@@ -55,6 +55,14 @@ func (v *Duration) ToDuration() *time.Duration {
 	return &v.Value
 }
 
+func (v *Duration) ToDurationWithDefault() time.Duration {
+	if !v.HasValue {
+		return 0
+	}
+
+	return v.Value
+}
+
 type Int64 struct {
 	Value    int64
 	HasValue bool

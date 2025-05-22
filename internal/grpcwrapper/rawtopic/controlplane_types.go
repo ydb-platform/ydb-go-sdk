@@ -112,8 +112,9 @@ func (s *AutoPartitioningSettings) FromProto(proto *Ydb_Topic.AutoPartitioningSe
 type AutoPartitioningStrategy int32
 
 const (
-	AutoPartitioningStrategyUnspecified    = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_UNSPECIFIED)       //nolint:lll
-	AutoPartitioningStrategyDisabled       = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_DISABLED)          //nolint:lll
+	AutoPartitioningStrategyUnspecified    = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_UNSPECIFIED) //nolint:lll
+	AutoPartitioningStrategyDisabled       = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_DISABLED)    //nolint:lll
+	AutoPartitioningStrategyScaleUp        = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_SCALE_UP)
 	AutoPartitioningStrategyScaleUpAndDown = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_SCALE_UP_AND_DOWN) //nolint:lll
 	AutoPartitioningStrategyPaused         = AutoPartitioningStrategy(Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_PAUSED)            //nolint:lll
 )

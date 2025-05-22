@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
@@ -95,20 +96,83 @@ func (m *MeteringMode) ToRaw(raw *rawtopic.MeteringMode) {
 
 // PartitionSettings settings of partitions
 type PartitionSettings struct {
-	MinActivePartitions int64
-	PartitionCountLimit int64
+	MinActivePartitions      int64
+	MaxActivePartitions      int64
+	PartitionCountLimit      int64
+	AutoPartitioningSettings AutoPartitioningSettings
 }
 
 // ToRaw convert public format to internal. Used internally only.
 func (s *PartitionSettings) ToRaw(raw *rawtopic.PartitioningSettings) {
 	raw.MinActivePartitions = s.MinActivePartitions
+	raw.MaxActivePartitions = s.MaxActivePartitions
 	raw.PartitionCountLimit = s.PartitionCountLimit
+	raw.AutoPartitioningSettings = s.AutoPartitioningSettings.ToRaw()
 }
 
 // FromRaw convert internal format to public. Used internally only.
 func (s *PartitionSettings) FromRaw(raw *rawtopic.PartitioningSettings) {
 	s.MinActivePartitions = raw.MinActivePartitions
+	s.MaxActivePartitions = raw.MaxActivePartitions
 	s.PartitionCountLimit = raw.PartitionCountLimit
+	s.AutoPartitioningSettings.FromRaw(&raw.AutoPartitioningSettings)
+}
+
+// AutoPartitioningSettings contains settings for automatic partitioning
+type AutoPartitioningSettings struct {
+	AutoPartitioningStrategy           AutoPartitioningStrategy
+	AutoPartitioningWriteSpeedStrategy AutoPartitioningWriteSpeedStrategy
+}
+
+// ToRaw convert public format to internal. Used internally only.
+func (s *AutoPartitioningSettings) ToRaw() rawtopic.AutoPartitioningSettings {
+	return rawtopic.AutoPartitioningSettings{
+		AutoPartitioningStrategy:           rawtopic.AutoPartitioningStrategy(s.AutoPartitioningStrategy),
+		AutoPartitioningWriteSpeedStrategy: s.AutoPartitioningWriteSpeedStrategy.ToRaw(),
+	}
+}
+
+// FromRaw convert internal format to public. Used internally only.
+func (s *AutoPartitioningSettings) FromRaw(raw *rawtopic.AutoPartitioningSettings) {
+	s.AutoPartitioningStrategy = AutoPartitioningStrategy(raw.AutoPartitioningStrategy)
+	s.AutoPartitioningWriteSpeedStrategy.FromRaw(&raw.AutoPartitioningWriteSpeedStrategy)
+}
+
+// AutoPartitioningStrategy defines the strategy for automatic partitioning
+type AutoPartitioningStrategy int32
+
+const (
+	AutoPartitioningStrategyUnspecified    = AutoPartitioningStrategy(rawtopic.AutoPartitioningStrategyUnspecified)
+	AutoPartitioningStrategyDisabled       = AutoPartitioningStrategy(rawtopic.AutoPartitioningStrategyDisabled)
+	AutoPartitioningStrategyScaleUp        = AutoPartitioningStrategy(rawtopic.AutoPartitioningStrategyScaleUp)
+	AutoPartitioningStrategyScaleUpAndDown = AutoPartitioningStrategy(rawtopic.AutoPartitioningStrategyScaleUpAndDown)
+	AutoPartitioningStrategyPaused         = AutoPartitioningStrategy(rawtopic.AutoPartitioningStrategyPaused)
+)
+
+// AutoPartitioningWriteSpeedStrategy contains settings for write speed strategy
+type AutoPartitioningWriteSpeedStrategy struct {
+	StabilizationWindow    time.Duration
+	UpUtilizationPercent   int32
+	DownUtilizationPercent int32
+}
+
+// ToRaw convert public format to internal. Used internally only.
+func (s *AutoPartitioningWriteSpeedStrategy) ToRaw() rawtopic.AutoPartitioningWriteSpeedStrategy {
+	return rawtopic.AutoPartitioningWriteSpeedStrategy{
+		StabilizationWindow: rawoptional.Duration{
+			Value:    s.StabilizationWindow,
+			HasValue: s.StabilizationWindow > 0,
+		},
+		UpUtilizationPercent:   s.UpUtilizationPercent,
+		DownUtilizationPercent: s.DownUtilizationPercent,
+	}
+}
+
+// FromRaw convert internal format to public. Used internally only.
+func (s *AutoPartitioningWriteSpeedStrategy) FromRaw(raw *rawtopic.AutoPartitioningWriteSpeedStrategy) {
+	s.StabilizationWindow = raw.StabilizationWindow.ToDurationWithDefault()
+	s.UpUtilizationPercent = raw.UpUtilizationPercent
+	s.DownUtilizationPercent = raw.DownUtilizationPercent
 }
 
 // TopicDescription contains info about topic.
