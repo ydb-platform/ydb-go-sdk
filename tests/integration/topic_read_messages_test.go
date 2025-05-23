@@ -107,34 +107,36 @@ func TestReader(t *testing.T) {
 	t.Logf("Last message ofset: %d, commited: %d", lastMessage.Offset, c.Partitions[0].PartitionConsumerStats.CommittedOffset)
 	const offset = 5
 
-	//t.Run("read1.5", func(t *testing.T) {
-	//	readSelector := topicoptions.ReadSelector{
-	//		Path:       topicName,
-	//		Partitions: []int64{0},
-	//	}
-	//
-	//	r, err := topic.StartReader(consumerName, []topicoptions.ReadSelector{readSelector},
-	//		topicoptions.WithReaderCommitMode(topicoptions.CommitModeAsync),
-	//		topicoptions.WithReaderGetPartitionStartOffset(func(ctx context.Context, req topicoptions.GetPartitionStartOffsetRequest) (res topicoptions.GetPartitionStartOffsetResponse, err error) {
-	//			res.StartFrom(lastMessage.Offset + offset)
-	//			return res, nil
-	//		}),
-	//	)
-	//	require.NoError(t, err)
-	//
-	//	c, err := topic.DescribeTopicConsumer(ctx, topicName, consumerName, topicoptions.IncludeConsumerStats())
-	//	require.NoError(t, err)
-	//	t.Logf("1.5 Commited offset before read: %d", c.Partitions[0].PartitionConsumerStats.CommittedOffset)
-	//
-	//	_, err = r.ReadMessagesBatch(ctx)
-	//	require.NoError(t, err)
-	//
-	//	c, err = topic.DescribeTopicConsumer(ctx, topicName, consumerName, topicoptions.IncludeConsumerStats())
-	//	require.NoError(t, err)
-	//	t.Logf("1.5 Commited offset after read: %d", c.Partitions[0].PartitionConsumerStats.CommittedOffset)
-	//
-	//	require.NoError(t, r.Close(ctx))
-	//})
+	t.Run("read1.5", func(t *testing.T) {
+		return // uncomment to fix the test
+
+		readSelector := topicoptions.ReadSelector{
+			Path:       topicName,
+			Partitions: []int64{0},
+		}
+
+		r, err := topic.StartReader(consumerName, []topicoptions.ReadSelector{readSelector},
+			topicoptions.WithReaderCommitMode(topicoptions.CommitModeAsync),
+			topicoptions.WithReaderGetPartitionStartOffset(func(ctx context.Context, req topicoptions.GetPartitionStartOffsetRequest) (res topicoptions.GetPartitionStartOffsetResponse, err error) {
+				res.StartFrom(lastMessage.Offset + offset)
+				return res, nil
+			}),
+		)
+		require.NoError(t, err)
+
+		c, err := topic.DescribeTopicConsumer(ctx, topicName, consumerName, topicoptions.IncludeConsumerStats())
+		require.NoError(t, err)
+		t.Logf("1.5 Commited offset before read: %d", c.Partitions[0].PartitionConsumerStats.CommittedOffset)
+
+		_, err = r.ReadMessagesBatch(ctx)
+		require.NoError(t, err)
+
+		c, err = topic.DescribeTopicConsumer(ctx, topicName, consumerName, topicoptions.IncludeConsumerStats())
+		require.NoError(t, err)
+		t.Logf("1.5 Commited offset after read: %d", c.Partitions[0].PartitionConsumerStats.CommittedOffset)
+
+		require.NoError(t, r.Close(ctx))
+	})
 
 	t.Run("read2", func(t *testing.T) {
 		readSelector := topicoptions.ReadSelector{
