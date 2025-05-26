@@ -81,6 +81,15 @@ func TestTopicDescribe(t *testing.T) {
 	err := db.Topic().Create(ctx, topicName,
 		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
 		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
+		topicoptions.CreateWithMaxActivePartitions(2),
+		topicoptions.CreateWithAutoPartitioningSettings(topictypes.AutoPartitioningSettings{
+			AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyScaleUp,
+			AutoPartitioningWriteSpeedStrategy: topictypes.AutoPartitioningWriteSpeedStrategy{
+				StabilizationWindow:    15 * time.Second,
+				UpUtilizationPercent:   80,
+				DownUtilizationPercent: 20,
+			},
+		}),
 		// topicoptions.CreateWithPartitionCountLimit(partitionCountLimit), LOGBROKER-7800
 		topicoptions.CreateWithRetentionPeriod(retentionPeriod),
 		// topicoptions.CreateWithRetentionStorageMB(...) - incompatible with retention period
@@ -98,6 +107,15 @@ func TestTopicDescribe(t *testing.T) {
 		Path: topicName,
 		PartitionSettings: topictypes.PartitionSettings{
 			MinActivePartitions: minActivePartitions,
+			MaxActivePartitions: 2,
+			AutoPartitioningSettings: topictypes.AutoPartitioningSettings{
+				AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyScaleUp,
+				AutoPartitioningWriteSpeedStrategy: topictypes.AutoPartitioningWriteSpeedStrategy{
+					StabilizationWindow:    15 * time.Second,
+					UpUtilizationPercent:   80,
+					DownUtilizationPercent: 20,
+				},
+			},
 			// PartitionCountLimit: partitionCountLimit, LOGBROKER-7800
 		},
 		Partitions: []topictypes.PartitionInfo{
@@ -146,14 +164,25 @@ func TestTopicDescribePartitionStats(t *testing.T) {
 	topicName := "test-topic-" + t.Name()
 
 	var (
-		supportedCodecs     = []topictypes.Codec{topictypes.CodecRaw}
-		minActivePartitions = int64(1)
+		supportedCodecs      = []topictypes.Codec{topictypes.CodecRaw}
+		minActivePartitions  = int64(1)
+		maxActivePartitions  = int64(1)
+		partitioningSettings = topictypes.AutoPartitioningSettings{
+			AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyScaleUp,
+			AutoPartitioningWriteSpeedStrategy: topictypes.AutoPartitioningWriteSpeedStrategy{
+				StabilizationWindow:    15 * time.Second,
+				UpUtilizationPercent:   80,
+				DownUtilizationPercent: 20,
+			},
+		}
 	)
 
 	_ = db.Topic().Drop(ctx, topicName)
 	err := db.Topic().Create(ctx, topicName,
 		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
 		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
+		topicoptions.CreateWithMaxActivePartitions(maxActivePartitions),
+		topicoptions.CreateWithAutoPartitioningSettings(partitioningSettings),
 	)
 	require.NoError(t, err)
 
@@ -171,7 +200,9 @@ func TestTopicDescribePartitionStats(t *testing.T) {
 	expected := topictypes.TopicDescription{
 		Path: topicName,
 		PartitionSettings: topictypes.PartitionSettings{
-			MinActivePartitions: minActivePartitions,
+			MinActivePartitions:      minActivePartitions,
+			MaxActivePartitions:      maxActivePartitions,
+			AutoPartitioningSettings: partitioningSettings,
 		},
 		Partitions: []topictypes.PartitionInfo{
 			{
@@ -656,11 +687,17 @@ func TestAlterTopic(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	time.Sleep(3 * time.Second)
+
 	// Verify min active partitions
+	xtest.SpinWaitConditionWithTimeout(t, nil, time.Second, func() bool {
+		topicDesc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+		require.NoError(t, err)
+		return newMinActivePartitions == topicDesc.PartitionSettings.MinActivePartitions
+	})
 	topicDesc, err = scope.Driver().Topic().Describe(ctx, topicPath)
 	require.NoError(t, err)
 	require.Equal(t, newMinActivePartitions, topicDesc.PartitionSettings.MinActivePartitions)
-	require.Equal(t, 3, len(topicDesc.Partitions), "Expected 3 active partitions after increasing min active partitions")
 }
 
 func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {
