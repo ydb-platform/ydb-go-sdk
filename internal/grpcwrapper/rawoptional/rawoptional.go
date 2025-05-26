@@ -55,12 +55,35 @@ func (v *Duration) ToDuration() *time.Duration {
 	return &v.Value
 }
 
+func (v *Duration) ToDurationWithDefault() time.Duration {
+	if !v.HasValue {
+		return 0
+	}
+
+	return v.Value
+}
+
 type Int64 struct {
 	Value    int64
 	HasValue bool
 }
 
 func (v *Int64) ToProto() *int64 {
+	if !v.HasValue {
+		return nil
+	}
+
+	val := v.Value
+
+	return &val
+}
+
+type Int32 struct {
+	Value    int32
+	HasValue bool
+}
+
+func (v *Int32) ToProto() *int32 {
 	if !v.HasValue {
 		return nil
 	}

@@ -14,7 +14,7 @@ type CreateTopicRequest struct {
 	OperationParams rawydb.OperationParams
 
 	Path                              string
-	PartitionSettings                 PartitioningSettings
+	PartitioningSettings              PartitioningSettings
 	RetentionPeriod                   time.Duration
 	RetentionStorageMB                int64
 	SupportedCodecs                   rawtopiccommon.SupportedCodecs
@@ -28,7 +28,7 @@ type CreateTopicRequest struct {
 func (req *CreateTopicRequest) ToProto() *Ydb_Topic.CreateTopicRequest {
 	proto := &Ydb_Topic.CreateTopicRequest{
 		Path:                 req.Path,
-		PartitioningSettings: req.PartitionSettings.ToProto(),
+		PartitioningSettings: req.PartitioningSettings.ToProto(),
 	}
 
 	if req.RetentionPeriod != 0 {
