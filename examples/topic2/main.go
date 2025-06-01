@@ -21,24 +21,6 @@ import (
 var connectionString = flag.String("ydb", "grpc://localhost:2136/local", "")
 var driverLog = flag.Bool("driver-log", false, "Enable YDB driver debug logging")
 
-// simpleLogger implements a basic logger for YDB driver debugging
-type simpleLogger struct{}
-
-func (l *simpleLogger) Log(ctx context.Context, msg string, fields ...ydbLog.Field) {
-	lvl := ydbLog.LevelFromContext(ctx)
-	names := ydbLog.NamesFromContext(ctx)
-
-	loggerName := strings.Join(names, ".")
-	values := make(map[string]string)
-	for _, field := range fields {
-		values[field.Key()] = field.String()
-	}
-
-	timeString := time.Now().UTC().Format("15:04:05.000")
-	message := fmt.Sprintf("[%s] %s [%s] %s: %v (%v)", timeString, "YDB-DRIVER", lvl, loggerName, msg, values)
-	log.Println(message)
-}
-
 func main() {
 	flag.Parse()
 
@@ -47,17 +29,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Prepare YDB options
-	var ydbOptions []ydb.Option
-
-	// Add driver debug logging if flag is enabled
-	if *driverLog {
-		logger := &simpleLogger{}
-		// Enable logging for key driver events: driver, discovery, retry, topic
-		details := trace.MatchDetails(`ydb\.(driver|discovery|retry|topic).*`)
-		ydbOptions = append(ydbOptions, ydb.WithLogger(logger, details))
-		log.Println("YDB driver debug logging enabled")
-	}
+	// Setup YDB options including optional debug logging
+	ydbOptions := setupYDBOptions()
 
 	// Connect to YDB
 	db, err := ydb.Open(ctx, *connectionString, ydbOptions...)
@@ -164,4 +137,38 @@ func main() {
 	}
 
 	log.Printf("Example completed successfully - read %d messages total", totalMessagesRead)
+}
+
+// setupYDBOptions configures YDB driver options including optional debug logging
+func setupYDBOptions() []ydb.Option {
+	var ydbOptions []ydb.Option
+
+	// Add driver debug logging if flag is enabled
+	if *driverLog {
+		logger := &simpleLogger{}
+		// Enable logging for key driver events: driver, discovery, retry, topic
+		details := trace.MatchDetails(`ydb\.(driver|discovery|retry|topic).*`)
+		ydbOptions = append(ydbOptions, ydb.WithLogger(logger, details))
+		log.Println("YDB driver debug logging enabled")
+	}
+
+	return ydbOptions
+}
+
+// simpleLogger implements a basic logger for YDB driver debugging
+type simpleLogger struct{}
+
+func (l *simpleLogger) Log(ctx context.Context, msg string, fields ...ydbLog.Field) {
+	lvl := ydbLog.LevelFromContext(ctx)
+	names := ydbLog.NamesFromContext(ctx)
+
+	loggerName := strings.Join(names, ".")
+	values := make(map[string]string)
+	for _, field := range fields {
+		values[field.Key()] = field.String()
+	}
+
+	timeString := time.Now().UTC().Format("15:04:05.000")
+	message := fmt.Sprintf("[%s] %s [%s] %s: %v (%v)", timeString, "YDB-DRIVER", lvl, loggerName, msg, values)
+	log.Println(message)
 }
