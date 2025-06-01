@@ -7,6 +7,7 @@ This example shows how to:
 - Write 3 messages to the topic
 - Read messages in batches with timeout handling
 - Process and commit each batch individually
+- Optional: Enable YDB driver debug logging for troubleshooting
 
 Prerequisites:
 Before running this example, ensure you have:
@@ -22,7 +23,23 @@ Before running this example, ensure you have:
 
 Usage:
 
+	# Basic usage without debug logging
 	go run . -ydb "grpc://localhost:2136/local"
+
+	# With YDB driver debug logging enabled
+	go run . -driver-log
+
+	# With custom YDB connection and debug logging
+	go run . -ydb "grpc://localhost:2136/local" -driver-log
+
+Debug Logging:
+The -driver-log flag enables YDB driver debug output, showing detailed information about:
+- Driver connection events and operations
+- Topic discovery and balancing operations
+- Retry attempts and error handling
+- Internal driver state changes and timing
+
+When enabled, debug output includes timestamps and structured logging information helpful for diagnosing connection issues, performance problems, or understanding YDB driver behavior.
 
 Connection timeout:
 The example uses a 5-second timeout for ydb.Open() because local YDB instances
@@ -60,7 +77,7 @@ Key operations demonstrated:
     err = reader.Commit(batch.Context(), batch)
     }
 
-Expected output:
+Expected output (normal mode):
 
 	Deleting topic (if exists)...
 	Topic deleted (if existed)
@@ -82,6 +99,20 @@ Expected output:
 	Read timeout reached, no more messages available
 	Example completed successfully - read 3 messages total
 
+Expected output (with -driver-log):
+
+	YDB driver debug logging enabled
+	[15:04:05.123] YDB-DRIVER [INFO] ydb.driver: driver init starting... ({endpoint: grpc://localhost:2136 database: /local secure: false})
+	[15:04:05.125] YDB-DRIVER [DEBUG] ydb.discovery: discovery starting... ({address: localhost:2136 database: /local})
+	... (additional debug output) ...
+	Deleting topic (if exists)...
+	[15:04:05.150] YDB-DRIVER [TRACE] ydb.topic.writer: topic writer starting... ({topic: /local/example-topic})
+	... (additional debug output) ...
+	Topic deleted (if existed)
+	Creating topic...
+	Topic created successfully
+	... (rest of normal output with interspersed debug logs) ...
+
 Batch Processing Features:
 - Uses 1-second timeout for read operations to handle cases where no more messages are available
 - Demonstrates real-world batch processing patterns with proper timeout handling
@@ -89,5 +120,6 @@ Batch Processing Features:
 - Continues reading until all messages are consumed or timeout occurs
 
 Note: This example does not clean up resources to allow exploration via Web UI.
+Debug mode provides detailed insights into YDB driver internals for development and troubleshooting.
 */
 package main
