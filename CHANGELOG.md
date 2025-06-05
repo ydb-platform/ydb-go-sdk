@@ -1,3 +1,4 @@
+## v3.109.0
 * Added control plane fields for split-merge topics (Create,Alter,Describe) 
 
 ## v3.108.5
