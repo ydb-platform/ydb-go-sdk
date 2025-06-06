@@ -88,6 +88,62 @@
    - Automatic reconnection
    - Error propagation to user handlers
 
+## PartitionWorker Message Handling Patterns
+
+### Clean Worker Design
+- **Dependency Injection**: All external interactions through interfaces
+- **No Side Effects**: Worker only interacts with injected dependencies
+- **Testable Design**: Can mock all external components for unit testing
+- **Sequential Processing**: Messages within a partition processed in order
+
+### Context-Aware Message Queue Integration
+- **UnboundedChan with Context**: Uses `Receive(ctx)` method for built-in context cancellation support
+- **Simplified Processing**: Direct integration eliminates need for custom goroutines
+- **Immediate Cancellation**: Context cancellation respected during message receiving
+- **Clean Error Handling**: Distinguishes context errors from normal queue closure
+- **Performance Optimized**: Minimal overhead when context is not cancelled
+
+### Message Queue Patterns
+- **Queue-Based Delivery**: Uses UnboundedChan for asynchronous message processing
+- **Built-in Merging**: ReadResponse messages merged automatically to optimize performance
+- **Context Integration**: `Receive(ctx)` returns immediately on context cancellation
+- **Error Propagation**: Context errors properly reported via callback mechanism
+
+### Safe Message Merging Patterns
+- **Metadata Validation**: Messages only merged when ServerMessageMetadata is identical
+- **Hierarchical Comparison**: Uses nested Equals() methods for deep metadata comparison
+- **Status Code Matching**: StatusCode fields must be identical for merge compatibility
+- **Issues Collection Matching**: Issues arrays must be identical including nested structures
+- **Merge Prevention Strategy**: When metadata differs, messages processed separately
+- **Data Integrity Guarantee**: No loss of status or error information during merging
+- **Performance Optimization**: Efficient comparison with early termination on differences
+
+### Metadata Validation Requirements for Merging
+- **Complete Metadata Equality**: All metadata fields must match exactly
+- **Nested Structure Validation**: Deep comparison of nested Issues structures
+- **Nil Safety**: Proper handling of nil metadata and nested components
+- **Type-Safe Comparison**: All comparisons respect Go type safety
+- **Fail-Safe Behavior**: Uncertain comparisons default to preventing merge
+- **Hierarchical Delegation**: Top-level Equals() delegates to nested structure methods
+
+### Message Type Handling
+- **StartPartitionSession**: Creates user event, waits for confirmation, sends response
+- **StopPartitionSession**: Handles both graceful and non-graceful termination
+- **ReadResponse**: Converts raw batches to public batches, processes each batch individually
+- **Message Merging**: ReadResponse messages merged to optimize user handler calls
+
+### Context Handling Best Practices
+- **Direct Integration**: Use `UnboundedChan.Receive(ctx)` for context-aware receiving
+- **Error Distinction**: Handle `context.Canceled` and `context.DeadlineExceeded` appropriately
+- **Graceful Shutdown**: Distinguish context cancellation from queue closure for proper cleanup
+- **Resource Management**: Context cancellation prevents goroutine leaks during shutdown
+
+### Integration with Existing Components
+- **streamListener Compatibility**: Uses existing event creation patterns
+- **topicreadercommon.PartitionSession**: Leverages existing session management
+- **background.Worker**: Integrates with existing worker lifecycle patterns
+- **Context Propagation**: Proper context flow from streamListener to PartitionWorker
+
 ## Integration Points
 
 1. **User Handler Interface**
@@ -100,13 +156,16 @@
    - Message sending loop
    - Message receiving loop
    - Commit management
+   - **PartitionWorker Integration**: Individual workers for each partition with context awareness
 
 3. **Partition Session Storage**
    - Thread-safe session management
    - Session lifecycle tracking
    - Garbage collection
+   - **Worker Coordination**: Session sharing between streamListener and workers
 
 4. **Commit Management**
    - Synchronous commit operations
    - Offset tracking
-   - Error handling 
+   - Error handling
+   - **Worker Integration**: Commit operations initiated from worker-processed events 

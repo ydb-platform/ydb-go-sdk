@@ -1,6 +1,10 @@
 package xsync
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+import (
+	"context"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+)
 
 // UnboundedChan is a generic unbounded channel implementation that supports
 // message merging and concurrent access.
@@ -63,10 +67,12 @@ func (c *UnboundedChan[T]) SendWithMerge(msg T, mergeFunc func(last, new T) (T, 
 	}
 }
 
-// Receive retrieves a message from the channel.
-// Returns (message, true) if a message is available.
-// Returns (zero_value, false) if the channel is closed and empty.
-func (c *UnboundedChan[T]) Receive() (T, bool) {
+// Receive retrieves a message from the channel with context support.
+// Returns (message, true, nil) if a message is available.
+// Returns (zero_value, false, nil) if the channel is closed and empty.
+// Returns (zero_value, false, context.Canceled) if context is cancelled.
+// Returns (zero_value, false, context.DeadlineExceeded) if context times out.
+func (c *UnboundedChan[T]) Receive(ctx context.Context) (T, bool, error) {
 	for {
 		var msg T
 		var hasMsg, isClosed bool
@@ -81,15 +87,19 @@ func (c *UnboundedChan[T]) Receive() (T, bool) {
 		})
 
 		if hasMsg {
-			return msg, true
+			return msg, true, nil
 		}
 		if isClosed {
-			return msg, false
+			return msg, false, nil
 		}
 
-		// Wait for signal that something happened
-		<-c.signal
-		// Loop back to check state again
+		// Wait for signal that something happened or context cancellation
+		select {
+		case <-ctx.Done():
+			return msg, false, ctx.Err()
+		case <-c.signal:
+			// Loop back to check state again
+		}
 	}
 }
 

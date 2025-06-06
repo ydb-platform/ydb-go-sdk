@@ -58,3 +58,37 @@ func (issue *Issue) String() string {
 
 	return fmt.Sprintf("message: %v, code: %v%v", issue.Message, issue.Code, innerIssues)
 }
+
+// Equals compares this Issue with another Issue for equality
+func (issue *Issue) Equals(other *Issue) bool {
+	if issue == nil && other == nil {
+		return true
+	}
+	if issue == nil || other == nil {
+		return false
+	}
+
+	if issue.Code != other.Code {
+		return false
+	}
+	if issue.Message != other.Message {
+		return false
+	}
+
+	return issue.Issues.Equals(other.Issues)
+}
+
+// Equals compares this Issues slice with another Issues slice for equality
+func (issues Issues) Equals(other Issues) bool {
+	if len(issues) != len(other) {
+		return false
+	}
+
+	for i := range issues {
+		if !issues[i].Equals(&other[i]) {
+			return false
+		}
+	}
+
+	return true
+}
