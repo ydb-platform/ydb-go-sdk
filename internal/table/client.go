@@ -2,12 +2,14 @@ package table
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -319,20 +321,86 @@ func (c *Client) BulkUpsert(
 
 	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 
-	err = retry.Retry(ctx,
-		func(ctx context.Context) (err error) {
-			attempts++
-			_, err = client.BulkUpsert(ctx, request)
-
-			return err
-		},
-		config.RetryOptions...,
-	)
+	// We must send requests in chunks to avoid exceeding the maximum message size
+	chunks, err := chunkBulkUpsertRequest(request, c.config.MaxRequestMessageSize())
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
+	for _, request := range chunks {
+		err = retry.Retry(ctx,
+			func(ctx context.Context) (err error) {
+				attempts++
+				_, err = client.BulkUpsert(ctx, request)
+
+				return err
+			},
+			config.RetryOptions...,
+		)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+	}
+
 	return nil
+}
+
+// chunkBulkUpsertRequest splits a BulkUpsertRequest into smaller chunks if it exceeds the maximum message size.
+// It recursively divides the request's rows into smaller requests while preserving the original request structure.
+// If the request is smaller than the maximum size or contains fewer than two rows, it returns the original request.
+func chunkBulkUpsertRequest(req *Ydb_Table.BulkUpsertRequest, maxBytes int) ([]*Ydb_Table.BulkUpsertRequest, error) {
+	// not a row bulk upsert request -> ret original request
+	if req.Rows == nil || req.Rows.Value == nil {
+		return []*Ydb_Table.BulkUpsertRequest{req}, nil
+	}
+
+	reqSize := proto.Size(req)
+
+	// not exceed the maximum size -> ret original request
+	if reqSize <= maxBytes {
+		return []*Ydb_Table.BulkUpsertRequest{req}, nil
+	}
+
+	n := len(req.Rows.Value.Items)
+	if n == 0 {
+		return []*Ydb_Table.BulkUpsertRequest{req}, nil
+	}
+
+	// we cannot split one item and one item is too big
+	if n == 1 {
+		err := fmt.Errorf("ydb: single row size (%d bytes) exceeds maximum request size (%d bytes) - row is too large to process", reqSize, maxBytes)
+		return nil, err
+	}
+
+	right := splitBulkUpsertRequestAt(req, n/2)
+
+	leftChunks, err := chunkBulkUpsertRequest(req, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	rightChunks, err := chunkBulkUpsertRequest(right, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(leftChunks, rightChunks...), nil
+}
+
+// splitBulkUpsertRequestAt splits a BulkUpsertRequest into two parts at the specified position.
+// It creates a new request with items from the specified position to the end,
+// while modifying the original request to contain only items before the position.
+// Returns the newly created request with the split items.
+func splitBulkUpsertRequestAt(req *Ydb_Table.BulkUpsertRequest, pos int) *Ydb_Table.BulkUpsertRequest {
+	items := req.Rows.Value.Items // save original items
+	req.Rows.Value.Items = nil
+
+	right := proto.Clone(req).(*Ydb_Table.BulkUpsertRequest)
+
+	req.Rows.Value.Items = items[:pos]
+	right.Rows.Value.Items = items[pos:]
+
+	return right
 }
 
 func makeReadRowsRequest(

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -72,6 +73,35 @@ func TestTableBulkUpsert(t *testing.T) {
 	for i := int64(0); i < 10; i++ {
 		val := fmt.Sprintf("value for %v", i)
 		assertIdValue(scope.Ctx, t, tablePath, i, val)
+	}
+}
+
+func TestTableBulkUpsertGrpcMaxMessageSize(t *testing.T) {
+	const MB = 1024 * 1024
+
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver()
+		tablePath = scope.TablePath()
+	)
+
+	s := stringWithSize(100 * MB)
+
+	var rows []types.Value
+	for i := int64(0); i < 10; i++ { // => 100 MB the whole request
+		rows = append(rows, types.StructValue(
+			types.StructFieldValue("id", types.Int64Value(i)),
+			types.StructFieldValue("val", types.TextValue(s)),
+		))
+	}
+
+	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.BulkUpsertDataRows(
+		types.ListValue(rows...),
+	))
+	scope.Require.NoError(err)
+
+	for i := int64(0); i < 10; i++ {
+		assertIdValue(scope.Ctx, t, tablePath, i, s)
 	}
 }
 
@@ -242,4 +272,13 @@ func assertIdValue(ctx context.Context, t *testing.T, tableName string, id int64
 
 func assertIdValueNil(ctx context.Context, t *testing.T, tableName string, id int64) {
 	assertIdValueImpl(ctx, t, tableName, id, nil)
+}
+
+func stringWithSize(sizeBytes int) string {
+	var sb strings.Builder
+	sb.Grow(sizeBytes)
+	for range sizeBytes {
+		sb.WriteString("a")
+	}
+	return sb.String()
 }

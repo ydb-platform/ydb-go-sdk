@@ -470,6 +470,9 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 					// prepend common params from root config
 					[]tableConfig.Option{
 						tableConfig.With(d.config.Common),
+
+						// because we are limiting by grpc message size
+						tableConfig.WithMaxRequestMessageSize(d.config.GrpcMaxMessageSize()),
 					},
 					d.tableOptions...,
 				)...,
