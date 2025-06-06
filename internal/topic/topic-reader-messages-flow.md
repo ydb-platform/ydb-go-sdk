@@ -1,0 +1,112 @@
+# Topic Reader Message Flow
+
+## Message Types
+
+### Server Messages
+1. **InitResponse**
+   - First message received after connection
+   - Contains session ID and initial configuration
+   - Must be handled before other messages
+
+2. **StartPartitionSessionRequest**
+   - Server requests to start reading a partition
+   - Contains partition metadata and initial offset
+   - Must be confirmed by client
+
+3. **StopPartitionSessionRequest**
+   - Server requests to stop reading a partition
+   - Can be graceful or immediate
+   - Must be confirmed by client
+
+4. **ReadResponse**
+   - Contains actual message data
+   - Includes partition session ID
+   - May contain multiple messages in a batch
+
+5. **CommitOffsetResponse**
+   - Response to client's commit request
+   - Contains commit status and any errors
+
+### Client Messages
+1. **InitRequest**
+   - Initial connection setup
+   - Contains consumer name and topic selectors
+
+2. **StartPartitionSessionResponse**
+   - Confirms partition start
+   - Contains client-side session ID
+
+3. **StopPartitionSessionResponse**
+   - Confirms partition stop
+   - Contains final committed offset
+
+4. **CommitOffsetRequest**
+   - Requests offset commit
+   - Contains partition session ID and offset
+
+## Partition Lifecycle
+
+1. **Creation**
+   - Triggered by StartPartitionSessionRequest
+   - Creates new PartitionSession
+   - Initializes offset tracking
+   - Must be confirmed to server
+
+2. **Operation**
+   - Receives ReadResponse messages
+   - Tracks message offsets
+   - Commits offsets periodically
+   - Maintains message order within partition
+
+3. **Destruction**
+   - Triggered by StopPartitionSessionRequest
+   - Can be graceful or immediate
+   - Commits final offset
+   - Removes from session storage
+   - Must be confirmed to server
+
+## Message Processing Patterns
+
+1. **Connection Management**
+   - Single gRPC stream per listener
+   - Handles reconnection automatically
+   - All partition sessions are reset on reconnect
+   - New connections always start fresh sessions
+
+2. **Partition Management**
+   - Dynamic partition assignment
+   - Thread-safe session storage
+   - Garbage collection for removed sessions
+
+3. **Message Delivery**
+   - Ordered delivery within partition
+   - Batch processing for efficiency
+   - Offset tracking and commit management
+
+4. **Error Handling**
+   - Graceful degradation on errors
+   - Automatic reconnection
+   - Error propagation to user handlers
+
+## Integration Points
+
+1. **User Handler Interface**
+   - OnStartPartitionSessionRequest
+   - OnStopPartitionSessionRequest
+   - OnReadMessages
+   - OnReaderCreated
+
+2. **Background Worker**
+   - Message sending loop
+   - Message receiving loop
+   - Commit management
+
+3. **Partition Session Storage**
+   - Thread-safe session management
+   - Session lifecycle tracking
+   - Garbage collection
+
+4. **Commit Management**
+   - Synchronous commit operations
+   - Offset tracking
+   - Error handling 
