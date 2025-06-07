@@ -40,7 +40,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 				return nil
 			})
 
-		StreamListener(e).onReceiveServerMessage(ctx, &rawtopicreader.ReadResponse{
+		StreamListener(e).routeMessage(ctx, &rawtopicreader.ReadResponse{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
 				Status: rawydb.StatusSuccess,
 			},
@@ -98,7 +98,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 			return nil
 		})
 
-		StreamListener(e).onReceiveServerMessage(sf.Context(e), &rawtopicreader.StartPartitionSessionRequest{
+		StreamListener(e).routeMessage(sf.Context(e), &rawtopicreader.StartPartitionSessionRequest{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
 				Status: rawydb.StatusSuccess,
 			},
@@ -149,7 +149,7 @@ func TestStreamListener_OnReceiveServerMessage(t *testing.T) {
 			return nil
 		})
 
-		listener.onReceiveServerMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
+		listener.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
 				Status: rawydb.StatusSuccess,
 			},
@@ -226,7 +226,7 @@ func TestCommitBatch(t *testing.T) {
 			return nil
 		})
 
-		StreamListener(e).onReceiveServerMessage(sf.Context(e), &rawtopicreader.ReadResponse{
+		StreamListener(e).routeMessage(sf.Context(e), &rawtopicreader.ReadResponse{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
 				Status: rawydb.StatusSuccess,
 			},
@@ -274,7 +274,7 @@ func TestCommitBatch(t *testing.T) {
 		}).DoAndReturn(func(message rawtopicreader.ClientMessage) error {
 			commitCounter++
 
-			StreamListener(e).onReceiveServerMessage(sf.Context(e),
+			StreamListener(e).routeMessage(sf.Context(e),
 				&rawtopicreader.CommitOffsetResponse{
 					ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
 						Status: rawydb.StatusSuccess,
@@ -301,7 +301,7 @@ func TestCommitBatch(t *testing.T) {
 			return nil
 		})
 
-		StreamListener(e).onReceiveServerMessage(sf.Context(e), &rawtopicreader.ReadResponse{
+		StreamListener(e).routeMessage(sf.Context(e), &rawtopicreader.ReadResponse{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
 				Status: rawydb.StatusSuccess,
 			},

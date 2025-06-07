@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -20,20 +21,50 @@ type MessageSender interface {
 	SendRaw(msg rawtopicreader.ClientMessage)
 }
 
+// partitionWorkerCallback notifies when events occur for this partition
+type partitionWorkerCallback func(partitionInfo *partitionInfo, err error)
+
+// partitionInfo contains partition information for callbacks
+type partitionInfo struct {
+	PartitionSessionID int64
+	SessionID          int64
+	PartitionID        int64
+	Topic              string
+}
+
+// unifiedMessage wraps three types of messages that PartitionWorker can handle
+type unifiedMessage struct {
+	// Only one of these should be set
+	RawServerMessage *rawtopicreader.ServerMessage
+	BatchMessage     *batchMessage
+	CommitMessage    *commitMessage
+}
+
+// batchMessage represents a ready PublicBatch message with metadata
+type batchMessage struct {
+	ServerMessageMetadata rawtopiccommon.ServerMessageMetadata
+	Batch                 *topicreadercommon.PublicBatch
+}
+
+// commitMessage represents a CommitOffsetResponse for this partition
+type commitMessage struct {
+	Response *rawtopicreader.CommitOffsetResponse
+}
+
 // WorkerStoppedCallback notifies when worker is stopped
 type WorkerStoppedCallback func(sessionID int64, err error)
 
 // PartitionWorker processes messages for a single partition
 type PartitionWorker struct {
-	sessionID      int64
-	session        *topicreadercommon.PartitionSession
-	messageSender  MessageSender
-	userHandler    EventHandler
-	onStopped      WorkerStoppedCallback
-	streamListener *streamListener
+	sessionID     int64
+	session       *topicreadercommon.PartitionSession
+	messageSender MessageSender
+	userHandler   EventHandler
+	onStopped     WorkerStoppedCallback
+	partitionInfo *partitionInfo
 
-	queue    *xsync.UnboundedChan[rawtopicreader.ServerMessage]
-	bgWorker *background.Worker
+	messageQueue *xsync.UnboundedChan[unifiedMessage]
+	bgWorker     *background.Worker
 }
 
 // NewPartitionWorker creates a new PartitionWorker instance
@@ -43,33 +74,65 @@ func NewPartitionWorker(
 	messageSender MessageSender,
 	userHandler EventHandler,
 	onStopped WorkerStoppedCallback,
-	streamListener *streamListener,
 ) *PartitionWorker {
+	partitionInfo := &partitionInfo{
+		PartitionSessionID: session.StreamPartitionSessionID.ToInt64(),
+		SessionID:          sessionID,
+		PartitionID:        session.PartitionID,
+		Topic:              session.Topic,
+	}
+
 	return &PartitionWorker{
-		sessionID:      sessionID,
-		session:        session,
-		messageSender:  messageSender,
-		userHandler:    userHandler,
-		onStopped:      onStopped,
-		streamListener: streamListener,
-		queue:          xsync.NewUnboundedChan[rawtopicreader.ServerMessage](),
+		sessionID:     sessionID,
+		session:       session,
+		messageSender: messageSender,
+		userHandler:   userHandler,
+		onStopped:     onStopped,
+		partitionInfo: partitionInfo,
+		messageQueue:  xsync.NewUnboundedChan[unifiedMessage](),
 	}
 }
 
 // Start begins processing messages for this partition
 func (w *PartitionWorker) Start(ctx context.Context) {
 	w.bgWorker = background.NewWorker(ctx, "partition worker")
-	w.bgWorker.Start("partition worker message loop", w.receiveMessagesLoop)
+	w.bgWorker.Start("partition worker message loop", func(bgCtx context.Context) {
+		w.receiveMessagesLoop(bgCtx)
+	})
 }
 
-// SendMessage adds a message to the processing queue
-func (w *PartitionWorker) SendMessage(msg rawtopicreader.ServerMessage) {
-	w.queue.SendWithMerge(msg, w.tryMergeMessages)
+// SendMessage adds a unified message to the processing queue
+func (w *PartitionWorker) SendMessage(msg unifiedMessage) {
+	w.messageQueue.SendWithMerge(msg, w.tryMergeMessages)
+}
+
+// SendRawServerMessage sends a raw server message
+func (w *PartitionWorker) SendRawServerMessage(msg rawtopicreader.ServerMessage) {
+	w.SendMessage(unifiedMessage{RawServerMessage: &msg})
+}
+
+// SendBatchMessage sends a ready batch message
+func (w *PartitionWorker) SendBatchMessage(metadata rawtopiccommon.ServerMessageMetadata, batch *topicreadercommon.PublicBatch) {
+	w.SendMessage(unifiedMessage{
+		BatchMessage: &batchMessage{
+			ServerMessageMetadata: metadata,
+			Batch:                 batch,
+		},
+	})
+}
+
+// SendCommitMessage sends a commit response message
+func (w *PartitionWorker) SendCommitMessage(response *rawtopicreader.CommitOffsetResponse) {
+	w.SendMessage(unifiedMessage{
+		CommitMessage: &commitMessage{
+			Response: response,
+		},
+	})
 }
 
 // Close stops the worker gracefully
 func (w *PartitionWorker) Close(ctx context.Context, reason error) error {
-	w.queue.Close()
+	w.messageQueue.Close()
 	if w.bgWorker != nil {
 		return w.bgWorker.Close(ctx, reason)
 	}
@@ -86,7 +149,7 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 
 	for {
 		// Use context-aware Receive method
-		msg, ok, err := w.queue.Receive(ctx)
+		msg, ok, err := w.messageQueue.Receive(ctx)
 		if err != nil {
 			// Context was cancelled or timed out
 			w.onStopped(w.sessionID, nil) // graceful shutdown
@@ -98,26 +161,89 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 			return
 		}
 
-		if err := w.processMessage(ctx, msg); err != nil {
+		if err := w.processUnifiedMessage(ctx, msg); err != nil {
 			w.onStopped(w.sessionID, err)
 			return
 		}
 	}
 }
 
-// processMessage handles a single server message
-func (w *PartitionWorker) processMessage(ctx context.Context, msg rawtopicreader.ServerMessage) error {
+// processUnifiedMessage handles a single unified message by routing to appropriate processor
+func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unifiedMessage) error {
+	switch {
+	case msg.RawServerMessage != nil:
+		return w.processRawServerMessage(ctx, *msg.RawServerMessage)
+	case msg.BatchMessage != nil:
+		return w.processBatchMessage(ctx, msg.BatchMessage)
+	case msg.CommitMessage != nil:
+		return w.processCommitMessage(ctx, msg.CommitMessage)
+	default:
+		// Ignore empty messages
+		return nil
+	}
+}
+
+// processRawServerMessage handles raw server messages (StartPartition, StopPartition)
+func (w *PartitionWorker) processRawServerMessage(ctx context.Context, msg rawtopicreader.ServerMessage) error {
 	switch m := msg.(type) {
 	case *rawtopicreader.StartPartitionSessionRequest:
 		return w.handleStartPartitionRequest(ctx, m)
 	case *rawtopicreader.StopPartitionSessionRequest:
 		return w.handleStopPartitionRequest(ctx, m)
-	case *rawtopicreader.ReadResponse:
-		return w.handleReadResponse(ctx, m)
 	default:
-		// Ignore unknown message types
+		// Ignore unknown raw message types (e.g., ReadResponse which is now handled via BatchMessage)
 		return nil
 	}
+}
+
+// processBatchMessage handles ready PublicBatch messages
+func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMessage) error {
+	// Check for errors in the metadata
+	if !msg.ServerMessageMetadata.Status.IsSuccess() {
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: batch message contains error status: %v", msg.ServerMessageMetadata.Status))
+	}
+
+	// Call user handler with PublicReadMessages if handler is available
+	if w.userHandler != nil {
+		event := NewPublicReadMessages(
+			w.session.ToPublic(),
+			msg.Batch,
+			nil, // streamListener is not needed for this callback-based approach
+		)
+
+		if err := w.userHandler.OnReadMessages(ctx, event); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+	}
+
+	// Send ReadRequest for flow control with the batch size
+	batchSize := 0
+	if msg.Batch != nil {
+		batchSize = len(msg.Batch.Messages)
+	}
+
+	// Use estimated bytes size for flow control
+	estimatedBytes := batchSize * 1024 // rough estimate, can be refined
+	w.messageSender.SendRaw(&rawtopicreader.ReadRequest{BytesSize: estimatedBytes})
+
+	return nil
+}
+
+// processCommitMessage handles CommitOffsetResponse messages
+func (w *PartitionWorker) processCommitMessage(ctx context.Context, msg *commitMessage) error {
+	// Find the committed offset for this partition
+	for _, partOffset := range msg.Response.PartitionsCommittedOffsets {
+		if partOffset.PartitionSessionID == w.session.StreamPartitionSessionID {
+			// Update committed offset in the session
+			w.session.SetCommittedOffsetForward(partOffset.CommittedOffset)
+
+			// For now, we don't track commit acknowledgments (no SyncCommitter)
+			// This simplifies the implementation as requested
+			break
+		}
+	}
+
+	return nil
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest
@@ -131,9 +257,14 @@ func (w *PartitionWorker) handleStartPartitionRequest(ctx context.Context, m *ra
 		},
 	)
 
-	err := w.userHandler.OnStartPartitionSessionRequest(ctx, event)
-	if err != nil {
-		return err
+	if w.userHandler != nil {
+		err := w.userHandler.OnStartPartitionSessionRequest(ctx, event)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+	} else {
+		// Auto-confirm if no handler
+		event.Confirm()
 	}
 
 	// Wait for user confirmation
@@ -171,8 +302,13 @@ func (w *PartitionWorker) handleStopPartitionRequest(ctx context.Context, m *raw
 		m.CommittedOffset.ToInt64(),
 	)
 
-	if err := w.userHandler.OnStopPartitionSessionRequest(ctx, event); err != nil {
-		return err
+	if w.userHandler != nil {
+		if err := w.userHandler.OnStopPartitionSessionRequest(ctx, event); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+	} else {
+		// Auto-confirm if no handler
+		event.Confirm()
 	}
 
 	// Wait for user confirmation
@@ -194,55 +330,20 @@ func (w *PartitionWorker) handleStopPartitionRequest(ctx context.Context, m *raw
 	return nil
 }
 
-// handleReadResponse processes ReadResponse messages
-func (w *PartitionWorker) handleReadResponse(ctx context.Context, m *rawtopicreader.ReadResponse) error {
-	// Convert raw batches to public batches - following streamListener pattern
-	sessions := &topicreadercommon.PartitionSessionStorage{}
-	if err := sessions.Add(w.session); err != nil {
-		return err
-	}
-
-	batches, err := topicreadercommon.ReadRawBatchesToPublicBatches(m, sessions, topicreadercommon.NewDecoderMap())
-	if err != nil {
-		return err
-	}
-
-	// Process each batch individually
-	for _, batch := range batches {
-		event := NewPublicReadMessages(
-			topicreadercommon.BatchGetPartitionSession(batch).ToPublic(),
-			batch,
-			w.streamListener,
-		)
-
-		if err := w.userHandler.OnReadMessages(ctx, event); err != nil {
-			return err
+// tryMergeMessages attempts to merge messages when possible
+func (w *PartitionWorker) tryMergeMessages(last, new unifiedMessage) (unifiedMessage, bool) {
+	// Only merge batch messages for now
+	if last.BatchMessage != nil && new.BatchMessage != nil {
+		// Validate metadata compatibility before merging
+		if !last.BatchMessage.ServerMessageMetadata.Equals(&new.BatchMessage.ServerMessageMetadata) {
+			return new, false // Don't merge messages with different metadata
 		}
+
+		// For batch messages, we don't merge the actual batches since they're already processed
+		// Just keep the newer message
+		return new, true
 	}
 
-	return nil
-}
-
-// tryMergeMessages attempts to merge ReadResponse messages with metadata validation
-func (w *PartitionWorker) tryMergeMessages(last, new rawtopicreader.ServerMessage) (rawtopicreader.ServerMessage, bool) {
-	lastRead, lastOk := last.(*rawtopicreader.ReadResponse)
-	newRead, newOk := new.(*rawtopicreader.ReadResponse)
-
-	if !lastOk || !newOk {
-		return new, false // Only merge ReadResponse messages
-	}
-
-	// Validate metadata compatibility before merging
-	if !lastRead.ServerMessageMetadata.Equals(&newRead.ServerMessageMetadata) {
-		return new, false // Don't merge messages with different metadata
-	}
-
-	// Merge by combining message batches
-	merged := &rawtopicreader.ReadResponse{
-		PartitionData:         append(lastRead.PartitionData, newRead.PartitionData...),
-		BytesSize:             lastRead.BytesSize + newRead.BytesSize,
-		ServerMessageMetadata: newRead.ServerMessageMetadata, // Use metadata from newer message
-	}
-
-	return merged, true
+	// Don't merge other types of messages
+	return new, false
 }

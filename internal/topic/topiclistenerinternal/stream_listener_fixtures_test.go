@@ -8,6 +8,8 @@ import (
 	"github.com/rekby/fixenv/sf"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreadermock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -39,8 +41,16 @@ func listenerAndHandler(e fixenv.Env) listenerAndHandlerPair {
 		)
 		listener.syncCommitter.Start()
 
+		// Initialize background worker for tests (but don't start it)
+		// This ensures the fallback logic works correctly
+		listener.background = *background.NewWorker(sf.Context(e), "test-listener")
+
+		// Initialize messagesToSend for test mode detection
+		listener.messagesToSend = make([]rawtopicreader.ClientMessage, 0)
+
 		stop := func() {
 			_ = listener.syncCommitter.Close(sf.Context(e), errors.New("test finished"))
+			_ = listener.background.Close(sf.Context(e), errors.New("test finished"))
 		}
 
 		return fixenv.NewGenericResultWithCleanup(listenerAndHandlerPair{
