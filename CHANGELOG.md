@@ -1,3 +1,5 @@
+* Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
+
 ## v3.109.0
 * Added control plane fields for split-merge topics (Create,Alter,Describe) 
 

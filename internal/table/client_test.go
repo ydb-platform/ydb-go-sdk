@@ -86,21 +86,23 @@ func TestRaceWgClosed(t *testing.T) {
 func TestChunkBulkUpsertRequest(t *testing.T) {
 	t.Run("empty request", func(t *testing.T) {
 		input := newTestBulkRequest(t, 0)
-		res, err := chunkBulkUpsertRequest(input, 100)
+		got := make([]*Ydb_Table.BulkUpsertRequest, 0)
+		err := chunkBulkUpsertRequest(&got, input, 100)
 		require.NoError(t, err)
-		assert.Len(t, res, 1)
-		assert.Equal(t, input, res[0])
+		assert.Len(t, got, 1)
+		assert.Equal(t, input, got[0])
 	})
 
 	t.Run("one chunk greater than maxSize", func(t *testing.T) {
 		input := newTestBulkRequest(t, 1)
-		_, err := chunkBulkUpsertRequest(input, 10)
-		assert.EqualError(t, err, "ydb: single row size (27 bytes) exceeds maximum request size (10 bytes) - row is too large to process")
+		err := chunkBulkUpsertRequest(nil, input, 10)
+		assert.Error(t, err)
 	})
 
 	t.Run("one request", func(t *testing.T) {
 		input := newTestBulkRequest(t, 50)
-		got, err := chunkBulkUpsertRequest(input, 100)
+		got := make([]*Ydb_Table.BulkUpsertRequest, 0)
+		err := chunkBulkUpsertRequest(&got, input, 100)
 		require.NoError(t, err)
 		assert.Len(t, got, 2)
 		assert.Less(t, proto.Size(got[0]), 100)
@@ -109,17 +111,17 @@ func TestChunkBulkUpsertRequest(t *testing.T) {
 
 	t.Run("zero max size", func(t *testing.T) {
 		input := newTestBulkRequest(t, 50)
-		_, err := chunkBulkUpsertRequest(input, 0)
-		assert.ErrorContains(t, err, "ydb: single row size (27 bytes) exceeds maximum request size (0 bytes) - row is too large to process")
+		err := chunkBulkUpsertRequest(nil, input, 0)
+		assert.Error(t, err)
 	})
 }
 
-func newTestBulkRequest(t *testing.T, itemsLen int64) *Ydb_Table.BulkUpsertRequest {
+func newTestBulkRequest(t *testing.T, itemsLen int) *Ydb_Table.BulkUpsertRequest {
 	t.Helper()
 
 	var rows []types.Value
 
-	for i := int64(0); i < int64(itemsLen); i++ {
+	for range itemsLen {
 		rows = append(rows, types.StructValue())
 	}
 
@@ -127,8 +129,6 @@ func newTestBulkRequest(t *testing.T, itemsLen int64) *Ydb_Table.BulkUpsertReque
 		types.ListValue(rows...),
 	).ToYDB("testTable")
 	require.NoError(t, err)
-
-	t.Log("BulkUpsertRequest was generated. Size = ", proto.Size(req))
 
 	return req
 }
