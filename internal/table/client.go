@@ -354,9 +354,9 @@ func (c *Client) sendBulkUpsertRequest(
 	return nil
 }
 
-// chunkBulkUpsertRequest splits a BulkUpsertRequest into smaller chunks if it exceeds the maximum message size.
-// It recursively divides the request's rows into smaller requests while preserving the original request structure.
-// If the request is smaller than the maximum size or contains fewer than two rows, it returns the original request.
+// chunkBulkUpsertRequest splits a bulk upsert request into smaller chunks if it exceeds the maximum message size.
+// It recursively divides the request into smaller parts, ensuring each chunk is within the size limit.
+// Returns a slice of chunked bulk upsert requests or an error if the request cannot be split.
 func chunkBulkUpsertRequest(
 	dst []*Ydb_Table.BulkUpsertRequest,
 	req *Ydb_Table.BulkUpsertRequest,
@@ -400,10 +400,10 @@ func chunkBulkUpsertRequest(
 	return chunkBulkUpsertRequest(dst, right, maxBytes)
 }
 
-// splitBulkUpsertRequestAt splits a BulkUpsertRequest into two parts at the specified position.
-// It creates a new request with items from the specified position to the end,
-// while modifying the original request to contain only items before the position.
-// Returns the newly created request with the split items.
+// splitBulkUpsertRequestAt splits a bulk upsert request into two parts at the specified position.
+// It divides the request's items into two separate requests, with the first request containing
+// items from the start up to the specified position, and the second request containing the remaining items.
+// Returns two modified bulk upsert requests with their respective item sets.
 func splitBulkUpsertRequestAt(req *Ydb_Table.BulkUpsertRequest, pos int) (_, _ *Ydb_Table.BulkUpsertRequest) {
 	items := req.GetRows().GetValue().GetItems() // save original items
 	req.Rows.Value.Items = nil
