@@ -286,7 +286,7 @@ func (c *Client) BulkUpsert(
 	tableName string,
 	data table.BulkUpsertData,
 	opts ...table.Option,
-) error {
+) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
@@ -294,6 +294,25 @@ func (c *Client) BulkUpsert(
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
+
+	attempts, config := 0, c.retryOptions(opts...)
+	config.RetryOptions = append(config.RetryOptions,
+		retry.WithIdempotent(true),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts += max(info.Attempts-1, 0) // `max` guarded against negative values
+				}
+			},
+		}),
+	)
+
+	onDone := trace.TableOnBulkUpsert(config.Trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
+	)
+	defer func() {
+		onDone(finalErr, attempts+1)
+	}()
 
 	request, err := data.ToYDB(tableName)
 	if err != nil {
@@ -308,33 +327,14 @@ func (c *Client) BulkUpsert(
 		return err
 	}
 
-	return c.sendBulkUpsertRequest(ctx, chunks, opts...)
+	return c.sendBulkUpsertRequest(ctx, chunks, config.RetryOptions...)
 }
 
 func (c *Client) sendBulkUpsertRequest(
 	ctx context.Context,
 	requests []*Ydb_Table.BulkUpsertRequest,
-	opts ...table.Option,
-) (finalErr error) {
-	attempts, config := 0, c.retryOptions(opts...)
-	config.RetryOptions = append(config.RetryOptions,
-		retry.WithIdempotent(true),
-		retry.WithTrace(&trace.Retry{
-			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts += info.Attempts - 1
-				}
-			},
-		}),
-	)
-
-	onDone := trace.TableOnBulkUpsert(config.Trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
-	)
-	defer func() {
-		onDone(finalErr, attempts+1)
-	}()
-
+	retryOpts ...retry.Option,
+) error {
 	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 
 	for _, request := range requests {
@@ -344,7 +344,7 @@ func (c *Client) sendBulkUpsertRequest(
 
 				return err
 			},
-			config.RetryOptions...,
+			retryOpts...,
 		)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
