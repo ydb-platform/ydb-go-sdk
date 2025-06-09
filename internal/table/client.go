@@ -310,7 +310,11 @@ func (c *Client) BulkUpsert(
 	return c.sendBulkUpsertRequest(ctx, chunks, opts...)
 }
 
-func (c *Client) sendBulkUpsertRequest(ctx context.Context, requests []*Ydb_Table.BulkUpsertRequest, opts ...table.Option) (finalErr error) {
+func (c *Client) sendBulkUpsertRequest(
+	ctx context.Context,
+	requests []*Ydb_Table.BulkUpsertRequest,
+	opts ...table.Option,
+) (finalErr error) {
 	attempts, config := 0, c.retryOptions(opts...)
 	config.RetryOptions = append(config.RetryOptions,
 		retry.WithIdempotent(true),
@@ -352,22 +356,27 @@ func (c *Client) sendBulkUpsertRequest(ctx context.Context, requests []*Ydb_Tabl
 // chunkBulkUpsertRequest splits a BulkUpsertRequest into smaller chunks if it exceeds the maximum message size.
 // It recursively divides the request's rows into smaller requests while preserving the original request structure.
 // If the request is smaller than the maximum size or contains fewer than two rows, it returns the original request.
-func chunkBulkUpsertRequest(dst *[]*Ydb_Table.BulkUpsertRequest, req *Ydb_Table.BulkUpsertRequest, maxBytes int) error {
+func chunkBulkUpsertRequest(
+	dst *[]*Ydb_Table.BulkUpsertRequest,
+	req *Ydb_Table.BulkUpsertRequest,
+	maxBytes int,
+) error {
 	reqSize := proto.Size(req)
 
 	// not exceed the maximum size -> ret original request
 	if reqSize <= maxBytes {
 		*dst = append(*dst, req)
+
 		return nil
 	}
 
 	// not a row bulk upsert request -> ret original request
-	if req.Rows == nil || req.Rows.Value == nil {
+	if req.GetRows() == nil || req.GetRows().GetValue() == nil {
 		return fmt.Errorf("ydb: request size (%d bytes) exceeds maximum size (%d bytes) "+
 			" but cannot be chunked (only row-based bulk upserts support chunking)", reqSize, maxBytes)
 	}
 
-	n := len(req.Rows.Value.Items)
+	n := len(req.GetRows().GetValue().GetItems())
 	if n == 0 {
 		return nil
 	}

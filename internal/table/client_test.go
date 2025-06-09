@@ -119,10 +119,10 @@ func TestChunkBulkUpsertRequest(t *testing.T) {
 func newTestBulkRequest(t *testing.T, itemsLen int) *Ydb_Table.BulkUpsertRequest {
 	t.Helper()
 
-	var rows []types.Value
+	rows := make([]types.Value, itemsLen)
 
-	for range itemsLen {
-		rows = append(rows, types.StructValue())
+	for i := range itemsLen {
+		rows[i] = types.StructValue()
 	}
 
 	req, err := table.BulkUpsertDataRows(
