@@ -303,7 +303,8 @@ func (c *Client) BulkUpsert(
 	chunks := make([]*Ydb_Table.BulkUpsertRequest, 0, 1)
 
 	// We must send requests in chunks to avoid exceeding the maximum message size
-	if err := chunkBulkUpsertRequest(&chunks, request, c.config.MaxRequestMessageSize()); err != nil {
+	chunks, err = chunkBulkUpsertRequest(chunks, request, c.config.MaxRequestMessageSize())
+	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -357,40 +358,39 @@ func (c *Client) sendBulkUpsertRequest(
 // It recursively divides the request's rows into smaller requests while preserving the original request structure.
 // If the request is smaller than the maximum size or contains fewer than two rows, it returns the original request.
 func chunkBulkUpsertRequest(
-	dst *[]*Ydb_Table.BulkUpsertRequest,
+	dst []*Ydb_Table.BulkUpsertRequest,
 	req *Ydb_Table.BulkUpsertRequest,
 	maxBytes int,
-) error {
+) ([]*Ydb_Table.BulkUpsertRequest, error) {
 	reqSize := proto.Size(req)
 
 	// not exceed the maximum size -> ret original request
 	if reqSize <= maxBytes {
-		*dst = append(*dst, req)
-
-		return nil
+		return append(dst, req), nil
 	}
 
 	// not a row bulk upsert request -> ret original request
 	if req.GetRows() == nil || req.GetRows().GetValue() == nil {
-		return fmt.Errorf("ydb: request size (%d bytes) exceeds maximum size (%d bytes) "+
+		return nil, fmt.Errorf("ydb: request size (%d bytes) exceeds maximum size (%d bytes) "+
 			" but cannot be chunked (only row-based bulk upserts support chunking)", reqSize, maxBytes)
 	}
 
 	n := len(req.GetRows().GetValue().GetItems())
 	if n == 0 {
-		return nil
+		return dst, nil
 	}
 
 	// we cannot split one item and one item is too big
 	if n == 1 {
-		return fmt.Errorf("ydb: single row size (%d bytes) exceeds maximum request size (%d bytes) "+
+		return nil, fmt.Errorf("ydb: single row size (%d bytes) exceeds maximum request size (%d bytes) "+
 			"- row is too large to process", reqSize, maxBytes)
 	}
 
 	left, right := splitBulkUpsertRequestAt(req, n/2)
 
-	if err := chunkBulkUpsertRequest(dst, left, maxBytes); err != nil {
-		return err
+	dst, err := chunkBulkUpsertRequest(dst, left, maxBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	return chunkBulkUpsertRequest(dst, right, maxBytes)

@@ -86,8 +86,7 @@ func TestRaceWgClosed(t *testing.T) {
 func TestChunkBulkUpsertRequest(t *testing.T) {
 	t.Run("empty request", func(t *testing.T) {
 		input := newTestBulkRequest(t, 0)
-		got := make([]*Ydb_Table.BulkUpsertRequest, 0)
-		err := chunkBulkUpsertRequest(&got, input, 100)
+		got, err := chunkBulkUpsertRequest(nil, input, 100)
 		require.NoError(t, err)
 		assert.Len(t, got, 1)
 		assert.Equal(t, input, got[0])
@@ -95,14 +94,13 @@ func TestChunkBulkUpsertRequest(t *testing.T) {
 
 	t.Run("one chunk greater than maxSize", func(t *testing.T) {
 		input := newTestBulkRequest(t, 1)
-		err := chunkBulkUpsertRequest(nil, input, 10)
+		_, err := chunkBulkUpsertRequest(nil, input, 10)
 		assert.Error(t, err)
 	})
 
 	t.Run("one request", func(t *testing.T) {
 		input := newTestBulkRequest(t, 50)
-		got := make([]*Ydb_Table.BulkUpsertRequest, 0)
-		err := chunkBulkUpsertRequest(&got, input, 100)
+		got, err := chunkBulkUpsertRequest(nil, input, 100)
 		require.NoError(t, err)
 		assert.Len(t, got, 2)
 		assert.Less(t, proto.Size(got[0]), 100)
@@ -111,7 +109,7 @@ func TestChunkBulkUpsertRequest(t *testing.T) {
 
 	t.Run("zero max size", func(t *testing.T) {
 		input := newTestBulkRequest(t, 50)
-		err := chunkBulkUpsertRequest(nil, input, 0)
+		_, err := chunkBulkUpsertRequest(nil, input, 0)
 		assert.Error(t, err)
 	})
 }
