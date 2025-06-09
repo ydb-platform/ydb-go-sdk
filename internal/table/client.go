@@ -401,7 +401,7 @@ func chunkBulkUpsertRequest(
 // while modifying the original request to contain only items before the position.
 // Returns the newly created request with the split items.
 func splitBulkUpsertRequestAt(req *Ydb_Table.BulkUpsertRequest, pos int) (_, _ *Ydb_Table.BulkUpsertRequest) {
-	items := req.Rows.Value.Items // save original items
+	items := req.GetRows().GetValue().GetItems() // save original items
 	req.Rows.Value.Items = nil
 
 	right, _ := proto.Clone(req).(*Ydb_Table.BulkUpsertRequest)
