@@ -29,8 +29,8 @@ func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
-		// Auto-confirm to complete the flow
 		event.Confirm()
+
 		return nil
 	})
 
@@ -74,6 +74,7 @@ func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 		gomock.Any(),
 	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
 		event.Confirm()
+
 		return nil
 	})
 
@@ -135,6 +136,7 @@ func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 	listener.m.WithLock(func() {
 		for _, w := range listener.workers {
 			worker = w
+
 			break
 		}
 	})
@@ -156,6 +158,7 @@ func TestStreamListener_CloseWorkers(t *testing.T) {
 		gomock.Any(),
 	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
 		event.Confirm()
+
 		return nil
 	})
 

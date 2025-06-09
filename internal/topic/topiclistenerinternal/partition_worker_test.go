@@ -63,6 +63,7 @@ func (s *syncMessageSender) waitForMessages(ctx context.Context, n int) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -89,6 +90,7 @@ func (m *mockMessageSender) SendRaw(msg rawtopicreader.ClientMessage) {
 func (m *mockMessageSender) sendCommit(b *topicreadercommon.PublicBatch) error {
 	// For tests, just record the commit as a message
 	m.SendRaw(&rawtopicreader.ReadRequest{BytesSize: -1}) // Use negative size to indicate commit
+
 	return nil
 }
 
@@ -102,12 +104,14 @@ func (m *mockMessageSender) GetMessages() []rawtopicreader.ClientMessage {
 
 	result := make([]rawtopicreader.ClientMessage, len(m.messages))
 	copy(result, m.messages)
+
 	return result
 }
 
 func (m *mockMessageSender) GetMessageCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	return len(m.messages)
 }
 
@@ -120,6 +124,7 @@ func (m *mockSyncCommitter) Commit(ctx context.Context, commitRange topicreaderc
 
 func createTestPartitionSession() *topicreadercommon.PartitionSession {
 	ctx := context.Background()
+
 	return topicreadercommon.NewPartitionSession(
 		ctx,
 		"test-topic",
@@ -148,6 +153,7 @@ func createTestStartPartitionRequest() *rawtopicreader.StartPartitionSessionRequ
 			End:   rawtopiccommon.NewOffset(1000),
 		},
 	}
+
 	return req
 }
 
@@ -215,6 +221,7 @@ func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 				xtest.WaitChannelClosed(t, confirmReady)
 				event.Confirm()
 			}()
+
 			return nil
 		})
 
@@ -277,6 +284,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 					xtest.WaitChannelClosed(t, confirmReady)
 					event.Confirm()
 				}()
+
 				return nil
 			})
 
@@ -339,6 +347,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 					// Signal that processing is complete
 					close(processingDone)
 				}()
+
 				return nil
 			})
 
@@ -391,6 +400,7 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 			require.Equal(t, session.ToPublic(), event.PartitionSession)
 			// Signal that processing is complete
 			close(processingDone)
+
 			return nil
 		})
 
@@ -437,7 +447,7 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
-	var errorReceived = make(empty.Chan, 1)
+	errorReceived := make(empty.Chan, 1)
 	onStopped := func(sessionID int64, err error) {
 		stoppedSessionID.Store(sessionID)
 		stoppedErr.Store(&err)
@@ -495,7 +505,7 @@ func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
-	var errorReceived = make(empty.Chan, 1)
+	errorReceived := make(empty.Chan, 1)
 	onStopped := func(sessionID int64, err error) {
 		stoppedSessionID.Store(sessionID)
 		stoppedErr.Store(&err)
@@ -536,7 +546,7 @@ func TestPartitionWorkerImpl_ContextCancellation(t *testing.T) {
 
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
-	var errorReceived = make(empty.Chan, 1)
+	errorReceived := make(empty.Chan, 1)
 	onStopped := func(sessionID int64, err error) {
 		stoppedSessionID.Store(sessionID)
 		stoppedErr.Store(&err)
@@ -577,7 +587,7 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
-	var errorReceived = make(empty.Chan, 1)
+	errorReceived := make(empty.Chan, 1)
 	onStopped := func(sessionID int64, err error) {
 		stoppedSessionID.Store(sessionID)
 		stoppedErr.Store(&err)

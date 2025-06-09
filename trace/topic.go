@@ -176,10 +176,14 @@ type (
 		OnPartitionWorkerStart func(TopicPartitionWorkerStartInfo)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnPartitionWorkerProcessMessage func(TopicPartitionWorkerProcessMessageStartInfo) func(TopicPartitionWorkerProcessMessageDoneInfo)
+		OnPartitionWorkerProcessMessage func(TopicPartitionWorkerProcessMessageStartInfo) func(
+			TopicPartitionWorkerProcessMessageDoneInfo,
+		)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnPartitionWorkerHandlerCall func(TopicPartitionWorkerHandlerCallStartInfo) func(TopicPartitionWorkerHandlerCallDoneInfo)
+		OnPartitionWorkerHandlerCall func(TopicPartitionWorkerHandlerCallStartInfo) func(
+			TopicPartitionWorkerHandlerCallDoneInfo,
+		)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnPartitionWorkerStop func(TopicPartitionWorkerStopStartInfo) func(TopicPartitionWorkerStopDoneInfo)

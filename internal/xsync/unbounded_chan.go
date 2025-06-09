@@ -28,10 +28,9 @@ func NewUnboundedChan[T any]() *UnboundedChan[T] {
 // The operation is non-blocking and thread-safe.
 func (c *UnboundedChan[T]) Send(msg T) {
 	c.mutex.WithLock(func() {
-		if c.closed {
-			return
+		if !c.closed {
+			c.buffer = append(c.buffer, msg)
 		}
-		c.buffer = append(c.buffer, msg)
 	})
 
 	// Signal that something happened
@@ -46,18 +45,17 @@ func (c *UnboundedChan[T]) Send(msg T) {
 // The merge operation is atomic and preserves message order.
 func (c *UnboundedChan[T]) SendWithMerge(msg T, mergeFunc func(last, new T) (T, bool)) {
 	c.mutex.WithLock(func() {
-		if c.closed {
-			return
-		}
+		if !c.closed {
+			if len(c.buffer) > 0 {
+				if merged, shouldMerge := mergeFunc(c.buffer[len(c.buffer)-1], msg); shouldMerge {
+					c.buffer[len(c.buffer)-1] = merged
 
-		if len(c.buffer) > 0 {
-			if merged, shouldMerge := mergeFunc(c.buffer[len(c.buffer)-1], msg); shouldMerge {
-				c.buffer[len(c.buffer)-1] = merged
-				return
+					return
+				}
 			}
-		}
 
-		c.buffer = append(c.buffer, msg)
+			c.buffer = append(c.buffer, msg)
+		}
 	})
 
 	// Signal that something happened
@@ -109,14 +107,13 @@ func (c *UnboundedChan[T]) Receive(ctx context.Context) (T, bool, error) {
 func (c *UnboundedChan[T]) Close() {
 	var isClosed bool
 	c.mutex.WithLock(func() {
-		if c.closed {
-			return
+		if !c.closed {
+			c.closed = true
+			isClosed = true
 		}
-		c.closed = true
-		isClosed = true
 	})
 
-	if isClosed {
+	if !isClosed {
 		return
 	}
 

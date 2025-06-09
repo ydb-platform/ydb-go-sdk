@@ -24,13 +24,11 @@ import (
 
 // extractSelectorNames extracts topic names from selectors for tracing
 func extractSelectorNames(selectors []*topicreadercommon.PublicReadSelector) []string {
-	if selectors == nil {
-		return nil
-	}
 	result := make([]string, len(selectors))
 	for i, selector := range selectors {
 		result[i] = selector.Path
 	}
+
 	return result
 }
 
@@ -108,6 +106,7 @@ func newStreamListener(
 	if err := res.initStream(connectionCtx, client); err != nil {
 		initDone("", err)
 		res.goClose(connectionCtx, err)
+
 		return nil, err
 	}
 
@@ -318,6 +317,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 			l.goClose(ctx, xerrors.WithStackTrace(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
 			))
+
 			return
 		}
 
@@ -526,13 +526,19 @@ func (l *streamListener) onWorkerStopped(sessionID int64, err error) {
 	for _, session := range l.sessions.GetAll() {
 		if session.ClientPartitionSessionID == sessionID {
 			_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
+
 			break
 		}
 	}
 
 	// If error from worker, propagate to streamListener shutdown
-	if err != nil {
-		l.goClose(l.background.Context(), err)
+	// But avoid cascading shutdowns for normal lifecycle events like queue closure during shutdown
+	if err != nil && !l.closing.Load() {
+		// Only propagate error if we're not already closing
+		// and if it's not a normal queue closure error (which can happen during shutdown)
+		if !xerrors.Is(err, errPartitionQueueClosed) {
+			l.goClose(l.background.Context(), err)
+		}
 	}
 }
 
@@ -560,7 +566,10 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 }
 
 // routeToWorker routes a message to the appropriate worker
-func (l *streamListener) routeToWorker(partitionSessionID rawtopicreader.PartitionSessionID, routeFunc func(*PartitionWorker)) error {
+func (l *streamListener) routeToWorker(
+	partitionSessionID rawtopicreader.PartitionSessionID,
+	routeFunc func(*PartitionWorker),
+) error {
 	// Find worker by session
 	var targetWorker *PartitionWorker
 	l.m.WithLock(func() {

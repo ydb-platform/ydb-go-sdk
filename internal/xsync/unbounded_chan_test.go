@@ -2,6 +2,7 @@ package xsync
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -21,6 +22,7 @@ func mergeTestMessages(last, new TestMessage) (TestMessage, bool) {
 			Data: last.Data + "|" + new.Data,
 		}, true
 	}
+
 	return new, false
 }
 
@@ -157,7 +159,7 @@ func TestUnboundedChanContextCancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	// Should return context.Canceled error
-	if msg, ok, err := ch.Receive(ctx); err != context.Canceled || ok {
+	if msg, ok, err := ch.Receive(ctx); !errors.Is(err, context.Canceled) || ok {
 		t.Errorf("Receive() = (%v, %v, %v), want (0, false, context.Canceled)", msg, ok, err)
 	}
 }
@@ -170,7 +172,7 @@ func TestUnboundedChanContextTimeout(t *testing.T) {
 
 	// Should return context.DeadlineExceeded error after timeout
 	start := time.Now()
-	if msg, ok, err := ch.Receive(ctx); err != context.DeadlineExceeded || ok {
+	if msg, ok, err := ch.Receive(ctx); !errors.Is(err, context.DeadlineExceeded) || ok {
 		t.Errorf("Receive() = (%v, %v, %v), want (0, false, context.DeadlineExceeded)", msg, ok, err)
 	}
 	elapsed := time.Since(start)
@@ -198,7 +200,7 @@ func TestUnboundedChanContextVsMessage(t *testing.T) {
 	}()
 
 	// Context cancellation should win
-	if msg, ok, err := ch.Receive(ctx); err != context.Canceled || ok {
+	if msg, ok, err := ch.Receive(ctx); !errors.Is(err, context.Canceled) || ok {
 		t.Errorf("Receive() = (%v, %v, %v), want (0, false, context.Canceled)", msg, ok, err)
 	}
 }
@@ -249,6 +251,7 @@ func TestUnboundedChanConcurrentSendReceive(t *testing.T) {
 					// After sender is done, check if we got all messages
 					if len(received) == count {
 						close(receiverDone)
+
 						return
 					}
 					// If not all messages received, continue receiving
@@ -304,29 +307,23 @@ func TestUnboundedChanConcurrentMerge(t *testing.T) {
 				select {
 				case <-timeout:
 					close(done)
+
 					return
 				default:
 					msg, ok, err := ch.Receive(ctx)
 					if err != nil {
 						t.Errorf("Unexpected error: %v", err)
 						close(done)
+
 						return
 					}
 					if ok {
 						received[msg.ID]++
 						// Check if we've received at least some messages from all senders
-						if len(received) == numSenders {
-							allReceived := true
-							for i := 0; i < numSenders; i++ {
-								if received[i] == 0 {
-									allReceived = false
-									break
-								}
-							}
-							if allReceived {
-								close(done)
-								return
-							}
+						if len(received) == numSenders && allSendersHaveMessages(received, numSenders) {
+							close(done)
+
+							return
 						}
 					}
 				}
@@ -336,4 +333,15 @@ func TestUnboundedChanConcurrentMerge(t *testing.T) {
 		// Wait for completion
 		xtest.WaitChannelClosed(t, done)
 	})
+}
+
+// allSendersHaveMessages checks if all sender IDs have sent at least one message
+func allSendersHaveMessages(received map[int]int, numSenders int) bool {
+	for i := 0; i < numSenders; i++ {
+		if received[i] == 0 {
+			return false
+		}
+	}
+
+	return true
 }

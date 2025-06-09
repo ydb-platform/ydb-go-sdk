@@ -79,13 +79,13 @@ func (issue *Issue) Equals(other *Issue) bool {
 }
 
 // Equals compares this Issues slice with another Issues slice for equality
-func (issues Issues) Equals(other Issues) bool {
-	if len(issues) != len(other) {
+func (issuesPointer Issues) Equals(other Issues) bool {
+	if len(issuesPointer) != len(other) {
 		return false
 	}
 
-	for i := range issues {
-		if !issues[i].Equals(&other[i]) {
+	for i := range issuesPointer {
+		if !issuesPointer[i].Equals(&other[i]) {
 			return false
 		}
 	}

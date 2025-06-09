@@ -64,9 +64,18 @@ func NewPartitionWorker(
 	tracer *trace.Topic,
 	listenerID string,
 ) *PartitionWorker {
-	// TODO: Add trace for worker creation - uncomment when linter issues are resolved
-	// logCtx := context.Background()
-	// trace.TopicOnPartitionWorkerStart(tracer, &logCtx, listenerID, "", session.StreamPartitionSessionID, session.PartitionID, session.Topic)
+	// Add trace for worker creation
+	logCtx := context.Background()
+	if tracer.OnPartitionWorkerStart != nil {
+		tracer.OnPartitionWorkerStart(trace.TopicPartitionWorkerStartInfo{
+			Context:            &logCtx,
+			ListenerID:         listenerID,
+			SessionID:          "",
+			PartitionSessionID: int64(session.StreamPartitionSessionID),
+			PartitionID:        session.PartitionID,
+			Topic:              session.Topic,
+		})
+	}
 
 	return &PartitionWorker{
 		sessionID:     sessionID,
@@ -99,7 +108,10 @@ func (w *PartitionWorker) SendRawServerMessage(msg rawtopicreader.ServerMessage)
 }
 
 // SendBatchMessage sends a ready batch message
-func (w *PartitionWorker) SendBatchMessage(metadata rawtopiccommon.ServerMessageMetadata, batch *topicreadercommon.PublicBatch) {
+func (w *PartitionWorker) SendBatchMessage(
+	metadata rawtopiccommon.ServerMessageMetadata,
+	batch *topicreadercommon.PublicBatch,
+) {
 	w.SendMessage(unifiedMessage{
 		BatchMessage: &batchMessage{
 			ServerMessageMetadata: metadata,
@@ -114,6 +126,7 @@ func (w *PartitionWorker) Close(ctx context.Context, reason error) error {
 	if w.bgWorker != nil {
 		return w.bgWorker.Close(ctx, reason)
 	}
+
 	return nil
 }
 
@@ -131,16 +144,19 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 		if err != nil {
 			// Context was cancelled or timed out
 			w.onStopped(w.sessionID, nil) // graceful shutdown
+
 			return
 		}
 		if !ok {
 			// Queue was closed
 			w.onStopped(w.sessionID, xerrors.WithStackTrace(errPartitionQueueClosed))
+
 			return
 		}
 
 		if err := w.processUnifiedMessage(ctx, msg); err != nil {
 			w.onStopped(w.sessionID, err)
+
 			return
 		}
 	}
@@ -176,7 +192,10 @@ func (w *PartitionWorker) processRawServerMessage(ctx context.Context, msg rawto
 func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMessage) error {
 	// Check for errors in the metadata
 	if !msg.ServerMessageMetadata.Status.IsSuccess() {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: batch message contains error status: %v", msg.ServerMessageMetadata.Status))
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"ydb: batch message contains error status: %v",
+			msg.ServerMessageMetadata.Status,
+		))
 	}
 
 	// Send ReadRequest for flow control with the batch size
@@ -213,7 +232,10 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest
-func (w *PartitionWorker) handleStartPartitionRequest(ctx context.Context, m *rawtopicreader.StartPartitionSessionRequest) error {
+func (w *PartitionWorker) handleStartPartitionRequest(
+	ctx context.Context,
+	m *rawtopicreader.StartPartitionSessionRequest,
+) error {
 	event := NewPublicStartPartitionSessionEvent(
 		w.session.ToPublic(),
 		m.CommittedOffset.ToInt64(),
@@ -257,11 +279,15 @@ func (w *PartitionWorker) handleStartPartitionRequest(ctx context.Context, m *ra
 	}
 
 	w.messageSender.SendRaw(resp)
+
 	return nil
 }
 
 // handleStopPartitionRequest processes StopPartitionSessionRequest
-func (w *PartitionWorker) handleStopPartitionRequest(ctx context.Context, m *rawtopicreader.StopPartitionSessionRequest) error {
+func (w *PartitionWorker) handleStopPartitionRequest(
+	ctx context.Context,
+	m *rawtopicreader.StopPartitionSessionRequest,
+) error {
 	event := NewPublicStopPartitionSessionEvent(
 		w.session.ToPublic(),
 		m.Graceful,
