@@ -305,7 +305,7 @@ func (c *Client) BulkUpsert(
 	// We must send requests in chunks to avoid exceeding the maximum message size
 	chunks, err = chunkBulkUpsertRequest(chunks, request, c.config.MaxRequestMessageSize())
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return err
 	}
 
 	return c.sendBulkUpsertRequest(ctx, chunks, opts...)
@@ -371,8 +371,10 @@ func chunkBulkUpsertRequest(
 
 	// not a row bulk upsert request -> ret original request
 	if req.GetRows() == nil || req.GetRows().GetValue() == nil {
-		return nil, fmt.Errorf("ydb: request size (%d bytes) exceeds maximum size (%d bytes) "+
-			" but cannot be chunked (only row-based bulk upserts support chunking)", reqSize, maxBytes)
+		return nil, xerrors.WithStackTrace(
+			xerrors.Wrap(
+				fmt.Errorf("ydb: request size (%d bytes) exceeds maximum size (%d bytes) "+
+					" but cannot be chunked (only row-based bulk upserts support chunking)", reqSize, maxBytes)))
 	}
 
 	n := len(req.GetRows().GetValue().GetItems())
@@ -382,8 +384,10 @@ func chunkBulkUpsertRequest(
 
 	// we cannot split one item and one item is too big
 	if n == 1 {
-		return nil, fmt.Errorf("ydb: single row size (%d bytes) exceeds maximum request size (%d bytes) "+
-			"- row is too large to process", reqSize, maxBytes)
+		return nil, xerrors.WithStackTrace(
+			xerrors.Wrap(
+				fmt.Errorf("ydb: single row size (%d bytes) exceeds maximum request size (%d bytes) "+
+					"- row is too large to process", reqSize, maxBytes)))
 	}
 
 	left, right := splitBulkUpsertRequestAt(req, n/2)
@@ -404,7 +408,7 @@ func splitBulkUpsertRequestAt(req *Ydb_Table.BulkUpsertRequest, pos int) (_, _ *
 	items := req.GetRows().GetValue().GetItems() // save original items
 	req.Rows.Value.Items = nil
 
-	right, _ := proto.Clone(req).(*Ydb_Table.BulkUpsertRequest)
+	right := proto.Clone(req).(*Ydb_Table.BulkUpsertRequest) //nolint:forcetypeassert
 
 	req.Rows.Value.Items = items[:pos]
 	right.Rows.Value.Items = items[pos:]
