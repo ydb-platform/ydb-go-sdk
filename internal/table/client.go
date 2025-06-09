@@ -365,7 +365,6 @@ func chunkBulkUpsertRequest(dst *[]*Ydb_Table.BulkUpsertRequest, req *Ydb_Table.
 	if req.Rows == nil || req.Rows.Value == nil {
 		return fmt.Errorf("ydb: request size (%d bytes) exceeds maximum size (%d bytes) "+
 			" but cannot be chunked (only row-based bulk upserts support chunking)", reqSize, maxBytes)
-
 	}
 
 	n := len(req.Rows.Value.Items)
@@ -385,11 +384,7 @@ func chunkBulkUpsertRequest(dst *[]*Ydb_Table.BulkUpsertRequest, req *Ydb_Table.
 		return err
 	}
 
-	if err := chunkBulkUpsertRequest(dst, right, maxBytes); err != nil {
-		return err
-	}
-
-	return nil
+	return chunkBulkUpsertRequest(dst, right, maxBytes)
 }
 
 // splitBulkUpsertRequestAt splits a BulkUpsertRequest into two parts at the specified position.
