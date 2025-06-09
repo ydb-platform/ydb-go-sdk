@@ -6,19 +6,33 @@ The TopicListener is a component that allows users to subscribe to and process m
 ## Key Components
 
 ### streamListener
-- **Purpose**: Core component that manages the gRPC stream connection and processes incoming messages
+- **Purpose**: Core component that manages the gRPC stream connection and routes incoming messages to partition workers
 - **Key Fields**:
   - `stream`: Raw gRPC stream connection
   - `sessions`: Storage for partition sessions
   - `handler`: User-provided event handler
   - `background`: Background worker for async operations
   - `syncCommitter`: Handles message commit operations
+  - `workers`: Map of partition workers for each active partition
 - **Key Methods**:
-  - `receiveMessagesLoop`: Main message processing loop
-  - `onReceiveServerMessage`: Processes different types of server messages
-  - `onStartPartitionRequest`: Handles new partition assignments
-  - `onStopPartitionRequest`: Handles partition stop requests
-  - `onReadResponse`: Processes incoming messages
+  - `receiveMessagesLoop`: Main message receiving loop
+  - `routeMessage`: Routes messages to appropriate handlers/workers
+  - `handleStartPartition`: Creates new partition workers and routes StartPartition messages
+  - `splitAndRouteReadResponse`: Splits ReadResponse into batches and routes to workers
+  - `splitAndRouteCommitResponse`: Routes CommitOffsetResponse to appropriate workers
+  - `routeToWorker`: Routes messages to the appropriate partition worker
+
+### PartitionWorker
+- **Purpose**: Processes messages for a single partition in a dedicated thread
+- **Key Features**:
+  - Each partition gets its own worker for parallel processing
+  - Uses UnboundedChan for message queuing with optional merging
+  - Handles Start/Stop/Read/Commit messages for its partition
+  - Calls user handlers in dedicated context per partition
+- **Message Types**:
+  - `SendRawServerMessage`: For Start/Stop partition requests
+  - `SendBatchMessage`: For processed ReadResponse batches
+  - `SendCommitMessage`: For CommitOffsetResponse messages
 
 ### Integration with Common Components
 - **PartitionSession**: Represents a single partition being read
@@ -34,40 +48,46 @@ The TopicListener is a component that allows users to subscribe to and process m
 
 ### Sequence Diagram (Text Format)
 ```
-gRPC Stream -> streamListener.receiveMessagesLoop -> onReceiveServerMessage -> [Message Type Handler] -> User Handler
+gRPC Stream -> streamListener.receiveMessagesLoop -> routeMessage -> [Message Router] -> PartitionWorker -> User Handler
 ```
 
 ### Detailed Steps
 1. Messages arrive through gRPC stream
-2. `receiveMessagesLoop` reads messages and calls `onReceiveServerMessage`
+2. `receiveMessagesLoop` reads messages and calls `routeMessage`
 3. Based on message type:
-   - StartPartitionSessionRequest: Creates new partition session
-   - StopPartitionSessionRequest: Removes partition session
-   - ReadResponse: Processes messages and calls user handler
-4. User handlers are called sequentially for each partition
-5. Messages are committed after processing
+   - StartPartitionSessionRequest: Creates new PartitionWorker and routes message to it
+   - StopPartitionSessionRequest: Routes to appropriate PartitionWorker
+   - ReadResponse: Split into batches and routed to respective PartitionWorkers
+   - CommitOffsetResponse: Split and routed to respective PartitionWorkers
+4. Each PartitionWorker processes messages sequentially for its partition
+5. User handlers are called by PartitionWorkers in parallel (one per partition)
+6. Messages are committed through the central flow control system
 
 ## Current Threading Model
-- **Single-threaded**: All user handler calls are made sequentially
-- **User Handler Calls**: Made in `onReadResponse` method
-- **Bottleneck**: Single message processing loop handles all partitions
+- **Multi-threaded**: Each partition processes messages in its own PartitionWorker thread
+- **User Handler Calls**: Made by individual PartitionWorker instances in parallel
+- **Scalability**: Supports concurrent processing of multiple partitions
+- **Per-Partition Ordering**: Messages within each partition are processed sequentially
 
 ## Critical Points for Multithreading
 - **User Handler Call Sites**: 
-  - `onReadResponse` method in streamListener
-  - `onStartPartitionSessionRequest` for partition start events
-  - `onStopPartitionSessionRequest` for partition stop events
+  - PartitionWorker methods for each partition independently
+  - `handleStartPartitionRequest` and `handleStopPartitionRequest` in workers
+  - `processBatchMessage` for read messages in workers
 - **Partition Management**: 
-  - Partition sessions are created in `onStartPartitionRequest`
-  - Removed in `onStopPartitionRequest`
+  - Partition sessions are created in `handleStartPartition`
+  - Workers are created and managed in `createWorkerForPartition`
+  - Removed via `onWorkerStopped` callback
   - Stored in thread-safe `PartitionSessionStorage`
 - **Message Routing**: 
   - Messages are routed based on partition session ID
   - Each message batch contains partition session ID
+  - Central routing in streamListener, processing in PartitionWorkers
 - **Synchronization Points**:
   - Partition session storage (already thread-safe)
   - Message commit operations
   - Background worker task management
+  - PartitionWorker lifecycle management
 
 ## PartitionWorker Architecture
 

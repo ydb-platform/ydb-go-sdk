@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 //go:generate mockgen -source partition_worker.go -destination partition_worker_mock_test.go --typed -package topiclistenerinternal -write_package_comment=false
@@ -21,34 +22,17 @@ type MessageSender interface {
 	SendRaw(msg rawtopicreader.ClientMessage)
 }
 
-// partitionWorkerCallback notifies when events occur for this partition
-type partitionWorkerCallback func(partitionInfo *partitionInfo, err error)
-
-// partitionInfo contains partition information for callbacks
-type partitionInfo struct {
-	PartitionSessionID int64
-	SessionID          int64
-	PartitionID        int64
-	Topic              string
-}
-
 // unifiedMessage wraps three types of messages that PartitionWorker can handle
 type unifiedMessage struct {
 	// Only one of these should be set
 	RawServerMessage *rawtopicreader.ServerMessage
 	BatchMessage     *batchMessage
-	CommitMessage    *commitMessage
 }
 
 // batchMessage represents a ready PublicBatch message with metadata
 type batchMessage struct {
 	ServerMessageMetadata rawtopiccommon.ServerMessageMetadata
 	Batch                 *topicreadercommon.PublicBatch
-}
-
-// commitMessage represents a CommitOffsetResponse for this partition
-type commitMessage struct {
-	Response *rawtopicreader.CommitOffsetResponse
 }
 
 // WorkerStoppedCallback notifies when worker is stopped
@@ -61,7 +45,10 @@ type PartitionWorker struct {
 	messageSender MessageSender
 	userHandler   EventHandler
 	onStopped     WorkerStoppedCallback
-	partitionInfo *partitionInfo
+
+	// Tracing fields
+	tracer     *trace.Topic
+	listenerID string
 
 	messageQueue *xsync.UnboundedChan[unifiedMessage]
 	bgWorker     *background.Worker
@@ -74,13 +61,12 @@ func NewPartitionWorker(
 	messageSender MessageSender,
 	userHandler EventHandler,
 	onStopped WorkerStoppedCallback,
+	tracer *trace.Topic,
+	listenerID string,
 ) *PartitionWorker {
-	partitionInfo := &partitionInfo{
-		PartitionSessionID: session.StreamPartitionSessionID.ToInt64(),
-		SessionID:          sessionID,
-		PartitionID:        session.PartitionID,
-		Topic:              session.Topic,
-	}
+	// TODO: Add trace for worker creation - uncomment when linter issues are resolved
+	// logCtx := context.Background()
+	// trace.TopicOnPartitionWorkerStart(tracer, &logCtx, listenerID, "", session.StreamPartitionSessionID, session.PartitionID, session.Topic)
 
 	return &PartitionWorker{
 		sessionID:     sessionID,
@@ -88,7 +74,8 @@ func NewPartitionWorker(
 		messageSender: messageSender,
 		userHandler:   userHandler,
 		onStopped:     onStopped,
-		partitionInfo: partitionInfo,
+		tracer:        tracer,
+		listenerID:    listenerID,
 		messageQueue:  xsync.NewUnboundedChan[unifiedMessage](),
 	}
 }
@@ -117,15 +104,6 @@ func (w *PartitionWorker) SendBatchMessage(metadata rawtopiccommon.ServerMessage
 		BatchMessage: &batchMessage{
 			ServerMessageMetadata: metadata,
 			Batch:                 batch,
-		},
-	})
-}
-
-// SendCommitMessage sends a commit response message
-func (w *PartitionWorker) SendCommitMessage(response *rawtopicreader.CommitOffsetResponse) {
-	w.SendMessage(unifiedMessage{
-		CommitMessage: &commitMessage{
-			Response: response,
 		},
 	})
 }
@@ -175,8 +153,6 @@ func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unified
 		return w.processRawServerMessage(ctx, *msg.RawServerMessage)
 	case msg.BatchMessage != nil:
 		return w.processBatchMessage(ctx, msg.BatchMessage)
-	case msg.CommitMessage != nil:
-		return w.processCommitMessage(ctx, msg.CommitMessage)
 	default:
 		// Ignore empty messages
 		return nil
@@ -203,12 +179,26 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: batch message contains error status: %v", msg.ServerMessageMetadata.Status))
 	}
 
+	// Send ReadRequest for flow control with the batch size
+	requestBytesSize := 0
+	if msg.Batch != nil {
+		for i := range msg.Batch.Messages {
+			requestBytesSize += topicreadercommon.MessageGetBufferBytesAccount(msg.Batch.Messages[i])
+		}
+	}
+
 	// Call user handler with PublicReadMessages if handler is available
 	if w.userHandler != nil {
+		// Cast messageSender to CommitHandler (it's the streamListener)
+		commitHandler, ok := w.messageSender.(CommitHandler)
+		if !ok {
+			return xerrors.WithStackTrace(fmt.Errorf("ydb: messageSender does not implement CommitHandler"))
+		}
+
 		event := NewPublicReadMessages(
 			w.session.ToPublic(),
 			msg.Batch,
-			nil, // streamListener is not needed for this callback-based approach
+			commitHandler,
 		)
 
 		if err := w.userHandler.OnReadMessages(ctx, event); err != nil {
@@ -216,32 +206,8 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		}
 	}
 
-	// Send ReadRequest for flow control with the batch size
-	batchSize := 0
-	if msg.Batch != nil {
-		batchSize = len(msg.Batch.Messages)
-	}
-
 	// Use estimated bytes size for flow control
-	estimatedBytes := batchSize * 1024 // rough estimate, can be refined
-	w.messageSender.SendRaw(&rawtopicreader.ReadRequest{BytesSize: estimatedBytes})
-
-	return nil
-}
-
-// processCommitMessage handles CommitOffsetResponse messages
-func (w *PartitionWorker) processCommitMessage(ctx context.Context, msg *commitMessage) error {
-	// Find the committed offset for this partition
-	for _, partOffset := range msg.Response.PartitionsCommittedOffsets {
-		if partOffset.PartitionSessionID == w.session.StreamPartitionSessionID {
-			// Update committed offset in the session
-			w.session.SetCommittedOffsetForward(partOffset.CommittedOffset)
-
-			// For now, we don't track commit acknowledgments (no SyncCommitter)
-			// This simplifies the implementation as requested
-			break
-		}
-	}
+	w.messageSender.SendRaw(&rawtopicreader.ReadRequest{BytesSize: requestBytesSize})
 
 	return nil
 }

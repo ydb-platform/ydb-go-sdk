@@ -1087,6 +1087,333 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			}
 		}
 	}
+	{
+		h1 := t.OnListenerStart
+		h2 := x.OnListenerStart
+		ret.OnListenerStart = func(t TopicListenerStartInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnListenerInit
+		h2 := x.OnListenerInit
+		ret.OnListenerInit = func(t TopicListenerInitStartInfo) func(TopicListenerInitDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicListenerInitDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicListenerInitDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnListenerReceiveMessage
+		h2 := x.OnListenerReceiveMessage
+		ret.OnListenerReceiveMessage = func(t TopicListenerReceiveMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnListenerRouteMessage
+		h2 := x.OnListenerRouteMessage
+		ret.OnListenerRouteMessage = func(t TopicListenerRouteMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnListenerSplitMessage
+		h2 := x.OnListenerSplitMessage
+		ret.OnListenerSplitMessage = func(t TopicListenerSplitMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnListenerError
+		h2 := x.OnListenerError
+		ret.OnListenerError = func(t TopicListenerErrorInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnListenerClose
+		h2 := x.OnListenerClose
+		ret.OnListenerClose = func(t TopicListenerCloseStartInfo) func(TopicListenerCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicListenerCloseDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicListenerCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPartitionWorkerStart
+		h2 := x.OnPartitionWorkerStart
+		ret.OnPartitionWorkerStart = func(t TopicPartitionWorkerStartInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnPartitionWorkerProcessMessage
+		h2 := x.OnPartitionWorkerProcessMessage
+		ret.OnPartitionWorkerProcessMessage = func(t TopicPartitionWorkerProcessMessageStartInfo) func(TopicPartitionWorkerProcessMessageDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicPartitionWorkerProcessMessageDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicPartitionWorkerProcessMessageDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPartitionWorkerHandlerCall
+		h2 := x.OnPartitionWorkerHandlerCall
+		ret.OnPartitionWorkerHandlerCall = func(t TopicPartitionWorkerHandlerCallStartInfo) func(TopicPartitionWorkerHandlerCallDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicPartitionWorkerHandlerCallDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicPartitionWorkerHandlerCallDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPartitionWorkerStop
+		h2 := x.OnPartitionWorkerStop
+		ret.OnPartitionWorkerStop = func(t TopicPartitionWorkerStopStartInfo) func(TopicPartitionWorkerStopDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicPartitionWorkerStopDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TopicPartitionWorkerStopDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnListenerSendDataRequest
+		h2 := x.OnListenerSendDataRequest
+		ret.OnListenerSendDataRequest = func(t TopicListenerSendDataRequestInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnListenerUnknownMessage
+		h2 := x.OnListenerUnknownMessage
+		ret.OnListenerUnknownMessage = func(t TopicListenerUnknownMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
 	return &ret
 }
 func (t *Topic) onReaderStart(info TopicReaderStartInfo) {
@@ -1529,6 +1856,137 @@ func (t *Topic) onWriterReceiveGRPCMessage(t1 TopicWriterReceiveGRPCMessageInfo)
 }
 func (t *Topic) onWriterReadUnknownGrpcMessage(t1 TopicOnWriterReadUnknownGrpcMessageInfo) {
 	fn := t.OnWriterReadUnknownGrpcMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onListenerStart(t1 TopicListenerStartInfo) {
+	fn := t.OnListenerStart
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onListenerInit(t1 TopicListenerInitStartInfo) func(TopicListenerInitDoneInfo) {
+	fn := t.OnListenerInit
+	if fn == nil {
+		return func(TopicListenerInitDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicListenerInitDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onListenerReceiveMessage(t1 TopicListenerReceiveMessageInfo) {
+	fn := t.OnListenerReceiveMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onListenerRouteMessage(t1 TopicListenerRouteMessageInfo) {
+	fn := t.OnListenerRouteMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onListenerSplitMessage(t1 TopicListenerSplitMessageInfo) {
+	fn := t.OnListenerSplitMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onListenerError(t1 TopicListenerErrorInfo) {
+	fn := t.OnListenerError
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onListenerClose(t1 TopicListenerCloseStartInfo) func(TopicListenerCloseDoneInfo) {
+	fn := t.OnListenerClose
+	if fn == nil {
+		return func(TopicListenerCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicListenerCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onPartitionWorkerStart(t1 TopicPartitionWorkerStartInfo) {
+	fn := t.OnPartitionWorkerStart
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onPartitionWorkerProcessMessage(t1 TopicPartitionWorkerProcessMessageStartInfo) func(TopicPartitionWorkerProcessMessageDoneInfo) {
+	fn := t.OnPartitionWorkerProcessMessage
+	if fn == nil {
+		return func(TopicPartitionWorkerProcessMessageDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicPartitionWorkerProcessMessageDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onPartitionWorkerHandlerCall(t1 TopicPartitionWorkerHandlerCallStartInfo) func(TopicPartitionWorkerHandlerCallDoneInfo) {
+	fn := t.OnPartitionWorkerHandlerCall
+	if fn == nil {
+		return func(TopicPartitionWorkerHandlerCallDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicPartitionWorkerHandlerCallDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onPartitionWorkerStop(t1 TopicPartitionWorkerStopStartInfo) func(TopicPartitionWorkerStopDoneInfo) {
+	fn := t.OnPartitionWorkerStop
+	if fn == nil {
+		return func(TopicPartitionWorkerStopDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TopicPartitionWorkerStopDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Topic) onListenerSendDataRequest(t1 TopicListenerSendDataRequestInfo) {
+	fn := t.OnListenerSendDataRequest
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func (t *Topic) onListenerUnknownMessage(t1 TopicListenerUnknownMessageInfo) {
+	fn := t.OnListenerUnknownMessage
 	if fn == nil {
 		return
 	}
@@ -2001,4 +2459,173 @@ func TopicOnWriterReadUnknownGrpcMessage(t *Topic, c *context.Context, writerIns
 	p.SessionID = sessionID
 	p.Error = e
 	t.onWriterReadUnknownGrpcMessage(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerStart(t *Topic, c *context.Context, listenerID string, consumer string, e error) {
+	var p TopicListenerStartInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.Consumer = consumer
+	p.Error = e
+	t.onListenerStart(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerInit(t *Topic, c *context.Context, listenerID string, consumer string, topicSelectors []string) func(sessionID string, _ error) {
+	var p TopicListenerInitStartInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.Consumer = consumer
+	p.TopicSelectors = topicSelectors
+	res := t.onListenerInit(p)
+	return func(sessionID string, e error) {
+		var p TopicListenerInitDoneInfo
+		p.SessionID = sessionID
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerReceiveMessage(t *Topic, c *context.Context, listenerID string, sessionID string, messageType string, bytesSize int, e error) {
+	var p TopicListenerReceiveMessageInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.MessageType = messageType
+	p.BytesSize = bytesSize
+	p.Error = e
+	t.onListenerReceiveMessage(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerRouteMessage(t *Topic, c *context.Context, listenerID string, sessionID string, messageType string, partitionSessionID *int64, workerFound bool, e error) {
+	var p TopicListenerRouteMessageInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.MessageType = messageType
+	p.PartitionSessionID = partitionSessionID
+	p.WorkerFound = workerFound
+	p.Error = e
+	t.onListenerRouteMessage(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerSplitMessage(t *Topic, c *context.Context, listenerID string, sessionID string, messageType string, totalBatches int, totalPartitions int, splitBatches int, routedBatches int, e error) {
+	var p TopicListenerSplitMessageInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.MessageType = messageType
+	p.TotalBatches = totalBatches
+	p.TotalPartitions = totalPartitions
+	p.SplitBatches = splitBatches
+	p.RoutedBatches = routedBatches
+	p.Error = e
+	t.onListenerSplitMessage(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerError(t *Topic, c *context.Context, listenerID string, sessionID string, e error) {
+	var p TopicListenerErrorInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.Error = e
+	t.onListenerError(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerClose(t *Topic, c *context.Context, listenerID string, sessionID string, reason error) func(workersClosed int, _ error) {
+	var p TopicListenerCloseStartInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.Reason = reason
+	res := t.onListenerClose(p)
+	return func(workersClosed int, e error) {
+		var p TopicListenerCloseDoneInfo
+		p.WorkersClosed = workersClosed
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnPartitionWorkerStart(t *Topic, c *context.Context, listenerID string, sessionID string, partitionSessionID int64, partitionID int64, topic string) {
+	var p TopicPartitionWorkerStartInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.PartitionSessionID = partitionSessionID
+	p.PartitionID = partitionID
+	p.Topic = topic
+	t.onPartitionWorkerStart(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnPartitionWorkerProcessMessage(t *Topic, c *context.Context, listenerID string, sessionID string, partitionSessionID int64, partitionID int64, topic string, messageType string, messagesCount int) func(processedMessages int, _ error) {
+	var p TopicPartitionWorkerProcessMessageStartInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.PartitionSessionID = partitionSessionID
+	p.PartitionID = partitionID
+	p.Topic = topic
+	p.MessageType = messageType
+	p.MessagesCount = messagesCount
+	res := t.onPartitionWorkerProcessMessage(p)
+	return func(processedMessages int, e error) {
+		var p TopicPartitionWorkerProcessMessageDoneInfo
+		p.ProcessedMessages = processedMessages
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnPartitionWorkerHandlerCall(t *Topic, c *context.Context, listenerID string, sessionID string, partitionSessionID int64, partitionID int64, topic string, handlerType string, messagesCount int) func(error) {
+	var p TopicPartitionWorkerHandlerCallStartInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.PartitionSessionID = partitionSessionID
+	p.PartitionID = partitionID
+	p.Topic = topic
+	p.HandlerType = handlerType
+	p.MessagesCount = messagesCount
+	res := t.onPartitionWorkerHandlerCall(p)
+	return func(e error) {
+		var p TopicPartitionWorkerHandlerCallDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnPartitionWorkerStop(t *Topic, c *context.Context, listenerID string, sessionID string, partitionSessionID int64, partitionID int64, topic string, reason error) func(error) {
+	var p TopicPartitionWorkerStopStartInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.PartitionSessionID = partitionSessionID
+	p.PartitionID = partitionID
+	p.Topic = topic
+	p.Reason = reason
+	res := t.onPartitionWorkerStop(p)
+	return func(e error) {
+		var p TopicPartitionWorkerStopDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerSendDataRequest(t *Topic, c *context.Context, listenerID string, sessionID string, bytesSize int) {
+	var p TopicListenerSendDataRequestInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.BytesSize = bytesSize
+	t.onListenerSendDataRequest(p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerUnknownMessage(t *Topic, c *context.Context, listenerID string, sessionID string, messageType string, e error) {
+	var p TopicListenerUnknownMessageInfo
+	p.Context = c
+	p.ListenerID = listenerID
+	p.SessionID = sessionID
+	p.MessageType = messageType
+	p.Error = e
+	t.onListenerUnknownMessage(p)
 }

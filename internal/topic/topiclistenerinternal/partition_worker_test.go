@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 //go:generate mockgen -source partition_worker.go -destination partition_worker_mock_test.go --typed -package topiclistenerinternal -write_package_comment=false
@@ -84,9 +85,21 @@ func (m *mockMessageSender) SendRaw(msg rawtopicreader.ClientMessage) {
 	m.messages = append(m.messages, msg)
 }
 
+// Implement CommitHandler interface for tests
+func (m *mockMessageSender) sendCommit(b *topicreadercommon.PublicBatch) error {
+	// For tests, just record the commit as a message
+	m.SendRaw(&rawtopicreader.ReadRequest{BytesSize: -1}) // Use negative size to indicate commit
+	return nil
+}
+
+func (m *mockMessageSender) getSyncCommitter() SyncCommitter {
+	return &mockSyncCommitter{}
+}
+
 func (m *mockMessageSender) GetMessages() []rawtopicreader.ClientMessage {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	result := make([]rawtopicreader.ClientMessage, len(m.messages))
 	copy(result, m.messages)
 	return result
@@ -96,6 +109,13 @@ func (m *mockMessageSender) GetMessageCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.messages)
+}
+
+// mockSyncCommitter provides a mock implementation of SyncCommitter for tests
+type mockSyncCommitter struct{}
+
+func (m *mockSyncCommitter) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
+	return nil
 }
 
 func createTestPartitionSession() *topicreadercommon.PartitionSession {
@@ -132,15 +152,24 @@ func createTestStartPartitionRequest() *rawtopicreader.StartPartitionSessionRequ
 }
 
 func createTestStopPartitionRequest(graceful bool) *rawtopicreader.StopPartitionSessionRequest {
-	req := &rawtopicreader.StopPartitionSessionRequest{
-		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
-			Status: rawydb.StatusSuccess,
-		},
+	return &rawtopicreader.StopPartitionSessionRequest{
 		PartitionSessionID: rawtopicreader.PartitionSessionID(456),
 		Graceful:           graceful,
 		CommittedOffset:    rawtopiccommon.NewOffset(200),
 	}
-	return req
+}
+
+func createTestBatch() *topicreadercommon.PublicBatch {
+	// Create a minimal test batch with correct PublicMessage fields
+	return &topicreadercommon.PublicBatch{
+		Messages: []*topicreadercommon.PublicMessage{
+			{
+				// Use the correct unexported field name for test purposes
+				UncompressedSize: 12,
+				Offset:           100, // Use int64 directly
+			},
+		},
+	}
 }
 
 // =============================================================================
@@ -168,6 +197,8 @@ func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 		messageSender,
 		mockHandler,
 		onStopped,
+		&trace.Topic{},
+		"test-listener",
 	)
 
 	// Set up mock expectations with deterministic coordination
@@ -230,7 +261,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 			stoppedErr = err
 		}
 
-		worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped)
+		worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
 
 		// Set up mock expectations with deterministic coordination
 		mockHandler.EXPECT().
@@ -291,7 +322,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 			stoppedErr = err
 		}
 
-		worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped)
+		worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
 
 		// Set up mock expectations with deterministic coordination
 		mockHandler.EXPECT().
@@ -349,7 +380,7 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 		stoppedErr = err
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped)
+	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
 
 	// Set up mock expectations with deterministic coordination
 	mockHandler.EXPECT().
@@ -417,14 +448,12 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 		}
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped)
-
-	expectedErr := errors.New("user handler error")
+	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
 
 	// Set up mock to return error
 	mockHandler.EXPECT().
-		OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).
-		Return(expectedErr)
+		OnReadMessages(gomock.Any(), gomock.Any()).
+		Return(errors.New("user handler error"))
 
 	worker.Start(ctx)
 	defer func() {
@@ -432,65 +461,27 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	// Send start partition request that will cause error
-	startReq := createTestStartPartitionRequest()
-	worker.SendRawServerMessage(startReq)
+	// Create a test batch
+	batch := createTestBatch()
+	metadata := rawtopiccommon.ServerMessageMetadata{
+		Status: rawydb.StatusSuccess,
+	}
+
+	// Send batch message that will cause error
+	worker.SendBatchMessage(metadata, batch)
 
 	// Wait for error handling using channel instead of Eventually
 	xtest.WaitChannelClosed(t, errorReceived)
 
-	// Verify error propagation through public callback
+	// Verify error contains user handler error using atomic access
 	require.Equal(t, int64(789), stoppedSessionID.Load())
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
-	require.Contains(t, (*errPtr).Error(), expectedErr.Error())
+	require.Contains(t, (*errPtr).Error(), "user handler error")
 }
 
-func TestPartitionWorkerInterface_CommitMessageFlow(t *testing.T) {
-	ctx := xtest.Context(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	session := createTestPartitionSession()
-	messageSender := newSyncMessageSender()
-	mockHandler := NewMockEventHandler(ctrl)
-
-	var stoppedErr error
-	onStopped := func(sessionID int64, err error) {
-		stoppedErr = err
-	}
-
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped)
-
-	worker.Start(ctx)
-	defer func() {
-		err := worker.Close(ctx, nil)
-		require.NoError(t, err)
-	}()
-
-	// Create a test commit response
-	commitResponse := &rawtopicreader.CommitOffsetResponse{
-		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
-			Status: rawydb.StatusSuccess,
-		},
-		PartitionsCommittedOffsets: []rawtopicreader.PartitionCommittedOffset{
-			{
-				PartitionSessionID: session.StreamPartitionSessionID,
-				CommittedOffset:    rawtopiccommon.NewOffset(150),
-			},
-		},
-	}
-
-	// Send commit message
-	worker.SendCommitMessage(commitResponse)
-
-	// Give some time for processing
-	time.Sleep(10 * time.Millisecond)
-
-	// Verify that committed offset was updated in session
-	require.Equal(t, int64(150), session.CommittedOffset().ToInt64())
-	require.Nil(t, stoppedErr)
-}
+// Note: CommitMessage processing has been moved to streamListener
+// and is no longer handled by PartitionWorker
 
 // =============================================================================
 // IMPLEMENTATION TESTS - Test internal behavior and edge cases
@@ -515,7 +506,7 @@ func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 		}
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, nil, onStopped)
+	worker := NewPartitionWorker(789, session, messageSender, nil, onStopped, &trace.Topic{}, "test-listener")
 
 	worker.Start(ctx)
 
@@ -556,7 +547,7 @@ func TestPartitionWorkerImpl_ContextCancellation(t *testing.T) {
 		}
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped)
+	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
 
 	// Create a context that we can cancel
 	ctx, cancel := context.WithCancel(context.Background())
@@ -597,7 +588,7 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 		}
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped)
+	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
 
 	// Set up mock to panic
 	mockHandler.EXPECT().
@@ -640,7 +631,7 @@ func TestPartitionWorkerImpl_MessageTypeHandling(t *testing.T) {
 		stoppedErr = err
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped)
+	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
 
 	worker.Start(ctx)
 	defer func() {

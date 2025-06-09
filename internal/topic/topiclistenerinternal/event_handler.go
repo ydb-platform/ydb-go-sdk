@@ -10,6 +10,17 @@ import (
 
 //go:generate mockgen -source event_handler.go -destination event_handler_mock_test.go --typed -package topiclistenerinternal -write_package_comment=false
 
+// CommitHandler interface for PublicReadMessages commit operations
+type CommitHandler interface {
+	sendCommit(b *topicreadercommon.PublicBatch) error
+	getSyncCommitter() SyncCommitter
+}
+
+// SyncCommitter interface for ConfirmWithAck support
+type SyncCommitter interface {
+	Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error
+}
+
 type EventHandler interface {
 	// OnStartPartitionSessionRequest called when server send start partition session request method.
 	// You can use it to store read progress on your own side.
@@ -41,19 +52,19 @@ type EventHandler interface {
 type PublicReadMessages struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
 	Batch            *topicreadercommon.PublicBatch
-	listener         *streamListener
+	commitHandler    CommitHandler
 	committed        atomic.Bool
 }
 
 func NewPublicReadMessages(
 	session topicreadercommon.PublicPartitionSession,
 	batch *topicreadercommon.PublicBatch,
-	listener *streamListener,
+	commitHandler CommitHandler,
 ) *PublicReadMessages {
 	return &PublicReadMessages{
 		PartitionSession: session,
 		Batch:            batch,
-		listener:         listener,
+		commitHandler:    commitHandler,
 	}
 }
 
@@ -66,7 +77,7 @@ func (e *PublicReadMessages) Confirm() {
 		return
 	}
 
-	_ = e.listener.sendCommit(e.Batch)
+	_ = e.commitHandler.sendCommit(e.Batch)
 }
 
 // ConfirmWithAck commit the batch and wait ack from the server. The method will be blocked until
@@ -74,7 +85,11 @@ func (e *PublicReadMessages) Confirm() {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
-	return e.listener.syncCommitter.Commit(ctx, topicreadercommon.GetCommitRange(e.Batch))
+	if e.committed.Swap(true) {
+		return nil
+	}
+
+	return e.commitHandler.getSyncCommitter().Commit(ctx, topicreadercommon.GetCommitRange(e.Batch))
 }
 
 // PublicEventStartPartitionSession

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type StreamListenerConfig struct {
@@ -15,6 +16,7 @@ type StreamListenerConfig struct {
 	Consumer               string
 	ConnectWithoutConsumer bool
 	readerID               int64
+	Tracer                 *trace.Topic
 }
 
 func NewStreamListenerConfig() StreamListenerConfig {
@@ -24,6 +26,7 @@ func NewStreamListenerConfig() StreamListenerConfig {
 		Selectors:  nil,
 		Consumer:   "",
 		readerID:   topicreadercommon.NextReaderID(),
+		Tracer:     &trace.Topic{},
 	}
 }
 

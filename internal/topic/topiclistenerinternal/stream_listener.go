@@ -2,8 +2,11 @@ package topiclistenerinternal
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -11,15 +14,41 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+// extractSelectorNames extracts topic names from selectors for tracing
+func extractSelectorNames(selectors []*topicreadercommon.PublicReadSelector) []string {
+	if selectors == nil {
+		return nil
+	}
+	result := make([]string, len(selectors))
+	for i, selector := range selectors {
+		result[i] = selector.Path
+	}
+	return result
+}
+
+// calculateMessageSize estimates the size of a message for tracing
+func calculateMessageSize(mess rawtopicreader.ServerMessage) int {
+	switch m := mess.(type) {
+	case *rawtopicreader.ReadResponse:
+		return m.BytesSize
+	case *rawtopicreader.StartPartitionSessionRequest:
+		return 128 // estimated header size
+	case *rawtopicreader.StopPartitionSessionRequest:
+		return 64
+	case *rawtopicreader.CommitOffsetResponse:
+		return len(m.PartitionsCommittedOffsets) * 32
+	default:
+		return 32 // default estimate
+	}
+}
 
 type streamListener struct {
 	cfg *StreamListenerConfig
@@ -28,6 +57,7 @@ type streamListener struct {
 	streamClose context.CancelCauseFunc
 	handler     EventHandler
 	sessionID   string
+	listenerID  string
 
 	background       background.Worker
 	sessions         *topicreadercommon.PartitionSessionStorage
@@ -36,13 +66,11 @@ type streamListener struct {
 	hasNewMessagesToSend empty.Chan
 	syncCommitter        *topicreadercommon.Committer
 
-	// Worker storage for partition workers (accessed only in receiveMessagesLoop thread)
-	workers map[int64]*PartitionWorker
-
 	closing atomic.Bool
 	tracer  *trace.Topic
 
 	m              xsync.Mutex
+	workers        map[int64]*PartitionWorker
 	messagesToSend []rawtopicreader.ClientMessage
 }
 
@@ -53,25 +81,40 @@ func newStreamListener(
 	config *StreamListenerConfig,
 	sessionIDCounter *atomic.Int64,
 ) (*streamListener, error) {
+	// Generate unique listener ID
+	listenerIDRand, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		listenerIDRand = big.NewInt(-1)
+	}
+	listenerID := "listener-" + listenerIDRand.String()
+
 	res := &streamListener{
 		cfg:              config,
 		handler:          eventListener,
 		background:       *background.NewWorker(xcontext.ValueOnly(connectionCtx), "topic reader stream listener"),
 		sessionIDCounter: sessionIDCounter,
+		listenerID:       listenerID,
 
-		//nolint:godox
-		tracer: &trace.Topic{}, // TODO: add read tracer
+		tracer: config.Tracer,
 	}
 
 	res.initVars(sessionIDCounter)
-	if err := res.initStream(connectionCtx, client); err != nil {
-		res.goClose(connectionCtx, err)
 
+	logCtx := connectionCtx
+	initDone := trace.TopicOnListenerInit(
+		res.tracer, &logCtx, res.listenerID, res.cfg.Consumer, extractSelectorNames(res.cfg.Selectors),
+	)
+
+	if err := res.initStream(connectionCtx, client); err != nil {
+		initDone("", err)
+		res.goClose(connectionCtx, err)
 		return nil, err
 	}
 
+	initDone(res.sessionID, nil)
+
 	res.syncCommitter = topicreadercommon.NewCommitterStopped(
-		&trace.Topic{},
+		res.tracer,
 		res.background.Context(),
 		topicreadercommon.CommitModeSync,
 		res.stream.Send,
@@ -88,16 +131,29 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 		return errTopicListenerClosed
 	}
 
+	logCtx := ctx
+	closeDone := trace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
+
 	var resErrors []error
 
 	// Stop all partition workers first
-	for _, worker := range l.workers {
+	// Copy workers to avoid holding mutex while closing them (to prevent deadlock)
+	var workers []*PartitionWorker
+	l.m.WithLock(func() {
+		workers = make([]*PartitionWorker, 0, len(l.workers))
+		for _, worker := range l.workers {
+			workers = append(workers, worker)
+		}
+		// Clear workers map
+		l.workers = make(map[int64]*PartitionWorker)
+	})
+
+	// Close workers without holding the mutex
+	for _, worker := range workers {
 		if err := worker.Close(ctx, reason); err != nil {
 			resErrors = append(resErrors, err)
 		}
 	}
-	// Clear workers map
-	l.workers = make(map[int64]*PartitionWorker)
 
 	// should be first because background wait stop of steams
 	if l.stream != nil {
@@ -114,22 +170,15 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 
 	for _, session := range l.sessions.GetAll() {
 		session.Close()
-		err := l.onStopPartitionRequest(session.Context(), &rawtopicreader.StopPartitionSessionRequest{
-			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
-				Status: rawydb.StatusSuccess,
-			},
-			PartitionSessionID: session.StreamPartitionSessionID,
-			Graceful:           false,
-			CommittedOffset:    session.CommittedOffset(),
-		})
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				resErrors = append(resErrors, err)
-			}
-		}
+		// For shutdown, we don't need to process stop partition requests through workers
+		// since all workers are already being closed above
 	}
 
-	return errors.Join(resErrors...)
+	finalErr := errors.Join(resErrors...)
+
+	closeDone(len(workers), finalErr)
+
+	return finalErr
 }
 
 func (l *streamListener) goClose(ctx context.Context, reason error) {
@@ -261,15 +310,23 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 		}
 
 		mess, err := l.stream.Recv()
+
+		logCtx := ctx
 		if err != nil {
+			trace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "error", 0, err)
+			trace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, xerrors.WithStackTrace(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
 			))
-
 			return
 		}
 
+		messageType := reflect.TypeOf(mess).String()
+		bytesSize := calculateMessageSize(mess)
+		trace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, messageType, bytesSize, nil)
+
 		if err := l.routeMessage(ctx, mess); err != nil {
+			trace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, err)
 		}
 	}
@@ -281,20 +338,15 @@ func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.S
 	case *rawtopicreader.StartPartitionSessionRequest:
 		return l.handleStartPartition(ctx, m)
 	case *rawtopicreader.StopPartitionSessionRequest:
-		// Test mode compatibility: if messagesToSend exists, use direct processing for tests
-		if l.messagesToSend != nil {
-			return l.onStopPartitionRequest(ctx, m)
-		}
 		return l.routeToWorker(m.PartitionSessionID, func(worker *PartitionWorker) {
 			worker.SendRawServerMessage(m)
 		})
 	case *rawtopicreader.ReadResponse:
 		return l.splitAndRouteReadResponse(m)
 	case *rawtopicreader.CommitOffsetResponse:
-		return l.splitAndRouteCommitResponse(m)
+		return l.onCommitResponse(m)
 	default:
-		//nolint:godox
-		// todo log
+		// Ignore unknown message types
 		return nil
 	}
 }
@@ -304,11 +356,6 @@ func (l *streamListener) handleStartPartition(
 	ctx context.Context,
 	m *rawtopicreader.StartPartitionSessionRequest,
 ) error {
-	// Test mode compatibility: if messagesToSend exists, use direct processing for tests
-	if l.messagesToSend != nil {
-		return l.onStartPartitionRequest(ctx, m)
-	}
-
 	session := topicreadercommon.NewPartitionSession(
 		ctx,
 		m.PartitionSession.Path,
@@ -332,135 +379,8 @@ func (l *streamListener) handleStartPartition(
 	return nil
 }
 
-func (l *streamListener) onStartPartitionRequest(
-	ctx context.Context,
-	m *rawtopicreader.StartPartitionSessionRequest,
-) error {
-	session := topicreadercommon.NewPartitionSession(
-		ctx,
-		m.PartitionSession.Path,
-		m.PartitionSession.PartitionID,
-		l.cfg.readerID,
-		l.sessionID,
-		m.PartitionSession.PartitionSessionID,
-		l.sessionIDCounter.Add(1),
-		m.CommittedOffset,
-	)
-	if err := l.sessions.Add(session); err != nil {
-		return err
-	}
-
-	resp := &rawtopicreader.StartPartitionSessionResponse{
-		PartitionSessionID: m.PartitionSession.PartitionSessionID,
-	}
-
-	event := NewPublicStartPartitionSessionEvent(
-		session.ToPublic(),
-		m.CommittedOffset.ToInt64(),
-		PublicOffsetsRange{
-			Start: m.PartitionOffsets.Start.ToInt64(),
-			End:   m.PartitionOffsets.End.ToInt64(),
-		},
-	)
-
-	err := l.handler.OnStartPartitionSessionRequest(ctx, event)
-	if err != nil {
-		return err
-	}
-
-	var userResp PublicStartPartitionSessionConfirm
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-event.confirm.Done():
-		userResp, _ = event.confirm.Get()
-	}
-
-	if userResp.readOffset != nil {
-		resp.ReadOffset.Offset.FromInt64(*userResp.readOffset)
-		resp.ReadOffset.HasValue = true
-	}
-	if userResp.CommitOffset != nil {
-		resp.CommitOffset.Offset.FromInt64(*userResp.CommitOffset)
-		resp.CommitOffset.HasValue = true
-	}
-
-	l.sendMessage(resp)
-
-	return nil
-}
-
-func (l *streamListener) onStopPartitionRequest(
-	ctx context.Context,
-	m *rawtopicreader.StopPartitionSessionRequest,
-) error {
-	session, err := l.sessions.Get(m.PartitionSessionID)
-	if err != nil {
-		return err
-	}
-
-	handlerCtx := session.Context()
-
-	event := NewPublicStopPartitionSessionEvent(
-		session.ToPublic(),
-		m.Graceful,
-		m.CommittedOffset.ToInt64(),
-	)
-
-	if err = l.handler.OnStopPartitionSessionRequest(handlerCtx, event); err != nil {
-		return err
-	}
-
-	go func() {
-		// remove partition on the confirmation or on the listener closed
-		select {
-		case <-l.background.Done():
-		case <-event.confirm.Done():
-		}
-		_, _ = l.sessions.Remove(m.PartitionSessionID)
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-event.confirm.Done():
-		// pass
-	}
-
-	if m.Graceful {
-		l.sendMessage(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: session.StreamPartitionSessionID})
-	}
-
-	return nil
-}
-
-func (l *streamListener) onReadResponse(m *rawtopicreader.ReadResponse) error {
-	batches, err := topicreadercommon.ReadRawBatchesToPublicBatches(m, l.sessions, l.cfg.Decoders)
-	if err != nil {
-		return err
-	}
-
-	for _, batch := range batches {
-		if err = l.handler.OnReadMessages(batch.Context(), NewPublicReadMessages(
-			topicreadercommon.BatchGetPartitionSession(batch).ToPublic(),
-			batch,
-			l,
-		)); err != nil {
-			return err
-		}
-	}
-	l.sendDataRequest(m.BytesSize)
-
-	return nil
-}
-
 // splitAndRouteReadResponse splits ReadResponse into batches and routes to workers
 func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadResponse) error {
-	// Test mode compatibility: if messagesToSend exists, use direct processing for tests
-	if l.messagesToSend != nil {
-		return l.onReadResponse(m)
-	}
-
 	batches, err := topicreadercommon.ReadRawBatchesToPublicBatches(m, l.sessions, l.cfg.Decoders)
 	if err != nil {
 		return err
@@ -480,28 +400,41 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 	return nil
 }
 
-// splitAndRouteCommitResponse splits CommitOffsetResponse and routes to workers
-func (l *streamListener) splitAndRouteCommitResponse(m *rawtopicreader.CommitOffsetResponse) error {
-	// Test mode compatibility: if messagesToSend exists, use direct processing for tests
-	if l.messagesToSend != nil {
-		return l.onCommitOffsetResponse(m)
-	}
+// onCommitResponse processes CommitOffsetResponse directly in streamListener
+// This prevents blocking commits in PartitionWorker threads
+func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetResponse) error {
+	for i := range msg.PartitionsCommittedOffsets {
+		commit := &msg.PartitionsCommittedOffsets[i]
 
-	for _, partOffset := range m.PartitionsCommittedOffsets {
-		// Create single-partition commit response for worker
-		singlePartitionResponse := &rawtopicreader.CommitOffsetResponse{
-			ServerMessageMetadata: m.ServerMessageMetadata,
-			PartitionsCommittedOffsets: []rawtopicreader.PartitionCommittedOffset{
-				partOffset,
-			},
-		}
-
-		err := l.routeToWorker(partOffset.PartitionSessionID, func(worker *PartitionWorker) {
-			worker.SendCommitMessage(singlePartitionResponse)
+		var worker *PartitionWorker
+		l.m.WithLock(func() {
+			worker = l.workers[commit.PartitionSessionID.ToInt64()]
 		})
-		if err != nil {
-			return err
+
+		if worker == nil {
+			// Session not found - this can happen during shutdown, log but don't fail
+			continue
 		}
+
+		session := worker.session
+
+		// Update committed offset in the session
+		session.SetCommittedOffsetForward(commit.CommittedOffset)
+
+		// Notify the syncCommitter about the commit
+		l.syncCommitter.OnCommitNotify(session, commit.CommittedOffset)
+
+		// Emit trace event - use partition context instead of background
+		logCtx := session.Context()
+		trace.TopicOnReaderCommittedNotify(
+			l.tracer,
+			&logCtx,
+			l.listenerID,
+			session.Topic,
+			session.PartitionID,
+			session.StreamPartitionSessionID.ToInt64(),
+			commit.CommittedOffset.ToInt64(),
+		)
 	}
 
 	return nil
@@ -515,7 +448,15 @@ func (l *streamListener) sendCommit(b *topicreadercommon.PublicBatch) error {
 	return l.stream.Send(commitRanges.ToRawMessage())
 }
 
+// getSyncCommitter returns the syncCommitter for CommitHandler interface compatibility
+func (l *streamListener) getSyncCommitter() SyncCommitter {
+	return l.syncCommitter
+}
+
 func (l *streamListener) sendDataRequest(bytesCount int) {
+	logCtx := l.background.Context()
+	trace.TopicOnListenerSendDataRequest(l.tracer, &logCtx, l.listenerID, l.sessionID, bytesCount)
+
 	l.sendMessage(&rawtopicreader.ReadRequest{BytesSize: bytesCount})
 }
 
@@ -528,19 +469,6 @@ func (l *streamListener) sendMessage(m rawtopicreader.ClientMessage) {
 	case l.hasNewMessagesToSend <- empty.Struct{}:
 	default:
 	}
-}
-
-func (l *streamListener) onCommitOffsetResponse(m *rawtopicreader.CommitOffsetResponse) error {
-	for _, partOffset := range m.PartitionsCommittedOffsets {
-		session, err := l.sessions.Get(partOffset.PartitionSessionID)
-		if err != nil {
-			return err
-		}
-
-		l.syncCommitter.OnCommitNotify(session, partOffset.CommittedOffset)
-	}
-
-	return nil
 }
 
 type confirmStorage[T any] struct {
@@ -590,7 +518,9 @@ func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 // onWorkerStopped handles worker stopped notifications
 func (l *streamListener) onWorkerStopped(sessionID int64, err error) {
 	// Remove worker from workers map
-	delete(l.workers, sessionID)
+	l.m.WithLock(func() {
+		delete(l.workers, sessionID)
+	})
 
 	// Remove corresponding session
 	for _, session := range l.sessions.GetAll() {
@@ -611,13 +541,17 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 	worker := NewPartitionWorker(
 		session.ClientPartitionSessionID,
 		session,
-		l, // streamListener implements MessageSender
+		l, // streamListener implements MessageSender and CommitHandler
 		l.handler,
 		l.onWorkerStopped,
+		l.tracer,
+		l.listenerID,
 	)
 
 	// Store worker in map
-	l.workers[session.ClientPartitionSessionID] = worker
+	l.m.WithLock(func() {
+		l.workers[session.ClientPartitionSessionID] = worker
+	})
 
 	// Start worker
 	worker.Start(l.background.Context())
@@ -628,15 +562,16 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 // routeToWorker routes a message to the appropriate worker
 func (l *streamListener) routeToWorker(partitionSessionID rawtopicreader.PartitionSessionID, routeFunc func(*PartitionWorker)) error {
 	// Find worker by session
-	for _, worker := range l.workers {
-		if worker.session.StreamPartitionSessionID == partitionSessionID {
-			routeFunc(worker)
-			return nil
-		}
+	var targetWorker *PartitionWorker
+	l.m.WithLock(func() {
+		targetWorker = l.workers[partitionSessionID.ToInt64()]
+	})
+
+	if targetWorker != nil {
+		routeFunc(targetWorker)
 	}
 
 	// Log error for missing worker but don't fail - this indicates a serious protocol/state issue
 	// In production, this should be extremely rare and indicates server/client state mismatch
-	// TODO: Add proper logging when available
 	return nil
 }
