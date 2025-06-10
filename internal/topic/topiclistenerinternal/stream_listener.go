@@ -169,7 +169,6 @@ func (l *streamListener) goClose(ctx context.Context, reason error) {
 		_ = l.background.Close(ctx, reason)
 		cancel()
 	}()
-
 }
 
 func (l *streamListener) startBackground() {
@@ -220,34 +219,35 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 	initMessage := topicreadercommon.CreateInitMessage(l.cfg.Consumer, false, l.cfg.Selectors)
 	err = stream.Send(initMessage)
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: failed to send init request for read stream in the listener: %w", err))
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: failed to send init request for read stream in the listener: %w", err)))
 	}
 
 	resp, err := l.stream.Recv()
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf(
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to receive init response for read stream in the listener: %w",
 			err,
-		))
+		)))
 	}
 
 	if status := resp.StatusData(); !status.Status.IsSuccess() {
 		// wrap initialization error as operation status error - for handle with retrier
 		// https://github.com/ydb-platform/ydb-go-sdk/issues/1361
-		return xerrors.WithStackTrace(fmt.Errorf(
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: received bad status on init the topic stream listener: %v (%v)",
 			status.Status,
 			status.Issues,
-		))
+		)))
 	}
 
 	initResp, ok := resp.(*rawtopicreader.InitResponse)
 	if !ok {
-		return xerrors.WithStackTrace(fmt.Errorf(
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"bad message type on session init: %v (%v)",
 			resp,
 			reflect.TypeOf(resp),
-		))
+		)))
 	}
 
 	l.sessionID = initResp.SessionID
@@ -296,9 +296,9 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 		if err != nil {
 			trace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
 			trace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
-			l.goClose(ctx, xerrors.WithStackTrace(
+			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
-			))
+			)))
 
 			return
 		}
@@ -353,7 +353,7 @@ func (l *streamListener) handleStartPartition(
 		m.CommittedOffset,
 	)
 	if err := l.sessions.Add(session); err != nil {
-		return err
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to add partition session: %w", err)))
 	}
 
 	// Create worker for this partition
@@ -369,7 +369,8 @@ func (l *streamListener) handleStartPartition(
 func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadResponse) error {
 	batches, err := topicreadercommon.ReadRawBatchesToPublicBatches(m, l.sessions, l.cfg.Decoders)
 	if err != nil {
-		return err
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: failed to convert raw batches to public batches: %w", err)))
 	}
 
 	// Route each batch to its partition worker
@@ -379,7 +380,8 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 			worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
 		})
 		if err != nil {
-			return err
+			return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+				"ydb: failed to route batch to worker: %w", err)))
 		}
 	}
 
@@ -431,7 +433,11 @@ func (l *streamListener) sendCommit(b *topicreadercommon.PublicBatch) error {
 		Ranges: []topicreadercommon.CommitRange{topicreadercommon.GetCommitRange(b)},
 	}
 
-	return l.stream.Send(commitRanges.ToRawMessage())
+	if err := l.stream.Send(commitRanges.ToRawMessage()); err != nil {
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to send commit message: %w", err)))
+	}
+
+	return nil
 }
 
 // getSyncCommitter returns the syncCommitter for CommitHandler interface compatibility
@@ -502,7 +508,7 @@ func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 }
 
 // onWorkerStopped handles worker stopped notifications
-func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessionID, err error) {
+func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessionID, reason error) {
 	// Remove worker from workers map
 	l.m.WithLock(func() {
 		delete(l.workers, sessionID)
@@ -517,13 +523,13 @@ func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessi
 		}
 	}
 
-	// If error from worker, propagate to streamListener shutdown
+	// If reason from worker, propagate to streamListener shutdown
 	// But avoid cascading shutdowns for normal lifecycle events like queue closure during shutdown
-	if err != nil && !l.closing.Load() {
-		// Only propagate error if we're not already closing
-		// and if it's not a normal queue closure error (which can happen during shutdown)
-		if !xerrors.Is(err, errPartitionQueueClosed) {
-			l.goClose(l.background.Context(), err)
+	if reason != nil && !l.closing.Load() {
+		// Only propagate reason if we're not already closing
+		// and if it's not a normal queue closure reason (which can happen during shutdown)
+		if !xerrors.Is(reason, errPartitionQueueClosed) {
+			l.goClose(l.background.Context(), reason)
 		}
 	}
 }

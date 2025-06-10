@@ -198,7 +198,7 @@ func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 	}
 
 	worker := NewPartitionWorker(
-		789,
+		123,
 		session,
 		messageSender,
 		mockHandler,
@@ -268,7 +268,15 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 			stoppedErr = err
 		}
 
-		worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
+		worker := NewPartitionWorker(
+			123,
+			session,
+			messageSender,
+			mockHandler,
+			onStopped,
+			&trace.Topic{},
+			"test-listener",
+		)
 
 		// Set up mock expectations with deterministic coordination
 		mockHandler.EXPECT().
@@ -330,7 +338,15 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 			stoppedErr = err
 		}
 
-		worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
+		worker := NewPartitionWorker(
+			123,
+			session,
+			messageSender,
+			mockHandler,
+			onStopped,
+			&trace.Topic{},
+			"test-listener",
+		)
 
 		// Set up mock expectations with deterministic coordination
 		mockHandler.EXPECT().
@@ -389,7 +405,15 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 		stoppedErr = err
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
 
 	// Set up mock expectations with deterministic coordination
 	mockHandler.EXPECT().
@@ -458,7 +482,15 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 		}
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
 
 	// Set up mock to return error
 	mockHandler.EXPECT().
@@ -484,7 +516,7 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	xtest.WaitChannelClosed(t, errorReceived)
 
 	// Verify error contains user handler error using atomic access
-	require.Equal(t, int64(789), stoppedSessionID.Load())
+	require.Equal(t, int64(123), stoppedSessionID.Load())
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	require.Contains(t, (*errPtr).Error(), "user handler error")
@@ -499,9 +531,12 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 
 func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	session := createTestPartitionSession()
 	messageSender := newSyncMessageSender()
+	mockHandler := NewMockEventHandler(ctrl)
 
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
@@ -516,7 +551,15 @@ func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 		}
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, nil, onStopped, &trace.Topic{}, "test-listener")
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
 
 	worker.Start(ctx)
 
@@ -528,11 +571,11 @@ func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 	xtest.WaitChannelClosed(t, errorReceived)
 
 	// Verify error propagation through public callback
-	require.Equal(t, int64(789), stoppedSessionID.Load())
+	require.Equal(t, int64(123), stoppedSessionID.Load())
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	if *errPtr != nil {
-		require.Contains(t, (*errPtr).Error(), "partition messages queue closed")
+		require.Contains(t, (*errPtr).Error(), "partition worker message queue closed")
 	}
 }
 
@@ -557,7 +600,15 @@ func TestPartitionWorkerImpl_ContextCancellation(t *testing.T) {
 		}
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
 
 	// Create a context that we can cancel
 	ctx, cancel := context.WithCancel(context.Background())
@@ -569,11 +620,12 @@ func TestPartitionWorkerImpl_ContextCancellation(t *testing.T) {
 	// Wait for error handling using channel instead of Eventually
 	xtest.WaitChannelClosed(t, errorReceived)
 
-	// Verify graceful shutdown (nil error)
-	require.Equal(t, int64(789), stoppedSessionID.Load())
+	// Verify graceful shutdown (proper reason provided)
+	require.Equal(t, int64(123), stoppedSessionID.Load())
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
-	require.Nil(t, *errPtr) // Graceful shutdown should have nil error
+	require.NotNil(t, *errPtr) // Graceful shutdown should have meaningful reason
+	require.Contains(t, (*errPtr).Error(), "graceful shutdown PartitionWorker")
 }
 
 func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
@@ -598,7 +650,15 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 		}
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
 
 	// Set up mock to panic
 	mockHandler.EXPECT().
@@ -621,7 +681,7 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 	xtest.WaitChannelClosed(t, errorReceived)
 
 	// Verify panic recovery
-	require.Equal(t, int64(789), stoppedSessionID.Load())
+	require.Equal(t, int64(123), stoppedSessionID.Load())
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	require.Contains(t, (*errPtr).Error(), "partition worker panic")
@@ -641,7 +701,15 @@ func TestPartitionWorkerImpl_MessageTypeHandling(t *testing.T) {
 		stoppedErr = err
 	}
 
-	worker := NewPartitionWorker(789, session, messageSender, mockHandler, onStopped, &trace.Topic{}, "test-listener")
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
 
 	worker.Start(ctx)
 	defer func() {
