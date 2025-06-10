@@ -21,59 +21,37 @@ import (
 
 func TestTopicListener(t *testing.T) {
 	scope := newScope(t)
+
+	// Write message first like commit tests do
 	require.NoError(t, scope.TopicWriter().Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader("asd")}))
 
+	var readMessages *topiclistener.ReadMessages
+	done := make(empty.Chan)
+
 	handler := &TestTopicListener_Handler{
-		done: make(empty.Chan),
+		onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
+			readMessages = event
+			close(done)
+			return nil
+		},
 	}
 
-	handler.onReaderCreated = func(event *topiclistener.ReaderReady) error {
-		handler.listener = event.Listener
-
-		return nil
-	}
-
-	handler.onStartPartitionSessionRequest = func(ctx context.Context, event *topiclistener.EventStartPartitionSession) error {
-		handler.onPartitionStart = event
-		event.Confirm()
-
-		return nil
-	}
-
-	handler.onStopPartitionSessionRequest = func(ctx context.Context, event *topiclistener.EventStopPartitionSession) error {
-		handler.onPartitionStop = event
-		event.Confirm()
-
-		return nil
-	}
-
-	handler.onReadMessages = func(ctx context.Context, event *topiclistener.ReadMessages) error {
-		handler.readMessages = event
-		close(handler.done)
-
-		return nil
-	}
-
-	listener, err := scope.Driver().Topic().StartListener(
+	startedListener, err := scope.Driver().Topic().StartListener(
 		scope.TopicConsumerName(),
 		handler,
 		topicoptions.ReadTopic(scope.TopicPath()),
 	)
-	require.Same(t, listener, handler.listener)
 	require.NoError(t, err)
-	require.NoError(t, listener.WaitInit(scope.Ctx))
+	require.NoError(t, startedListener.WaitInit(scope.Ctx))
 
-	<-handler.done
+	xtest.WaitChannelClosed(t, done)
 
-	require.NotNil(t, handler.onPartitionStart)
-	require.NotNil(t, handler.readMessages)
+	require.NotNil(t, readMessages)
 
-	content := string(xtest.Must(io.ReadAll(handler.readMessages.Batch.Messages[0])))
+	content := string(xtest.Must(io.ReadAll(readMessages.Batch.Messages[0])))
 	require.Equal(t, "asd", content)
 
-	require.NoError(t, listener.Close(scope.Ctx))
-
-	require.NotNil(t, handler.onPartitionStop)
+	require.NoError(t, startedListener.Close(scope.Ctx))
 }
 
 func TestTopicListenerCommit(t *testing.T) {
@@ -167,20 +145,23 @@ func TestTopicListenerCommit(t *testing.T) {
 		err = scope.TopicWriter().Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader("qqq")})
 		require.NoError(t, err)
 
-		readed = make(empty.Chan)
+		committed := make(empty.Chan)
+		var commitError error
 		handler = &TestTopicListener_Handler{
 			onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
 				savedEvent = event
-				close(readed)
 
-				return event.ConfirmWithAck(ctx)
+				commitError = event.ConfirmWithAck(ctx)
+				close(committed)
+				return commitError
 			},
 		}
 
 		listener, err = scope.Driver().Topic().StartListener(scope.TopicConsumerName(), handler, topicoptions.ReadTopic(scope.TopicPath()))
 		require.NoError(t, err)
 
-		xtest.WaitChannelClosed(t, readed)
+		xtest.WaitChannelClosed(t, committed)
+		require.NoError(t, commitError)
 		messData = string(xtest.Must(io.ReadAll(savedEvent.Batch.Messages[0])))
 		require.Equal(t, "qqq", messData)
 

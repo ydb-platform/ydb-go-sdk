@@ -32,3 +32,25 @@ func (m *ServerMessageMetadata) StatusData() ServerMessageMetadata {
 func (m *ServerMessageMetadata) SetStatus(status rawydb.StatusCode) {
 	m.Status = status
 }
+
+// Equals compares this ServerMessageMetadata with another ServerMessageMetadata for equality
+func (m *ServerMessageMetadata) Equals(other *ServerMessageMetadata) bool {
+	if m == nil && other == nil {
+		return true
+	}
+	if m == nil || other == nil {
+		return false
+	}
+
+	// Compare status using StatusCode's Equals method
+	if !m.Status.Equals(other.Status) {
+		return false
+	}
+
+	// Compare issues using Issues' Equals method
+	if !m.Issues.Equals(other.Issues) {
+		return false
+	}
+
+	return true
+}

@@ -272,6 +272,7 @@ func (c *Client) StartListener(
 	cfg := topiclistenerinternal.NewStreamListenerConfig()
 
 	cfg.Consumer = consumer
+	cfg.Tracer = c.cfg.Trace // Set tracer from client config
 
 	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
