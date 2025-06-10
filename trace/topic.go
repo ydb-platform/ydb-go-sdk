@@ -832,10 +832,11 @@ type (
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicListenerSendDataRequestInfo struct {
-		Context    *context.Context
-		ListenerID string
-		SessionID  string
-		BytesSize  int
+		Context     *context.Context
+		ListenerID  string
+		SessionID   string
+		MessageType string
+		Error       error
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

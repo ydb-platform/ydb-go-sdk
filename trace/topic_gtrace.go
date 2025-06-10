@@ -2611,12 +2611,13 @@ func TopicOnPartitionWorkerStop(t *Topic, c *context.Context, listenerID string,
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnListenerSendDataRequest(t *Topic, c *context.Context, listenerID string, sessionID string, bytesSize int) {
+func TopicOnListenerSendDataRequest(t *Topic, c *context.Context, listenerID string, sessionID string, messageType string, e error) {
 	var p TopicListenerSendDataRequestInfo
 	p.Context = c
 	p.ListenerID = listenerID
 	p.SessionID = sessionID
-	p.BytesSize = bytesSize
+	p.MessageType = messageType
+	p.Error = e
 	t.onListenerSendDataRequest(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

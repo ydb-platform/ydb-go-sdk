@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -447,8 +448,13 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 
 	worker.AddMessagesBatch(metadata, testBatch)
 
-	// Wait for processing to complete instead of sleeping
+	// Wait for processing to complete
 	xtest.WaitChannelClosed(t, processingDone)
+
+	// Wait for the ReadRequest to be sent (small additional wait for async SendRaw)
+	err := messageSender.waitForMessage(ctx)
+	require.NoError(t, err)
+
 	require.Nil(t, stoppedErr)
 
 	// Verify ReadRequest was sent for flow control
@@ -575,7 +581,14 @@ func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	if *errPtr != nil {
-		require.Contains(t, (*errPtr).Error(), "partition worker message queue closed")
+		// When Close() is called, there's a race between queue closure and context cancellation
+		// Both are valid shutdown reasons, so accept either one
+		errorMsg := (*errPtr).Error()
+		isQueueClosed := strings.Contains(errorMsg, "partition worker message queue closed")
+		isContextCanceled := strings.Contains(errorMsg, "partition worker message queue context error") &&
+			strings.Contains(errorMsg, "context canceled")
+		require.True(t, isQueueClosed || isContextCanceled,
+			"Expected either queue closure or context cancellation error, got: %s", errorMsg)
 	}
 }
 

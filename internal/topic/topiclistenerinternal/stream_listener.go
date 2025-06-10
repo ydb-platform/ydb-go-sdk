@@ -270,17 +270,60 @@ func (l *streamListener) sendMessagesLoop(ctx context.Context) {
 				}
 			})
 
-			for _, m := range messages {
+			if len(messages) == 0 {
+				continue
+			}
+
+			logCtx := l.background.Context()
+
+			for i, m := range messages {
+				messageType := l.getMessageTypeName(m)
+
 				if err := l.stream.Send(m); err != nil {
-					l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-						"ydb: failed send message by grpc to topic reader stream from listener: %w",
-						err,
-					))))
+					// Trace send error
+					l.traceMessageSend(&logCtx, messageType, err)
+					trace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
+
+					reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+						"ydb: failed send message by grpc to topic reader stream from listener: "+
+							"message_type=%s, message_index=%d, total_messages=%d: %w",
+						messageType, i, len(messages), err,
+					)))
+					l.goClose(ctx, reason)
 
 					return
 				}
+
+				// Trace successful send
+				l.traceMessageSend(&logCtx, messageType, nil)
 			}
 		}
+	}
+}
+
+// traceMessageSend provides consistent tracing for message sends
+func (l *streamListener) traceMessageSend(ctx *context.Context, messageType string, err error) {
+	// Use TopicOnListenerSendDataRequest for all message send tracing
+	trace.TopicOnListenerSendDataRequest(l.tracer, ctx, l.listenerID, l.sessionID, messageType, err)
+}
+
+// getMessageTypeName returns a human-readable name for the message type
+func (l *streamListener) getMessageTypeName(m rawtopicreader.ClientMessage) string {
+	switch m.(type) {
+	case *rawtopicreader.ReadRequest:
+		return "ReadRequest"
+	case *rawtopicreader.StartPartitionSessionResponse:
+		return "StartPartitionSessionResponse"
+	case *rawtopicreader.StopPartitionSessionResponse:
+		return "StopPartitionSessionResponse"
+	case *rawtopicreader.CommitOffsetRequest:
+		return "CommitOffsetRequest"
+	case *rawtopicreader.PartitionSessionStatusRequest:
+		return "PartitionSessionStatusRequest"
+	case *rawtopicreader.UpdateTokenRequest:
+		return "UpdateTokenRequest"
+	default:
+		return fmt.Sprintf("Unknown(%T)", m)
 	}
 }
 
@@ -446,9 +489,6 @@ func (l *streamListener) getSyncCommitter() SyncCommitter {
 }
 
 func (l *streamListener) sendDataRequest(bytesCount int) {
-	logCtx := l.background.Context()
-	trace.TopicOnListenerSendDataRequest(l.tracer, &logCtx, l.listenerID, l.sessionID, bytesCount)
-
 	l.sendMessage(&rawtopicreader.ReadRequest{BytesSize: bytesCount})
 }
 

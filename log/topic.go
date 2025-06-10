@@ -1108,12 +1108,23 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		if d.Details()&trace.TopicListenerStreamEvents == 0 {
 			return
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "topic", "listener", "send", "data", "request")
-		l.Log(ctx, "topic listener send data request",
+		fields := []Field{
 			kv.String("listener_id", info.ListenerID),
 			kv.String("session_id", info.SessionID),
-			kv.Int("bytes_size", info.BytesSize),
-		)
+			kv.String("message_type", info.MessageType),
+		}
+		if info.Error == nil {
+			ctx := with(*info.Context, TRACE, "ydb", "topic", "listener", "send", "data", "request")
+			l.Log(ctx, "topic listener send data request", fields...)
+		} else {
+			ctx := with(*info.Context, WARN, "ydb", "topic", "listener", "send", "data", "request")
+			l.Log(ctx, "topic listener send data request failed",
+				append(fields,
+					kv.Error(info.Error),
+					kv.Version(),
+				)...,
+			)
+		}
 	}
 
 	t.OnListenerUnknownMessage = func(info trace.TopicListenerUnknownMessageInfo) {
