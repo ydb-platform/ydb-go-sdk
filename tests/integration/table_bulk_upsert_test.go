@@ -78,18 +78,18 @@ func TestTableBulkUpsert(t *testing.T) {
 }
 
 func TestTableBulkUpsertGrpcMaxMessageSize(t *testing.T) {
-	const KB = 1024
+	const MB = 1024 * 1024
 
 	var (
 		scope     = newScope(t)
-		driver    = scope.Driver(ydb.WithGrpcMaxMessageSize(2 * KB))
+		driver    = scope.Driver(ydb.WithGrpcMaxMessageSize(10 * MB))
 		tablePath = scope.TablePath()
 	)
 
-	s := strings.Repeat("a", 1*KB)
+	s := strings.Repeat("a", 5*MB)
 
 	var rows []types.Value
-	for i := int64(0); i < 10; i++ { // => 10 KB the whole request
+	for i := int64(0); i < 10; i++ { // => 50MB the whole request
 		rows = append(rows, types.StructValue(
 			types.StructFieldValue("id", types.Int64Value(i)),
 			types.StructFieldValue("val", types.TextValue(s)),
