@@ -25,7 +25,6 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          go-version: '1.23'
           args: --timeout=5m
   golangci-examples:
     name: golangci-lint-examples
