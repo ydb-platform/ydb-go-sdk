@@ -525,6 +525,9 @@ func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
 	if version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
 		t.Skip()
 	}
+	if os.Getenv("YDB_VERSION") == "nightly" {
+		t.Skip("bug: https://github.com/ydb-platform/ydb/issues/19449")
+	}
 	scope := newScope(t)
 
 	maxGrpcMsgSize := config.DefaultGRPCMsgSize // bytes
