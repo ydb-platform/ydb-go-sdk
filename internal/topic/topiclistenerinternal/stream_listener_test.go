@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
@@ -75,6 +76,18 @@ func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
 		event.Confirm()
 
+		return nil
+	})
+
+	calledHandlerOnReadMessages := make(chan struct{}, 1)
+	// Set up mock expectation for OnReadMessages which will be called when ReadResponse is processed
+	EventHandlerMock(e).EXPECT().OnReadMessages(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicReadMessages) error {
+		close(calledHandlerOnReadMessages)
+
+		// Just return nil to acknowledge receipt
 		return nil
 	})
 
@@ -145,6 +158,7 @@ func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 	// The worker should have received the batch message in its queue
 	// We can't easily check queue state, but the routing completed without error
 	// which means the batch was successfully created and sent to the worker
+	xtest.WaitChannelClosed(t, calledHandlerOnReadMessages)
 }
 
 func TestStreamListener_CloseWorkers(t *testing.T) {
