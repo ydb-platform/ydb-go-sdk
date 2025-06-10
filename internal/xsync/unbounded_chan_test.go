@@ -249,10 +249,12 @@ func TestUnboundedChanConcurrentSendReceive(t *testing.T) {
 				msg, ok, err := ch.Receive(ctx)
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
+
 					return
 				} else if ok {
 					if received[msg] {
 						t.Errorf("Received duplicate message: %d", msg)
+
 						return
 					}
 					received[msg] = true
@@ -272,6 +274,7 @@ func TestUnboundedChanConcurrentSendReceive(t *testing.T) {
 			for i := 0; i < count; i++ {
 				if !received[i] {
 					t.Errorf("Missing message: %d", i)
+
 					break // Don't spam with too many errors
 				}
 			}
@@ -308,12 +311,14 @@ func TestUnboundedChanConcurrentMerge(t *testing.T) {
 				select {
 				case <-timeout:
 					close(done)
+
 					return
 				default:
 					msg, ok, err := ch.Receive(ctx)
 					if err != nil {
 						t.Errorf("Unexpected error: %v", err)
 						close(done)
+
 						return
 					}
 					if ok {
@@ -321,6 +326,7 @@ func TestUnboundedChanConcurrentMerge(t *testing.T) {
 						// Check if we've received at least some messages from all senders
 						if len(received) == numSenders && allSendersHaveMessages(received, numSenders) {
 							close(done)
+
 							return
 						}
 					}
