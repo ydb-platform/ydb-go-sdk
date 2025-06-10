@@ -233,7 +233,7 @@ func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 
 	// Send start partition request
 	startReq := createTestStartPartitionRequest()
-	worker.SendRawServerMessage(startReq)
+	worker.AddRawServerMessage(startReq)
 
 	// Signal that confirmation can proceed
 	close(confirmReady)
@@ -296,7 +296,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 
 		// Send graceful stop request
 		stopReq := createTestStopPartitionRequest(true)
-		worker.SendRawServerMessage(stopReq)
+		worker.AddRawServerMessage(stopReq)
 
 		// Signal that confirmation can proceed
 		close(confirmReady)
@@ -359,7 +359,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 
 		// Send non-graceful stop request
 		stopReq := createTestStopPartitionRequest(false)
-		worker.SendRawServerMessage(stopReq)
+		worker.AddRawServerMessage(stopReq)
 
 		// Signal that confirmation can proceed
 		close(confirmReady)
@@ -421,7 +421,7 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 		Status: rawydb.StatusSuccess,
 	}
 
-	worker.SendBatchMessage(metadata, testBatch)
+	worker.AddMessagesBatch(metadata, testBatch)
 
 	// Wait for processing to complete instead of sleeping
 	xtest.WaitChannelClosed(t, processingDone)
@@ -478,7 +478,7 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	}
 
 	// Send batch message that will cause error
-	worker.SendBatchMessage(metadata, batch)
+	worker.AddMessagesBatch(metadata, batch)
 
 	// Wait for error handling using channel instead of Eventually
 	xtest.WaitChannelClosed(t, errorReceived)
@@ -615,7 +615,7 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 
 	// Send start partition request that will cause panic
 	startReq := createTestStartPartitionRequest()
-	worker.SendRawServerMessage(startReq)
+	worker.AddRawServerMessage(startReq)
 
 	// Wait for error handling using channel instead of Eventually
 	xtest.WaitChannelClosed(t, errorReceived)
@@ -650,7 +650,7 @@ func TestPartitionWorkerImpl_MessageTypeHandling(t *testing.T) {
 	}()
 
 	// Send empty unified message (should be ignored)
-	worker.SendMessage(unifiedMessage{})
+	worker.AddUnifiedMessage(unifiedMessage{})
 
 	// Give some time for processing
 	time.Sleep(10 * time.Millisecond)

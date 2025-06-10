@@ -32,22 +32,6 @@ func extractSelectorNames(selectors []*topicreadercommon.PublicReadSelector) []s
 	return result
 }
 
-// calculateMessageSize estimates the size of a message for tracing
-func calculateMessageSize(mess rawtopicreader.ServerMessage) int {
-	switch m := mess.(type) {
-	case *rawtopicreader.ReadResponse:
-		return m.BytesSize
-	case *rawtopicreader.StartPartitionSessionRequest:
-		return 128 // estimated header size
-	case *rawtopicreader.StopPartitionSessionRequest:
-		return 64
-	case *rawtopicreader.CommitOffsetResponse:
-		return len(m.PartitionsCommittedOffsets) * 32
-	default:
-		return 32 // default estimate
-	}
-}
-
 type streamListener struct {
 	cfg *StreamListenerConfig
 
@@ -322,7 +306,11 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 		}
 
 		messageType := reflect.TypeOf(mess).String()
-		bytesSize := calculateMessageSize(mess)
+		bytesSize := 0
+		if mess, ok := mess.(*rawtopicreader.ReadResponse); ok {
+			bytesSize = mess.BytesSize
+		}
+
 		trace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, messageType, bytesSize, nil)
 
 		if err := l.routeMessage(ctx, mess); err != nil {
@@ -339,7 +327,7 @@ func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.S
 		return l.handleStartPartition(ctx, m)
 	case *rawtopicreader.StopPartitionSessionRequest:
 		return l.routeToWorker(m.PartitionSessionID, func(worker *PartitionWorker) {
-			worker.SendRawServerMessage(m)
+			worker.AddRawServerMessage(m)
 		})
 	case *rawtopicreader.ReadResponse:
 		return l.splitAndRouteReadResponse(m)
@@ -374,7 +362,7 @@ func (l *streamListener) handleStartPartition(
 	worker := l.createWorkerForPartition(session)
 
 	// Send StartPartition message to the worker
-	worker.SendRawServerMessage(m)
+	worker.AddRawServerMessage(m)
 
 	return nil
 }
@@ -390,7 +378,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 	for _, batch := range batches {
 		partitionSession := topicreadercommon.BatchGetPartitionSession(batch)
 		err := l.routeToWorker(partitionSession.StreamPartitionSessionID, func(worker *PartitionWorker) {
-			worker.SendBatchMessage(m.ServerMessageMetadata, batch)
+			worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
 		})
 		if err != nil {
 			return err
@@ -416,7 +404,7 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 			continue
 		}
 
-		session := worker.session
+		session := worker.partitionSession
 
 		// Update committed offset in the session
 		session.SetCommittedOffsetForward(commit.CommittedOffset)

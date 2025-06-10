@@ -22,7 +22,7 @@ type MessageSender interface {
 	SendRaw(msg rawtopicreader.ClientMessage)
 }
 
-// unifiedMessage wraps three types of messages that PartitionWorker can handle
+// unifiedMessage wraps messages that PartitionWorker can handle
 type unifiedMessage struct {
 	// Only one of these should be set
 	RawServerMessage *rawtopicreader.ServerMessage
@@ -40,11 +40,11 @@ type WorkerStoppedCallback func(sessionID int64, err error)
 
 // PartitionWorker processes messages for a single partition
 type PartitionWorker struct {
-	sessionID     int64
-	session       *topicreadercommon.PartitionSession
-	messageSender MessageSender
-	userHandler   EventHandler
-	onStopped     WorkerStoppedCallback
+	partitionSessionID int64
+	partitionSession   *topicreadercommon.PartitionSession
+	messageSender      MessageSender
+	userHandler        EventHandler
+	onStopped          WorkerStoppedCallback
 
 	// Tracing fields
 	tracer     *trace.Topic
@@ -78,14 +78,14 @@ func NewPartitionWorker(
 	}
 
 	return &PartitionWorker{
-		sessionID:     sessionID,
-		session:       session,
-		messageSender: messageSender,
-		userHandler:   userHandler,
-		onStopped:     onStopped,
-		tracer:        tracer,
-		listenerID:    listenerID,
-		messageQueue:  xsync.NewUnboundedChan[unifiedMessage](),
+		partitionSessionID: sessionID,
+		partitionSession:   session,
+		messageSender:      messageSender,
+		userHandler:        userHandler,
+		onStopped:          onStopped,
+		tracer:             tracer,
+		listenerID:         listenerID,
+		messageQueue:       xsync.NewUnboundedChan[unifiedMessage](),
 	}
 }
 
@@ -97,22 +97,22 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 	})
 }
 
-// SendMessage adds a unified message to the processing queue
-func (w *PartitionWorker) SendMessage(msg unifiedMessage) {
+// AddUnifiedMessage adds a unified message to the processing queue
+func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
 	w.messageQueue.SendWithMerge(msg, w.tryMergeMessages)
 }
 
-// SendRawServerMessage sends a raw server message
-func (w *PartitionWorker) SendRawServerMessage(msg rawtopicreader.ServerMessage) {
-	w.SendMessage(unifiedMessage{RawServerMessage: &msg})
+// AddRawServerMessage sends a raw server message
+func (w *PartitionWorker) AddRawServerMessage(msg rawtopicreader.ServerMessage) {
+	w.AddUnifiedMessage(unifiedMessage{RawServerMessage: &msg})
 }
 
-// SendBatchMessage sends a ready batch message
-func (w *PartitionWorker) SendBatchMessage(
+// AddMessagesBatch sends a ready batch message
+func (w *PartitionWorker) AddMessagesBatch(
 	metadata rawtopiccommon.ServerMessageMetadata,
 	batch *topicreadercommon.PublicBatch,
 ) {
-	w.SendMessage(unifiedMessage{
+	w.AddUnifiedMessage(unifiedMessage{
 		BatchMessage: &batchMessage{
 			ServerMessageMetadata: metadata,
 			Batch:                 batch,
@@ -134,7 +134,7 @@ func (w *PartitionWorker) Close(ctx context.Context, reason error) error {
 func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			w.onStopped(w.sessionID, xerrors.WithStackTrace(fmt.Errorf("ydb: partition worker panic: %v", r)))
+			w.onStopped(w.partitionSessionID, xerrors.WithStackTrace(fmt.Errorf("ydb: partition worker panic: %v", r)))
 		}
 	}()
 
@@ -143,19 +143,19 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 		msg, ok, err := w.messageQueue.Receive(ctx)
 		if err != nil {
 			// Context was cancelled or timed out
-			w.onStopped(w.sessionID, nil) // graceful shutdown
+			w.onStopped(w.partitionSessionID, nil) // graceful shutdown
 
 			return
 		}
 		if !ok {
 			// Queue was closed
-			w.onStopped(w.sessionID, xerrors.WithStackTrace(errPartitionQueueClosed))
+			w.onStopped(w.partitionSessionID, xerrors.WithStackTrace(errPartitionQueueClosed))
 
 			return
 		}
 
 		if err := w.processUnifiedMessage(ctx, msg); err != nil {
-			w.onStopped(w.sessionID, err)
+			w.onStopped(w.partitionSessionID, err)
 
 			return
 		}
@@ -215,7 +215,7 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		}
 
 		event := NewPublicReadMessages(
-			w.session.ToPublic(),
+			w.partitionSession.ToPublic(),
 			msg.Batch,
 			commitHandler,
 		)
@@ -237,7 +237,7 @@ func (w *PartitionWorker) handleStartPartitionRequest(
 	m *rawtopicreader.StartPartitionSessionRequest,
 ) error {
 	event := NewPublicStartPartitionSessionEvent(
-		w.session.ToPublic(),
+		w.partitionSession.ToPublic(),
 		m.CommittedOffset.ToInt64(),
 		PublicOffsetsRange{
 			Start: m.PartitionOffsets.Start.ToInt64(),
@@ -289,7 +289,7 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 	m *rawtopicreader.StopPartitionSessionRequest,
 ) error {
 	event := NewPublicStopPartitionSessionEvent(
-		w.session.ToPublic(),
+		w.partitionSession.ToPublic(),
 		m.Graceful,
 		m.CommittedOffset.ToInt64(),
 	)
@@ -314,7 +314,7 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 	// Only send response if graceful
 	if m.Graceful {
 		resp := &rawtopicreader.StopPartitionSessionResponse{
-			PartitionSessionID: w.session.StreamPartitionSessionID,
+			PartitionSessionID: w.partitionSession.StreamPartitionSessionID,
 		}
 		w.messageSender.SendRaw(resp)
 	}
@@ -331,9 +331,17 @@ func (w *PartitionWorker) tryMergeMessages(last, new unifiedMessage) (unifiedMes
 			return new, false // Don't merge messages with different metadata
 		}
 
-		// For batch messages, we don't merge the actual batches since they're already processed
-		// Just keep the newer message
-		return new, true
+		var err error
+		result, err := topicreadercommon.BatchAppend(last.BatchMessage.Batch, new.BatchMessage.Batch)
+		if err != nil {
+			w.Close(context.Background(), err)
+			return new, false
+		}
+
+		return unifiedMessage{BatchMessage: &batchMessage{
+			ServerMessageMetadata: last.BatchMessage.ServerMessageMetadata,
+			Batch:                 result,
+		}}, true
 	}
 
 	// Don't merge other types of messages
