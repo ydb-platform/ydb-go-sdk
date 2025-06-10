@@ -193,7 +193,7 @@ func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 	confirmReady := make(empty.Chan)
 
 	var stoppedErr error
-	onStopped := func(sessionID int64, err error) {
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
 		stoppedErr = err
 	}
 
@@ -264,7 +264,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 		confirmReady := make(empty.Chan)
 
 		var stoppedErr error
-		onStopped := func(sessionID int64, err error) {
+		onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
 			stoppedErr = err
 		}
 
@@ -326,7 +326,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 		processingDone := make(empty.Chan)
 
 		var stoppedErr error
-		onStopped := func(sessionID int64, err error) {
+		onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
 			stoppedErr = err
 		}
 
@@ -385,7 +385,7 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 	processingDone := make(empty.Chan)
 
 	var stoppedErr error
-	onStopped := func(sessionID int64, err error) {
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
 		stoppedErr = err
 	}
 
@@ -448,8 +448,8 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
 	errorReceived := make(empty.Chan, 1)
-	onStopped := func(sessionID int64, err error) {
-		stoppedSessionID.Store(sessionID)
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
+		stoppedSessionID.Store(sessionID.ToInt64())
 		stoppedErr.Store(&err)
 		// Signal that error was received
 		select {
@@ -506,8 +506,8 @@ func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
 	errorReceived := make(empty.Chan, 1)
-	onStopped := func(sessionID int64, err error) {
-		stoppedSessionID.Store(sessionID)
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
+		stoppedSessionID.Store(sessionID.ToInt64())
 		stoppedErr.Store(&err)
 		// Signal that error was received
 		select {
@@ -547,8 +547,8 @@ func TestPartitionWorkerImpl_ContextCancellation(t *testing.T) {
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
 	errorReceived := make(empty.Chan, 1)
-	onStopped := func(sessionID int64, err error) {
-		stoppedSessionID.Store(sessionID)
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
+		stoppedSessionID.Store(sessionID.ToInt64())
 		stoppedErr.Store(&err)
 		// Signal that error was received
 		select {
@@ -588,8 +588,8 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
 	errorReceived := make(empty.Chan, 1)
-	onStopped := func(sessionID int64, err error) {
-		stoppedSessionID.Store(sessionID)
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
+		stoppedSessionID.Store(sessionID.ToInt64())
 		stoppedErr.Store(&err)
 		// Signal that error was received
 		select {
@@ -637,7 +637,7 @@ func TestPartitionWorkerImpl_MessageTypeHandling(t *testing.T) {
 	mockHandler := NewMockEventHandler(ctrl)
 
 	var stoppedErr error
-	onStopped := func(sessionID int64, err error) {
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
 		stoppedErr = err
 	}
 

@@ -52,7 +52,7 @@ type streamListener struct {
 	tracer  *trace.Topic
 
 	m              xsync.Mutex
-	workers        map[int64]*PartitionWorker
+	workers        map[rawtopicreader.PartitionSessionID]*PartitionWorker
 	messagesToSend []rawtopicreader.ClientMessage
 }
 
@@ -127,8 +127,6 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 		for _, worker := range l.workers {
 			workers = append(workers, worker)
 		}
-		// Clear workers map
-		l.workers = make(map[int64]*PartitionWorker)
 	})
 
 	// Close workers without holding the mutex
@@ -169,9 +167,9 @@ func (l *streamListener) goClose(ctx context.Context, reason error) {
 	l.streamClose(reason)
 	go func() {
 		_ = l.background.Close(ctx, reason)
+		cancel()
 	}()
 
-	cancel()
 }
 
 func (l *streamListener) startBackground() {
@@ -184,7 +182,7 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.hasNewMessagesToSend = make(empty.Chan, 1)
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
-	l.workers = make(map[int64]*PartitionWorker)
+	l.workers = make(map[rawtopicreader.PartitionSessionID]*PartitionWorker)
 	if l.cfg == nil {
 		l.cfg = &StreamListenerConfig{}
 	}
@@ -296,7 +294,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		logCtx := ctx
 		if err != nil {
-			trace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "error", 0, err)
+			trace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
 			trace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, xerrors.WithStackTrace(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
@@ -396,7 +394,7 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 
 		var worker *PartitionWorker
 		l.m.WithLock(func() {
-			worker = l.workers[commit.PartitionSessionID.ToInt64()]
+			worker = l.workers[commit.PartitionSessionID]
 		})
 
 		if worker == nil {
@@ -504,7 +502,7 @@ func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 }
 
 // onWorkerStopped handles worker stopped notifications
-func (l *streamListener) onWorkerStopped(sessionID int64, err error) {
+func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessionID, err error) {
 	// Remove worker from workers map
 	l.m.WithLock(func() {
 		delete(l.workers, sessionID)
@@ -512,7 +510,7 @@ func (l *streamListener) onWorkerStopped(sessionID int64, err error) {
 
 	// Remove corresponding session
 	for _, session := range l.sessions.GetAll() {
-		if session.ClientPartitionSessionID == sessionID {
+		if session.StreamPartitionSessionID == sessionID {
 			_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
 
 			break
@@ -533,7 +531,7 @@ func (l *streamListener) onWorkerStopped(sessionID int64, err error) {
 // createWorkerForPartition creates a new PartitionWorker for the given session
 func (l *streamListener) createWorkerForPartition(session *topicreadercommon.PartitionSession) *PartitionWorker {
 	worker := NewPartitionWorker(
-		session.ClientPartitionSessionID,
+		session.StreamPartitionSessionID,
 		session,
 		l, // streamListener implements MessageSender and CommitHandler
 		l.handler,
@@ -544,7 +542,7 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 
 	// Store worker in map
 	l.m.WithLock(func() {
-		l.workers[session.ClientPartitionSessionID] = worker
+		l.workers[session.StreamPartitionSessionID] = worker
 	})
 
 	// Start worker
@@ -561,7 +559,7 @@ func (l *streamListener) routeToWorker(
 	// Find worker by session
 	var targetWorker *PartitionWorker
 	l.m.WithLock(func() {
-		targetWorker = l.workers[partitionSessionID.ToInt64()]
+		targetWorker = l.workers[partitionSessionID]
 	})
 
 	if targetWorker != nil {

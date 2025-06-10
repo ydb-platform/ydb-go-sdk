@@ -36,11 +36,11 @@ type batchMessage struct {
 }
 
 // WorkerStoppedCallback notifies when worker is stopped
-type WorkerStoppedCallback func(sessionID int64, err error)
+type WorkerStoppedCallback func(sessionID rawtopicreader.PartitionSessionID, err error)
 
 // PartitionWorker processes messages for a single partition
 type PartitionWorker struct {
-	partitionSessionID int64
+	partitionSessionID rawtopicreader.PartitionSessionID
 	partitionSession   *topicreadercommon.PartitionSession
 	messageSender      MessageSender
 	userHandler        EventHandler
@@ -56,7 +56,7 @@ type PartitionWorker struct {
 
 // NewPartitionWorker creates a new PartitionWorker instance
 func NewPartitionWorker(
-	sessionID int64,
+	sessionID rawtopicreader.PartitionSessionID,
 	session *topicreadercommon.PartitionSession,
 	messageSender MessageSender,
 	userHandler EventHandler,
