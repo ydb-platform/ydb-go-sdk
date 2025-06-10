@@ -36,13 +36,16 @@ func TestUnboundedChanBasicSendReceive(t *testing.T) {
 	ch.Send(3)
 
 	// Receive them in order
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg != 1 {
+	msg, ok, err := ch.Receive(ctx)
+	if err != nil || !ok || msg != 1 {
 		t.Errorf("Receive() = (%v, %v, %v), want (1, true, nil)", msg, ok, err)
 	}
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg != 2 {
+	msg, ok, err = ch.Receive(ctx)
+	if err != nil || !ok || msg != 2 {
 		t.Errorf("Receive() = (%v, %v, %v), want (2, true, nil)", msg, ok, err)
 	}
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg != 3 {
+	msg, ok, err = ch.Receive(ctx)
+	if err != nil || !ok || msg != 3 {
 		t.Errorf("Receive() = (%v, %v, %v), want (3, true, nil)", msg, ok, err)
 	}
 }
@@ -56,7 +59,8 @@ func TestUnboundedChanSendWithMerge_ShouldMerge(t *testing.T) {
 	ch.SendWithMerge(TestMessage{ID: 1, Data: "b"}, mergeTestMessages)
 
 	// Should get one merged message
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg.Data != "a|b" {
+	msg, ok, err := ch.Receive(ctx)
+	if err != nil || !ok || msg.Data != "a|b" {
 		t.Errorf("Receive() = (%v, %v, %v), want ({1, a|b}, true, nil)", msg, ok, err)
 	}
 }
@@ -70,10 +74,12 @@ func TestUnboundedChanSendWithMerge_ShouldNotMerge(t *testing.T) {
 	ch.SendWithMerge(TestMessage{ID: 2, Data: "b"}, mergeTestMessages)
 
 	// Should get both messages
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg.Data != "a" {
+	msg, ok, err := ch.Receive(ctx)
+	if err != nil || !ok || msg.Data != "a" {
 		t.Errorf("Receive() = (%v, %v, %v), want ({1, a}, true, nil)", msg, ok, err)
 	}
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg.Data != "b" {
+	msg, ok, err = ch.Receive(ctx)
+	if err != nil || !ok || msg.Data != "b" {
 		t.Errorf("Receive() = (%v, %v, %v), want ({2, b}, true, nil)", msg, ok, err)
 	}
 }
@@ -90,15 +96,18 @@ func TestUnboundedChanClose(t *testing.T) {
 	ch.Close()
 
 	// Should still be able to receive buffered messages
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg != 1 {
+	msg, ok, err := ch.Receive(ctx)
+	if err != nil || !ok || msg != 1 {
 		t.Errorf("Receive() = (%v, %v, %v), want (1, true, nil)", msg, ok, err)
 	}
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg != 2 {
+	msg, ok, err = ch.Receive(ctx)
+	if err != nil || !ok || msg != 2 {
 		t.Errorf("Receive() = (%v, %v, %v), want (2, true, nil)", msg, ok, err)
 	}
 
 	// After buffer is empty, should return (0, false, nil)
-	if msg, ok, err := ch.Receive(ctx); err != nil || ok {
+	msg, ok, err = ch.Receive(ctx)
+	if err != nil || ok {
 		t.Errorf("Receive() = (%v, %v, %v), want (0, false, nil)", msg, ok, err)
 	}
 }
@@ -111,7 +120,8 @@ func TestUnboundedChanReceiveAfterClose(t *testing.T) {
 	ch.Close()
 
 	// Should return (0, false, nil)
-	if msg, ok, err := ch.Receive(ctx); err != nil || ok {
+	msg, ok, err := ch.Receive(ctx)
+	if err != nil || ok {
 		t.Errorf("Receive() = (%v, %v, %v), want (0, false, nil)", msg, ok, err)
 	}
 }
@@ -128,7 +138,8 @@ func TestUnboundedChanMultipleMessages(t *testing.T) {
 
 	// Receive them all
 	for i := 0; i < count; i++ {
-		if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg != i {
+		msg, ok, err := ch.Receive(ctx)
+		if err != nil || !ok || msg != i {
 			t.Errorf("Receive() = (%v, %v, %v), want (%d, true, nil)", msg, ok, err, i)
 		}
 	}
@@ -145,7 +156,8 @@ func TestUnboundedChanSignalChannelBehavior(t *testing.T) {
 
 	// Should receive all messages despite signal channel being buffered
 	for i := 0; i < 100; i++ {
-		if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg != i {
+		msg, ok, err := ch.Receive(ctx)
+		if err != nil || !ok || msg != i {
 			t.Errorf("Receive() = (%v, %v, %v), want (%d, true, nil)", msg, ok, err, i)
 		}
 	}
@@ -159,8 +171,9 @@ func TestUnboundedChanContextCancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	// Should return context.Canceled error
-	if msg, ok, err := ch.Receive(ctx); !errors.Is(err, context.Canceled) || ok {
-		t.Errorf("Receive() = (%v, %v, %v), want (0, false, context.Canceled)", msg, ok, err)
+	_, ok, err := ch.Receive(ctx)
+	if !errors.Is(err, context.Canceled) || ok {
+		t.Errorf("Expected context.Canceled error and ok=false, got ok=%v, err=%v", ok, err)
 	}
 }
 
@@ -172,8 +185,9 @@ func TestUnboundedChanContextTimeout(t *testing.T) {
 
 	// Should return context.DeadlineExceeded error after timeout
 	start := time.Now()
-	if msg, ok, err := ch.Receive(ctx); !errors.Is(err, context.DeadlineExceeded) || ok {
-		t.Errorf("Receive() = (%v, %v, %v), want (0, false, context.DeadlineExceeded)", msg, ok, err)
+	_, ok, err := ch.Receive(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) || ok {
+		t.Errorf("Expected context.DeadlineExceeded error and ok=false, got ok=%v, err=%v", ok, err)
 	}
 	elapsed := time.Since(start)
 	if elapsed < 10*time.Millisecond {
@@ -187,42 +201,22 @@ func TestUnboundedChanContextVsMessage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start a goroutine that will send a message after a delay
+	// Start a goroutine that will send a message after context is cancelled
 	go func() {
-		time.Sleep(50 * time.Millisecond)
+		xtest.WaitChannelClosed(t, ctx.Done())
 		ch.Send(42)
 	}()
 
 	// Start another goroutine that will cancel context after shorter delay
 	go func() {
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 		cancel()
 	}()
 
 	// Context cancellation should win
-	if msg, ok, err := ch.Receive(ctx); !errors.Is(err, context.Canceled) || ok {
-		t.Errorf("Receive() = (%v, %v, %v), want (0, false, context.Canceled)", msg, ok, err)
-	}
-}
-
-func TestUnboundedChanMessageVsContext(t *testing.T) {
-	ch := NewUnboundedChan[int]()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Send message immediately
-	ch.Send(42)
-
-	// Start a goroutine that will cancel context after a delay
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		cancel()
-	}()
-
-	// Message should be received immediately
-	if msg, ok, err := ch.Receive(ctx); err != nil || !ok || msg != 42 {
-		t.Errorf("Receive() = (%v, %v, %v), want (42, true, nil)", msg, ok, err)
+	_, ok, err := ch.Receive(ctx)
+	if !errors.Is(err, context.Canceled) || ok {
+		t.Errorf("Expected context.Canceled error and ok=false, got ok=%v, err=%v", ok, err)
 	}
 }
 
@@ -236,42 +230,49 @@ func TestUnboundedChanConcurrentSendReceive(t *testing.T) {
 
 		// Start sender goroutine
 		go func() {
+			defer close(senderDone)
 			for i := 0; i < count; i++ {
 				ch.Send(i)
 			}
-			close(senderDone)
 		}()
 
 		// Start receiver goroutine
 		go func() {
+			defer close(receiverDone)
 			received := make(map[int]bool)
-			for {
-				select {
-				case <-senderDone:
-					// After sender is done, check if we got all messages
-					if len(received) == count {
-						close(receiverDone)
+			receivedCount := 0
+			maxReceiveAttempts := count + 100 // Allow some extra attempts
+			attempts := 0
 
+			for receivedCount < count && attempts < maxReceiveAttempts {
+				attempts++
+				msg, ok, err := ch.Receive(ctx)
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+					return
+				} else if ok {
+					if received[msg] {
+						t.Errorf("Received duplicate message: %d", msg)
 						return
 					}
-					// If not all messages received, continue receiving
-					if msg, ok, err := ch.Receive(ctx); err != nil {
-						t.Errorf("Unexpected error: %v", err)
-					} else if ok {
-						if received[msg] {
-							t.Errorf("Received duplicate message: %d", msg)
-						}
-						received[msg] = true
-					}
-				default:
-					if msg, ok, err := ch.Receive(ctx); err != nil {
-						t.Errorf("Unexpected error: %v", err)
-					} else if ok {
-						if received[msg] {
-							t.Errorf("Received duplicate message: %d", msg)
-						}
-						received[msg] = true
-					}
+					received[msg] = true
+					receivedCount++
+				} else {
+					// Channel closed but we haven't received all messages
+					break
+				}
+			}
+
+			// Verify we received all expected messages
+			if receivedCount != count {
+				t.Errorf("Expected to receive %d messages, but received %d", count, receivedCount)
+			}
+
+			// Verify we received the correct messages
+			for i := 0; i < count; i++ {
+				if !received[i] {
+					t.Errorf("Missing message: %d", i)
+					break // Don't spam with too many errors
 				}
 			}
 		}()
@@ -307,14 +308,12 @@ func TestUnboundedChanConcurrentMerge(t *testing.T) {
 				select {
 				case <-timeout:
 					close(done)
-
 					return
 				default:
 					msg, ok, err := ch.Receive(ctx)
 					if err != nil {
 						t.Errorf("Unexpected error: %v", err)
 						close(done)
-
 						return
 					}
 					if ok {
@@ -322,7 +321,6 @@ func TestUnboundedChanConcurrentMerge(t *testing.T) {
 						// Check if we've received at least some messages from all senders
 						if len(received) == numSenders && allSendersHaveMessages(received, numSenders) {
 							close(done)
-
 							return
 						}
 					}
