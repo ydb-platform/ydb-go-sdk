@@ -162,6 +162,13 @@ func WithIgnoreTruncated() Option {
 	}
 }
 
+// WithMaxRequestMessageSize sets the maximum size of request message in bytes.
+func WithMaxRequestMessageSize(maxMessageSize int) Option {
+	return func(c *Config) {
+		c.maxRequestMessageSize = maxMessageSize
+	}
+}
+
 // ExecuteDataQueryOverQueryService overrides Execute handle with query service execute with materialized result
 func ExecuteDataQueryOverQueryService(b bool) Option {
 	return func(c *Config) {
@@ -201,6 +208,8 @@ type Config struct {
 	ignoreTruncated                  bool
 	useQuerySession                  bool
 	executeDataQueryOverQueryService bool
+
+	maxRequestMessageSize int
 
 	trace *trace.Table
 
@@ -302,6 +311,13 @@ func (c *Config) CreateSessionTimeout() time.Duration {
 // If DeleteTimeout is less than or equal to zero then the DefaultSessionPoolDeleteTimeout is used.
 func (c *Config) DeleteTimeout() time.Duration {
 	return c.deleteTimeout
+}
+
+// MaxRequestMessageSize returns the maximum size in bytes for a single request message.
+//
+// If the value is exceeded, the request will be split into several parts.
+func (c *Config) MaxRequestMessageSize() int {
+	return c.maxRequestMessageSize
 }
 
 func defaults() *Config {

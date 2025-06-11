@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestTableBulkUpsertSession(t *testing.T) {
@@ -72,6 +74,43 @@ func TestTableBulkUpsert(t *testing.T) {
 	for i := int64(0); i < 10; i++ {
 		val := fmt.Sprintf("value for %v", i)
 		assertIdValue(scope.Ctx, t, tablePath, i, val)
+	}
+}
+
+func TestTableBulkUpsertGrpcMaxMessageSize(t *testing.T) {
+	const MB = 1024 * 1024
+
+	var (
+		scope     = newScope(t)
+		driver    = scope.Driver(ydb.WithGrpcMaxMessageSize(10 * MB))
+		tablePath = scope.TablePath()
+	)
+
+	s := strings.Repeat("a", 5*MB)
+
+	var rows []types.Value
+	for i := int64(0); i < 10; i++ { // => 50MB the whole request
+		rows = append(rows, types.StructValue(
+			types.StructFieldValue("id", types.Int64Value(i)),
+			types.StructFieldValue("val", types.TextValue(s)),
+		))
+	}
+
+	attemptsTraceChecker := trace.Table{
+		OnBulkUpsert: func(_ trace.TableBulkUpsertStartInfo) func(trace.TableBulkUpsertDoneInfo) {
+			return func(info trace.TableBulkUpsertDoneInfo) {
+				scope.Require.Equal(1, info.Attempts, "expected 1 attempt for successful request")
+			}
+		},
+	}
+
+	err := driver.Table().BulkUpsert(scope.Ctx, tablePath, table.BulkUpsertDataRows(
+		types.ListValue(rows...),
+	), table.WithTrace(attemptsTraceChecker))
+	scope.Require.NoError(err)
+
+	for i := int64(0); i < 10; i++ {
+		assertIdValue(scope.Ctx, t, tablePath, i, s)
 	}
 }
 

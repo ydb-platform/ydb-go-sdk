@@ -1,3 +1,5 @@
+* Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
+
 ## v3.110.0
 * Added read partitions in parallel for topic listener.
 

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -19,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -78,6 +81,54 @@ func TestRaceWgClosed(t *testing.T) {
 		_ = p.Close(context.Background())
 		wg.Wait()
 	}, xtest.StopAfter(27*time.Second))
+}
+
+func TestChunkBulkUpsertRequest(t *testing.T) {
+	t.Run("empty request", func(t *testing.T) {
+		input := newTestBulkRequest(t, 0)
+		got, err := chunkBulkUpsertRequest(nil, input, 100)
+		require.NoError(t, err)
+		assert.Len(t, got, 1)
+		assert.Equal(t, input, got[0])
+	})
+
+	t.Run("one chunk greater than maxSize", func(t *testing.T) {
+		input := newTestBulkRequest(t, 1)
+		_, err := chunkBulkUpsertRequest(nil, input, 10)
+		assert.Error(t, err)
+	})
+
+	t.Run("one request", func(t *testing.T) {
+		input := newTestBulkRequest(t, 50)
+		got, err := chunkBulkUpsertRequest(nil, input, 100)
+		require.NoError(t, err)
+		assert.Len(t, got, 2)
+		assert.Less(t, proto.Size(got[0]), 100)
+		assert.Less(t, proto.Size(got[1]), 100)
+	})
+
+	t.Run("zero max size", func(t *testing.T) {
+		input := newTestBulkRequest(t, 50)
+		_, err := chunkBulkUpsertRequest(nil, input, 0)
+		assert.Error(t, err)
+	})
+}
+
+func newTestBulkRequest(t *testing.T, itemsLen int) *Ydb_Table.BulkUpsertRequest {
+	t.Helper()
+
+	rows := make([]types.Value, itemsLen)
+
+	for i := range itemsLen {
+		rows[i] = types.StructValue()
+	}
+
+	req, err := table.BulkUpsertDataRows(
+		types.ListValue(rows...),
+	).ToYDB("testTable")
+	require.NoError(t, err)
+
+	return req
 }
 
 var okHandler = func(interface{}) (proto.Message, error) {
