@@ -62,6 +62,10 @@ const (
 	TopicReaderMessageEvents
 	TopicReaderPartitionEvents
 
+	TopicListenerStreamEvents
+	TopicListenerWorkerEvents
+	TopicListenerPartitionEvents
+
 	TopicWriterStreamLifeCycleEvents
 	TopicWriterStreamEvents
 	TopicWriterStreamGrpcMessageEvents
@@ -117,10 +121,12 @@ const (
 		TopicReaderPartitionEvents |
 		TopicReaderStreamLifeCycleEvents
 
+	TopicListenerEvents = TopicListenerStreamEvents | TopicListenerWorkerEvents | TopicListenerPartitionEvents
+
 	TopicWriterEvents = TopicWriterStreamLifeCycleEvents | TopicWriterStreamEvents |
 		TopicWriterStreamGrpcMessageEvents
 
-	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents | TopicWriterEvents
+	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents | TopicListenerEvents | TopicWriterEvents
 
 	DatabaseSQLEvents = DatabaseSQLConnectorEvents |
 		DatabaseSQLConnEvents |
@@ -180,9 +186,14 @@ var (
 		TopicReaderMessageEvents:           "ydb.topic.reader.message",
 		TopicReaderPartitionEvents:         "ydb.topic.reader.partition",
 		TopicReaderStreamLifeCycleEvents:   "ydb.topic.reader.lifecycle",
+		TopicListenerEvents:                "ydb.topic.listener",
 		TopicWriterStreamLifeCycleEvents:   "ydb.topic.writer.lifecycle",
 		TopicWriterStreamEvents:            "ydb.topic.writer.stream",
 		TopicWriterStreamGrpcMessageEvents: "ydb.topic.writer.grpc",
+
+		TopicListenerStreamEvents:    "ydb.topic.listener.stream",
+		TopicListenerWorkerEvents:    "ydb.topic.listener.worker",
+		TopicListenerPartitionEvents: "ydb.topic.listener.partition",
 	}
 	defaultDetails = DetailsAll
 )
