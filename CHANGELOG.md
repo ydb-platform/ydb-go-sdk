@@ -1,3 +1,5 @@
+NOOP (check slo tests in ci)
+
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
 
 ## v3.110.0
