@@ -460,7 +460,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "update")
+			ctx := with(*info.Context, INFO, "ydb", "driver", "balancer", "update")
 			l.Log(ctx, "driver balancer update starting...",
 				kv.Bool("needLocalDC", info.NeedLocalDC),
 				kv.String("database", info.Database),

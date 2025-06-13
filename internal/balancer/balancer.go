@@ -175,23 +175,24 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	return nil
 }
 
-func buildConnectionsState(ctx context.Context, pool interface {
-	GetIfPresent(endpoint endpoint.Endpoint) conn.Conn
-	Allow(ctx context.Context, cc conn.Conn)
-	EndpointsToConnections(endpoints []endpoint.Endpoint) []conn.Conn
-}, newest []endpoint.Endpoint,
+func buildConnectionsState(ctx context.Context,
+	pool interface {
+		GetIfPresent(endpoint endpoint.Endpoint) conn.Conn
+		Allow(ctx context.Context, cc conn.Conn)
+		EndpointsToConnections(endpoints []endpoint.Endpoint) []conn.Conn
+	},
+	newest []endpoint.Endpoint,
 	dropped []endpoint.Endpoint,
-	config balancerConfig.Config,
+	balancerConfig *balancerConfig.Config,
 	selfLocation balancerConfig.Info,
 ) *connectionsState {
 	connections := pool.EndpointsToConnections(newest)
 	for _, c := range connections {
 		pool.Allow(ctx, c)
 		c.Endpoint().Touch()
-		_ = c.Ping(ctx)
 	}
 
-	state := newConnectionsState(connections, config.Filter, selfLocation, config.AllowFallback)
+	state := newConnectionsState(connections, balancerConfig.Filter, selfLocation, balancerConfig.AllowFallback)
 
 	for _, e := range dropped {
 		c := pool.GetIfPresent(e)
@@ -229,7 +230,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 	}()
 
 	info := balancerConfig.Info{SelfLocation: localDC}
-	b.connectionsState.Store(buildConnectionsState(ctx, b.pool, newest, dropped, b.balancerConfig, info))
+	b.connectionsState.Store(buildConnectionsState(ctx, b.pool, newest, dropped, &b.balancerConfig, info))
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {

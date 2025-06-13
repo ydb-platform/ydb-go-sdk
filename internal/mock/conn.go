@@ -18,7 +18,7 @@ type Conn struct {
 	NodeIDField   uint32
 	State         conn.State
 	LocalDCField  bool
-	Pinged        atomic.Bool
+	Allowed       atomic.Bool
 	Closed        atomic.Bool
 }
 
@@ -64,7 +64,6 @@ func (c *Conn) Close(ctx context.Context) error {
 }
 
 func (c *Conn) Ping(ctx context.Context) error {
-	c.Pinged.Store(true)
 	if c.PingErr == nil {
 		c.SetState(ctx, conn.Online)
 	}
@@ -97,6 +96,7 @@ type Endpoint struct {
 	LocationField string
 	NodeIDField   uint32
 	LocalDCField  bool
+	Touched       uint32
 }
 
 func (e *Endpoint) Choose(bool) {
@@ -145,4 +145,5 @@ func (e *Endpoint) Copy() endpoint.Endpoint {
 }
 
 func (e *Endpoint) Touch(opts ...endpoint.Option) {
+	e.Touched++
 }
