@@ -27,7 +27,11 @@ func (fp *fakePool) EndpointsToConnections(eps []endpoint.Endpoint) []conn.Conn 
 	return conns
 }
 
-func (fp *fakePool) Allow(_ context.Context, _ conn.Conn) {}
+func (fp *fakePool) Allow(_ context.Context, c conn.Conn) {
+	if c, ok := fp.connections[c.Endpoint().Address()]; ok {
+		c.Allowed.Store(true)
+	}
+}
 
 func (fp *fakePool) GetIfPresent(ep endpoint.Endpoint) conn.Conn {
 	if c, ok := fp.connections[ep.Address()]; ok {
@@ -41,40 +45,18 @@ func TestBuildConnectionsState(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name         string
-		newEndpoints []endpoint.Endpoint
-		oldEndpoints []endpoint.Endpoint
-		initialConns map[string]*mock.Conn
-		conf         balancerConfig.Config
-		selfLoc      balancerConfig.Info
-		expectPinged []string
-		expectClosed []string
+		name          string
+		newEndpoints  []endpoint.Endpoint
+		oldEndpoints  []endpoint.Endpoint
+		initialConns  map[string]*mock.Conn
+		conf          balancerConfig.Config
+		selfLoc       balancerConfig.Info
+		expectAllowed []string
+		expectClosed  []string
 	}{
 		{
-			name:         "single new and old endpoint",
-			newEndpoints: []endpoint.Endpoint{&mock.Endpoint{AddrField: "127.0.0.1"}},
-			oldEndpoints: []endpoint.Endpoint{&mock.Endpoint{AddrField: "127.0.0.2"}},
-			initialConns: map[string]*mock.Conn{
-				"127.0.0.1": {
-					AddrField: "127.0.0.1",
-					State:     conn.Online,
-				},
-				"127.0.0.2": {
-					AddrField: "127.0.0.2",
-					State:     conn.Offline,
-				},
-			},
-			conf: balancerConfig.Config{
-				AllowFallback:   true,
-				DetectNearestDC: true,
-			},
-			selfLoc:      balancerConfig.Info{SelfLocation: "local"},
-			expectPinged: []string{"127.0.0.1"},
-			expectClosed: []string{"127.0.0.2"},
-		},
-		{
 			newEndpoints: []endpoint.Endpoint{&mock.Endpoint{AddrField: "a1"}, &mock.Endpoint{AddrField: "a2"}},
-			oldEndpoints: []endpoint.Endpoint{&mock.Endpoint{AddrField: "a3"}},
+			oldEndpoints: []endpoint.Endpoint{&mock.Endpoint{AddrField: "a3"}, &mock.Endpoint{AddrField: "a4"}},
 			initialConns: map[string]*mock.Conn{
 				"a1": {
 					AddrField:     "a1",
@@ -84,9 +66,14 @@ func TestBuildConnectionsState(t *testing.T) {
 				"a2": {
 					AddrField: "a2",
 					State:     conn.Offline,
+					PingErr:   ErrNoEndpoints,
 				},
 				"a3": {
 					AddrField: "a3",
+					State:     conn.Online,
+				},
+				"a4": {
+					AddrField: "a4",
 					State:     conn.Online,
 				},
 			},
@@ -94,9 +81,9 @@ func TestBuildConnectionsState(t *testing.T) {
 				AllowFallback:   true,
 				DetectNearestDC: true,
 			},
-			selfLoc:      balancerConfig.Info{SelfLocation: "local"},
-			expectPinged: []string{"a1", "a2"},
-			expectClosed: []string{"a3"},
+			selfLoc:       balancerConfig.Info{SelfLocation: "local"},
+			expectAllowed: []string{"a1", "a2"},
+			expectClosed:  []string{"a3", "a4"},
 		},
 	}
 
@@ -107,12 +94,11 @@ func TestBuildConnectionsState(t *testing.T) {
 				fp.connections[addr] = c
 			}
 
-			state := buildConnectionsState(ctx, fp, tt.newEndpoints, tt.oldEndpoints, tt.conf, tt.selfLoc)
+			state := buildConnectionsState(ctx, fp, tt.newEndpoints, tt.oldEndpoints, &tt.conf, tt.selfLoc)
 			assert.NotNil(t, state)
-			for _, addr := range tt.expectPinged {
+			for _, addr := range tt.expectAllowed {
 				c := fp.connections[addr]
-				assert.True(t, c.Pinged.Load(), "connection %s should be pinged", addr)
-				assert.True(t, c.State == conn.Online || c.PingErr != nil)
+				assert.True(t, c.Allowed.Load(), "connection %s should be allowed", addr)
 			}
 			for _, addr := range tt.expectClosed {
 				c := fp.connections[addr]

@@ -511,6 +511,25 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
+		h1 := t.OnConnDiscover
+		h2 := x.OnConnDiscover
+		ret.OnConnDiscover = func(d DriverConnDiscoverInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(d)
+			}
+			if h2 != nil {
+				h2(d)
+			}
+		}
+	}
+	{
 		h1 := t.OnConnBan
 		h2 := x.OnConnBan
 		ret.OnConnBan = func(d DriverConnBanStartInfo) func(DriverConnBanDoneInfo) {
@@ -1099,6 +1118,13 @@ func (t *Driver) onConnDial(d DriverConnDialStartInfo) func(DriverConnDialDoneIn
 	}
 	return res
 }
+func (t *Driver) onConnDiscover(d DriverConnDiscoverInfo) {
+	fn := t.OnConnDiscover
+	if fn == nil {
+		return
+	}
+	fn(d)
+}
 func (t *Driver) onConnBan(d DriverConnBanStartInfo) func(DriverConnBanDoneInfo) {
 	fn := t.OnConnBan
 	if fn == nil {
@@ -1445,6 +1471,14 @@ func DriverOnConnDial(t *Driver, c *context.Context, call call, endpoint Endpoin
 		p.Error = e
 		res(p)
 	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DriverOnConnDiscover(t *Driver, c *context.Context, call call, endpoint EndpointInfo) {
+	var p DriverConnDiscoverInfo
+	p.Context = c
+	p.Call = call
+	p.Endpoint = endpoint
+	t.onConnDiscover(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnBan(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
