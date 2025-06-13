@@ -175,6 +175,35 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	return nil
 }
 
+func buildConnectionsState(ctx context.Context,
+	pool interface {
+		GetIfPresent(endpoint endpoint.Endpoint) conn.Conn
+		Allow(ctx context.Context, cc conn.Conn)
+		EndpointsToConnections(endpoints []endpoint.Endpoint) []conn.Conn
+	},
+	newest []endpoint.Endpoint,
+	dropped []endpoint.Endpoint,
+	balancerConfig *balancerConfig.Config,
+	selfLocation balancerConfig.Info,
+) *connectionsState {
+	connections := pool.EndpointsToConnections(newest)
+	for _, c := range connections {
+		pool.Allow(ctx, c)
+		c.Endpoint().Touch()
+	}
+
+	state := newConnectionsState(connections, balancerConfig.Filter, selfLocation, balancerConfig.AllowFallback)
+
+	for _, e := range dropped {
+		c := pool.GetIfPresent(e)
+		if c != nil {
+			_ = c.Close(ctx)
+		}
+	}
+
+	return state
+}
+
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoint.Endpoint, localDC string) {
 	var (
 		onDone = trace.DriverOnBalancerUpdate(
@@ -186,10 +215,12 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 		previous = b.connections().All()
 	)
+
+	_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
+		return strings.Compare(lhs.Address(), rhs.Address())
+	})
+
 	defer func() {
-		_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
-			return strings.Compare(lhs.Address(), rhs.Address())
-		})
 		onDone(
 			xslices.Transform(newest, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
 			xslices.Transform(added, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
@@ -198,21 +229,15 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 	}()
 
-	connections := endpointsToConnections(b.pool, newest)
-	for _, c := range connections {
-		b.pool.Allow(ctx, c)
-		c.Endpoint().Touch()
-	}
-
 	info := balancerConfig.Info{SelfLocation: localDC}
-	state := newConnectionsState(connections, b.balancerConfig.Filter, info, b.balancerConfig.AllowFallback)
-
-	endpointsInfo := make([]endpoint.Info, len(newest))
-	for i, e := range newest {
-		endpointsInfo[i] = e
+	b.connectionsState.Store(buildConnectionsState(ctx, b.pool, newest, dropped, &b.balancerConfig, info))
+	for _, e := range added {
+		trace.DriverOnConnDiscover(
+			b.driverConfig.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial"),
+			e,
+		)
 	}
-
-	b.connectionsState.Store(state)
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -443,13 +468,4 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	}
 
 	return c, nil
-}
-
-func endpointsToConnections(p *conn.Pool, endpoints []endpoint.Endpoint) []conn.Conn {
-	conns := make([]conn.Conn, 0, len(endpoints))
-	for _, e := range endpoints {
-		conns = append(conns, p.Get(e))
-	}
-
-	return conns
 }

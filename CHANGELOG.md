@@ -1,3 +1,5 @@
+* Fixed `ydb_go_sdk_ydb_driver_conns` metric to correctly display nodes that are discovered at the moment
+
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
 
 ## v3.110.0

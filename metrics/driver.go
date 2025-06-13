@@ -139,19 +139,15 @@ func driver(config Config) (t trace.Driver) {
 			}
 		}
 	}
-	t.OnConnDial = func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+	t.OnConnDiscover = func(info trace.DriverConnDiscoverInfo) {
 		endpoint := info.Endpoint.Address()
 		nodeID := info.Endpoint.NodeID()
 
-		return func(info trace.DriverConnDialDoneInfo) {
-			if config.Details()&trace.DriverConnEvents != 0 {
-				if info.Error == nil {
-					conns.With(map[string]string{
-						"endpoint": endpoint,
-						"node_id":  idToString(nodeID),
-					}).Add(1)
-				}
-			}
+		if config.Details()&trace.DriverConnEvents != 0 {
+			conns.With(map[string]string{
+				"endpoint": endpoint,
+				"node_id":  idToString(nodeID),
+			}).Add(1)
 		}
 	}
 	t.OnConnClose = func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
