@@ -110,6 +110,82 @@ if err = row.Scan(&id, &myStr); err != nil {
 log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 ```
 
+* usage with [Apache Arrow](https://github.com/apache/arrow-go):
+
+```go
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+
+	sql := `SELECT 42 as id, "my string" as myStr;
+	SELECT 24 as id, "WOW" as myStr, "UHH" as secondStr;`
+
+	r, err := db.Query().QueryArrow(ctx, sql, query.WithIdempotent())
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		part, err := r.NextPart(ctx)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			panic(err)
+		}
+
+		fmt.Println("ResultSet[idx=", part.GetResultSetIndex(), "]")
+
+		rdr, err := ipc.NewReader(io.MultiReader(part.Schema(), part.Data()))
+		if err != nil {
+			panic(err)
+		}
+
+		schm := rdr.Schema()
+
+		fmt.Println(schm)
+
+		for rdr.Next() {
+			out := rdr.Record()
+			fmt.Println(out)
+		}
+	}
+
+	// Output:
+	// ResultSet[idx= 0 ]
+	// schema:
+	//   fields: 2
+	//     - id: type=int32
+	//     - myStr: type=binary
+	// record:
+	//   schema:
+	//   fields: 2
+	//     - id: type=int32
+	//     - myStr: type=binary
+	//   rows: 1
+	//   col[0][id]: [42]
+	//   col[1][myStr]: ["my string"]
+	//
+	// ResultSet[idx= 1 ]
+	// schema:
+	//	fields: 3
+	//	  - id: type=int32
+	//	  - myStr: type=binary
+	//	  - secondStr: type=binary
+	// record:
+	//	schema:
+	//	fields: 3
+	//	  - id: type=int32
+	//	  - myStr: type=binary
+	//	  - secondStr: type=binary
+	//	rows: 1
+	//	col[0][id]: [24]
+	//	col[1][myStr]: ["WOW"]
+	//	col[2][secondStr]: ["UHH"]
+```
 
 More examples of usage placed in [examples](./examples) directory.
 

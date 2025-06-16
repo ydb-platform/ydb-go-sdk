@@ -101,6 +101,8 @@ type (
 		FetchScriptResults(
 			ctx context.Context, opID string, opts ...options.FetchScriptOption,
 		) (*options.FetchScriptResult, error)
+
+		QueryArrow(ctx context.Context, sql string, opts ...ExecuteOption) (ArrowResult, error)
 	}
 )
 
