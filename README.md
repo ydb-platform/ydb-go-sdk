@@ -113,6 +113,12 @@ log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 * usage with [Apache Arrow](https://github.com/apache/arrow-go):
 
 ```go
+import (
+	"github.com/apache/arrow/go/arrow/ipc"
+)
+
+...
+
 ctx := context.TODO()
 db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 if err != nil {
