@@ -112,6 +112,10 @@ log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 
 * usage with [Apache Arrow](https://github.com/apache/arrow-go):
 
+```sh
+go get github.com/apache/arrow/go/arrow
+```
+
 ```go
 import (
 	"github.com/apache/arrow/go/arrow/ipc"
