@@ -1,3 +1,4 @@
+## v3.110.1
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
 
 ## v3.110.0
