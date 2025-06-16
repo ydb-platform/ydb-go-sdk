@@ -1,7 +1,6 @@
 package options
 
 import (
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
@@ -22,10 +21,9 @@ var (
 )
 
 type (
-	Syntax        Ydb_Query.Syntax
-	ExecMode      Ydb_Query.ExecMode
-	StatsMode     Ydb_Query.StatsMode
-	ResultSetType Ydb.ResultSet_Type
+	Syntax    Ydb_Query.Syntax
+	ExecMode  Ydb_Query.ExecMode
+	StatsMode Ydb_Query.StatsMode
 
 	TxControl interface {
 		ToYdbQueryTransactionControl() *Ydb_Query.TransactionControl
@@ -39,7 +37,6 @@ type (
 		params                 params.Parameters
 		execMode               ExecMode
 		statsMode              StatsMode
-		resultSetType          ResultSetType
 		resourcePool           string
 		statsCallback          func(queryStats stats.QueryStats)
 		callOptions            []grpc.CallOption
@@ -72,7 +69,6 @@ type (
 		callback func(stats.QueryStats)
 	}
 	execModeOption         = ExecMode
-	resultSetTypeOption    = ResultSetType
 	responsePartLimitBytes int64
 )
 
@@ -123,10 +119,6 @@ func (mode ExecMode) applyExecuteOption(s *executeSettings) {
 	s.execMode = mode
 }
 
-func (typ ResultSetType) applyExecuteOption(s *executeSettings) {
-	s.resultSetType = typ
-}
-
 const (
 	ExecModeParse    = ExecMode(Ydb_Query.ExecMode_EXEC_MODE_PARSE)
 	ExecModeValidate = ExecMode(Ydb_Query.ExecMode_EXEC_MODE_VALIDATE)
@@ -139,12 +131,6 @@ const (
 	StatsModeNone    = StatsMode(Ydb_Query.StatsMode_STATS_MODE_NONE)
 	StatsModeFull    = StatsMode(Ydb_Query.StatsMode_STATS_MODE_FULL)
 	StatsModeProfile = StatsMode(Ydb_Query.StatsMode_STATS_MODE_PROFILE)
-)
-
-const (
-	ResultSetTypeUnspecified = ResultSetType(Ydb.ResultSet_UNSPECIFIED)
-	ResultSetTypeMessage     = ResultSetType(Ydb.ResultSet_MESSAGE)
-	ResultSetTypeArrow       = ResultSetType(Ydb.ResultSet_ARROW)
 )
 
 func defaultExecuteSettings() executeSettings {
@@ -206,10 +192,6 @@ func (s *executeSettings) Label() string {
 	return s.label
 }
 
-func (s *executeSettings) ResultSetType() ResultSetType {
-	return s.resultSetType
-}
-
 func WithParameters(params params.Parameters) parametersOption {
 	return parametersOption{
 		params: params,
@@ -236,10 +218,6 @@ func WithResourcePool(id string) resourcePool {
 
 func WithExecMode(mode ExecMode) execModeOption {
 	return mode
-}
-
-func WithResultSetType(typ ResultSetType) resultSetTypeOption {
-	return typ
 }
 
 func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
@@ -33,7 +32,6 @@ type executeSettings interface {
 	ResourcePool() string
 	ResponsePartLimitSizeBytes() int64
 	Label() string
-	ResultSetType() options.ResultSetType
 }
 
 type executeScriptConfig interface {
@@ -97,7 +95,6 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 		ConcurrentResultSets:   false,
 		PoolId:                 cfg.ResourcePool(),
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
-		ResultSetType:          Ydb.ResultSet_Type(cfg.ResultSetType()),
 	}
 
 	return request, cfg.CallOptions(), nil

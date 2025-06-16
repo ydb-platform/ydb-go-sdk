@@ -6,19 +6,20 @@ import (
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 )
 
 type (
 	arrowResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		resultSetIndex int64
+		close          context.CancelFunc
 	}
 
 	arrowPart struct {
@@ -29,18 +30,6 @@ type (
 func (c *Client) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (r arrow.Result, err error) {
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
-
-	opts = append(opts, options.WithResultSetType(options.ResultSetTypeArrow))
-
-	settings := options.ExecuteSettings(opts...)
-
-	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
-		q, settings.Label(),
-	)
-	defer func() {
-		onDone(err)
-	}()
 
 	r, err = arrowQuery(ctx, c.pool, q, opts...)
 	if err != nil {
@@ -55,7 +44,7 @@ func arrowQuery(ctx context.Context, pool sessionPool, q string, opts ...options
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		r, err = s.executeArrow(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+		r, err = s.executeArrow(ctx, q, options.ExecuteSettings(opts...))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -70,7 +59,7 @@ func arrowQuery(ctx context.Context, pool sessionPool, q string, opts ...options
 }
 
 func (s *Session) executeArrow(
-	ctx context.Context, q string, settings executeSettings, opts ...resultOption,
+	ctx context.Context, q string, settings executeSettings,
 ) (_ arrow.Result, finalErr error) {
 	ctx, cancel := xcontext.WithDone(ctx, s.Done())
 	defer func() {
@@ -85,6 +74,8 @@ func (s *Session) executeArrow(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
+	request.ResultSetType = Ydb.ResultSet_ARROW
+
 	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
 		if finalErr != nil {
@@ -97,10 +88,27 @@ func (s *Session) executeArrow(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return &arrowResult{stream: stream}, nil
+	return &arrowResult{stream: stream, close: executeCancel}, nil
 }
 
-func (r *arrowResult) NextPart(ctx context.Context) (arrow.Part, error) {
+func (r *arrowResult) Parts(ctx context.Context) xiter.Seq2[arrow.Part, error] {
+	return func(yield func(arrow.Part, error) bool) {
+		for {
+			part, err := r.nextPart(ctx)
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					return
+				}
+			}
+			cont := yield(part, err)
+			if !cont || err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
 	if ctx.Err() != nil {
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
@@ -116,6 +124,12 @@ func (r *arrowResult) NextPart(ctx context.Context) (arrow.Part, error) {
 	r.resultSetIndex = part.GetResultSetIndex()
 
 	return &arrowPart{part}, nil
+}
+
+func (r *arrowResult) Close(ctx context.Context) error {
+	r.close()
+
+	return nil
 }
 
 func (p *arrowPart) Schema() io.Reader {

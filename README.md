@@ -133,17 +133,13 @@ defer db.Close(ctx) // cleanup resources
 sql := `SELECT 42 as id, "my string" as myStr;
 SELECT 24 as id, "WOW" as myStr, "UHH" as secondStr;`
 
-r, err := db.Query().QueryArrow(ctx, sql, query.WithIdempotent())
+result, err := db.Query().QueryArrow(ctx, sql, query.WithIdempotent())
 if err != nil {
 	panic(err)
 }
 
-for {
-	part, err := r.NextPart(ctx)
+for part, err := range result.Parts(ctx) {
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			break
-		}
 		panic(err)
 	}
 
