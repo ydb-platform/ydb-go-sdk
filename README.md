@@ -144,22 +144,19 @@ result, err := db.Query().QueryArrow(ctx, sql, query.WithIdempotent())
 if err != nil {
 	panic(err)
 }
+defer result.Close(ctx)
 
 for part, err := range result.Parts(ctx) {
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("ResultSet[idx=", part.GetResultSetIndex(), "]")
+	fmt.Printf("ResultSet#%d ", part.GetResultSetIndex())
 
-	rdr, err := ipc.NewReader(io.MultiReader(part.Schema(), part.Data()))
+	rdr, err := ipc.NewReader(part) // part already implements io.Reader
 	if err != nil {
 		panic(err)
 	}
-
-	scm := rdr.Schema()
-
-	fmt.Println(scm)
 
 	for rdr.Next() {
 		out := rdr.Record()
@@ -168,12 +165,7 @@ for part, err := range result.Parts(ctx) {
 }
 
 // Output:
-// ResultSet[idx= 0 ]
-// schema:
-//   fields: 2
-//     - id: type=int32
-//     - myStr: type=binary
-// record:
+// ResultSet#0 record:
 //   schema:
 //   fields: 2
 //     - id: type=int32
@@ -182,13 +174,7 @@ for part, err := range result.Parts(ctx) {
 //   col[0][id]: [42]
 //   col[1][myStr]: ["my string"]
 //
-// ResultSet[idx= 1 ]
-// schema:
-//	fields: 3
-//	  - id: type=int32
-//	  - myStr: type=binary
-//	  - secondStr: type=binary
-// record:
+// ResultSet#1 record:
 //	schema:
 //	fields: 3
 //	  - id: type=int32

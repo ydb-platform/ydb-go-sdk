@@ -12,12 +12,12 @@ type (
 	Result interface {
 		closer.Closer
 
-		// Parts is the range iterator for result parts
+		// Parts is the range iterator for result parts (parts implement io.Reader)
 		Parts(ctx context.Context) xiter.Seq2[Part, error]
 	}
 	Part interface {
-		Schema() io.Reader
-		Data() io.Reader
+		io.Reader
+
 		GetResultSetIndex() int64
 	}
 )

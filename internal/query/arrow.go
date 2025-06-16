@@ -7,7 +7,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -23,7 +22,8 @@ type (
 	}
 
 	arrowPart struct {
-		part *Ydb_Query.ExecuteQueryResponsePart
+		resultSetIndex int64
+		reader         io.Reader
 	}
 )
 
@@ -123,7 +123,13 @@ func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
 	}
 	r.resultSetIndex = part.GetResultSetIndex()
 
-	return &arrowPart{part}, nil
+	schema := part.GetResultSet().GetArrowBatchSettings().GetSchema()
+	data := part.GetResultSet().GetData()
+
+	// Apache Arrow ipc.Reader expects schema and data to be concatenated
+	rdr := bytes.NewReader(append(schema, data...))
+
+	return &arrowPart{reader: rdr, resultSetIndex: part.GetResultSetIndex()}, nil
 }
 
 func (r *arrowResult) Close(ctx context.Context) error {
@@ -132,14 +138,10 @@ func (r *arrowResult) Close(ctx context.Context) error {
 	return nil
 }
 
-func (p *arrowPart) Schema() io.Reader {
-	return bytes.NewReader(p.part.GetResultSet().GetArrowBatchSettings().GetSchema())
-}
-
-func (p *arrowPart) Data() io.Reader {
-	return bytes.NewReader(p.part.GetResultSet().GetData())
+func (p *arrowPart) Read(buf []byte) (n int, err error) {
+	return p.reader.Read(buf)
 }
 
 func (p *arrowPart) GetResultSetIndex() int64 {
-	return p.part.GetResultSetIndex()
+	return p.resultSetIndex
 }
