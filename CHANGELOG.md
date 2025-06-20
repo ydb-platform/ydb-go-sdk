@@ -1,4 +1,4 @@
-* Added the previously lost HintSessionBalancer
+* Added the previously lost `HintSessionBalancer`
 
 ## v3.110.1
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
