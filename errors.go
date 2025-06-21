@@ -99,3 +99,8 @@ func IsRatelimiterAcquireError(err error) bool {
 func ToRatelimiterAcquireError(err error) ratelimiter.AcquireError {
 	return ratelimiterErrors.ToAcquireError(err)
 }
+
+// PrintErrorWithoutStack removed stacktrace records from error string
+func PrintErrorWithoutStack(err error) string {
+	return xerrors.PrintWithoutStack(err)
+}
