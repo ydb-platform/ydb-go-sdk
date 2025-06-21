@@ -198,8 +198,8 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 	}
 
 	core.closeOnce = sync.OnceFunc(func() {
-		defer close(core.done)
-		defer cancelAttach()
+		cancelAttach()
+		close(core.done)
 	})
 
 	if markGoroutineWithLabelNodeIDForAttachStream {
