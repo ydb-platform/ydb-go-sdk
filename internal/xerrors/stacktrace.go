@@ -1,8 +1,6 @@
 package xerrors
 
 import (
-	"regexp"
-
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -67,14 +65,4 @@ type stackTransportError struct {
 
 func (e *stackTransportError) GRPCStatus() *grpcStatus.Status {
 	return e.status
-}
-
-var re = regexp.MustCompile("\\s+at\\s+`[^`]+`")
-
-func removeStack(s string) string {
-	return re.ReplaceAllString(s, "")
-}
-
-func PrintWithoutStack(err error) string {
-	return removeStack(err.Error())
 }

@@ -1,4 +1,4 @@
-* Added `PrintErrorWithoutStack` helper for remove stack records from error string
+* Added `sugar.PrintErrorWithoutStack` helper for remove stack records from error string
 
 ## v3.110.1
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
