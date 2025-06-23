@@ -16,7 +16,7 @@ func PrintErrorWithoutStack(err error) string {
 	return removeStackRecords(err.Error())
 }
 
-// UnwrapError unwrapped source error to root errors
+// UnwrapError unwrapps source error to root errors
 func UnwrapError(err error) (errs []error) {
 	for {
 		if x, has := err.(interface {
