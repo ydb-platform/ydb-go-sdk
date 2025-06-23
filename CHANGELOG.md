@@ -1,3 +1,4 @@
+## v3.111.0
 * Added `sugar.PrintErrorWithoutStack` helper for remove stack records from error string
 * Added `sugar.UnwrapError` helper for unwrap source error to root errors
 
