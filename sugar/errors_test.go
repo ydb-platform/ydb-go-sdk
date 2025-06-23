@@ -39,9 +39,7 @@ func TestPrintWithoutStack(t *testing.T) {
 		},
 		{
 			in: fmt.Errorf("test1: %w",
-				xerrors.WithStackTrace(
-					errors.New("test2"),
-				),
+				xerrors.WithStackTrace(errors.New("test2")),
 			),
 			out: "test1: test2",
 		},
