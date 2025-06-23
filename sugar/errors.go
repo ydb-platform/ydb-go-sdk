@@ -5,8 +5,8 @@ import "regexp"
 var re = regexp.MustCompile("\\s+at\\s+`[^`]+`")
 
 func removeStackRecords(s string) string {
-	// Some error constructors (such as fmt.Errorf, grpcStatus.Error) are serializing the error string at the 
-	// construction time. Thats why the "true way" with casting the wrapped error into *xerrors.stackError 
+	// Some error constructors (such as fmt.Errorf, grpcStatus.Error) are serializing the error string at the
+	// construction time. Thats why the "true way" with casting the wrapped error into *xerrors.stackError
 	// has no effect
 	return re.ReplaceAllString(s, "")
 }
