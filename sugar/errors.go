@@ -29,6 +29,7 @@ func UnwrapError(err error) (errs []error) {
 			for _, xx := range x.Unwrap() {
 				errs = append(errs, UnwrapError(xx)...)
 			}
+
 			return errs
 		} else if len(errs) == 0 {
 			return []error{err}
