@@ -18,23 +18,21 @@ func PrintErrorWithoutStack(err error) string {
 
 // UnwrapError unwrapps source error to root errors
 func UnwrapError(err error) (errs []error) {
-	for {
-		if x, has := err.(interface {
-			Unwrap() error
-		}); has {
-			return UnwrapError(x.Unwrap())
-		} else if x, has := err.(interface {
-			Unwrap() []error
-		}); has {
-			for _, xx := range x.Unwrap() {
-				errs = append(errs, UnwrapError(xx)...)
-			}
-
-			return errs
-		} else if len(errs) == 0 {
-			return []error{err}
-		} else {
-			return errs
+	if x, has := err.(interface {
+		Unwrap() error
+	}); has {
+		return UnwrapError(x.Unwrap())
+	} else if x, has := err.(interface {
+		Unwrap() []error
+	}); has {
+		for _, xx := range x.Unwrap() {
+			errs = append(errs, UnwrapError(xx)...)
 		}
+
+		return errs
+	} else if len(errs) == 0 {
+		return []error{err}
 	}
+
+	return errs
 }
