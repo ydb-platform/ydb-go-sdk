@@ -15,13 +15,16 @@ func removeStackRecords(s string) string {
 	return re.ReplaceAllString(s, "")
 }
 
-// PrintErrorWithoutStack removed stacktrace records from error string
+// PrintErrorWithoutStack removes stacktrace records from error string
 func PrintErrorWithoutStack(err error) string {
 	return removeStackRecords(err.Error())
 }
 
-// UnwrapError unwrapps source error to root errors
+// UnwrapError unwraps the source error into its root errors
 func UnwrapError(err error) (errs []error) {
+	if err == nil {
+		return nil
+	}
 	if x, has := err.(interface {
 		Unwrap() error
 	}); has {
