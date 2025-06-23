@@ -1,8 +1,12 @@
 package sugar
 
-import "regexp"
+import (
+	"regexp"
 
-var re = regexp.MustCompile("\\s+at\\s+`[^`]+`")
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+)
+
+var re = regexp.MustCompile("\\s+" + xerrors.KeywordAt + "\\s+`[^`]+`")
 
 func removeStackRecords(s string) string {
 	// Some error constructors (such as fmt.Errorf, grpcStatus.Error) are serializing the error string at the
