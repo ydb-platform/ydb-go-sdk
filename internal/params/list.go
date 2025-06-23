@@ -177,7 +177,7 @@ func (l *listItem) YSON(v []byte) *list {
 //	return l.parent
 //}
 
-func (l *listItem) Uuid(v uuid.UUID) *list { //nolint:revive,stylecheck
+func (l *listItem) Uuid(v uuid.UUID) *list { //nolint:revive
 	l.parent.values = append(l.parent.values, value.Uuid(v))
 
 	return l.parent

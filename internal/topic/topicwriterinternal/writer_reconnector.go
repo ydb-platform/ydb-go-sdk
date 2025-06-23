@@ -36,8 +36,8 @@ var (
 	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
 	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
-	PublicErrQueueIsFull                           = xerrors.Wrap(errors.New("ydb: queue is full"))                                                                                                                                                                                                                          // Deprecated.
-	PublicErrMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
+	ErrPublicQueueIsFull                           = xerrors.Wrap(errors.New("ydb: queue is full"))                                                                                                                                                                                                                          // Deprecated.
+	ErrPublicMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 
 	// errProducerIDNotEqualMessageGroupID is temporary
@@ -86,8 +86,8 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
-		MaxMessageSize:     50 * 1024 * 1024, //nolint:gomnd
-		MaxQueueLen:        1000,             //nolint:gomnd
+		MaxMessageSize:     50 * 1024 * 1024, //nolint:mnd
+		MaxQueueLen:        1000,             //nolint:mnd
 		RetrySettings: topic.RetrySettings{
 			StartTimeout: topic.DefaultStartTimeout,
 		},
@@ -265,7 +265,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	}
 	defer func() {
 		if resErr != nil {
-			resErr = xerrors.Join(resErr, PublicErrMessagesPutToInternalQueueBeforeError)
+			resErr = xerrors.Join(resErr, ErrPublicMessagesPutToInternalQueueBeforeError)
 		}
 	}()
 
@@ -361,7 +361,7 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 	reason := xerrors.WithStackTrace(errStopWriterReconnector)
 	w.queue.StopAddNewMessages(reason)
 
-	flushErr := w.Flush(ctx) //nolint:ifshort,nolintlint
+	flushErr := w.Flush(ctx)
 	closeErr := w.close(ctx, reason)
 
 	if flushErr != nil {

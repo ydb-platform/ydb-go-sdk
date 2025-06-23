@@ -162,7 +162,7 @@ func (c *Client) explain(ctx context.Context, sql string, mode scripting.Explain
 		result   = Ydb_Scripting.ExplainYqlResult{}
 	)
 	defer func() {
-		onDone(e.Explanation.Plan, err)
+		onDone(e.Plan, err)
 	}()
 	response, err = c.service.ExplainYql(ctx, request)
 	if err != nil {

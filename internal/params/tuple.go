@@ -177,7 +177,7 @@ func (t *tupleItem) YSON(v []byte) *tuple {
 //	return t.parent
 //}
 
-func (t *tupleItem) Uuid(v uuid.UUID) *tuple { //nolint:revive,stylecheck
+func (t *tupleItem) Uuid(v uuid.UUID) *tuple { //nolint:revive
 	t.parent.values = append(t.parent.values, value.Uuid(v))
 
 	return t.parent

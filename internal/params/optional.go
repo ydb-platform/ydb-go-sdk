@@ -165,7 +165,7 @@ func (p *optional) YSON(v *[]byte) *optionalBuilder {
 //	return &optionalBuilder{opt: p}
 //}
 
-func (p *optional) Uuid(v *uuid.UUID) *optionalBuilder { //nolint:revive,stylecheck
+func (p *optional) Uuid(v *uuid.UUID) *optionalBuilder { //nolint:revive
 	p.value = value.NullableUuidValue(v)
 
 	return &optionalBuilder{opt: p}

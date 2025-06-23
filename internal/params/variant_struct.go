@@ -247,7 +247,7 @@ func (vsf *variantStructField) YSON() *variantStruct {
 //	return vsf.parent
 //}
 
-func (vsf *variantStructField) Uuid() *variantStruct { //nolint:revive,stylecheck
+func (vsf *variantStructField) Uuid() *variantStruct { //nolint:revive
 	vsf.parent.fields = append(vsf.parent.fields, types.StructField{
 		Name: vsf.name,
 		T:    types.UUID,
@@ -480,7 +480,7 @@ func (vsi *variantStructItem) YSON(v []byte) *variantStructBuilder {
 //	}
 //}
 
-func (vsi *variantStructItem) Uuid(v uuid.UUID) *variantStructBuilder { //nolint:revive,stylecheck
+func (vsi *variantStructItem) Uuid(v uuid.UUID) *variantStructBuilder { //nolint:revive
 	vsi.parent.value = value.Uuid(v)
 
 	return &variantStructBuilder{

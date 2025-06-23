@@ -313,7 +313,7 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 	}
 
 	// no need goroutines and synchronization for zero or one worker
-	if workerCount < 2 { //nolint:gomnd
+	if workerCount < 2 { //nolint:mnd
 		for i := range messages {
 			if _, err := messages[i].GetEncodedBytes(codec); err != nil {
 				return err

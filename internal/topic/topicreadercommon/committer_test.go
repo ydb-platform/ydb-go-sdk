@@ -177,7 +177,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		sessionCancel()
 
 		commitErr := <-waitErr
-		require.ErrorIs(t, commitErr, PublicErrCommitSessionToExpiredSession)
+		require.ErrorIs(t, commitErr, ErrPublicCommitSessionToExpiredSession)
 	})
 }
 
