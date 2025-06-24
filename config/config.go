@@ -251,6 +251,12 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
+func WithDisableServerBalancer() Option {
+	return func(c *Config) {
+		config.DisableSessionBalancer(&c.Common)
+	}
+}
+
 func WithGrpcMaxMessageSize(sizeBytes int) Option {
 	return func(c *Config) {
 		c.grpcMaxMessageSize = sizeBytes

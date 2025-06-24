@@ -354,6 +354,16 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
+// WithDisabledServerBalancer disables server-side session load balancing for the driver.
+// This option prevents the server from performing session load balancing on the connection.
+func WithDisabledServerBalancer() Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.options = append(d.options, config.WithDisableServerBalancer())
+
+		return nil
+	}
+}
+
 // WithGrpcMaxMessageSize set max size of message on grpc level
 // use the option for the driver known custom limit.
 // Driver can't read the limit from direct grpc option

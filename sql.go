@@ -220,6 +220,9 @@ func WithDatabaseSQLTrace(
 	return xsql.WithTrace(&t, opts...)
 }
 
+// WithDisableServerBalancer returns a ConnectorOption that disables server-side session balancing for the SQL connector.
+//
+// Deprecated: Use WithDisabledServerBalancer native driver option instead.
 func WithDisableServerBalancer() ConnectorOption {
 	return xsql.WithDisableServerBalancer()
 }
