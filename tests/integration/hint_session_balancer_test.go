@@ -13,9 +13,8 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-func TestSQL(t *testing.T) {
-	// TestSQL tests the behavior of server-side session balancing in both SQL and native YDB drivers.
-	// It verifies that the "session-balancer" capability is correctly added or removed based on configuration.
+func TestHintSessionBalancer(t *testing.T) {
+	// This test verifies that the "session-balancer" capability is correctly added or removed based on configuration.
 	// The test covers four scenarios:
 	// 1. SQL driver with server balancer disabled
 	// 2. SQL driver with server balancer enabled
