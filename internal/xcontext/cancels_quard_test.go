@@ -3,8 +3,8 @@ package xcontext
 import (
 	"testing"
 
+	"context"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 )
 
 func TestCancelsGuard(t *testing.T) {
