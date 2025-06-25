@@ -1,9 +1,9 @@
 package xcontext
 
 import (
+	"context"
 	"testing"
 
-	"context"
 	"github.com/stretchr/testify/require"
 )
 
