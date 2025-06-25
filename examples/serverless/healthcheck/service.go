@@ -14,7 +14,6 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -204,8 +203,6 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 }
 
 // Serverless is an entrypoint for serverless yandex function
-//
-//nolint:deadcode
 func Serverless(ctx context.Context) error {
 	s, err := getService(
 		ctx,

@@ -8,16 +8,16 @@ import (
 
 	ydb "github.com/ydb-platform/gorm-driver"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
-	gormLogger "gorm.io/gorm/logger"
-	"slo/internal/config"
-	"slo/internal/generator"
-
 	ydbSDK "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	gormLogger "gorm.io/gorm/logger"
+
+	"slo/internal/config"
+	"slo/internal/generator"
 )
 
 const optionsTemplate = `

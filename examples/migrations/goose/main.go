@@ -11,7 +11,6 @@ import (
 	"os"
 
 	"github.com/pressly/goose/v3"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
