@@ -187,7 +187,7 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	}
 }
 
-//nolint:funlen,nolintlint
+//nolint:funlen
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
 	streamCtx, streamClose := context.WithCancelCause(xcontext.ValueOnly(ctx))
 	l.streamClose = streamClose

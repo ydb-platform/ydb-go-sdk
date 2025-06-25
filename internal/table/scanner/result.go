@@ -94,7 +94,7 @@ type option func(r *baseResult)
 
 func WithIgnoreTruncated(ignoreTruncated bool) option {
 	return func(r *baseResult) {
-		r.ignoreTruncated = ignoreTruncated
+		r.valueScanner.ignoreTruncated = ignoreTruncated
 	}
 }
 

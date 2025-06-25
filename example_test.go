@@ -66,9 +66,6 @@ func Example_query() {
 			}
 		}
 	}
-	if err != nil {
-		panic(err)
-	}
 }
 
 //nolint:testableexamples, nonamedreturns

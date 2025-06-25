@@ -95,9 +95,11 @@ linters:
       replace-allow-list:
         - xorm.io/xorm
       replace-local: true
-    # govet:
-    #   enable:
-    #     - shadow #
+    govet:
+      enable-all: true
+      disable:
+        - shadow
+        - fieldalignment
     misspell:
       locale: US
       ignore-rules:
