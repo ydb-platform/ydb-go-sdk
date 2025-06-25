@@ -1,5 +1,9 @@
 * Added the previously lost `HintSessionBalancer`
 
+## v3.111.0
+* Added `sugar.PrintErrorWithoutStack` helper for remove stack records from error string
+* Added `sugar.UnwrapError` helper for unwrap source error to root errors
+
 ## v3.110.1
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
 
