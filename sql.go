@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -220,11 +221,23 @@ func WithDatabaseSQLTrace(
 	return xsql.WithTrace(&t, opts...)
 }
 
+type uoption Option
+
+func (uoption) Apply(c *xsql.Connector) error {
+	return xsql.WithDisableServerBalancer().Apply(c)
+}
+
+var hintSessionBalancerOption = uoption(func(ctx context.Context, d *Driver) error {
+	d.options = append(d.options, config.WithDisableServerBalancer())
+
+	return nil
+})
+
 // WithDisableServerBalancer returns a ConnectorOption that disables server-side session balancing for the SQL connector.
-//
-// Deprecated: Use WithDisabledServerBalancer native driver option instead.
-func WithDisableServerBalancer() ConnectorOption {
-	return xsql.WithDisableServerBalancer()
+// If you want to use it as an Option for the native driver, wrap it with `ydb.Option`.
+func WithDisableServerBalancer() uoption {
+	// Separate type is necessary so that the option works for both the SQL driver and the native driver
+	return hintSessionBalancerOption
 }
 
 type SQLConnector interface {

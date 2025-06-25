@@ -50,7 +50,7 @@ func TestHintSessionBalancer(t *testing.T) {
 			scope = newScope(t)
 			caps  []string
 			db    = nativeDriverWithYDBCapabilitiesTraces(scope, &caps,
-				ydb.WithDisabledServerBalancer(),
+				ydb.Option(ydb.WithDisableServerBalancer()),
 			)
 		)
 
