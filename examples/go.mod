@@ -1,8 +1,8 @@
 module examples
 
-go 1.22.12
+go 1.23.0
 
-toolchain go1.24.4
+toolchain go1.23.6
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
@@ -16,7 +16,7 @@ require (
 	github.com/ydb-platform/ydb-go-sdk-prometheus/v2 v2.1.2
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.95.0
 	github.com/ydb-platform/ydb-go-yc v0.12.1
-	golang.org/x/sync v0.11.0
+	golang.org/x/sync v0.12.0
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9
 	gorm.io/driver/postgres v1.5.0
 	gorm.io/driver/sqlite v1.5.0
@@ -59,10 +59,10 @@ require (
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20241112172322-ea1f63298f77 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241015192408-796eee8c2d53 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
