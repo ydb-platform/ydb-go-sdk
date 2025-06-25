@@ -100,7 +100,7 @@ func WithIgnoreTruncated(ignoreTruncated bool) option {
 
 func WithMarkTruncatedAsRetryable() option {
 	return func(r *baseResult) {
-		r.markTruncatedAsRetryable = true
+		r.valueScanner.markTruncatedAsRetryable = true
 	}
 }
 
