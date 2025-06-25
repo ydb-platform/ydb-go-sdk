@@ -11,7 +11,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
-
 	"slo/internal/config"
 	"slo/internal/generator"
 	"slo/internal/log"

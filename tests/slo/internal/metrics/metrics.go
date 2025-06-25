@@ -6,6 +6,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 

@@ -6,6 +6,9 @@ import (
 	"path"
 	"time"
 
+	"slo/internal/config"
+	"slo/internal/generator"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -14,9 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"slo/internal/config"
-	"slo/internal/generator"
 )
 
 const (

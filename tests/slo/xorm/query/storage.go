@@ -9,15 +9,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"slo/internal/config"
+	"slo/internal/generator"
 	"xorm.io/xorm"
 	"xorm.io/xorm/core"
 	"xorm.io/xorm/log"
 
-	"slo/internal/config"
-	"slo/internal/generator"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type mapper struct {
