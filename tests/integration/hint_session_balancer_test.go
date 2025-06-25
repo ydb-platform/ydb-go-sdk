@@ -8,9 +8,10 @@ import (
 	"database/sql"
 	"testing"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"google.golang.org/grpc/metadata"
 )
 
 func TestHintSessionBalancer(t *testing.T) {
@@ -99,7 +100,8 @@ func nativeDriverWithYDBCapabilitiesTraces(scope *scopeT, capabilities *[]string
 			*capabilities = extractYDBCapabilities(*info.Context)
 
 			return func(trace.QuerySessionCreateDoneInfo) {}
-		}}))
+		},
+	}))
 
 	return scope.Driver(opts...)
 }

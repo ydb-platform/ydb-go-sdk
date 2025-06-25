@@ -233,7 +233,7 @@ var hintSessionBalancerOption = uoption(func(ctx context.Context, d *Driver) err
 	return nil
 })
 
-// WithDisableServerBalancer returns a ConnectorOption that disables server-side session balancing for the SQL connector.
+// WithDisableServerBalancer returns a ConnectorOption that disables session balancing for the SQL connector.
 // If you want to use it as an Option for the native driver, wrap it with `ydb.Option`.
 func WithDisableServerBalancer() uoption {
 	// Separate type is necessary so that the option works for both the SQL driver and the native driver
