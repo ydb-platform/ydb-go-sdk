@@ -96,7 +96,7 @@ func SetAutoRetry(c *Common, autoRetry bool) {
 	c.disableAutoRetry = !autoRetry
 }
 
-// SetAutoRetry affects on AutoRetry() flag
+// DisableSessionBalancer disables the session balancer.
 func DisableSessionBalancer(c *Common) {
 	c.disableSessionBalancer = true
 }
