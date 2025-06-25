@@ -251,7 +251,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
-func WithDisableServerBalancer() Option {
+func WithDisableSessionBalancer() Option {
 	return func(c *Config) {
 		config.DisableSessionBalancer(&c.Common)
 	}

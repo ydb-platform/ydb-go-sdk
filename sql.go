@@ -228,7 +228,7 @@ func (uoption) Apply(c *xsql.Connector) error {
 }
 
 var hintSessionBalancerOption = uoption(func(ctx context.Context, d *Driver) error {
-	d.options = append(d.options, config.WithDisableServerBalancer())
+	d.options = append(d.options, config.WithDisableSessionBalancer())
 
 	return nil
 })
