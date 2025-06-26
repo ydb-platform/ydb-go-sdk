@@ -1,5 +1,5 @@
-* Migrated `golangci-lint` to version `v2.1.6`
 * Replaced requirements from go1.23 to go1.22
+* Migrated `golangci-lint` to version `v2.1.6`
 
 ## v3.111.0
 * Added `sugar.PrintErrorWithoutStack` helper for remove stack records from error string
