@@ -1,3 +1,4 @@
+* Fixed `Publish YDB SLO Report` workflow
 * Migrated `golangci-lint` to version `v2.1.6`
 
 ## v3.111.0
