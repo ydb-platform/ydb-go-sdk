@@ -49,7 +49,7 @@ func TestWithCertificatesCached(t *testing.T) {
 		Bytes: caBytes,
 	})
 	require.NoError(t, err)
-	f, err := os.CreateTemp(os.TempDir(), "ca.pem")
+	f, err := os.CreateTemp("", "ca.pem")
 	require.NoError(t, err)
 	_, err = f.Write(caPEM.Bytes())
 	require.NoError(t, err)
