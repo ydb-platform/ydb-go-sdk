@@ -299,7 +299,7 @@ func NullableUUIDValueWithIssue1501(v *[16]byte) Value {
 	return OptionalValue(UUIDWithIssue1501Value(*v))
 }
 
-func NullableUuidValue(v *uuid.UUID) Value { //nolint:revive,stylecheck
+func NullableUuidValue(v *uuid.UUID) Value { //nolint:revive
 	if v == nil {
 		return NullValue(types.UUID)
 	}

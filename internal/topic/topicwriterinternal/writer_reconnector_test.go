@@ -310,7 +310,7 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		}()
 		err = w.Write(ctxNoQueueSpace, newTestMessages(3))
 		require.Error(t, err)
-		require.NotErrorIs(t, err, PublicErrMessagesPutToInternalQueueBeforeError)
+		require.NotErrorIs(t, err, ErrPublicMessagesPutToInternalQueueBeforeError)
 
 		// Test queue space becomes available after ack
 		go func() {
@@ -439,7 +439,7 @@ func TestMessagesPutToInternalQueueBeforeError(t *testing.T) {
 		cancel()
 	}()
 	err := w.Write(ctxCancel, newTestMessages(1))
-	require.ErrorIs(t, err, PublicErrMessagesPutToInternalQueueBeforeError)
+	require.ErrorIs(t, err, ErrPublicMessagesPutToInternalQueueBeforeError)
 }
 
 func TestEnv(t *testing.T) {

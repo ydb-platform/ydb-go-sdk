@@ -179,7 +179,7 @@ func (vtt *variantTupleTypes) YSON() *variantTupleTypes {
 //	return vtt
 //}
 
-func (vtt *variantTupleTypes) Uuid() *variantTupleTypes { //nolint:revive,stylecheck
+func (vtt *variantTupleTypes) Uuid() *variantTupleTypes { //nolint:revive
 	vtt.tuple.types = append(vtt.tuple.types, types.UUID)
 
 	return vtt
@@ -397,7 +397,7 @@ func (vti *variantTupleItem) YSON(v []byte) *variantTupleBuilder {
 //	}
 //}
 
-func (vti *variantTupleItem) Uuid(v uuid.UUID) *variantTupleBuilder { //nolint:revive,stylecheck
+func (vti *variantTupleItem) Uuid(v uuid.UUID) *variantTupleBuilder { //nolint:revive
 	vti.tuple.value = value.Uuid(v)
 
 	return &variantTupleBuilder{

@@ -435,6 +435,8 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, _ conte
 		return res.stream, cancel, nil
 	}
 
+	cancel(res.err)
+
 	return nil, nil, res.err
 }
 

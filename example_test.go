@@ -66,9 +66,6 @@ func Example_query() {
 			}
 		}
 	}
-	if err != nil {
-		panic(err)
-	}
 }
 
 //nolint:testableexamples, nonamedreturns
@@ -413,13 +410,13 @@ func Example_scripting() {
 		defer res.Close() // cleanup resources
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
-				fmt.Errorf("no result sets"), //nolint:goerr113
+				fmt.Errorf("no result sets"), //nolint:err113
 				retry.WithBackoff(retry.TypeNoBackoff),
 			)
 		}
 		if !res.NextRow() {
 			return retry.RetryableError(
-				fmt.Errorf("no rows"), //nolint:goerr113
+				fmt.Errorf("no rows"), //nolint:err113
 				retry.WithBackoff(retry.TypeSlowBackoff),
 			)
 		}
@@ -428,7 +425,7 @@ func Example_scripting() {
 			return fmt.Errorf("scan failed: %w", err)
 		}
 		if sum != 2 {
-			return fmt.Errorf("unexpected sum: %v", sum) //nolint:goerr113
+			return fmt.Errorf("unexpected sum: %v", sum) //nolint:err113
 		}
 
 		return res.Err()

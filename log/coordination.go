@@ -16,7 +16,7 @@ func Coordination(l Logger, d trace.Detailer, opts ...Option) (t trace.Coordinat
 
 //nolint:funlen
 func internalCoordination(
-	l *wrapper, //nolint:interfacer
+	l *wrapper,
 	d trace.Detailer,
 ) trace.Coordination {
 	return trace.Coordination{

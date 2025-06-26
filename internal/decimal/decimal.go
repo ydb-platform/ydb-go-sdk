@@ -14,12 +14,12 @@ const (
 )
 
 var (
-	ten  = big.NewInt(10) //nolint:gomnd
+	ten  = big.NewInt(10) //nolint:mnd
 	zero = big.NewInt(0)
 	one  = big.NewInt(1)
 	inf  = big.NewInt(0).Mul(
-		big.NewInt(100000000000000000),  //nolint:gomnd
-		big.NewInt(1000000000000000000), //nolint:gomnd
+		big.NewInt(100000000000000000),  //nolint:mnd
+		big.NewInt(1000000000000000000), //nolint:mnd
 	)
 	nan    = big.NewInt(0).Add(inf, one)
 	err    = big.NewInt(0).Add(nan, one)
@@ -61,7 +61,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 	}
 
 	v.SetBytes(bts)
-	neg := bts[0]&negMask != 0 //nolint:ifshort
+	neg := bts[0]&negMask != 0
 	if neg {
 		// Given bytes contains negative value.
 		// Interpret is as two's complement.
@@ -100,7 +100,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		return v, nil
 	}
 
-	neg := s[0] == '-' //nolint:ifshort,nolintlint
+	neg := s[0] == '-' //nolint:nolintlint
 	if neg || s[0] == '+' {
 		s = s[1:]
 	}
@@ -215,7 +215,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	}
 
 	v := big.NewInt(0).Set(x)
-	neg := x.Sign() < 0 //nolint:ifshort,nolintlint
+	neg := x.Sign() < 0 //nolint:nolintlint
 	if neg {
 		// Convert negative to positive.
 		v.Neg(x)
@@ -291,7 +291,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 }
 
 func put(x *big.Int, p []byte) {
-	neg := x.Sign() < 0 //nolint:ifshort
+	neg := x.Sign() < 0
 	if neg {
 		x = complement(x)
 	}

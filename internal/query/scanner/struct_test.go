@@ -53,7 +53,7 @@ func TestStruct(t *testing.T) {
 		return data
 	}
 
-	type scanData struct { //nolint:maligned
+	type scanData struct {
 		Utf8String    string
 		Utf8Bytes     []byte
 		StringString  string

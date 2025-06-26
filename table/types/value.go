@@ -175,7 +175,7 @@ func UUIDWithIssue1501Value(v [16]byte) Value {
 	return value.UUIDWithIssue1501Value(v)
 }
 
-func UuidValue(v uuid.UUID) Value { //nolint:revive,stylecheck
+func UuidValue(v uuid.UUID) Value { //nolint:revive
 	return value.Uuid(v)
 }
 

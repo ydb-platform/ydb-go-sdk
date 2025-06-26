@@ -33,7 +33,7 @@ type (
 	}
 )
 
-type endpoint struct { //nolint:maligned
+type endpoint struct {
 	mu              sync.RWMutex
 	id              uint32
 	address         string

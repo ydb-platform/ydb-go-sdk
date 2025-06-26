@@ -131,7 +131,7 @@ func TestRetryTransportDeadlineExceeded(t *testing.T) {
 			ctx, cancel := xcontext.WithTimeout(context.Background(), time.Hour)
 			err := Retry(ctx, func(ctx context.Context) error {
 				counter++
-				if !(counter < cancelCounterValue) {
+				if counter >= cancelCounterValue {
 					cancel()
 				}
 
@@ -155,7 +155,7 @@ func TestRetryTransportCancelled(t *testing.T) {
 			ctx, cancel := xcontext.WithCancel(context.Background())
 			err := Retry(ctx, func(ctx context.Context) error {
 				counter++
-				if !(counter < cancelCounterValue) {
+				if counter >= cancelCounterValue {
 					cancel()
 				}
 

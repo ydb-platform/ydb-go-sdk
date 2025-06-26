@@ -149,7 +149,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	for i := range values {
 		if !r.discarded[i] {
 			if v := values[i]; v != nil {
-				dst[dstI], err = value.Any(*(v.(*value.Value)))
+				dst[dstI], err = value.Any(*(v.(*value.Value))) //nolint:forcetypeassert
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
