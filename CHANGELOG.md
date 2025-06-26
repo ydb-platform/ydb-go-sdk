@@ -1,4 +1,4 @@
-* Replaced requirements from go1.23 to go1.22
+* Replaced minimal requirements of `go` from `1.23` to `1.22`
 * Migrated `golangci-lint` to version `v2.1.6`
 
 ## v3.111.0
