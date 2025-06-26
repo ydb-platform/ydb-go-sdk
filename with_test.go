@@ -49,11 +49,12 @@ func TestWithCertificatesCached(t *testing.T) {
 		Bytes: caBytes,
 	})
 	require.NoError(t, err)
-	f, err := os.CreateTemp("", "ca.pem")
+	f, err := os.CreateTemp(os.TempDir(), "ca.pem")
+	defer os.Remove(f.Name())
+	defer f.Close()
 	require.NoError(t, err)
 	_, err = f.Write(caPEM.Bytes())
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
 
 	var (
 		n           = 100
