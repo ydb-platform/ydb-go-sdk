@@ -18,5 +18,5 @@ jobs:
       - name: Publish YDB SLO Report
         uses: ydb-platform/ydb-slo-action/report@charts
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          run_id: ${{ github.event.workflow_run.id }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_run_id: ${{ github.event.workflow_run.id }}
