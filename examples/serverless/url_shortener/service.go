@@ -441,8 +441,6 @@ func (s *service) handleLonger(w http.ResponseWriter, r *http.Request) {
 }
 
 // Serverless is an entrypoint for serverless yandex function
-//
-//nolint:deadcode
 func Serverless(w http.ResponseWriter, r *http.Request) {
 	s, err := getService(
 		r.Context(),

@@ -1149,7 +1149,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 		require.ErrorIs(
 			t,
 			commitByMode(topicreadercommon.CommitModeSync),
-			topicreadercommon.PublicErrCommitSessionToExpiredSession,
+			topicreadercommon.ErrPublicCommitSessionToExpiredSession,
 		)
 	})
 	t.Run("CommitModeAsync", func(t *testing.T) {

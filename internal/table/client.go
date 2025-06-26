@@ -443,7 +443,7 @@ func makeReadRowsResponse(response *Ydb_Table.ReadRowsResponse, err error, isTru
 
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.FromOperation(response),
+			xerrors.Operation(xerrors.FromOperation(response)),
 		)
 	}
 

@@ -79,7 +79,10 @@ func WithTraceID(traceID string) traceIDOption {
 	return traceIDOption(traceID)
 }
 
-type operationOption = operationError
+type operationOption struct {
+	code   Ydb.StatusIds_StatusCode
+	issues issues
+}
 
 func (e *operationOption) applyToOperationError(oe *operationError) {
 	oe.code = e.code

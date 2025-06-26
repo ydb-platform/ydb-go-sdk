@@ -168,7 +168,7 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 
 func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) (err error) {
 	// skipping second recv because first call of recv is from New Stream(), second call is from user
-	if r.nextResultSetCounter.Add(1) == 2 { //nolint:gomnd
+	if r.nextResultSetCounter.Add(1) == 2 { //nolint:mnd
 		r.setColumnIndexes(columns)
 
 		return ctx.Err()

@@ -203,8 +203,6 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 }
 
 // Serverless is an entrypoint for serverless yandex function
-//
-//nolint:deadcode
 func Serverless(ctx context.Context) error {
 	s, err := getService(
 		ctx,

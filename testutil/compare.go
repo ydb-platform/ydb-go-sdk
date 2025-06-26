@@ -286,7 +286,7 @@ func compareBytes(l, r *Ydb.Value) int {
 }
 
 func compareBool(l, r *Ydb.Value) int {
-	rr := r.GetBoolValue() //nolint:ifshort
+	rr := r.GetBoolValue()
 	if ll := l.GetBoolValue(); ll {
 		if rr {
 			return 0
@@ -304,11 +304,11 @@ func compareBool(l, r *Ydb.Value) int {
 func compareDyNumber(l, r *Ydb.Value) (int, error) {
 	ll := l.GetTextValue()
 	rr := r.GetTextValue()
-	lf, _, err := big.ParseFloat(ll, 10, 127, big.ToNearestEven) //nolint:gomnd
+	lf, _, err := big.ParseFloat(ll, 10, 127, big.ToNearestEven) //nolint:mnd
 	if err != nil {
 		return 0, xerrors.WithStackTrace(err)
 	}
-	rf, _, err := big.ParseFloat(rr, 10, 127, big.ToNearestEven) //nolint:gomnd
+	rf, _, err := big.ParseFloat(rr, 10, 127, big.ToNearestEven) //nolint:mnd
 	if err != nil {
 		return 0, err
 	}

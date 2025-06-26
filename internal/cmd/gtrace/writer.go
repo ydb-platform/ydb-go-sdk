@@ -19,7 +19,6 @@ import (
 	"unicode/utf8"
 )
 
-//nolint:maligned
 type Writer struct {
 	Output  io.Writer
 	Context build.Context
@@ -421,9 +420,9 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 				w.line("if " + h + " != nil {")
 				w.block(func() {
 					if fn.HasResult() {
-						w.code(rs[i], ` = `) //nolint:scopelint
+						w.code(rs[i], ` = `)
 					}
-					w.code(h) //nolint:scopelint
+					w.code(h)
 					w.call(args)
 				})
 				w.line("}")
@@ -1047,7 +1046,7 @@ func (s *scope) set(v string) bool {
 	if _, has := s.vars[v]; has {
 		return false
 	}
-	_, file, line, _ := runtime.Caller(2) //nolint:gomnd
+	_, file, line, _ := runtime.Caller(2) //nolint:mnd
 	s.vars[v] = decl{
 		where: fmt.Sprintf("%s:%d", file, line),
 	}

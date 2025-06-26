@@ -13,7 +13,7 @@ type TopicListener struct {
 }
 
 func NewTopicListener(
-	client *rawtopic.Client, //nolint:interfacer
+	client *rawtopic.Client,
 	config *topiclistenerinternal.StreamListenerConfig,
 	handler EventHandler,
 ) (*TopicListener, error) {
