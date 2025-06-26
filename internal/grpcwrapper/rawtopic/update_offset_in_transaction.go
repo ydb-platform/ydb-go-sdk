@@ -53,12 +53,12 @@ func (r *UpdateOffsetsInTransactionRequest) ToProto() *Ydb_Topic.UpdateOffsetsIn
 	return req
 }
 
-type UpdateOffsetsInTransactionRequest_TopicOffsets struct { //nolint:revive,stylecheck
+type UpdateOffsetsInTransactionRequest_TopicOffsets struct { //nolint:revive
 	Path       string // Topic path
 	Partitions []UpdateOffsetsInTransactionRequest_PartitionOffsets
 }
 
-type UpdateOffsetsInTransactionRequest_PartitionOffsets struct { //nolint:revive,stylecheck
+type UpdateOffsetsInTransactionRequest_PartitionOffsets struct { //nolint:revive
 	PartitionID      int64
 	PartitionOffsets []rawtopiccommon.OffsetRange
 }

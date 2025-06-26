@@ -75,7 +75,6 @@ type Static struct {
 	sourceInfo string
 }
 
-//nolint:funlen
 func (c *Static) Token(ctx context.Context) (token string, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

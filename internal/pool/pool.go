@@ -646,7 +646,7 @@ func (p *Pool[PT, T]) notifyAboutIdle(idle PT) (notified bool) {
 		// After that we taking a next waiter and repeat the same.
 		var ch *chan PT
 		p.changeState(func() Stats {
-			ch = p.waitQ.Remove(el) //nolint:scopelint
+			ch = p.waitQ.Remove(el)
 
 			return p.stats()
 		})

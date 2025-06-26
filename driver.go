@@ -429,13 +429,13 @@ func driverFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err erro
 }
 
 //nolint:cyclop, nonamedreturns, funlen
-func (d *Driver) connect(ctx context.Context) (err error) {
+func (d *Driver) connect(ctx context.Context) error {
 	if d.config.Endpoint() == "" {
-		return xerrors.WithStackTrace(errors.New("configuration: empty dial address")) //nolint:goerr113
+		return xerrors.WithStackTrace(errors.New("configuration: empty dial address")) //nolint:err113
 	}
 
 	if d.config.Database() == "" {
-		return xerrors.WithStackTrace(errors.New("configuration: empty database")) //nolint:goerr113
+		return xerrors.WithStackTrace(errors.New("configuration: empty database")) //nolint:err113
 	}
 
 	if d.userInfo != nil {
@@ -493,9 +493,6 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 			),
 		), nil
 	})
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
 
 	d.scheme = xsync.OnceValue(func() (*internalScheme.Client, error) {
 		return internalScheme.New(xcontext.ValueOnly(ctx),

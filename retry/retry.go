@@ -310,7 +310,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 
 	defer func() {
 		if finalErr != nil && options.stackTrace {
-			//nolint:gomnd
+			//nolint:mnd
 			finalErr = xerrors.WithStackTrace(finalErr,
 				xerrors.WithSkipDepth(2), // 1 - exit from defer, 1 - exit from Retry call
 			)

@@ -88,9 +88,6 @@ func deleteExpiredRange(ctx context.Context, c table.Client, prefix string, time
 	if err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
 	if err = res.Err(); err != nil {
 		return err
 	}

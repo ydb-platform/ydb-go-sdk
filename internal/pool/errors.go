@@ -18,7 +18,7 @@ var (
 
 func isRetriable(err error) bool {
 	if err == nil {
-		panic(err)
+		panic("nil")
 	}
 
 	switch {

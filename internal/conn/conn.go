@@ -167,7 +167,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 func (c *conn) Unban(ctx context.Context) State {
 	var newState State
 	c.mtx.RLock()
-	cc := c.grpcConn //nolint:ifshort
+	cc := c.grpcConn
 	c.mtx.RUnlock()
 	if isAvailable(cc) {
 		newState = Online

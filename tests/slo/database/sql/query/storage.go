@@ -71,10 +71,10 @@ type Storage struct {
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
 	defer cancel()
 
-	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:gomnd
+	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:mnd
 
 	s = &Storage{
 		cfg: cfg,

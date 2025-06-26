@@ -43,7 +43,7 @@ type PublicCheckRetryResult struct {
 var (
 	PublicRetryDecisionDefault = PublicCheckRetryResult{val: 0}
 	PublicRetryDecisionRetry   = PublicCheckRetryResult{val: 1}
-	PublicRetryDecisionStop    = PublicCheckRetryResult{val: 2} //nolint:gomnd
+	PublicRetryDecisionStop    = PublicCheckRetryResult{val: 2} //nolint:mnd
 )
 
 func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout time.Duration) bool {

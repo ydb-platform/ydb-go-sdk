@@ -526,7 +526,7 @@ func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange topicrea
 	defer func() {
 		if errors.Is(
 			err,
-			topicreadercommon.PublicErrCommitSessionToExpiredSession,
+			topicreadercommon.ErrPublicCommitSessionToExpiredSession,
 		) && r.cfg.CommitMode == topicreadercommon.CommitModeAsync {
 			err = nil
 		}
@@ -568,12 +568,12 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange topicreadercommon.C
 	}
 
 	if session.Context().Err() != nil {
-		return xerrors.WithStackTrace(topicreadercommon.PublicErrCommitSessionToExpiredSession)
+		return xerrors.WithStackTrace(topicreadercommon.ErrPublicCommitSessionToExpiredSession)
 	}
 
 	ownSession, err := r.sessionController.Get(session.StreamPartitionSessionID)
 	if err != nil || session != ownSession {
-		return xerrors.WithStackTrace(topicreadercommon.PublicErrCommitSessionToExpiredSession)
+		return xerrors.WithStackTrace(topicreadercommon.ErrPublicCommitSessionToExpiredSession)
 	}
 	if session.CommittedOffset() != commitRange.CommitOffsetStart && r.cfg.CommitMode == topicreadercommon.CommitModeSync {
 		return topicreadercommon.ErrWrongCommitOrderInSyncMode
