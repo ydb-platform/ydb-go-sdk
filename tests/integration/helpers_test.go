@@ -79,8 +79,21 @@ func (scope *scopeT) ConnectionString() string {
 	return "grpc://localhost:2136/local"
 }
 
+func (scope *scopeT) Endpoint() string {
+	conn := "grpc://localhost:2136/local"
+	if envString := os.Getenv("YDB_CONNECTION_STRING"); envString != "" {
+		conn = envString
+	}
+	arr := strings.Split(conn, "/")
+	return arr[len(arr)-2]
+}
+
 func (scope *scopeT) AuthToken() string {
 	return os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")
+}
+
+func (scope *scopeT) CertFile() string {
+	return os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE")
 }
 
 func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
@@ -117,18 +130,24 @@ func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 		token := scope.AuthToken()
 		if token == "" {
 			scope.Logf("With empty auth token")
+			opts = append(opts, ydb.WithAnonymousCredentials())
 		} else {
 			scope.Logf("With auth token")
+			opts = append(opts, ydb.WithAccessTokenCredentials(token))
+		}
+		cert := scope.CertFile()
+		if cert == "" {
+			scope.Logf("Without tls")
+			opts = append(opts, ydb.WithTLSSInsecureSkipVerify())
+		} else {
+			scope.Logf("With tls")
+			opts = append(opts, ydb.WithCertificatesFromFile(cert))
 		}
 
 		connectionContext, cancel := context.WithTimeout(scope.Ctx, time.Second*10)
 		defer cancel()
 
-		driver, err := ydb.Open(connectionContext, connectionString,
-			append(opts,
-				ydb.WithAccessTokenCredentials(token),
-			)...,
-		)
+		driver, err := ydb.Open(connectionContext, connectionString, opts...)
 		clean := func() {
 			if driver != nil {
 				scope.Require.NoError(driver.Close(scope.Ctx))
