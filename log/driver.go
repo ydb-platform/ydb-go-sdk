@@ -25,7 +25,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverResolverEvents == 0 {
 				return nil
 			}
-			ctx := with(context.Background(), TRACE, "ydb", "driver", "resolver", "update")
+			ctx := with(context.Background(), DEBUG, "ydb", "driver", "resolver", "update")
 			target := info.Target
 			addresses := info.Resolved
 			l.Log(ctx, "driver resolve starting...",
@@ -460,7 +460,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "update")
+			ctx := with(*info.Context, DEBUG, "ydb", "driver", "balancer", "update")
 			l.Log(ctx, "driver balancer update starting...",
 				kv.Bool("needLocalDC", info.NeedLocalDC),
 				kv.String("database", info.Database),
