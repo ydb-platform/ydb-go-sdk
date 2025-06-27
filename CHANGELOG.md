@@ -1,3 +1,4 @@
+## v3.111.2
 * Changed discovery and dns resolving log level to DEBUG
 
 ## v3.111.1
