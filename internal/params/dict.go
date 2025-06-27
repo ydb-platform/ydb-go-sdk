@@ -215,7 +215,7 @@ func (d *dictPair) UUID(v [16]byte) *dictValue {
 	}
 }
 
-func (d *dictPair) Uuid(v uuid.UUID) *dictValue { //nolint:revive,stylecheck
+func (d *dictPair) Uuid(v uuid.UUID) *dictValue { //nolint:revive
 	d.keyValue = value.Uuid(v)
 
 	return &dictValue{
@@ -457,7 +457,7 @@ func (d *dictValue) YSON(v []byte) *dict {
 //	return d.pair.parent
 //}
 
-func (d *dictValue) Uuid(v uuid.UUID) *dict { //nolint:revive,stylecheck
+func (d *dictValue) Uuid(v uuid.UUID) *dict { //nolint:revive
 	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
 		K: d.pair.keyValue,
 		V: value.Uuid(v),

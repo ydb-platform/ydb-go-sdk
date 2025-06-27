@@ -1220,7 +1220,7 @@ func (v intervalValue) Yql() string {
 		d = -d
 	}
 	buffer.WriteByte('P')
-	//nolint:gomnd
+	//nolint:mnd
 	if days := d / time.Hour / 24; days > 0 {
 		d -= days * time.Hour * 24 //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(days), 10))
@@ -1307,7 +1307,7 @@ func (v interval64Value) Yql() string {
 		d = -d
 	}
 	buffer.WriteByte('P')
-	//nolint:gomnd
+	//nolint:mnd
 	if days := d / time.Hour / 24; days > 0 {
 		d -= days * time.Hour * 24 //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(days), 10))
@@ -2626,7 +2626,7 @@ func UUIDFromYDBPair(high uint64, low uint64) *uuidValue {
 	return &uuidValue{value: res}
 }
 
-func Uuid(val uuid.UUID) *uuidValue { //nolint:revive,stylecheck
+func Uuid(val uuid.UUID) *uuidValue { //nolint:revive
 	return &uuidValue{value: val}
 }
 

@@ -621,9 +621,10 @@ func TestJWTTokenSourceReadPrivateKeyFromFile(t *testing.T) {
 
 	for _, method := range methods {
 		for _, binary := range binaryOpts {
-			f, err := os.CreateTemp("", "tmpfile-")
+			f, err := os.CreateTemp(t.TempDir(), "tmpfile-")
 			require.NoError(t, err)
 			defer os.Remove(f.Name())
+			defer f.Close()
 
 			var publicKey interface{}
 			var src TokenSource
@@ -1018,12 +1019,12 @@ func TestParseSettingsFromFile(t *testing.T) {
 	for _, params := range testsParams {
 		var fileName string
 		if params.Cfg != "" {
-			f, err := os.CreateTemp("", "cfg-")
+			f, err := os.CreateTemp(t.TempDir(), "cfg-")
 			require.NoError(t, err)
 			defer os.Remove(f.Name())
+			defer f.Close()
 			_, err = f.WriteString(params.Cfg)
 			require.NoError(t, err)
-			f.Close()
 			fileName = f.Name()
 		} else {
 			fileName = params.CfgFile

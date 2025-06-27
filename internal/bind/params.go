@@ -208,8 +208,6 @@ func toValue(v any) (_ value.Value, err error) {
 	}
 
 	switch x := v.(type) {
-	case nil:
-		return value.VoidValue(), nil
 	case value.Value:
 		return x, nil
 	case bool:

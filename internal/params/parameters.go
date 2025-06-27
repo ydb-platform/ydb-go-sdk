@@ -383,7 +383,7 @@ func (p *Parameter) UUIDWithIssue1501Value(v [16]byte) Builder {
 	}
 }
 
-func (p *Parameter) Uuid(val uuid.UUID) Builder { //nolint:revive,stylecheck
+func (p *Parameter) Uuid(val uuid.UUID) Builder { //nolint:revive
 	p.value = value.Uuid(val)
 
 	return Builder{

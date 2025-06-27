@@ -246,7 +246,7 @@ func (s *structValue) YSON(v []byte) *structure {
 //	return s.parent
 //}
 
-func (s *structValue) Uuid(v uuid.UUID) *structure { //nolint:revive,stylecheck
+func (s *structValue) Uuid(v uuid.UUID) *structure { //nolint:revive
 	s.parent.values = append(s.parent.values, value.StructValueField{
 		Name: s.name,
 		V:    value.Uuid(v),
