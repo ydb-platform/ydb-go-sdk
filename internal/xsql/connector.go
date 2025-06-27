@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -45,10 +44,9 @@ type (
 
 		processor Engine
 
-		TableOpts             []xtable.Option
-		QueryOpts             []xquery.Option
-		disableServerBalancer bool
-		onClose               []func(*Connector)
+		TableOpts []xtable.Option
+		QueryOpts []xquery.Option
+		onClose   []func(*Connector)
 
 		clock          clockwork.Clock
 		idleThreshold  time.Duration
@@ -117,11 +115,6 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
-
-	// Deprecated: use native driver configuration instead
-	if !c.disableServerBalancer {
-		ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-	}
 
 	switch c.processor {
 	case QUERY:

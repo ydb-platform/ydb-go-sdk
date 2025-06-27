@@ -6,102 +6,138 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestHintSessionBalancer(t *testing.T) {
+func TestWithDisableServerBalancer(t *testing.T) {
 	// This test verifies that the "session-balancer" capability is correctly added or removed based on configuration.
 	// The test covers four scenarios:
 	// 1. SQL driver with server balancer disabled
 	// 2. SQL driver with server balancer enabled
 	// 3. Native driver with server balancer disabled
 	// 4. Native driver with server balancer enabled
+	//
+	// All cases test in two modes: query and table.
 
-	t.Run("sql driver with disable server balancer", func(t *testing.T) {
-		var (
-			scope = newScope(t)
-			caps  []string
-			db    = sqlDriverWithOnSessionCreateTraces(scope, &caps,
-				ydb.WithDisableServerBalancer(),
-			)
-		)
+	var scope = newScope(t)
 
-		db.ExecContext(scope.Ctx, "SELECT 42")
-		scope.Require.NotContains(caps, "session-balancer")
-	})
+	// Test matrix
+	tests := []struct {
+		nativeEnable  bool // Add/Remove `ydb.WithDisableServerBalancer()` for native driver
+		sqlEnable     bool // Add/Remove `ydb.WithDisableServerBalancer()` for SQL driver
+		nativeHasHint bool
+		sqlHasHint    bool
+	}{
+		{
+			nativeEnable:  false,
+			sqlEnable:     false,
+			nativeHasHint: true,
+			sqlHasHint:    true,
+		},
+		{
+			nativeEnable:  true,
+			sqlEnable:     false,
+			nativeHasHint: false,
+			sqlHasHint:    false,
+		},
+		{
+			nativeEnable:  false,
+			sqlEnable:     true,
+			nativeHasHint: true,
+			sqlHasHint:    false,
+		},
+		{
+			nativeEnable:  true,
+			sqlEnable:     true,
+			nativeHasHint: false,
+			sqlHasHint:    false,
+		},
+	}
 
-	t.Run("sql driver without disable server balancer", func(t *testing.T) {
-		var (
-			scope = newScope(t)
-			caps  []string
-			db    = sqlDriverWithOnSessionCreateTraces(scope, &caps)
-		)
+	for _, mode := range []string{"query", "table"} {
+		for _, test := range tests {
+			testName := fmt.Sprintf("native=%t,sql=%t,checking=%s", test.nativeEnable, test.sqlEnable, mode)
+			t.Run(testName, func(t *testing.T) {
+				var (
+					nativeCapabilities []string
+					sqlCapabilities    []string
+					nativeOpts         = []ydb.Option{ydbTraceCapabilitiesOpt(&nativeCapabilities)}
+					nativeForSQLOpts   = []ydb.Option{ydbTraceCapabilitiesOpt(&sqlCapabilities)}
+					sqlOpts            = []ydb.ConnectorOption{}
+					err                error
+				)
 
-		db.ExecContext(scope.Ctx, "SELECT 42")
-		scope.Require.Contains(caps, "session-balancer")
-	})
+				const q = "SELECT 42"
 
-	t.Run("native driver with disable server balancer", func(t *testing.T) {
-		var (
-			scope = newScope(t)
-			caps  []string
-			db    = nativeDriverWithYDBCapabilitiesTraces(scope, &caps,
-				ydb.Option(ydb.WithDisableServerBalancer()),
-			)
-		)
+				if test.nativeEnable {
+					nativeOpts = append(nativeOpts, ydb.WithDisableServerBalancer())
+					nativeForSQLOpts = append(nativeForSQLOpts, ydb.WithDisableServerBalancer())
+				}
 
-		db.Query().Exec(scope.Ctx, "SELECT 42")
-		scope.Require.NotContains(caps, "session-balancer")
-	})
+				if test.sqlEnable {
+					sqlOpts = append(sqlOpts, ydb.WithDisableServerBalancer())
+				}
 
-	t.Run("native driver without disable server balancer", func(t *testing.T) {
-		var (
-			scope = newScope(t)
-			caps  []string
-			db    = nativeDriverWithYDBCapabilitiesTraces(scope, &caps)
-		)
+				if mode == "query" {
+					sqlOpts = append(sqlOpts, ydb.WithDefaultQueryMode(ydb.QueryExecuteQueryMode))
+				}
 
-		db.Query().Exec(scope.Ctx, "SELECT 42")
-		scope.Require.Contains(caps, "session-balancer")
-	})
+				native := scope.NonCachingDriver(nativeOpts...)
+				if mode == "query" {
+					err = native.Query().Exec(scope.Ctx, q)
+				} else {
+					err = native.Table().Do(scope.Ctx,
+						func(ctx context.Context, s table.Session) error {
+							_, _, err := s.Execute(ctx, table.DefaultTxControl(), q, nil)
+							return err
+						})
+				}
+				scope.Require.NoError(err)
+
+				connector, err := ydb.Connector(scope.NonCachingDriver(nativeForSQLOpts...), sqlOpts...)
+				scope.Require.NoError(err)
+
+				_, err = sql.OpenDB(connector).Exec(q)
+				scope.Require.NoError(err)
+
+				if test.nativeHasHint {
+					scope.Require.Contains(nativeCapabilities, "session-balancer")
+				} else {
+					scope.Require.NotContains(nativeCapabilities, "session-balancer")
+				}
+
+				if test.sqlHasHint {
+					scope.Require.Contains(sqlCapabilities, "session-balancer")
+				} else {
+					scope.Require.NotContains(sqlCapabilities, "session-balancer")
+				}
+			})
+		}
+	}
 }
 
 // internal
 
+func ydbTraceCapabilitiesOpt(capabilities *[]string) ydb.Option {
+	return ydb.WithTraceDriver(trace.Driver{
+		OnBalancerChooseEndpoint: func(info trace.DriverBalancerChooseEndpointStartInfo) func(trace.DriverBalancerChooseEndpointDoneInfo) {
+			*capabilities = extractYDBCapabilities(*info.Context)
+
+			fmt.Println("capabilities:", info.Call.String())
+
+			return func(trace.DriverBalancerChooseEndpointDoneInfo) {}
+		},
+	})
+}
+
 func extractYDBCapabilities(mdCtx context.Context) []string {
 	md, _ := metadata.FromOutgoingContext(mdCtx)
 	return md.Get("x-ydb-client-capabilities")
-}
-
-func sqlDriverWithOnSessionCreateTraces(scope *scopeT, capabilities *[]string, opts ...ydb.ConnectorOption) *sql.DB {
-	scope.T().Helper()
-
-	nativeDriver := nativeDriverWithYDBCapabilitiesTraces(scope, capabilities)
-
-	// only query mode testing
-	opts = append(opts, ydb.WithDefaultQueryMode(ydb.QueryExecuteQueryMode))
-
-	connector, err := ydb.Connector(nativeDriver, opts...)
-	scope.Require.NoError(err)
-
-	return sql.OpenDB(connector)
-}
-
-func nativeDriverWithYDBCapabilitiesTraces(scope *scopeT, capabilities *[]string, opts ...ydb.Option) *ydb.Driver {
-	scope.T().Helper()
-
-	opts = append(opts, ydb.WithTraceQuery(trace.Query{
-		OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(trace.QuerySessionCreateDoneInfo) {
-			*capabilities = extractYDBCapabilities(*info.Context)
-
-			return func(trace.QuerySessionCreateDoneInfo) {}
-		},
-	}))
-
-	return scope.Driver(opts...)
 }

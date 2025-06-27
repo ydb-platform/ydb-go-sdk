@@ -8,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -111,21 +113,40 @@ type (
 		panicCallback func(e interface{})
 	}
 	balancerWithMeta struct {
-		balancer *balancer.Balancer
-		meta     *meta.Meta
-		close    func(ctx context.Context) error
+		balancer               *balancer.Balancer
+		meta                   *meta.Meta
+		close                  func(ctx context.Context) error
+		disableSessionBalancer bool
 	}
 )
 
 func (b *balancerWithMeta) Invoke(ctx context.Context, method string, args any, reply any,
 	opts ...grpc.CallOption,
 ) error {
+	b.optionSessionBalancerForMethod(method)(b.meta)
+
 	metaCtx, err := b.meta.Context(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	return b.balancer.Invoke(metaCtx, method, args, reply, opts...)
+}
+
+func (b *balancerWithMeta) optionSessionBalancerForMethod(method string) meta.Option {
+	if b.disableSessionBalancer {
+		return meta.ForbidOption(meta.HintSessionBalancer)
+	}
+
+	if method == Ydb_Query_V1.QueryService_CreateSession_FullMethodName {
+		return meta.AllowOption(meta.HintSessionBalancer)
+	}
+
+	if method == Ydb_Table_V1.TableService_CreateSession_FullMethodName {
+		return meta.AllowOption(meta.HintSessionBalancer)
+	}
+
+	return meta.ForbidOption(meta.HintSessionBalancer)
 }
 
 func (b *balancerWithMeta) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string,

@@ -114,31 +114,42 @@ func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 		connectionString := scope.ConnectionString()
 		scope.Logf("Connect with connection string, driver name %q: %v", name, connectionString)
 
-		token := scope.AuthToken()
-		if token == "" {
-			scope.Logf("With empty auth token")
-		} else {
-			scope.Logf("With auth token")
-		}
+		driver := scope.NonCachingDriver(opts...)
 
-		connectionContext, cancel := context.WithTimeout(scope.Ctx, time.Second*10)
-		defer cancel()
-
-		driver, err := ydb.Open(connectionContext, connectionString,
-			append(opts,
-				ydb.WithAccessTokenCredentials(token),
-			)...,
-		)
 		clean := func() {
 			if driver != nil {
 				scope.Require.NoError(driver.Close(scope.Ctx))
 			}
 		}
 
-		return fixenv.NewGenericResultWithCleanup(driver, clean), err
+		return fixenv.NewGenericResultWithCleanup(driver, clean), nil
 	}
 
 	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
+}
+
+func (scope *scopeT) NonCachingDriver(opts ...ydb.Option) *ydb.Driver {
+	connectionString := scope.ConnectionString()
+	scope.Logf("Connect with connection string: %v", connectionString)
+
+	token := scope.AuthToken()
+	if token == "" {
+		scope.Logf("With empty auth token")
+	} else {
+		scope.Logf("With auth token")
+	}
+
+	connectionContext, cancel := context.WithTimeout(scope.Ctx, time.Second*10)
+	defer cancel()
+
+	driver, err := ydb.Open(connectionContext, connectionString,
+		append(opts,
+			ydb.WithAccessTokenCredentials(token),
+		)...,
+	)
+	scope.Require.NoError(err)
+
+	return driver
 }
 
 func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {

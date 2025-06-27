@@ -10,12 +10,11 @@ import (
 var defaultRetryBudget = budget.Limited(-1)
 
 type Common struct {
-	operationTimeout       time.Duration
-	operationCancelAfter   time.Duration
-	disableAutoRetry       bool
-	disableSessionBalancer bool
-	traceRetry             trace.Retry
-	retryBudget            budget.Budget
+	operationTimeout     time.Duration
+	operationCancelAfter time.Duration
+	disableAutoRetry     bool
+	traceRetry           trace.Retry
+	retryBudget          budget.Budget
 
 	panicCallback func(e interface{})
 }
@@ -23,11 +22,6 @@ type Common struct {
 // AutoRetry defines auto-retry flag
 func (c *Common) AutoRetry() bool {
 	return !c.disableAutoRetry
-}
-
-// DisableSessionBalancer returns whether the session balancer is disabled
-func (c *Common) DisableSessionBalancer() bool {
-	return c.disableSessionBalancer
 }
 
 // PanicCallback returns user-defined panic callback
@@ -94,11 +88,6 @@ func SetPanicCallback(c *Common, panicCallback func(e interface{})) {
 // SetAutoRetry affects on AutoRetry() flag
 func SetAutoRetry(c *Common, autoRetry bool) {
 	c.disableAutoRetry = !autoRetry
-}
-
-// DisableSessionBalancer disables the session balancer.
-func DisableSessionBalancer(c *Common) {
-	c.disableSessionBalancer = true
 }
 
 func SetTraceRetry(c *Common, t *trace.Retry, opts ...trace.RetryComposeOption) {

@@ -253,7 +253,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 
 func WithDisableSessionBalancer() Option {
 	return func(c *Config) {
-		config.DisableSessionBalancer(&c.Common)
+		c.metaOptions = append(c.metaOptions, meta.ForbidOption(meta.HintSessionBalancer))
 	}
 }
 

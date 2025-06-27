@@ -1,4 +1,4 @@
-* Added the previously lost `HintSessionBalancer`
+* Support for server-side load balancing of sessions ('session-balancer' value in the 'x-ydb-client-capabilities' metadata header)
 
 ## v3.111.1
 * Replaced minimal requirements of `go` from `1.23` to `1.22`
