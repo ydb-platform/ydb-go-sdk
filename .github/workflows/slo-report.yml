@@ -2,7 +2,7 @@ name: slo-report
 
 on:
   workflow_run:
-    workflows: [slo]
+    workflows: ['slo']
     types:
       - completed
 
