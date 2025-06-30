@@ -123,7 +123,8 @@ type (
 func (b *balancerWithMeta) Invoke(ctx context.Context, method string, args any, reply any,
 	opts ...grpc.CallOption,
 ) error {
-	b.optionSessionBalancerForMethod(method)(b.meta)
+	opt := b.optionSessionBalancerForMethod(method)
+	opt(b.meta)
 
 	metaCtx, err := b.meta.Context(ctx)
 	if err != nil {

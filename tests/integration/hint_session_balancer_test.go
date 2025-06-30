@@ -26,7 +26,7 @@ func TestWithDisableServerBalancer(t *testing.T) {
 	//
 	// All cases test in two modes: query and table.
 
-	var scope = newScope(t)
+	scope := newScope(t)
 
 	// Test matrix
 	tests := []struct {
@@ -129,7 +129,7 @@ func TestWithDisableServerBalancer(t *testing.T) {
 func ydbTraceCapabilitiesOpt(capabilities *[]string) ydb.Option {
 	return ydb.WithTraceDriver(trace.Driver{
 		OnBalancerChooseEndpoint: func(info trace.DriverBalancerChooseEndpointStartInfo) func(trace.DriverBalancerChooseEndpointDoneInfo) {
-			if *capabilities == nil { //if not nil then it's not a first call (not CreateSession)
+			if *capabilities == nil { // `nil` => first executing => CreateSession
 				*capabilities = extractYDBCapabilities(*info.Context)
 			}
 
