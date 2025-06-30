@@ -213,6 +213,7 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 	}
 
 	core.closeOnce = sync.OnceFunc(func() {
+		core.SetStatus(StatusClosed)
 		defer close(core.done)
 		defer cancelAttach()
 	})
@@ -288,7 +289,6 @@ func (core *sessionCore) Close(ctx context.Context) (err error) {
 		return nil
 	default:
 		core.SetStatus(StatusClosing)
-		defer core.SetStatus(StatusClosed)
 
 		if err = core.deleteSession(ctx); err != nil {
 			return xerrors.WithStackTrace(err)

@@ -1,5 +1,11 @@
 * Support for server-side load balancing of sessions ('session-balancer' value in the 'x-ydb-client-capabilities' metadata header)
 
+## v3.111.3
+* Fixed session closing in `ydb.WithExecuteDataQueryOverQueryClient(true)` scenario
+
+## v3.111.2
+* Changed discovery and dns resolving log level to DEBUG
+
 ## v3.111.1
 * Replaced minimal requirements of `go` from `1.23` to `1.22`
 * Migrated `golangci-lint` to version `v2.1.6`
