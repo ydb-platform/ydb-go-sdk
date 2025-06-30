@@ -1,3 +1,4 @@
+## v3.111.3
 * Fixed session closing in `ydb.WithExecuteDataQueryOverQueryClient(true)` scenario
 
 ## v3.111.2
