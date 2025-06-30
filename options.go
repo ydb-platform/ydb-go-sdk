@@ -252,7 +252,7 @@ func WithDatabase(database string) Option {
 	}
 }
 
-// WithDisableServerBalancer returns an Option that disables session balancing.
+// WithDisableSessionBalancer returns an Option that disables session balancing.
 func WithDisableSessionBalancer() Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.queryOptions = append(d.queryOptions, queryConfig.WithDisableSessionBalancer())

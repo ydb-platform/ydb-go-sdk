@@ -118,6 +118,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
 
+	// `queryConfig` needed here to check option from parent YDB driver
 	if !c.disableServerBalancer && !c.queryConfig.DisableSessionBalancer() {
 		ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
 	}
