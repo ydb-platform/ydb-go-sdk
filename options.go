@@ -258,6 +258,10 @@ func WithDisableSessionBalancer() Option {
 		d.queryOptions = append(d.queryOptions, queryConfig.WithDisableSessionBalancer())
 		d.tableOptions = append(d.tableOptions, tableConfig.WithDisableSessionBalancer())
 
+		// implicit disable session balancer for SQL driver;
+		// rule of thumb: if user disables session balancer anywhere, we disable it everywhere
+		d.databaseSQLOptions = append(d.databaseSQLOptions, WithDisableServerBalancer())
+
 		return nil
 	}
 }
