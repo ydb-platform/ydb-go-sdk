@@ -82,7 +82,7 @@ func (onClose onCloseOption) Apply(c *Connector) error {
 }
 
 func (disableServerBalancerOption) Apply(c *Connector) error {
-	c.disableSessionBalancer = true
+	c.disableServerBalancer = true
 
 	return nil
 }

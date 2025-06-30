@@ -111,17 +111,15 @@ type (
 		panicCallback func(e interface{})
 	}
 	balancerWithMeta struct {
-		balancer               *balancer.Balancer
-		meta                   *meta.Meta
-		close                  func(ctx context.Context) error
-		disableSessionBalancer bool
+		balancer *balancer.Balancer
+		meta     *meta.Meta
+		close    func(ctx context.Context) error
 	}
 )
 
 func (b *balancerWithMeta) Invoke(ctx context.Context, method string, args any, reply any,
 	opts ...grpc.CallOption,
 ) error {
-
 	metaCtx, err := b.meta.Context(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -143,11 +141,6 @@ func (b *balancerWithMeta) NewStream(ctx context.Context, desc *grpc.StreamDesc,
 
 func (b *balancerWithMeta) Close(ctx context.Context) error {
 	return b.close(ctx)
-}
-
-// DisableSessionBalancer disables the session balancer on session creating.
-func (b *balancerWithMeta) DisableSessionBalancer() {
-	b.disableSessionBalancer = true
 }
 
 // Close closes Driver and clear resources

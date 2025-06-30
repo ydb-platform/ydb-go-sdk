@@ -60,6 +60,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				if !config.DisableSessionBalancer() {
 					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
 				}
+
 				return newSession(ctx, cc, config)
 			}),
 			pool.WithTrace[*Session, Session](&pool.Trace{

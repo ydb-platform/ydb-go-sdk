@@ -45,9 +45,10 @@ type (
 
 		processor Engine
 
-		TableOpts []xtable.Option
-		QueryOpts []xquery.Option
-		onClose   []func(*Connector)
+		TableOpts             []xtable.Option
+		QueryOpts             []xquery.Option
+		disableServerBalancer bool
+		onClose               []func(*Connector)
 
 		clock          clockwork.Clock
 		idleThreshold  time.Duration
@@ -58,8 +59,6 @@ type (
 		retryBudget    budget.Budget
 		pathNormalizer bind.TablePathPrefix
 		bindings       bind.Bindings
-
-		disableSessionBalancer bool
 	}
 	ydbDriver interface {
 		Name() string
@@ -119,7 +118,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
 
-	if !c.disableSessionBalancer && !c.queryConfig.DisableSessionBalancer() {
+	if !c.disableServerBalancer && !c.queryConfig.DisableSessionBalancer() {
 		ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
 	}
 

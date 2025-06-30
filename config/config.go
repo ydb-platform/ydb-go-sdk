@@ -251,12 +251,6 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
-func WithDisableSessionBalancer() Option {
-	return func(c *Config) {
-		c.metaOptions = append(c.metaOptions, meta.ForbidOption(meta.HintSessionBalancer))
-	}
-}
-
 func WithGrpcMaxMessageSize(sizeBytes int) Option {
 	return func(c *Config) {
 		c.grpcMaxMessageSize = sizeBytes
