@@ -77,8 +77,8 @@ func TestWithDisableServerBalancer(t *testing.T) {
 				const q = "SELECT 42"
 
 				if test.nativeEnable {
-					nativeOpts = append(nativeOpts, ydb.WithDisableServerBalancer())
-					nativeForSQLOpts = append(nativeForSQLOpts, ydb.WithDisableServerBalancer())
+					nativeOpts = append(nativeOpts, ydb.WithDisableSessionBalancer())
+					nativeForSQLOpts = append(nativeForSQLOpts, ydb.WithDisableSessionBalancer())
 				}
 
 				if test.sqlEnable {

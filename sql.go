@@ -220,6 +220,10 @@ func WithDatabaseSQLTrace(
 	return xsql.WithTrace(&t, opts...)
 }
 
+func WithDisableServerBalancer() ConnectorOption {
+	return xsql.WithDisableServerBalancer()
+}
+
 type SQLConnector interface {
 	driver.Connector
 

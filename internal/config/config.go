@@ -16,6 +16,8 @@ type Common struct {
 	traceRetry           trace.Retry
 	retryBudget          budget.Budget
 
+	disableSessionBalancer bool
+
 	panicCallback func(e interface{})
 }
 
@@ -60,6 +62,10 @@ func (c *Common) RetryBudget() budget.Budget {
 	return c.retryBudget
 }
 
+func (c *Common) DisableSessionBalancer() bool {
+	return c.disableSessionBalancer
+}
+
 // SetOperationTimeout define the maximum amount of time a YDB server will process
 // an operation. After timeout exceeds YDB will try to cancel operation and
 // regardless of the cancellation appropriate error will be returned to
@@ -96,4 +102,8 @@ func SetTraceRetry(c *Common, t *trace.Retry, opts ...trace.RetryComposeOption) 
 
 func SetRetryBudget(c *Common, b budget.Budget) {
 	c.retryBudget = b
+}
+
+func (c *Common) SetDisableSessionBalancer() {
+	c.disableSessionBalancer = true
 }

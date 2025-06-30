@@ -33,22 +33,6 @@ import (
 // Option contains configuration values for Driver
 type Option func(ctx context.Context, d *Driver) error
 
-func (opt Option) Apply(c *xsql.Connector) error {
-	d := &Driver{}
-
-	if err := opt(context.Background(), d); err != nil {
-		return err
-	}
-
-	for _, sqlOpt := range d.databaseSQLOptions {
-		if err := sqlOpt.Apply(c); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func WithStaticCredentials(user, password string) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.userInfo = &dsn.UserInfo{
@@ -270,14 +254,10 @@ func WithDatabase(database string) Option {
 
 // WithDisableServerBalancer returns an Option that disables session balancing.
 // You can use it as a `ConnectorOption` for the SQL driver.
-func WithDisableServerBalancer() Option {
+func WithDisableSessionBalancer() Option {
 	return func(ctx context.Context, d *Driver) error {
-		if d.metaBalancer != nil {
-			d.metaBalancer.disableSessionBalancer = true
-		}
-
-		d.options = append(d.options, config.WithDisableSessionBalancer())
-		d.databaseSQLOptions = append(d.databaseSQLOptions, xsql.WithDisableServerBalancer())
+		d.queryOptions = append(d.queryOptions, queryConfig.WithDisableSessionBalancer())
+		d.tableOptions = append(d.tableOptions, tableConfig.WithDisableSessionBalancer())
 
 		return nil
 	}

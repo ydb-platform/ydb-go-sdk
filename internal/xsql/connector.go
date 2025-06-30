@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -57,6 +58,8 @@ type (
 		retryBudget    budget.Budget
 		pathNormalizer bind.TablePathPrefix
 		bindings       bind.Bindings
+
+		disableSessionBalancer bool
 	}
 	ydbDriver interface {
 		Name() string
@@ -115,6 +118,10 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
+
+	if !c.disableSessionBalancer && !c.queryConfig.DisableSessionBalancer() {
+		ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
+	}
 
 	switch c.processor {
 	case QUERY:

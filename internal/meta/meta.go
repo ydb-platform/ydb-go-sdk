@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"slices"
 	"strconv"
 
 	"google.golang.org/grpc/metadata"
@@ -56,7 +55,7 @@ func WithRequestTypeOption(requestType string) Option {
 
 func AllowOption(feature string) Option {
 	return func(m *Meta) {
-		m.capabilities = slices.Compact(append(m.capabilities, feature))
+		m.capabilities = append(m.capabilities, feature)
 	}
 }
 

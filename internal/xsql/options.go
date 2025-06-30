@@ -82,9 +82,7 @@ func (onClose onCloseOption) Apply(c *Connector) error {
 }
 
 func (disableServerBalancerOption) Apply(c *Connector) error {
-	if balancer, ok := c.balancer.(interface{ DisableSessionBalancer() }); ok {
-		balancer.DisableSessionBalancer()
-	}
+	c.disableSessionBalancer = true
 
 	return nil
 }
