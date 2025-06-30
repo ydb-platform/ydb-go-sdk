@@ -164,6 +164,11 @@ func (b *balancerWithMeta) Close(ctx context.Context) error {
 	return b.close(ctx)
 }
 
+// DisableSessionBalancer disables the session balancer on session creating.
+func (b *balancerWithMeta) DisableSessionBalancer() {
+	b.disableSessionBalancer = true
+}
+
 // Close closes Driver and clear resources
 //
 //nolint:nonamedreturns

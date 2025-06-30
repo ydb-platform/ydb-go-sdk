@@ -85,11 +85,8 @@ func TestWithDisableServerBalancer(t *testing.T) {
 					sqlOpts = append(sqlOpts, ydb.WithDisableServerBalancer())
 				}
 
-				if mode == "query" {
-					sqlOpts = append(sqlOpts, ydb.WithDefaultQueryMode(ydb.QueryExecuteQueryMode))
-				}
-
 				native := scope.NonCachingDriver(nativeOpts...)
+
 				if mode == "query" {
 					err = native.Query().Exec(scope.Ctx, q)
 				} else {
@@ -100,6 +97,10 @@ func TestWithDisableServerBalancer(t *testing.T) {
 						})
 				}
 				scope.Require.NoError(err)
+
+				if mode == "query" {
+					sqlOpts = append(sqlOpts, ydb.WithDefaultQueryMode(ydb.QueryExecuteQueryMode))
+				}
 
 				connector, err := ydb.Connector(scope.NonCachingDriver(nativeForSQLOpts...), sqlOpts...)
 				scope.Require.NoError(err)
@@ -128,9 +129,9 @@ func TestWithDisableServerBalancer(t *testing.T) {
 func ydbTraceCapabilitiesOpt(capabilities *[]string) ydb.Option {
 	return ydb.WithTraceDriver(trace.Driver{
 		OnBalancerChooseEndpoint: func(info trace.DriverBalancerChooseEndpointStartInfo) func(trace.DriverBalancerChooseEndpointDoneInfo) {
-			*capabilities = extractYDBCapabilities(*info.Context)
-
-			fmt.Println("capabilities:", info.Call.String())
+			if *capabilities == nil { //if not nil then it's not a first call (not CreateSession)
+				*capabilities = extractYDBCapabilities(*info.Context)
+			}
 
 			return func(trace.DriverBalancerChooseEndpointDoneInfo) {}
 		},

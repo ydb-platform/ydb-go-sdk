@@ -588,7 +588,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 					createCtx    context.Context
 					cancelCreate context.CancelFunc
 				)
-
 				if d := cfg.SessionCreateTimeout(); d > 0 {
 					createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
 				} else {
