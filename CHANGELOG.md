@@ -1,3 +1,5 @@
+* Fixed session closing in `ydb.WithExecuteDataQueryOverQueryClient(true)` scenario
+
 ## v3.111.2
 * Changed discovery and dns resolving log level to DEBUG
 
