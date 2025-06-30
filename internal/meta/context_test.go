@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 )
@@ -59,43 +58,4 @@ func TestContext(t *testing.T) {
 			require.Equal(t, tt.values, md.Get(tt.header))
 		})
 	}
-}
-
-func TestWithoutAllowFeatures(t *testing.T) {
-	t.Run("happy path", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = WithAllowFeatures(ctx, "feature-1", "feature-2", "feature-3")
-
-		ctx = WithoutAllowFeatures(ctx, "feature-1", "feature-3")
-
-		md, ok := metadata.FromOutgoingContext(ctx)
-		require.True(t, ok)
-		features := md.Get(HeaderClientCapabilities)
-		assert.Contains(t, features, "feature-2")
-		assert.NotContains(t, features, "feature-1")
-		assert.NotContains(t, features, "feature-3")
-	})
-
-	t.Run("only one feature", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = WithAllowFeatures(ctx, "feature")
-
-		ctx = WithoutAllowFeatures(ctx, "feature")
-
-		md, ok := metadata.FromOutgoingContext(ctx)
-		require.True(t, ok)
-		features := md.Get(HeaderClientCapabilities)
-		assert.Empty(t, features)
-	})
-
-	t.Run("no client capabilities", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = WithRequestType(ctx, "my-request-type")
-
-		ctx = WithoutAllowFeatures(ctx, "feature-1", "feature-2", "feature-3")
-
-		md, ok := metadata.FromOutgoingContext(ctx)
-		require.True(t, ok)
-		assert.Equal(t, md.Get(HeaderRequestType), []string{"my-request-type"})
-	})
 }

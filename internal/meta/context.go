@@ -2,7 +2,6 @@ package meta
 
 import (
 	"context"
-	"slices"
 
 	"google.golang.org/grpc/metadata"
 )
@@ -48,23 +47,6 @@ func WithAllowFeatures(ctx context.Context, features ...string) context.Context 
 	}
 
 	return metadata.AppendToOutgoingContext(ctx, kv...)
-}
-
-func WithoutAllowFeatures(ctx context.Context, features ...string) context.Context {
-	md, _ := metadata.FromOutgoingContext(ctx)
-	caps := md.Get(HeaderClientCapabilities)
-
-	cleanedCaps := slices.DeleteFunc(caps, func(cap string) bool {
-		return slices.Contains(features, cap)
-	})
-
-	if len(cleanedCaps) == 0 {
-		md.Delete(HeaderClientCapabilities)
-	} else {
-		md.Set(HeaderClientCapabilities, cleanedCaps...)
-	}
-
-	return metadata.NewOutgoingContext(ctx, md)
 }
 
 // WithTraceParent returns a copy of parent context with traceparent header

@@ -269,7 +269,7 @@ func WithDatabase(database string) Option {
 }
 
 // WithDisableServerBalancer returns an Option that disables session balancing.
-// You can use it as a ConnectorOption for the SQL driver.
+// You can use it as a `ConnectorOption` for the SQL driver.
 func WithDisableServerBalancer() Option {
 	return func(ctx context.Context, d *Driver) error {
 		if d.metaBalancer != nil {

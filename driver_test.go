@@ -6,8 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 )
 
 func Test_balancerWithMeta_DisableSessionBalancer(t *testing.T) {
@@ -38,5 +39,6 @@ func Test_balancerWithMeta_DisableSessionBalancer(t *testing.T) {
 
 func extractYDBCapabilities(mdCtx context.Context) []string {
 	md, _ := metadata.FromOutgoingContext(mdCtx)
+
 	return md.Get("x-ydb-client-capabilities")
 }
