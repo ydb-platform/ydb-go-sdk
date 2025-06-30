@@ -145,35 +145,28 @@ func (scope *scopeT) NonCachingDriver(opts ...ydb.Option) *ydb.Driver {
 	connectionString := scope.ConnectionString()
 	scope.Logf("Connect with connection string: %v", connectionString)
 
-		token := scope.AuthToken()
-		if token == "" {
-			scope.Logf("With empty auth token")
-			opts = append(opts, ydb.WithAnonymousCredentials())
-		} else {
-			scope.Logf("With auth token")
-			opts = append(opts, ydb.WithAccessTokenCredentials(token))
-		}
-		cert := scope.CertFile()
-		if cert == "" {
-			scope.Logf("Without tls")
-			opts = append(opts, ydb.WithTLSSInsecureSkipVerify())
-		} else {
-			scope.Logf("With tls")
-			opts = append(opts, ydb.WithCertificatesFromFile(cert))
-		}
+	token := scope.AuthToken()
+	if token == "" {
+		scope.Logf("With empty auth token")
+		opts = append(opts, ydb.WithAnonymousCredentials())
+	} else {
+		scope.Logf("With auth token")
+		opts = append(opts, ydb.WithAccessTokenCredentials(token))
+	}
+	cert := scope.CertFile()
+	if cert == "" {
+		scope.Logf("Without tls")
+		opts = append(opts, ydb.WithTLSSInsecureSkipVerify())
+	} else {
+		scope.Logf("With tls")
+		opts = append(opts, ydb.WithCertificatesFromFile(cert))
+	}
 
 	connectionContext, cancel := context.WithTimeout(scope.Ctx, time.Second*10)
 	defer cancel()
 
-		driver, err := ydb.Open(connectionContext, connectionString, opts...)
-		clean := func() {
-			if driver != nil {
-				scope.Require.NoError(driver.Close(scope.Ctx))
-			}
-		}
-
-		return fixenv.NewGenericResultWithCleanup(driver, clean), err
-	}
+	driver, err := ydb.Open(connectionContext, connectionString, opts...)
+	scope.Require.NoError(err)
 
 	return driver
 }
