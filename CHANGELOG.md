@@ -1,4 +1,4 @@
-* Fixed the support for server-side load balancing of sessions ('session-balancer' value in the 'x-ydb-client-capabilities' metadata header)
+* Fixed the support of server-side load balancing of sessions in `database/sql` driver
 * Added `ydb.WithDisableSessionBalancer()` driver option for disable server-side session balancing on table and query clients
 
 ## v3.111.3
