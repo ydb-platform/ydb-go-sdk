@@ -198,8 +198,9 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 	}
 
 	core.closeOnce = sync.OnceFunc(func() {
-		cancelAttach()
-		close(core.done)
+		defer close(core.done)
+		defer cancelAttach()
+		core.SetStatus(StatusClosed)
 	})
 
 	if markGoroutineWithLabelNodeIDForAttachStream {
@@ -273,7 +274,6 @@ func (core *sessionCore) Close(ctx context.Context) (err error) {
 		return nil
 	default:
 		core.SetStatus(StatusClosing)
-		defer core.SetStatus(StatusClosed)
 
 		if err = core.deleteSession(ctx); err != nil {
 			return xerrors.WithStackTrace(err)

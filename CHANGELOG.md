@@ -1,3 +1,17 @@
+## v3.111.3
+* Fixed session closing in `ydb.WithExecuteDataQueryOverQueryClient(true)` scenario
+
+## v3.111.2
+* Changed discovery and dns resolving log level to DEBUG
+
+## v3.111.1
+* Replaced minimal requirements of `go` from `1.23` to `1.22`
+* Migrated `golangci-lint` to version `v2.1.6`
+
+## v3.111.0
+* Added `sugar.PrintErrorWithoutStack` helper for remove stack records from error string
+* Added `sugar.UnwrapError` helper for unwrap source error to root errors
+
 ## v3.110.1
 * Added the ability to send BulkRequest exceeding the GrpcMaxMessageSize
 

@@ -178,7 +178,7 @@ func (s *setItem) YSON(v []byte) *set {
 //	return s.parent
 //}
 
-func (s *setItem) Uuid(v uuid.UUID) *set { //nolint:revive,stylecheck
+func (s *setItem) Uuid(v uuid.UUID) *set { //nolint:revive
 	s.parent.values = append(s.parent.values, value.Uuid(v))
 
 	return s.parent

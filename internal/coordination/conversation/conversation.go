@@ -319,7 +319,7 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	notify := false //nolint:ifshort
+	notify := false
 	handled := false
 	for i := len(c.queue) - 1; i >= 0; i-- {
 		req := c.queue[i]

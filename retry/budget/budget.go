@@ -110,7 +110,7 @@ func Percent(percent int) *percentBudget {
 }
 
 func (b *percentBudget) Acquire(ctx context.Context) error {
-	if b.rand.Int(100) < b.percent { //nolint:gomnd
+	if b.rand.Int(100) < b.percent { //nolint:mnd
 		return nil
 	}
 
