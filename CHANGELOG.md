@@ -1,3 +1,5 @@
+* Added support for the `json.Unmarshaler` interface in the `CastTo` function for use in scanners, such as the `ScanStruct` method
+
 ## v3.111.3
 * Fixed session closing in `ydb.WithExecuteDataQueryOverQueryClient(true)` scenario
 
