@@ -1,3 +1,6 @@
+* Fixed the support of server-side session balancing in `database/sql` driver
+* Added `ydb.WithDisableSessionBalancer()` driver option for disable server-side session balancing on table and query clients
+
 ## v3.111.3
 * Fixed session closing in `ydb.WithExecuteDataQueryOverQueryClient(true)` scenario
 

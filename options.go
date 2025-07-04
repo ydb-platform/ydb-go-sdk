@@ -252,6 +252,20 @@ func WithDatabase(database string) Option {
 	}
 }
 
+// WithDisableSessionBalancer returns an Option that disables session balancing.
+func WithDisableSessionBalancer() Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.queryOptions = append(d.queryOptions, queryConfig.WithDisableSessionBalancer())
+		d.tableOptions = append(d.tableOptions, tableConfig.WithDisableSessionBalancer())
+
+		// implicit disable session balancer for SQL driver;
+		// rule of thumb: if user disables session balancer anywhere, we disable it everywhere
+		d.databaseSQLOptions = append(d.databaseSQLOptions, WithDisableServerBalancer())
+
+		return nil
+	}
+}
+
 // WithSecure defines secure option
 //
 // Warning: use ydb.Open with required Driver string parameter instead

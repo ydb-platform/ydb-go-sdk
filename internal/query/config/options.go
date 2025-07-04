@@ -85,3 +85,9 @@ func WithLazyTx(lazyTx bool) Option {
 		c.lazyTx = lazyTx
 	}
 }
+
+func WithDisableSessionBalancer() Option {
+	return func(c *Config) {
+		c.SetDisableSessionBalancer()
+	}
+}
