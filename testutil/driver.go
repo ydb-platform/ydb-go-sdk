@@ -3,10 +3,13 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
@@ -58,6 +61,10 @@ const (
 	TableDescribeTableOptions
 	TableStreamReadTable
 	TableStreamExecuteScanQuery
+
+	QueryCreateSession
+	QueryExecuteQuery
+	QueryAttachSession
 )
 
 var grpcMethodToCode = map[Method]MethodCode{
@@ -79,6 +86,10 @@ var grpcMethodToCode = map[Method]MethodCode{
 	"/Ydb.Table.V1.TableService/DescribeTableOptions":   TableDescribeTableOptions,
 	"/Ydb.Table.V1.TableService/StreamReadTable":        TableStreamReadTable,
 	"/Ydb.Table.V1.TableService/StreamExecuteScanQuery": TableStreamExecuteScanQuery,
+
+	"/Ydb.Query.V1.QueryService/ExecuteQuery":  QueryExecuteQuery,
+	"/Ydb.Query.V1.QueryService/CreateSession": QueryCreateSession,
+	"/Ydb.Query.V1.QueryService/AttachSession": QueryAttachSession,
 }
 
 var codeToString = map[MethodCode]string{
@@ -107,10 +118,7 @@ func setField(name string, dst, value interface{}) {
 	t := x.Type()
 	f, ok := t.FieldByName(name)
 	if !ok {
-		panic(fmt.Sprintf(
-			"struct %s has no field %q",
-			t, name,
-		))
+		return
 	}
 	v := reflect.ValueOf(value)
 	if f.Type.Kind() != v.Type().Kind() {
@@ -363,6 +371,28 @@ func (s *ClientStream) RecvMsg(m interface{}) error {
 	}
 
 	return s.OnRecvMsg(m)
+}
+
+func MockClientStream() *ClientStream {
+	var recvMsgAlreadySent bool
+
+	return &ClientStream{
+		OnSendMsg:   func(m any) error { return nil },
+		OnCloseSend: func() error { return nil },
+		OnRecvMsg: func(m any) error {
+			if recvMsgAlreadySent {
+				return io.EOF
+			}
+			recvMsgAlreadySent = true
+
+			switch resp := m.(type) { // you can freely add additional mock data
+			case *Ydb_Query.ExecuteQueryResponsePart:
+				resp.ResultSet = &Ydb.ResultSet{Rows: []*Ydb.Value{{}}}
+			}
+
+			return nil
+		},
+	}
 }
 
 func lastSegment(m string) string {

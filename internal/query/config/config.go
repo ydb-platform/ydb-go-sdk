@@ -17,9 +17,10 @@ const (
 type Config struct {
 	config.Common
 
-	poolLimit             int
-	poolSessionUsageLimit uint64
-	poolSessionUsageTTL   time.Duration
+	poolLimit                int
+	implicitSessionPoolLimit int
+	poolSessionUsageLimit    uint64
+	poolSessionUsageTTL      time.Duration
 
 	sessionCreateTimeout   time.Duration
 	sessionDeleteTimeout   time.Duration
@@ -43,10 +44,11 @@ func New(opts ...Option) *Config {
 
 func defaults() *Config {
 	return &Config{
-		poolLimit:            DefaultPoolMaxSize,
-		sessionCreateTimeout: DefaultSessionCreateTimeout,
-		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
-		trace:                &trace.Query{},
+		poolLimit:                DefaultPoolMaxSize,
+		implicitSessionPoolLimit: DefaultPoolMaxSize,
+		sessionCreateTimeout:     DefaultSessionCreateTimeout,
+		sessionDeleteTimeout:     DefaultSessionDeleteTimeout,
+		trace:                    &trace.Query{},
 	}
 }
 
@@ -60,6 +62,10 @@ func (c *Config) Trace() *trace.Query {
 // DefaultPoolMaxSize variable is used as a pool limit.
 func (c *Config) PoolLimit() int {
 	return c.poolLimit
+}
+
+func (c *Config) ImplicitSessionPoolLimit() int {
+	return c.implicitSessionPoolLimit
 }
 
 func (c *Config) PoolSessionUsageLimit() uint64 {

@@ -1,3 +1,4 @@
+* Added a feature: "Execute queries without explicit session creation"
 * Fixed the support of server-side session balancing in `database/sql` driver
 * Added `ydb.WithDisableSessionBalancer()` driver option for disable server-side session balancing on table and query clients
 
