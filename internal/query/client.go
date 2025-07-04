@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -594,6 +595,10 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 					createCtx, cancelCreate = xcontext.WithCancel(ctx)
 				}
 				defer cancelCreate()
+
+				if !cfg.DisableSessionBalancer() {
+					createCtx = meta.WithAllowFeatures(createCtx, meta.HintSessionBalancer)
+				}
 
 				s, err := createSession(createCtx, client,
 					WithConn(cc),
