@@ -3,6 +3,7 @@ package value
 import (
 	"database/sql/driver"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -1370,6 +1371,16 @@ func (v jsonValue) castTo(dst any) error {
 		*vv = xstring.ToBytes(string(v))
 
 		return nil
+	case json.Unmarshaler:
+		err := vv.UnmarshalJSON(xstring.ToBytes(string(v)))
+		if err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"%w '%s(%+v)' to '%T' destination: %w",
+				ErrCannotCast, v.Type().Yql(), v, vv, err,
+			))
+		}
+
+		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
@@ -1412,6 +1423,16 @@ func (v jsonDocumentValue) castTo(dst any) error {
 		return nil
 	case *[]byte:
 		*vv = xstring.ToBytes(string(v))
+
+		return nil
+	case json.Unmarshaler:
+		err := vv.UnmarshalJSON(xstring.ToBytes(string(v)))
+		if err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"%w '%s(%+v)' to '%T' destination: %w",
+				ErrCannotCast, v.Type().Yql(), v, vv, err,
+			))
+		}
 
 		return nil
 	default:

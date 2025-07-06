@@ -1,4 +1,9 @@
-* Added a feature: "Execute queries without explicit session creation"
+* Added a feature: "Execute queries without explicit session creation":
+  * added `ydb.WithImplicitSessionPoolSizeLimit()` option for limitation of implicit sessions
+  * added `query.WithImplicitSession()` option for execute query with implicit session
+
+## v3.112.0
+* Added support for the `json.Unmarshaler` interface in the `CastTo` function for use in scanners, such as the `ScanStruct` method
 * Fixed the support of server-side session balancing in `database/sql` driver
 * Added `ydb.WithDisableSessionBalancer()` driver option for disable server-side session balancing on table and query clients
 
