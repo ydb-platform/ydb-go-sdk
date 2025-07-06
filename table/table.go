@@ -177,7 +177,7 @@ type Session interface {
 }
 
 type (
-	TransactionSettings = tx.Settings
+	TransactionSettings = tx.Options
 	// Transaction control options
 	TxOption = tx.SettingsOption
 )
