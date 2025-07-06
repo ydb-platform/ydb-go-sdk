@@ -186,6 +186,12 @@ func UseQuerySession(b bool) Option {
 	}
 }
 
+func WithDisableSessionBalancer() Option {
+	return func(c *Config) {
+		c.SetDisableSessionBalancer()
+	}
+}
+
 // WithClock replaces default clock
 func WithClock(clock clockwork.Clock) Option {
 	return func(c *Config) {

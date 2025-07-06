@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -56,6 +57,10 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			}),
 			pool.WithClock[*Session, Session](config.Clock()),
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
+				if !config.DisableSessionBalancer() {
+					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
+				}
+
 				return newSession(ctx, cc, config)
 			}),
 			pool.WithTrace[*Session, Session](&pool.Trace{

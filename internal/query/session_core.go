@@ -13,10 +13,12 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -90,6 +92,19 @@ func (core *sessionCore) Status() string {
 	}
 }
 
+func (core *sessionCore) checkCloseHint(md metadata.MD) {
+	for header, values := range md {
+		if header != meta.HeaderServerHints {
+			continue
+		}
+		for _, hint := range values {
+			if hint == meta.HintSessionClose {
+				core.SetStatus(StatusClosing)
+			}
+		}
+	}
+}
+
 type Option func(*sessionCore)
 
 func WithConn(cc grpc.ClientConnInterface) Option {
@@ -150,7 +165,7 @@ func Open(
 	if core.cc != nil {
 		core.Client = Ydb_Query_V1.NewQueryServiceClient(
 			conn.WithContextModifier(core.cc, func(ctx context.Context) context.Context {
-				return balancerContext.WithNodeID(ctx, core.NodeID())
+				return meta.WithTrailerCallback(balancerContext.WithNodeID(ctx, core.NodeID()), core.checkCloseHint)
 			}),
 		)
 	}
@@ -198,9 +213,9 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 	}
 
 	core.closeOnce = sync.OnceFunc(func() {
-		core.SetStatus(StatusClosed)
 		defer close(core.done)
 		defer cancelAttach()
+		core.SetStatus(StatusClosed)
 	})
 
 	if markGoroutineWithLabelNodeIDForAttachStream {
