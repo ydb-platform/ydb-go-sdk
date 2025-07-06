@@ -2,6 +2,8 @@ package value
 
 import (
 	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -24,6 +26,28 @@ func value2ptr[T any](v T) *T {
 func unwrapPtr(v interface{}) interface{} {
 	return reflect.ValueOf(v).Elem().Interface()
 }
+
+type jsonUnmarshaller struct {
+	bytes []byte
+}
+
+func (json *jsonUnmarshaller) UnmarshalJSON(bytes []byte) error {
+	json.bytes = bytes
+
+	return nil
+}
+
+var _ json.Unmarshaler = &jsonUnmarshaller{}
+
+type jsonUnmarshallerBroken struct {
+	bytes []byte
+}
+
+func (json *jsonUnmarshallerBroken) UnmarshalJSON(_ []byte) error {
+	return errors.New("unmarshal error")
+}
+
+var _ json.Unmarshaler = &jsonUnmarshallerBroken{}
 
 func loadLocation(t *testing.T, name string) *time.Location {
 	loc, err := time.LoadLocation(name)
@@ -138,6 +162,75 @@ func TestCastTo(t *testing.T) {
 			err:   ErrCannotCast,
 		},
 
+		// JSONValue
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONValue(`{"test": "text"}"`),
+			dst:   ptr[string](),
+			exp:   `{"test": "text"}"`,
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONValue(`{"test":"text"}"`),
+			dst:   ptr[Value](),
+			exp:   JSONValue(`{"test":"text"}"`),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(JSONValue(`{"test": "text"}"`)),
+			dst:   ptr[*[]byte](),
+			exp:   value2ptr([]byte(`{"test": "text"}"`)),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONValue(`{"test":"text"}"`),
+			dst:   ptr[[]byte](),
+			exp:   []byte(`{"test":"text"}"`),
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONValue(`{"test": "text"}"`),
+			dst:   ptr[jsonUnmarshaller](),
+			exp:   jsonUnmarshaller{[]byte(`{"test": "text"}"`)},
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONValue(`{"test": "text"}"`),
+			dst:   ptr[jsonUnmarshallerBroken](),
+			err:   ErrCannotCast,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(JSONValue(`{"test": "text"}"`)),
+			dst:   ptr[jsonUnmarshaller](),
+			exp:   jsonUnmarshaller{[]byte(`{"test": "text"}"`)},
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(JSONValue(`{"test": "text"}"`)),
+			dst:   ptr[jsonUnmarshallerBroken](),
+			err:   ErrCannotCast,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONValue(`{"test": "text"}"`),
+			dst:   ptr[int](),
+			err:   ErrCannotCast,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(JSONValue(`{"test": "text"}"`)),
+			dst:   ptr[int](),
+			err:   ErrCannotCast,
+		},
+
+		// JSONDocumentValue
 		{
 			name:  xtest.CurrentFileLine(),
 			value: JSONDocumentValue(`{"test": "text"}"`),
@@ -165,6 +258,44 @@ func TestCastTo(t *testing.T) {
 			dst:   ptr[[]byte](),
 			exp:   []byte(`{"test":"text"}"`),
 			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONDocumentValue(`{"test": "text"}"`),
+			dst:   ptr[jsonUnmarshaller](),
+			exp:   jsonUnmarshaller{[]byte(`{"test": "text"}"`)},
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONDocumentValue(`{"test": "text"}"`),
+			dst:   ptr[jsonUnmarshallerBroken](),
+			err:   ErrCannotCast,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(JSONDocumentValue(`{"test": "text"}"`)),
+			dst:   ptr[jsonUnmarshaller](),
+			exp:   jsonUnmarshaller{[]byte(`{"test": "text"}"`)},
+			err:   nil,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(JSONDocumentValue(`{"test": "text"}"`)),
+			dst:   ptr[jsonUnmarshallerBroken](),
+			err:   ErrCannotCast,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: JSONDocumentValue(`{"test": "text"}"`),
+			dst:   ptr[int](),
+			err:   ErrCannotCast,
+		},
+		{
+			name:  xtest.CurrentFileLine(),
+			value: OptionalValue(JSONDocumentValue(`{"test": "text"}"`)),
+			dst:   ptr[int](),
+			err:   ErrCannotCast,
 		},
 
 		{
