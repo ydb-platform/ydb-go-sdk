@@ -23,6 +23,9 @@ func WithTrace(trace *trace.Query, opts ...trace.QueryComposeOption) Option {
 	}
 }
 
+// WithPoolLimit defines upper bound of pooled sessions.
+// If poolLimit is less than or equal to zero then the
+// DefaultPoolMaxSize variable is used as a poolLimit.
 func WithPoolLimit(size int) Option {
 	return func(c *Config) {
 		if size > 0 {

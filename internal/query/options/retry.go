@@ -109,10 +109,6 @@ func WithIdempotent() RetryOptionsOption {
 	return []retry.Option{retry.WithIdempotent(true)}
 }
 
-func WithImplicitSession() implicitSessionOption {
-	return implicitSessionOption{}
-}
-
 func WithLabel(lbl string) LabelOption {
 	return LabelOption(lbl)
 }

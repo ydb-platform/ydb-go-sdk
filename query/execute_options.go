@@ -50,7 +50,8 @@ func WithExecMode(mode options.ExecMode) ExecuteOption {
 }
 
 // WithImplicitSession is an option to execute a query using an implicit session
-// which allows the query to be executed without explicitly creating a session
+// which allows the query to be executed without explicitly creating a session.
+// Please note that requests with this option use a separate session pool.
 func WithImplicitSession() ExecuteOption {
 	return options.WithImplicitSession()
 }

@@ -230,6 +230,10 @@ func WithExecMode(mode ExecMode) execModeOption {
 	return mode
 }
 
+func WithImplicitSession() implicitSessionOption {
+	return implicitSessionOption{}
+}
+
 func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 	return responsePartLimitBytes(size)
 }
