@@ -175,7 +175,7 @@ func TestClient(t *testing.T) {
 		})
 
 		t.Run("WithImplicitSession", func(t *testing.T) {
-			mockClientTransactionalForImplicitSessionTest(ctx).
+			err := mockClientTransactionalForImplicitSessionTest(ctx).
 				Do(ctx, func(ctx context.Context, s query.Session) error {
 					err := s.Exec(ctx, "SELECT 1", query.WithImplicitSession())
 					require.ErrorContains(t, err, "implicit sessions are not supported")
@@ -191,6 +191,7 @@ func TestClient(t *testing.T) {
 
 					return nil
 				})
+			require.NoError(t, err)
 		})
 	})
 	t.Run("DoTx", func(t *testing.T) {
