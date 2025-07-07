@@ -32,6 +32,7 @@ type executeSettings interface {
 	ResourcePool() string
 	ResponsePartLimitSizeBytes() int64
 	Label() string
+	IsImplicitSession() bool
 }
 
 type executeScriptConfig interface {

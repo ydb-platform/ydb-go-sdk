@@ -31,14 +31,6 @@ func WithPoolLimit(size int) Option {
 	}
 }
 
-func WithImplicitSessionPoolLimit(size int) Option {
-	return func(c *Config) {
-		if size > 0 {
-			c.implicitSessionPoolLimit = size
-		}
-	}
-}
-
 // WithSessionPoolSessionUsageLimit set pool session max usage:
 // - if argument type is uint64 - WithSessionPoolSessionUsageLimit limits max usage count of pool session
 // - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session

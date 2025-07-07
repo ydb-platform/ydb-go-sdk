@@ -648,7 +648,7 @@ func createImplicitSessionPool(ctx context.Context,
 	cc grpc.ClientConnInterface,
 ) sessionPool {
 	return pool.New(ctx,
-		pool.WithLimit[*Session](cfg.ImplicitSessionPoolLimit()),
+		pool.WithLimit[*Session](cfg.PoolLimit()),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 			core := &sessionCore{
 				cc:     cc,

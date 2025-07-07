@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -171,6 +172,25 @@ func TestClient(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Equal(t, 10, counter)
+		})
+
+		t.Run("WithImplicitSession", func(t *testing.T) {
+			mockClientTransactionalForImplicitSessionTest(ctx).
+				Do(ctx, func(ctx context.Context, s query.Session) error {
+					err := s.Exec(ctx, "SELECT 1", query.WithImplicitSession())
+					require.ErrorContains(t, err, "implicit sessions are not supported")
+
+					_, err = s.Query(ctx, "SELECT 1", query.WithImplicitSession())
+					require.ErrorContains(t, err, "implicit sessions are not supported")
+
+					_, err = s.QueryResultSet(ctx, "SELECT 1", query.WithImplicitSession())
+					require.ErrorContains(t, err, "implicit sessions are not supported")
+
+					_, err = s.QueryRow(ctx, "SELECT 1", query.WithImplicitSession())
+					require.ErrorContains(t, err, "implicit sessions are not supported")
+
+					return nil
+				})
 		})
 	})
 	t.Run("DoTx", func(t *testing.T) {
@@ -673,6 +693,27 @@ func TestClient(t *testing.T) {
 					})
 				})
 			})
+		})
+
+		t.Run("WithImplicitSession", func(t *testing.T) {
+			err := mockClientTransactionalForImplicitSessionTest(ctx).
+				DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+					err := tx.Exec(ctx, "SELECT 1", query.WithImplicitSession())
+					require.ErrorContains(t, err, "implicit sessions are not supported")
+
+					_, err = tx.Query(ctx, "SELECT 1", query.WithImplicitSession())
+					require.ErrorContains(t, err, "implicit sessions are not supported")
+
+					_, err = tx.QueryResultSet(ctx, "SELECT 1", query.WithImplicitSession())
+					require.ErrorContains(t, err, "implicit sessions are not supported")
+
+					_, err = tx.QueryRow(ctx, "SELECT 1", query.WithImplicitSession())
+					require.ErrorContains(t, err, "implicit sessions are not supported")
+
+					return nil
+				})
+
+			require.NoError(t, err) // no transaction errors
 		})
 	})
 	t.Run("Exec", func(t *testing.T) {
@@ -1573,9 +1614,38 @@ func TestClient(t *testing.T) {
 // the mock in such way that calling `CreateSession` or `AttachSession` will result in an error.
 func mockClientForImplicitSessionTest(ctx context.Context) *Client {
 	balancer := testutil.NewBalancer(
-		testutil.WithInvokeHandlers(testutil.InvokeHandlers{}),
 		testutil.WithNewStreamHandlers(testutil.NewStreamHandlers{
 			testutil.QueryExecuteQuery: func(desc *grpc.StreamDesc) (grpc.ClientStream, error) {
+				return testutil.MockClientStream(), nil
+			},
+		}),
+	)
+
+	return New(ctx, balancer, config.New())
+}
+
+// mockClientTransactionalForImplicitSessionTest creates a new Client with a test balancer
+// for simulating transactional implicit session scenarios in query client testing.
+// It configures the mock to return successful responses for session creation and attachment.
+// But returns error if real Qeury was sended.
+func mockClientTransactionalForImplicitSessionTest(ctx context.Context) *Client {
+	balancer := testutil.NewBalancer(
+		testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			testutil.QueryCreateSession: func(any) (proto.Message, error) {
+				return &Ydb_Query.CreateSessionResponse{}, nil
+			},
+			testutil.QueryBeginTransaction: func(any) (proto.Message, error) {
+				return &Ydb_Query.BeginTransactionResponse{}, nil
+			},
+			testutil.QueryCommitTransaction: func(any) (proto.Message, error) {
+				return &Ydb_Query.CommitTransactionResponse{}, nil
+			},
+		}),
+		testutil.WithNewStreamHandlers(testutil.NewStreamHandlers{
+			testutil.QueryExecuteQuery: func(desc *grpc.StreamDesc) (grpc.ClientStream, error) {
+				return nil, errors.New("ExecuteQuery should not be called for transactional implicit session")
+			},
+			testutil.QueryAttachSession: func(desc *grpc.StreamDesc) (grpc.ClientStream, error) {
 				return testutil.MockClientStream(), nil
 			},
 		}),

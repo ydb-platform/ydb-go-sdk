@@ -65,6 +65,8 @@ const (
 	QueryCreateSession
 	QueryExecuteQuery
 	QueryAttachSession
+	QueryBeginTransaction
+	QueryCommitTransaction
 )
 
 var grpcMethodToCode = map[Method]MethodCode{
@@ -87,9 +89,11 @@ var grpcMethodToCode = map[Method]MethodCode{
 	"/Ydb.Table.V1.TableService/StreamReadTable":        TableStreamReadTable,
 	"/Ydb.Table.V1.TableService/StreamExecuteScanQuery": TableStreamExecuteScanQuery,
 
-	"/Ydb.Query.V1.QueryService/ExecuteQuery":  QueryExecuteQuery,
-	"/Ydb.Query.V1.QueryService/CreateSession": QueryCreateSession,
-	"/Ydb.Query.V1.QueryService/AttachSession": QueryAttachSession,
+	"/Ydb.Query.V1.QueryService/ExecuteQuery":      QueryExecuteQuery,
+	"/Ydb.Query.V1.QueryService/CreateSession":     QueryCreateSession,
+	"/Ydb.Query.V1.QueryService/AttachSession":     QueryAttachSession,
+	"/Ydb.Query.V1.QueryService/BeginTransaction":  QueryBeginTransaction,
+	"/Ydb.Query.V1.QueryService/CommitTransaction": QueryCommitTransaction,
 }
 
 var codeToString = map[MethodCode]string{

@@ -86,6 +86,10 @@ func (tx *Transaction) QueryResultSet(
 		onDone(finalErr)
 	}()
 
+	if txSettings.IsImplicitSession() {
+		return nil, xerrors.WithStackTrace(errImplicitSessionsNotSupported)
+	}
+
 	if tx.completed {
 		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
 	}
@@ -138,6 +142,10 @@ func (tx *Transaction) QueryRow(
 	defer func() {
 		onDone(finalErr)
 	}()
+
+	if txSettings.IsImplicitSession() {
+		return nil, xerrors.WithStackTrace(errImplicitSessionsNotSupported)
+	}
 
 	resultOpts := []resultOption{
 		withTrace(tx.s.trace),
@@ -202,6 +210,10 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	defer func() {
 		onDone(finalErr)
 	}()
+
+	if txSettings.IsImplicitSession() {
+		return xerrors.WithStackTrace(errImplicitSessionsNotSupported)
+	}
 
 	if tx.completed {
 		return xerrors.WithStackTrace(errExecuteOnCompletedTx)
@@ -275,6 +287,10 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	defer func() {
 		onDone(finalErr)
 	}()
+
+	if txSettings.IsImplicitSession() {
+		return nil, xerrors.WithStackTrace(errImplicitSessionsNotSupported)
+	}
 
 	if tx.completed {
 		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)

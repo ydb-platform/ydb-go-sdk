@@ -545,15 +545,6 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	}
 }
 
-// WithImplicitSessionPoolSizeLimit set max size of implicit sessions pool in query.Client
-func WithImplicitSessionPoolSizeLimit(sizeLimit int) Option {
-	return func(ctx context.Context, d *Driver) error {
-		d.queryOptions = append(d.queryOptions, queryConfig.WithImplicitSessionPoolLimit(sizeLimit))
-
-		return nil
-	}
-}
-
 // WithSessionPoolSessionUsageLimit set pool session max usage:
 // - if argument type is uint64 - WithSessionPoolSessionUsageLimit limits max usage count of pool session
 // - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session
