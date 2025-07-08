@@ -210,7 +210,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+	return retry.Do(ctx, s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ctx, s.createQuery)
 
@@ -227,7 +227,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+	return retry.Do(ctx, s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ctx, s.dropQuery)
 
