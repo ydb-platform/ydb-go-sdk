@@ -8,6 +8,7 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -52,6 +53,19 @@ const (
 		SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
 		FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
 	`
+)
+
+var (
+	readTx = query.TxControl(
+		query.BeginTx(
+			query.WithOnlineReadOnly(),
+		),
+		query.CommitTx(),
+	)
+
+	writeTx = query.SerializableReadWriteTxControl(
+		query.CommitTx(),
+	)
 )
 
 type Storage struct {
@@ -121,7 +135,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = retry.Do(ctx, s.db,
+	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -158,7 +172,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = retry.Do(ctx, s.db,
+	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -196,7 +210,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ctx, s.db,
+	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ctx, s.createQuery)
 
@@ -213,7 +227,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ctx, s.db,
+	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ctx, s.dropQuery)
 
