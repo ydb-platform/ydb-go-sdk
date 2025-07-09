@@ -44,7 +44,6 @@ type (
 		retryOptions           []retry.Option
 		responsePartLimitBytes int64
 		label                  string
-		isImplicitSession      bool
 	}
 
 	// Execute is an interface for execute method options
@@ -71,7 +70,6 @@ type (
 	}
 	execModeOption         = ExecMode
 	responsePartLimitBytes int64
-	implicitSessionOption  struct{}
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -194,14 +192,6 @@ func (s *executeSettings) Label() string {
 	return s.label
 }
 
-func (s *executeSettings) IsImplicitSession() bool {
-	return s.isImplicitSession
-}
-
-func (implicitSessionOption) applyExecuteOption(s *executeSettings) {
-	s.isImplicitSession = true
-}
-
 func WithParameters(params params.Parameters) parametersOption {
 	return parametersOption{
 		params: params,
@@ -228,10 +218,6 @@ func WithResourcePool(id string) resourcePool {
 
 func WithExecMode(mode ExecMode) execModeOption {
 	return mode
-}
-
-func WithImplicitSession() implicitSessionOption {
-	return implicitSessionOption{}
 }
 
 func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {

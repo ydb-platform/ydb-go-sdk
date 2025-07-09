@@ -334,7 +334,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 	}()
 
 	pool := c.pool
-	if settings.IsImplicitSession() {
+	if c.config.IsImplicitSession() {
 		pool = c.implicitSessionPool
 	}
 
@@ -386,7 +386,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	}()
 
 	pool := c.pool
-	if settings.IsImplicitSession() {
+	if c.config.IsImplicitSession() {
 		pool = c.implicitSessionPool
 	}
 
@@ -439,7 +439,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 	}()
 
 	pool := c.pool
-	if settings.IsImplicitSession() {
+	if c.config.IsImplicitSession() {
 		pool = c.implicitSessionPool
 	}
 
@@ -499,7 +499,7 @@ func (c *Client) QueryResultSet(
 	}()
 
 	pool := c.pool
-	if settings.IsImplicitSession() {
+	if c.config.IsImplicitSession() {
 		pool = c.implicitSessionPool
 	}
 

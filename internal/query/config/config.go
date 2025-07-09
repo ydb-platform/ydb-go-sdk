@@ -25,6 +25,8 @@ type Config struct {
 	sessionDeleteTimeout   time.Duration
 	sessionIddleTimeToLive time.Duration
 
+	implicitSession bool
+
 	lazyTx bool
 
 	trace *trace.Query
@@ -60,6 +62,10 @@ func (c *Config) Trace() *trace.Query {
 // DefaultPoolMaxSize variable is used as a pool limit.
 func (c *Config) PoolLimit() int {
 	return c.poolLimit
+}
+
+func (c *Config) IsImplicitSession() bool {
+	return c.implicitSession
 }
 
 func (c *Config) PoolSessionUsageLimit() uint64 {
