@@ -62,11 +62,7 @@ const (
 	TableStreamReadTable
 	TableStreamExecuteScanQuery
 
-	QueryCreateSession
 	QueryExecuteQuery
-	QueryAttachSession
-	QueryBeginTransaction
-	QueryCommitTransaction
 )
 
 var grpcMethodToCode = map[Method]MethodCode{
@@ -89,11 +85,7 @@ var grpcMethodToCode = map[Method]MethodCode{
 	"/Ydb.Table.V1.TableService/StreamReadTable":        TableStreamReadTable,
 	"/Ydb.Table.V1.TableService/StreamExecuteScanQuery": TableStreamExecuteScanQuery,
 
-	"/Ydb.Query.V1.QueryService/ExecuteQuery":      QueryExecuteQuery,
-	"/Ydb.Query.V1.QueryService/CreateSession":     QueryCreateSession,
-	"/Ydb.Query.V1.QueryService/AttachSession":     QueryAttachSession,
-	"/Ydb.Query.V1.QueryService/BeginTransaction":  QueryBeginTransaction,
-	"/Ydb.Query.V1.QueryService/CommitTransaction": QueryCommitTransaction,
+	"/Ydb.Query.V1.QueryService/ExecuteQuery": QueryExecuteQuery,
 }
 
 var codeToString = map[MethodCode]string{
@@ -377,6 +369,9 @@ func (s *ClientStream) RecvMsg(m interface{}) error {
 	return s.OnRecvMsg(m)
 }
 
+// MockClientStream creates a mock ClientStream with predefined behavior for testing purposes.
+// It simulates a client stream with a single message.
+// The returned ClientStream can be used to mock gRPC stream interactions in unit tests.
 func MockClientStream() *ClientStream {
 	var recvMsgAlreadySent bool
 
