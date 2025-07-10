@@ -1,4 +1,5 @@
 * Added experimental config.WithDisableOptimisticUnban to disable fast node unban after pessimization
+
 ## v3.112.0
 * Added support for the `json.Unmarshaler` interface in the `CastTo` function for use in scanners, such as the `ScanStruct` method
 * Fixed the support of server-side session balancing in `database/sql` driver
