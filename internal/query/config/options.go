@@ -83,9 +83,9 @@ func WithSessionIdleTimeToLive(idleTimeToLive time.Duration) Option {
 // WithImplicitSessions is an option to execute queries using an implicit session
 // which allows the queries to be executed without explicitly creating a session.
 // Please note that requests with this option use a separate session pool.
-func WithImplicitSessions() Option {
+func AllowImplicitSessions() Option {
 	return func(c *Config) {
-		c.implicitSession = true
+		c.allowImplicitSessions = true
 	}
 }
 

@@ -1573,7 +1573,7 @@ func TestClient(t *testing.T) {
 // the mock in such way that calling `CreateSession` or `AttachSession` will result in an error.
 func mockClientForImplicitSessionTest(ctx context.Context) *Client {
 	return New(ctx, mockConnForImplicitSessionTest(), config.New(
-		config.WithImplicitSessions(),
+		config.AllowImplicitSessions(),
 	))
 }
 
@@ -1581,10 +1581,34 @@ func mockConnForImplicitSessionTest() grpc.ClientConnInterface {
 	return testutil.NewBalancer(
 		testutil.WithNewStreamHandlers(testutil.NewStreamHandlers{
 			testutil.QueryExecuteQuery: func(desc *grpc.StreamDesc) (grpc.ClientStream, error) {
-				return testutil.MockClientStream(), nil
+				return mockClientStream(), nil
 			},
 		}),
 	)
+}
+
+// mockClientStream creates a mock ClientStream.
+// It simulates a client stream with a single message.
+func mockClientStream() *testutil.ClientStream {
+	var recvMsgAlreadySent bool
+
+	return &testutil.ClientStream{
+		OnSendMsg:   func(m any) error { return nil },
+		OnCloseSend: func() error { return nil },
+		OnRecvMsg: func(m any) error {
+			if recvMsgAlreadySent {
+				return io.EOF
+			}
+			recvMsgAlreadySent = true
+
+			switch resp := m.(type) {
+			case *Ydb_Query.ExecuteQueryResponsePart:
+				resp.ResultSet = &Ydb.ResultSet{Rows: []*Ydb.Value{{}}}
+			}
+
+			return nil
+		},
+	}
 }
 
 type sessionControllerMock struct {

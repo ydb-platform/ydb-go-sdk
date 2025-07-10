@@ -25,7 +25,7 @@ type Config struct {
 	sessionDeleteTimeout   time.Duration
 	sessionIddleTimeToLive time.Duration
 
-	implicitSession bool
+	allowImplicitSessions bool
 
 	lazyTx bool
 
@@ -64,8 +64,8 @@ func (c *Config) PoolLimit() int {
 	return c.poolLimit
 }
 
-func (c *Config) IsImplicitSession() bool {
-	return c.implicitSession
+func (c *Config) AllowImplicitSessions() bool {
+	return c.allowImplicitSessions
 }
 
 func (c *Config) PoolSessionUsageLimit() uint64 {

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 // BenchmarkQuery_Query_WithImplicitSession
@@ -34,7 +34,7 @@ import (
 // BenchmarkQuery_Query_WithImplicitSession/parallel-1048576-12           1        1902566958 ns/op
 func BenchmarkQuery_Query_WithImplicitSession(b *testing.B) {
 	benchOverQueryService(context.TODO(), b,
-		ydb.WithQueryConfigOption(config.WithImplicitSessions()),
+		ydb.WithQueryConfigOption(query.AllowImplicitSessions()),
 	)
 }
 

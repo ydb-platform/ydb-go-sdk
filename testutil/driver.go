@@ -3,13 +3,10 @@ package testutil
 import (
 	"context"
 	"fmt"
-	"io"
 	"reflect"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
@@ -367,31 +364,6 @@ func (s *ClientStream) RecvMsg(m interface{}) error {
 	}
 
 	return s.OnRecvMsg(m)
-}
-
-// MockClientStream creates a mock ClientStream with predefined behavior for testing purposes.
-// It simulates a client stream with a single message.
-// The returned ClientStream can be used to mock gRPC stream interactions in unit tests.
-func MockClientStream() *ClientStream {
-	var recvMsgAlreadySent bool
-
-	return &ClientStream{
-		OnSendMsg:   func(m any) error { return nil },
-		OnCloseSend: func() error { return nil },
-		OnRecvMsg: func(m any) error {
-			if recvMsgAlreadySent {
-				return io.EOF
-			}
-			recvMsgAlreadySent = true
-
-			switch resp := m.(type) { // you can freely add additional mock data
-			case *Ydb_Query.ExecuteQueryResponsePart:
-				resp.ResultSet = &Ydb.ResultSet{Rows: []*Ydb.Value{{}}}
-			}
-
-			return nil
-		},
-	}
 }
 
 func lastSegment(m string) string {
