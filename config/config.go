@@ -311,8 +311,9 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 	}
 }
 
+// WithDisableOptimisticUnban disabled unban nodes in case of success response just after pessimization.
+// 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-// Do not unban node in case of success response just after pessimization.
 func WithDisableOptimisticUnban() Option {
 	return func(c *Config) {
 		c.disableOptimisticUnban = false
