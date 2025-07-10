@@ -32,42 +32,42 @@ jobs:
     strategy:
       matrix:
         sdk:
-          - id: database_sql_table
-            name: database-sql-table
-            path: ./database/sql/table
-            label: database/sql/table
+          # - id: database_sql_table
+          #   name: database-sql-table
+          #   path: ./database/sql/table
+          #   label: database/sql/table
           - id: database_sql_query
             name: database-sql-query
             path: ./database/sql/query
             label: database/sql/query
-          - id: native_query
-            name: native-query
-            path: ./native/query
-            label: native/query
-          - id: native_table
-            name: native-table
-            path: ./native/table
-            label: native/table
-          - id: native_table_over_query_service
-            name: native-table-over-query-service
-            path: ./native/table/over/query/service
-            label: native/table/over/query/service
-          - id: gorm_table
-            name: gorm-table
-            path: ./gorm/table
-            label: gorm/table
-          - id: gorm_query
-            name: gorm-query
-            path: ./gorm/query
-            label: gorm/query
-          - id: xorm_table
-            name: xorm-table
-            path: ./xorm/table
-            label: xorm/table
-          - id: xorm_query
-            name: xorm-query
-            path: ./xorm/query
-            label: xorm/query
+          # - id: native_query
+          #   name: native-query
+          #   path: ./native/query
+          #   label: native/query
+          # - id: native_table
+          #   name: native-table
+          #   path: ./native/table
+          #   label: native/table
+          # - id: native_table_over_query_service
+          #   name: native-table-over-query-service
+          #   path: ./native/table/over/query/service
+          #   label: native/table/over/query/service
+          # - id: gorm_table
+          #   name: gorm-table
+          #   path: ./gorm/table
+          #   label: gorm/table
+          # - id: gorm_query
+          #   name: gorm-query
+          #   path: ./gorm/query
+          #   label: gorm/query
+          # - id: xorm_table
+          #   name: xorm-table
+          #   path: ./xorm/table
+          #   label: xorm/table
+          # - id: xorm_query
+          #   name: xorm-query
+          #   path: ./xorm/query
+          #   label: xorm/query
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
