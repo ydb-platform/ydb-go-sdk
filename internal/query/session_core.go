@@ -260,10 +260,6 @@ func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	if core.id == "" {
-		return nil
-	}
-
 	_, err := core.Client.DeleteSession(ctx,
 		&Ydb_Query.DeleteSessionRequest{
 			SessionId: core.id,
