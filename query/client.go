@@ -154,7 +154,7 @@ func WithRetryBudget(b budget.Budget) options.RetryOptionsOption {
 	return options.WithRetryBudget(b)
 }
 
-// WithImplicitSessions is an option to execute queries using an implicit session
+// AllowImplicitSessions is an option to execute queries using an implicit session
 // which allows the queries to be executed without explicitly creating a session.
 // Please note that requests with this option use a separate session pool.
 //
