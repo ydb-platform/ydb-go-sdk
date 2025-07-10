@@ -33,7 +33,7 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 
 	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return resultNoRows{}, nil

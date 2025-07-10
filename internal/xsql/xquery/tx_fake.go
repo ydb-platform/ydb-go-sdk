@@ -19,7 +19,7 @@ type txFake struct {
 func (t *txFake) Exec(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
 	result, err := t.conn.Exec(ctx, sql, params)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return result, nil
@@ -28,7 +28,7 @@ func (t *txFake) Exec(ctx context.Context, sql string, params *params.Params) (d
 func (t *txFake) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
 	rows, err := t.conn.Query(ctx, sql, params)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return rows, nil
