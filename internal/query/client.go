@@ -202,6 +202,10 @@ func (c *Client) Close(ctx context.Context) error {
 		return xerrors.WithStackTrace(err)
 	}
 
+	if err := c.implicitSessionPool.Close(ctx); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
 	return nil
 }
 
