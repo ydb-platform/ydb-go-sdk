@@ -573,12 +573,20 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 }
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *Client {
+	client := Ydb_Query_V1.NewQueryServiceClient(cc)
+
+	return newWithQueryServiceClient(ctx, client, cc, cfg)
+}
+
+func newWithQueryServiceClient(ctx context.Context,
+	client Ydb_Query_V1.QueryServiceClient,
+	cc grpc.ClientConnInterface,
+	cfg *config.Config,
+) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
 	defer onDone()
-
-	client := Ydb_Query_V1.NewQueryServiceClient(cc)
 
 	return &Client{
 		config:              cfg,
@@ -633,31 +641,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 	}
 }
 
-func createImplicitSessionPool(ctx context.Context,
-	cfg *config.Config,
-	c Ydb_Query_V1.QueryServiceClient,
-	cc grpc.ClientConnInterface,
-) sessionPool {
-	return pool.New(ctx,
-		pool.WithLimit[*Session](cfg.PoolLimit()),
-		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
-		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
-			core := &sessionCore{
-				cc:     cc,
-				Client: c,
-				Trace:  cfg.Trace(),
-				done:   make(chan struct{}),
-			}
-
-			return &Session{
-				Core:   core,
-				trace:  cfg.Trace(),
-				client: c,
-			}, nil
-		}),
-	)
-}
-
 func poolTrace(t *trace.Query) *pool.Trace {
 	return &pool.Trace{
 		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
@@ -706,4 +689,29 @@ func poolTrace(t *trace.Query) *pool.Trace {
 			trace.QueryOnPoolChange(t, stats.Limit, stats.Index, stats.Idle, stats.Wait, stats.CreateInProgress)
 		},
 	}
+}
+
+func createImplicitSessionPool(ctx context.Context,
+	cfg *config.Config,
+	c Ydb_Query_V1.QueryServiceClient,
+	cc grpc.ClientConnInterface,
+) sessionPool {
+	return pool.New(ctx,
+		pool.WithLimit[*Session](cfg.PoolLimit()),
+		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
+		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
+			core := &sessionCore{
+				cc:     cc,
+				Client: c,
+				Trace:  cfg.Trace(),
+				done:   make(chan struct{}),
+			}
+
+			return &Session{
+				Core:   core,
+				trace:  cfg.Trace(),
+				client: c,
+			}, nil
+		}),
+	)
 }

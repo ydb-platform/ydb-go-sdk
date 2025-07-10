@@ -58,8 +58,6 @@ const (
 	TableDescribeTableOptions
 	TableStreamReadTable
 	TableStreamExecuteScanQuery
-
-	QueryExecuteQuery
 )
 
 var grpcMethodToCode = map[Method]MethodCode{
@@ -81,8 +79,6 @@ var grpcMethodToCode = map[Method]MethodCode{
 	"/Ydb.Table.V1.TableService/DescribeTableOptions":   TableDescribeTableOptions,
 	"/Ydb.Table.V1.TableService/StreamReadTable":        TableStreamReadTable,
 	"/Ydb.Table.V1.TableService/StreamExecuteScanQuery": TableStreamExecuteScanQuery,
-
-	"/Ydb.Query.V1.QueryService/ExecuteQuery": QueryExecuteQuery,
 }
 
 var codeToString = map[MethodCode]string{
@@ -111,7 +107,10 @@ func setField(name string, dst, value interface{}) {
 	t := x.Type()
 	f, ok := t.FieldByName(name)
 	if !ok {
-		return
+		panic(fmt.Sprintf(
+			"struct %s has no field %q",
+			t, name,
+		))
 	}
 	v := reflect.ValueOf(value)
 	if f.Type.Kind() != v.Type().Kind() {
