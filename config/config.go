@@ -316,7 +316,7 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithDisableOptimisticUnban() Option {
 	return func(c *Config) {
-		c.disableOptimisticUnban = false
+		c.disableOptimisticUnban = true
 	}
 }
 
