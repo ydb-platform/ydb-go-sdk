@@ -573,6 +573,11 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 }
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *Client {
+	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
+	)
+	defer onDone()
+
 	client := Ydb_Query_V1.NewQueryServiceClient(cc)
 
 	return newWithQueryServiceClient(ctx, client, cc, cfg)
@@ -583,11 +588,6 @@ func newWithQueryServiceClient(ctx context.Context,
 	cc grpc.ClientConnInterface,
 	cfg *config.Config,
 ) *Client {
-	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
-	)
-	defer onDone()
-
 	return &Client{
 		config:              cfg,
 		client:              client,
