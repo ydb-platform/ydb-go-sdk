@@ -35,6 +35,7 @@ type Config struct {
 	meta               *meta.Meta
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
+	disableOptimisticUnban           bool
 }
 
 func (c *Config) Credentials() credentials.Credentials {
@@ -44,6 +45,10 @@ func (c *Config) Credentials() credentials.Credentials {
 // ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
 func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
+}
+
+func (c *Config) DisableOptimisticUnban() bool {
+	return c.disableOptimisticUnban
 }
 
 // GrpcDialOptions reports about used grpc dialing options
@@ -303,6 +308,14 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 			c.excludeGRPCCodesForPessimization,
 			codes...,
 		)
+	}
+}
+
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+// Do not unban node in case of success response just after pessimization.
+func WithDisableOptimisticUnban() Option {
+	return func(c *Config) {
+		c.disableOptimisticUnban = false
 	}
 }
 

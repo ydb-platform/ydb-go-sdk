@@ -372,7 +372,7 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 
 	defer func() {
 		if err == nil {
-			if cc.GetState() == conn.Banned {
+			if !b.driverConfig.DisableOptimisticUnban() && cc.GetState() == conn.Banned {
 				b.pool.Allow(ctx, cc)
 			}
 		} else if conn.IsBadConn(err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
