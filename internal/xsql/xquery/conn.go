@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
 
@@ -75,10 +76,10 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	result driver.RowsNextResultSet, finalErr error,
 ) {
 	if !c.isReady() {
-		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		))
+		)))
 	}
 
 	opts := []options.Execute{
