@@ -75,6 +75,13 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	result driver.RowsNextResultSet, finalErr error,
 ) {
+	if !c.IsValid() {
+		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+			xerrors.Invalid(c),
+			xerrors.Invalid(c.session),
+		)))
+	}
+
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
