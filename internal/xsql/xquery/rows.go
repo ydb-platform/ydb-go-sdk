@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 )
 
 var (
@@ -107,7 +106,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 	}
 
 	if r.nextErr != nil {
-		return badconn.Map(xerrors.WithStackTrace(r.nextErr))
+		return xerrors.WithStackTrace(r.nextErr)
 	}
 	r.updateColumns()
 
@@ -129,7 +128,7 @@ func (r *rows) Next(dst []driver.Value) error {
 			return io.EOF
 		}
 
-		return badconn.Map(xerrors.WithStackTrace(r.nextErr))
+		return xerrors.WithStackTrace(r.nextErr)
 	}
 
 	nextRow, err := r.nextSet.NextRow(ctx)
@@ -138,7 +137,7 @@ func (r *rows) Next(dst []driver.Value) error {
 			return io.EOF
 		}
 
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	values := xslices.Transform(make([]value.Value, len(r.allColumns)), func(v value.Value) any { return &v })
@@ -165,5 +164,5 @@ func (r *rows) Next(dst []driver.Value) error {
 func (r *rows) Close() error {
 	ctx := context.Background()
 
-	return badconn.Map(r.result.Close(ctx))
+	return r.result.Close(ctx)
 }

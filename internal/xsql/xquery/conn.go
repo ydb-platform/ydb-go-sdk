@@ -12,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
 
@@ -43,17 +42,17 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	result driver.Result, finalErr error,
 ) {
 	if !c.IsValid() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	opts := []options.Execute{
@@ -66,7 +65,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return resultNoRows{}, nil
@@ -75,18 +74,11 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	result driver.RowsNextResultSet, finalErr error,
 ) {
-	if !c.IsValid() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
-			xerrors.Invalid(c),
-			xerrors.Invalid(c.session),
-		)))
-	}
-
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	opts := []options.Execute{
@@ -99,7 +91,7 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 
 	res, err := c.session.Query(ctx, sql, opts...)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
@@ -118,7 +110,7 @@ func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast s
 		}),
 	)
 	if err != nil {
-		return "", "", badconn.Map(xerrors.WithStackTrace(err))
+		return "", "", xerrors.WithStackTrace(err)
 	}
 
 	return ast, plan, nil
@@ -150,7 +142,7 @@ func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx comm
 
 	tx, err := beginTx(ctx, c, txOptions)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return tx, nil
@@ -166,17 +158,17 @@ func (c *Conn) IsValid() bool {
 
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	if !c.isReady() {
-		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	if !c.session.IsAlive() {
-		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	err := c.session.Exec(ctx, "select 1")
@@ -187,7 +179,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (common.Tx, error) {
 	tx, err := c.beginTx(ctx, txOptions)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return tx, nil
@@ -195,10 +187,10 @@ func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (common.
 
 func (c *Conn) Close() (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
-		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
+		return xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	defer func() {
@@ -209,7 +201,7 @@ func (c *Conn) Close() (finalErr error) {
 
 	err := c.session.Close(xcontext.ValueOnly(c.ctx))
 	if err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
