@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -151,4 +152,13 @@ func WithLabel(lbl string) options.LabelOption {
 // WithRetryBudget creates option with external budget
 func WithRetryBudget(b budget.Budget) options.RetryOptionsOption {
 	return options.WithRetryBudget(b)
+}
+
+// AllowImplicitSessions is an option to execute queries using an implicit session
+// which allows the queries to be executed without explicitly creating a session.
+// Please note that requests with this option use a separate session pool.
+//
+// Working with `query.Client.{Exec,Query,QueryResultSet,QueryRow}`.
+func AllowImplicitSessions() config.Option {
+	return config.AllowImplicitSessions()
 }

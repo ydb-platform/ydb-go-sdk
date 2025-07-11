@@ -80,6 +80,12 @@ func WithSessionIdleTimeToLive(idleTimeToLive time.Duration) Option {
 	}
 }
 
+func AllowImplicitSessions() Option {
+	return func(c *Config) {
+		c.allowImplicitSessions = true
+	}
+}
+
 func WithLazyTx(lazyTx bool) Option {
 	return func(c *Config) {
 		c.lazyTx = lazyTx
