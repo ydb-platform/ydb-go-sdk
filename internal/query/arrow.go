@@ -24,6 +24,7 @@ type (
 	arrowPart struct {
 		resultSetIndex int64
 		reader         io.Reader
+		data           []byte
 	}
 )
 
@@ -124,18 +125,23 @@ func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
 	r.resultSetIndex = part.GetResultSetIndex()
 
 	schema := part.GetResultSet().GetArrowBatchSettings().GetSchema()
-	data := part.GetResultSet().GetData()
 
 	// Apache Arrow ipc.Reader expects schema and data to be concatenated
-	rdr := bytes.NewReader(append(schema, data...))
+	data := append(schema, part.GetResultSet().GetData()...)
 
-	return &arrowPart{reader: rdr, resultSetIndex: part.GetResultSetIndex()}, nil
+	rdr := bytes.NewReader(data)
+
+	return &arrowPart{reader: rdr, data: data, resultSetIndex: part.GetResultSetIndex()}, nil
 }
 
 func (r *arrowResult) Close(ctx context.Context) error {
 	r.close()
 
 	return nil
+}
+
+func (p *arrowPart) Bytes() []byte {
+	return p.data
 }
 
 func (p *arrowPart) Read(buf []byte) (n int, err error) {

@@ -153,6 +153,8 @@ for part, err := range result.Parts(ctx) {
 
 	fmt.Printf("ResultSet#%d ", part.GetResultSetIndex())
 
+	// or you can use `part.Bytes()` instead of `io.Reader` interface
+
 	rdr, err := ipc.NewReader(part) // part already implements io.Reader
 	if err != nil {
 		panic(err)
