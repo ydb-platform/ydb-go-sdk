@@ -1,3 +1,5 @@
+* Added `query.AllowImplicitSessions()` option for execute queries through `query.Client.{Exec,Query,QueryResultSet,QueryRow}` without explicit sessions
+
 ## v3.112.0
 * Added support for the `json.Unmarshaler` interface in the `CastTo` function for use in scanners, such as the `ScanStruct` method
 * Fixed the support of server-side session balancing in `database/sql` driver
