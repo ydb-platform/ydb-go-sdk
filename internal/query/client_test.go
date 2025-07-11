@@ -1565,6 +1565,18 @@ func TestClient(t *testing.T) {
 			require.NoError(t, err)
 		})
 	})
+
+	t.Run("Close", func(t *testing.T) {
+		t.Run("AllowImplicitSessions", func(t *testing.T) {
+			client := mockClientForImplicitSessionTest(ctx, t)
+			_, err := client.QueryRow(ctx, "SELECT 1")
+			require.NoError(t, err)
+
+			err = client.Close(context.Background())
+
+			require.NoError(t, err)
+		})
+	})
 }
 
 // mockClientForImplicitSessionTest creates a new Client with a test balancer
