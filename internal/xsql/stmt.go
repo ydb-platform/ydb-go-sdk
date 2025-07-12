@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -37,11 +36,11 @@ func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 	}()
 
 	if !stmt.conn.cc.IsValid() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(stmt),
 			xerrors.Invalid(stmt.conn),
 			xerrors.Invalid(stmt.conn.cc),
-		)))
+		))
 	}
 
 	sql, params, err := stmt.conn.toYdb(stmt.sql, args...)
@@ -62,11 +61,11 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 	}()
 
 	if !stmt.conn.cc.IsValid() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(stmt),
 			xerrors.Invalid(stmt.conn),
 			xerrors.Invalid(stmt.conn.cc),
-		)))
+		))
 	}
 
 	sql, params, err := stmt.conn.toYdb(stmt.sql, args...)
