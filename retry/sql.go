@@ -216,17 +216,17 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 		attempts++
 		tx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
-			return zeroValue, xerrors.WithStackTrace(err)
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
 			_ = tx.Rollback()
 		}()
 		v, err := op(xcontext.MarkRetryCall(ctx), tx)
 		if err != nil {
-			return zeroValue, xerrors.WithStackTrace(err)
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		if err = tx.Commit(); err != nil {
-			return zeroValue, xerrors.WithStackTrace(err)
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 
 		return v, nil
