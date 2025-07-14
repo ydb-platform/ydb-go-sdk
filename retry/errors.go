@@ -9,9 +9,9 @@ func unwrapErrBadConn(err error) error {
 	var e *badconn.Error
 	if xerrors.As(err, &e) {
 		origin := e.Origin()
-		// if xerrors.IsRetryableError(err) {
-		// 	return xerrors.Retryable(origin)
-		// }
+		if xerrors.IsRetryableError(err) {
+			return xerrors.Retryable(origin)
+		}
 
 		return origin
 	}
