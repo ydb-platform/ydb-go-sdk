@@ -91,7 +91,7 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 		attempts++
 		cc, err := db.Conn(ctx)
 		if err != nil {
-			return zeroValue, xerrors.WithStackTrace(err)
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
 			if finalErr != nil && mustDeleteConn(finalErr, cc) {
@@ -104,7 +104,7 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 		}()
 		v, err := op(xcontext.MarkRetryCall(ctx), cc)
 		if err != nil {
-			return zeroValue, xerrors.WithStackTrace(err)
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 
 		return v, nil
