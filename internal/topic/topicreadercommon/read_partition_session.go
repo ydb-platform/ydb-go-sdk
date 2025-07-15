@@ -48,8 +48,7 @@ func NewPartitionSession(
 		StreamPartitionSessionID: partitionSessionID,
 		ClientPartitionSessionID: clientPartitionSessionID,
 	}
-	res.committedOffsetVal.Store(committedOffset.ToInt64())
-	res.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
+	res.SetInitialCommitOffset(committedOffset)
 
 	return res
 }
@@ -101,6 +100,11 @@ func (s *PartitionSession) LastReceivedMessageOffset() rawtopiccommon.Offset {
 
 func (s *PartitionSession) SetLastReceivedMessageOffset(v rawtopiccommon.Offset) {
 	s.lastReceivedOffsetEndVal.Store(v.ToInt64())
+}
+
+func (s *PartitionSession) SetInitialCommitOffset(committedOffset rawtopiccommon.Offset) {
+	s.committedOffsetVal.Store(committedOffset.ToInt64())
+	s.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
 }
 
 func (s *PartitionSession) NoMoreMessages() bool {
