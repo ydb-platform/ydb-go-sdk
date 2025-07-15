@@ -96,6 +96,15 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workload_name: ${{ matrix.sdk.name }}
 
+      - name: List containers
+        run: |
+          docker ps -a
+
+      - name: List containers after 30 seconds
+        run: |
+          sleep 30
+          docker ps -a
+
       - name: Prepare SLO Database
         run: |
           ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 create grpc://localhost:2136 /Root/testdb
@@ -112,6 +121,30 @@ jobs:
             -write-timeout 1000 || true
 
       - if: always()
+        name: Store ydb healthcheck
+        run: |
+          curl -ik http://localhost:8765/healthcheck > ydb-healthcheck.log
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{matrix.sdk.name}}-ydb-healthcheck.log
+          path: ./ydb-healthcheck.log
+          retention-days: 1
+
+      - if: always()
+        name: Store ydb logs
+        run: |
+          docker compose -f .slo/compose.ydb.yaml logs > ydb.log
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{matrix.sdk.name}}-ydb.log
+          path: ./ydb.log
+          retention-days: 1
+
+      - if: always()
         name: Store ydb chaos testing logs
         run: |
           docker logs ydb-chaos > chaos-ydb.log
@@ -123,7 +156,7 @@ jobs:
           path: ./chaos-ydb.log
           retention-days: 1
 
-      - if: always()
+      - if: success()
         name: Cleanup SLO Database
         run: |
           ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 cleanup grpc://localhost:2136 /Root/testdb || true
