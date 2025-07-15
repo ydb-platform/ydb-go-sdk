@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -172,7 +173,12 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 		return c.currentTx.tx.Query(ctx, sql, params)
 	}
 
-	return c.cc.Query(ctx, sql, params)
+	res, err := c.cc.Query(ctx, sql, params)
+	if err != nil {
+		return nil, badconn.Map(err)
+	}
+
+	return res, nil
 }
 
 func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
@@ -198,5 +204,10 @@ func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 		return c.currentTx.tx.Exec(ctx, sql, params)
 	}
 
-	return c.cc.Exec(ctx, sql, params)
+	res, err := c.cc.Exec(ctx, sql, params)
+	if err != nil {
+		return nil, badconn.Map(err)
+	}
+
+	return res, nil
 }

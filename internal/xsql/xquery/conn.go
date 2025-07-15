@@ -48,13 +48,6 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		))
 	}
 
-	if !c.isReady() {
-		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
-			xerrors.Invalid(c),
-			xerrors.Invalid(c.session),
-		))
-	}
-
 	opts := []options.Execute{
 		options.WithParameters(params),
 	}
