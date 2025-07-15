@@ -90,12 +90,11 @@ jobs:
           chmod +x .bin/${{matrix.sdk.id}}_linux_amd64
 
       - name: Inititialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@main
+        uses: ydb-platform/ydb-slo-action/init@2dc
         with:
           github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          sdk_name: ${{ matrix.sdk.name }}
-          ydb_database_node_count: 5
+          workload_name: ${{ matrix.sdk.name }}
 
       - name: Prepare SLO Database
         run: |
