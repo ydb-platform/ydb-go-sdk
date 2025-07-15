@@ -5,16 +5,16 @@ package integration
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
 func TestTopicReadMessages(t *testing.T) {
@@ -81,5 +81,4 @@ func TestRegression1802_StartPartitionWithOffsetHandler(t *testing.T) {
 
 		require.EqualValues(t, 3, c.Partitions[0].PartitionConsumerStats.CommittedOffset)
 	}, 10*time.Second, 100*time.Millisecond)
-
 }
