@@ -156,6 +156,26 @@ jobs:
           path: ./chaos-ydb.log
           retention-days: 1
 
+      - if: always()
+        name: List .slo files
+        run: |
+          ls -lR .slo
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{matrix.sdk.name}}-slo-output
+          path: |
+            .slo/ydb-config.yml
+            .slo/compose.ydb.yaml
+            .slo/Dockerfile
+            .slo/entrypoint.sh
+            .slo/prometheus.yml
+            .slo/compose.prometheus.yaml
+            .slo/run-chaos.sh
+            .slo/compose.chaos.yaml
+          retention-days: 1
+
       - if: success()
         name: Cleanup SLO Database
         run: |
