@@ -10,7 +10,6 @@ func MustDeleteTableOrQuerySession(err error) bool {
 		Ydb.StatusIds_BAD_SESSION,
 		Ydb.StatusIds_SESSION_BUSY,
 		Ydb.StatusIds_SESSION_EXPIRED,
-		Ydb.StatusIds_UNAVAILABLE,
 	) {
 		return true
 	}

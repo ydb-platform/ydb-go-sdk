@@ -118,12 +118,15 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	executeCtx, executeCancel := xcontext.WithCancel(ctx)
+	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
 		if finalErr != nil {
 			executeCancel()
 		}
 	}()
+
+	stopCtxBinding := context.AfterFunc(ctx, executeCancel)
+	defer stopCtxBinding()
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {

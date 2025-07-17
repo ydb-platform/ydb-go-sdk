@@ -98,9 +98,9 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 				_ = cc.Raw(func(driverConn any) error {
 					return xerrors.WithStackTrace(badconn.Errorf("close connection because: %w", finalErr))
 				})
+			} else {
+				_ = cc.Close()
 			}
-
-			_ = cc.Close()
 		}()
 		v, err := op(xcontext.MarkRetryCall(ctx), cc)
 		if err != nil {
