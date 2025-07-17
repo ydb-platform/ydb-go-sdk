@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -117,9 +118,9 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
 
-	// if !c.disableServerBalancer {
-	// 	ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-	// }
+	if !c.disableServerBalancer {
+		ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
+	}
 
 	switch c.processor {
 	case QUERY:

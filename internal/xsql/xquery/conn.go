@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
@@ -14,6 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
+
+const defaultCloseTimeout = time.Second
 
 type resultNoRows struct{}
 
@@ -199,7 +202,10 @@ func (c *Conn) Close() (finalErr error) {
 		}
 	}()
 
-	err := c.session.Close(xcontext.ValueOnly(c.ctx))
+	ctx, cancel := context.WithTimeout(xcontext.ValueOnly(c.ctx), defaultCloseTimeout)
+	defer cancel()
+
+	err := c.session.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

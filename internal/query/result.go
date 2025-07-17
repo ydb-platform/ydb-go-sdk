@@ -188,6 +188,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 	}
 
+	stop := context.AfterFunc(ctx, r.closeOnce)
+	defer stop()
+
 	select {
 	case <-r.closed:
 		return nil, xerrors.WithStackTrace(io.EOF)

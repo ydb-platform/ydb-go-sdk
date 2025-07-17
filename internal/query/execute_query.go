@@ -125,9 +125,6 @@ func execute(
 		}
 	}()
 
-	stopCtxBinding := context.AfterFunc(ctx, executeCancel)
-	defer stopCtxBinding()
-
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
