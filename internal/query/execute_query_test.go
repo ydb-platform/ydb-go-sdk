@@ -439,7 +439,7 @@ func TestExecute(t *testing.T) {
 
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-				cancel() // canceling happen in the middle of Recv()
+				cancel() // canceling happen in the beginning of the Recv() call
 
 				<-executeCtx.Done()
 
@@ -449,8 +449,8 @@ func TestExecute(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(ctx context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
-					Ydb_Query_V1.QueryService_ExecuteQueryClient, error) {
-
+					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+				) {
 					executeCtx = ctx
 
 					return stream, nil
@@ -472,8 +472,8 @@ func TestExecute(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(ctx context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
-					Ydb_Query_V1.QueryService_ExecuteQueryClient, error) {
-
+					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+				) {
 					streamCtx = ctx
 
 					return stream, nil
@@ -485,14 +485,18 @@ func TestExecute(t *testing.T) {
 
 			cancelExecuteCtx()
 
-			readResultSet(xtest.Context(t), r)
-			readResultSet(xtest.Context(t), r)
-			readResultSet(xtest.Context(t), r)
+			_, err = readResultSet(xtest.Context(t), r)
+			require.NoError(t, err)
+			_, err = readResultSet(xtest.Context(t), r)
+			require.NoError(t, err)
+			_, err = readResultSet(xtest.Context(t), r)
+			require.NoError(t, err)
 
 			// check here because the last `readResultSet()` closes stream with stream cancellation
 			require.NoError(t, streamCtx.Err())
 
-			readResultSet(xtest.Context(t), r)
+			_, err = readResultSet(xtest.Context(t), r)
+			require.ErrorIs(t, err, io.EOF)
 		})
 	})
 }
