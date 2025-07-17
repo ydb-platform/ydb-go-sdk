@@ -1,3 +1,4 @@
+## v3.113.0
 * Added experimental `config.WithDisableOptimisticUnban` option to disable fast node unban after pessimization
 * Fixed respect start offset from `topicoptions.WithReaderGetPartitionStartOffset` for commit messages
 * Added `query.AllowImplicitSessions()` option for execute queries through `query.Client.{Exec,Query,QueryResultSet,QueryRow}` without explicit sessions
