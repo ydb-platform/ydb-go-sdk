@@ -144,7 +144,11 @@ func (s *Session) execute(
 		}
 	}()
 
-	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts, withOnClose(cancel))...)
+	opts = append(opts,
+		withOnClose(cancel),
+		withCloseTimeout(s.DeleteTimeout()))
+
+	r, err := execute(ctx, s.ID(), s.client, q, settings, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -1572,6 +1573,10 @@ func (s sessionControllerMock) Status() string {
 
 func (s sessionControllerMock) Done() <-chan struct{} {
 	return s.done
+}
+
+func (s sessionControllerMock) DeleteTimeout() time.Duration {
+	return time.Second
 }
 
 func newTestSession(id string) *Session {

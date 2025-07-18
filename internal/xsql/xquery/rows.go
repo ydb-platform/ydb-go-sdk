@@ -162,8 +162,7 @@ func (r *rows) Next(dst []driver.Value) error {
 }
 
 func (r *rows) Close() error {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.conn.ctx), defaultCloseTimeout)
-	defer cancel()
+	ctx := context.WithoutCancel(r.conn.ctx)
 
 	return r.result.Close(ctx)
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -42,6 +43,7 @@ type (
 		onClose        []func()
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
+		closeTimeout   time.Duration
 	}
 	resultOption func(s *streamResult)
 )
@@ -114,6 +116,12 @@ func onNextPartErr(callback func(err error)) resultOption {
 func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
 	return func(s *streamResult) {
 		s.onTxMeta = append(s.onTxMeta, callback)
+	}
+}
+
+func withCloseTimeout(timeout time.Duration) resultOption {
+	return func(s *streamResult) {
+		s.closeTimeout = timeout
 	}
 }
 
@@ -229,6 +237,12 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.closeOnce()
+
+	if r.closeTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.closeTimeout)
+		defer cancel()
+	}
 
 	if r.trace != nil {
 		onDone := trace.QueryOnResultClose(r.trace, &ctx,
