@@ -119,7 +119,7 @@ func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
 	}
 }
 
-func withCloseTimeout(timeout time.Duration) resultOption {
+func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	return func(s *streamResult) {
 		s.closeTimeout = timeout
 	}

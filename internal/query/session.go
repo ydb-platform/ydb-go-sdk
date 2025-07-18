@@ -144,13 +144,9 @@ func (s *Session) execute(
 		}
 	}()
 
-	opts = append(opts,
-		withOnClose(cancel),
-		withCloseTimeout(s.DeleteTimeout()))
-
 	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts,
-			withOnClose(cancel),
-			withCloseTimeout(s.DeleteTimeout()),
+		withOnClose(cancel),
+		withStreamResultCloseTimeout(s.DeleteTimeout()),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
