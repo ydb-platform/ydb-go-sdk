@@ -162,7 +162,7 @@ func (r *rows) Next(dst []driver.Value) error {
 }
 
 func (r *rows) Close() error {
-	ctx := context.Background()
+	ctx := context.WithoutCancel(r.conn.ctx)
 
 	return r.result.Close(ctx)
 }

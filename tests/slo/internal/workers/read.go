@@ -28,8 +28,6 @@ func (w *Workers) Read(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter
 				if ctxErr := ctx.Err(); ctxErr == nil {
 					log.Printf("read failed: %v", err)
 				}
-
-				return
 			}
 		}
 	}
