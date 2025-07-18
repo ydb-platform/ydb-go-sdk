@@ -1,3 +1,5 @@
+* fix panic in `database/sql` traces
+
 ## v3.113.0
 * Added experimental `config.WithDisableOptimisticUnban` option to disable fast node unban after pessimization
 * Fixed respect start offset from `topicoptions.WithReaderGetPartitionStartOffset` for commit messages
