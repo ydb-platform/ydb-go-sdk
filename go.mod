@@ -7,6 +7,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20241112172322-ea1f63298f77
+	github.com/ydb-platform/ydb-go-sdk-otel v0.10.1
+	go.opentelemetry.io/otel v1.31.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.11.0
@@ -24,7 +26,11 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	go.opentelemetry.io/otel/metric v1.31.0 // indirect
+	go.opentelemetry.io/otel/trace v1.31.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
