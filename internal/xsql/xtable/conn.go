@@ -145,15 +145,15 @@ func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.
 		sql, params, c.dataOpts...,
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 	defer res.Close()
 
 	if err := res.NextResultSetErr(ctx); err != nil && !xerrors.Is(err, nil, io.EOF) {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 	if err := res.Err(); err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return resultNoRows{}, nil
@@ -161,7 +161,7 @@ func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.
 
 func (c *Conn) executeSchemeQuery(ctx context.Context, sql string) (driver.Result, error) {
 	if err := c.session.ExecuteSchemeQuery(ctx, sql); err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return resultNoRows{}, nil
@@ -172,15 +172,15 @@ func (c *Conn) executeScriptingQuery(ctx context.Context, sql string, params *pa
 ) {
 	res, err := c.scriptingClient.StreamExecute(ctx, sql, params)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 	defer res.Close()
 
 	if err := res.NextResultSetErr(ctx); err != nil && !xerrors.Is(err, nil, io.EOF) {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 	if err := res.Err(); err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return resultNoRows{}, nil
@@ -194,10 +194,10 @@ func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Par
 		sql, params, c.dataOpts...,
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 	if err = res.Err(); err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
@@ -213,10 +213,10 @@ func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Par
 		sql, params, c.scanOpts...,
 	)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 	if err = res.Err(); err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
@@ -230,10 +230,10 @@ func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *param
 ) {
 	res, err := c.scriptingClient.StreamExecute(ctx, sql, params)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 	if err = res.Err(); err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
@@ -250,7 +250,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 		)))
 	}
 	if err := c.session.KeepAlive(ctx); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -272,7 +272,7 @@ func (c *Conn) Close() (finalErr error) {
 
 	err := c.session.Close(xcontext.ValueOnly(c.ctx))
 	if err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
