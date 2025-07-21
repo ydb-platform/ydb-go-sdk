@@ -163,7 +163,11 @@ func (r *rows) Next(dst []driver.Value) error {
 }
 
 func (r *rows) Close() error {
-	ctx := xcontext.ValueOnly(r.conn.ctx)
+	ctx := context.Background()
+
+	if r.conn != nil && r.conn.ctx != nil {
+		ctx = xcontext.ValueOnly(r.conn.ctx)
+	}
 
 	return r.result.Close(ctx)
 }
