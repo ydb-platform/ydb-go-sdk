@@ -282,7 +282,9 @@ func (core *sessionCore) IsAlive() bool {
 }
 
 func (core *sessionCore) Close(ctx context.Context) (err error) {
-	defer core.closeOnce()
+	if core.closeOnce != nil {
+		defer core.closeOnce()
+	}
 
 	select {
 	case <-core.done:

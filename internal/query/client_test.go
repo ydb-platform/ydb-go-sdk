@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -842,6 +843,13 @@ func TestClient(t *testing.T) {
 			}), "")
 			require.NoError(t, err)
 		})
+
+		t.Run("AllowImplicitSessions", func(t *testing.T) {
+			err := mockClientForImplicitSessionTest(ctx, t).
+				Exec(ctx, "SELECT 1")
+
+			require.NoError(t, err)
+		})
 	})
 	t.Run("Query", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
@@ -1078,6 +1086,12 @@ func TestClient(t *testing.T) {
 				require.ErrorIs(t, err, io.EOF)
 				require.Nil(t, r3)
 			}
+		})
+		t.Run("AllowImplicitSessions", func(t *testing.T) {
+			_, err := mockClientForImplicitSessionTest(ctx, t).
+				Query(ctx, "SELECT 1")
+
+			require.NoError(t, err)
 		})
 	})
 	t.Run("QueryResultSet", func(t *testing.T) {
@@ -1397,6 +1411,12 @@ func TestClient(t *testing.T) {
 			require.Nil(t, rs)
 			require.Equal(t, 0, rowsCount)
 		})
+		t.Run("AllowImplicitSessions", func(t *testing.T) {
+			_, err := mockClientForImplicitSessionTest(ctx, t).
+				QueryResultSet(ctx, "SELECT 1")
+
+			require.NoError(t, err)
+		})
 	})
 	t.Run("QueryRow", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
@@ -1537,7 +1557,46 @@ func TestClient(t *testing.T) {
 			require.ErrorIs(t, err, errMoreThanOneRow)
 			require.Nil(t, row)
 		})
+
+		t.Run("AllowImplicitSessions", func(t *testing.T) {
+			_, err := mockClientForImplicitSessionTest(ctx, t).
+				QueryRow(ctx, "SELECT 1")
+
+			require.NoError(t, err)
+		})
 	})
+
+	t.Run("Close", func(t *testing.T) {
+		t.Run("AllowImplicitSessions", func(t *testing.T) {
+			client := mockClientForImplicitSessionTest(ctx, t)
+			_, err := client.QueryRow(ctx, "SELECT 1")
+			require.NoError(t, err)
+
+			err = client.Close(context.Background())
+
+			require.NoError(t, err)
+		})
+	})
+}
+
+// mockClientForImplicitSessionTest creates a new Client with a test balancer
+// for simulating implicit session scenarios in query client testing. It configures
+// the mock in such way that calling `CreateSession` or `AttachSession` will result in an error.
+func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client {
+	ctrl := gomock.NewController(t)
+
+	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		ResultSet: &Ydb.ResultSet{Rows: []*Ydb.Value{{}}},
+	}, nil)
+	stream.EXPECT().Recv().Return(nil, io.EOF)
+
+	queryService := NewMockQueryServiceClient(ctrl)
+	queryService.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+	cfg := config.New(config.AllowImplicitSessions())
+
+	return newWithQueryServiceClient(ctx, queryService, nil, cfg)
 }
 
 type sessionControllerMock struct {

@@ -991,6 +991,9 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequestFromBuffer(
 		commitOffset = forceOffset
 		respMessage.CommitOffset.FromInt64Pointer(commitOffset)
 	}
+	if forceOffset != nil {
+		session.SetInitialCommitOffset(rawtopiccommon.NewOffset(*forceOffset))
+	}
 
 	return r.send(respMessage)
 }
