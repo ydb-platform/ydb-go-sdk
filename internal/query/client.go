@@ -337,7 +337,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 		onDone(finalErr)
 	}()
 
-	row, err := clientQueryRow(ctx, c.pool, q, settings, withStreamResultTrace(c.config.Trace()))
+	row, err := clientQueryRow(ctx, c.pool(), q, settings, withStreamResultTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -487,7 +487,7 @@ func (c *Client) QueryResultSet(
 		onDone(finalErr, rowsCount)
 	}()
 
-	rs, rowsCount, err = clientQueryResultSet(ctx, c.pool, q, settings, withStreamResultTrace(c.config.Trace()))
+	rs, rowsCount, err = clientQueryResultSet(ctx, c.pool(), q, settings, withStreamResultTrace(c.config.Trace()))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
