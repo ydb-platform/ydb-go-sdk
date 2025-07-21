@@ -91,7 +91,7 @@ func (tx *Transaction) QueryResultSet(
 	}
 
 	resultOpts := []resultOption{
-		withTrace(tx.s.trace),
+		withStreamResultTrace(tx.s.trace),
 		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
 		}),
@@ -140,7 +140,7 @@ func (tx *Transaction) QueryRow(
 	}()
 
 	resultOpts := []resultOption{
-		withTrace(tx.s.trace),
+		withStreamResultTrace(tx.s.trace),
 		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
 		}),
@@ -208,7 +208,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	}
 
 	resultOpts := []resultOption{
-		withTrace(tx.s.trace),
+		withStreamResultTrace(tx.s.trace),
 		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
 		}),
@@ -281,7 +281,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	}
 
 	resultOpts := []resultOption{
-		withTrace(tx.s.trace),
+		withStreamResultTrace(tx.s.trace),
 		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
 		}),

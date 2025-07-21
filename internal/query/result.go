@@ -89,19 +89,19 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, err
 	return r.resultSets[r.idx], nil
 }
 
-func withTrace(t *trace.Query) resultOption {
+func withStreamResultTrace(t *trace.Query) resultOption {
 	return func(s *streamResult) {
 		s.trace = t
 	}
 }
 
-func withStatsCallback(callback func(queryStats stats.QueryStats)) resultOption {
+func withStreamResultStatsCallback(callback func(queryStats stats.QueryStats)) resultOption {
 	return func(s *streamResult) {
 		s.statsCallback = callback
 	}
 }
 
-func withOnClose(onClose func()) resultOption {
+func withStreamResultOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
 		s.onClose = append(s.onClose, onClose)
 	}
