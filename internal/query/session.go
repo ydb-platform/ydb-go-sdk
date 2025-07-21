@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 
@@ -21,9 +22,10 @@ type (
 	Session struct {
 		Core
 
-		client Ydb_Query_V1.QueryServiceClient
-		trace  *trace.Query
-		lazyTx bool
+		client                   Ydb_Query_V1.QueryServiceClient
+		trace                    *trace.Query
+		lazyTx                   bool
+		streamResultCloseTimeout time.Duration
 	}
 )
 
@@ -36,7 +38,7 @@ func (s *Session) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -75,7 +77,7 @@ func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execut
 		onDone(finalErr)
 	}()
 
-	row, err := s.queryRow(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	row, err := s.queryRow(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -92,9 +94,10 @@ func createSession(
 	}
 
 	return &Session{
-		Core:   core,
-		trace:  core.Trace,
-		client: core.Client,
+		Core:                     core,
+		trace:                    core.Trace,
+		client:                   core.Client,
+		streamResultCloseTimeout: core.deleteTimeout,
 	}, nil
 }
 
@@ -144,7 +147,10 @@ func (s *Session) execute(
 		}
 	}()
 
-	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts, withOnClose(cancel))...)
+	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts,
+		withStreamResultOnClose(cancel),
+		withStreamResultCloseTimeout(s.streamResultCloseTimeout),
+	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -164,7 +170,7 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -192,7 +198,7 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withTrace(s.trace))
+	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
