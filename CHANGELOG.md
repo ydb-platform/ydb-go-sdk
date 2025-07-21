@@ -1,4 +1,5 @@
-* Fixed SLO test failures for the `database-sql-query` component by addressing connection leaks and hanging issues. The changes focus on removing deprecated error handling and improving context management for query result streams.
+* Fixed several issues in `database/sql` error handling
+* Improved context management for query result streams.
 
 ## v3.113.0
 * Added experimental `config.WithDisableOptimisticUnban` option to disable fast node unban after pessimization
