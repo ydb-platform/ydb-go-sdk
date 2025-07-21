@@ -38,7 +38,6 @@ type (
 
 		Done() <-chan struct{}
 		SetStatus(code Status)
-		DeleteTimeout() time.Duration
 	}
 	sessionCore struct {
 		cc     grpc.ClientConnInterface
@@ -82,10 +81,6 @@ func (core *sessionCore) SetStatus(status Status) {
 			}
 		}
 	}
-}
-
-func (core *sessionCore) DeleteTimeout() time.Duration {
-	return core.deleteTimeout
 }
 
 func (core *sessionCore) Status() string {

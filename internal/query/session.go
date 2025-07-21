@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 
@@ -21,9 +22,10 @@ type (
 	Session struct {
 		Core
 
-		client Ydb_Query_V1.QueryServiceClient
-		trace  *trace.Query
-		lazyTx bool
+		client                   Ydb_Query_V1.QueryServiceClient
+		trace                    *trace.Query
+		lazyTx                   bool
+		streamResultCloseTimeout time.Duration
 	}
 )
 
@@ -92,9 +94,10 @@ func createSession(
 	}
 
 	return &Session{
-		Core:   core,
-		trace:  core.Trace,
-		client: core.Client,
+		Core:                     core,
+		trace:                    core.Trace,
+		client:                   core.Client,
+		streamResultCloseTimeout: core.deleteTimeout,
 	}, nil
 }
 
@@ -146,7 +149,7 @@ func (s *Session) execute(
 
 	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts,
 		withOnClose(cancel),
-		withStreamResultCloseTimeout(s.DeleteTimeout()),
+		withStreamResultCloseTimeout(s.streamResultCloseTimeout),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

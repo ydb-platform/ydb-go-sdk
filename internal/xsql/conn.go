@@ -40,7 +40,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	return badconn.Map(c.cc.Ping(ctx))
+	return c.cc.Ping(ctx)
 }
 
 func (c *Conn) CheckNamedValue(value *driver.NamedValue) (finalErr error) {
