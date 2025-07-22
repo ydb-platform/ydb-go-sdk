@@ -1,3 +1,5 @@
+* Fixed panic in `database/sql` traces
+
 ## v3.113.1
 * Fixed several issues in `database/sql` error handling
 * Improved context management for query result streams.
