@@ -1,3 +1,4 @@
+## v3.113.2
 * Fixed panic in `database/sql` traces
 
 ## v3.113.1
