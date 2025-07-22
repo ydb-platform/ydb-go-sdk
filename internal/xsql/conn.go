@@ -61,7 +61,11 @@ func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx,
 		stack.FunctionID("database/sql.(*Conn).BeginTx", stack.Package("database/sql")),
 	)
 	defer func() {
-		onDone(c.currentTx, finalErr)
+		if c.currentTx != nil {
+			onDone(c.currentTx, finalErr)
+		} else {
+			onDone(nil, finalErr)
+		}
 	}()
 
 	if c.currentTx != nil {
@@ -103,7 +107,11 @@ func (c *Conn) Begin() (_ driver.Tx, finalErr error) {
 		stack.FunctionID("database/sql.(*Conn).Begin", stack.Package("database/sql")),
 	)
 	defer func() {
-		onDone(c.currentTx, finalErr)
+		if c.currentTx != nil {
+			onDone(c.currentTx, finalErr)
+		} else {
+			onDone(nil, finalErr)
+		}
 	}()
 
 	if c.currentTx != nil {
