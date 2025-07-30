@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/test/bufconn"
 )
 
@@ -25,9 +26,12 @@ func TestBalancer_discoveryConn(t *testing.T) {
 	dialAttempt := 0
 
 	balancer := &Balancer{
-		address: "ydb:///example.com:2135", // `example.com` has several IPs, TODO: replace with custom resolver
+		address: "ydbmock:///mock",
 		driverConfig: config.New(
+			config.WithEndpoint("mock"),
 			config.WithGrpcOptions(
+				grpc.WithResolvers(&mockResolverBuilder{}),
+
 				grpc.WithContextDialer(
 					// The first dialing is very long and ends with an error, while the subsequent ones work fine.
 					func(ctx context.Context, s string) (net.Conn, error) {
@@ -55,3 +59,25 @@ func TestBalancer_discoveryConn(t *testing.T) {
 	_, err := balancer.discoveryConn(ctx)
 	require.NoError(t, err)
 }
+
+// Mock resolver
+//
+
+type mockResolverBuilder struct{}
+
+func (r *mockResolverBuilder) Build(_ resolver.Target, cc resolver.ClientConn, _ resolver.BuildOptions) (
+	resolver.Resolver, error) {
+	state := resolver.State{Addresses: []resolver.Address{
+		{Addr: "mockaddress1"},
+		{Addr: "mockaddress2"},
+	}}
+	cc.UpdateState(state)
+	return &mockResover{}, nil
+}
+
+func (r *mockResolverBuilder) Scheme() string { return "ydbmock" }
+
+type mockResover struct{}
+
+func (r *mockResover) ResolveNow(resolver.ResolveNowOptions) {}
+func (r *mockResover) Close()                                {}
