@@ -40,7 +40,7 @@ func TestBalancer_discoveryConn(t *testing.T) {
 		_ = fakeServer.Serve(fakeListener)
 	}()
 
-	var dialAttempt uint32
+	var dialAttempt atomic.Uint32
 
 	balancer := &Balancer{
 		address: "ydbmock:///mock",
@@ -52,9 +52,7 @@ func TestBalancer_discoveryConn(t *testing.T) {
 				grpc.WithContextDialer(
 					// The first dialing is never ended, while the subsequent ones work fine.
 					func(ctx context.Context, s string) (net.Conn, error) {
-						atomic.AddUint32(&dialAttempt, 1)
-
-						if atomic.LoadUint32(&dialAttempt) == 1 {
+						if dialAttempt.Add(1) == 1 {
 							<-ctx.Done() // dial will never complete successfully
 
 							return nil, fmt.Errorf("fake error for endpoint: %s: %w", s, ctx.Err())
