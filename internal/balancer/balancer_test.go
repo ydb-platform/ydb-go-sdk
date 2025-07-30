@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/test/bufconn"
@@ -41,7 +40,7 @@ func TestBalancer_discoveryConn(t *testing.T) {
 						atomic.AddUint32(&dialAttempt, 1)
 
 						if atomic.LoadUint32(&dialAttempt) == 1 {
-							time.Sleep(1 * time.Hour) //extremely slow dialing
+							time.Sleep(1 * time.Hour) // extremely slow dialing
 
 							return nil, fmt.Errorf("fake error for endpoint: %s", s)
 						}
