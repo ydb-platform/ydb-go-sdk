@@ -17,7 +17,22 @@ import (
 )
 
 func TestBalancer_discoveryConn(t *testing.T) {
+	// testTimeout defines the test timeout and is an example of an actual user-defined timeout.
+	//
+	// I couldn't find any events for synchronization, assuming that there
+	// might be retries with different logic and their own timeouts inside `discoveryConn`.
+	// If not now, then in the future. One second excludes false test failures in case
+	// the test is run on very slow workers. Moreover, one second is only lost if the test fails,
+	// and in that case, losing it is not critical. Upon successful completion of the test,
+	// the context is canceled via `cancel()`.
+	const testTimeout = 1 * time.Second
+
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
 	fakeListener := bufconn.Listen(1024 * 1024)
+	defer fakeListener.Close()
+
 	fakeServer := grpc.NewServer()
 	defer fakeServer.Stop()
 
@@ -35,14 +50,14 @@ func TestBalancer_discoveryConn(t *testing.T) {
 				grpc.WithResolvers(&mockResolverBuilder{}),
 
 				grpc.WithContextDialer(
-					// The first dialing is very long and ends with an error, while the subsequent ones work fine.
+					// The first dialing is never ended, while the subsequent ones work fine.
 					func(ctx context.Context, s string) (net.Conn, error) {
 						atomic.AddUint32(&dialAttempt, 1)
 
 						if atomic.LoadUint32(&dialAttempt) == 1 {
-							time.Sleep(1 * time.Hour) // extremely slow dialing
+							<-ctx.Done() // dial will never complete successfully
 
-							return nil, fmt.Errorf("fake error for endpoint: %s", s)
+							return nil, fmt.Errorf("fake error for endpoint: %s: %w", s, ctx.Err())
 						}
 
 						return fakeListener.DialContext(ctx)
@@ -53,10 +68,6 @@ func TestBalancer_discoveryConn(t *testing.T) {
 			),
 		),
 	}
-
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
 
 	_, err := balancer.discoveryConn(ctx)
 	require.NoError(t, err)
@@ -76,12 +87,12 @@ func (r *mockResolverBuilder) Build(_ resolver.Target, cc resolver.ClientConn, _
 	}}
 	_ = cc.UpdateState(state)
 
-	return &mockResover{}, nil
+	return &mockResolver{}, nil
 }
 
 func (r *mockResolverBuilder) Scheme() string { return "ydbmock" }
 
-type mockResover struct{}
+type mockResolver struct{}
 
-func (r *mockResover) ResolveNow(resolver.ResolveNowOptions) {}
-func (r *mockResover) Close()                                {}
+func (r *mockResolver) ResolveNow(resolver.ResolveNowOptions) {}
+func (r *mockResolver) Close()                                {}
