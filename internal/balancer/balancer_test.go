@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/test/bufconn"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 )
 
 func TestBalancer_discoveryConn(t *testing.T) {
@@ -21,9 +22,11 @@ func TestBalancer_discoveryConn(t *testing.T) {
 	fakeServer := grpc.NewServer()
 	defer fakeServer.Stop()
 
-	go fakeServer.Serve(fakeListener)
+	go func() {
+		_ = fakeServer.Serve(fakeListener)
+	}()
 
-	dialAttempt := 0
+	var dialAttempt uint32
 
 	balancer := &Balancer{
 		address: "ydbmock:///mock",
@@ -35,9 +38,9 @@ func TestBalancer_discoveryConn(t *testing.T) {
 				grpc.WithContextDialer(
 					// The first dialing is very long and ends with an error, while the subsequent ones work fine.
 					func(ctx context.Context, s string) (net.Conn, error) {
-						dialAttempt++
+						atomic.AddUint32(&dialAttempt, 1)
 
-						if dialAttempt == 1 {
+						if atomic.LoadUint32(&dialAttempt) == 1 {
 							time.Sleep(1 * time.Hour) //extremely slow dialing
 
 							return nil, fmt.Errorf("fake error for endpoint: %s", s)
@@ -66,12 +69,14 @@ func TestBalancer_discoveryConn(t *testing.T) {
 type mockResolverBuilder struct{}
 
 func (r *mockResolverBuilder) Build(_ resolver.Target, cc resolver.ClientConn, _ resolver.BuildOptions) (
-	resolver.Resolver, error) {
+	resolver.Resolver, error,
+) {
 	state := resolver.State{Addresses: []resolver.Address{
 		{Addr: "mockaddress1"},
 		{Addr: "mockaddress2"},
 	}}
-	cc.UpdateState(state)
+	_ = cc.UpdateState(state)
+
 	return &mockResover{}, nil
 }
 
