@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -281,6 +282,21 @@ var errsToCheck = []struct {
 		canRetry: map[idempotency]bool{
 			idempotent:    true,
 			nonIdempotent: true,
+		},
+	},
+	{
+		err: xerrors.Operation(
+			xerrors.WithStatusCode(Ydb.StatusIds_ABORTED),
+			xerrors.WithIssues([]*Ydb_Issue.IssueMessage{
+				{
+					IssueCode: xerrors.IssueCodeDatashardProgramSizeLimitExceeded,
+				},
+			}),
+		),
+		backoff: backoff.TypeNoBackoff,
+		canRetry: map[idempotency]bool{
+			idempotent:    false,
+			nonIdempotent: false,
 		},
 	},
 	{

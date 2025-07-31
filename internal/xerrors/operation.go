@@ -3,6 +3,7 @@ package xerrors
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -159,22 +160,16 @@ func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 	return false
 }
 
-const issueCodeTransactionLocksInvalidated = 2001
-
 func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {
-	if IsOperationError(err, Ydb.StatusIds_ABORTED) {
-		IterateByIssues(err, func(_ string, code Ydb.StatusIds_StatusCode, severity uint32) {
-			isTLI = isTLI || (code == issueCodeTransactionLocksInvalidated)
+	return IsOperationError(err, Ydb.StatusIds_ABORTED) &&
+		iterateByIssues(err, func(message string, code Ydb.StatusIds_StatusCode, severity uint32) (stop bool) {
+			return code == IssueCodeTransactionLocksInvalidated
 		})
-	}
-
-	return isTLI
 }
 
 func (e *operationError) Type() Type {
 	switch e.code {
 	case
-		Ydb.StatusIds_ABORTED,
 		Ydb.StatusIds_UNAVAILABLE,
 		Ydb.StatusIds_OVERLOADED,
 		Ydb.StatusIds_BAD_SESSION,
@@ -186,9 +181,21 @@ func (e *operationError) Type() Type {
 		return TypeConditionallyRetryable
 	case Ydb.StatusIds_UNAUTHORIZED:
 		return TypeNonRetryable
+	case Ydb.StatusIds_ABORTED:
+		if e.hasIssueCodes(IssueCodeDatashardProgramSizeLimitExceeded) {
+			return TypeNonRetryable
+		}
+
+		return TypeRetryable
 	default:
 		return TypeUndefined
 	}
+}
+
+func (e *operationError) hasIssueCodes(codes ...Ydb.StatusIds_StatusCode) bool {
+	return iterateByIssues(e, func(message string, code Ydb.StatusIds_StatusCode, severity uint32) (stop bool) {
+		return slices.Contains(codes, code)
+	})
 }
 
 func (e *operationError) BackoffType() backoff.Type {
@@ -196,11 +203,16 @@ func (e *operationError) BackoffType() backoff.Type {
 	case Ydb.StatusIds_OVERLOADED:
 		return backoff.TypeSlow
 	case
-		Ydb.StatusIds_ABORTED,
 		Ydb.StatusIds_UNAVAILABLE,
 		Ydb.StatusIds_CANCELLED,
 		Ydb.StatusIds_SESSION_BUSY,
 		Ydb.StatusIds_UNDETERMINED:
+		return backoff.TypeFast
+	case Ydb.StatusIds_ABORTED:
+		if e.hasIssueCodes(IssueCodeDatashardProgramSizeLimitExceeded) {
+			return backoff.TypeNoBackoff
+		}
+
 		return backoff.TypeFast
 	default:
 		return backoff.TypeNoBackoff

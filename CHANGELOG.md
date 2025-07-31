@@ -1,3 +1,5 @@
+* Marked as non-retryable operation error `ABORTED` with internal issue `200509` ("Datashard program size limit exceeded")
+
 ## v3.113.2
 * Fixed panic in `database/sql` traces
 

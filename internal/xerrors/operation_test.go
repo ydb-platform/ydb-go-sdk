@@ -88,7 +88,7 @@ func TestIsOperationErrorTransactionLocksInvalidated(t *testing.T) {
 			err: Operation(
 				WithStatusCode(Ydb.StatusIds_ABORTED),
 				WithIssues([]*Ydb_Issue.IssueMessage{{
-					IssueCode: issueCodeTransactionLocksInvalidated,
+					IssueCode: IssueCodeTransactionLocksInvalidated,
 				}}),
 			),
 			isTLI: true,
@@ -97,7 +97,7 @@ func TestIsOperationErrorTransactionLocksInvalidated(t *testing.T) {
 			err: Operation(
 				WithStatusCode(Ydb.StatusIds_OVERLOADED),
 				WithIssues([]*Ydb_Issue.IssueMessage{{
-					IssueCode: issueCodeTransactionLocksInvalidated,
+					IssueCode: IssueCodeTransactionLocksInvalidated,
 				}}),
 			),
 			isTLI: false,
@@ -113,7 +113,7 @@ func TestIsOperationErrorTransactionLocksInvalidated(t *testing.T) {
 				WithStatusCode(Ydb.StatusIds_ABORTED),
 				WithIssues([]*Ydb_Issue.IssueMessage{{
 					Issues: []*Ydb_Issue.IssueMessage{{
-						IssueCode: issueCodeTransactionLocksInvalidated,
+						IssueCode: IssueCodeTransactionLocksInvalidated,
 					}},
 				}}),
 			),
