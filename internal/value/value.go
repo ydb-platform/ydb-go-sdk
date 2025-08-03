@@ -2230,11 +2230,11 @@ func (v uint8Value) castTo(dst any) error {
 
 		return nil
 	case *string:
-		*vv = strconv.FormatInt(int64(v), 10)
+		*vv = strconv.FormatUint(uint64(v), 10)
 
 		return nil
 	case *[]byte:
-		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatUint(uint64(v), 10))
 
 		return nil
 	case *uint64:
@@ -2310,11 +2310,11 @@ func (v uint16Value) castTo(dst any) error {
 
 		return nil
 	case *string:
-		*vv = strconv.FormatInt(int64(v), 10)
+		*vv = strconv.FormatUint(uint64(v), 10)
 
 		return nil
 	case *[]byte:
-		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatUint(uint64(v), 10))
 
 		return nil
 	case *uint64:
@@ -2382,11 +2382,11 @@ func (v uint32Value) castTo(dst any) error {
 
 		return nil
 	case *string:
-		*vv = strconv.FormatInt(int64(v), 10)
+		*vv = strconv.FormatUint(uint64(v), 10)
 
 		return nil
 	case *[]byte:
-		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatUint(uint64(v), 10))
 
 		return nil
 	case *uint64:
@@ -2442,11 +2442,11 @@ func (v uint64Value) castTo(dst any) error {
 
 		return nil
 	case *string:
-		*vv = strconv.FormatInt(int64(v), 10)
+		*vv = strconv.FormatUint(uint64(v), 10)
 
 		return nil
 	case *[]byte:
-		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatUint(uint64(v), 10))
 
 		return nil
 
