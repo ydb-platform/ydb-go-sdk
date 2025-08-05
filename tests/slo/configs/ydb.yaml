@@ -1,0 +1,60 @@
+actor_system_config:
+  cpu_count: 1
+  node_type: STORAGE
+  use_auto_config: true
+blob_storage_config:
+  service_set:
+    groups:
+      - erasure_species: none
+        rings:
+          - fail_domains:
+              - vdisk_locations:
+                  - node_id: 1
+                    path: SectorMap:1:64
+                    pdisk_category: SSD
+channel_profile_config:
+  profile:
+    - channel:
+        - erasure_species: none
+          pdisk_category: 0
+          storage_pool_kind: ssd
+        - erasure_species: none
+          pdisk_category: 0
+          storage_pool_kind: ssd
+        - erasure_species: none
+          pdisk_category: 0
+          storage_pool_kind: ssd
+      profile_id: 0
+domains_config:
+  domain:
+    - name: Root
+      storage_pool_types:
+        - kind: ssd
+          pool_config:
+            box_id: 1
+            erasure_species: none
+            kind: ssd
+            pdisk_filter:
+              - property:
+                  - type: SSD
+            vdisk_kind: Default
+  state_storage:
+    - ring:
+        node: [1]
+        nto_select: 1
+      ssid: 1
+host_configs:
+  - drive:
+      - path: SectorMap:1:64
+        type: SSD
+    host_config_id: 1
+hosts:
+  - host: static-0
+    host_config_id: 1
+    node_id: 1
+    port: 19001
+    walle_location:
+      body: 1
+      data_center: az-1
+      rack: "0"
+static_erasure: none

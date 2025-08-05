@@ -1,0 +1,275 @@
+networks:
+  default:
+    name: slo-network
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.18.0.0/16"
+          ip_range: 172.18.238.0/27
+
+x-runtime: &runtime
+  platform: linux/amd64
+  privileged: true
+
+x-ydb-node: &ydb-node
+  image: cr.yandex/crptqonuodf51kdj7a7d/ydb:24.4.4.12
+  restart: always
+  <<: *runtime
+  volumes:
+    - ./configs/ydb.yaml:/opt/ydb/cfg/config.yaml
+
+name: ydb
+
+services:
+  # `stub` service opens a port, connections to which never receive a response.
+  stub:
+    build:
+      # separate image because openBSD version of `netcat` can handle multiple connects
+      dockerfile: Dockerfile.netcat-openbsd
+    stdin_open: true
+    tty: true
+    expose:
+      - "2135"
+    networks:
+      default:
+        ipv4_address: 172.18.238.10
+    command: [ "-k", "-l", "-p", "2135" ]
+
+  static-0:
+    <<: *ydb-node
+    hostname: static-0
+    command:
+      - /opt/ydb/bin/ydbd
+      - server
+      - --grpc-port
+      - "2135"
+      - --mon-port
+      - "8765"
+      - --ic-port
+      - "19001"
+      - --yaml-config
+      - /opt/ydb/cfg/config.yaml
+      - --node
+      - static
+      - --label
+      - deployment=docker
+    ports:
+      - "8765:8765"
+      - "2135:2135"
+    healthcheck:
+      test: bash -c "exec 6<> /dev/tcp/localhost/2135"
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
+
+  static-init:
+    <<: *ydb-node
+    restart: on-failure
+    command:
+      - /opt/ydb/bin/ydbd
+      - -s
+      - grpc://static-0:2135
+      - admin
+      - blobstorage
+      - config
+      - init
+      - --yaml-file
+      - /opt/ydb/cfg/config.yaml
+    depends_on:
+      static-0:
+        condition: service_healthy
+
+  tenant-init:
+    <<: *ydb-node
+    restart: on-failure
+    command:
+      - /opt/ydb/bin/ydbd
+      - -s
+      - grpc://static-0:2135
+      - admin
+      - database
+      - /Root/testdb
+      - create
+      - ssd:1
+    depends_on:
+      static-init:
+        condition: service_completed_successfully
+
+  database-1: &dynnode
+    <<: *ydb-node
+    command:
+      - /opt/ydb/bin/ydbd
+      - server
+      - --grpc-port
+      - "2135"
+      - --mon-port
+      - "8766"
+      - --ic-port
+      - "19002"
+      - --yaml-config
+      - /opt/ydb/cfg/config.yaml
+      - --tenant
+      - /Root/testdb
+      - --node-broker
+      - grpc://static-0:2135
+      - --label
+      - deployment=docker
+    healthcheck:
+      test: bash -c "exec 6<> /dev/tcp/localhost/2135"
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      static-0:
+        condition: service_healthy
+      static-init:
+        condition: service_completed_successfully
+      tenant-init:
+        condition: service_completed_successfully
+    networks:
+      default:
+        ipv4_address: 172.18.238.11
+
+  database-2:
+    <<: *dynnode
+    networks:
+      default:
+        ipv4_address: 172.18.238.12
+
+  database-3:
+    <<: *dynnode
+    networks:
+      default:
+        ipv4_address: 172.18.238.13
+
+  database-4:
+    <<: *dynnode
+    networks:
+      default:
+        ipv4_address: 172.18.238.14
+
+  database-5:
+    <<: *dynnode
+    networks:
+      default:
+        ipv4_address: 172.18.238.15
+
+  chaos:
+    image: docker:latest
+    restart: on-failure
+    <<: *runtime
+    entrypoint: [ "/bin/sh", "-c", "chmod +x /opt/ydb/chaos.sh && ls -la /opt/ydb && /opt/ydb/chaos.sh" ]
+    volumes:
+      - ./configs/chaos.sh:/opt/ydb/chaos.sh
+      - ./configs/ydb.yaml:/opt/ydb/cfg/config.yaml
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      static-0:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus
+    restart: unless-stopped
+    <<: *runtime
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+    deploy: &monitoring-deploy
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 1000M
+        reservations:
+          cpus: '0.001'
+          memory: 50M
+
+  prometheus-pushgateway:
+    image: prom/pushgateway
+    restart: unless-stopped
+    <<: *runtime
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9091/metrics" ]
+      interval: 1m30s
+      timeout: 1s
+      retries: 3
+      start_period: 10s
+    deploy:
+      <<: *monitoring-deploy
+
+  grafana:
+    image: grafana/grafana-enterprise
+    restart: unless-stopped
+    environment:
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - '3000:3000'
+
+  slo-native-query-create:
+    profiles: [ "native-query" ]
+    build:
+      context: ../..
+      dockerfile: tests/slo/Dockerfile
+      args:
+        SRC_PATH: native/query
+        JOB_NAME: native-query
+    restart: on-failure
+    networks:
+      - default
+    command:
+      - create
+      - grpc://static-0:2135
+      - /Root/testdb
+    depends_on:
+      tenant-init:
+        condition: service_completed_successfully
+      static-0:
+        condition: service_healthy
+
+  slo-native-query-run:
+    profiles: [ "native-query" ]
+    build:
+      context: ../..
+      dockerfile: tests/slo/Dockerfile
+      args:
+        SRC_PATH: native/query
+        JOB_NAME: native-query
+    extra_hosts:
+      # We are explicitly adding the stub service and dynnodes. 
+      # This way, `stub` will always be the first in the list of IP addresses for the `database` FQDN.
+      - "database=172.18.238.10"
+      - "database=172.18.238.11"
+      - "database=172.18.238.12"
+      - "database=172.18.238.13"
+      - "database=172.18.238.14"
+      - "database=172.18.238.15"
+    command:
+      - run
+      - grpc://database:2135
+      - /Root/testdb
+      - -prom-pgw
+      - prometheus-pushgateway:9091
+      - -report-period
+      - "250"
+      - -time
+      - "600"
+      - -read-rps
+      - "500"
+      - -write-rps
+      - "50"
+      - -read-timeout
+      - "1000"
+      - -write-timeout
+      - "1000"
+    depends_on:
+      slo-native-query-create:
+        condition: service_completed_successfully
+      prometheus-pushgateway:
+        condition: service_healthy
+      stub:
+        condition: service_started
