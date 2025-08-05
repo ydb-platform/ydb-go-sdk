@@ -1166,6 +1166,147 @@ func TestCastNumbers(t *testing.T) {
 			})
 		}
 	}
+	for _, tt := range []struct {
+		v      Value
+		dst    interface{}
+		result interface{}
+		error  bool
+	}{
+		{
+			v:      Int8Value(-128),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("-128"),
+		},
+		{
+			v:      Int8Value(127),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("127"),
+		},
+		{
+			v:      Uint8Value(128),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("128"),
+		},
+		{
+			v:      Int8Value(-128),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("-128")),
+		},
+		{
+			v:      Int8Value(127),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("127")),
+		},
+		{
+			v:      Uint8Value(128),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("128")),
+		},
+		{
+			v:      Int16Value(-32768),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("-32768"),
+		},
+		{
+			v:      Int16Value(32767),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("32767"),
+		},
+		{
+			v:      Uint16Value(32768),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("32768"),
+		},
+		{
+			v:      Int16Value(-32768),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("-32768")),
+		},
+		{
+			v:      Int16Value(32767),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("32767")),
+		},
+		{
+			v:      Uint16Value(32768),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("32768")),
+		},
+		{
+			v:      Int32Value(-2147483648),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("-2147483648"),
+		},
+		{
+			v:      Int32Value(2147483647),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("2147483647"),
+		},
+		{
+			v:      Uint32Value(2147483648),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("2147483648"),
+		},
+		{
+			v:      Int32Value(-2147483648),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("-2147483648")),
+		},
+		{
+			v:      Int32Value(2147483647),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("2147483647")),
+		},
+		{
+			v:      Uint32Value(2147483648),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("2147483648")),
+		},
+		{
+			v:      Int64Value(-9223372036854775808),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("-9223372036854775808"),
+		},
+		{
+			v:      Int64Value(9223372036854775807),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("9223372036854775807"),
+		},
+		{
+			v:      Uint64Value(9223372036854775808),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("9223372036854775808"),
+		},
+		{
+			v:      Int64Value(-9223372036854775808),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("-9223372036854775808")),
+		},
+		{
+			v:      Int64Value(9223372036854775807),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("9223372036854775807")),
+		},
+		{
+			v:      Uint64Value(9223372036854775808),
+			dst:    func(v []byte) *[]byte { return &v }([]byte("")),
+			result: func(v []byte) *[]byte { return &v }([]byte("9223372036854775808")),
+		},
+	} {
+		t.Run(fmt.Sprintf("%s(%s)→%s",
+			tt.v.Type().Yql(), tt.v.Yql(), reflect.ValueOf(tt.dst).Type().Elem()),
+			func(t *testing.T) {
+				if err := CastTo(tt.v, tt.dst); (err != nil) != tt.error {
+					t.Errorf("castTo() error = %v, want %v", err, tt.error)
+				} else if !reflect.DeepEqual(tt.dst, tt.result) {
+					t.Errorf("castTo() result = %+v, want %+v",
+						reflect.ValueOf(tt.dst).Elem(),
+						reflect.ValueOf(tt.result).Elem(),
+					)
+				}
+			},
+		)
+	}
 }
 
 func TestCastList(t *testing.T) {

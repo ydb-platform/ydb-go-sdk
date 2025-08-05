@@ -1,3 +1,5 @@
+* Fixed incorrect string conversion of `Uint64Value` values greater than `int64` max value
+
 ## v3.113.4
 * Added original error to `listValue` and `setValue` cast error
 
