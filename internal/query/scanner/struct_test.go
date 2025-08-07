@@ -40,8 +40,8 @@ func TestFieldName(t *testing.T) {
 }
 
 func TestStruct(t *testing.T) {
-	newScannerData := func(mapping map[*Ydb.Column]*Ydb.Value) *data {
-		data := &data{
+	newScannerData := func(mapping map[*Ydb.Column]*Ydb.Value) *Data {
+		data := &Data{
 			columns: make([]*Ydb.Column, 0, len(mapping)),
 			values:  make([]*Ydb.Value, 0, len(mapping)),
 		}
@@ -484,7 +484,7 @@ func TestStruct(t *testing.T) {
 }
 
 func TestStructNotAPointer(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",
@@ -512,7 +512,7 @@ func TestStructNotAPointer(t *testing.T) {
 }
 
 func TestStructNotAPointerToStruct(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",
@@ -537,7 +537,7 @@ func TestStructNotAPointerToStruct(t *testing.T) {
 }
 
 func TestStructCastFailed(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "A",
@@ -564,7 +564,7 @@ func TestStructCastFailed(t *testing.T) {
 }
 
 func TestStructCastFailedErrMsg(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "A",
@@ -591,7 +591,7 @@ func TestStructCastFailedErrMsg(t *testing.T) {
 }
 
 func TestStructNotFoundColumns(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",
@@ -619,7 +619,7 @@ func TestStructNotFoundColumns(t *testing.T) {
 }
 
 func TestStructSkippedColumns(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "A",
@@ -650,7 +650,7 @@ func TestStructSkippedColumns(t *testing.T) {
 }
 
 func TestStructWithAllowMissingColumnsFromSelect(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "A",
@@ -684,7 +684,7 @@ func TestStructWithAllowMissingColumnsFromSelect(t *testing.T) {
 }
 
 func TestStructNotFoundFields(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "A",
@@ -737,7 +737,7 @@ func TestStructNotFoundFields(t *testing.T) {
 }
 
 func TestStructWithAllowMissingFieldsInStruct(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "A",
@@ -793,7 +793,7 @@ func TestStructWithAllowMissingFieldsInStruct(t *testing.T) {
 }
 
 func TestStructWithTagName(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "A",
@@ -853,7 +853,7 @@ func TestStructWithTagName(t *testing.T) {
 }
 
 func TestScannerStructOrdering(t *testing.T) {
-	scanner := Struct(Data(
+	scanner := Struct(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "B",

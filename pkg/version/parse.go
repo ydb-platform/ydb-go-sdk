@@ -8,7 +8,7 @@ import (
 )
 
 type version struct {
-	Major  uint64
+	Major  string
 	Minor  uint64
 	Patch  uint64
 	Suffix string
@@ -39,11 +39,11 @@ func (lhs version) Less(rhs version) bool {
 
 // Lt compare lhs and rhs as (lhs < rhs)
 func Lt(lhs, rhs string) bool {
-	v1, err := parse(lhs)
+	v1, err := Parse(lhs)
 	if err != nil {
 		return false
 	}
-	v2, err := parse(rhs)
+	v2, err := Parse(rhs)
 	if err != nil {
 		return false
 	}
@@ -53,11 +53,11 @@ func Lt(lhs, rhs string) bool {
 
 // Gte compare lhs and rhs as (lhs >= rhs)
 func Gte(lhs, rhs string) bool {
-	v1, err := parse(lhs)
+	v1, err := Parse(lhs)
 	if err != nil {
 		return false
 	}
-	v2, err := parse(rhs)
+	v2, err := Parse(rhs)
 	if err != nil {
 		return false
 	}
@@ -69,30 +69,28 @@ func Gte(lhs, rhs string) bool {
 }
 
 //nolint:mnd
-func parse(s string) (v version, err error) {
+func Parse(s string) (v version, err error) {
 	ss := strings.SplitN(s, "-", 2)
 	if len(ss) == 2 {
 		v.Suffix = ss[1]
 	}
-	sss := strings.SplitN(ss[0], ".", 3)
-	if len(sss) == 3 {
-		v.Patch, err = strconv.ParseUint(sss[2], 10, 64)
+	ss = strings.SplitN(ss[0], ".", 4)
+	if len(ss) >= 2 {
+		ss = append([]string{ss[0] + "." + ss[1]}, ss[2:]...)
+	}
+	if len(ss) == 3 {
+		v.Patch, err = strconv.ParseUint(ss[2], 10, 64)
 		if err != nil {
 			return version{}, xerrors.WithStackTrace(err)
 		}
 	}
-	if len(sss) >= 2 {
-		v.Minor, err = strconv.ParseUint(sss[1], 10, 64)
+	if len(ss) >= 2 {
+		v.Minor, err = strconv.ParseUint(ss[1], 10, 64)
 		if err != nil {
 			return version{}, xerrors.WithStackTrace(err)
 		}
 	}
-	if len(sss) >= 1 {
-		v.Major, err = strconv.ParseUint(sss[0], 10, 64)
-		if err != nil {
-			return version{}, xerrors.WithStackTrace(err)
-		}
-	}
+	v.Major = ss[0]
 
 	return v, nil
 }

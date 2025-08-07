@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
