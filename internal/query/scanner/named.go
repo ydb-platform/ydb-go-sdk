@@ -10,7 +10,7 @@ import (
 
 type (
 	NamedScanner struct {
-		data *data
+		data *Data
 	}
 	namedDestination struct {
 		name string
@@ -44,7 +44,7 @@ func NamedRef(columnName string, destinationValueReference interface{}) (dst nam
 	return dst
 }
 
-func Named(data *data) NamedScanner {
+func Named(data *Data) NamedScanner {
 	return NamedScanner{
 		data: data,
 	}

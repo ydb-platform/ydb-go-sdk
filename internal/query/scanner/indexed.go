@@ -8,10 +8,10 @@ import (
 )
 
 type IndexedScanner struct {
-	data *data
+	data *Data
 }
 
-func Indexed(data *data) IndexedScanner {
+func Indexed(data *Data) IndexedScanner {
 	return IndexedScanner{
 		data: data,
 	}

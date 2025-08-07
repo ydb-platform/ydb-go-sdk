@@ -37,7 +37,7 @@ type dbForMakeRecursive interface {
 	dbScheme
 }
 
-type dbFoRemoveRecursive interface {
+type driver interface {
 	dbName
 	dbScheme
 	dbTable
@@ -89,7 +89,7 @@ func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate stri
 // An empty prefix means using the root of the database.
 // RemoveRecursive method is equivalent to the bash command `rm -rf ~/path/to/remove`
 // where `~` is the root of the database.
-func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove string) error {
+func RemoveRecursive(ctx context.Context, db driver, pathToRemove string) error {
 	fullSysTablePath := path.Join(db.Name(), sysDirectory)
 
 	var rmPath func(int, string) error
@@ -153,7 +153,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 // handleEntry processes and removes different types of database entries
 func handleEntry(
 	ctx context.Context,
-	db dbFoRemoveRecursive,
+	db driver,
 	rmPath func(int, string) error,
 	depth int,
 	entry *scheme.Entry,
@@ -188,7 +188,7 @@ func handleEntry(
 }
 
 // removeTable removes a table in the database
-func removeTable(ctx context.Context, db dbFoRemoveRecursive, tablePath string) error {
+func removeTable(ctx context.Context, db driver, tablePath string) error {
 	return db.Table().Do(ctx, func(ctx context.Context, session table.Session) error {
 		return session.DropTable(ctx, tablePath)
 	}, table.WithIdempotent())

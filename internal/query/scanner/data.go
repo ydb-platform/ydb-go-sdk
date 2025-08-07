@@ -9,28 +9,38 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-type data struct {
+type Data struct {
 	columns []*Ydb.Column
 	values  []*Ydb.Value
 }
 
-func Data(columns []*Ydb.Column, values []*Ydb.Value) *data {
-	return &data{
+func NewData(columns []*Ydb.Column, values []*Ydb.Value) *Data {
+	return &Data{
 		columns: columns,
 		values:  values,
 	}
 }
 
-func (s data) seekByName(name string) (value.Value, error) {
-	for i := range s.columns {
-		if s.columns[i].GetName() == name {
-			return value.FromYDB(s.columns[i].GetType(), s.values[i]), nil
+func (d Data) seekByName(name string) (value.Value, error) {
+	for i := range d.columns {
+		if d.columns[i].GetName() == name {
+			return value.FromYDB(d.columns[i].GetType(), d.values[i]), nil
 		}
 	}
 
 	return nil, xerrors.WithStackTrace(fmt.Errorf("'%s': %w", name, ErrColumnsNotFoundInRow))
 }
 
-func (s data) seekByIndex(idx int) value.Value {
-	return value.FromYDB(s.columns[idx].GetType(), s.values[idx])
+func (d Data) seekByIndex(idx int) value.Value {
+	return value.FromYDB(d.columns[idx].GetType(), d.values[idx])
+}
+
+func (d Data) Values() []value.Value {
+	values := make([]value.Value, len(d.columns))
+
+	for idx := range values {
+		values[idx] = value.FromYDB(d.columns[idx].GetType(), d.values[idx])
+	}
+
+	return values
 }

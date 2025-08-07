@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
 type (

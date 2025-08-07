@@ -1,7 +1,7 @@
 package secret
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
 func Password(password string) string {
