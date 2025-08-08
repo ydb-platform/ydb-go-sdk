@@ -1,3 +1,5 @@
+* Removed experimental label from `retry.DoWithResult` and `retry.DoTxWithResult`
+
 ## v3.113.5
 * Fixed incorrect string conversion of `Uint64Value` values greater than `int64` max value
 
