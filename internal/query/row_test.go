@@ -45,21 +45,21 @@ func TestRowScan(t *testing.T) {
 			scan: func() error {
 				return row.Scan()
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.Scan(row.go:39)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func1(row_test.go:46)`", //nolint:lll
+			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.Scan(row.go:47)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func1(row_test.go:46)`", //nolint:lll
 		},
 		{
 			name: "named scan",
 			scan: func() error {
 				return row.ScanNamed()
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanNamed(row.go:51)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func2(row_test.go:53)`", //nolint:lll
+			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanNamed(row.go:59)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func2(row_test.go:53)`", //nolint:lll
 		},
 		{
 			name: "struct scan",
 			scan: func() error {
 				return row.ScanStruct(nil)
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanStruct(row.go:63)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func3(row_test.go:60)`", //nolint:lll
+			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanStruct(row.go:71)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func3(row_test.go:60)`", //nolint:lll
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
