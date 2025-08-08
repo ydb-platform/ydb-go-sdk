@@ -20,7 +20,7 @@ func TestNamed(t *testing.T) {
 	}{
 		{
 			name: "Ydb.Type_UTF8",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -50,7 +50,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_STRING",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -80,7 +80,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_UINT64",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -108,7 +108,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INT64",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -136,7 +136,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_UINT32",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -170,7 +170,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INT32",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -206,7 +206,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_UINT16",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -244,7 +244,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INT16",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -278,7 +278,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_UINT8",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -318,7 +318,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INT8",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -354,7 +354,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_BOOL",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -382,7 +382,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_DATE",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -416,7 +416,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_DATETIME",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -450,7 +450,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_TIMESTAMP",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -480,7 +480,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INTERVAL",
-			s: Named(Data(
+			s: Named(NewData(
 				[]*Ydb.Column{
 					{
 						Name: "a",
@@ -526,7 +526,7 @@ func TestNamed(t *testing.T) {
 }
 
 func TestScannerNamedNotFoundByName(t *testing.T) {
-	scanner := Named(Data(
+	scanner := Named(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",
@@ -551,7 +551,7 @@ func TestScannerNamedNotFoundByName(t *testing.T) {
 }
 
 func TestScannerNamedOrdering(t *testing.T) {
-	scanner := Named(Data(
+	scanner := Named(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",
@@ -676,7 +676,7 @@ func TestNamedRef(t *testing.T) {
 }
 
 func TestNamedCastFailed(t *testing.T) {
-	scanner := Named(Data(
+	scanner := Named(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",
@@ -701,7 +701,7 @@ func TestNamedCastFailed(t *testing.T) {
 }
 
 func TestNamedCastFailedErrMsg(t *testing.T) {
-	scanner := Named(Data(
+	scanner := Named(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",

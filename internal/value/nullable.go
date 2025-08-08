@@ -8,8 +8,36 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
+
+func IsNull(v Value) bool {
+	if v == nil {
+		return true
+	}
+
+	if opt, has := v.(*optionalValue); has {
+		return opt.value == nil
+	}
+
+	return false
+}
+
+func Unwrap(v Value) Value {
+	if v == nil {
+		return nil
+	}
+
+	if opt, has := v.(*optionalValue); has {
+		if opt.value == nil {
+			return nil
+		}
+
+		return opt.value
+	}
+
+	return v
+}
 
 func NullableBoolValue(v *bool) Value {
 	if v == nil {

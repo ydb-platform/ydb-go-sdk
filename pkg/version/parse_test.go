@@ -16,47 +16,62 @@ func TestParse(t *testing.T) {
 	}{
 		{
 			s:   "1",
-			v:   version{Major: 1},
+			v:   version{Major: "1"},
 			err: false,
 		},
 		{
 			s:   "1.2",
-			v:   version{Major: 1, Minor: 2},
+			v:   version{Major: "1.2"},
 			err: false,
 		},
 		{
 			s:   "1.2.3",
-			v:   version{Major: 1, Minor: 2, Patch: 3},
+			v:   version{Major: "1.2", Minor: 3},
 			err: false,
 		},
 		{
 			s:   "1.2.3-alpha",
-			v:   version{Major: 1, Minor: 2, Patch: 3, Suffix: "alpha"},
+			v:   version{Major: "1.2", Minor: 3, Suffix: "alpha"},
+			err: false,
+		},
+		{
+			s:   "1.2.3.4-alpha",
+			v:   version{Major: "1.2", Minor: 3, Patch: 4, Suffix: "alpha"},
 			err: false,
 		},
 		{
 			s:   "22.5",
-			v:   version{Major: 22, Minor: 5},
+			v:   version{Major: "22.5"},
 			err: false,
 		},
 		{
 			s:   "23.1",
-			v:   version{Major: 23, Minor: 1},
+			v:   version{Major: "23.1"},
 			err: false,
 		},
 		{
 			s:   "23.2",
-			v:   version{Major: 23, Minor: 2},
+			v:   version{Major: "23.2"},
 			err: false,
 		},
 		{
-			s:   "trunk",
+			s:   "25.1.2.7-rc",
+			v:   version{Major: "25.1", Minor: 2, Patch: 7, Suffix: "rc"},
+			err: false,
+		},
+		{
+			s:   "25.1.2a.7-rc",
 			v:   version{},
 			err: true,
 		},
+		{
+			s:   "trunk",
+			v:   version{Major: "trunk"},
+			err: false,
+		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {
-			v, err := parse(tt.s)
+			v, err := Parse(tt.s)
 			if tt.err {
 				require.Error(t, err)
 			} else {
