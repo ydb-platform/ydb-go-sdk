@@ -31,6 +31,18 @@ func IsOptional(t Type) (isOptional bool, innerType Type) {
 	return false, nil
 }
 
+// IsNull checks if optional value is NULL.
+// If value is not optional value - returns false
+func IsNull(v Value) bool {
+	return value.IsNull(v)
+}
+
+// Unwrap returns inner optional value
+// If value is not optional value - returns self
+func Unwrap(v Value) Value {
+	return value.Unwrap(v)
+}
+
 // ToDecimal returns Decimal struct from abstract Value
 func ToDecimal(v Value) (*Decimal, error) {
 	if valuer, isDecimalValuer := v.(value.DecimalValuer); isDecimalValuer {
