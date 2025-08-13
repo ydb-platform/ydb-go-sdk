@@ -156,7 +156,6 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 		options[0] = WithTrace(d.TraceRetry())
 		options[1] = WithBudget(d.RetryBudget())
 	}
-	
 	for _, opt := range opts {
 		if opt != nil {
 			if txOpt, ok := opt.(doTxOption); ok {
