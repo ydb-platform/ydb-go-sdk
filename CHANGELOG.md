@@ -1,3 +1,4 @@
+## v3.113.6
 * Removed experimental label from `retry.DoWithResult` and `retry.DoTxWithResult`
 
 ## v3.113.5
