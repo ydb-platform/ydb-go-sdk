@@ -89,8 +89,10 @@ type doTxOption interface {
 	ApplyDoTxOption(txOptions *sql.TxOptions)
 }
 
-var _ Option = txOptionsOption{}
-var _ doTxOption = txOptionsOption{}
+var (
+	_ Option     = txOptionsOption{}
+	_ doTxOption = txOptionsOption{}
+)
 
 type txOptionsOption struct {
 	txOptions *sql.TxOptions
@@ -154,6 +156,7 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 		options[0] = WithTrace(d.TraceRetry())
 		options[1] = WithBudget(d.RetryBudget())
 	}
+	
 	for _, opt := range opts {
 		if opt != nil {
 			if txOpt, ok := opt.(doTxOption); ok {
