@@ -89,10 +89,14 @@ type doTxOption interface {
 	ApplyDoTxOption(txOptions *sql.TxOptions)
 }
 
+var _ Option = txOptionsOption{}
 var _ doTxOption = txOptionsOption{}
 
 type txOptionsOption struct {
 	txOptions *sql.TxOptions
+}
+
+func (t txOptionsOption) ApplyRetryOption(_ *retryOptions) {
 }
 
 func (t txOptionsOption) ApplyDoTxOption(txOptions *sql.TxOptions) {
