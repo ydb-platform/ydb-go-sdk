@@ -39,14 +39,6 @@ var _ Option = labelOption("")
 
 type labelOption string
 
-func (label labelOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithLabel(string(label)))
-}
-
-func (label labelOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithLabel(string(label)))
-}
-
 func (label labelOption) ApplyRetryOption(opts *retryOptions) {
 	opts.label = string(label)
 }
@@ -60,14 +52,6 @@ var _ Option = (*callOption)(nil)
 
 type callOption struct {
 	call
-}
-
-func (call callOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, withCaller(call))
-}
-
-func (call callOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, withCaller(call))
 }
 
 func (call callOption) ApplyRetryOption(opts *retryOptions) {
@@ -90,14 +74,6 @@ func (stackTraceOption) ApplyRetryOption(opts *retryOptions) {
 	opts.stackTrace = true
 }
 
-func (stackTraceOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithStackTrace())
-}
-
-func (stackTraceOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithStackTrace())
-}
-
 // WithStackTrace wraps errors with stacktrace from Retry call
 func WithStackTrace() stackTraceOption {
 	return stackTraceOption{}
@@ -111,14 +87,6 @@ type traceOption struct {
 
 func (t traceOption) ApplyRetryOption(opts *retryOptions) {
 	opts.trace = opts.trace.Compose(t.t)
-}
-
-func (t traceOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithTrace(t.t))
-}
-
-func (t traceOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithTrace(t.t))
 }
 
 // WithTrace returns trace option
@@ -136,14 +104,6 @@ func (b budgetOption) ApplyRetryOption(opts *retryOptions) {
 	opts.budget = b.b
 }
 
-func (b budgetOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithBudget(b.b))
-}
-
-func (b budgetOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithBudget(b.b))
-}
-
 //	WithBudget returns budget option
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
@@ -157,14 +117,6 @@ type idempotentOption bool
 
 func (idempotent idempotentOption) ApplyRetryOption(opts *retryOptions) {
 	opts.idempotent = bool(idempotent)
-}
-
-func (idempotent idempotentOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithIdempotent(bool(idempotent)))
-}
-
-func (idempotent idempotentOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithIdempotent(bool(idempotent)))
 }
 
 // WithIdempotent applies idempotent flag to retry operation
@@ -184,14 +136,6 @@ func (o fastBackoffOption) ApplyRetryOption(opts *retryOptions) {
 	}
 }
 
-func (o fastBackoffOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithFastBackoff(o.backoff))
-}
-
-func (o fastBackoffOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithFastBackoff(o.backoff))
-}
-
 // WithFastBackoff replaces default fast backoff
 func WithFastBackoff(b backoff.Backoff) fastBackoffOption {
 	return fastBackoffOption{backoff: b}
@@ -209,14 +153,6 @@ func (o slowBackoffOption) ApplyRetryOption(opts *retryOptions) {
 	}
 }
 
-func (o slowBackoffOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithSlowBackoff(o.backoff))
-}
-
-func (o slowBackoffOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithSlowBackoff(o.backoff))
-}
-
 // WithSlowBackoff replaces default slow backoff
 func WithSlowBackoff(b backoff.Backoff) slowBackoffOption {
 	return slowBackoffOption{backoff: b}
@@ -230,14 +166,6 @@ type panicCallbackOption struct {
 
 func (o panicCallbackOption) ApplyRetryOption(opts *retryOptions) {
 	opts.panicCallback = o.callback
-}
-
-func (o panicCallbackOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithPanicCallback(o.callback))
-}
-
-func (o panicCallbackOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithPanicCallback(o.callback))
 }
 
 // WithPanicCallback returns panic callback option

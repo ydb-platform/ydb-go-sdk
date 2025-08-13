@@ -14,36 +14,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type doOptions struct {
-	retryOptions []Option
-}
-
-// doTxOption defines option for redefine default Retry behavior
-type doOption interface {
-	ApplyDoOption(opts *doOptions)
-}
-
-var (
-	_ doOption = doRetryOptionsOption(nil)
-	_ doOption = labelOption("")
-)
-
-type doRetryOptionsOption []Option
-
-func (retryOptions doRetryOptionsOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, retryOptions...)
-}
-
-// WithDoRetryOptions specified retry options
-// Deprecated: use explicit options instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
-	return opts
-}
-
 // Do is a retryer of database/sql conn with fallbacks on errors
-func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Conn) error, opts ...doOption) error {
+func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Conn) error, opts ...Option) error {
 	_, err := DoWithResult(ctx, db, func(ctx context.Context, cc *sql.Conn) (*struct{}, error) {
 		err := op(ctx, cc)
 		if err != nil {
@@ -62,29 +34,25 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 // DoWithResult is a retryer of database/sql conn with fallbacks on errors
 func DoWithResult[T any](ctx context.Context, db *sql.DB,
 	op func(ctx context.Context, cc *sql.Conn) (T, error),
-	opts ...doOption,
+	opts ...Option,
 ) (T, error) {
 	var (
 		zeroValue T
-		options   = doOptions{
-			retryOptions: []Option{
-				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/retry.DoWithResult")),
-			},
+		options   = []Option{
+			withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/retry.DoWithResult")),
 		}
 		attempts = 0
 	)
 	if tracer, has := db.Driver().(interface {
 		TraceRetry() *trace.Retry
 	}); has {
-		options.retryOptions = append(options.retryOptions, nil)
-		copy(options.retryOptions[1:], options.retryOptions)
-		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
+		options = append(options, nil)
+		copy(options[1:], options)
+		options[0] = WithTrace(tracer.TraceRetry())
 	}
-	for _, opt := range opts {
-		if opt != nil {
-			opt.ApplyDoOption(&options)
-		}
-	}
+
+	options = append(options, opts...)
+
 	v, err := RetryWithResult(ctx, func(ctx context.Context) (_ T, finalErr error) {
 		attempts++
 		cc, err := db.Conn(ctx)
@@ -106,7 +74,7 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 		}
 
 		return v, nil
-	}, options.retryOptions...)
+	}, options...)
 	if err != nil {
 		return zeroValue, xerrors.WithStackTrace(
 			fmt.Errorf("operation failed with %d attempts: %w", attempts, err),
@@ -116,30 +84,9 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 	return v, nil
 }
 
-type doTxOptions struct {
-	txOptions    *sql.TxOptions
-	retryOptions []Option
-}
-
 // doTxOption defines option for redefine default Retry behavior
 type doTxOption interface {
-	ApplyDoTxOption(o *doTxOptions)
-}
-
-var _ doTxOption = doTxRetryOptionsOption(nil)
-
-type doTxRetryOptionsOption []Option
-
-func (doTxRetryOptions doTxRetryOptionsOption) ApplyDoTxOption(o *doTxOptions) {
-	o.retryOptions = append(o.retryOptions, doTxRetryOptions...)
-}
-
-// WithDoTxRetryOptions specified retry options
-// Deprecated: use explicit options instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func WithDoTxRetryOptions(opts ...Option) doTxRetryOptionsOption {
-	return opts
+	ApplyDoTxOption(txOptions *sql.TxOptions)
 }
 
 var _ doTxOption = txOptionsOption{}
@@ -148,8 +95,10 @@ type txOptionsOption struct {
 	txOptions *sql.TxOptions
 }
 
-func (txOptions txOptionsOption) ApplyDoTxOption(o *doTxOptions) {
-	o.txOptions = txOptions.txOptions
+func (t txOptionsOption) ApplyDoTxOption(txOptions *sql.TxOptions) {
+	if t.txOptions != nil {
+		*txOptions = *t.txOptions
+	}
 }
 
 // WithTxOptions specified transaction options
@@ -160,7 +109,7 @@ func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 }
 
 // DoTx is a retryer of database/sql transactions with fallbacks on errors
-func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
+func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) error, opts ...Option) error {
 	_, err := DoTxWithResult(ctx, db, func(ctx context.Context, tx *sql.Tx) (*struct{}, error) {
 		err := op(ctx, tx)
 		if err != nil {
@@ -179,18 +128,16 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 // DoTxWithResult is a retryer of database/sql transactions with fallbacks on errors
 func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	op func(context.Context, *sql.Tx) (T, error),
-	opts ...doTxOption,
+	opts ...Option,
 ) (T, error) {
 	var (
 		zeroValue T
-		options   = doTxOptions{
-			retryOptions: []Option{
-				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/retry.DoTxWithResult")),
-			},
-			txOptions: &sql.TxOptions{
-				Isolation: sql.LevelDefault,
-				ReadOnly:  false,
-			},
+		options   = []Option{
+			withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/retry.DoTxWithResult")),
+		}
+		txOptions = &sql.TxOptions{
+			Isolation: sql.LevelDefault,
+			ReadOnly:  false,
 		}
 		attempts = 0
 	)
@@ -198,19 +145,23 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 		TraceRetry() *trace.Retry
 		RetryBudget() budget.Budget
 	}); has {
-		options.retryOptions = append(options.retryOptions, nil, nil)
-		copy(options.retryOptions[2:], options.retryOptions)
-		options.retryOptions[0] = WithTrace(d.TraceRetry())
-		options.retryOptions[1] = WithBudget(d.RetryBudget())
+		options = append(options, nil, nil)
+		copy(options[2:], options)
+		options[0] = WithTrace(d.TraceRetry())
+		options[1] = WithBudget(d.RetryBudget())
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyDoTxOption(&options)
+			if txOpt, ok := opt.(doTxOption); ok {
+				txOpt.ApplyDoTxOption(txOptions)
+			} else {
+				options = append(options, opt)
+			}
 		}
 	}
 	v, err := RetryWithResult(ctx, func(ctx context.Context) (_ T, finalErr error) {
 		attempts++
-		tx, err := db.BeginTx(ctx, options.txOptions)
+		tx, err := db.BeginTx(ctx, txOptions)
 		if err != nil {
 			return zeroValue, xerrors.WithStackTrace(err)
 		}
@@ -226,7 +177,7 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 		}
 
 		return v, nil
-	}, options.retryOptions...)
+	}, options...)
 	if err != nil {
 		return zeroValue, xerrors.WithStackTrace(
 			fmt.Errorf("tx operation failed with %d attempts: %w", attempts, err),

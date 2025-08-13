@@ -1,3 +1,5 @@
+* Refactored `retry.Do`/`retry.DoWithResult` and `retry.DoTx`/`retry.DoTxWithResult` option handling to unify Option usage and simplify implementation
+
 ## v3.113.6
 * Removed experimental label from `retry.DoWithResult` and `retry.DoTxWithResult`
 
