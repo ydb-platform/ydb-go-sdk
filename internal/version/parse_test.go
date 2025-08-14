@@ -16,62 +16,47 @@ func TestParse(t *testing.T) {
 	}{
 		{
 			s:   "1",
-			v:   version{Major: "1"},
+			v:   version{Major: 1},
 			err: false,
 		},
 		{
 			s:   "1.2",
-			v:   version{Major: "1.2"},
+			v:   version{Major: 1, Minor: 2},
 			err: false,
 		},
 		{
 			s:   "1.2.3",
-			v:   version{Major: "1.2", Minor: 3},
+			v:   version{Major: 1, Minor: 2, Patch: 3},
 			err: false,
 		},
 		{
 			s:   "1.2.3-alpha",
-			v:   version{Major: "1.2", Minor: 3, Suffix: "alpha"},
-			err: false,
-		},
-		{
-			s:   "1.2.3.4-alpha",
-			v:   version{Major: "1.2", Minor: 3, Patch: 4, Suffix: "alpha"},
+			v:   version{Major: 1, Minor: 2, Patch: 3, Suffix: "alpha"},
 			err: false,
 		},
 		{
 			s:   "22.5",
-			v:   version{Major: "22.5"},
+			v:   version{Major: 22, Minor: 5},
 			err: false,
 		},
 		{
 			s:   "23.1",
-			v:   version{Major: "23.1"},
+			v:   version{Major: 23, Minor: 1},
 			err: false,
 		},
 		{
 			s:   "23.2",
-			v:   version{Major: "23.2"},
+			v:   version{Major: 23, Minor: 2},
 			err: false,
-		},
-		{
-			s:   "25.1.2.7-rc",
-			v:   version{Major: "25.1", Minor: 2, Patch: 7, Suffix: "rc"},
-			err: false,
-		},
-		{
-			s:   "25.1.2a.7-rc",
-			v:   version{},
-			err: true,
 		},
 		{
 			s:   "trunk",
-			v:   version{Major: "trunk"},
-			err: false,
+			v:   version{},
+			err: true,
 		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {
-			v, err := Parse(tt.s)
+			v, err := parse(tt.s)
 			if tt.err {
 				require.Error(t, err)
 			} else {
@@ -129,63 +114,28 @@ var cases = []struct {
 		lhs:  "trunk",
 		rhs:  "22.5",
 		lt:   false,
-		gte:  true,
-	},
-	{
-		name: xtest.CurrentFileLine(),
-		lhs:  "nightly",
-		rhs:  "22.5",
-		lt:   false,
-		gte:  true,
-	},
-	{
-		name: xtest.CurrentFileLine(),
-		lhs:  "main",
-		rhs:  "22.5",
-		lt:   false,
-		gte:  true,
+		gte:  false,
 	},
 	{
 		name: xtest.CurrentFileLine(),
 		lhs:  "trunk",
 		rhs:  "23.1",
 		lt:   false,
-		gte:  true,
+		gte:  false,
 	},
 	{
 		name: xtest.CurrentFileLine(),
 		lhs:  "22.5",
 		rhs:  "trunk",
-		lt:   true,
+		lt:   false,
 		gte:  false,
 	},
 	{
 		name: xtest.CurrentFileLine(),
 		lhs:  "23.1",
-		rhs:  "trunk",
-		lt:   true,
-		gte:  false,
-	},
-	{
-		name: xtest.CurrentFileLine(),
-		lhs:  "23.1",
-		rhs:  "nightly",
-		lt:   true,
-		gte:  false,
-	},
-	{
-		name: xtest.CurrentFileLine(),
-		lhs:  "23.1",
-		rhs:  "main",
-		lt:   true,
-		gte:  false,
-	},
-	{
-		name: xtest.CurrentFileLine(),
-		lhs:  "nightly",
 		rhs:  "trunk",
 		lt:   false,
-		gte:  true,
+		gte:  false,
 	},
 }
 
