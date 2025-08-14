@@ -1,11 +1,18 @@
 package version
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
+
+var nightlyVersions = []string{
+	"trunk",
+	"nightly",
+	"main",
+}
 
 type version struct {
 	Major  string
@@ -15,6 +22,12 @@ type version struct {
 }
 
 func (lhs version) Less(rhs version) bool {
+	if slices.Contains(nightlyVersions, lhs.Major) {
+		return false
+	}
+	if slices.Contains(nightlyVersions, rhs.Major) {
+		return true
+	}
 	if lhs.Major < rhs.Major {
 		return true
 	}
@@ -35,6 +48,17 @@ func (lhs version) Less(rhs version) bool {
 	}
 
 	return lhs.Suffix < rhs.Suffix
+}
+
+func (lhs version) Equal(rhs version) bool {
+	if slices.Contains(nightlyVersions, lhs.Major) && slices.Contains(nightlyVersions, rhs.Major) {
+		return true
+	}
+
+	return lhs.Major == rhs.Major &&
+		lhs.Minor == rhs.Minor &&
+		lhs.Patch == rhs.Patch &&
+		lhs.Suffix == rhs.Suffix
 }
 
 // Lt compare lhs and rhs as (lhs < rhs)
@@ -61,11 +85,8 @@ func Gte(lhs, rhs string) bool {
 	if err != nil {
 		return false
 	}
-	if v1.Less(v2) {
-		return false
-	}
 
-	return true
+	return v2.Less(v1) || v1.Equal(v2)
 }
 
 //nolint:mnd
