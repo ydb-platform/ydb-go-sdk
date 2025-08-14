@@ -1,5 +1,4 @@
 * Added public packages:
-  - `pkg/version` - helpers to parse version from string and compare two versions 
   - `pkg/xerrors` - helpers for wrap errors with stacktrace and join errors
   - `pkg/xslices` - helpers for work with slices
   - `pkg/xstring` - helpers for work with strings
