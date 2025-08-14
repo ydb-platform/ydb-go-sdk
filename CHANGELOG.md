@@ -1,3 +1,4 @@
+## v3.114.0
 * Added public packages:
   - `pkg/xerrors` - helpers for wrap errors with stacktrace and join errors
   - `pkg/xslices` - helpers for work with slices
