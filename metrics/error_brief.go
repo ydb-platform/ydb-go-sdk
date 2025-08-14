@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
 func errorBrief(err error) string {

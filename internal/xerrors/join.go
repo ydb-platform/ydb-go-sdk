@@ -3,8 +3,8 @@ package xerrors
 import (
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
 func Join(errs ...error) error {

@@ -16,10 +16,10 @@ type scanStructSettings struct {
 }
 
 type StructScanner struct {
-	data *data
+	data *Data
 }
 
-func Struct(data *data) StructScanner {
+func Struct(data *Data) StructScanner {
 	return StructScanner{
 		data: data,
 	}

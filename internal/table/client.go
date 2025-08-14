@@ -115,6 +115,25 @@ type Client struct {
 	done   chan struct{}
 }
 
+func (c *Client) DescribeTable(ctx context.Context, path string, opts ...options.DescribeTableOption) (
+	*options.Description, error,
+) {
+	var desc options.Description
+	err := c.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+		desc, err = s.DescribeTable(ctx, path, opts...)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return &desc, nil
+}
+
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)

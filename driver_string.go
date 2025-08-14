@@ -3,7 +3,7 @@ package ydb
 import (
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
 // String returns string representation of Driver
