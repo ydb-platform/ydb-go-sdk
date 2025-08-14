@@ -10,7 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
 type transportError struct {

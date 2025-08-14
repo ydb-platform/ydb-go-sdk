@@ -20,7 +20,7 @@ func TestIndexed(t *testing.T) {
 	}{
 		{
 			name: "Ydb.Type_UTF8",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -49,7 +49,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_STRING",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -78,7 +78,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_UINT64",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -105,7 +105,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INT64",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -132,7 +132,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_UINT32",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -165,7 +165,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INT32",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -200,7 +200,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_UINT16",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -237,7 +237,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INT16",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -270,7 +270,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_UINT8",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -309,7 +309,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INT8",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -344,7 +344,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_BOOL",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -371,7 +371,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_DATE",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -404,7 +404,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_DATETIME",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -437,7 +437,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_TIMESTAMP",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -466,7 +466,7 @@ func TestIndexed(t *testing.T) {
 		},
 		{
 			name: "Ydb.Type_INTERVAL",
-			s: Indexed(Data(
+			s: Indexed(NewData(
 				[]*Ydb.Column{
 					{
 						Type: &Ydb.Type{
@@ -505,7 +505,7 @@ func TestIndexed(t *testing.T) {
 }
 
 func TestIndexedIncompatibleColumnsAndDestinations(t *testing.T) {
-	scanner := &IndexedScanner{data: Data(
+	scanner := &IndexedScanner{data: NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",
@@ -533,7 +533,7 @@ func TestIndexedIncompatibleColumnsAndDestinations(t *testing.T) {
 }
 
 func TestIndexedCastFailed(t *testing.T) {
-	scanner := Indexed(Data(
+	scanner := Indexed(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",
@@ -558,7 +558,7 @@ func TestIndexedCastFailed(t *testing.T) {
 }
 
 func TestIndexedCastFailedErrMsg(t *testing.T) {
-	scanner := Indexed(Data(
+	scanner := Indexed(NewData(
 		[]*Ydb.Column{
 			{
 				Name: "a",

@@ -6,8 +6,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
 type blockID int

@@ -1,3 +1,10 @@
+* Added public packages:
+  - `pkg/xerrors` - helpers for wrap errors with stacktrace and join errors
+  - `pkg/xslices` - helpers for work with slices
+  - `pkg/xstring` - helpers for work with strings
+* Added `table.Client.DescribeTable()` helper method
+* Added `table/types/IsNull()` and `table/types/Unwrap()` methods for work with optional values
+
 ## v3.113.6
 * Removed experimental label from `retry.DoWithResult` and `retry.DoTxWithResult`
 

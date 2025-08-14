@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -34,6 +35,8 @@ type (
 		closer.Closer
 	}
 	Row interface {
+		Values() []value.Value
+
 		Scan(dst ...interface{}) error
 		ScanNamed(dst ...scanner.NamedDestination) error
 		ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error
