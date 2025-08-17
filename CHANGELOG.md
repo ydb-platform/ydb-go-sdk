@@ -1,3 +1,5 @@
+* Fixed depth for `pkg/xerrors.WithStackTrace()` error 
+
 ## v3.114.0
 * Added public packages:
   - `pkg/xerrors` - helpers for wrap errors with stacktrace and join errors
