@@ -1,3 +1,4 @@
+## v3.114.1
 * Fixed depth for `pkg/xerrors.WithStackTrace()` error 
 
 ## v3.114.0
