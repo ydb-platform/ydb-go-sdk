@@ -1,4 +1,4 @@
-package xtest
+package topicmock
 
 import (
 	"context"

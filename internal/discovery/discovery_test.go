@@ -16,7 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestDiscover(t *testing.T) {

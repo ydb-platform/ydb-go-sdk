@@ -16,7 +16,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestSessionCoreCancelAttachOnDone(t *testing.T) {
