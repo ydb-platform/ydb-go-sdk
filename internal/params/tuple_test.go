@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestTuple(t *testing.T) {

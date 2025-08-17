@@ -1,3 +1,5 @@
+* Added public package `pkg/xtest` with test helpers
+
 ## v3.114.1
 * Fixed depth for `pkg/xerrors.WithStackTrace()` error 
 
