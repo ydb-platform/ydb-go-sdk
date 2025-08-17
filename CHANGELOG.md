@@ -1,3 +1,4 @@
+## v3.115.0
 * Added public package `pkg/xtest` with test helpers
 
 ## v3.114.1
