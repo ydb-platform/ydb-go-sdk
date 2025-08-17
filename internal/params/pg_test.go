@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestPg(t *testing.T) {

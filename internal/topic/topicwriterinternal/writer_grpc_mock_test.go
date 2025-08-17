@@ -15,7 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmock"
+	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
@@ -25,7 +26,7 @@ func TestRegressionOperationUnavailableIssue1007(t *testing.T) {
 		e := fixenv.New(t)
 
 		mock := newTopicWriterOperationUnavailable()
-		connString := xtest.GrpcMockTopicConnString(e, mock)
+		connString := topicmock.GrpcMockTopicConnString(e, mock)
 
 		db, err := ydb.Open(sf.Context(e), connString)
 		require.NoError(t, err)

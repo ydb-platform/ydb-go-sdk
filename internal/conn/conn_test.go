@@ -18,7 +18,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 //go:generate mockgen -destination grpc_client_conn_interface_mock_test.go --typed -package conn -write_package_comment=false google.golang.org/grpc ClientConnInterface
