@@ -47,12 +47,19 @@ func (r *rows) updateColumns() {
 		for i, v := range r.allColumns {
 			r.discarded[i] = strings.HasPrefix(v, ignoreColumnPrefixName)
 			if !r.discarded[i] {
+				// TODO: should be enable by option with default=disabled
+				v = shortColumnName(v)
 				r.columns = append(r.columns, v)
 			}
 		}
 		r.columnsType = r.nextSet.ColumnTypes()
 		r.columnsFetchError = r.nextErr
 	}
+}
+
+// TODO: need docstring with detailed explanation why is it needed.
+func shortColumnName(name string) string {
+	return name[strings.LastIndex(name, ".")+1:]
 }
 
 func (r *rows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
