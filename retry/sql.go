@@ -222,6 +222,13 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 			return zeroValue, xerrors.WithStackTrace(err)
 		}
 		if err = tx.Commit(); err != nil {
+			// We create and use tx in this method, so if we catch this error
+			// it means context cancellation
+			if xerrors.Is(err, sql.ErrTxDone) {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return zeroValue, xerrors.WithStackTrace(ctxErr)
+				}
+			}
 			return zeroValue, xerrors.WithStackTrace(err)
 		}
 
