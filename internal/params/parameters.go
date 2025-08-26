@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -23,10 +24,24 @@ type (
 		value  value.Value
 	}
 	Parameters interface {
+		fmt.Stringer
+
 		ToYDB() (map[string]*Ydb.TypedValue, error)
+		Range() xiter.Seq2[string, value.Value]
 	}
 	Params []*Parameter
 )
+
+func (p *Params) Range() xiter.Seq2[string, value.Value] {
+	return func(yield func(name string, v value.Value) bool) {
+		for _, param := range *p {
+			cont := yield(param.name, param.value)
+			if !cont {
+				return
+			}
+		}
+	}
+}
 
 var _ Parameters = (*Params)(nil)
 
