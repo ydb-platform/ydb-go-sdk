@@ -8,12 +8,22 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 )
 
 type wrongParameters struct {
 	err error
+}
+
+func (p wrongParameters) String() string {
+	panic(p.err)
+}
+
+func (p wrongParameters) Range() xiter.Seq2[string, value.Value] {
+	panic(p.err)
 }
 
 func (p wrongParameters) ToYDB() (map[string]*Ydb.TypedValue, error) {

@@ -1,3 +1,5 @@
+* Added `ydb.Param.Range()` range iterator
+
 ## v3.115.0
 * Added public package `pkg/xtest` with test helpers
 
