@@ -1,3 +1,4 @@
+## v3.115.3
 * Fixed error catching in `retry.DoTxWithResult`
 
 ## v3.115.2
