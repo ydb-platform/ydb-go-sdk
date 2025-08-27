@@ -18,10 +18,11 @@ import (
 )
 
 type mockConnector struct {
-	t        testing.TB
-	conns    uint32
-	queryErr error
-	execErr  error
+	t         testing.TB
+	conns     uint32
+	queryErr  error
+	execErr   error
+	commitErr error
 }
 
 var _ driver.Connector = &mockConnector{}
@@ -290,5 +291,57 @@ func TestCleanUpResourcesOnPanicInRetryOperation(t *testing.T) {
 				},
 			)
 		})
+	})
+}
+
+func TestTxDoneErrorReturnsContextError(t *testing.T) {
+	t.Run("DoTxWithResult", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		m := &mockConnector{
+			t:         t,
+			commitErr: sql.ErrTxDone,
+		}
+		db := sql.OpenDB(m)
+
+		attempts := 0
+		_, err := DoTxWithResult(ctx, db,
+			func(ctx context.Context, tx *sql.Tx) (int, error) {
+				attempts++
+				cancel()
+				time.Sleep(10 * time.Millisecond)
+
+				return 42, nil
+			},
+		)
+
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Equal(t, 1, attempts)
+	})
+
+	t.Run("DoTx", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		m := &mockConnector{
+			t:         t,
+			commitErr: sql.ErrTxDone,
+		}
+		db := sql.OpenDB(m)
+
+		attempts := 0
+		err := DoTx(ctx, db,
+			func(ctx context.Context, tx *sql.Tx) error {
+				attempts++
+				cancel()
+				time.Sleep(10 * time.Millisecond)
+
+				return nil
+			},
+		)
+
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Equal(t, 1, attempts)
 	})
 }
