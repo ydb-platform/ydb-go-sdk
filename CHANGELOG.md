@@ -1,3 +1,4 @@
+## v3.115.2
 * Fixed bug with wrong literal YQL representation for signed integer YDB types
 
 ## v3.115.1
