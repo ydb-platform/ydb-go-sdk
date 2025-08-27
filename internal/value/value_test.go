@@ -226,12 +226,20 @@ func TestValueYql(t *testing.T) {
 			literal: `42t`,
 		},
 		{
+			value:   Int8Value(-42),
+			literal: `-42t`,
+		},
+		{
 			value:   Uint8Value(42),
 			literal: `42ut`,
 		},
 		{
 			value:   Int16Value(42),
 			literal: `42s`,
+		},
+		{
+			value:   Int16Value(-42),
+			literal: `-42s`,
 		},
 		{
 			value:   Uint16Value(42),
@@ -242,12 +250,20 @@ func TestValueYql(t *testing.T) {
 			literal: `42`,
 		},
 		{
+			value:   Int32Value(-42),
+			literal: `-42`,
+		},
+		{
 			value:   Uint32Value(42),
 			literal: `42u`,
 		},
 		{
 			value:   Int64Value(42),
 			literal: `42l`,
+		},
+		{
+			value:   Int64Value(-42),
+			literal: `-42l`,
 		},
 		{
 			value:   Uint64Value(42),
