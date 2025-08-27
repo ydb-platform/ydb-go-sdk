@@ -982,7 +982,7 @@ func (v int8Value) castTo(dst any) error {
 }
 
 func (v int8Value) Yql() string {
-	return strconv.FormatUint(uint64(v), 10) + "t"
+	return strconv.FormatInt(int64(v), 10) + "t"
 }
 
 func (int8Value) Type() types.Type {
@@ -1046,7 +1046,7 @@ func (v int16Value) castTo(dst any) error {
 }
 
 func (v int16Value) Yql() string {
-	return strconv.FormatUint(uint64(v), 10) + "s"
+	return strconv.FormatInt(int64(v), 10) + "s"
 }
 
 func (int16Value) Type() types.Type {
@@ -1166,7 +1166,7 @@ func (v int64Value) castTo(dst any) error {
 }
 
 func (v int64Value) Yql() string {
-	return strconv.FormatUint(uint64(v), 10) + "l"
+	return strconv.FormatInt(int64(v), 10) + "l"
 }
 
 func (int64Value) Type() types.Type {
@@ -2230,11 +2230,11 @@ func (v uint8Value) castTo(dst any) error {
 
 		return nil
 	case *string:
-		*vv = strconv.FormatUint(uint64(v), 10)
+		*vv = strconv.FormatInt(int64(v), 10)
 
 		return nil
 	case *[]byte:
-		*vv = xstring.ToBytes(strconv.FormatUint(uint64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 
 		return nil
 	case *uint64:

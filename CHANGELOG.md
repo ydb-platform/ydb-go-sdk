@@ -1,4 +1,4 @@
-* Fixed error catching in DoTxWithResult
+* Fixed error catching in `retry.DoTxWithResult`
 
 ## v3.115.2
 * Fixed bug with wrong literal YQL representation for signed integer YDB types
