@@ -1,3 +1,11 @@
+* Fixed error catching in DoTxWithResult
+
+## v3.115.2
+* Fixed bug with wrong literal YQL representation for signed integer YDB types
+
+## v3.115.1
+* Added `ydb.Param.Range()` range iterator
+
 ## v3.115.0
 * Added public package `pkg/xtest` with test helpers
 

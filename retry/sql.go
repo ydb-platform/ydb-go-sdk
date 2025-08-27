@@ -222,7 +222,8 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 			return zeroValue, xerrors.WithStackTrace(err)
 		}
 		if err = tx.Commit(); err != nil {
-			return zeroValue, xerrors.WithStackTrace(err)
+			// We create and use tx in this method, so if we catch this error, it means context cancellation
+			return zeroValue, xerrors.WithStackTrace(transformCommitError(ctx, err))
 		}
 
 		return v, nil
@@ -234,6 +235,16 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	}
 
 	return v, nil
+}
+
+func transformCommitError(ctx context.Context, err error) error {
+	if xerrors.Is(err, sql.ErrTxDone) {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+	}
+
+	return err
 }
 
 func mustDeleteConn[T interface {
