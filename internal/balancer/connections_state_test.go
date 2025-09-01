@@ -2,6 +2,8 @@ package balancer
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"google.golang.org/grpc"
 	"strings"
 	"testing"
 
@@ -461,4 +463,37 @@ func TestConnection(t *testing.T) {
 		require.Equal(t, &mock.Conn{AddrField: "1", State: conn.Online, NodeIDField: 1}, c)
 		require.Equal(t, 0, failed)
 	})
+}
+
+func TestDiscoverySameIp(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.New()
+	e := mock.Endpoint{AddrField: "a:123", NodeIDField: 1}
+	r := &Balancer{
+		driverConfig:   cfg,
+		balancerConfig: *cfg.Balancer(),
+		pool:           conn.NewPool(context.Background(), cfg),
+		discover: func(ctx context.Context, _ *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
+			var ee mock.Endpoint
+			ee = e
+			return []endpoint.Endpoint{
+				&ee,
+			}, "", nil
+		},
+	}
+
+	err := r.clusterDiscoveryAttempt(ctx, nil)
+	require.NoError(t, err)
+
+	conn, _ := r.connections().GetConnection(ctx)
+	require.Equal(t, "a:123", conn.Endpoint().Address())
+	require.Equal(t, e.NodeIDField, conn.Endpoint().NodeID())
+
+	e.NodeIDField = 2
+	err = r.clusterDiscoveryAttempt(ctx, nil)
+	require.NoError(t, err)
+
+	conn, _ = r.connections().GetConnection(ctx)
+	require.Equal(t, "a:123", conn.Endpoint().Address())
+	require.Equal(t, e.NodeIDField, conn.Endpoint().NodeID())
 }
