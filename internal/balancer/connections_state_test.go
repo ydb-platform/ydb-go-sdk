@@ -2,13 +2,13 @@ package balancer
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"google.golang.org/grpc"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -465,35 +465,37 @@ func TestConnection(t *testing.T) {
 	})
 }
 
-func TestDiscoverySameIp(t *testing.T) {
+func TestDiscoveryReuseIpAndHostName(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New()
-	e := mock.Endpoint{AddrField: "a:123", NodeIDField: 1}
+	e := mock.Endpoint{AddrField: "::1:123", NodeIDField: 1, OverrideHostField: "dyn-node-1.svc.cluster.local"}
 	r := &Balancer{
 		driverConfig:   cfg,
 		balancerConfig: *cfg.Balancer(),
 		pool:           conn.NewPool(context.Background(), cfg),
 		discover: func(ctx context.Context, _ *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
-			var ee mock.Endpoint
-			ee = e
+			ee := e
+
 			return []endpoint.Endpoint{
 				&ee,
 			}, "", nil
 		},
 	}
 
-	err := r.clusterDiscoveryAttempt(ctx, nil)
-	require.NoError(t, err)
+	check := func() {
+		err := r.clusterDiscoveryAttempt(ctx, nil)
+		require.NoError(t, err)
+		conn, _ := r.connections().GetConnection(ctx)
+		require.Equal(t, e.AddrField, conn.Endpoint().Address())
+		require.Equal(t, e.NodeIDField, conn.Endpoint().NodeID())
+		require.Equal(t, e.OverrideHostField, conn.Endpoint().OverrideHost())
+	}
 
-	conn, _ := r.connections().GetConnection(ctx)
-	require.Equal(t, "a:123", conn.Endpoint().Address())
-	require.Equal(t, e.NodeIDField, conn.Endpoint().NodeID())
+	check()
 
 	e.NodeIDField = 2
-	err = r.clusterDiscoveryAttempt(ctx, nil)
-	require.NoError(t, err)
+	check()
 
-	conn, _ = r.connections().GetConnection(ctx)
-	require.Equal(t, "a:123", conn.Endpoint().Address())
-	require.Equal(t, e.NodeIDField, conn.Endpoint().NodeID())
+	e.OverrideHostField = "dyn-node-2.svc.cluster.local"
+	check()
 }

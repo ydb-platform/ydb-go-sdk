@@ -48,7 +48,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 	)
 
 	cc, has = p.conns.Get(address)
-	if has && cc.Endpoint().NodeID() == endpoint.NodeID() {
+	if has && cc.Endpoint().NodeID() == endpoint.NodeID() && cc.Endpoint().OverrideHost() == endpoint.OverrideHost() {
 		return cc
 	}
 

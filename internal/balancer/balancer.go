@@ -188,10 +188,15 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 	)
 	defer func() {
 		_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
-			return strings.Compare(
-				fmt.Sprintf("%s@%d", lhs.Address(), lhs.NodeID()),
-				fmt.Sprintf("%s@%d", rhs.Address(), rhs.NodeID()),
-			)
+			cmp := strings.Compare(lhs.Address(), rhs.Address())
+			if cmp != 0 {
+				return cmp
+			}
+			cmp = int(lhs.NodeID()) - int(rhs.NodeID())
+			if cmp != 0 {
+				return cmp
+			}
+			return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
 		})
 		onDone(
 			xslices.Transform(newest, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
