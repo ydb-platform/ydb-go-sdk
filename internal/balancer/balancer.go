@@ -196,6 +196,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 			if cmp != 0 {
 				return cmp
 			}
+
 			return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
 		})
 		onDone(
