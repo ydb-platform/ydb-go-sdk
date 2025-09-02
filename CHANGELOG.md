@@ -1,3 +1,5 @@
+*  Supported reusing one IP address and host name after nodes restart
+
 ## v3.115.3
 * Fixed error catching in `retry.DoTxWithResult`
 

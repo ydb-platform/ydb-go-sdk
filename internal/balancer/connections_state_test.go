@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -461,4 +463,39 @@ func TestConnection(t *testing.T) {
 		require.Equal(t, &mock.Conn{AddrField: "1", State: conn.Online, NodeIDField: 1}, c)
 		require.Equal(t, 0, failed)
 	})
+}
+
+func TestDiscoveryReuseIpAndHostName(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.New()
+	e := mock.Endpoint{AddrField: "::1:123", NodeIDField: 1, OverrideHostField: "dyn-node-1.svc.cluster.local"}
+	r := &Balancer{
+		driverConfig:   cfg,
+		balancerConfig: *cfg.Balancer(),
+		pool:           conn.NewPool(context.Background(), cfg),
+		discover: func(ctx context.Context, _ *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
+			ee := e
+
+			return []endpoint.Endpoint{
+				&ee,
+			}, "", nil
+		},
+	}
+
+	check := func() {
+		err := r.clusterDiscoveryAttempt(ctx, nil)
+		require.NoError(t, err)
+		conn, _ := r.connections().GetConnection(ctx)
+		require.Equal(t, e.AddrField, conn.Endpoint().Address())
+		require.Equal(t, e.NodeIDField, conn.Endpoint().NodeID())
+		require.Equal(t, e.OverrideHostField, conn.Endpoint().OverrideHost())
+	}
+
+	check()
+
+	e.NodeIDField = 2
+	check()
+
+	e.OverrideHostField = "dyn-node-2.svc.cluster.local"
+	check()
 }

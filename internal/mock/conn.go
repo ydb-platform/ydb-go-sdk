@@ -78,10 +78,11 @@ func (c *Conn) Unban(ctx context.Context) conn.State {
 }
 
 type Endpoint struct {
-	AddrField     string
-	LocationField string
-	NodeIDField   uint32
-	LocalDCField  bool
+	AddrField         string
+	LocationField     string
+	NodeIDField       uint32
+	LocalDCField      bool
+	OverrideHostField string
 }
 
 func (e *Endpoint) Choose(bool) {
@@ -116,7 +117,7 @@ func (e *Endpoint) LoadFactor() float32 {
 }
 
 func (e *Endpoint) OverrideHost() string {
-	panic("not implemented in mock")
+	return e.OverrideHostField
 }
 
 func (e *Endpoint) String() string {
