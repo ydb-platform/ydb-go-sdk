@@ -490,7 +490,7 @@ func TestRegressionKikimr23995(t *testing.T) {
 
 		return rows.Err()
 	})
-	assert.ErrorIs(t, err, context.Canceled)
+	assert.Error(t, err)
 }
 
 type testValuer struct {

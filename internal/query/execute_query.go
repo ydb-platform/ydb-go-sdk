@@ -119,6 +119,10 @@ func execute(
 	}
 
 	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+
+	stop := context.AfterFunc(ctx, executeCancel)
+	defer stop()
+
 	defer func() {
 		if finalErr != nil {
 			executeCancel()
@@ -133,6 +137,7 @@ func execute(
 	r, err := newResult(ctx, stream, append(opts,
 		withStreamResultStatsCallback(settings.StatsCallback()),
 		withStreamResultOnClose(executeCancel),
+		withStreamResultCancelFunc(executeCancel),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

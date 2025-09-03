@@ -34,6 +34,7 @@ type (
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
+		cancelStream   context.CancelFunc
 		closeOnce      func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
@@ -107,6 +108,12 @@ func withStreamResultOnClose(onClose func()) resultOption {
 	}
 }
 
+func withStreamResultCancelFunc(cancel context.CancelFunc) resultOption {
+	return func(s *streamResult) {
+		s.cancelStream = cancel
+	}
+}
+
 func onNextPartErr(callback func(err error)) resultOption {
 	return func(s *streamResult) {
 		s.onNextPartErr = append(s.onNextPartErr, callback)
@@ -141,6 +148,7 @@ func newResult(
 			},
 			closed:         closed,
 			resultSetIndex: -1,
+			cancelStream:   func() {},
 		}
 	)
 
@@ -196,7 +204,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 	}
 
-	stop := context.AfterFunc(ctx, r.closeOnce)
+	stop := context.AfterFunc(ctx, r.cancelStream)
 	defer stop()
 
 	select {
