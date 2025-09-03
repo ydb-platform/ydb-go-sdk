@@ -486,8 +486,6 @@ func TestRegressionKikimr23995(t *testing.T) {
 			return err
 		}
 
-		cancelStream()
-
 		require.False(t, rows.Next())
 
 		return rows.Err()
