@@ -200,6 +200,8 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	defer stop()
 
 	select {
+	case <-ctx.Done():
+		return nil, xerrors.WithStackTrace(ctx.Err())
 	case <-r.closed:
 		return nil, xerrors.WithStackTrace(io.EOF)
 	default:
