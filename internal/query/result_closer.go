@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-var resultCloserNilReason = io.EOF
+var errResultCloserNilReason = io.EOF
 
 // ResultCloser provides a mechanism to close query results and handle cleanup operations.
 // It tracks the reason for closing, provides a done channel for synchronization,
@@ -41,7 +41,7 @@ func (r *ResultCloser) Close(reason error) {
 	defer close(r.done)
 
 	if reason == nil {
-		reason = resultCloserNilReason
+		reason = errResultCloserNilReason
 	}
 
 	r.reason = reason

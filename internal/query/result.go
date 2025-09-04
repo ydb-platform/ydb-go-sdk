@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -34,14 +33,11 @@ type (
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-		cancelStream   context.CancelFunc
-		closeOnce      func()
+		closer         *ResultCloser
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
-		closed         chan struct{}
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
-		onClose        []func()
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
@@ -104,13 +100,7 @@ func withStreamResultStatsCallback(callback func(queryStats stats.QueryStats)) r
 
 func withStreamResultOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
-		s.onClose = append(s.onClose, onClose)
-	}
-}
-
-func withStreamResultCancelFunc(cancel context.CancelFunc) resultOption {
-	return func(s *streamResult) {
-		s.cancelStream = cancel
+		s.closer.OnClose(onClose)
 	}
 }
 
@@ -137,32 +127,17 @@ func newResult(
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	opts ...resultOption,
 ) (_ *streamResult, finalErr error) {
-	var (
-		closed = make(chan struct{})
-		r      = streamResult{
-			stream: stream,
-			onClose: []func(){
-				func() {
-					close(closed)
-				},
-			},
-			closed:         closed,
-			resultSetIndex: -1,
-			cancelStream:   func() {},
-		}
-	)
+	r := streamResult{
+		stream:         stream,
+		closer:         NewResultCloser(),
+		resultSetIndex: -1,
+	}
 
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&r)
 		}
 	}
-
-	r.closeOnce = sync.OnceFunc(func() {
-		for i := range r.onClose { // descending calls for LIFO
-			r.onClose[len(r.onClose)-i-1]()
-		}
-	})
 
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNew(r.trace, &ctx,
@@ -204,19 +179,25 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 	}
 
-	stop := context.AfterFunc(ctx, r.cancelStream)
-	defer stop()
-
 	select {
+	case <-r.closer.Done():
+		return nil, xerrors.WithStackTrace(r.closer.Err())
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
-	case <-r.closed:
-		return nil, xerrors.WithStackTrace(io.EOF)
 	default:
+		stop := r.closer.CloseOnContextCancel(ctx)
+		defer func() {
+			stop()
+
+			if err != nil {
+				r.closer.Close(err)
+			}
+
+			err = r.closer.Err()
+		}()
+
 		part, err = nextPart(r.stream)
 		if err != nil {
-			r.closeOnce()
-
 			for _, callback := range r.onNextPartErr {
 				callback(err)
 			}
@@ -246,7 +227,9 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
-	defer r.closeOnce()
+	defer func() {
+		r.closer.Close(finalErr)
+	}()
 
 	if r.closeTimeout > 0 {
 		var cancel context.CancelFunc
@@ -267,7 +250,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		select {
 		case <-ctx.Done():
 			return xerrors.WithStackTrace(ctx.Err())
-		case <-r.closed:
+		case <-r.closer.Done():
 			return nil
 		default:
 			_, err := r.nextPart(ctx)
@@ -286,8 +269,8 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
 		select {
-		case <-r.closed:
-			return nil, xerrors.WithStackTrace(io.EOF)
+		case <-r.closer.Done():
+			return nil, xerrors.WithStackTrace(r.closer.Err())
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
@@ -307,7 +290,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 				r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
-				r.closeOnce()
+				r.closer.Close(nil)
 
 				if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
 					return nil, xerrors.WithStackTrace(io.EOF)
@@ -330,8 +313,10 @@ func (r *streamResult) nextPartFunc(
 ) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 		select {
-		case <-r.closed:
-			return nil, xerrors.WithStackTrace(io.EOF)
+		case <-ctx.Done():
+			return nil, xerrors.WithStackTrace(ctx.Err())
+		case <-r.closer.Done():
+			return nil, xerrors.WithStackTrace(r.closer.Err())
 		default:
 			if r.stream == nil {
 				return nil, xerrors.WithStackTrace(io.EOF)

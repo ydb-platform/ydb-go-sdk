@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 )
 
@@ -34,7 +35,7 @@ func TestResultCloser_Done(t *testing.T) {
 }
 
 func TestResultCloser_Close(t *testing.T) {
-	var someError = errors.New("some error")
+	someError := errors.New("some error")
 
 	t.Run("closer should return io.EOF if closed with nil", func(t *testing.T) {
 		closer := query.NewResultCloser()
@@ -102,7 +103,7 @@ func TestResultCloser_CloseOnContextCancel(t *testing.T) {
 		select {
 		case <-closer.Done():
 			t.Fatal("done channel should not be closed")
-		case <-time.After(1 * time.Millisecond): // TODO: remove [time.Sleep]
+		case <-time.After(1 * time.Microsecond):
 		}
 	})
 }
