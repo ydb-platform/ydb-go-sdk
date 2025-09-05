@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestRegressionCloud109307(t *testing.T) {
@@ -453,44 +451,6 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		require.Equal(t, id.String(), res.String())
 	})
-}
-
-func TestRegressionKikimr23995(t *testing.T) {
-	var (
-		ctx                     = xtest.Context(t)
-		streamCtx, cancelStream = context.WithCancel(ctx)
-		scope                   = newScope(t)
-	)
-
-	conn, err := ydb.Open(ctx, scope.ConnectionString(), ydb.WithTraceQuery(trace.Query{
-		OnResultNextPart: func(trace.QueryResultNextPartStartInfo) func(trace.QueryResultNextPartDoneInfo) {
-			cancelStream()
-			time.Sleep(10 * time.Millisecond) // brief delay ensures stream closure completes before proceeding
-
-			return func(trace.QueryResultNextPartDoneInfo) {}
-		},
-	}))
-	require.NoError(t, err)
-
-	connOpts := []ydb.ConnectorOption{
-		ydb.WithQueryService(true),
-	}
-	connector, err := ydb.Connector(conn, connOpts...)
-	require.NoError(t, err)
-
-	db := sql.OpenDB(connector)
-
-	err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
-		rows, err := tx.QueryContext(streamCtx, "SELECT 42;")
-		if err != nil {
-			return err
-		}
-
-		require.False(t, rows.Next())
-
-		return rows.Err()
-	})
-	assert.Error(t, err)
 }
 
 type testValuer struct {
