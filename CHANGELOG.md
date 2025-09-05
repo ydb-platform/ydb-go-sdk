@@ -1,3 +1,5 @@
+* Fixed error logging in `topic.UpdateOffsetsInTransaction`
+
 ## v3.115.4
 *  Supported reusing one IP address and host name after nodes restart
 
