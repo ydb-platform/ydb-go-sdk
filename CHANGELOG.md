@@ -1,3 +1,5 @@
+* Fixed `query.streamResult` context cancellation issues
+
 ## v3.115.5
 * Fixed error logging in `topic.UpdateOffsetsInTransaction`
 
