@@ -438,7 +438,14 @@ func (p *Parameter) TzDatetime(v time.Time) Builder {
 	}
 }
 
+// Raw makes value from raw protobuf
+// Deprecated: use FromProtobuf instead
 func (p *Parameter) Raw(pb *Ydb.TypedValue) Builder {
+	return p.FromProtobuf(pb)
+}
+
+// FromProtobuf makes value from raw protobuf
+func (p *Parameter) FromProtobuf(pb *Ydb.TypedValue) Builder {
 	p.value = value.FromProtobuf(pb)
 
 	return Builder{
