@@ -9,32 +9,82 @@ var (
 	querySerializableReadWrite = &Ydb_Query.TransactionSettings_SerializableReadWrite{
 		SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
 	}
+	querySerializableReadWriteTxSelector = &Ydb_Query.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Query.TransactionSettings{
+			TxMode: querySerializableReadWrite,
+		},
+	}
 	queryStaleReadOnly = &Ydb_Query.TransactionSettings_StaleReadOnly{
 		StaleReadOnly: &Ydb_Query.StaleModeSettings{},
+	}
+	queryStaleReadOnlyTxSelector = &Ydb_Query.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Query.TransactionSettings{
+			TxMode: queryStaleReadOnly,
+		},
 	}
 	querySnapshotReadOnly = &Ydb_Query.TransactionSettings_SnapshotReadOnly{
 		SnapshotReadOnly: &Ydb_Query.SnapshotModeSettings{},
 	}
+	querySnapshotReadOnlyTxSelector = &Ydb_Query.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Query.TransactionSettings{
+			TxMode: querySnapshotReadOnly,
+		},
+	}
 	queryOnlineReadOnlyAllowInconsistentReads = &Ydb_Query.TransactionSettings_OnlineReadOnly{
 		OnlineReadOnly: &Ydb_Query.OnlineModeSettings{AllowInconsistentReads: true},
+	}
+	queryOnlineReadOnlyAllowInconsistentReadsTxSelector = &Ydb_Query.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Query.TransactionSettings{
+			TxMode: queryOnlineReadOnlyAllowInconsistentReads,
+		},
 	}
 	queryOnlineReadOnlyForbidInconsistentReads = &Ydb_Query.TransactionSettings_OnlineReadOnly{
 		OnlineReadOnly: &Ydb_Query.OnlineModeSettings{AllowInconsistentReads: false},
 	}
+	queryOnlineReadOnlyForbidInconsistentReadsTxSelector = &Ydb_Query.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Query.TransactionSettings{
+			TxMode: queryOnlineReadOnlyForbidInconsistentReads,
+		},
+	}
 	tableSerializableReadWrite = &Ydb_Table.TransactionSettings_SerializableReadWrite{
 		SerializableReadWrite: &Ydb_Table.SerializableModeSettings{},
+	}
+	tableSerializableReadWriteTxSelector = &Ydb_Table.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Table.TransactionSettings{
+			TxMode: tableSerializableReadWrite,
+		},
 	}
 	tableStaleReadOnly = &Ydb_Table.TransactionSettings_StaleReadOnly{
 		StaleReadOnly: &Ydb_Table.StaleModeSettings{},
 	}
+	tableStaleReadOnlyTxSelector = &Ydb_Table.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Table.TransactionSettings{
+			TxMode: tableStaleReadOnly,
+		},
+	}
 	tableSnapshotReadOnly = &Ydb_Table.TransactionSettings_SnapshotReadOnly{
 		SnapshotReadOnly: &Ydb_Table.SnapshotModeSettings{},
+	}
+	tableSnapshotReadOnlyTxSelector = &Ydb_Table.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Table.TransactionSettings{
+			TxMode: tableSnapshotReadOnly,
+		},
 	}
 	tableOnlineReadOnlyAllowInconsistentReads = &Ydb_Table.TransactionSettings_OnlineReadOnly{
 		OnlineReadOnly: &Ydb_Table.OnlineModeSettings{AllowInconsistentReads: true},
 	}
+	tableOnlineReadOnlyAllowInconsistentReadsTxSelector = &Ydb_Table.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Table.TransactionSettings{
+			TxMode: tableOnlineReadOnlyAllowInconsistentReads,
+		},
+	}
 	tableOnlineReadOnlyForbidInconsistentReads = &Ydb_Table.TransactionSettings_OnlineReadOnly{
 		OnlineReadOnly: &Ydb_Table.OnlineModeSettings{AllowInconsistentReads: false},
+	}
+	tableOnlineReadOnlyForbidInconsistentReadsTxSelector = &Ydb_Table.TransactionControl_BeginTx{
+		BeginTx: &Ydb_Table.TransactionSettings{
+			TxMode: tableOnlineReadOnlyForbidInconsistentReads,
+		},
 	}
 )
 
@@ -44,10 +94,45 @@ type (
 		ApplyQueryTxSettingsOption(txSettings *Ydb_Query.TransactionSettings)
 		ApplyTableTxSettingsOption(txSettings *Ydb_Table.TransactionSettings)
 	}
-	Settings []SettingsOption
+	Settings interface {
+		ControlOption
+		Selector
+
+		ToTableSettings() *Ydb_Table.TransactionSettings
+		ToQuerySettings() *Ydb_Query.TransactionSettings
+	}
+	Options []SettingsOption
 )
 
-func (opts Settings) applyTableTxSelector(txControl *Ydb_Table.TransactionControl) {
+func (opts Options) applyTxControlOption(txControl *Control) {
+	txControl.selector = BeginTx(opts...)
+}
+
+func (opts Options) ToTableSettings() *Ydb_Table.TransactionSettings {
+	txSettings := &Ydb_Table.TransactionSettings{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyTableTxSettingsOption(txSettings)
+		}
+	}
+
+	return txSettings
+}
+
+func (opts Options) ToQuerySettings() *Ydb_Query.TransactionSettings {
+	txSettings := &Ydb_Query.TransactionSettings{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyQueryTxSettingsOption(txSettings)
+		}
+	}
+
+	return txSettings
+}
+
+var _ Settings = Options(nil)
+
+func (opts Options) applyTableTxSelector(txControl *Ydb_Table.TransactionControl) {
 	beginTx := &Ydb_Table.TransactionControl_BeginTx{
 		BeginTx: &Ydb_Table.TransactionSettings{},
 	}
@@ -59,7 +144,7 @@ func (opts Settings) applyTableTxSelector(txControl *Ydb_Table.TransactionContro
 	txControl.TxSelector = beginTx
 }
 
-func (opts Settings) applyQueryTxSelector(txControl *Ydb_Query.TransactionControl) {
+func (opts Options) applyQueryTxSelector(txControl *Ydb_Query.TransactionControl) {
 	beginTx := &Ydb_Query.TransactionControl_BeginTx{
 		BeginTx: &Ydb_Query.TransactionSettings{},
 	}
@@ -71,7 +156,7 @@ func (opts Settings) applyQueryTxSelector(txControl *Ydb_Query.TransactionContro
 	txControl.TxSelector = beginTx
 }
 
-func (opts Settings) ToYdbQuerySettings() *Ydb_Query.TransactionSettings {
+func (opts Options) ToYdbQuerySettings() *Ydb_Query.TransactionSettings {
 	txSettings := &Ydb_Query.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -82,7 +167,7 @@ func (opts Settings) ToYdbQuerySettings() *Ydb_Query.TransactionSettings {
 	return txSettings
 }
 
-func (opts Settings) ToYdbTableSettings() *Ydb_Table.TransactionSettings {
+func (opts Options) ToYdbTableSettings() *Ydb_Table.TransactionSettings {
 	txSettings := &Ydb_Table.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -94,7 +179,7 @@ func (opts Settings) ToYdbTableSettings() *Ydb_Table.TransactionSettings {
 }
 
 // NewSettings returns transaction settings
-func NewSettings(opts ...SettingsOption) Settings {
+func NewSettings(opts ...SettingsOption) Options {
 	return opts
 }
 
