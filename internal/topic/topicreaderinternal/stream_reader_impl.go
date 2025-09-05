@@ -232,16 +232,17 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 
 	req := r.createUpdateOffsetRequest(ctx, batch, tx)
 	updateOffsetInTransactionErr := retry.Retry(ctx, func(ctx context.Context) (err error) {
+		logCtx := r.cfg.BaseContext
+		onDone := trace.TopicOnReaderUpdateOffsetsInTransaction(
+			r.cfg.Trace,
+			&logCtx,
+			r.readerID,
+			r.readConnectionID,
+			tx.SessionID(),
+			tx,
+		)
 		defer func() {
-			logCtx := r.cfg.BaseContext
-			trace.TopicOnReaderUpdateOffsetsInTransaction(
-				r.cfg.Trace,
-				&logCtx,
-				r.readerID,
-				r.readConnectionID,
-				tx.SessionID(),
-				tx,
-			)
+			onDone(err)
 		}()
 
 		err = r.topicClient.UpdateOffsetsInTransaction(ctx, req)
