@@ -1,3 +1,4 @@
+## v3.115.5
 * Fixed error logging in `topic.UpdateOffsetsInTransaction`
 
 ## v3.115.4
