@@ -119,6 +119,10 @@ func execute(
 	}
 
 	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+
+	stop := context.AfterFunc(ctx, executeCancel)
+	defer stop()
+
 	defer func() {
 		if finalErr != nil {
 			executeCancel()

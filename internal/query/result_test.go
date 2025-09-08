@@ -539,7 +539,7 @@ func TestResultNextResultSet(t *testing.T) {
 				require.EqualValues(t, 1, rs.rowIndex)
 			}
 			t.Log("explicit interrupt stream")
-			r.closeOnce()
+			r.closer.Close(nil)
 			{
 				t.Log("next (row=3)")
 				_, err := rs.nextRow(context.Background())
@@ -888,6 +888,31 @@ func TestResultNextResultSet(t *testing.T) {
 			_, err := r.nextResultSet(ctx)
 			require.ErrorIs(t, err, errWrongNextResultSetIndex)
 		}
+	})
+
+	t.Run("context canceling and closing issues", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(xtest.Context(t))
+		defer cancel()
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:    Ydb.StatusIds_SUCCESS,
+			ResultSet: &Ydb.ResultSet{},
+		}, nil).AnyTimes()
+
+		r, err := newResult(ctx, stream, withStreamResultTrace(&trace.Query{
+			OnResultNextPart: func(trace.QueryResultNextPartStartInfo) func(trace.QueryResultNextPartDoneInfo) {
+				cancel()
+
+				return func(trace.QueryResultNextPartDoneInfo) {}
+			},
+		}))
+		if err != nil {
+			t.Skip("test is not actual")
+		}
+
+		_, err = r.nextResultSet(context.Background())
+		require.ErrorIs(t, err, context.Canceled)
 	})
 }
 
