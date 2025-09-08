@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"sync"
-	"sync/atomic"
 )
 
 var errResultCloserNilReason = io.EOF
@@ -13,11 +12,10 @@ var errResultCloserNilReason = io.EOF
 // It tracks the reason for closing, provides a done channel for synchronization,
 // and allows registering cleanup functions to be called on close.
 type ResultCloser struct {
-	reason                 error
-	done                   chan struct{}
-	mu                     sync.Mutex
-	onClose                []func()
-	onCloseCallbacksCalled atomic.Bool
+	reason  error
+	done    chan struct{}
+	mu      sync.Mutex
+	onClose []func()
 }
 
 // NewResultCloser creates and returns a new ResultCloser instance.
@@ -33,20 +31,22 @@ func NewResultCloser() *ResultCloser {
 // All registered onClose functions will be called in LIFO order.
 // After calling Close, the done channel will be closed to signal completion.
 func (r *ResultCloser) Close(reason error) {
-	r.doneWithReason(reason)
-	r.runOnCloseCallbacks()
+	if r.doneWithReason(reason) { // only first [r.Close] invoke runs callbacks
+		r.runOnCloseCallbacks()
+	}
 }
 
 // doneWithReason sets the closure reason and signals completion by closing the done channel.
 // The method is idempotent - subsequent calls after the first successful call are no-ops.
 // If reason is nil, it defaults to errResultCloserNilReason.
 // The method uses mutex synchronization to ensure safe concurrent access.
-func (r *ResultCloser) doneWithReason(reason error) {
+// Returns true if the close operation was performed (first call), false otherwise.
+func (r *ResultCloser) doneWithReason(reason error) (realClose bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if r.reason != nil {
-		return
+		return false
 	}
 
 	if reason == nil {
@@ -56,18 +56,13 @@ func (r *ResultCloser) doneWithReason(reason error) {
 	r.reason = reason
 
 	close(r.done)
+
+	return true
 }
 
 // runOnCloseCallbacks executes registered cleanup callbacks in reverse order (LIFO).
-// Ensures callbacks are only called once.
-// This method is safe for concurrent access.
+// This method is NOT safe for concurrent access.
 func (r *ResultCloser) runOnCloseCallbacks() {
-	// we cannot use [sync.Once] here:
-	//  Because no call to Do returns until the one call to f returns, if f causes Do to be called, it will deadlock.
-	if !r.onCloseCallbacksCalled.CompareAndSwap(false, true) {
-		return
-	}
-
 	for i := range r.onClose { // descending calls for LIFO
 		r.onClose[len(r.onClose)-i-1]()
 	}
