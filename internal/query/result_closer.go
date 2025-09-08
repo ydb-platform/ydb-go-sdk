@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"sync/atomic"
 )
 
 var errResultCloserNilReason = io.EOF
@@ -12,10 +13,11 @@ var errResultCloserNilReason = io.EOF
 // It tracks the reason for closing, provides a done channel for synchronization,
 // and allows registering cleanup functions to be called on close.
 type ResultCloser struct {
-	reason  error
-	done    chan struct{}
-	mu      sync.Mutex
-	onClose []func()
+	reason                 error
+	done                   chan struct{}
+	mu                     sync.Mutex
+	onClose                []func()
+	onCloseCallbacksCalled atomic.Bool
 }
 
 // NewResultCloser creates and returns a new ResultCloser instance.
@@ -31,6 +33,15 @@ func NewResultCloser() *ResultCloser {
 // All registered onClose functions will be called in LIFO order.
 // After calling Close, the done channel will be closed to signal completion.
 func (r *ResultCloser) Close(reason error) {
+	r.doneWithReason(reason)
+	r.runOnCloseCallbacks()
+}
+
+// doneWithReason sets the closure reason and signals completion by closing the done channel.
+// The method is idempotent - subsequent calls after the first successful call are no-ops.
+// If reason is nil, it defaults to errResultCloserNilReason.
+// The method uses mutex synchronization to ensure safe concurrent access.
+func (r *ResultCloser) doneWithReason(reason error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -38,13 +49,24 @@ func (r *ResultCloser) Close(reason error) {
 		return
 	}
 
-	defer close(r.done)
-
 	if reason == nil {
 		reason = errResultCloserNilReason
 	}
 
 	r.reason = reason
+
+	close(r.done)
+}
+
+// runOnCloseCallbacks executes registered cleanup callbacks in reverse order (LIFO).
+// Ensures callbacks are only called once.
+// This method is safe for concurrent access.
+func (r *ResultCloser) runOnCloseCallbacks() {
+	// we cannot use [sync.Once] here:
+	//  Because no call to Do returns until the one call to f returns, if f causes Do to be called, it will deadlock.
+	if !r.onCloseCallbacksCalled.CompareAndSwap(false, true) {
+		return
+	}
 
 	for i := range r.onClose { // descending calls for LIFO
 		r.onClose[len(r.onClose)-i-1]()

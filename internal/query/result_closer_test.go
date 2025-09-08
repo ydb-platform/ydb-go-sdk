@@ -143,4 +143,25 @@ func TestResultCloser_OnClose(t *testing.T) {
 		assert.Equal(t, uint32(1), onCloseCalled1.Load())
 		assert.Equal(t, uint32(1), onCloseCalled2.Load())
 	})
+
+	t.Run("deadlock when `onClose` execute `Close()`", func(t *testing.T) {
+		closer := query.NewResultCloser()
+
+		closer.OnClose(func() {
+			closer.Close(nil)
+		})
+
+		closeEnded := make(chan struct{})
+
+		go func() {
+			closer.Close(nil)
+			close(closeEnded)
+		}()
+
+		select {
+		case <-closeEnded:
+		case <-time.After(time.Second):
+			t.Fatal("close should not deadlock")
+		}
+	})
 }
