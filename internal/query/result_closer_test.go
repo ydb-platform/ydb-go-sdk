@@ -1,4 +1,4 @@
-package query_test
+package query
 
 import (
 	"context"
@@ -10,13 +10,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 )
 
 func TestNewResultCloser(t *testing.T) {
 	t.Run("empty closer should return nil if not closed", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 
 		assert.NoError(t, closer.Err())
 	})
@@ -24,7 +22,7 @@ func TestNewResultCloser(t *testing.T) {
 
 func TestResultCloser_Done(t *testing.T) {
 	t.Run("empty closer Done() blocks", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 
 		select {
 		case <-closer.Done():
@@ -38,7 +36,7 @@ func TestResultCloser_Close(t *testing.T) {
 	someError := errors.New("some error")
 
 	t.Run("closer should return io.EOF if closed with nil", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 
 		closer.Close(nil)
 
@@ -46,7 +44,7 @@ func TestResultCloser_Close(t *testing.T) {
 	})
 
 	t.Run("closer should return error if closed", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 
 		closer.Close(someError)
 
@@ -54,7 +52,7 @@ func TestResultCloser_Close(t *testing.T) {
 	})
 
 	t.Run("closer should return first error if closed multiple times", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 
 		closer.Close(someError)
 		closer.Close(io.EOF)
@@ -63,7 +61,7 @@ func TestResultCloser_Close(t *testing.T) {
 	})
 
 	t.Run("closer Done() channel should be closed after Close()", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 
 		closer.Close(nil)
 
@@ -77,7 +75,7 @@ func TestResultCloser_Close(t *testing.T) {
 
 func TestResultCloser_CloseOnContextCancel(t *testing.T) {
 	t.Run("closer should close on context cancel", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 		ctx, cancel := context.WithCancel(context.Background())
 
 		closer.CloseOnContextCancel(ctx)
@@ -92,7 +90,7 @@ func TestResultCloser_CloseOnContextCancel(t *testing.T) {
 	})
 
 	t.Run("closer should not close after CloseOnContextCancel() stop() method invoked", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 		ctx, cancel := context.WithCancel(context.Background())
 
 		stop := closer.CloseOnContextCancel(ctx)
@@ -110,7 +108,7 @@ func TestResultCloser_CloseOnContextCancel(t *testing.T) {
 
 func TestResultCloser_OnClose(t *testing.T) {
 	t.Run("closer should execute onClose once", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 		var (
 			onCloseCalled1 atomic.Uint32
 			onCloseCalled2 atomic.Uint32
@@ -145,7 +143,7 @@ func TestResultCloser_OnClose(t *testing.T) {
 	})
 
 	t.Run("deadlock when `onClose` execute `Close()`", func(t *testing.T) {
-		closer := query.NewResultCloser()
+		closer := NewResultCloser()
 
 		closer.OnClose(func() {
 			closer.Close(nil)
