@@ -1,3 +1,5 @@
+* Fixed build
+
 ## v3.115.6
 * Fixed context cancellation issues in the `QueryService` stream results
 
