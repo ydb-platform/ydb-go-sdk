@@ -147,6 +147,7 @@ func NullableDate32Value(v *int32) Value {
 	if v == nil {
 		return NullValue(types.Date32)
 	}
+
 	return OptionalValue(Date32Value(*v))
 }
 
@@ -154,6 +155,7 @@ func NullableDate32ValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(types.Date32)
 	}
+
 	return OptionalValue(Date32ValueFromTime(*v))
 }
 
@@ -169,6 +171,7 @@ func NullableDatetime64Value(v *int64) Value {
 	if v == nil {
 		return NullValue(types.Datetime64)
 	}
+
 	return OptionalValue(Datetime64Value(*v))
 }
 
@@ -176,6 +179,7 @@ func NullableDatetime64ValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(types.Datetime64)
 	}
+
 	return OptionalValue(Datetime64ValueFromTime(*v))
 }
 
@@ -255,15 +259,17 @@ func NullableTimestamp64Value(v *int64) Value {
 	if v == nil {
 		return NullValue(types.Timestamp64)
 	}
+
 	return OptionalValue(Timestamp64Value(*v))
 }
 
 func NullableTimestamp64ValueFromTime(v *time.Time) Value {
-		if v == nil {
-			return NullValue(types.Timestamp64)
-		}
-		return OptionalValue(Timestamp64ValueFromTime(*v))
+	if v == nil {
+		return NullValue(types.Timestamp64)
 	}
+
+	return OptionalValue(Timestamp64ValueFromTime(*v))
+}
 
 func NullableTzTimestampValue(v *string) Value {
 	if v == nil {
@@ -301,15 +307,17 @@ func NullableInterval64ValueFromNanoseconds(v *int64) Value {
 	if v == nil {
 		return NullValue(types.Interval64)
 	}
+
 	return OptionalValue(Interval64Value(*v))
 }
 
 func NullableInterval64ValueFromDuration(v *time.Duration) Value {
-		if v == nil {
-			return NullValue(types.Interval64)
-		}
-		return OptionalValue(Interval64ValueFromDuration(*v))
+	if v == nil {
+		return NullValue(types.Interval64)
 	}
+
+	return OptionalValue(Interval64ValueFromDuration(*v))
+}
 
 func NullableBytesValue(v *[]byte) Value {
 	if v == nil {
