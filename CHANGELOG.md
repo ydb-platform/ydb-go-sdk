@@ -1,3 +1,6 @@
+* Added support for nullable `Date32`, `Datetime64`, `Timestamp64`, and `Interval64` types in the `optional` parameter builder
+* Added corresponding functions for nullable types in value layer
+
 ## v3.115.6
 * Fixed context cancellation issues in the `QueryService` stream results
 
