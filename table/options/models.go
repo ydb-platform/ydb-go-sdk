@@ -245,6 +245,7 @@ type Partitions interface {
 }
 
 type PartitioningSettings struct {
+	PartitionBy        []string
 	PartitioningBySize FeatureFlag
 	PartitionSizeMb    uint64
 	PartitioningByLoad FeatureFlag
@@ -264,6 +265,7 @@ func (ps PartitioningSettings) toYDB() *Ydb_Table.PartitioningSettings {
 
 func NewPartitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSettings {
 	return PartitioningSettings{
+		PartitionBy:        ps.GetPartitionBy(),
 		PartitioningBySize: feature.FromYDB(ps.GetPartitioningBySize()),
 		PartitionSizeMb:    ps.GetPartitionSizeMb(),
 		PartitioningByLoad: feature.FromYDB(ps.GetPartitioningByLoad()),
