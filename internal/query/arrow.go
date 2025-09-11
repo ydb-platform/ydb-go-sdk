@@ -32,7 +32,7 @@ func (c *Client) QueryArrow(ctx context.Context, q string, opts ...options.Execu
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
-	r, err = arrowQuery(ctx, c.pool, q, opts...)
+	r, err = arrowQuery(ctx, c.pool(), q, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
