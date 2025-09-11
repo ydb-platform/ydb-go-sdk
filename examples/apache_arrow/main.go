@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	ctx := context.TODO()
+	ctx := context.Background()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		panic(err)
