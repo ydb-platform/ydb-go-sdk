@@ -75,7 +75,7 @@ func (s *Session) executeArrow(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	request.ResultSetType = Ydb.ResultSet_ARROW
+	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
 
 	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
@@ -124,7 +124,7 @@ func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
 	}
 	r.resultSetIndex = part.GetResultSetIndex()
 
-	schema := part.GetResultSet().GetArrowBatchSettings().GetSchema()
+	schema := part.GetResultSet().GetArrowFormatMeta().GetSchema()
 
 	// Apache Arrow ipc.Reader expects schema and data to be concatenated
 	data := append(schema, part.GetResultSet().GetData()...)

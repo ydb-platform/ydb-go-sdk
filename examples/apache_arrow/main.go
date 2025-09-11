@@ -3,6 +3,9 @@
 // Before starting add apache arrow IPC package:
 //
 //	go get github.com/apache/arrow/go/arrow
+//
+// Currently (2025-09-11), Apache Arrow supported in the `main` YDB branch and
+// enabled by feature flag `EnableArrowResultSetFormat`.
 package main
 
 import (
