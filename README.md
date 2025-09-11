@@ -110,6 +110,7 @@ if err = row.Scan(&id, &myStr); err != nil {
 log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 ```
 
+
 More examples of usage placed in [examples](./examples) directory.
 
 ## Credentials <a name="credentials"></a>
