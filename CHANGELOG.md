@@ -1,3 +1,5 @@
+* Added experimental support for query results in `Apache Arrow`
+
 ## v3.115.7
 * Added support for `PartitionBy` in `DescribeTable` results
 

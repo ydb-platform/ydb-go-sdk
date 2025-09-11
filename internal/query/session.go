@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -156,6 +158,39 @@ func (s *Session) execute(
 	}
 
 	return r, nil
+}
+
+func (s *Session) executeArrow(
+	ctx context.Context, q string, settings executeSettings,
+) (_ arrow.Result, finalErr error) {
+	ctx, cancel := xcontext.WithDone(ctx, s.Done())
+	defer func() {
+		if finalErr != nil {
+			cancel()
+			applyStatusByError(s, finalErr)
+		}
+	}()
+
+	request, callOptions, err := executeQueryRequest(s.ID(), q, settings)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
+
+	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	defer func() {
+		if finalErr != nil {
+			executeCancel()
+		}
+	}()
+
+	stream, err := s.client.ExecuteQuery(executeCtx, request, callOptions...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return &arrowResult{stream: stream, close: executeCancel}, nil
 }
 
 func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
