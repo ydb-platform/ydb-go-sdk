@@ -1,4 +1,4 @@
-* Fix flacky unit test TestUnboundedChanContextTimeout
+* Fix flaky unit test TestUnboundedChanContextTimeout
 
 ## v3.115.7
 * Added support for `PartitionBy` in `DescribeTable` results
