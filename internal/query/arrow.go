@@ -36,13 +36,6 @@ func (r *arrowResult) Parts(ctx context.Context) xiter.Seq2[arrow.Part, error] {
 				}
 			}
 
-			// TODO:
-			// if txMeta := part.GetTxMeta(); txMeta != nil {
-			// 	for _, f := range r.onTxMeta {
-			// 		f(txMeta)
-			// 	}
-			// }
-
 			cont := yield(part, err)
 			if !cont || err != nil {
 				return
