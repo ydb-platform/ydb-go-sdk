@@ -1,3 +1,4 @@
+## v3.116.0
 * Added experimental support for query results in `Apache Arrow`
 * Fix flaky unit test TestUnboundedChanContextTimeout
 
