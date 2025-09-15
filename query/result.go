@@ -1,7 +1,6 @@
 package query
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -9,7 +8,6 @@ import (
 
 type (
 	Result            = result.Result
-	ArrowResult       = arrow.Result
 	ResultSet         = result.Set
 	ClosableResultSet = result.ClosableResultSet
 	Row               = result.Row

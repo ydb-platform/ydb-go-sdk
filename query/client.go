@@ -54,8 +54,8 @@ type (
 		// DoTx provide the best effort for execute transaction.
 		//
 		// DoTx implements internal busy loop until one of the following conditions is met:
-		// - deadline was canceled or deadlined
-		// - retry operation returned nil as error
+		//  - deadline was canceled or deadlined
+		//  - retry operation returned nil as error
 		//
 		// DoTx makes auto selector (with TransactionSettings, by default - SerializableReadWrite), commit and
 		// rollback (on error) of transaction.
@@ -102,14 +102,6 @@ type (
 		FetchScriptResults(
 			ctx context.Context, opID string, opts ...options.FetchScriptOption,
 		) (*options.FetchScriptResult, error)
-
-		// QueryArrow like [Query] but returns results in [Apache Arrow] format.
-		// Each part of the result implements io.Reader and contains the data in Arrow IPC format.
-		//
-		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-		//
-		// [Apache Arrow]: https://arrow.apache.org/
-		QueryArrow(ctx context.Context, sql string, opts ...ExecuteOption) (ArrowResult, error)
 	}
 )
 

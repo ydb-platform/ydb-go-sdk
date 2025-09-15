@@ -28,30 +28,39 @@ func main() {
 	sql := `SELECT 42 as id, "my string" as myStr;
 SELECT 24 as id, "WOW" as myStr, "UHH" as secondStr;`
 
-	result, err := db.Query().QueryArrow(ctx, sql, query.WithIdempotent())
+	err = db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		result, err := tx.QueryArrow(ctx, sql)
+		if err != nil {
+			return err
+		}
+		defer result.Close(ctx)
+
+		for part, err := range result.Parts(ctx) {
+			if err != nil {
+				panic(err)
+			}
+
+			fmt.Printf("ResultSet#%d ", part.GetResultSetIndex())
+
+			// or you can use `part.Bytes()` instead of [io.Reader] interface
+
+			rdr, err := ipc.NewReader(part) // part already implements io.Reader
+			if err != nil {
+				panic(err)
+			}
+
+			for rdr.Next() {
+				out := rdr.Record()
+				fmt.Println(out)
+			}
+		}
+
+		return nil
+
+	}, query.WithIdempotent())
+
 	if err != nil {
 		panic(err)
-	}
-	defer result.Close(ctx)
-
-	for part, err := range result.Parts(ctx) {
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Printf("ResultSet#%d ", part.GetResultSetIndex())
-
-		// or you can use `part.Bytes()` instead of [io.Reader] interface
-
-		rdr, err := ipc.NewReader(part) // part already implements io.Reader
-		if err != nil {
-			panic(err)
-		}
-
-		for rdr.Next() {
-			out := rdr.Record()
-			fmt.Println(out)
-		}
 	}
 
 	// Output:

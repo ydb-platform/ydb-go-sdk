@@ -10,6 +10,7 @@ type (
 	TxActor interface {
 		tx.Identifier
 		Executor
+		ArrowExecutor
 	}
 	TransactionActor = TxActor
 	Transaction      interface {

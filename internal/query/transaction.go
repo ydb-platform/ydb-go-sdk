@@ -308,6 +308,53 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	return r, nil
 }
 
+func (tx *Transaction) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (_ query.ArrowResult, finalErr error) {
+	txSettings, err := tx.executeSettings(opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	onDone := trace.QueryOnTxQuery(tx.s.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"),
+		tx.s, tx, q, txSettings.Label(),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	if tx.completed {
+		return nil, xerrors.WithStackTrace(errExecuteOnCompletedTx)
+	}
+
+	resultOpts := []resultOption{
+		withStreamResultTrace(tx.s.trace),
+		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
+			tx.SetTxID(txMeta.GetId())
+		}),
+	}
+	if txSettings.TxControl().Commit() {
+		err = tx.waitOnBeforeCommit(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// notification about complete transaction must be sended for any error or for successfully read all result if
+		// it was execution with commit flag
+		resultOpts = append(resultOpts,
+			onNextPartErr(func(err error) {
+				tx.notifyOnCompleted(xerrors.HideEOF(err))
+			}),
+		)
+	}
+
+	r, err := tx.s.executeArrow(ctx, q, txSettings)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
+}
+
 func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
 	_, err := client.CommitTransaction(ctx, &Ydb_Query.CommitTransactionRequest{
 		SessionId: sessionID,
