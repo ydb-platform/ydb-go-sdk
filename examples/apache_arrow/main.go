@@ -28,8 +28,8 @@ func main() {
 	sql := `SELECT 42 as id, "my string" as myStr;
 SELECT 24 as id, "WOW" as myStr, "UHH" as secondStr;`
 
-	err = db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		result, err := tx.QueryArrow(ctx, sql)
+	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+		result, err := s.QueryArrow(ctx, sql)
 		if err != nil {
 			return err
 		}
@@ -56,7 +56,6 @@ SELECT 24 as id, "WOW" as myStr, "UHH" as secondStr;`
 		}
 
 		return nil
-
 	}, query.WithIdempotent())
 
 	if err != nil {

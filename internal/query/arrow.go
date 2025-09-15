@@ -8,8 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 )
@@ -27,37 +25,6 @@ type (
 		data           []byte
 	}
 )
-
-func (c *Client) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (r arrow.Result, err error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
-
-	r, err = arrowQuery(ctx, c.pool(), q, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return r, nil
-}
-
-func arrowQuery(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (
-	r arrow.Result, err error,
-) {
-	settings := options.ExecuteSettings(opts...)
-	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		r, err = s.executeArrow(ctx, q, options.ExecuteSettings(opts...))
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return nil
-	}, settings.RetryOpts()...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return r, nil
-}
 
 func (r *arrowResult) Parts(ctx context.Context) xiter.Seq2[arrow.Part, error] {
 	return func(yield func(arrow.Part, error) bool) {

@@ -160,39 +160,6 @@ func (s *Session) execute(
 	return r, nil
 }
 
-func (s *Session) executeArrow(
-	ctx context.Context, q string, settings executeSettings,
-) (_ arrow.Result, finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, s.Done())
-	defer func() {
-		if finalErr != nil {
-			cancel()
-			applyStatusByError(s, finalErr)
-		}
-	}()
-
-	request, callOptions, err := executeQueryRequest(s.ID(), q, settings)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
-
-	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
-	defer func() {
-		if finalErr != nil {
-			executeCancel()
-		}
-	}()
-
-	stream, err := s.client.ExecuteQuery(executeCtx, request, callOptions...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return &arrowResult{stream: stream, close: executeCancel}, nil
-}
-
 func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnSessionExec(s.trace, &ctx,
@@ -239,4 +206,37 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 	}
 
 	return r, nil
+}
+
+func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (_ arrow.Result, finalErr error) {
+	settings := options.ExecuteSettings(opts...)
+
+	ctx, cancel := xcontext.WithDone(ctx, s.Done())
+	defer func() {
+		if finalErr != nil {
+			cancel()
+			applyStatusByError(s, finalErr)
+		}
+	}()
+
+	request, callOptions, err := executeQueryRequest(s.ID(), q, settings)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
+
+	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	defer func() {
+		if finalErr != nil {
+			executeCancel()
+		}
+	}()
+
+	stream, err := s.client.ExecuteQuery(executeCtx, request, callOptions...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return &arrowResult{stream: stream, close: executeCancel}, nil
 }
