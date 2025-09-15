@@ -57,7 +57,6 @@ SELECT 24 as id, "WOW" as myStr, "UHH" as secondStr;`
 
 		return nil
 	}, query.WithIdempotent())
-
 	if err != nil {
 		panic(err)
 	}
