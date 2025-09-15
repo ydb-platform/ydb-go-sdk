@@ -208,6 +208,12 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 	return r, nil
 }
 
+// QueryArrow like [*Session.Query] but returns results in [Apache Arrow] format.
+// Each part of the result implements io.Reader and contains the data in Arrow IPC format.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+//
+// [Apache Arrow]: https://arrow.apache.org/
 func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (_ arrow.Result, finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 
