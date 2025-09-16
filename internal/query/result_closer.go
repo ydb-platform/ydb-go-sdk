@@ -2,11 +2,8 @@ package query
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"runtime/debug"
 	"sync"
-	"time"
 )
 
 var errResultCloserNilReason = io.EOF
@@ -34,15 +31,8 @@ func NewResultCloser() *ResultCloser {
 // All registered onClose functions will be called in LIFO order.
 // After calling Close, the done channel will be closed to signal completion.
 func (r *ResultCloser) Close(reason error) {
-	fmt.Println(">>> ResultCloser.Close called with reason:", reason)
-	fmt.Println(">>> RESULT CLOSER CLOSE STACK TRACE:")
-	fmt.Println(string(debug.Stack()))
-
 	if r.doneWithReason(reason) { // only first [r.Close] invoke runs callbacks
-		fmt.Println(">>> ResultCloser: First close, running callbacks")
 		r.runOnCloseCallbacks()
-	} else {
-		fmt.Println(">>> ResultCloser: Already closed, reason:", r.reason)
 	}
 }
 
@@ -97,23 +87,7 @@ func (r *ResultCloser) Done() <-chan struct{} {
 // when the provided context is cancelled.
 // It returns a function that can be used to stop the callback.
 func (r *ResultCloser) CloseOnContextCancel(ctx context.Context) func() bool {
-	fmt.Println(">>> ResultCloser.CloseOnContextCancel called")
-	fmt.Println(">>> CLOSE ON CONTEXT CANCEL STACK TRACE:")
-	fmt.Println(string(debug.Stack()))
-
-	// Print context details
-	deadline, hasDeadline := ctx.Deadline()
-	fmt.Println(">>> Context Details in CloseOnContextCancel:")
-	fmt.Printf(">>>   - Has Deadline: %v\n", hasDeadline)
-	if hasDeadline {
-		fmt.Printf(">>>   - Deadline: %v\n", deadline)
-		fmt.Printf(">>>   - Time Remaining: %v\n", time.Until(deadline))
-	}
-	fmt.Printf(">>>   - Error: %v\n", ctx.Err())
-	fmt.Printf(">>>   - Context Type: %T\n", ctx)
-
 	return context.AfterFunc(ctx, func() {
-		fmt.Println(">>> ResultCloser: Context cancel callback triggered with error:", ctx.Err())
 		r.Close(ctx.Err())
 	})
 }
