@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -192,6 +193,8 @@ func (c *Client) ExecuteScript(
 }
 
 func (c *Client) Close(ctx context.Context) error {
+	fmt.Println(">>> Client.Close")
+
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
@@ -235,8 +238,8 @@ func do(
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
+	ctx, _ = xcontext.WithDone(ctx, c.done)
+	// defer cancel()
 
 	var (
 		settings = options.ParseDoOpts(c.config.Trace(), opts...)
