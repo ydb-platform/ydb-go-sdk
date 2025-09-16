@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -181,19 +182,24 @@ func (r *streamResult) nextPart(ctx context.Context) (
 
 	select {
 	case <-r.closer.Done():
+		fmt.Println(">>> streamResult.nextPart A", ctx.Err())
 		return nil, xerrors.WithStackTrace(r.closer.Err())
 	case <-ctx.Done():
+		fmt.Println(">>> streamResult.nextPart B", ctx.Err())
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
+		fmt.Println(">>> streamResult.nextPart C1", ctx.Err())
 		stop := r.closer.CloseOnContextCancel(ctx)
 		defer func() {
 			stop()
 
 			if err != nil {
+				fmt.Println(">>> streamResult.nextPart C4", ctx.Err(), err)
 				r.closer.Close(err)
 			}
 
 			err = r.closer.Err()
+			fmt.Println(">>> streamResult.nextPart C5", ctx.Err(), err)
 		}()
 
 		part, err = nextPart(r.stream)
@@ -202,6 +208,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 				callback(err)
 			}
 
+			fmt.Println(">>> streamResult.nextPart C2", ctx.Err(), err)
 			return nil, xerrors.WithStackTrace(err)
 		}
 
@@ -211,6 +218,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 			}
 		}
 
+		fmt.Println(">>> streamResult.nextPart C3", ctx.Err(), err)
 		return part, nil
 	}
 }
@@ -227,6 +235,7 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
+	fmt.Println(">>> streamResult.Close")
 	defer func() {
 		r.closer.Close(finalErr)
 	}()
@@ -266,14 +275,20 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 }
 
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
+	fmt.Println(">>> streamResult.nextResultSet")
+	fmt.Println(">>> STACK TRACE:")
+	fmt.Println(string(debug.Stack()))
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
 		select {
 		case <-r.closer.Done():
+			fmt.Println(">>> streamResult.nextResultSet A", ctx.Err())
 			return nil, xerrors.WithStackTrace(r.closer.Err())
 		case <-ctx.Done():
+			fmt.Println(">>> streamResult.nextResultSet B", ctx.Err())
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
+			fmt.Println(">>> streamResult.nextResultSet C", ctx.Err())
 			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
 				r.resultSetIndex = resultSetIndex
 
@@ -314,15 +329,20 @@ func (r *streamResult) nextPartFunc(
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 		select {
 		case <-ctx.Done():
+			fmt.Println(">>> streamResult.nextPartFunc A", ctx.Err())
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		case <-r.closer.Done():
+			fmt.Println(">>> streamResult.nextPartFunc B", ctx.Err())
 			return nil, xerrors.WithStackTrace(r.closer.Err())
 		default:
+			fmt.Println(">>> streamResult.nextPartFunc C", ctx.Err())
 			if r.stream == nil {
+				fmt.Println(">>> streamResult.nextPartFunc C1")
 				return nil, xerrors.WithStackTrace(io.EOF)
 			}
 			part, err := r.nextPart(ctx)
 			if err != nil {
+				fmt.Println(">>> streamResult.nextPartFunc C2", ctx.Err(), part, err)
 				return nil, xerrors.WithStackTrace(err)
 			}
 			r.lastPart = part
@@ -330,12 +350,14 @@ func (r *streamResult) nextPartFunc(
 				r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 			}
 			if part.GetResultSetIndex() > nextResultSetIndex {
+				fmt.Println(">>> streamResult.nextPartFunc C3", ctx.Err(), part, err)
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"result set (index=%d) receive part (index=%d) for next result set: %w (%w)",
 					nextResultSetIndex, part.GetResultSetIndex(), io.EOF, errReadNextResultSet,
 				))
 			}
 
+			fmt.Println(">>> streamResult.nextPartFunc C4", ctx.Err())
 			return part, nil
 		}
 	}
@@ -351,7 +373,13 @@ func (r *streamResult) NextResultSet(ctx context.Context) (_ result.Set, err err
 		}()
 	}
 
-	return r.nextResultSet(ctx)
+	fmt.Println(">>> streamResult.NextResultSet A", ctx.Err())
+
+	out, err := r.nextResultSet(ctx)
+
+	fmt.Println(">>> streamResult.NextResultSet B", ctx.Err(), err)
+
+	return out, err
 }
 
 func exactlyOneRowFromResult(ctx context.Context, r result.Result) (row result.Row, err error) {

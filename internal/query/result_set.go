@@ -156,13 +156,16 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 	for {
 		select {
 		case <-rs.done:
+			fmt.Println(">>> resultSet.nextRow A", ctx.Err())
 			return nil, io.EOF
 		case <-ctx.Done():
+			fmt.Println(">>> resultSet.nextRow B", ctx.Err())
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
 			//nolint:nestif
 			if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
 				part, err := rs.recv()
+				fmt.Println(">>> resultSet.nextRow", ctx.Err(), part, err)
 				if err != nil {
 					if xerrors.Is(err, io.EOF) {
 						close(rs.done)
