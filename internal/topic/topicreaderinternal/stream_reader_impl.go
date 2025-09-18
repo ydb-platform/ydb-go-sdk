@@ -250,7 +250,7 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 		return err
 	})
 	if updateOffsetInTransactionErr == nil {
-		r.addOnTransactionCompletedHandler(ctx, tx, batch, updateOffsetInTransactionErr)
+		r.addOnTransactionCompletedHandler(ctx, tx, batch)
 	} else {
 		_ = retry.Retry(ctx, func(ctx context.Context) (err error) {
 			defer func() {
@@ -282,7 +282,6 @@ func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
 	ctx context.Context,
 	tx tx.Transaction,
 	batch *topicreadercommon.PublicBatch,
-	updateOffesetInTransactionErr error,
 ) {
 	commitRange := topicreadercommon.GetCommitRange(batch)
 	tx.OnCompleted(func(transactionResult error) {
@@ -303,7 +302,7 @@ func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
 			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
 		} else {
 			_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.Retryable(
-				fmt.Errorf("ydb: failed batch commit because transaction doesn't committed: %w", updateOffesetInTransactionErr),
+				fmt.Errorf("ydb: failed batch commit because transaction doesn't committed: %w", transactionResult),
 			)))
 		}
 	})
