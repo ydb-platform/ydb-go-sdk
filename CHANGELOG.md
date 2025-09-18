@@ -1,3 +1,6 @@
+* Fixed error handling in internaltopicreader.addOnTransactionCompletedHandler
+
+## v3.115.7
 * Added support for `PartitionBy` in `DescribeTable` results
 
 ## v3.115.6
