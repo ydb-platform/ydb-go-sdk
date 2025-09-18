@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -204,4 +206,43 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 	}
 
 	return r, nil
+}
+
+// QueryArrow like [*Session.Query] but returns results in [Apache Arrow] format.
+// Each part of the result implements io.Reader and contains the data in Arrow IPC format.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+//
+// [Apache Arrow]: https://arrow.apache.org/
+func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (_ arrow.Result, finalErr error) {
+	settings := options.ExecuteSettings(opts...)
+
+	ctx, cancel := xcontext.WithDone(ctx, s.Done())
+	defer func() {
+		if finalErr != nil {
+			cancel()
+			applyStatusByError(s, finalErr)
+		}
+	}()
+
+	request, callOptions, err := executeQueryRequest(s.ID(), q, settings)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
+
+	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	defer func() {
+		if finalErr != nil {
+			executeCancel()
+		}
+	}()
+
+	stream, err := s.client.ExecuteQuery(executeCtx, request, callOptions...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return &arrowResult{stream: stream, close: executeCancel}, nil
 }

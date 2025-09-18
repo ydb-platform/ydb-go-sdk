@@ -17,6 +17,7 @@ type (
 	Session interface {
 		SessionInfo
 		Executor
+		ArrowExecutor
 
 		Begin(ctx context.Context, txSettings TransactionSettings) (Transaction, error)
 	}
