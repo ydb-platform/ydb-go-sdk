@@ -21,6 +21,7 @@ type mockTransaction struct {
 	materializedID tx.Identifier
 	materialized   bool
 	sessionID      string
+	nodeID         uint32
 	onCompleted    []tx.OnTransactionCompletedFunc
 	RolledBack     bool
 }
@@ -34,6 +35,10 @@ func (m *mockTransaction) UnLazy(_ context.Context) error {
 
 func (m *mockTransaction) SessionID() string {
 	return m.sessionID
+}
+
+func (m *mockTransaction) NodeID() uint32 {
+	return m.nodeID
 }
 
 func (m *mockTransaction) OnBeforeCommit(f tx.OnTransactionBeforeCommit) {
