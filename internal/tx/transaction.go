@@ -11,6 +11,7 @@ type Transaction interface {
 	Identifier
 	UnLazy(ctx context.Context) error
 	SessionID() string
+	NodeID() uint32
 
 	// OnBeforeCommit add callback, which will be called before commit transaction
 	// the method will be not call the method if some error happen and transaction will not be committed

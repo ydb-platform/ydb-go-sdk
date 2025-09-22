@@ -179,6 +179,10 @@ func (tx *Transaction) SessionID() string {
 	return tx.s.ID()
 }
 
+func (tx *Transaction) NodeID() uint32 {
+	return tx.s.NodeID()
+}
+
 func (tx *Transaction) txControl() *baseTx.Control {
 	if tx.ID() != baseTx.LazyTxID {
 		return baseTx.NewControl(baseTx.WithTxID(tx.ID()))
