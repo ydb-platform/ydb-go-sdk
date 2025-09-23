@@ -1,3 +1,5 @@
+* Default grpc message adjusted to the server's defaults
+
 ## v3.116.1
 * Fixed an issue where `topic.UpdateOffsetsInTransaction` was executed on a node different from the one where the transaction was running, which could lead to the error "Database coordinators are unavailable"
 
