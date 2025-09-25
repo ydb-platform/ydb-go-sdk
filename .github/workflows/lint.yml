@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 env:
   GOLANGCI_LINT_VERSION: v2.1.6
-  GO_VERSION: '1.22'
+  GO_VERSION: '1.24'
 jobs:
   golangci:
     if: (!contains(github.event.pull_request.labels.*.name, 'no lint'))
