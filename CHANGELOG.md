@@ -1,3 +1,4 @@
+## v3.116.2
 * Fixed grpc connections leak on reused node IP
 
 ## v3.116.1
