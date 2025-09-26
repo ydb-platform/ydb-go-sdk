@@ -1,4 +1,4 @@
-* Fixed error handling in internaltopicreader.addOnTransactionCompletedHandler
+* Fixed error handling in `internaltopicreader.addOnTransactionCompletedHandler`
 
 ## v3.116.0
 * Added experimental support for query results in `Apache Arrow`
