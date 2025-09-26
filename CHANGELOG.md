@@ -1,5 +1,11 @@
 * Fixed error handling in `internaltopicreader.addOnTransactionCompletedHandler`
 
+## v3.116.2
+* Fixed grpc connections leak on reused node IP
+
+## v3.116.1
+* Fixed an issue where `topic.UpdateOffsetsInTransaction` was executed on a node different from the one where the transaction was running, which could lead to the error "Database coordinators are unavailable"
+
 ## v3.116.0
 * Added experimental support for query results in `Apache Arrow`
 * Fix flaky unit test TestUnboundedChanContextTimeout

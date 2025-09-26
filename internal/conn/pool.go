@@ -24,7 +24,7 @@ type Pool struct {
 	usages      int64
 	config      Config
 	dialOptions []grpc.DialOption
-	conns       xsync.Map[string, *conn]
+	conns       xsync.Map[endpoint.Key, *conn]
 	done        chan struct{}
 }
 
@@ -42,12 +42,11 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 
 func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 	var (
-		address = endpoint.Address()
-		cc      *conn
-		has     bool
+		cc  *conn
+		has bool
 	)
 
-	cc, has = p.conns.Get(address)
+	cc, has = p.conns.Get(endpoint.Key())
 	if has && cc.Endpoint().NodeID() == endpoint.NodeID() && cc.Endpoint().OverrideHost() == endpoint.OverrideHost() {
 		return cc
 	}
@@ -57,13 +56,13 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 		withOnTransportError(p.Ban),
 	)
 
-	p.conns.Set(address, cc)
+	p.conns.Set(endpoint.Key(), cc)
 
 	return cc
 }
 
 func (p *Pool) remove(c *conn) {
-	p.conns.Delete(c.Address())
+	p.conns.Delete(c.endpoint.Key())
 }
 
 func (p *Pool) isClosed() bool {
@@ -104,7 +103,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 
 	e := cc.Endpoint().Copy()
 
-	cc, ok := p.conns.Get(e.Address())
+	cc, ok := p.conns.Get(e.Key())
 	if !ok {
 		return
 	}
@@ -123,7 +122,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 
 	e := cc.Endpoint().Copy()
 
-	cc, ok := p.conns.Get(e.Address())
+	cc, ok := p.conns.Get(e.Key())
 	if !ok {
 		return
 	}
@@ -161,7 +160,7 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	)
 
 	wg.Add(cap(errCh))
-	p.conns.Range(func(_ string, c *conn) bool {
+	p.conns.Range(func(_ endpoint.Key, c *conn) bool {
 		go func(c closer.Closer) {
 			defer wg.Done()
 			if err := c.Close(ctx); err != nil {
@@ -194,7 +193,7 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 		case <-p.done:
 			return
 		case <-ticker.C:
-			p.conns.Range(func(_ string, c *conn) bool {
+			p.conns.Range(func(_ endpoint.Key, c *conn) bool {
 				if time.Since(c.LastUsage()) > ttl {
 					switch c.GetState() {
 					case Online, Banned:
@@ -232,10 +231,10 @@ func NewPool(ctx context.Context, config Config) *Pool {
 
 					return func(info trace.DriverResolveDoneInfo) {
 						if info.Error != nil || len(resolved) == 0 {
-							p.conns.Range(func(address string, cc *conn) bool {
-								if u, err := url.Parse(address); err == nil && u.Host == target && cc.grpcConn != nil {
+							p.conns.Range(func(key endpoint.Key, cc *conn) bool {
+								if u, err := url.Parse(key.Address); err == nil && u.Host == target && cc.grpcConn != nil {
 									_ = cc.grpcConn.Close()
-									_ = p.conns.Delete(address)
+									_ = p.conns.Delete(key)
 								}
 
 								return true

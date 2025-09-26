@@ -14,6 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -1419,5 +1420,28 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		require.Error(t, xerrors.RetryableError(e.reader.err))
 		require.True(t, txMock.RolledBack)
 		require.True(t, txMock.materialized)
+	})
+	t.Run("UpdateOffsetsInTransaction must be executed on the tx Node", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+
+		txMock := newMockTransactionWrapper("test-session-id", "test-tx-id")
+		txMock.nodeID = 123
+
+		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, _ *rawtopic.UpdateOffsetsInTransactionRequest) error {
+				nodeID, ok := endpoint.ContextNodeID(ctx)
+
+				require.True(t, ok)
+				require.Equal(t, uint32(123), nodeID)
+
+				return nil
+			})
+
+		batch, err := topicreadercommon.NewBatch(e.partitionSession, nil)
+		require.NoError(t, err)
+
+		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.NoError(t, err)
 	})
 }

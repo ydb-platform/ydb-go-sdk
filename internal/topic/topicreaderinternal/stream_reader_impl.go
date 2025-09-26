@@ -14,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -244,6 +245,10 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 		defer func() {
 			onDone(err)
 		}()
+
+		// UpdateOffsetsInTransaction operation must be executed on the same Node where the transaction was initiated.
+		// Otherwise, errors such as `Database coordinators are unavailable` may occur.
+		ctx = endpoint.WithNodeID(ctx, tx.NodeID())
 
 		err = r.topicClient.UpdateOffsetsInTransaction(ctx, req)
 
