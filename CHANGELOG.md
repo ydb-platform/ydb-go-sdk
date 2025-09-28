@@ -1,3 +1,5 @@
+* Added support for nullable `Date32`, `Datetime64`, `Timestamp64`, and `Interval64` types in the `optional` parameter builder
+
 ## v3.116.3
 * Default grpc message size adjusted to the server's defaults
 
