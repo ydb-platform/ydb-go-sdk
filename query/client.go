@@ -54,8 +54,8 @@ type (
 		// DoTx provide the best effort for execute transaction.
 		//
 		// DoTx implements internal busy loop until one of the following conditions is met:
-		// - deadline was canceled or deadlined
-		// - retry operation returned nil as error
+		//  - deadline was canceled or deadlined
+		//  - retry operation returned nil as error
 		//
 		// DoTx makes auto selector (with TransactionSettings, by default - SerializableReadWrite), commit and
 		// rollback (on error) of transaction.

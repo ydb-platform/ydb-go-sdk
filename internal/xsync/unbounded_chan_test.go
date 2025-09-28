@@ -180,11 +180,11 @@ func TestUnboundedChanContextCancellation(t *testing.T) {
 func TestUnboundedChanContextTimeout(t *testing.T) {
 	ch := NewUnboundedChan[int]()
 
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
 	// Should return context.DeadlineExceeded error after timeout
-	start := time.Now()
 	_, ok, err := ch.Receive(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) || ok {
 		t.Errorf("Expected context.DeadlineExceeded error and ok=false, got ok=%v, err=%v", ok, err)
