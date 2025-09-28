@@ -1,3 +1,5 @@
+* Default grpc message size adjusted to the server's defaults
+
 ## v3.116.2
 * Fixed grpc connections leak on reused node IP
 
