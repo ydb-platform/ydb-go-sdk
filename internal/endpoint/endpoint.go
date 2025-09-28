@@ -24,12 +24,18 @@ type (
 		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 		LocalDC() bool
 	}
+	Key struct {
+		Address      string
+		NodeID       uint32
+		HostOverride string
+	}
 	Endpoint interface {
 		Info
 
 		String() string
 		Copy() Endpoint
 		Touch(opts ...Option)
+		Key() Key
 	}
 )
 
@@ -47,6 +53,14 @@ type endpoint struct {
 	lastUpdated time.Time
 
 	local bool
+}
+
+func (e *endpoint) Key() Key {
+	return Key{
+		Address:      e.address,
+		NodeID:       e.id,
+		HostOverride: e.sslNameOverride,
+	}
 }
 
 func (e *endpoint) Copy() Endpoint {

@@ -85,6 +85,14 @@ type Endpoint struct {
 	OverrideHostField string
 }
 
+func (e *Endpoint) Key() endpoint.Key {
+	return endpoint.Key{
+		Address:      e.AddrField,
+		NodeID:       e.NodeIDField,
+		HostOverride: e.OverrideHostField,
+	}
+}
+
 func (e *Endpoint) Choose(bool) {
 }
 
