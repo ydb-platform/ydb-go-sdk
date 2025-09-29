@@ -90,9 +90,23 @@ func (l *defaultLogger) Log(ctx context.Context, msg string, fields ...Field) {
 		return
 	}
 
+	additionalFields := FieldsFromContext(ctx)
+	var merged []Field
+	if len(additionalFields) > 0 {
+		merged = make([]Field, 0, len(additionalFields)+len(fields))
+
+		for k, v := range additionalFields {
+			merged = append(merged, String(k, v))
+		}
+
+		merged = append(merged, fields...)
+	} else {
+		merged = fields
+	}
+
 	_, _ = io.WriteString(l.w, l.format(
 		NamesFromContext(ctx),
-		l.appendFields(msg, fields...),
+		l.appendFields(msg, merged...),
 		lvl,
 	)+"\n")
 }

@@ -1,3 +1,7 @@
+## v3.116.4
+* Added helper methods `WithFields` and `FieldsFromContext` for working with structured logging fields via context.
+  These methods allow adding custom fields to the context, which are later extracted by the logger.
+
 ## v3.116.3
 * Default grpc message size adjusted to the server's defaults
 
