@@ -105,12 +105,6 @@ func (core *sessionCore) checkCloseHint(md metadata.MD) {
 	}
 }
 
-type implicitSessionCore struct {
-	sessionCore
-}
-
-func (s *implicitSessionCore) Close(context.Context) error { return nil }
-
 type Option func(*sessionCore)
 
 func WithConn(cc grpc.ClientConnInterface) Option {
