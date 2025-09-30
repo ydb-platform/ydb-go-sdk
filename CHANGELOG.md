@@ -1,3 +1,5 @@
+* Fixed error handling in internaltopicreader.addOnTransactionCompletedHandler
+
 ## v3.116.3
 * Default grpc message size adjusted to the server's defaults
 
