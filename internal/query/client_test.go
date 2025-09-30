@@ -845,9 +845,7 @@ func TestClient(t *testing.T) {
 		})
 
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			err := mockClientForImplicitSessionTest(ctx, ctrl).
+			err := mockClientForImplicitSessionTest(ctx, t).
 				Exec(ctx, "SELECT 1")
 
 			require.NoError(t, err)
@@ -1090,9 +1088,7 @@ func TestClient(t *testing.T) {
 			}
 		})
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			_, err := mockClientForImplicitSessionTest(ctx, ctrl).
+			_, err := mockClientForImplicitSessionTest(ctx, t).
 				Query(ctx, "SELECT 1")
 
 			require.NoError(t, err)
@@ -1416,9 +1412,7 @@ func TestClient(t *testing.T) {
 			require.Equal(t, 0, rowsCount)
 		})
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			_, err := mockClientForImplicitSessionTest(ctx, ctrl).
+			_, err := mockClientForImplicitSessionTest(ctx, t).
 				QueryResultSet(ctx, "SELECT 1")
 
 			require.NoError(t, err)
@@ -1565,9 +1559,7 @@ func TestClient(t *testing.T) {
 		})
 
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			_, err := mockClientForImplicitSessionTest(ctx, ctrl).
+			_, err := mockClientForImplicitSessionTest(ctx, t).
 				QueryRow(ctx, "SELECT 1")
 
 			require.NoError(t, err)
@@ -1576,9 +1568,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("Close", func(t *testing.T) {
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			client := mockClientForImplicitSessionTest(ctx, ctrl)
+			client := mockClientForImplicitSessionTest(ctx, t)
 			_, err := client.QueryRow(ctx, "SELECT 1")
 			require.NoError(t, err)
 
@@ -1592,7 +1582,9 @@ func TestClient(t *testing.T) {
 // mockClientForImplicitSessionTest creates a new Client with a test balancer
 // for simulating implicit session scenarios in query client testing. It configures
 // the mock in such way that calling `CreateSession` or `AttachSession` will result in an error.
-func mockClientForImplicitSessionTest(ctx context.Context, ctrl *gomock.Controller) *Client {
+func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client {
+	ctrl := gomock.NewController(t)
+
 	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 		ResultSet: &Ydb.ResultSet{Rows: []*Ydb.Value{{}}},
