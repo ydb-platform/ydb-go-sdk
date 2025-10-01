@@ -1,3 +1,4 @@
+## v3.116.4
 * Fixed error handling in internaltopicreader.addOnTransactionCompletedHandler
 
 ## v3.116.3
