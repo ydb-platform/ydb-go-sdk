@@ -115,7 +115,7 @@ func wrapLogger(l Logger, opts ...Option) *wrapper {
 	return ll
 }
 
-func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
+func appendFieldsToMsg(msg string, fields ...Field) string {
 	if len(fields) == 0 {
 		return msg
 	}
