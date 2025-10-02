@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ydb-version: [ 24.3 ]
+        ydb-version: [ 25.2 ]
         application: [ native/table, native/query ]
     services:
       ydb:
@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ydb-version: [ 24.3 ]
+        ydb-version: [ 25.2 ]
         application: [ database/sql, gorm, xorm ]
         query_service: [ true, false ]
     services:
