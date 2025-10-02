@@ -44,7 +44,7 @@ func WithFields(ctx context.Context, fields ...Field) context.Context {
 	))
 }
 
-func FieldsFromContext(ctx context.Context) []Fields {
+func FieldsFromContext(ctx context.Context) []Field {
 	if fields, has := ctx.Value(ctxFieldsKey{}).([]Field); has && len(fields) > 0 {
 		return fields
 	}
