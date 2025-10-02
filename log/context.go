@@ -4,8 +4,6 @@ import (
 	"context"
 )
 
-type FieldsType map[string]string
-
 type (
 	ctxLevelKey  struct{}
 	ctxNamesKey  struct{}
@@ -39,27 +37,19 @@ func NamesFromContext(ctx context.Context) []string {
 	return v[:len(v):len(v)] // prevent re
 }
 
-func WithFields(ctx context.Context, fields FieldsType) context.Context {
-	existing := FieldsFromContext(ctx)
-	merged := make(FieldsType, len(existing)+len(fields))
-
-	for k, v := range existing {
-		merged[k] = v
-	}
-
-	for k, v := range fields {
-		merged[k] = v
-	}
-
-	return context.WithValue(ctx, ctxFieldsKey{}, merged)
+func WithFields(ctx context.Context, fields ...Field) context.Context {
+	return context.WithValue(ctx, ctxFieldsKey{}, append(
+		FieldsFromContext(ctx),
+		fields...,
+	))
 }
 
-func FieldsFromContext(ctx context.Context) FieldsType {
-	if fields, _ := ctx.Value(ctxFieldsKey{}).(FieldsType); fields != nil {
+func FieldsFromContext(ctx context.Context) []Fields {
+	if fields, has := ctx.Value(ctxFieldsKey{}).([]Field); has && len(fields) > 0 {
 		return fields
 	}
 
-	return FieldsType{}
+	return nil
 }
 
 func with(ctx context.Context, lvl Level, names ...string) context.Context {
