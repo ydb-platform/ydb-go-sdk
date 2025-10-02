@@ -1,3 +1,9 @@
+## v3.116.4
+* Fixed error handling in internaltopicreader.addOnTransactionCompletedHandler
+
+## v3.116.3
+* Default grpc message size adjusted to the server's defaults
+
 ## v3.116.2
 * Fixed grpc connections leak on reused node IP
 
