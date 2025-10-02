@@ -704,11 +704,13 @@ func createImplicitSessionPool(ctx context.Context,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
 		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
-			core := &sessionCore{
-				cc:     cc,
-				Client: c,
-				Trace:  cfg.Trace(),
-				done:   make(chan struct{}),
+			core := &implicitSessionCore{
+				sessionCore{
+					cc:     cc,
+					Client: c,
+					Trace:  cfg.Trace(),
+					done:   make(chan struct{}),
+				},
 			}
 
 			return &Session{
