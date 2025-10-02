@@ -198,16 +198,17 @@ func (r *topicStreamReaderImpl) PopMessagesBatchTx(
 	tx tx.Transaction,
 	opts ReadMessageBatchOptions,
 ) (_ *topicreadercommon.PublicBatch, resErr error) {
+	logCtx := r.cfg.BaseContext
+	onDone := trace.TopicOnReaderStreamPopBatchTx(
+		r.cfg.Trace,
+		&logCtx,
+		r.readerID,
+		r.readConnectionID,
+		tx.SessionID(),
+		tx,
+	)
 	defer func() {
-		logCtx := r.cfg.BaseContext
-		trace.TopicOnReaderStreamPopBatchTx(
-			r.cfg.Trace,
-			&logCtx,
-			r.readerID,
-			r.readConnectionID,
-			tx.SessionID(),
-			tx,
-		)(resErr)
+		onDone(resErr)
 	}()
 
 	batch, err := r.ReadMessageBatch(ctx, opts)
@@ -258,16 +259,17 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 		r.addOnTransactionCompletedHandler(ctx, tx, batch)
 	} else {
 		_ = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			logCtx := r.cfg.BaseContext
+			onDone := trace.TopicOnReaderTransactionRollback(
+				r.cfg.Trace,
+				&logCtx,
+				r.readerID,
+				r.readConnectionID,
+				tx.SessionID(),
+				tx,
+			)
 			defer func() {
-				logCtx := r.cfg.BaseContext
-				trace.TopicOnReaderTransactionRollback(
-					r.cfg.Trace,
-					&logCtx,
-					r.readerID,
-					r.readConnectionID,
-					tx.SessionID(),
-					tx,
-				)(err)
+				onDone(err)
 			}()
 
 			return tx.Rollback(ctx)
@@ -350,31 +352,20 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 	ctx context.Context,
 	opts ReadMessageBatchOptions,
 ) (batch *topicreadercommon.PublicBatch, err error) {
+	mergeCtx := xcontext.MergeContexts(ctx, r.cfg.BaseContext)
+	onDone := trace.TopicOnReaderReadMessages(
+		r.cfg.Trace,
+		&mergeCtx,
+		opts.MinCount,
+		opts.MaxCount,
+		r.getRestBufferBytes(),
+	)
 	defer func() {
-		traceFunc := func(
-			messagesCount int,
-			topic string,
-			partitionID int64,
-			partitionSessionID int64,
-			offsetStart int64,
-			offsetEnd int64,
-			freeBufferCapacity int,
-		) {
-			mergeCtx := xcontext.MergeContexts(ctx, r.cfg.BaseContext)
-			onDone := trace.TopicOnReaderReadMessages(
-				r.cfg.Trace,
-				&mergeCtx,
-				opts.MinCount,
-				opts.MaxCount,
-				r.getRestBufferBytes(),
-			)
-			onDone(messagesCount, topic, partitionID, partitionSessionID, offsetStart, offsetEnd, freeBufferCapacity, nil)
-		}
 		if batch == nil {
-			traceFunc(0, "", -1, -1, -1, -1, r.getRestBufferBytes())
+			onDone(0, "", -1, -1, -1, -1, r.getRestBufferBytes(), err)
 		} else {
 			commitRange := topicreadercommon.GetCommitRange(batch)
-			traceFunc(
+			onDone(
 				len(batch.Messages),
 				batch.Topic(),
 				batch.PartitionID(),
@@ -382,6 +373,7 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 				commitRange.CommitOffsetStart.ToInt64(),
 				commitRange.CommitOffsetEnd.ToInt64(),
 				r.getRestBufferBytes(),
+				err,
 			)
 		}
 	}()
@@ -842,9 +834,10 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 }
 
 func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error) (closeErr error) {
+	logCtx := r.cfg.BaseContext
+	onDone := trace.TopicOnReaderClose(r.cfg.Trace, &logCtx, r.readConnectionID, reason)
 	defer func() {
-		logCtx := r.cfg.BaseContext
-		trace.TopicOnReaderClose(r.cfg.Trace, &logCtx, r.readConnectionID, reason)
+		onDone(closeErr)
 	}()
 
 	isFirstClose := false
