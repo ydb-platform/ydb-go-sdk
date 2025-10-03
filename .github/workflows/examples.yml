@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ydb-version: [ 24.3 ]
+        ydb-version: [ 25.2 ]
         application: [ native/table, native/query ]
     services:
       ydb:
@@ -34,7 +34,7 @@ jobs:
         options: '-h localhost'
     env:
       OS: ubuntu-latest
-      GO: 1.24.x
+      GO: 1.25.x
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
       YDB_VERSION: ${{ matrix.ydb-version }}
@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ydb-version: [ 24.3 ]
+        ydb-version: [ 25.2 ]
         application: [ database/sql, gorm, xorm ]
         query_service: [ true, false ]
     services:
@@ -76,7 +76,7 @@ jobs:
         options: '-h localhost'
     env:
       OS: ubuntu-latest
-      GO: 1.24.x
+      GO: 1.25.x
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
       YDB_VERSION: ${{ matrix.ydb-version }}
@@ -116,7 +116,7 @@ jobs:
           - 5432:5432
     env:
       OS: ubuntu-latest
-      GO: 1.24.x
+      GO: 1.25.x
       POSTGRES_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/basic?sslmode=disable
     steps:
       - name: Checkout code
@@ -140,7 +140,7 @@ jobs:
         application: [ gorm, xorm ]
     env:
       OS: ubuntu-latest
-      GO: 1.24.x
+      GO: 1.25.x
       SQLITE_CONNECTION_STRING: ${{ matrix.application }}.db
     steps:
       - name: Checkout code
