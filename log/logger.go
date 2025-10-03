@@ -92,7 +92,7 @@ func (l *defaultLogger) Log(ctx context.Context, msg string, fields ...Field) {
 
 	_, _ = io.WriteString(l.w, l.format(
 		NamesFromContext(ctx),
-		l.appendFields(msg, fields...),
+		appendFieldsToMsg(msg, append(FieldsFromContext(ctx), fields...)...),
 		lvl,
 	)+"\n")
 }
@@ -115,7 +115,7 @@ func wrapLogger(l Logger, opts ...Option) *wrapper {
 	return ll
 }
 
-func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
+func appendFieldsToMsg(msg string, fields ...Field) string {
 	if len(fields) == 0 {
 		return msg
 	}

@@ -90,3 +90,37 @@ func TestWithNamesRaceRegression(t *testing.T) {
 		}
 	})
 }
+
+func TestFieldsFromContext(t *testing.T) {
+	for _, tt := range []struct {
+		ctx    context.Context //nolint:containedctx
+		fields []Field
+	}{
+		{
+			ctx:    context.Background(),
+			fields: nil,
+		},
+		{
+			ctx:    WithFields(context.Background(), String("a", "1"), String("b", "1")),
+			fields: []Field{String("a", "1"), String("b", "1")},
+		},
+		{
+			ctx: WithFields(
+				WithFields(context.Background(), String("a", "1"), String("b", "1")),
+				String("a", "1"), String("b", "1"),
+			),
+			fields: []Field{String("a", "1"), String("b", "1"), String("a", "1"), String("b", "1")},
+		},
+		{
+			ctx: WithFields(
+				WithFields(context.Background(), String("a", "1"), String("b", "1")),
+				String("a", "3"),
+			),
+			fields: []Field{String("a", "1"), String("b", "1"), String("a", "3")},
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.fields, FieldsFromContext(tt.ctx))
+		})
+	}
+}
