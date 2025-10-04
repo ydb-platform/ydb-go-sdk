@@ -1,3 +1,4 @@
+* Fixed `conn/pool.Get()` behaviour for YDB databases with public IPs. Bug was introduced in v3.116.2
 * Added helper methods `log.WithFields` and `log.FieldsFromContext` for working with structured logging fields via context.
   These methods allow adding custom fields to the context, which are later extracted by the logger.
 
