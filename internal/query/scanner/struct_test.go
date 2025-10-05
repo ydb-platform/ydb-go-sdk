@@ -966,12 +966,7 @@ func TestScannerDecimalNegative(t *testing.T) {
 	var row struct {
 		A ttypes.Decimal
 	}
-	expectedVal := -2005000000
-	expectedBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(expectedBytes, uint64(expectedVal))
-	var bArr [16]byte
-	copy(bArr[8:], expectedBytes)
-	expected := ttypes.Decimal{Bytes: bArr, Precision: 22, Scale: 9}
+	expected := ttypes.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(-2005000000), 22, 9), Precision: 22, Scale: 9}
 	err := scanner.ScanStruct(&row)
 	require.NoError(t, err)
 	require.Equal(t, expected, row.A)
