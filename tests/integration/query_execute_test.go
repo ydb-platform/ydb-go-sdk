@@ -712,7 +712,6 @@ func TestQueryWideIntervalTypes(t *testing.T) {
 
 // https://github.com/ydb-platform/ydb-go-sdk/issues/1785
 func TestIssue1785FillDecimalFields(t *testing.T) {
-
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 	db, err := ydb.Open(ctx,
