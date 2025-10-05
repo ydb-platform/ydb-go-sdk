@@ -1002,9 +1002,10 @@ func TestScannerDecimalBigDecimal(t *testing.T) {
 	var row struct {
 		A ttypes.Decimal
 	}
-	expectedVal := decimal.Decimal{Bytes: [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0}, Precision: 22, Scale: 9}
+	expectedVal := decimal.Decimal{
+		Bytes:     [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0},
+		Precision: 22, Scale: 9}
 	err := scanner.ScanStruct(&row)
 	require.NoError(t, err)
 	require.Equal(t, expectedVal, row.A)
 }
-
