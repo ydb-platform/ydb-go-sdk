@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"encoding/binary"
 	"math/big"
 	"reflect"
 	"testing"
@@ -960,6 +959,7 @@ func TestScannerDecimalNegative(t *testing.T) {
 				Value: &Ydb.Value_Low_128{
 					Low_128: 18446744071704551616,
 				},
+				High_128: 0xffffffffffffffff,
 			},
 		},
 	))
