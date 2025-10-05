@@ -756,7 +756,6 @@ func TestIssue1785FillDecimalFields(t *testing.T) {
 		err = row.ScanStruct(&rd)
 		require.NoError(t, err)
 		require.EqualValues(t, uint64(1), rd.Id)
-		require.NoError(t, err)
 		require.EqualValues(t, types.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(10010000000), 22, 9), Precision: 22, Scale: 9}, rd.DecimalVal)
 		row, err = resultSet.NextRow(ctx)
 		require.NoError(t, err)
