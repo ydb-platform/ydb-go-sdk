@@ -991,7 +991,7 @@ func TestScannerDecimalBigDecimal(t *testing.T) {
 		},
 		[]*Ydb.Value{
 			{
-				//val: 1844674407370955.1615
+				// val: 1844674407370955.1615
 				Value: &Ydb.Value_Low_128{
 					Low_128: 3136633892082024448,
 				},
@@ -1004,7 +1004,8 @@ func TestScannerDecimalBigDecimal(t *testing.T) {
 	}
 	expectedVal := decimal.Decimal{
 		Bytes:     [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0},
-		Precision: 22, Scale: 9}
+		Precision: 22, Scale: 9,
+	}
 	err := scanner.ScanStruct(&row)
 	require.NoError(t, err)
 	require.Equal(t, expectedVal, row.A)
