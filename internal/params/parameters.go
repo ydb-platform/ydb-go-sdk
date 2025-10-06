@@ -135,13 +135,6 @@ func (p *Params) AddNamed(name string, value value.Value) {
 	*p = append(*p, Named(name, value))
 }
 
-// еще один вариант - можно собират прям из ренджа, но в таком случае надо go.mod обновлять до 1.23
-func (p *Params) AddRange(params xiter.Seq2[string, value.Value]) {
-	for name, val := range params {
-		*p = append(*p, Named(name, val))
-	}
-}
-
 func (p *Parameter) BeginOptional() *optional {
 	return &optional{
 		parent: p.parent,
