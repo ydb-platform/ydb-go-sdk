@@ -23,6 +23,7 @@ type (
 		name   string
 		value  value.Value
 	}
+
 	Parameters interface {
 		fmt.Stringer
 
@@ -126,6 +127,21 @@ func (p *Params) Count() int {
 func (p *Params) Add(params ...NamedValue) {
 	for _, param := range params {
 		*p = append(*p, Named(param.Name(), param.Value()))
+	}
+}
+
+
+// Так как у нас есть Range() для любого из параметров, пользователь сможет добавлять
+// свои параметры, доставая из него имя и value.Value как раз
+func (p *Params) AddNamed(name string, value value.Value) {
+	*p = append(*p, Named(name, value))
+}
+
+
+// еще один вариант - можно собират прям из ренджа, но в таком случае надо go.mod обновлять
+func (p *Params) AddRange(params xiter.Seq2[string, value.Value]) {
+	for name, val := range params {
+		*p = append(*p, Named(name, val))
 	}
 }
 
