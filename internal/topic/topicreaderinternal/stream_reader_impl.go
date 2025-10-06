@@ -292,18 +292,17 @@ func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
 ) {
 	commitRange := topicreadercommon.GetCommitRange(batch)
 	tx.OnCompleted(func(transactionResult error) {
-		defer func() {
-			logCtx := r.cfg.BaseContext
-			trace.TopicOnReaderTransactionCompleted(
-				r.cfg.Trace,
-				&logCtx,
-				r.readerID,
-				r.readConnectionID,
-				tx.SessionID(),
-				tx,
-				transactionResult,
-			)
-		}()
+		logCtx := r.cfg.BaseContext
+		onDone := trace.TopicOnReaderTransactionCompleted(
+			r.cfg.Trace,
+			&logCtx,
+			r.readerID,
+			r.readConnectionID,
+			tx.SessionID(),
+			tx,
+			transactionResult,
+		)
+		defer onDone()
 
 		if transactionResult == nil {
 			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
@@ -533,18 +532,20 @@ func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange topicrea
 		return xerrors.WithStackTrace(errCommitWithNilPartitionSession)
 	}
 
+	session := commitRange.PartitionSession
+	mergeCtx := xcontext.MergeContexts(ctx, r.cfg.BaseContext)
+	onDone := trace.TopicOnReaderCommit(
+		r.cfg.Trace,
+		&mergeCtx,
+		session.Topic,
+		session.PartitionID,
+		session.StreamPartitionSessionID.ToInt64(),
+		commitRange.CommitOffsetStart.ToInt64(),
+		commitRange.CommitOffsetEnd.ToInt64(),
+	)
+
 	defer func() {
-		session := commitRange.PartitionSession
-		mergeCtx := xcontext.MergeContexts(ctx, r.cfg.BaseContext)
-		trace.TopicOnReaderCommit(
-			r.cfg.Trace,
-			&mergeCtx,
-			session.Topic,
-			session.PartitionID,
-			session.StreamPartitionSessionID.ToInt64(),
-			commitRange.CommitOffsetStart.ToInt64(),
-			commitRange.CommitOffsetEnd.ToInt64(),
-		)
+		onDone(err)
 	}()
 
 	if err = r.checkCommitRange(commitRange); err != nil {
@@ -623,9 +624,10 @@ func (r *topicStreamReaderImpl) setStarted() error {
 func (r *topicStreamReaderImpl) initSession() (err error) {
 	initMessage := topicreadercommon.CreateInitMessage(r.cfg.Consumer, r.cfg.EnableSplitMergeSupport, r.cfg.ReadSelectors)
 
+	logCtx := r.cfg.BaseContext
+	onDone := trace.TopicOnReaderInit(r.cfg.Trace, &logCtx, r.readConnectionID, initMessage)
+
 	defer func() {
-		logCtx := r.cfg.BaseContext
-		onDone := trace.TopicOnReaderInit(r.cfg.Trace, &logCtx, r.readConnectionID, initMessage)
 		onDone(r.readConnectionID, err)
 	}()
 
@@ -814,9 +816,11 @@ func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 
 func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) (err error) {
 	resCapacity := r.addRestBufferBytes(-msg.BytesSize)
+
+	logCtx := r.cfg.BaseContext
+	onDone := trace.TopicOnReaderReceiveDataResponse(r.cfg.Trace, &logCtx, r.readConnectionID, resCapacity, msg)
 	defer func() {
-		logCtx := r.cfg.BaseContext
-		trace.TopicOnReaderReceiveDataResponse(r.cfg.Trace, &logCtx, r.readConnectionID, resCapacity, msg)
+		onDone(err)
 	}()
 
 	batches, err2 := topicreadercommon.ReadRawBatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
