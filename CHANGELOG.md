@@ -1,4 +1,4 @@
-* Fixed error handling in `topics` traces
+* Fixed traces handling in `topic.Reader` and `query.Result`
 
 ## v3.117.0
 * Fixed `conn/pool.Get()` behaviour for YDB databases with public IPs. Bug was introduced in v3.116.2
