@@ -612,6 +612,11 @@ func (v *decimalValue) castTo(dst any) error {
 		*dstValue = v
 
 		return nil
+	case *decimal.Decimal:
+		decVal := decimal.Decimal{Bytes: v.value, Precision: v.Precision(), Scale: v.Scale()}
+		*dstValue = decVal
+
+		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
