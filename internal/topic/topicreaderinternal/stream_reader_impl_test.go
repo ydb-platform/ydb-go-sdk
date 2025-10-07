@@ -1271,17 +1271,6 @@ func (e *streamEnv) Start() {
 	})
 }
 
-func (e *streamEnv) readerReceiveWaitClose(callback func()) {
-	e.stream.EXPECT().Recv().DoAndReturn(func() (rawtopicreader.ServerMessage, error) {
-		if callback != nil {
-			callback()
-		}
-		<-e.ctx.Done()
-
-		return nil, errors.New("test reader closed")
-	})
-}
-
 func (e *streamEnv) SendFromServer(msg rawtopicreader.ServerMessage) {
 	e.SendFromServerAndSetNextCallback(msg, nil)
 }

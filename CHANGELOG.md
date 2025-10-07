@@ -1,4 +1,5 @@
-Fixed race in integration test `TestTopicWriterLogMessagesWithoutData` 
+* Fixed traces handling in `topic.Reader`
+* Fixed race in integration test `TestTopicWriterLogMessagesWithoutData` 
 
 ## v3.117.0
 * Fixed `conn/pool.Get()` behaviour for YDB databases with public IPs. Bug was introduced in v3.116.2
