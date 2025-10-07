@@ -175,7 +175,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart"),
 		)
 		defer func() {
-			onDone(part.GetExecStats(), xerrors.HideEOF(err))
+			onDone(part.GetExecStats(), err)
 		}()
 	}
 
@@ -347,7 +347,7 @@ func (r *streamResult) NextResultSet(ctx context.Context) (_ result.Set, err err
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).NextResultSet"),
 		)
 		defer func() {
-			onDone(xerrors.HideEOF(err))
+			onDone(err)
 		}()
 	}
 

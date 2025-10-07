@@ -1,4 +1,4 @@
-* Fixed traces handling in `topic.Reader` and `query.Result`
+* Fixed traces handling in `topic.Reader`
 * Fixed race in integration test `TestTopicWriterLogMessagesWithoutData` 
 
 ## v3.117.0
