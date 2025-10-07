@@ -1,5 +1,5 @@
-
-Fixed scan a column of type Decimal(22,9) into a struct field of type types.Decimal using ScanStruct.
+* Fixed scan a column of type `Decimal(precision,scale)` into a struct field of type `types.Decimal{}` using `ScanStruct()`
+* Fixed race in integration test `TestTopicWriterLogMessagesWithoutData`
 
 ## v3.117.0
 * Fixed `conn/pool.Get()` behaviour for YDB databases with public IPs. Bug was introduced in v3.116.2
