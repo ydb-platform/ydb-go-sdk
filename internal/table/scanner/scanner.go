@@ -787,9 +787,9 @@ func (s *valueScanner) setString(dst *string) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		_ = s.errorf(0, "ydb: failed scan uuid: %w", value.ErrIssue1501BadUUID)
-	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
+	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = s.text()
-	case Ydb.Type_STRING:
+	case Ydb.Type_STRING, Ydb.Type_YSON: // TODO: need additional parsing YSON typeValue.
 		*dst = xstring.FromBytes(s.bytes())
 	default:
 		_ = s.errorf(0, "scan row failed: incorrect source types %s", t)
@@ -800,9 +800,9 @@ func (s *valueScanner) setByte(dst *[]byte) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		_ = s.errorf(0, "ydb: failed to scan uuid: %w", value.ErrIssue1501BadUUID)
-	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
+	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = xstring.ToBytes(s.text())
-	case Ydb.Type_STRING:
+	case Ydb.Type_STRING, Ydb.Type_YSON: // TODO: need additional parsing YSON typeValue.
 		*dst = s.bytes()
 	default:
 		_ = s.errorf(0, "scan row failed: incorrect source types %s", t)
