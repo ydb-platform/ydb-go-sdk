@@ -129,6 +129,12 @@ func (p *Params) Add(params ...NamedValue) {
 	}
 }
 
+// Так как у нас есть Range() для любого из параметров, пользователь сможет добавлять
+// свои параметры, доставая из него имя и value.Value как раз
+func (p *Params) AddNamed(name string, value value.Value) {
+	*p = append(*p, Named(name, value))
+}
+
 func (p *Parameter) BeginOptional() *optional {
 	return &optional{
 		parent: p.parent,
