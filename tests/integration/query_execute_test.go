@@ -771,3 +771,57 @@ func TestIssue1785FillDecimalFields(t *testing.T) {
 		require.EqualValues(t, expectedVal, rd.DecimalVal)
 	})
 }
+
+func TestIssue1872QueryWarning(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.INFO),
+				),
+				trace.QueryEvents,
+			),
+		),
+	)
+	require.NoError(t, err)
+	_ = db.Query().Exec(ctx,
+		`drop table TestIssue1872QueryWarning;`,
+	)
+	err = db.Query().Exec(ctx,
+		`create table TestIssue1872QueryWarning 
+		(Id uint64, Amount decimal(22,9), primary key(Id));`,
+	)
+	require.NoError(t, err)
+
+	t.Run("Query", func(t *testing.T) {
+		q := db.Query()
+		result, err := q.Query(ctx, `
+        insert into TestIssue1872QueryWarning (Id, Amount) values (-3, Decimal("3.01",22,9));
+		insert into TestIssue1872QueryWarning (Id, Amount) values (-5, Decimal("5.01",22,9));
+        `,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$p1").Text("test").
+					Build(),
+			),
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+		)
+		require.NoError(t, err)
+		issues := result.GetIssues()
+		require.Equal(t, 1, len(issues))
+		require.Equal(t, "Type annotation", issues[0].Message)
+		require.Equal(t, 2, len(issues[0].Issues))
+		require.Equal(t, "At function: KiWriteTable!", issues[0].Issues[0].Message)
+		require.Equal(t,
+			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
+			issues[0].Issues[0].Issues[0].Message)
+		fmt.Printf("%#v", result)
+	})
+}

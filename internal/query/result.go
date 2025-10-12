@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
@@ -30,6 +31,7 @@ type (
 	materializedResult struct {
 		resultSets []result.Set
 		idx        int
+		issues     []*Ydb_Issue.IssueMessage
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
@@ -66,8 +68,16 @@ func (r *materializedResult) ResultSets(ctx context.Context) xiter.Seq2[result.S
 	return rangeResultSets(ctx, r)
 }
 
+func (r *materializedResult) GetIssues() []*Ydb_Issue.IssueMessage {
+	return r.issues
+}
+
 func (r *streamResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, error] {
 	return rangeResultSets(ctx, r)
+}
+
+func (r *streamResult) GetIssues() []*Ydb_Issue.IssueMessage {
+	return r.lastPart.Issues
 }
 
 func (r *materializedResult) Close(ctx context.Context) error {
@@ -457,5 +467,6 @@ func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Re
 
 	return &materializedResult{
 		resultSets: resultSets,
+		issues: r.GetIssues(),
 	}, nil
 }
