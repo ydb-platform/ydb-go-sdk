@@ -77,7 +77,7 @@ func (r *streamResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, er
 }
 
 func (r *streamResult) GetIssues() []*Ydb_Issue.IssueMessage {
-	return r.lastPart.Issues
+	return r.lastPart.GetIssues()
 }
 
 func (r *materializedResult) Close(ctx context.Context) error {
@@ -467,6 +467,6 @@ func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Re
 
 	return &materializedResult{
 		resultSets: resultSets,
-		issues: r.GetIssues(),
+		issues:     r.GetIssues(),
 	}, nil
 }
