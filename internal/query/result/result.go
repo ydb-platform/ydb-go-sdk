@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
