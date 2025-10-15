@@ -1,4 +1,4 @@
-* Added method `GetIssues()` for result.Result to get query issues  
+* Added method `query.WithIssuesHandler` to get query issues  
 
 ## v3.117.1
 * Fixed scan a column of type `Decimal(precision,scale)` into a struct field of type `types.Decimal{}` using `ScanStruct()`

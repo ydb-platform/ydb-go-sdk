@@ -3,8 +3,6 @@ package result
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -22,8 +20,6 @@ type (
 		// ResultSets is experimental API for range iterators available
 		// with Go version 1.23+
 		ResultSets(ctx context.Context) xiter.Seq2[Set, error]
-		// GetIssues returns warning messages collected during the query execution
-		GetIssues() []*Ydb_Issue.IssueMessage
 	}
 	Set interface {
 		Index() int
@@ -44,5 +40,9 @@ type (
 		Scan(dst ...interface{}) error
 		ScanNamed(dst ...scanner.NamedDestination) error
 		ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error
+	}
+	resultOption func(s *Result)
+	Option       interface {
+		ApplyResultOption(opts *resultOption)
 	}
 )

@@ -31,7 +31,6 @@ type (
 	materializedResult struct {
 		resultSets []result.Set
 		idx        int
-		issues     []*Ydb_Issue.IssueMessage
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
@@ -40,6 +39,7 @@ type (
 		resultSetIndex int64
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
+		issuesCallback func(issues []*Ydb_Issue.IssueMessage)
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
@@ -68,16 +68,8 @@ func (r *materializedResult) ResultSets(ctx context.Context) xiter.Seq2[result.S
 	return rangeResultSets(ctx, r)
 }
 
-func (r *materializedResult) GetIssues() []*Ydb_Issue.IssueMessage {
-	return r.issues
-}
-
 func (r *streamResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, error] {
 	return rangeResultSets(ctx, r)
-}
-
-func (r *streamResult) GetIssues() []*Ydb_Issue.IssueMessage {
-	return r.lastPart.GetIssues()
 }
 
 func (r *materializedResult) Close(ctx context.Context) error {
@@ -99,6 +91,12 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, err
 func withStreamResultTrace(t *trace.Query) resultOption {
 	return func(s *streamResult) {
 		s.trace = t
+	}
+}
+
+func withIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) resultOption {
+	return func(s *streamResult) {
+		s.issuesCallback = callback
 	}
 }
 
@@ -171,6 +169,13 @@ func newResult(
 
 		if part.GetExecStats() != nil && r.statsCallback != nil {
 			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
+		}
+		if r.issuesCallback != nil {
+			if r.lastPart != nil {
+				r.issuesCallback(r.lastPart.Issues)
+			} else {
+				r.issuesCallback(make([]*Ydb_Issue.IssueMessage, 0))
+			}
 		}
 
 		return &r, nil
@@ -467,6 +472,5 @@ func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Re
 
 	return &materializedResult{
 		resultSets: resultSets,
-		issues:     r.GetIssues(),
 	}, nil
 }
