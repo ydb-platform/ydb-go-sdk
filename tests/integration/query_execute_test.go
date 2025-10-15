@@ -19,8 +19,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"

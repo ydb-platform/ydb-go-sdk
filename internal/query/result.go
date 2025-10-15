@@ -172,7 +172,7 @@ func newResult(
 		}
 		if r.issuesCallback != nil {
 			if r.lastPart != nil {
-				r.issuesCallback(r.lastPart.Issues)
+				r.issuesCallback(r.lastPart.GetIssues())
 			} else {
 				r.issuesCallback(make([]*Ydb_Issue.IssueMessage, 0))
 			}
