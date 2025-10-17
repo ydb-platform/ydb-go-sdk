@@ -41,4 +41,8 @@ type (
 		ScanNamed(dst ...scanner.NamedDestination) error
 		ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error
 	}
+	resultOption func(s *Result)
+	Option       interface {
+		ApplyResultOption(opts *resultOption)
+	}
 )

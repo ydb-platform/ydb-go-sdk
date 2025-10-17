@@ -1,6 +1,7 @@
 package query
 
 import (
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
@@ -55,6 +56,10 @@ func WithSyntax(syntax options.Syntax) ExecuteOption {
 
 func WithStatsMode(mode options.StatsMode, callback func(Stats)) ExecuteOption {
 	return options.WithStatsMode(mode, callback)
+}
+
+func WithIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) ExecuteOption {
+	return options.WithIssuesHandler(callback)
 }
 
 // WithResponsePartLimitSizeBytes limit size of each part (data portion) in stream for query service resoponse
