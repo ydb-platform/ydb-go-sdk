@@ -42,6 +42,7 @@ type (
 		issuesCallback func(issues []*Ydb_Issue.IssueMessage)
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
+		issuesList     []*Ydb_Issue.IssueMessage
 		closeTimeout   time.Duration
 	}
 	resultOption func(s *streamResult)
@@ -139,6 +140,7 @@ func newResult(
 		stream:         stream,
 		closer:         NewResultCloser(),
 		resultSetIndex: -1,
+		issuesList:     make([]*Ydb_Issue.IssueMessage, 0),
 	}
 
 	for _, opt := range opts {
@@ -212,6 +214,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 
 		part, err = nextPart(r.stream)
+		if part != nil {
+			r.issuesList = append(r.issuesList, part.GetIssues()...)
+		}
 		if err != nil {
 			for _, callback := range r.onNextPartErr {
 				callback(err)

@@ -348,8 +348,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
-			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
+		streamResult, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -358,6 +357,11 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 		}()
 
 		err = readAll(ctx, streamResult)
+		if len(streamResult.issuesList) > 0 {
+			if issueHandler := settings.IssuesOpts(); issueHandler != nil {
+				issueHandler(streamResult.issuesList)
+			}
+		}
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -398,9 +402,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		settingsLocal := options.ExecuteSettings(opts...)
-		streamResult, err := s.execute(ctx, q, settings,
-			withStreamResultTrace(s.trace), withIssuesHandler(settingsLocal.IssuesOpts()))
+		streamResult, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -409,6 +411,11 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 		}()
 
 		r, err = resultToMaterializedResult(ctx, streamResult)
+		if len(streamResult.issuesList) > 0 {
+			if issueHandler := settings.IssuesOpts(); issueHandler != nil {
+				issueHandler(streamResult.issuesList)
+			}
+		}
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
