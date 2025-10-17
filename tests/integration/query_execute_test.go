@@ -19,8 +19,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -993,5 +993,4 @@ func TestIssue1872QueryWarning(t *testing.T) {
 			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
 			issueList[0].Issues[0].Issues[0].Message)
 	})
-
 }

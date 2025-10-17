@@ -95,12 +95,6 @@ func withStreamResultTrace(t *trace.Query) resultOption {
 	}
 }
 
-func withIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) resultOption {
-	return func(s *streamResult) {
-		s.issuesCallback = callback
-	}
-}
-
 func withStreamResultStatsCallback(callback func(queryStats stats.QueryStats)) resultOption {
 	return func(s *streamResult) {
 		s.statsCallback = callback
