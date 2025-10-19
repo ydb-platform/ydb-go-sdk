@@ -44,6 +44,7 @@ type (
 		retryOptions           []retry.Option
 		responsePartLimitBytes int64
 		label                  string
+		concurrentResultSets   bool
 	}
 
 	// Execute is an interface for execute method options
@@ -70,6 +71,7 @@ type (
 	}
 	execModeOption         = ExecMode
 	responsePartLimitBytes int64
+	concurrentResultSets   bool
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -117,6 +119,10 @@ func (mode StatsMode) applyExecuteOption(s *executeSettings) {
 
 func (mode ExecMode) applyExecuteOption(s *executeSettings) {
 	s.execMode = mode
+}
+
+func (opt concurrentResultSets) applyExecuteOption(s *executeSettings) {
+	s.concurrentResultSets = bool(opt)
 }
 
 const (
@@ -192,6 +198,10 @@ func (s *executeSettings) Label() string {
 	return s.label
 }
 
+func (s *executeSettings) ConcurrentResultSets() bool {
+	return s.concurrentResultSets
+}
+
 func WithParameters(params params.Parameters) parametersOption {
 	return parametersOption{
 		params: params,
@@ -222,6 +232,10 @@ func WithExecMode(mode ExecMode) execModeOption {
 
 func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 	return responsePartLimitBytes(size)
+}
+
+func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
+	return concurrentResultSets(isEnabled)
 }
 
 func (size responsePartLimitBytes) applyExecuteOption(s *executeSettings) {
