@@ -70,6 +70,10 @@ func WithResponsePartLimitSizeBytes(size int64) ExecuteOption {
 	return options.WithResponsePartLimitSizeBytes(size)
 }
 
+//func WithConcurrentResultSets(isEnabled bool) ExecuteOption {
+//	return options.WithConcurrentResultSets(isEnabled)
+//}
+
 func WithCallOptions(opts ...grpc.CallOption) ExecuteOption {
 	return options.WithCallOptions(opts...)
 }

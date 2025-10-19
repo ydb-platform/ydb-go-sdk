@@ -46,6 +46,7 @@ type (
 		issueCallback          func(issues []*Ydb_Issue.IssueMessage)
 		responsePartLimitBytes int64
 		label                  string
+		concurrentResultSets   bool
 	}
 
 	// Execute is an interface for execute method options
@@ -72,9 +73,12 @@ type (
 	}
 	execModeOption         = ExecMode
 	responsePartLimitBytes int64
-	issuesOption           struct {
+
+	issuesOption struct {
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
+
+	concurrentResultSets bool
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -130,6 +134,10 @@ func (mode ExecMode) applyExecuteOption(s *executeSettings) {
 
 func (opts issuesOption) applyExecuteOption(s *executeSettings) {
 	s.issueCallback = opts.callback
+}
+
+func (opt concurrentResultSets) applyExecuteOption(s *executeSettings) {
+	s.concurrentResultSets = bool(opt)
 }
 
 const (
@@ -205,6 +213,10 @@ func (s *executeSettings) Label() string {
 	return s.label
 }
 
+func (s *executeSettings) ConcurrentResultSets() bool {
+	return s.concurrentResultSets
+}
+
 func WithParameters(params params.Parameters) parametersOption {
 	return parametersOption{
 		params: params,
@@ -235,6 +247,10 @@ func WithExecMode(mode ExecMode) execModeOption {
 
 func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 	return responsePartLimitBytes(size)
+}
+
+func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
+	return concurrentResultSets(isEnabled)
 }
 
 func (size responsePartLimitBytes) applyExecuteOption(s *executeSettings) {
