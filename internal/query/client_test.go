@@ -922,6 +922,24 @@ func TestClient(t *testing.T) {
 					Status:         Ydb.StatusIds_SUCCESS,
 					ResultSetIndex: 0,
 					ResultSet: &Ydb.ResultSet{
+						Columns: []*Ydb.Column{
+							{
+								Name: "a",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									},
+								},
+							},
+							{
+								Name: "b",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UTF8,
+									},
+								},
+							},
+						},
 						Rows: []*Ydb.Value{
 							{
 								Items: []*Ydb.Value{{

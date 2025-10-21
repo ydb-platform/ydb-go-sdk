@@ -401,11 +401,12 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		defer func() {
 			_ = streamResult.Close(ctx)
 		}()
 
-		r, err = resultToMaterializedResult(ctx, streamResult)
+		r, err = concurrentResultToMaterializedResult(ctx, streamResult)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}

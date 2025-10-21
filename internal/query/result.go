@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -341,6 +342,33 @@ func (r *streamResult) nextPartFunc(
 	}
 }
 
+func (r *streamResult) NextPart(ctx context.Context) (_ result.Part, err error) {
+	if r.lastPart == nil {
+		return nil, xerrors.WithStackTrace(io.EOF)
+	}
+
+	select {
+	case <-r.closer.Done():
+		return nil, xerrors.WithStackTrace(r.closer.Err())
+	case <-ctx.Done():
+		return nil, xerrors.WithStackTrace(ctx.Err())
+	default:
+		part, err := r.nextPart(ctx)
+		if err != nil && !xerrors.Is(err, io.EOF) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		if part.GetExecStats() != nil && r.statsCallback != nil {
+			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
+		}
+		defer func() {
+			r.lastPart = part
+			r.resultSetIndex = part.GetResultSetIndex()
+		}()
+
+		return newResultPart(r.lastPart), nil
+	}
+}
+
 func (r *streamResult) NextResultSet(ctx context.Context) (_ result.Set, err error) {
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx,
@@ -425,11 +453,20 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
-func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Result, error) {
-	var resultSets []result.Set
+func concurrentResultToMaterializedResult(ctx context.Context, r result.ConcurrentResult) (result.Result, error) {
+	type resultSet struct {
+		rows        []query.Row
+		columnNames []string
+		columnTypes []types.Type
+	}
+	resultSetByIndex := make(map[int64]resultSet)
 
 	for {
-		rs, err := r.NextResultSet(ctx)
+		if ctx.Err() != nil {
+			return nil, xerrors.WithStackTrace(ctx.Err())
+		}
+
+		part, err := r.NextPart(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				break
@@ -438,9 +475,15 @@ func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Re
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		var rows []query.Row
+		rs := resultSetByIndex[part.ResultSetIndex()]
+		if len(rs.columnNames) == 0 {
+			rs.columnTypes = part.ColumnTypes()
+			rs.columnNames = part.ColumnNames()
+		}
+
+		rows := make([]query.Row, 0)
 		for {
-			row, err := rs.NextRow(ctx)
+			row, err := part.NextRow(ctx)
 			if err != nil {
 				if xerrors.Is(err, io.EOF) {
 					break
@@ -448,11 +491,16 @@ func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Re
 
 				return nil, xerrors.WithStackTrace(err)
 			}
-
 			rows = append(rows, row)
 		}
+		rs.rows = append(rs.rows, rows...)
 
-		resultSets = append(resultSets, MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
+		resultSetByIndex[part.ResultSetIndex()] = rs
+	}
+
+	resultSets := make([]result.Set, len(resultSetByIndex))
+	for rsIndex, rs := range resultSetByIndex {
+		resultSets[rsIndex] = MaterializedResultSet(int(rsIndex), rs.columnNames, rs.columnTypes, rs.rows)
 	}
 
 	return &materializedResult{
