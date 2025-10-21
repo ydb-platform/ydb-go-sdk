@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
-
+	
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -453,6 +455,63 @@ func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Re
 		}
 
 		resultSets = append(resultSets, MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
+	}
+
+	return &materializedResult{
+		resultSets: resultSets,
+	}, nil
+}
+
+func streamToMaterializedResult(ctx context.Context, stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (result.Result, error) {
+	type resultSet struct {
+		rows        []query.Row
+		rawColumns  []*Ydb.Column
+		columnNames []string
+		columnTypes []types.Type
+	}
+	resultSetByIndex := make(map[int64]resultSet)
+
+	for {
+		if ctx.Err() != nil {
+			return nil, xerrors.WithStackTrace(ctx.Err())
+		}
+
+		part, err := stream.Recv()
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				break
+			}
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		if part.GetResultSetIndex() < 0 {
+			break
+		}
+
+		rs := resultSetByIndex[part.GetResultSetIndex()]
+		if len(rs.columnNames) == 0 {
+			rs.rawColumns = part.GetResultSet().GetColumns()
+			rs.columnNames = make([]string, 0, len(rs.rawColumns))
+			rs.columnTypes = make([]types.Type, 0, len(rs.rawColumns))
+
+			for _, column := range rs.rawColumns {
+				rs.columnNames = append(rs.columnNames, column.GetName())
+				rs.columnTypes = append(rs.columnTypes, types.TypeFromYDB(column.GetType()))
+			}
+		}
+
+		rows := make([]query.Row, 0, len(part.GetResultSet().GetRows()))
+		for _, row := range part.GetResultSet().GetRows() {
+			rows = append(rows, NewRow(rs.rawColumns, row))
+		}
+		rs.rows = append(rs.rows, rows...)
+
+		resultSetByIndex[part.GetResultSetIndex()] = rs
+	}
+
+	resultSets := make([]result.Set, len(resultSetByIndex))
+	for rsIndex, rs := range resultSetByIndex {
+		resultSets[rsIndex] = MaterializedResultSet(int(rsIndex), rs.columnNames, rs.columnTypes, rs.rows)
 	}
 
 	return &materializedResult{

@@ -397,15 +397,23 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
+		request, callOptions, err := executeQueryRequest(s.ID(), q, settings)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+		request.ConcurrentResultSets = settings.ConcurrentResultSets()
+
+		executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 		defer func() {
-			_ = streamResult.Close(ctx)
+			executeCancel()
 		}()
 
-		r, err = resultToMaterializedResult(ctx, streamResult)
+		stream, err := s.client.ExecuteQuery(executeCtx, request, callOptions...)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		r, err = streamToMaterializedResult(ctx, stream)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}

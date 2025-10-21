@@ -93,7 +93,7 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 		},
 		Parameters:             params,
 		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
-		ConcurrentResultSets:   cfg.ConcurrentResultSets(),
+		ConcurrentResultSets:   false,
 		PoolId:                 cfg.ResourcePool(),
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
 	}
