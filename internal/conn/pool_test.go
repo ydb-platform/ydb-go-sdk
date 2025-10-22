@@ -56,13 +56,13 @@ func TestPool_Get(t *testing.T) {
 		}()
 
 		e := endpoint.New("test-endpoint:2135")
-		
+
 		conn1 := pool.Get(e)
 		require.NotNil(t, conn1)
-		
+
 		conn2 := pool.Get(e)
 		require.NotNil(t, conn2)
-		
+
 		// Should return the same connection
 		require.Equal(t, conn1, conn2)
 	})
@@ -80,13 +80,13 @@ func TestPool_Get(t *testing.T) {
 
 		e1 := endpoint.New("endpoint1:2135")
 		e2 := endpoint.New("endpoint2:2135")
-		
+
 		conn1 := pool.Get(e1)
 		require.NotNil(t, conn1)
-		
+
 		conn2 := pool.Get(e2)
 		require.NotNil(t, conn2)
-		
+
 		// Should return different connections
 		require.NotEqual(t, conn1, conn2)
 	})
@@ -107,18 +107,18 @@ func TestPool_Ban(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
-		
+
 		// Initially should be Created
 		require.Equal(t, Created, conn.GetState())
-		
+
 		// Set to Online first
 		conn.SetState(ctx, Online)
 		require.Equal(t, Online, conn.GetState())
-		
+
 		// Ban the connection with Unavailable error
 		err := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
 		pool.Ban(ctx, conn, err)
-		
+
 		// Should be Banned
 		require.Equal(t, Banned, conn.GetState())
 	})
@@ -137,14 +137,14 @@ func TestPool_Ban(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
-		
+
 		conn.SetState(ctx, Online)
 		require.Equal(t, Online, conn.GetState())
-		
+
 		// Try to ban with operation error (should not ban)
 		err := xerrors.Operation()
 		pool.Ban(ctx, conn, err)
-		
+
 		// Should still be Online
 		require.Equal(t, Online, conn.GetState())
 	})
@@ -163,14 +163,14 @@ func TestPool_Ban(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
-		
+
 		conn.SetState(ctx, Online)
 		require.Equal(t, Online, conn.GetState())
-		
+
 		// Ban with ResourceExhausted error (should ban)
 		err := xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "test"))
 		pool.Ban(ctx, conn, err)
-		
+
 		// Should be Banned
 		require.Equal(t, Banned, conn.GetState())
 	})
@@ -189,14 +189,14 @@ func TestPool_Ban(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
-		
+
 		conn.SetState(ctx, Online)
 		require.Equal(t, Online, conn.GetState())
-		
+
 		// Try to ban with Internal error (should not ban)
 		err := xerrors.Transport(grpcStatus.Error(grpcCodes.Internal, "test"))
 		pool.Ban(ctx, conn, err)
-		
+
 		// Should still be Online
 		require.Equal(t, Online, conn.GetState())
 	})
@@ -217,14 +217,14 @@ func TestPool_Allow(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
-		
+
 		// Set to Banned
 		conn.SetState(ctx, Banned)
 		require.Equal(t, Banned, conn.GetState())
-		
+
 		// Allow the connection
 		pool.Allow(ctx, conn)
-		
+
 		// Should be Offline (since grpcConn is nil)
 		require.Equal(t, Offline, conn.GetState())
 	})
@@ -238,18 +238,18 @@ func TestPool_TakeRelease(t *testing.T) {
 			connectionTTL: 0,
 		}
 		pool := NewPool(ctx, config)
-		
+
 		// Initial usage is 1
 		require.Equal(t, int64(1), pool.usages)
-		
+
 		err := pool.Take(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), pool.usages)
-		
+
 		err = pool.Take(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(3), pool.usages)
-		
+
 		// Clean up
 		_ = pool.Release(ctx)
 		_ = pool.Release(ctx)
@@ -263,15 +263,15 @@ func TestPool_TakeRelease(t *testing.T) {
 			connectionTTL: 0,
 		}
 		pool := NewPool(ctx, config)
-		
+
 		err := pool.Take(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), pool.usages)
-		
+
 		err = pool.Release(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), pool.usages)
-		
+
 		// Clean up
 		_ = pool.Release(ctx)
 	})
@@ -283,16 +283,16 @@ func TestPool_TakeRelease(t *testing.T) {
 			connectionTTL: 0,
 		}
 		pool := NewPool(ctx, config)
-		
+
 		// Get a connection to ensure the pool has something to close
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
-		
+
 		// Final release should close the pool
 		err := pool.Release(ctx)
 		require.NoError(t, err)
-		
+
 		// Pool should be closed
 		require.True(t, pool.isClosed())
 	})
@@ -309,7 +309,7 @@ func TestPool_IsClosed(t *testing.T) {
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
-		
+
 		require.False(t, pool.isClosed())
 	})
 
@@ -320,10 +320,10 @@ func TestPool_IsClosed(t *testing.T) {
 			connectionTTL: 0,
 		}
 		pool := NewPool(ctx, config)
-		
+
 		err := pool.Release(ctx)
 		require.NoError(t, err)
-		
+
 		require.True(t, pool.isClosed())
 	})
 }
@@ -339,7 +339,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
-		
+
 		require.Equal(t, 10*time.Second, pool.DialTimeout())
 	})
 
@@ -355,7 +355,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
-		
+
 		require.Equal(t, driverTrace, pool.Trace())
 	})
 
@@ -371,7 +371,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
-		
+
 		// The pool adds additional options, so we check the length is at least the ones we provided
 		require.GreaterOrEqual(t, len(pool.GrpcDialOptions()), len(opts))
 	})
