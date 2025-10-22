@@ -35,7 +35,7 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return resultNoRows{}, nil
+	return &resultWithStats{}, nil
 }
 
 func (t *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {

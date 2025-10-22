@@ -15,12 +15,38 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
 
-type resultNoRows struct{}
+type resultWithStats struct {
+	stats stats.QueryStats
+}
 
-func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
-func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
+func (r *resultWithStats) LastInsertId() (int64, error) { return 0, ErrUnsupported }
+func (r *resultWithStats) RowsAffected() (int64, error) {
+	if r.stats == nil {
+		return 0, ErrUnsupported
+	}
 
-var _ driver.Result = resultNoRows{}
+	var rowsAffected uint64
+	for {
+		phase, ok := r.stats.NextPhase()
+		if !ok {
+			break
+		}
+
+		for {
+			tableAccess, ok := phase.NextTableAccess()
+			if !ok {
+				break
+			}
+
+			rowsAffected += tableAccess.Deletes.Rows
+			rowsAffected += tableAccess.Updates.Rows
+		}
+	}
+
+	return int64(rowsAffected), nil
+}
+
+var _ driver.Result = &resultWithStats{}
 
 type Parent interface {
 	Query() *query.Client
@@ -55,8 +81,12 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		))
 	}
 
+	var st stats.QueryStats
 	opts := []options.Execute{
 		options.WithParameters(params),
+		options.WithStatsMode(options.StatsModeBasic, func(qs stats.QueryStats) {
+			st = qs
+		}),
 	}
 
 	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
@@ -68,7 +98,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return resultNoRows{}, nil
+	return &resultWithStats{st}, nil
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
