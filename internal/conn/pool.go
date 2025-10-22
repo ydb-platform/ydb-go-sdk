@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
@@ -22,6 +23,7 @@ import (
 
 type Pool struct {
 	usages      int64
+	clock       clockwork.Clock
 	config      Config
 	dialOptions []grpc.DialOption
 	conns       xsync.Map[endpoint.Key, *conn]
@@ -185,13 +187,13 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 }
 
 func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
-	ticker := time.NewTicker(interval)
+	ticker := p.clock.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-p.done:
 			return
-		case <-ticker.C:
+		case <-ticker.Chan():
 			p.conns.Range(func(_ endpoint.Key, c *conn) bool {
 				if time.Since(c.LastUsage()) > ttl {
 					switch c.GetState() {
@@ -216,6 +218,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 
 	p := &Pool{
 		usages:      1,
+		clock:       clockwork.NewRealClock(),
 		config:      config,
 		dialOptions: config.GrpcDialOptions(),
 		done:        make(chan struct{}),
