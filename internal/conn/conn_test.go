@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -17,6 +18,7 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
@@ -148,5 +150,145 @@ func TestConn(t *testing.T) {
 				require.Nil(t, response)
 			})
 		})
+	})
+}
+
+func TestModificationMark(t *testing.T) {
+	t.Run("NewMarkCanRetry", func(t *testing.T) {
+		mark := &modificationMark{}
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("DirtyMarkCannotRetry", func(t *testing.T) {
+		mark := &modificationMark{}
+		mark.markDirty()
+		require.False(t, mark.canRetry())
+	})
+
+	t.Run("MarkDirtyMultipleTimes", func(t *testing.T) {
+		mark := &modificationMark{}
+		mark.markDirty()
+		mark.markDirty()
+		require.False(t, mark.canRetry())
+	})
+}
+
+func TestMarkContext(t *testing.T) {
+	t.Run("MarkContextCreatesNewMark", func(t *testing.T) {
+		ctx := context.Background()
+		newCtx, mark := markContext(ctx)
+		
+		require.NotNil(t, newCtx)
+		require.NotNil(t, mark)
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("GetContextMarkFromMarkedContext", func(t *testing.T) {
+		ctx := context.Background()
+		ctx, mark := markContext(ctx)
+		
+		retrievedMark := getContextMark(ctx)
+		require.NotNil(t, retrievedMark)
+		require.Equal(t, mark, retrievedMark)
+	})
+
+	t.Run("GetContextMarkFromUnmarkedContext", func(t *testing.T) {
+		ctx := context.Background()
+		mark := getContextMark(ctx)
+		
+		require.NotNil(t, mark)
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("MarkFromContextReflectsDirtyState", func(t *testing.T) {
+		ctx := context.Background()
+		ctx, mark := markContext(ctx)
+		
+		mark.markDirty()
+		
+		retrievedMark := getContextMark(ctx)
+		require.False(t, retrievedMark.canRetry())
+	})
+}
+
+func TestReplyWrapper(t *testing.T) {
+	t.Run("OperationResponse", func(t *testing.T) {
+		resp := &Ydb_Discovery.WhoAmIResponse{
+			Operation: &Ydb_Operations.Operation{
+				Id:     "test-op-id",
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+			},
+		}
+
+		opID, issues := replyWrapper(resp)
+		require.Equal(t, "test-op-id", opID)
+		require.Empty(t, issues)
+	})
+
+	t.Run("StatusResponse", func(t *testing.T) {
+		resp := &Ydb_Query.BeginTransactionResponse{
+			Status: Ydb.StatusIds_SUCCESS,
+		}
+
+		opID, issues := replyWrapper(resp)
+		require.Empty(t, opID)
+		require.Empty(t, issues)
+	})
+
+	t.Run("NonOperationResponse", func(t *testing.T) {
+		resp := &Ydb_Discovery.WhoAmIRequest{}
+
+		opID, issues := replyWrapper(resp)
+		require.Empty(t, opID)
+		require.Empty(t, issues)
+	})
+}
+
+func TestConn_StateManagement(t *testing.T) {
+	t.Run("NewConnHasCreatedState", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+		
+		require.Equal(t, Created, c.GetState())
+	})
+
+	t.Run("IsStateChecksMultipleStates", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+		
+		c.setState(context.Background(), Online)
+		
+		require.True(t, c.IsState(Online))
+		require.True(t, c.IsState(Online, Offline))
+		require.False(t, c.IsState(Offline))
+		require.False(t, c.IsState(Banned, Destroyed))
+	})
+
+	t.Run("EndpointMethodsWork", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
+		c := newConn(e, config)
+		
+		require.Equal(t, "test-endpoint:2135", c.Address())
+		require.Equal(t, uint32(123), c.NodeID())
+		require.NotNil(t, c.Endpoint())
+	})
+
+	t.Run("NilConnHandling", func(t *testing.T) {
+		var c *conn
+		require.Equal(t, uint32(0), c.NodeID())
+		require.Nil(t, c.Endpoint())
 	})
 }
