@@ -5,24 +5,61 @@ ydb-go-sdk (and YDB also) is an open project, and you can contribute to it in ma
 Thank you!
 
 ## Table of contents
-  * [Legal Info](#legal-info)
-  * [Technical Info](#technical-info)
-    * [Using Dev Containers and GitHub Codespaces](#using-dev-containers-and-github-codespaces)
-      + [Quick Start with Dev Containers](#quick-start-with-dev-containers)
-      + [Using GitHub Codespaces](#using-github-codespaces)
-    * [Instructions for checks code changes locally](#instructions-for-checks-code-changes-locally)
-      + [Prerequisites](#prerequisites)
-      + [Run linter checks](#run-linter-checks)
-      + [Run tests](#run-tests)
+- [How to contribute](#how-to-contribute)
+  - [Table of contents](#table-of-contents)
+  - [How You Can Help](#how-you-can-help)
+    - [🔧 Work on Issues](#-work-on-issues)
+    - [👀 Review Pull Requests](#-review-pull-requests)
+    - [📚 Add Examples](#-add-examples)
+    - [📝 Improve Documentation](#-improve-documentation)
+    - [🧪 Test the SDK](#-test-the-sdk)
+  - [Using Dev Containers and GitHub Codespaces](#using-dev-containers-and-github-codespaces)
+    - [Quick Start with Dev Containers](#quick-start-with-dev-containers)
+    - [Using GitHub Codespaces](#using-github-codespaces)
+    - [Instructions for checks code changes locally](#instructions-for-checks-code-changes-locally)
+      - [Prerequisites](#prerequisites)
+      - [Run linter checks](#run-linter-checks)
+      - [Run tests](#run-tests)
         - [Only unit tests](#only-unit-tests)
-        - [All tests (include integration tests)](#all-tests)
+        - [All tests](#all-tests)
 
-## Technical Info
+## How You Can Help
 
-1. Check for open issues or open a fresh issue to start a discussion around a feature idea or a bug.
-2. Fork the repository <https://github.com/ydb-platform/ydb-go-sdk> on GitHub to start making your changes to the **master** branch (or branch off of it).
-3. Write a test which shows that the bug was fixed or that the feature works as expected.
-4. Send a pull request and bug the maintainer until it gets merged and published.
+There are many ways to contribute to the YDB Go SDK project, regardless of your experience level:
+
+### 🔧 Work on Issues
+- Browse our [open issues](https://github.com/ydb-platform/ydb-go-sdk/issues) and pick one that interests you
+- Look for issues labeled `good first issue` or `student project` or even `30min` if you're new to the project
+- Comment on the issue to let others know you're working on it
+- Submit a Pull Request with your solution
+
+### 👀 Review Pull Requests
+- Help review [open pull requests](https://github.com/ydb-platform/ydb-go-sdk/pulls)
+- Test proposed changes locally
+- Provide constructive feedback on code quality, performance, and design
+- Share your expertise to help improve submissions
+
+### 📚 Add Examples
+- Create practical examples demonstrating SDK features
+- Add code samples to the `/examples` directory
+- Show real-world use cases and best practices
+- Help others understand how to use different SDK capabilities
+
+### 📝 Improve Documentation
+- Document undocumented functions and methods
+- Improve existing documentation clarity
+- Add missing godoc comments
+- Create tutorials or guides for common tasks
+- Fix typos and grammatical errors
+
+### 🧪 Test the SDK
+- Test the SDK in different environments and scenarios
+- Report bugs with detailed reproduction steps
+- Verify fixes for reported issues
+- Help improve test coverage by writing unit or integration tests
+- Test compatibility with different YDB versions
+
+Every contribution, no matter how small, helps make the YDB Go SDK better for everyone. Thank you for your support!
 
 ## Using Dev Containers and GitHub Codespaces
 
