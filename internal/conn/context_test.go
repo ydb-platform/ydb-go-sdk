@@ -31,7 +31,6 @@ func TestUseWrapping(t *testing.T) {
 		ctx := context.Background()
 		ctx = WithoutWrapping(ctx)
 		ctx = context.WithValue(ctx, "key", "value") //nolint:revive,staticcheck
-		
 		require.False(t, UseWrapping(ctx))
 	})
 }

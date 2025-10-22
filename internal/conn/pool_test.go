@@ -17,10 +17,10 @@ import (
 
 // mockConfig implements the Config interface for testing
 type mockConfig struct {
-	dialTimeout    time.Duration
-	connectionTTL  time.Duration
-	driverTrace    *trace.Driver
-	grpcDialOpts   []grpc.DialOption
+	dialTimeout   time.Duration
+	connectionTTL time.Duration
+	driverTrace   *trace.Driver
+	grpcDialOpts  []grpc.DialOption
 }
 
 func (m *mockConfig) DialTimeout() time.Duration {

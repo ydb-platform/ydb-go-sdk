@@ -58,7 +58,6 @@ func TestMiddleware_WithAppendOptions(t *testing.T) {
 	t.Run("AppendOptionsToInvoke", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		cc := NewMockClientConnInterface(ctrl)
-		
 		var capturedOpts []grpc.CallOption
 		cc.EXPECT().Invoke(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {

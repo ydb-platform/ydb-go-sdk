@@ -259,9 +259,7 @@ func TestConn_StateManagement(t *testing.T) {
 		}
 		e := endpoint.New("test-endpoint:2135")
 		c := newConn(e, config)
-		
 		c.setState(context.Background(), Online)
-		
 		require.True(t, c.IsState(Online))
 		require.True(t, c.IsState(Online, Offline))
 		require.False(t, c.IsState(Offline))
@@ -275,7 +273,6 @@ func TestConn_StateManagement(t *testing.T) {
 		}
 		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
 		c := newConn(e, config)
-		
 		require.Equal(t, "test-endpoint:2135", c.Address())
 		require.Equal(t, uint32(123), c.NodeID())
 		require.NotNil(t, c.Endpoint())
@@ -292,7 +289,6 @@ func TestStatsHandler(t *testing.T) {
 	t.Run("TagRPC", func(t *testing.T) {
 		handler := statsHandler{}
 		ctx := context.Background()
-		
 		newCtx := handler.TagRPC(ctx, &stats.RPCTagInfo{})
 		require.Equal(t, ctx, newCtx)
 	})
@@ -300,7 +296,6 @@ func TestStatsHandler(t *testing.T) {
 	t.Run("TagConn", func(t *testing.T) {
 		handler := statsHandler{}
 		ctx := context.Background()
-		
 		newCtx := handler.TagConn(ctx, &stats.ConnTagInfo{})
 		require.Equal(t, ctx, newCtx)
 	})
@@ -314,7 +309,6 @@ func TestStatsHandler(t *testing.T) {
 	t.Run("HandleRPC_Begin", func(t *testing.T) {
 		handler := statsHandler{}
 		ctx, mark := markContext(context.Background())
-		
 		require.True(t, mark.canRetry())
 		handler.HandleRPC(ctx, &stats.Begin{})
 		// Begin should not mark as dirty
@@ -324,7 +318,6 @@ func TestStatsHandler(t *testing.T) {
 	t.Run("HandleRPC_End", func(t *testing.T) {
 		handler := statsHandler{}
 		ctx, mark := markContext(context.Background())
-		
 		require.True(t, mark.canRetry())
 		handler.HandleRPC(ctx, &stats.End{})
 		// End should not mark as dirty
@@ -334,7 +327,6 @@ func TestStatsHandler(t *testing.T) {
 	t.Run("HandleRPC_Other", func(t *testing.T) {
 		handler := statsHandler{}
 		ctx, mark := markContext(context.Background())
-		
 		require.True(t, mark.canRetry())
 		handler.HandleRPC(ctx, &stats.InPayload{})
 		// Other stats should mark as dirty
@@ -349,14 +341,11 @@ func TestConn_OnClose(t *testing.T) {
 			connectionTTL: 0,
 		}
 		e := endpoint.New("test-endpoint:2135")
-		
 		called := false
 		onClose := func(c *conn) {
 			called = true
 		}
-		
 		c := newConn(e, config, withOnClose(onClose))
-		
 		err := c.Close(context.Background())
 		require.NoError(t, err)
 		require.True(t, called)
@@ -368,15 +357,15 @@ func TestConn_OnClose(t *testing.T) {
 			connectionTTL: 0,
 		}
 		e := endpoint.New("test-endpoint:2135")
-		
+
 		called1 := false
 		called2 := false
-		
+
 		c := newConn(e, config,
 			withOnClose(func(c *conn) { called1 = true }),
 			withOnClose(func(c *conn) { called2 = true }),
 		)
-		
+
 		err := c.Close(context.Background())
 		require.NoError(t, err)
 		require.True(t, called1)
@@ -389,9 +378,9 @@ func TestConn_OnClose(t *testing.T) {
 			connectionTTL: 0,
 		}
 		e := endpoint.New("test-endpoint:2135")
-		
+
 		c := newConn(e, config, withOnClose(nil))
-		
+
 		err := c.Close(context.Background())
 		require.NoError(t, err)
 	})
@@ -404,20 +393,20 @@ func TestConn_OnTransportError(t *testing.T) {
 			connectionTTL: 0,
 		}
 		e := endpoint.New("test-endpoint:2135")
-		
+
 		var capturedConn Conn
 		var capturedErr error
-		
+
 		onTransportError := func(ctx context.Context, cc Conn, cause error) {
 			capturedConn = cc
 			capturedErr = cause
 		}
-		
+
 		c := newConn(e, config, withOnTransportError(onTransportError))
-		
+
 		testErr := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
 		c.onTransportError(context.Background(), testErr)
-		
+
 		require.Equal(t, c, capturedConn)
 		require.Equal(t, testErr, capturedErr)
 	})
@@ -428,9 +417,9 @@ func TestConn_OnTransportError(t *testing.T) {
 			connectionTTL: 0,
 		}
 		e := endpoint.New("test-endpoint:2135")
-		
+
 		c := newConn(e, config, withOnTransportError(nil))
-		
+
 		// Should not panic
 		testErr := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
 		c.onTransportError(context.Background(), testErr)
