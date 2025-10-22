@@ -583,7 +583,7 @@ func TestPool_ConnParker(t *testing.T) {
 		}()
 
 		tickCount := 0
-		
+
 		// Create connection to track parking attempts
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)

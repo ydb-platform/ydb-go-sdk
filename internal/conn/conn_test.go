@@ -498,7 +498,7 @@ func TestConn_Park(t *testing.T) {
 		// Park should succeed without error (grpcConn is nil so it's a no-op)
 		err := c.park(context.Background())
 		require.NoError(t, err)
-		
+
 		// State should remain Online since grpcConn was nil
 		require.Equal(t, Online, c.GetState())
 	})
