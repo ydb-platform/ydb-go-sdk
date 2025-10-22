@@ -178,7 +178,6 @@ func TestMarkContext(t *testing.T) {
 	t.Run("MarkContextCreatesNewMark", func(t *testing.T) {
 		ctx := context.Background()
 		newCtx, mark := markContext(ctx)
-		
 		require.NotNil(t, newCtx)
 		require.NotNil(t, mark)
 		require.True(t, mark.canRetry())
@@ -187,7 +186,6 @@ func TestMarkContext(t *testing.T) {
 	t.Run("GetContextMarkFromMarkedContext", func(t *testing.T) {
 		ctx := context.Background()
 		ctx, mark := markContext(ctx)
-		
 		retrievedMark := getContextMark(ctx)
 		require.NotNil(t, retrievedMark)
 		require.Equal(t, mark, retrievedMark)
@@ -196,7 +194,6 @@ func TestMarkContext(t *testing.T) {
 	t.Run("GetContextMarkFromUnmarkedContext", func(t *testing.T) {
 		ctx := context.Background()
 		mark := getContextMark(ctx)
-		
 		require.NotNil(t, mark)
 		require.True(t, mark.canRetry())
 	})
@@ -204,9 +201,7 @@ func TestMarkContext(t *testing.T) {
 	t.Run("MarkFromContextReflectsDirtyState", func(t *testing.T) {
 		ctx := context.Background()
 		ctx, mark := markContext(ctx)
-		
 		mark.markDirty()
-		
 		retrievedMark := getContextMark(ctx)
 		require.False(t, retrievedMark.canRetry())
 	})
