@@ -16,8 +16,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
-	grpcStatus "google.golang.org/grpc/status"
 	"google.golang.org/grpc/stats"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"

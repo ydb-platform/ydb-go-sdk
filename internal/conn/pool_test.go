@@ -35,6 +35,7 @@ func (m *mockConfig) Trace() *trace.Driver {
 	if m.driverTrace == nil {
 		return &trace.Driver{}
 	}
+
 	return m.driverTrace
 }
 
