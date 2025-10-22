@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+	"google.golang.org/grpc/stats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -290,5 +291,160 @@ func TestConn_StateManagement(t *testing.T) {
 		var c *conn
 		require.Equal(t, uint32(0), c.NodeID())
 		require.Nil(t, c.Endpoint())
+	})
+}
+
+func TestStatsHandler(t *testing.T) {
+	t.Run("TagRPC", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx := context.Background()
+		
+		newCtx := handler.TagRPC(ctx, &stats.RPCTagInfo{})
+		require.Equal(t, ctx, newCtx)
+	})
+
+	t.Run("TagConn", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx := context.Background()
+		
+		newCtx := handler.TagConn(ctx, &stats.ConnTagInfo{})
+		require.Equal(t, ctx, newCtx)
+	})
+
+	t.Run("HandleConn", func(t *testing.T) {
+		handler := statsHandler{}
+		// Should not panic
+		handler.HandleConn(context.Background(), &stats.ConnBegin{})
+	})
+
+	t.Run("HandleRPC_Begin", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx, mark := markContext(context.Background())
+		
+		require.True(t, mark.canRetry())
+		handler.HandleRPC(ctx, &stats.Begin{})
+		// Begin should not mark as dirty
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("HandleRPC_End", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx, mark := markContext(context.Background())
+		
+		require.True(t, mark.canRetry())
+		handler.HandleRPC(ctx, &stats.End{})
+		// End should not mark as dirty
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("HandleRPC_Other", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx, mark := markContext(context.Background())
+		
+		require.True(t, mark.canRetry())
+		handler.HandleRPC(ctx, &stats.InPayload{})
+		// Other stats should mark as dirty
+		require.False(t, mark.canRetry())
+	})
+}
+
+func TestConn_OnClose(t *testing.T) {
+	t.Run("OnCloseCalledOnClose", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		
+		called := false
+		onClose := func(c *conn) {
+			called = true
+		}
+		
+		c := newConn(e, config, withOnClose(onClose))
+		
+		err := c.Close(context.Background())
+		require.NoError(t, err)
+		require.True(t, called)
+	})
+
+	t.Run("MultipleOnCloseCalled", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		
+		called1 := false
+		called2 := false
+		
+		c := newConn(e, config,
+			withOnClose(func(c *conn) { called1 = true }),
+			withOnClose(func(c *conn) { called2 = true }),
+		)
+		
+		err := c.Close(context.Background())
+		require.NoError(t, err)
+		require.True(t, called1)
+		require.True(t, called2)
+	})
+
+	t.Run("OnCloseWithNilCallback", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		
+		c := newConn(e, config, withOnClose(nil))
+		
+		err := c.Close(context.Background())
+		require.NoError(t, err)
+	})
+}
+
+func TestConn_OnTransportError(t *testing.T) {
+	t.Run("OnTransportErrorCalledOnError", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		
+		var capturedConn Conn
+		var capturedErr error
+		
+		onTransportError := func(ctx context.Context, cc Conn, cause error) {
+			capturedConn = cc
+			capturedErr = cause
+		}
+		
+		c := newConn(e, config, withOnTransportError(onTransportError))
+		
+		testErr := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
+		c.onTransportError(context.Background(), testErr)
+		
+		require.Equal(t, c, capturedConn)
+		require.Equal(t, testErr, capturedErr)
+	})
+
+	t.Run("OnTransportErrorWithNilCallback", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		
+		c := newConn(e, config, withOnTransportError(nil))
+		
+		// Should not panic
+		testErr := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
+		c.onTransportError(context.Background(), testErr)
+	})
+}
+
+func TestIsAvailable(t *testing.T) {
+	t.Run("NilConnIsNotAvailable", func(t *testing.T) {
+		require.False(t, isAvailable(nil))
 	})
 }
