@@ -11,7 +11,6 @@ func TestWithoutWrapping(t *testing.T) {
 	t.Run("ContextWithoutWrapping", func(t *testing.T) {
 		ctx := context.Background()
 		ctxWithoutWrapping := WithoutWrapping(ctx)
-		
 		require.NotNil(t, ctxWithoutWrapping)
 		require.False(t, UseWrapping(ctxWithoutWrapping))
 	})
@@ -31,7 +30,7 @@ func TestUseWrapping(t *testing.T) {
 	t.Run("NestedContextWithoutWrapping", func(t *testing.T) {
 		ctx := context.Background()
 		ctx = WithoutWrapping(ctx)
-		ctx = context.WithValue(ctx, "key", "value") //nolint:revive
+		ctx = context.WithValue(ctx, "key", "value") //nolint:revive,staticcheck
 		
 		require.False(t, UseWrapping(ctx))
 	})

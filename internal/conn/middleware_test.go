@@ -23,7 +23,7 @@ func TestMiddleware_WithContextModifier(t *testing.T) {
 			})
 
 		modifiedCtx := WithContextModifier(cc, func(ctx context.Context) context.Context {
-			return context.WithValue(ctx, "test-key", "test-value") //nolint:revive
+			return context.WithValue(ctx, "test-key", "test-value") //nolint:revive,staticcheck
 		})
 
 		err := modifiedCtx.Invoke(context.Background(), "/test", nil, nil)
@@ -35,7 +35,6 @@ func TestMiddleware_WithContextModifier(t *testing.T) {
 	t.Run("ModifyContextInNewStream", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		cc := NewMockClientConnInterface(ctrl)
-		
 		var capturedCtx context.Context
 		cc.EXPECT().NewStream(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
@@ -45,7 +44,7 @@ func TestMiddleware_WithContextModifier(t *testing.T) {
 			})
 
 		modifiedCtx := WithContextModifier(cc, func(ctx context.Context) context.Context {
-			return context.WithValue(ctx, "stream-key", "stream-value") //nolint:revive
+			return context.WithValue(ctx, "stream-key", "stream-value") //nolint:revive,staticcheck
 		})
 
 		_, err := modifiedCtx.NewStream(context.Background(), &grpc.StreamDesc{}, "/test")
@@ -152,7 +151,7 @@ func TestMiddleware_Chaining(t *testing.T) {
 		})
 		wrapped = WithAppendOptions(wrapped, testOpt)
 		wrapped = WithContextModifier(wrapped, func(ctx context.Context) context.Context {
-			return context.WithValue(ctx, "chain-key", "chain-value") //nolint:revive
+			return context.WithValue(ctx, "chain-key", "chain-value") //nolint:revive,staticcheck
 		})
 
 		err := wrapped.Invoke(context.Background(), "/test", nil, nil)

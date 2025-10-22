@@ -249,7 +249,6 @@ func TestConn_StateManagement(t *testing.T) {
 		}
 		e := endpoint.New("test-endpoint:2135")
 		c := newConn(e, config)
-		
 		require.Equal(t, Created, c.GetState())
 	})
 
