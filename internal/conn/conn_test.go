@@ -431,3 +431,75 @@ func TestIsAvailable(t *testing.T) {
 		require.False(t, isAvailable(nil))
 	})
 }
+
+func TestConn_Park(t *testing.T) {
+	t.Run("ParkingClosedConnectionSucceeds", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+
+		// Close the connection first
+		err := c.Close(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, Destroyed, c.GetState())
+
+		// Parking a closed connection should succeed without error
+		err = c.park(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("ParkingConnectionWithNoGrpcConnSucceeds", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+
+		// Connection is created but never dialed (grpcConn is nil)
+		require.Nil(t, c.grpcConn)
+
+		// Parking should succeed (no-op since grpcConn is nil)
+		err := c.park(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("ParkingMultipleTimesSucceeds", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+
+		// Park multiple times (should all be no-ops since no grpcConn)
+		err := c.park(context.Background())
+		require.NoError(t, err)
+
+		err = c.park(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("ParkDoesNotErrorOnNilGrpcConn", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+
+		// Set to Online but don't actually dial
+		c.setState(context.Background(), Online)
+		require.Nil(t, c.grpcConn)
+
+		// Park should succeed without error (grpcConn is nil so it's a no-op)
+		err := c.park(context.Background())
+		require.NoError(t, err)
+		
+		// State should remain Online since grpcConn was nil
+		require.Equal(t, Online, c.GetState())
+	})
+}

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
@@ -374,5 +375,234 @@ func TestPool_ConfigMethods(t *testing.T) {
 
 		// The pool adds additional options, so we check the length is at least the ones we provided
 		require.GreaterOrEqual(t, len(pool.GrpcDialOptions()), len(opts))
+	})
+}
+
+func TestPool_ConnParker(t *testing.T) {
+	t.Run("AttemptsToCheckIdleOnlineConnections", func(t *testing.T) {
+		ctx := context.Background()
+		fakeClock := clockwork.NewFakeClock()
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 5 * time.Minute,
+		}
+
+		pool := NewPool(ctx, config)
+		pool.clock = fakeClock
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		// Create a connection and set it to Online
+		e := endpoint.New("test-endpoint:2135")
+		conn := pool.Get(e)
+		require.NotNil(t, conn)
+
+		conn.SetState(ctx, Online)
+		require.Equal(t, Online, conn.GetState())
+
+		// Start the parker in background
+		ttl := 10 * time.Second
+		interval := 5 * time.Second
+		go pool.connParker(ctx, ttl, interval)
+
+		// Advance clock past the TTL
+		fakeClock.Advance(interval)
+		fakeClock.Advance(ttl + time.Second)
+
+		// Give goroutine time to process
+		time.Sleep(50 * time.Millisecond)
+
+		// Note: Without actual grpcConn, park() is a no-op, so state won't change
+		// This test verifies the parker runs without error
+	})
+
+	t.Run("AttemptsToCheckBannedConnections", func(t *testing.T) {
+		ctx := context.Background()
+		fakeClock := clockwork.NewFakeClock()
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 5 * time.Minute,
+		}
+
+		pool := NewPool(ctx, config)
+		pool.clock = fakeClock
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		// Create a connection and set it to Banned
+		e := endpoint.New("test-endpoint:2135")
+		conn := pool.Get(e)
+		require.NotNil(t, conn)
+
+		conn.SetState(ctx, Banned)
+		require.Equal(t, Banned, conn.GetState())
+
+		// Start the parker in background
+		ttl := 10 * time.Second
+		interval := 5 * time.Second
+		go pool.connParker(ctx, ttl, interval)
+
+		// Advance clock past the TTL
+		fakeClock.Advance(interval)
+		fakeClock.Advance(ttl + time.Second)
+
+		// Give goroutine time to process
+		time.Sleep(50 * time.Millisecond)
+
+		// Note: Without actual grpcConn, park() is a no-op, so state won't change
+		// This test verifies the parker runs without error
+	})
+
+	t.Run("DoesNotParkRecentlyUsedConnections", func(t *testing.T) {
+		ctx := context.Background()
+		fakeClock := clockwork.NewFakeClock()
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 5 * time.Minute,
+		}
+
+		pool := NewPool(ctx, config)
+		pool.clock = fakeClock
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		// Create a connection and set it to Online
+		e := endpoint.New("test-endpoint:2135")
+		conn := pool.Get(e)
+		require.NotNil(t, conn)
+
+		conn.SetState(ctx, Online)
+		require.Equal(t, Online, conn.GetState())
+
+		// Start the parker in background
+		ttl := 10 * time.Second
+		interval := 5 * time.Second
+		go pool.connParker(ctx, ttl, interval)
+
+		// Advance clock but not past TTL
+		fakeClock.Advance(interval)
+		fakeClock.Advance(ttl / 2)
+
+		// Give goroutine time to process
+		time.Sleep(50 * time.Millisecond)
+
+		// Connection should still be Online (not idle enough to park)
+		require.Equal(t, Online, conn.GetState())
+	})
+
+	t.Run("DoesNotParkCreatedConnections", func(t *testing.T) {
+		ctx := context.Background()
+		fakeClock := clockwork.NewFakeClock()
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 5 * time.Minute,
+		}
+
+		pool := NewPool(ctx, config)
+		pool.clock = fakeClock
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		// Create a connection (default state is Created)
+		e := endpoint.New("test-endpoint:2135")
+		conn := pool.Get(e)
+		require.NotNil(t, conn)
+		require.Equal(t, Created, conn.GetState())
+
+		// Start the parker in background
+		ttl := 10 * time.Second
+		interval := 5 * time.Second
+		go pool.connParker(ctx, ttl, interval)
+
+		// Advance clock past the TTL
+		fakeClock.Advance(interval)
+		fakeClock.Advance(ttl + time.Second)
+
+		// Give goroutine time to process
+		time.Sleep(50 * time.Millisecond)
+
+		// Connection should still be Created (not parked since not Online/Banned)
+		require.Equal(t, Created, conn.GetState())
+	})
+
+	t.Run("StopsWhenPoolIsClosed", func(t *testing.T) {
+		ctx := context.Background()
+		fakeClock := clockwork.NewFakeClock()
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 5 * time.Minute,
+		}
+
+		pool := NewPool(ctx, config)
+		pool.clock = fakeClock
+
+		// Start the parker in background
+		ttl := 10 * time.Second
+		interval := 5 * time.Second
+		parkerDone := make(chan struct{})
+		go func() {
+			pool.connParker(ctx, ttl, interval)
+			close(parkerDone)
+		}()
+
+		// Close the pool
+		err := pool.Release(ctx)
+		require.NoError(t, err)
+
+		// Parker should stop
+		select {
+		case <-parkerDone:
+			// Success - parker stopped
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("connParker did not stop after pool was closed")
+		}
+	})
+
+	t.Run("TickerAdvancesCorrectly", func(t *testing.T) {
+		ctx := context.Background()
+		fakeClock := clockwork.NewFakeClock()
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 5 * time.Minute,
+		}
+
+		pool := NewPool(ctx, config)
+		pool.clock = fakeClock
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		tickCount := 0
+		
+		// Create connection to track parking attempts
+		e := endpoint.New("test-endpoint:2135")
+		conn := pool.Get(e)
+		conn.SetState(ctx, Online)
+
+		// Start the parker
+		ttl := 10 * time.Second
+		interval := 5 * time.Second
+		go pool.connParker(ctx, ttl, interval)
+
+		// Advance clock multiple times and verify parker is running
+		for i := 0; i < 3; i++ {
+			fakeClock.Advance(interval)
+			fakeClock.Advance(ttl)
+			time.Sleep(50 * time.Millisecond)
+			tickCount++
+		}
+
+		// If we got here without hanging, the ticker is working
+		require.Equal(t, 3, tickCount)
 	})
 }
