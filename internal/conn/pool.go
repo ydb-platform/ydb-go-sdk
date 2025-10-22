@@ -210,7 +210,9 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 	}
 }
 
-func NewPool(ctx context.Context, config Config) *Pool {
+type poolOption func(p *Pool)
+
+func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.NewPool"),
 	)
@@ -222,6 +224,10 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		config:      config,
 		dialOptions: config.GrpcDialOptions(),
 		done:        make(chan struct{}),
+	}
+
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	p.dialOptions = append(p.dialOptions,

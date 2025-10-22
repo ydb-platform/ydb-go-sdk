@@ -388,8 +388,9 @@ func TestPool_ConnParker(t *testing.T) {
 			connectionTTL: 5 * time.Minute,
 		}
 
-		pool := NewPool(ctx, config)
-		pool.clock = fakeClock
+		pool := NewPool(ctx, config, func(p *Pool) {
+			p.clock = fakeClock
+		})
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
@@ -427,8 +428,9 @@ func TestPool_ConnParker(t *testing.T) {
 			connectionTTL: 5 * time.Minute,
 		}
 
-		pool := NewPool(ctx, config)
-		pool.clock = fakeClock
+		pool := NewPool(ctx, config, func(p *Pool) {
+			p.clock = fakeClock
+		})
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
@@ -466,8 +468,9 @@ func TestPool_ConnParker(t *testing.T) {
 			connectionTTL: 5 * time.Minute,
 		}
 
-		pool := NewPool(ctx, config)
-		pool.clock = fakeClock
+		pool := NewPool(ctx, config, func(p *Pool) {
+			p.clock = fakeClock
+		})
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
@@ -505,8 +508,9 @@ func TestPool_ConnParker(t *testing.T) {
 			connectionTTL: 5 * time.Minute,
 		}
 
-		pool := NewPool(ctx, config)
-		pool.clock = fakeClock
+		pool := NewPool(ctx, config, func(p *Pool) {
+			p.clock = fakeClock
+		})
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
@@ -542,8 +546,9 @@ func TestPool_ConnParker(t *testing.T) {
 			connectionTTL: 5 * time.Minute,
 		}
 
-		pool := NewPool(ctx, config)
-		pool.clock = fakeClock
+		pool := NewPool(ctx, config, func(p *Pool) {
+			p.clock = fakeClock
+		})
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -576,8 +581,9 @@ func TestPool_ConnParker(t *testing.T) {
 			connectionTTL: 5 * time.Minute,
 		}
 
-		pool := NewPool(ctx, config)
-		pool.clock = fakeClock
+		pool := NewPool(ctx, config, func(p *Pool) {
+			p.clock = fakeClock
+		})
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
