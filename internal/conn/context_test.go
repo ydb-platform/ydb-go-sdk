@@ -31,7 +31,7 @@ func TestUseWrapping(t *testing.T) {
 	t.Run("NestedContextWithoutWrapping", func(t *testing.T) {
 		ctx := context.Background()
 		ctx = WithoutWrapping(ctx)
-		ctx = context.WithValue(ctx, "key", "value")
+		ctx = context.WithValue(ctx, "key", "value") //nolint:revive
 		
 		require.False(t, UseWrapping(ctx))
 	})

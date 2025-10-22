@@ -361,7 +361,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 
 	t.Run("GrpcDialOptions", func(t *testing.T) {
 		ctx := context.Background()
-		opts := []grpc.DialOption{grpc.WithBlock()}
+		opts := []grpc.DialOption{grpc.WithBlock()} //nolint:staticcheck,nolintlint
 		config := &mockConfig{
 			dialTimeout:   5 * time.Second,
 			connectionTTL: 0,
