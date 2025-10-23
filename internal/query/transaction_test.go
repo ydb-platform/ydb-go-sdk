@@ -524,6 +524,7 @@ func TestTransactionOnBeforeCommit(t *testing.T) {
 	callbackCalled := false
 	tx.OnBeforeCommit(func(ctx context.Context) error {
 		callbackCalled = true
+
 		return nil
 	})
 

@@ -211,7 +211,7 @@ func TestStatsMode(t *testing.T) {
 	t.Run("StatsModeNone", func(t *testing.T) {
 		settings := ExecuteSettings(
 			WithTxControl(tx.NewControl(tx.WithTxID(""))),
-			StatsMode(StatsModeNone),
+			StatsModeNone,
 		)
 		require.Equal(t, StatsModeNone, settings.StatsMode())
 	})
@@ -219,7 +219,7 @@ func TestStatsMode(t *testing.T) {
 	t.Run("StatsModeBasic", func(t *testing.T) {
 		settings := ExecuteSettings(
 			WithTxControl(tx.NewControl(tx.WithTxID(""))),
-			StatsMode(StatsModeBasic),
+			StatsModeBasic,
 		)
 		require.Equal(t, StatsModeBasic, settings.StatsMode())
 	})
