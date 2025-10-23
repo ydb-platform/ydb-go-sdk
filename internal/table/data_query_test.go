@@ -106,6 +106,9 @@ func TestQueryInterface(t *testing.T) {
 		require.NotNil(t, ydbQuery)
 		require.NotNil(t, ydbQuery.Query)
 		require.IsType(t, &Ydb_Table.Query_YqlText{}, ydbQuery.Query)
+		yqlText, ok := ydbQuery.Query.(*Ydb_Table.Query_YqlText)
+		require.True(t, ok)
+		require.Equal(t, "SELECT 1", yqlText.YqlText)
 		require.Equal(t, "SELECT 1", ydbQuery.GetYqlText())
 	})
 

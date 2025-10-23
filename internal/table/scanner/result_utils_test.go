@@ -167,6 +167,10 @@ func TestUnaryResult_HasNextResultSet(t *testing.T) {
 		}
 		_ = r.Close()
 		require.False(t, r.HasNextResultSet())
+		// Verify NextResultSetErr returns errAlreadyClosed
+		err := r.NextResultSetErr(context.Background())
+		require.Error(t, err)
+		require.ErrorIs(t, err, errAlreadyClosed)
 	})
 }
 
@@ -187,6 +191,22 @@ func TestStreamResult_NextResultSet(t *testing.T) {
 			},
 		}
 		require.False(t, r.NextResultSet(context.Background()))
+	})
+
+	t.Run("closed stream result", func(t *testing.T) {
+		r := &streamResult{
+			close: func(err error) error {
+				return nil
+			},
+			recv: func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error) {
+				return &Ydb.ResultSet{}, nil, nil
+			},
+		}
+		_ = r.Close()
+		// Verify NextResultSetErr returns errAlreadyClosed
+		err := r.NextResultSetErr(context.Background())
+		require.Error(t, err)
+		require.ErrorIs(t, err, errAlreadyClosed)
 	})
 }
 
