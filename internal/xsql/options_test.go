@@ -265,6 +265,8 @@ func TestMergedOptions_Apply(t *testing.T) {
 	require.NotNil(t, connector.retryBudget)
 }
 
+
+
 func TestMerge(t *testing.T) {
 	opt1 := WithDisableServerBalancer()
 	opt2 := WithRetryBudget(budget.Limited(100))

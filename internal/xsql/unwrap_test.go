@@ -30,8 +30,8 @@ func TestUnwrap_DB(t *testing.T) {
 
 	t.Run("WrongDriver", func(t *testing.T) {
 		// Create a DB with a mock driver that is not a Connector
-		sql.Register("mock_driver", &mockDriver{})
-		db, err := sql.Open("mock_driver", "")
+		sql.Register("mock_driver_unwrap", &mockDriver{})
+		db, err := sql.Open("mock_driver_unwrap", "")
 		require.NoError(t, err)
 		defer db.Close()
 
@@ -40,16 +40,4 @@ func TestUnwrap_DB(t *testing.T) {
 		require.Nil(t, result)
 		require.Contains(t, err.Error(), "is not a *driverWrapper")
 	})
-}
-
-func TestUnwrap_WrongDriver(t *testing.T) {
-	sql.Register("mock_driver2", &mockDriver{})
-	db, err := sql.Open("mock_driver2", "")
-	require.NoError(t, err)
-	defer db.Close()
-
-	// Since we can't create a real connection with mock driver,
-	// we'll verify that unwrap returns an error for wrong driver types
-	_, err = Unwrap(db)
-	require.Error(t, err)
 }

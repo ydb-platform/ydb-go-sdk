@@ -1,6 +1,7 @@
 package xsql
 
 import (
+	"database/sql/driver"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -90,6 +91,13 @@ func TestConnector_Driver(t *testing.T) {
 	connector := &Connector{}
 	driver := connector.Driver()
 	require.Equal(t, connector, driver)
+}
+
+func TestConnector_Open(t *testing.T) {
+	connector := &Connector{}
+	conn, err := connector.Open("test")
+	require.Nil(t, conn)
+	require.ErrorIs(t, err, driver.ErrSkip)
 }
 
 func TestConnector_Close(t *testing.T) {
