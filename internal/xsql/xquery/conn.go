@@ -65,7 +65,7 @@ func (c *Conn) NodeID() uint32 {
 }
 
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
-	result driver.Result, finalErr error,
+	driver.Result, error,
 ) {
 	if !c.IsValid() {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
@@ -81,24 +81,25 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		))
 	}
 
-	var st stats.QueryStats
 	opts := []options.Execute{
 		options.WithParameters(params),
-		options.WithStatsMode(options.StatsModeBasic, func(qs stats.QueryStats) {
-			st = qs
-		}),
 	}
 
 	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
 		opts = append(opts, options.WithTxControl(txControl))
 	}
 
+	result := &resultWithStats{}
+	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, func(qs stats.QueryStats) {
+		result.stats = qs
+	}))
+
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return &resultWithStats{st}, nil
+	return result, nil
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
