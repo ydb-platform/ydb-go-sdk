@@ -230,6 +230,7 @@ func (v *Dict) String() string {
 func (v *Dict) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
+
 	buffer.WriteString("Dict<")
 	buffer.WriteString(v.keyType.Yql())
 	buffer.WriteByte(',')
@@ -244,9 +245,11 @@ func (v *Dict) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	if !v.keyType.equalsTo(vv.keyType) {
 		return false
 	}
+
 	if !v.valueType.equalsTo(vv.valueType) {
 		return false
 	}
@@ -639,15 +642,19 @@ func (v *Struct) String() string {
 func (v *Struct) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
+
 	buffer.WriteString("Struct<")
+
 	for i := range v.fields {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString("'" + v.fields[i].Name + "'")
 		buffer.WriteByte(':')
 		buffer.WriteString(v.fields[i].T.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -658,13 +665,16 @@ func (v *Struct) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	if len(v.fields) != len(vv.fields) {
 		return false
 	}
+
 	for i := range v.fields {
 		if v.fields[i].Name != vv.fields[i].Name {
 			return false
 		}
+
 		if !v.fields[i].T.equalsTo(vv.fields[i].T) {
 			return false
 		}
@@ -675,6 +685,7 @@ func (v *Struct) equalsTo(rhs Type) bool {
 
 func (v *Struct) ToYDB() *Ydb.Type {
 	t := &Ydb.Type{}
+
 	structType := &Ydb.StructType{}
 	for i := range v.fields {
 		member := &Ydb.StructMember{
@@ -683,6 +694,7 @@ func (v *Struct) ToYDB() *Ydb.Type {
 		}
 		structType.Members = append(structType.Members, member)
 	}
+
 	t.Type = &Ydb.Type_StructType{
 		StructType: structType,
 	}
@@ -727,13 +739,17 @@ func (v *Tuple) String() string {
 func (v *Tuple) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
+
 	buffer.WriteString("Tuple<")
+
 	for i, t := range v.innerTypes {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(t.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -744,9 +760,11 @@ func (v *Tuple) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	if len(v.innerTypes) != len(vv.innerTypes) {
 		return false
 	}
+
 	for i := range v.innerTypes {
 		if !v.innerTypes[i].equalsTo(vv.innerTypes[i]) {
 			return false
@@ -761,11 +779,14 @@ func (v *Tuple) ToYDB() *Ydb.Type {
 	if v != nil {
 		items = v.innerTypes
 	}
+
 	t := &Ydb.Type{}
+
 	tupleType := &Ydb.TupleType{}
 	for _, vv := range items {
 		tupleType.Elements = append(tupleType.Elements, vv.ToYDB())
 	}
+
 	t.Type = &Ydb.Type_TupleType{
 		TupleType: tupleType,
 	}
@@ -786,15 +807,19 @@ type VariantStruct struct {
 func (v *VariantStruct) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
+
 	buffer.WriteString("Variant<")
+
 	for i := range v.fields {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString("'" + v.fields[i].Name + "'")
 		buffer.WriteByte(':')
 		buffer.WriteString(v.fields[i].T.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -838,13 +863,17 @@ type VariantTuple struct {
 func (v *VariantTuple) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
+
 	buffer.WriteString("Variant<")
+
 	for i, t := range v.innerTypes {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(t.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
