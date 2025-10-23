@@ -27,6 +27,8 @@ func TestTextQuery(t *testing.T) {
 		q := textQuery("SELECT * FROM users")
 		ydbQuery := q.toYDB()
 		require.NotNil(t, ydbQuery)
+		require.NotNil(t, ydbQuery.Query)
+		require.IsType(t, &Ydb_Table.Query_YqlText{}, ydbQuery.Query)
 		require.NotNil(t, ydbQuery.GetYqlText())
 		require.Equal(t, "SELECT * FROM users", ydbQuery.GetYqlText())
 	})
@@ -52,6 +54,8 @@ func TestPreparedQuery(t *testing.T) {
 		q := preparedQuery{id: "query-id-456", sql: "INSERT INTO users VALUES ($1, $2)"}
 		ydbQuery := q.toYDB()
 		require.NotNil(t, ydbQuery)
+		require.NotNil(t, ydbQuery.Query)
+		require.IsType(t, &Ydb_Table.Query_YqlText{}, ydbQuery.Query)
 		require.NotNil(t, ydbQuery.GetYqlText())
 		require.Equal(t, "INSERT INTO users VALUES ($1, $2)", ydbQuery.GetYqlText())
 	})
@@ -100,7 +104,9 @@ func TestQueryInterface(t *testing.T) {
 		require.Equal(t, "SELECT 1", q.YQL())
 		ydbQuery := q.toYDB()
 		require.NotNil(t, ydbQuery)
+		require.NotNil(t, ydbQuery.Query)
 		require.IsType(t, &Ydb_Table.Query_YqlText{}, ydbQuery.Query)
+		require.Equal(t, "SELECT 1", ydbQuery.GetYqlText())
 	})
 
 	t.Run("prepared query implements Query interface", func(t *testing.T) {
@@ -111,6 +117,8 @@ func TestQueryInterface(t *testing.T) {
 		require.Equal(t, "SELECT 2", q.YQL())
 		ydbQuery := q.toYDB()
 		require.NotNil(t, ydbQuery)
+		require.NotNil(t, ydbQuery.Query)
 		require.IsType(t, &Ydb_Table.Query_YqlText{}, ydbQuery.Query)
+		require.Equal(t, "SELECT 2", ydbQuery.GetYqlText())
 	})
 }
