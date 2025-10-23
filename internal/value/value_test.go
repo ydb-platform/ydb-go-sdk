@@ -2463,3 +2463,218 @@ func TestJSONDocumentValueCastTo(t *testing.T) {
 		require.Equal(t, []byte(`{"key": "value"}`), result)
 	})
 }
+
+func TestBoolValueCastTo(t *testing.T) {
+	v := BoolValue(true)
+
+	t.Run("CastToBool", func(t *testing.T) {
+		var result bool
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.True(t, result)
+	})
+
+	t.Run("CastToString", func(t *testing.T) {
+		var result string
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, "true", result)
+	})
+
+	t.Run("CastToInvalid", func(t *testing.T) {
+		var result int
+		err := v.castTo(&result)
+		require.Error(t, err)
+	})
+}
+
+func TestDateValueCastTo(t *testing.T) {
+	v := DateValue(18000)
+
+	t.Run("CastToTime", func(t *testing.T) {
+		var result time.Time
+		err := v.castTo(&result)
+		require.NoError(t, err)
+	})
+
+	t.Run("CastToUint64", func(t *testing.T) {
+		var result uint64
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, uint64(18000), result)
+	})
+
+	t.Run("CastToInt64", func(t *testing.T) {
+		var result int64
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, int64(18000), result)
+	})
+
+	t.Run("CastToInt32", func(t *testing.T) {
+		var result int32
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, int32(18000), result)
+	})
+}
+
+func TestDate32ValueCastTo(t *testing.T) {
+	v := Date32Value(18000)
+
+	t.Run("CastToTime", func(t *testing.T) {
+		var result time.Time
+		err := v.castTo(&result)
+		require.NoError(t, err)
+	})
+
+	t.Run("CastToInt64", func(t *testing.T) {
+		var result int64
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, int64(18000), result)
+	})
+
+	t.Run("CastToInt32", func(t *testing.T) {
+		var result int32
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, int32(18000), result)
+	})
+
+	t.Run("CastToInt", func(t *testing.T) {
+		var result int
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, int(18000), result)
+	})
+}
+
+func TestDatetime64ValueCastTo(t *testing.T) {
+	v := Datetime64Value(1234567890)
+
+	t.Run("CastToTime", func(t *testing.T) {
+		var result time.Time
+		err := v.castTo(&result)
+		require.NoError(t, err)
+	})
+
+	t.Run("CastToInt64", func(t *testing.T) {
+		var result int64
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, int64(1234567890), result)
+	})
+}
+
+func TestFloatValueCastToFloat64(t *testing.T) {
+	v := FloatValue(123.456)
+
+	var result float64
+	err := v.castTo(&result)
+	require.NoError(t, err)
+	require.InDelta(t, 123.456, result, 0.01)
+}
+
+func TestIntegerValuesCastTo(t *testing.T) {
+	t.Run("Int8", func(t *testing.T) {
+		v := Int8Value(42)
+		var result int8
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, int8(42), result)
+
+		var strResult string
+		err = v.castTo(&strResult)
+		require.NoError(t, err)
+		require.Equal(t, "42", strResult)
+	})
+
+	t.Run("Int16", func(t *testing.T) {
+		v := Int16Value(42)
+		var result int16
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, int16(42), result)
+
+		var strResult string
+		err = v.castTo(&strResult)
+		require.NoError(t, err)
+	})
+
+	t.Run("Uint8", func(t *testing.T) {
+		v := Uint8Value(42)
+		var result uint8
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, uint8(42), result)
+
+		var strResult string
+		err = v.castTo(&strResult)
+		require.NoError(t, err)
+	})
+
+	t.Run("Uint16", func(t *testing.T) {
+		v := Uint16Value(42)
+		var result uint16
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, uint16(42), result)
+
+		var strResult string
+		err = v.castTo(&strResult)
+		require.NoError(t, err)
+	})
+}
+
+func TestTimestampValueCastTo(t *testing.T) {
+	v := TimestampValue(1234567890)
+
+	t.Run("CastToTime", func(t *testing.T) {
+		var result time.Time
+		err := v.castTo(&result)
+		require.NoError(t, err)
+	})
+
+	t.Run("CastToUint64", func(t *testing.T) {
+		var result uint64
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1234567890), result)
+	})
+
+	t.Run("CastToInvalid", func(t *testing.T) {
+		var result string
+		err := v.castTo(&result)
+		require.Error(t, err)
+	})
+}
+
+func TestTextValueCastTo(t *testing.T) {
+	v := TextValue("test")
+
+	t.Run("CastToString", func(t *testing.T) {
+		var result string
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, "test", result)
+	})
+
+	t.Run("CastToBytes", func(t *testing.T) {
+		var result []byte
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, []byte("test"), result)
+	})
+}
+
+func TestBytesValueCastTo(t *testing.T) {
+	v := BytesValue([]byte("test"))
+
+	t.Run("CastToBytes", func(t *testing.T) {
+		var result []byte
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, []byte("test"), result)
+	})
+}
