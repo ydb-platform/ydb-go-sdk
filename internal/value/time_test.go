@@ -70,3 +70,91 @@ func TestTzSomeToTime(t *testing.T) {
 		})
 	}
 }
+
+func TestInterval64ToDuration(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		input    int64
+		expected time.Duration
+	}{
+		{
+			name:     "zero",
+			input:    0,
+			expected: 0,
+		},
+		{
+			name:     "one nanosecond",
+			input:    1,
+			expected: time.Nanosecond,
+		},
+		{
+			name:     "one second",
+			input:    int64(time.Second / time.Nanosecond),
+			expected: time.Second,
+		},
+		{
+			name:     "one hour",
+			input:    int64(time.Hour / time.Nanosecond),
+			expected: time.Hour,
+		},
+		{
+			name:     "negative value",
+			input:    -1000000,
+			expected: -time.Millisecond,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Interval64ToDuration(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDurationToNanoseconds(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		input    time.Duration
+		expected int64
+	}{
+		{
+			name:     "zero",
+			input:    0,
+			expected: 0,
+		},
+		{
+			name:     "one nanosecond",
+			input:    time.Nanosecond,
+			expected: 1,
+		},
+		{
+			name:     "one microsecond",
+			input:    time.Microsecond,
+			expected: 1000,
+		},
+		{
+			name:     "one millisecond",
+			input:    time.Millisecond,
+			expected: 1000000,
+		},
+		{
+			name:     "one second",
+			input:    time.Second,
+			expected: 1000000000,
+		},
+		{
+			name:     "one hour",
+			input:    time.Hour,
+			expected: 3600000000000,
+		},
+		{
+			name:     "negative duration",
+			input:    -time.Millisecond,
+			expected: -1000000,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result := durationToNanoseconds(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
