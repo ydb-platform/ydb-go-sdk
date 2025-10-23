@@ -89,21 +89,55 @@ jobs:
           go build -o .bin/${{matrix.sdk.id}}_linux_amd64 -ldflags "-X \"main.ref=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}\" -X \"main.label=${{matrix.sdk.label}}\" -X \"main.jobName=${{matrix.sdk.name}}\"" ${{matrix.sdk.path}}
           chmod +x .bin/${{matrix.sdk.id}}_linux_amd64
 
+      - name: Update dependencies
+        run: |
+          for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+          sudo apt-get update
+          sudo apt-get install ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+          sudo apt-get update
+          sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
       - name: Inititialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@main
+        uses: ydb-platform/ydb-slo-action/init@2dc
         with:
           github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          sdk_name: ${{ matrix.sdk.name }}
-          ydb_database_node_count: 5
+          workload_name: ${{ matrix.sdk.name }}
+
+      - name: List containers
+        run: |
+          docker ps -a
+
+      - name: List containers after 30 seconds
+        run: |
+          sleep 30
+          docker ps -a
+
+      - name: List ports
+        run: |
+          netstat -tuln
+
+      - name: Discovery nodes
+        run: |
+          curl -sSL https://install.ydb.tech/cli | bash
+          ${HOME}/ydb/bin/ydb -e grpc://localhost:2136 -d /Root/testdb discovery list
 
       - name: Prepare SLO Database
         run: |
-          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 create grpc://localhost:2135 /Root/testdb
+          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 create grpc://localhost:2136 /Root/testdb
 
       - name: Run SLO Tests
         run: |
-          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 run grpc://localhost:2135 /Root/testdb \
+          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 run grpc://localhost:2136 /Root/testdb \
             -prom-pgw localhost:9091 \
             -report-period 250 \
             -time ${{inputs.slo_workload_duration_seconds || 600}} \
@@ -111,6 +145,30 @@ jobs:
             -write-rps ${{inputs.slo_workload_write_max_rps || 100}} \
             -read-timeout 1000 \
             -write-timeout 1000 || true
+
+      - if: always()
+        name: Store ydb healthcheck
+        run: |
+          curl -ik http://localhost:8765/healthcheck > ydb-healthcheck.log
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{matrix.sdk.name}}-ydb-healthcheck.log
+          path: ./ydb-healthcheck.log
+          retention-days: 1
+
+      - if: always()
+        name: Store ydb logs
+        run: |
+          docker compose -f .slo/compose.ydb.yaml logs > ydb.log
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{matrix.sdk.name}}-ydb.log
+          path: ./ydb.log
+          retention-days: 1
 
       - if: always()
         name: Store ydb chaos testing logs
@@ -125,6 +183,26 @@ jobs:
           retention-days: 1
 
       - if: always()
+        name: List .slo files
+        run: |
+          ls -lR .slo
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{matrix.sdk.name}}-slo-output
+          path: |
+            .slo/ydb-config.yml
+            .slo/compose.ydb.yaml
+            .slo/Dockerfile
+            .slo/entrypoint.sh
+            .slo/prometheus.yml
+            .slo/compose.prometheus.yaml
+            .slo/run-chaos.sh
+            .slo/compose.chaos.yaml
+          retention-days: 1
+
+      - if: success()
         name: Cleanup SLO Database
         run: |
-          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 cleanup grpc://localhost:2135 /Root/testdb || true
+          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 cleanup grpc://localhost:2136 /Root/testdb || true
