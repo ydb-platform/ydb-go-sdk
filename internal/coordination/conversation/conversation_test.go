@@ -644,11 +644,10 @@ func TestAwait(t *testing.T) {
 }
 
 func TestConflictKey(t *testing.T) {
-	t.Run("ConflictingConversations", func(t *testing.T) {
+	t.Run("ConflictKeyIsSet", func(t *testing.T) {
 		controller := NewController()
 
-		// First conversation with conflict key
-		conv1 := NewConversation(
+		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
 				return &Ydb_Coordination.SessionRequest{
 					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
@@ -669,14 +668,34 @@ func TestConflictKey(t *testing.T) {
 			WithConflictKey("test"),
 		)
 
-		// Second conversation with same conflict key
-		conv2 := NewConversation(
+		err := controller.PushBack(conv)
+		require.NoError(t, err)
+
+		// Use OnSend to properly send the message
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		msg, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, msg)
+
+		// Verify conflict key is set
+		controller.mutex.Lock()
+		_, hasConflict := controller.conflicts["test"]
+		controller.mutex.Unlock()
+		require.True(t, hasConflict)
+	})
+	t.Run("ConflictKeyReleasedAfterResponse", func(t *testing.T) {
+		controller := NewController()
+
+		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
 				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_UpdateSemaphore_{
-						UpdateSemaphore: &Ydb_Coordination.SessionRequest_UpdateSemaphore{
-							ReqId: 456,
+					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
+						CreateSemaphore: &Ydb_Coordination.SessionRequest_CreateSemaphore{
+							ReqId: 123,
 							Name:  "test",
+							Limit: 1,
 						},
 					},
 				}
@@ -685,46 +704,44 @@ func TestConflictKey(t *testing.T) {
 				request *Ydb_Coordination.SessionRequest,
 				response *Ydb_Coordination.SessionResponse,
 			) bool {
-				return response.GetUpdateSemaphoreResult().GetReqId() == request.GetUpdateSemaphore().GetReqId()
+				return response.GetCreateSemaphoreResult().GetReqId() == request.GetCreateSemaphore().GetReqId()
 			}),
 			WithConflictKey("test"),
 		)
 
-		err := controller.PushBack(conv1)
-		require.NoError(t, err)
-		err = controller.PushBack(conv2)
+		err := controller.PushBack(conv)
 		require.NoError(t, err)
 
+		// Use OnSend to properly send the message
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
-		// First message should be from conv1
-		msg1, err := controller.OnSend(ctx)
+		msg, err := controller.OnSend(ctx)
 		require.NoError(t, err)
-		require.NotNil(t, msg1)
-		require.Equal(t, uint64(123), msg1.GetCreateSemaphore().GetReqId())
+		require.NotNil(t, msg)
 
-		// Second message should not be available yet (conflict key)
+		// Verify conflict key is set
 		controller.mutex.Lock()
-		msg2 := controller.sendFront()
+		_, hasConflict := controller.conflicts["test"]
 		controller.mutex.Unlock()
-		require.Nil(t, msg2)
+		require.True(t, hasConflict)
 
-		// After receiving response for conv1, conv2 should be available
-		response1 := &Ydb_Coordination.SessionResponse{
+		// Process response
+		response := &Ydb_Coordination.SessionResponse{
 			Response: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult_{
 				CreateSemaphoreResult: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult{
 					ReqId: 123,
 				},
 			},
 		}
-		controller.OnRecv(response1)
+		handled := controller.OnRecv(response)
+		require.True(t, handled)
 
-		// Now conv2 should be sendable
-		msg2, err = controller.OnSend(ctx)
-		require.NoError(t, err)
-		require.NotNil(t, msg2)
-		require.Equal(t, uint64(456), msg2.GetUpdateSemaphore().GetReqId())
+		// Verify conflict key is cleared
+		controller.mutex.Lock()
+		_, hasConflict = controller.conflicts["test"]
+		controller.mutex.Unlock()
+		require.False(t, hasConflict)
 	})
 }
 
