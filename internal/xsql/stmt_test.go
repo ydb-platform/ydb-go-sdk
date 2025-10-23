@@ -45,8 +45,6 @@ func TestStmt_Close(t *testing.T) {
 	require.NoError(t, err)
 }
 
-
-
 func TestStmt_QueryContext(t *testing.T) {
 	t.Run("ValidConn", func(t *testing.T) {
 		stmt := &Stmt{

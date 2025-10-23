@@ -12,8 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-
-
 func TestConn_ID(t *testing.T) {
 	conn := &Conn{
 		cc: &mockCommonConn{id: "test-conn-123"},
@@ -143,8 +141,6 @@ func TestConn_PrepareContext(t *testing.T) {
 	})
 }
 
-
-
 func TestConn_BeginTx(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		conn := &Conn{
@@ -183,9 +179,9 @@ func TestConn_QueryContext(t *testing.T) {
 		conn := &Conn{
 			cc: &mockCommonConn{},
 			connector: &Connector{
-				trace:    &trace.DatabaseSQL{},
-				bindings: newMockBindings(),
-				clock:    clockwork.NewRealClock(),
+				trace:     &trace.DatabaseSQL{},
+				bindings:  newMockBindings(),
+				clock:     clockwork.NewRealClock(),
 				processor: QUERY,
 			},
 			ctx:       context.Background(),
@@ -200,9 +196,9 @@ func TestConn_QueryContext(t *testing.T) {
 		conn := &Conn{
 			cc: &mockCommonConn{},
 			connector: &Connector{
-				trace:    &trace.DatabaseSQL{},
-				bindings: newMockBindings(),
-				clock:    clockwork.NewRealClock(),
+				trace:     &trace.DatabaseSQL{},
+				bindings:  newMockBindings(),
+				clock:     clockwork.NewRealClock(),
 				processor: QUERY,
 			},
 			ctx:       context.Background(),
@@ -222,9 +218,9 @@ func TestConn_ExecContext(t *testing.T) {
 		conn := &Conn{
 			cc: &mockCommonConn{},
 			connector: &Connector{
-				trace:    &trace.DatabaseSQL{},
-				bindings: newMockBindings(),
-				clock:    clockwork.NewRealClock(),
+				trace:     &trace.DatabaseSQL{},
+				bindings:  newMockBindings(),
+				clock:     clockwork.NewRealClock(),
 				processor: QUERY,
 			},
 			ctx:       context.Background(),
@@ -239,9 +235,9 @@ func TestConn_ExecContext(t *testing.T) {
 		conn := &Conn{
 			cc: &mockCommonConn{},
 			connector: &Connector{
-				trace:    &trace.DatabaseSQL{},
-				bindings: newMockBindings(),
-				clock:    clockwork.NewRealClock(),
+				trace:     &trace.DatabaseSQL{},
+				bindings:  newMockBindings(),
+				clock:     clockwork.NewRealClock(),
 				processor: QUERY,
 			},
 			ctx:       context.Background(),

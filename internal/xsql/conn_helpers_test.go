@@ -70,31 +70,6 @@ var (
 	} = (*Conn)(nil)
 )
 
-// Mock parent driver for testing
-type mockParent struct {
-	name string
-}
-
-func (m *mockParent) Name() string {
-	return m.name
-}
-
-func (m *mockParent) Table() interface{} {
-	return nil
-}
-
-func (m *mockParent) Query() interface{} {
-	return nil
-}
-
-func (m *mockParent) Scripting() interface{} {
-	return nil
-}
-
-func (m *mockParent) Scheme() interface{} {
-	return nil
-}
-
 func TestConn_Engine(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -255,7 +230,7 @@ func TestConn_toYdb(t *testing.T) {
 			bindings: newMockBindings(),
 		},
 	}
-	
+
 	yql, p, err := conn.toYdb("SELECT 1", driver.NamedValue{Name: "p1", Value: 42})
 	require.NoError(t, err)
 	require.NotEmpty(t, yql)

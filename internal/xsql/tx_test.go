@@ -10,8 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-
-
 func TestTx_ID(t *testing.T) {
 	tx := &Tx{
 		tx: &mockTx{id: "test-tx-123"},
@@ -59,8 +57,6 @@ func TestTx_Rollback(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, mockConn.currentTx)
 }
-
-
 
 func TestTx_QueryContext(t *testing.T) {
 	mockConn := &Conn{
@@ -141,5 +137,3 @@ func TestTx_PrepareContext(t *testing.T) {
 		require.Nil(t, stmt)
 	})
 }
-
-
