@@ -856,7 +856,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	issueCount = -1
 	t.Run("Exec no issues", func(t *testing.T) {
 		q := db.Query()
-		result, err := q.Query(ctx, `
+		_, err := q.Query(ctx, `
 			SELECT 42;
 			SELECT 43;
         `,
@@ -867,7 +867,6 @@ func TestIssue1872QueryWarning(t *testing.T) {
 			}),
 		)
 		require.NoError(t, err)
-		fmt.Printf("%#v", result)
 	})
 	require.Equal(t, -1, issueCount)
 	t.Run("Exec insert", func(t *testing.T) {
@@ -911,7 +910,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 		)
 		require.NoError(t, err)
 	})
-	t.Run("Quiery complex", func(t *testing.T) {
+	t.Run("Query complex", func(t *testing.T) {
 		err = db.Query().Exec(ctx,
 			`	DECLARE $x as String;
 		    DECLARE $x1 as String;
@@ -953,7 +952,6 @@ func TestIssue1872QueryWarning(t *testing.T) {
 			query.WithIdempotent(),
 			query.WithIssuesHandler(func(issues []*Ydb_Issue.IssueMessage) {
 				issueList = issues
-				fmt.Printf("len=%d", len(issues))
 			}),
 		)
 		require.NoError(t, err)
@@ -981,7 +979,6 @@ func TestIssue1872QueryWarning(t *testing.T) {
 			query.WithIdempotent(),
 			query.WithIssuesHandler(func(issues []*Ydb_Issue.IssueMessage) {
 				issueList = issues
-				fmt.Printf("len=%d", len(issues))
 			}),
 		)
 		require.NoError(t, err)

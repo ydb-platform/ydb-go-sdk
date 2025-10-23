@@ -167,11 +167,7 @@ func newResult(
 			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 		}
 		if r.issuesCallback != nil {
-			if r.lastPart != nil {
-				r.issuesCallback(r.lastPart.GetIssues())
-			} else {
-				r.issuesCallback(make([]*Ydb_Issue.IssueMessage, 0))
-			}
+			r.issuesCallback(r.issuesList)
 		}
 
 		return &r, nil
