@@ -314,9 +314,9 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
         DECLARE $ts AS Datetime;
         SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views AND first_aired > $ts;
       `,
-      sql.Named("$title", "%Season 1%"), // argument name with prefix `$` 
+      sql.Named("title", "%Season 1%"), // argument name with without prefix `$` 
       sql.Named("views", uint64(1000)),  // argument name without prefix `$` (driver will prepend `$` if necessary)
-      sql.Named("$ts", types.DatetimeValueFromTime( // native ydb type
+      sql.Named("ts", types.DatetimeValueFromTime( // native ydb type
         time.Now().Add(-time.Hour*24*365), 
       )),
    )
@@ -401,7 +401,7 @@ func main() {
     DECLARE $p0 AS Int32;
     DECLARE $p1 AS Utf8;
     SELECT $p0, $p1`, 
-    sql.Named("$p0", 42), 
+    sql.Named("p0", 42), 
     table.ValueParam("$p1", types.TextValue("my string")),
   )
   // process row ...
