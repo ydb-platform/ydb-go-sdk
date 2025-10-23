@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
@@ -165,4 +166,67 @@ func must[T any](v T, err error) T {
 	}
 
 	return v
+}
+
+func TestResponsePartLimitSizeBytes(t *testing.T) {
+	settings := ExecuteSettings(
+		WithTxControl(tx.NewControl(tx.WithTxID(""))),
+		WithResponsePartLimitSizeBytes(1024),
+	)
+	require.Equal(t, int64(1024), settings.ResponsePartLimitSizeBytes())
+}
+
+func TestLabel(t *testing.T) {
+	settings := defaultExecuteSettings()
+	require.Equal(t, "undefined", settings.Label())
+}
+
+func TestStatsModeApplyWithCallback(t *testing.T) {
+	called := false
+	callback := func(stats.QueryStats) {
+		called = true
+	}
+	settings := ExecuteSettings(
+		WithTxControl(tx.NewControl(tx.WithTxID(""))),
+		WithStatsMode(StatsModeBasic, callback),
+	)
+	require.Equal(t, StatsModeBasic, settings.StatsMode())
+	require.NotNil(t, settings.StatsCallback())
+	// Verify callback works
+	settings.StatsCallback()(nil)
+	require.True(t, called)
+}
+
+func TestRetryOpts(t *testing.T) {
+	settings := defaultExecuteSettings()
+	require.Nil(t, settings.RetryOpts())
+}
+
+func TestStatsCallback(t *testing.T) {
+	settings := defaultExecuteSettings()
+	require.Nil(t, settings.StatsCallback())
+}
+
+func TestStatsMode(t *testing.T) {
+	t.Run("StatsModeNone", func(t *testing.T) {
+		settings := ExecuteSettings(
+			WithTxControl(tx.NewControl(tx.WithTxID(""))),
+			StatsMode(StatsModeNone),
+		)
+		require.Equal(t, StatsModeNone, settings.StatsMode())
+	})
+
+	t.Run("StatsModeBasic", func(t *testing.T) {
+		settings := ExecuteSettings(
+			WithTxControl(tx.NewControl(tx.WithTxID(""))),
+			StatsMode(StatsModeBasic),
+		)
+		require.Equal(t, StatsModeBasic, settings.StatsMode())
+	})
+}
+
+func TestThisOptionIsNotForExecuteOnTx(t *testing.T) {
+	txCtrl := (*txControlOption)(tx.NewControl(tx.WithTxID("test")))
+	// Should not panic
+	txCtrl.thisOptionIsNotForExecuteOnTx()
 }
