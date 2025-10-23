@@ -502,3 +502,56 @@ func TestRollback(t *testing.T) {
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 	})
 }
+
+func TestTransactionSessionIDAndNodeID(t *testing.T) {
+	e := fixenv.New(t)
+	tx := TransactionOverGrpcMock(e)
+
+	sessionID := tx.SessionID()
+	require.Contains(t, sessionID, "test-session-id")
+
+	nodeID := tx.NodeID()
+	require.Equal(t, uint32(0), nodeID)
+}
+
+func TestTransactionOnBeforeCommit(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := xtest.Context(t)
+
+	tx := TransactionOverGrpcMock(e)
+
+	// Test OnBeforeCommit
+	callbackCalled := false
+	tx.OnBeforeCommit(func(ctx context.Context) error {
+		callbackCalled = true
+		return nil
+	})
+
+	// Setup commit expectation
+	client := QueryGrpcMock(e)
+	client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
+		Status: Ydb.StatusIds_SUCCESS,
+	}, nil)
+
+	err := tx.CommitTx(ctx)
+	require.NoError(t, err)
+	require.True(t, callbackCalled)
+}
+
+func TestTransactionOnBeforeCommitWithError(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := xtest.Context(t)
+
+	tx := TransactionOverGrpcMock(e)
+
+	// Test OnBeforeCommit with error
+	expectedErr := errors.New("before commit error")
+	tx.OnBeforeCommit(func(ctx context.Context) error {
+		return expectedErr
+	})
+
+	// Commit should fail due to OnBeforeCommit error
+	err := tx.CommitTx(ctx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, expectedErr)
+}
