@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -54,10 +55,16 @@ type (
 		DialTimeout() time.Duration
 		GrpcDialOptions() []grpc.DialOption
 	}
+	grpcClientConnInterface interface {
+		grpc.ClientConnInterface
+		io.Closer
+
+		GetState() connectivity.State
+	}
 	conn struct {
 		mtx               sync.RWMutex
 		config            connConfig // ro access
-		grpcConn          *grpc.ClientConn
+		grpcConn          grpcClientConnInterface
 		done              chan struct{}
 		endpoint          endpoint.Endpoint // ro access
 		closed            bool
@@ -184,7 +191,7 @@ func (c *conn) GetState() (s State) {
 	return State(c.state.Load())
 }
 
-func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
+func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err error) {
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedConnection)
 	}
@@ -200,7 +207,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 }
 
 // c.mtx must be locked
-func (c *conn) dial(ctx context.Context) (cc *grpc.ClientConn, err error) {
+func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error) {
 	onDone := trace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial"),
@@ -259,7 +266,7 @@ func (c *conn) onTransportError(ctx context.Context, cause error) {
 	}
 }
 
-func isAvailable(raw *grpc.ClientConn) bool {
+func isAvailable(raw grpcClientConnInterface) bool {
 	return raw != nil && raw.GetState() == connectivity.Ready
 }
 
@@ -453,7 +460,7 @@ func (c *conn) Invoke(
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).Invoke"),
 			c.endpoint, trace.Method(method),
 		)
-		cc *grpc.ClientConn
+		cc grpcClientConnInterface
 		md = metadata.MD{}
 	)
 	defer func() {
