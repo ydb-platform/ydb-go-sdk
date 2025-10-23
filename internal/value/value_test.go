@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/proto"
@@ -1545,4 +1546,322 @@ func TestCastOtherTypes(t *testing.T) {
 			},
 		)
 	}
+}
+
+func TestUuid(t *testing.T) {
+	u := uuid.New()
+	v := Uuid(u)
+	require.NotNil(t, v)
+	require.Equal(t, types.UUID, v.Type())
+
+	var result uuid.UUID
+	err := v.castTo(&result)
+	require.NoError(t, err)
+	require.Equal(t, u, result)
+}
+
+func TestNewUUIDIssue1501FixedBytesWrapper(t *testing.T) {
+	uuidBytes := [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	wrapper := NewUUIDIssue1501FixedBytesWrapper(uuidBytes)
+
+	t.Run("AsBytesArray", func(t *testing.T) {
+		result := wrapper.AsBytesArray()
+		require.Equal(t, uuidBytes, result)
+	})
+
+	t.Run("AsBytesSlice", func(t *testing.T) {
+		result := wrapper.AsBytesSlice()
+		require.Equal(t, uuidBytes[:], result)
+	})
+
+	t.Run("AsBrokenString", func(t *testing.T) {
+		result := wrapper.AsBrokenString()
+		require.Equal(t, string(uuidBytes[:]), result)
+	})
+
+	t.Run("PublicRevertReorderForIssue1501", func(t *testing.T) {
+		result := wrapper.PublicRevertReorderForIssue1501()
+		require.NotEqual(t, uuid.UUID{}, result)
+	})
+}
+
+func TestUuidReorderBytesForReadWithBug(t *testing.T) {
+	input := [16]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	result := uuidReorderBytesForReadWithBug(input)
+
+	expected := [16]byte{15, 14, 13, 12, 11, 10, 9, 8, 6, 7, 4, 5, 0, 1, 2, 3}
+	require.Equal(t, expected, result)
+}
+
+func TestUuidFixBytesOrder(t *testing.T) {
+	input := [16]byte{15, 14, 13, 12, 11, 10, 9, 8, 6, 7, 4, 5, 0, 1, 2, 3}
+	result := uuidFixBytesOrder(input)
+
+	expected := [16]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	require.Equal(t, expected, result)
+
+	t.Run("RoundTrip", func(t *testing.T) {
+		original := [16]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+		reordered := uuidReorderBytesForReadWithBug(original)
+		fixed := uuidFixBytesOrder(reordered)
+		require.Equal(t, original, fixed)
+	})
+}
+
+func TestVariantValue(t *testing.T) {
+	t.Run("VariantTuple", func(t *testing.T) {
+		v := VariantValueTuple(Int32Value(42), 1, types.NewTuple(
+			types.Bytes,
+			types.Int32,
+		))
+
+		name, idx := v.Variant()
+		require.Equal(t, "", name)
+		require.Equal(t, uint32(1), idx)
+
+		innerValue := v.Value()
+		require.NotNil(t, innerValue)
+		// The inner value Yql output depends on the actual type implementation
+		require.Contains(t, innerValue.Yql(), "42")
+	})
+
+	t.Run("VariantStruct", func(t *testing.T) {
+		v := VariantValueStruct(TextValue("test"), "bar", types.NewStruct(
+			types.StructField{Name: "foo", T: types.Text},
+			types.StructField{Name: "bar", T: types.Text},
+		))
+
+		name, idx := v.Variant()
+		require.Equal(t, "bar", name)
+		// Index is 0 because fields are sorted and "bar" comes before "foo"
+		require.Equal(t, uint32(0), idx)
+
+		innerValue := v.Value()
+		require.NotNil(t, innerValue)
+		require.Contains(t, innerValue.Yql(), "test")
+	})
+
+	t.Run("VariantCastToInvalidType", func(t *testing.T) {
+		v := VariantValueTuple(Int32Value(42), 0, types.NewTuple(types.Int32))
+
+		var dst int
+		err := v.castTo(&dst)
+		require.Error(t, err)
+	})
+}
+
+func TestVoidValueCastTo(t *testing.T) {
+	v := VoidValue()
+
+	t.Run("CastToInvalidType", func(t *testing.T) {
+		var dst string
+		err := v.castTo(&dst)
+		require.Error(t, err)
+	})
+}
+
+func TestYSONValueCastTo(t *testing.T) {
+	yson := []byte(`{"key": "value"}`)
+	v := YSONValue(yson)
+
+	t.Run("CastToString", func(t *testing.T) {
+		var dst string
+		err := v.castTo(&dst)
+		require.NoError(t, err)
+		require.Equal(t, string(yson), dst)
+	})
+
+	t.Run("CastToBytes", func(t *testing.T) {
+		var dst []byte
+		err := v.castTo(&dst)
+		require.NoError(t, err)
+		require.Equal(t, yson, dst)
+	})
+
+	t.Run("CastToInvalidType", func(t *testing.T) {
+		var dst int
+		err := v.castTo(&dst)
+		require.Error(t, err)
+	})
+}
+
+func TestZeroPrimitiveValue(t *testing.T) {
+	tests := []struct {
+		name      string
+		primitive types.Primitive
+	}{
+		{"Bool", types.Bool},
+		{"Int8", types.Int8},
+		{"Uint8", types.Uint8},
+		{"Int16", types.Int16},
+		{"Uint16", types.Uint16},
+		{"Int32", types.Int32},
+		{"Uint32", types.Uint32},
+		{"Int64", types.Int64},
+		{"Uint64", types.Uint64},
+		{"Float", types.Float},
+		{"Double", types.Double},
+		{"Date", types.Date},
+		{"Datetime", types.Datetime},
+		{"Timestamp", types.Timestamp},
+		{"Interval", types.Interval},
+		{"TzDate", types.TzDate},
+		{"TzDatetime", types.TzDatetime},
+		{"TzTimestamp", types.TzTimestamp},
+		{"Text", types.Text},
+		{"YSON", types.YSON},
+		{"JSON", types.JSON},
+		{"UUID", types.UUID},
+		{"JSONDocument", types.JSONDocument},
+		{"DyNumber", types.DyNumber},
+		{"Bytes", types.Bytes},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := zeroPrimitiveValue(tt.primitive)
+			require.NotNil(t, v)
+			require.NotEmpty(t, v.Yql())
+			require.Equal(t, tt.primitive, v.Type())
+		})
+	}
+}
+
+func TestZeroValue(t *testing.T) {
+	t.Run("Primitive", func(t *testing.T) {
+		v := ZeroValue(types.Int32)
+		require.NotNil(t, v)
+		require.Equal(t, "0", v.Yql())
+	})
+
+	t.Run("Optional", func(t *testing.T) {
+		v := ZeroValue(types.NewOptional(types.Int32))
+		require.NotNil(t, v)
+		require.True(t, IsNull(v))
+	})
+
+	t.Run("Void", func(t *testing.T) {
+		voidType := &types.Void{}
+		v := ZeroValue(voidType)
+		require.NotNil(t, v)
+		require.Equal(t, "Void()", v.Yql())
+	})
+
+	t.Run("List", func(t *testing.T) {
+		v := ZeroValue(types.NewList(types.Int32))
+		require.NotNil(t, v)
+	})
+
+	t.Run("EmptyList", func(t *testing.T) {
+		listType := &types.EmptyList{}
+		v := ZeroValue(listType)
+		require.NotNil(t, v)
+	})
+
+	t.Run("Set", func(t *testing.T) {
+		v := ZeroValue(types.NewSet(types.Int32))
+		require.NotNil(t, v)
+	})
+
+	t.Run("Dict", func(t *testing.T) {
+		v := ZeroValue(types.NewDict(types.Int32, types.Text))
+		require.NotNil(t, v)
+	})
+
+	t.Run("EmptyDict", func(t *testing.T) {
+		dictType := &types.EmptyDict{}
+		v := ZeroValue(dictType)
+		require.NotNil(t, v)
+	})
+
+	t.Run("Tuple", func(t *testing.T) {
+		v := ZeroValue(types.NewTuple(types.Int32, types.Text))
+		require.NotNil(t, v)
+	})
+
+	t.Run("Struct", func(t *testing.T) {
+		v := ZeroValue(types.NewStruct(
+			types.StructField{Name: "id", T: types.Int32},
+			types.StructField{Name: "name", T: types.Text},
+		))
+		require.NotNil(t, v)
+	})
+
+	t.Run("Decimal", func(t *testing.T) {
+		v := ZeroValue(types.NewDecimal(22, 9))
+		require.NotNil(t, v)
+	})
+}
+
+func TestProtobufValue(t *testing.T) {
+	t.Run("Type", func(t *testing.T) {
+		ydbType := &Ydb.Type{
+			Type: &Ydb.Type_TypeId{
+				TypeId: Ydb.Type_INT32,
+			},
+		}
+		ydbValue := &Ydb.Value{
+			Value: &Ydb.Value_Int32Value{
+				Int32Value: 42,
+			},
+		}
+		pb := &Ydb.TypedValue{
+			Type:  ydbType,
+			Value: ydbValue,
+		}
+
+		v := FromProtobuf(pb)
+		require.NotNil(t, v)
+		require.NotNil(t, v.Type())
+		// The type will be a protobufType wrapper, not the actual primitive type
+		require.Equal(t, "Int32", v.Type().Yql())
+	})
+
+	t.Run("CastTo", func(t *testing.T) {
+		ydbType := &Ydb.Type{
+			Type: &Ydb.Type_TypeId{
+				TypeId: Ydb.Type_INT32,
+			},
+		}
+		ydbValue := &Ydb.Value{
+			Value: &Ydb.Value_Int32Value{
+				Int32Value: 42,
+			},
+		}
+		pb := &Ydb.TypedValue{
+			Type:  ydbType,
+			Value: ydbValue,
+		}
+
+		v := FromProtobuf(pb)
+
+		var dst Ydb.TypedValue
+		err := v.castTo(&dst)
+		require.NoError(t, err)
+		require.NotNil(t, dst.GetType())
+		require.NotNil(t, dst.GetValue())
+	})
+
+	t.Run("CastToInvalidType", func(t *testing.T) {
+		ydbType := &Ydb.Type{
+			Type: &Ydb.Type_TypeId{
+				TypeId: Ydb.Type_INT32,
+			},
+		}
+		ydbValue := &Ydb.Value{
+			Value: &Ydb.Value_Int32Value{
+				Int32Value: 42,
+			},
+		}
+		pb := &Ydb.TypedValue{
+			Type:  ydbType,
+			Value: ydbValue,
+		}
+
+		v := FromProtobuf(pb)
+
+		var dst int
+		err := v.castTo(&dst)
+		require.Error(t, err)
+	})
 }
