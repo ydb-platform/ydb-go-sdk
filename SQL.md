@@ -314,7 +314,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
         DECLARE $ts AS Datetime;
         SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views AND first_aired > $ts;
       `,
-      sql.Named("title", "%Season 1%"), // argument name with witout prefix `$` 
+      sql.Named("title", "%Season 1%"), // argument name with without prefix `$` 
       sql.Named("views", uint64(1000)),  // argument name without prefix `$` (driver will prepend `$` if necessary)
       sql.Named("ts", types.DatetimeValueFromTime( // native ydb type
         time.Now().Add(-time.Hour*24*365), 
@@ -329,8 +329,8 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
         DECLARE $views AS Uint64;
         SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views;
       `,
-      table.ValueParam("seasonTitle", types.TextValue("%Season 1%")),
-      table.ValueParam("views", types.Uint64Value((1000)),
+      table.ValueParam("$seasonTitle", types.TextValue("%Season 1%")),
+      table.ValueParam("$views", types.Uint64Value((1000)),
    )
    ```
 * single `*table.QueryParameters` argument:
@@ -342,8 +342,8 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
         SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views;
       `,
       table.NewQueryParameters(
-          table.ValueParam("seasonTitle", types.TextValue("%Season 1%")),
-          table.ValueParam("views", types.Uint64Value((1000)),
+          table.ValueParam("$seasonTitle", types.TextValue("%Season 1%")),
+          table.ValueParam("$views", types.Uint64Value((1000)),
       ),
    )
    ```
@@ -402,7 +402,7 @@ func main() {
     DECLARE $p1 AS Utf8;
     SELECT $p0, $p1`, 
     sql.Named("p0", 42), 
-    table.ValueParam("p1", types.TextValue("my string")),
+    table.ValueParam("$p1", types.TextValue("my string")),
   )
   // process row ...
 }
@@ -519,9 +519,9 @@ DECLARE $p2 AS Utf8;
 -- origin query with positional args replacement
 SELECT $p0, $p1, $p2`, query)
   require.Equal(t, table.NewQueryParameters(
-    table.ValueParam("p0", types.Int32Value(1)),
-    table.ValueParam("p1", types.Uint64Value(2)),
-    table.ValueParam("p2", types.TextValue("3")),
+    table.ValueParam("$p0", types.Int32Value(1)),
+    table.ValueParam("$p1", types.Uint64Value(2)),
+    table.ValueParam("$p2", types.TextValue("3")),
   ), params)
 }
 ```
