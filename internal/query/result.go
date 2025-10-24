@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
@@ -38,8 +39,10 @@ type (
 		resultSetIndex int64
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
+		issuesCallback func(issues []*Ydb_Issue.IssueMessage)
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
+		issuesList     []*Ydb_Issue.IssueMessage
 		closeTimeout   time.Duration
 	}
 	resultOption func(s *streamResult)
@@ -131,6 +134,7 @@ func newResult(
 		stream:         stream,
 		closer:         NewResultCloser(),
 		resultSetIndex: -1,
+		issuesList:     make([]*Ydb_Issue.IssueMessage, 0),
 	}
 
 	for _, opt := range opts {
@@ -161,6 +165,9 @@ func newResult(
 
 		if part.GetExecStats() != nil && r.statsCallback != nil {
 			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
+		}
+		if r.issuesCallback != nil {
+			r.issuesCallback(r.issuesList)
 		}
 
 		return &r, nil
@@ -197,6 +204,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 
 		part, err = nextPart(r.stream)
+		if part != nil {
+			r.issuesList = append(r.issuesList, part.GetIssues()...)
+		}
 		if err != nil {
 			for _, callback := range r.onNextPartErr {
 				callback(err)
