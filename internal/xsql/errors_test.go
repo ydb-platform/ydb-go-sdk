@@ -2,6 +2,7 @@ package xsql
 
 import (
 	"database/sql/driver"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,7 @@ func TestErrorConstants(t *testing.T) {
 	t.Run("errNotReadyConn", func(t *testing.T) {
 		require.Error(t, errNotReadyConn)
 		require.ErrorIs(t, errNotReadyConn, driver.ErrBadConn)
-		_, ok := errNotReadyConn.(*badconn.Error)
-		require.True(t, ok)
+		var badConnErr *badconn.Error
+		require.True(t, errors.As(errNotReadyConn, &badConnErr))
 	})
 }

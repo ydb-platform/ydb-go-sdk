@@ -42,11 +42,11 @@ func (m *mockCommonConn) Close() error {
 }
 
 func (m *mockCommonConn) Query(ctx context.Context, sql string, p *params.Params) (driver.RowsNextResultSet, error) {
-	return nil, nil
+	return nil, nil //nolint:nilnil // valid for test mock
 }
 
 func (m *mockCommonConn) Exec(ctx context.Context, sql string, p *params.Params) (driver.Result, error) {
-	return nil, nil
+	return nil, nil //nolint:nilnil // valid for test mock
 }
 
 func (m *mockCommonConn) Explain(ctx context.Context, sql string, p *params.Params) (string, string, error) {
@@ -71,11 +71,11 @@ func (m *mockTx) Rollback(ctx context.Context) error {
 }
 
 func (m *mockTx) Exec(ctx context.Context, sql string, p *params.Params) (driver.Result, error) {
-	return nil, nil
+	return nil, nil //nolint:nilnil // valid for test mock
 }
 
 func (m *mockTx) Query(ctx context.Context, sql string, p *params.Params) (driver.RowsNextResultSet, error) {
-	return nil, nil
+	return nil, nil //nolint:nilnil // valid for test mock
 }
 
 // mockInvalidConn is a mock that returns IsValid() = false
@@ -98,9 +98,9 @@ func newMockBindings() mockBindings {
 type mockProcessor struct{}
 
 func (m *mockProcessor) Exec(ctx context.Context, sql string, p *params.Params) (driver.Result, error) {
-	return nil, nil
+	return nil, nil //nolint:nilnil // valid for test mock
 }
 
 func (m *mockProcessor) Query(ctx context.Context, sql string, p *params.Params) (driver.RowsNextResultSet, error) {
-	return nil, nil
+	return nil, nil //nolint:nilnil // valid for test mock
 }
