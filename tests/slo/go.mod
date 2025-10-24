@@ -1,8 +1,6 @@
 module slo
 
-go 1.23.0
-
-toolchain go1.23.6
+go 1.23.9
 
 require (
 	github.com/prometheus/client_golang v1.14.0
