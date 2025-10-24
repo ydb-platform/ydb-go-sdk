@@ -54,36 +54,43 @@ func asSQLNull(v any) (value.Value, bool) {
 		if x.Valid {
 			return value.OptionalValue(value.BoolValue(x.Bool)), true
 		}
+		
 		return value.NullValue(types.Bool), true
 	case sql.NullFloat64:
 		if x.Valid {
 			return value.OptionalValue(value.DoubleValue(x.Float64)), true
 		}
+
 		return value.NullValue(types.Double), true
 	case sql.NullInt16:
 		if x.Valid {
 			return value.OptionalValue(value.Int16Value(x.Int16)), true
 		}
+
 		return value.NullValue(types.Int16), true
 	case sql.NullInt32:
 		if x.Valid {
 			return value.OptionalValue(value.Int32Value(x.Int32)), true
 		}
+
 		return value.NullValue(types.Int32), true
 	case sql.NullInt64:
 		if x.Valid {
 			return value.OptionalValue(value.Int64Value(x.Int64)), true
 		}
+
 		return value.NullValue(types.Int64), true
 	case sql.NullString:
 		if x.Valid {
 			return value.OptionalValue(value.TextValue(x.String)), true
 		}
+
 		return value.NullValue(types.Text), true
 	case sql.NullTime:
 		if x.Valid {
 			return value.OptionalValue(value.TimestampValueFromTime(x.Time)), true
 		}
+
 		return value.NullValue(types.Timestamp), true
 	}
 
