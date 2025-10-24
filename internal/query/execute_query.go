@@ -32,6 +32,7 @@ type executeSettings interface {
 	ResourcePool() string
 	ResponsePartLimitSizeBytes() int64
 	Label() string
+	ConcurrentResultSets() bool
 }
 
 type executeScriptConfig interface {
