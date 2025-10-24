@@ -81,6 +81,7 @@ func TestStreamResult_Close(t *testing.T) {
 		r := &streamResult{
 			close: func(err error) error {
 				closeCalled = true
+
 				return nil
 			},
 		}
