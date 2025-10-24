@@ -20,18 +20,8 @@ func (r *resultWithStats) RowsAffected() (int64, error) {
 	}
 
 	var rowsAffected uint64
-	for {
-		phase, ok := r.stats.NextPhase()
-		if !ok {
-			break
-		}
-
-		for {
-			tableAccess, ok := phase.NextTableAccess()
-			if !ok {
-				break
-			}
-
+	for queryPhase := range r.stats.QueryPhases() {
+		for tableAccess := range queryPhase.TableAccess() {
 			rowsAffected += tableAccess.Deletes.Rows
 			rowsAffected += tableAccess.Updates.Rows
 		}
