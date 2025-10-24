@@ -386,3 +386,61 @@ func TestDropNode(t *testing.T) {
 		require.False(t, mustDeleteSession(err))
 	})
 }
+
+func TestConsistencyMode(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		input    Ydb_Coordination.ConsistencyMode
+		expected coordination.ConsistencyMode
+	}{
+		{
+			name:     "Strict",
+			input:    Ydb_Coordination.ConsistencyMode_CONSISTENCY_MODE_STRICT,
+			expected: coordination.ConsistencyModeStrict,
+		},
+		{
+			name:     "Relaxed",
+			input:    Ydb_Coordination.ConsistencyMode_CONSISTENCY_MODE_RELAXED,
+			expected: coordination.ConsistencyModeRelaxed,
+		},
+		{
+			name:     "Unset",
+			input:    Ydb_Coordination.ConsistencyMode_CONSISTENCY_MODE_UNSET,
+			expected: coordination.ConsistencyModeUnset,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result := consistencyMode(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestRatelimiterCountersMode(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		input    Ydb_Coordination.RateLimiterCountersMode
+		expected coordination.RatelimiterCountersMode
+	}{
+		{
+			name:     "Aggregated",
+			input:    Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_AGGREGATED,
+			expected: coordination.RatelimiterCountersModeAggregated,
+		},
+		{
+			name:     "Detailed",
+			input:    Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_DETAILED,
+			expected: coordination.RatelimiterCountersModeDetailed,
+		},
+		{
+			name:     "Unset",
+			input:    Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_UNSET,
+			expected: coordination.RatelimiterCountersModeUnset,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ratelimiterCountersMode(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
