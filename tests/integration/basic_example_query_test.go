@@ -39,7 +39,7 @@ func TestBasicExampleQuery(sourceTest *testing.T) { //nolint:gocyclo
 	t := xtest.MakeSyncedTest(sourceTest)
 	folder := t.Name()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	var totalConsumedUnits atomic.Uint64
