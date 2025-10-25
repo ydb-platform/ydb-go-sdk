@@ -214,7 +214,11 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 
 		if r.streamVal != nil {
 			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
-			r.streamContextCancel(errReaderClosed)
+			var cancel context.CancelCauseFunc
+			r.m.WithLock(func() {
+				cancel = r.streamContextCancel
+			})
+			cancel(errReaderClosed)
 			if closeErr == nil {
 				closeErr = streamCloseErr
 			}
