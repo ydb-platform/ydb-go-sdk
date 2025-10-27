@@ -142,7 +142,7 @@ func TestDoBadSession(t *testing.T) {
 func TestDoCreateSessionError(t *testing.T) {
 	rootCtx := xtest.Context(t)
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx, cancel := xcontext.WithTimeout(rootCtx, 100*time.Millisecond)
+		ctx, cancel := xcontext.WithTimeout(rootCtx, 30*time.Millisecond)
 		defer cancel()
 		p := pool.New[*Session, Session](ctx,
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
