@@ -278,9 +278,9 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 		case <-ctx.Done():
 			// Wait briefly for goroutine to complete and get its error
 			// This ensures we include both context error and operation error in the result
-			timer := time.NewTimer(10 * time.Millisecond)
+			timer := time.NewTimer(contextDoneWaitTimeout)
 			defer timer.Stop()
-			
+
 			select {
 			case result, has := <-ch:
 				if has {
@@ -725,7 +725,12 @@ func (p *Pool[PT, T]) pushIdle(item PT, now time.Time) {
 	})
 }
 
-const maxAttempts = 100
+const (
+	maxAttempts = 100
+	// contextDoneWaitTimeout is how long to wait for create goroutine to complete
+	// when context is cancelled, ensuring operation errors are preserved in error chain
+	contextDoneWaitTimeout = 10 * time.Millisecond
+)
 
 func needCloseItemByMaxUsage[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
 	if c.itemUsageLimit <= 0 {
