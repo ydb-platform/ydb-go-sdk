@@ -276,6 +276,20 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 		case <-p.done:
 			return nil, xerrors.WithStackTrace(errClosedPool)
 		case <-ctx.Done():
+			// Try non-blocking read from ch to check if goroutine has already completed
+			select {
+			case result, has := <-ch:
+				if has {
+					if result.err != nil {
+						// Goroutine completed with an error, join it with context error
+						return nil, xerrors.WithStackTrace(xerrors.Join(result.err, ctx.Err()))
+					}
+					// Goroutine completed successfully, return the item
+					return result.item, nil
+				}
+			default:
+			}
+
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		case result, has := <-ch:
 			if !has {
