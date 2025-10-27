@@ -219,12 +219,6 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 		r.m.WithLock(func() {
 			streamVal = r.streamVal
 			streamCancel = r.streamContextCancel
-
-			// Update initDone and initErr while we have the lock
-			if !r.initDone {
-				r.initErr = reason
-				close(r.initDoneCh)
-			}
 		})
 
 		// Make I/O calls outside the lock
@@ -237,6 +231,13 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 				closeErr = streamCloseErr
 			}
 		}
+
+		r.m.WithLock(func() {
+			if !r.initDone {
+				r.initErr = reason
+				close(r.initDoneCh)
+			}
+		})
 	})
 
 	return closeErr
