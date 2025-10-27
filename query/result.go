@@ -8,8 +8,10 @@ import (
 
 type (
 	Result            = result.Result
+	ConcurrentResult  = result.ConcurrentResult
 	ResultSet         = result.Set
 	ClosableResultSet = result.ClosableResultSet
+	Part              = result.Part
 	Row               = result.Row
 	Type              = types.Type
 	NamedDestination  = scanner.NamedDestination

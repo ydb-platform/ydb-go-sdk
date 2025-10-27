@@ -21,6 +21,11 @@ type (
 		// with Go version 1.23+
 		ResultSets(ctx context.Context) xiter.Seq2[Set, error]
 	}
+	ConcurrentResult interface {
+		closer.Closer
+
+		NextPart(ctx context.Context) (Part, error)
+	}
 	Set interface {
 		Index() int
 		Columns() []string
@@ -33,6 +38,13 @@ type (
 	ClosableResultSet interface {
 		Set
 		closer.Closer
+	}
+	Part interface {
+		ResultSetIndex() int64
+		ColumnNames() []string
+		ColumnTypes() []types.Type
+
+		NextRow(ctx context.Context) (Row, error)
 	}
 	Row interface {
 		Values() []value.Value
