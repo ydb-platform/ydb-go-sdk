@@ -60,7 +60,7 @@ func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 	// Should have created a worker
 	require.Len(t, listener.workers, 1)
 
-	// Wait for the handler to be called by the worker
+	// Waiting for add session to internals
 	xtest.WaitChannelClosed(t, handlerCalled)
 
 	// Verify session was added
