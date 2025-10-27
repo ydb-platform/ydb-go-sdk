@@ -25,12 +25,16 @@ func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 	// Initially no workers should exist
 	require.Empty(t, listener.workers)
 
+	// Channel to signal when handler has been called
+	handlerCalled := make(chan struct{})
+
 	// Set up mock expectations - the worker will call OnStartPartitionSessionRequest
 	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
 		gomock.Any(),
 		gomock.Any(),
 	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
 		event.Confirm()
+		close(handlerCalled)
 
 		return nil
 	})
@@ -55,6 +59,9 @@ func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 
 	// Should have created a worker
 	require.Len(t, listener.workers, 1)
+
+	// Waiting for add session to internals
+	xtest.WaitChannelClosed(t, handlerCalled)
 
 	// Verify session was added
 	session, err := listener.sessions.Get(100)
@@ -166,12 +173,16 @@ func TestStreamListener_CloseWorkers(t *testing.T) {
 	ctx := sf.Context(e)
 	listener := StreamListener(e)
 
+	// Channel to signal when handler has been called
+	handlerCalled := make(chan struct{})
+
 	// Set up mock expectations
 	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
 		gomock.Any(),
 		gomock.Any(),
 	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
 		event.Confirm()
+		close(handlerCalled)
 
 		return nil
 	})
@@ -194,6 +205,9 @@ func TestStreamListener_CloseWorkers(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, listener.workers, 1)
+
+	// Wait for the handler to be called by the worker
+	xtest.WaitChannelClosed(t, handlerCalled)
 
 	// Close the listener - this might fail if background worker is already closed by test cleanup
 	// That's expected behavior in test environment
