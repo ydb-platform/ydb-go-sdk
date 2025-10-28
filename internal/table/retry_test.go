@@ -155,7 +155,10 @@ func TestDoCreateSessionError(t *testing.T) {
 			},
 			nil,
 		)
-		if !(xerrors.Is(err, context.DeadlineExceeded) || xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE)) {
+		switch {
+		case xerrors.Is(err, context.DeadlineExceeded):
+		case xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE):
+		default:
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
