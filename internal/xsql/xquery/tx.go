@@ -6,7 +6,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
@@ -31,17 +30,15 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 		opts = append(opts, options.WithTxControl(txControl))
 	}
 
-	result := &resultWithStats{}
-	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, func(qs stats.QueryStats) {
-		result.stats = qs
-	}))
+	r := &resultWithStats{}
+	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
 
 	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return result, nil
+	return r, nil
 }
 
 func (t *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {

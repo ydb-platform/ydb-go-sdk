@@ -56,24 +56,15 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		opts = append(opts, options.WithTxControl(txControl))
 	}
 
-	result := &resultWithStats{}
-	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, func(qs stats.QueryStats) {
-		var rowsAffected uint64
-		for queryPhase := range qs.QueryPhases() {
-			for tableAccess := range queryPhase.TableAccess() {
-				rowsAffected += tableAccess.Deletes.Rows + tableAccess.Updates.Rows
-			}
-		}
-		// last stats always contains the full stats of query
-		result.rowsAffected = &rowsAffected
-	}))
+	r := &resultWithStats{}
+	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
 
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return result, nil
+	return r, nil
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
