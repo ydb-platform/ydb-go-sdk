@@ -58,7 +58,14 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 
 	result := &resultWithStats{}
 	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, func(qs stats.QueryStats) {
-		result.stats = qs
+		var rowsAffected uint64
+		for queryPhase := range qs.QueryPhases() {
+			for tableAccess := range queryPhase.TableAccess() {
+				rowsAffected += tableAccess.Deletes.Rows + tableAccess.Updates.Rows
+			}
+		}
+		// last stats always contains the full stats of query
+		result.rowsAffected = &rowsAffected
 	}))
 
 	err := c.session.Exec(ctx, sql, opts...)
