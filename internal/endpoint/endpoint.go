@@ -57,7 +57,7 @@ type endpoint struct {
 
 func (e *endpoint) Key() Key {
 	return Key{
-		Address:      e.address,
+		Address:      e.Address(),
 		NodeID:       e.id,
 		HostOverride: e.sslNameOverride,
 	}
@@ -87,7 +87,7 @@ func (e *endpoint) String() string {
 
 	return fmt.Sprintf(`{id:%d,address:%q,local:%t,location:%q,loadFactor:%f,lastUpdated:%q}`,
 		e.id,
-		e.address,
+		e.Address(),
 		e.local,
 		e.location,
 		e.loadFactor,

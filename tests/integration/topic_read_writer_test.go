@@ -27,6 +27,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	tu "github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -44,7 +45,7 @@ func TestTopicWriterLogMessagesWithoutData(t *testing.T) {
 	metaKey := "gyoeexiufo"
 	metaValue := "fjedeikeosbv"
 
-	logs := &strings.Builder{}
+	logs := &tu.ThreadSafeBuilder{}
 	writer, err := scope.Driver().Topic().StartWriter(
 		scope.TopicPath(),
 		topicoptions.WithWriterProducerID(producerID),

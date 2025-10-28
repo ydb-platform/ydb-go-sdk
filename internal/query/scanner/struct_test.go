@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"math/big"
 	"reflect"
 	"testing"
 	"time"
@@ -8,8 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	ttypes "github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestFieldName(t *testing.T) {
@@ -908,4 +911,97 @@ func TestScannerStructOrdering(t *testing.T) {
 	require.Equal(t, "A", row.A)
 	require.Equal(t, "B", row.B)
 	require.Equal(t, "C", row.C)
+}
+
+func TestScannerDecimal(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_DecimalType{
+						DecimalType: &Ydb.DecimalType{Scale: 9, Precision: 22},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_Low_128{
+					Low_128: 10200000000,
+				},
+			},
+		},
+	))
+	var row struct {
+		A ttypes.Decimal
+	}
+	expected := ttypes.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(10200000000), 22, 9), Precision: 22, Scale: 9}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, expected, row.A)
+}
+
+func TestScannerDecimalNegative(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_DecimalType{
+						DecimalType: &Ydb.DecimalType{Scale: 9, Precision: 22},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_Low_128{
+					Low_128: 18446744071704551616,
+				},
+				High_128: 0xffffffffffffffff,
+			},
+		},
+	))
+	var row struct {
+		A ttypes.Decimal
+	}
+	expected := ttypes.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(-2005000000), 22, 9), Precision: 22, Scale: 9}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, expected, row.A)
+}
+
+func TestScannerDecimalBigDecimal(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_DecimalType{
+						DecimalType: &Ydb.DecimalType{Scale: 9, Precision: 22},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				// val: 1844674407370955.1615
+				Value: &Ydb.Value_Low_128{
+					Low_128: 3136633892082024448,
+				},
+				High_128: 5421010862427522,
+			},
+		},
+	))
+	var row struct {
+		A ttypes.Decimal
+	}
+	expectedVal := decimal.Decimal{
+		Bytes:     [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0},
+		Precision: 22, Scale: 9,
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, expectedVal, row.A)
 }

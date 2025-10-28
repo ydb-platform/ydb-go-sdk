@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"math/rand"
 	"os"
 	"path"
@@ -20,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -706,4 +708,66 @@ func TestQueryWideIntervalTypes(t *testing.T) {
 			require.Equal(t, tt.expGoValue, actInterval)
 		})
 	}
+}
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1785
+func TestIssue1785FillDecimalFields(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.INFO),
+				),
+				trace.QueryEvents,
+			),
+		),
+	)
+	require.NoError(t, err)
+	t.Run("Query", func(t *testing.T) {
+		type RowData struct {
+			Id         uint64        `sql:"id"`
+			DecimalVal types.Decimal `sql:"dc"`
+		}
+		result, err := db.Query().Query(ctx, `
+        SELECT id, dc
+        FROM AS_TABLE(
+          AsList(
+            AsStruct(1u AS id, decimal("10.01",22,9) AS dc),
+            AsStruct(2u AS id, decimal("-5.33",22,9) AS dc),
+			AsStruct(3u AS id, decimal("1844674407370955.1615",22,9) AS dc)
+            )
+          );
+        `,
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+		)
+		require.NoError(t, err)
+		resultSet, err := result.NextResultSet(ctx)
+		require.NoError(t, err)
+		row, err := resultSet.NextRow(ctx)
+		require.NoError(t, err)
+		var rd RowData
+		err = row.ScanStruct(&rd)
+		require.NoError(t, err)
+		require.EqualValues(t, uint64(1), rd.Id)
+		require.EqualValues(t, types.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(10010000000), 22, 9), Precision: 22, Scale: 9}, rd.DecimalVal)
+		row, err = resultSet.NextRow(ctx)
+		require.NoError(t, err)
+		err = row.ScanStruct(&rd)
+		require.NoError(t, err)
+		require.EqualValues(t, uint64(2), rd.Id)
+		require.EqualValues(t, types.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(-5330000000), 22, 9), Precision: 22, Scale: 9}, rd.DecimalVal)
+		row, err = resultSet.NextRow(ctx)
+		require.NoError(t, err)
+		err = row.ScanStruct(&rd)
+		require.NoError(t, err)
+		expectedVal := types.Decimal{Bytes: [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0}, Precision: 22, Scale: 9}
+		require.EqualValues(t, expectedVal, rd.DecimalVal)
+	})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -15,8 +16,10 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/stats"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
@@ -148,5 +151,355 @@ func TestConn(t *testing.T) {
 				require.Nil(t, response)
 			})
 		})
+	})
+}
+
+func TestModificationMark(t *testing.T) {
+	t.Run("NewMarkCanRetry", func(t *testing.T) {
+		mark := &modificationMark{}
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("DirtyMarkCannotRetry", func(t *testing.T) {
+		mark := &modificationMark{}
+		mark.markDirty()
+		require.False(t, mark.canRetry())
+	})
+
+	t.Run("MarkDirtyMultipleTimes", func(t *testing.T) {
+		mark := &modificationMark{}
+		mark.markDirty()
+		mark.markDirty()
+		require.False(t, mark.canRetry())
+	})
+}
+
+func TestMarkContext(t *testing.T) {
+	t.Run("MarkContextCreatesNewMark", func(t *testing.T) {
+		ctx := context.Background()
+		newCtx, mark := markContext(ctx)
+		require.NotNil(t, newCtx)
+		require.NotNil(t, mark)
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("GetContextMarkFromMarkedContext", func(t *testing.T) {
+		ctx := context.Background()
+		ctx, mark := markContext(ctx)
+		retrievedMark := getContextMark(ctx)
+		require.NotNil(t, retrievedMark)
+		require.Equal(t, mark, retrievedMark)
+	})
+
+	t.Run("GetContextMarkFromUnmarkedContext", func(t *testing.T) {
+		ctx := context.Background()
+		mark := getContextMark(ctx)
+		require.NotNil(t, mark)
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("MarkFromContextReflectsDirtyState", func(t *testing.T) {
+		ctx := context.Background()
+		ctx, mark := markContext(ctx)
+		mark.markDirty()
+		retrievedMark := getContextMark(ctx)
+		require.False(t, retrievedMark.canRetry())
+	})
+}
+
+func TestReplyWrapper(t *testing.T) {
+	t.Run("OperationResponse", func(t *testing.T) {
+		resp := &Ydb_Discovery.WhoAmIResponse{
+			Operation: &Ydb_Operations.Operation{
+				Id:     "test-op-id",
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+			},
+		}
+
+		opID, issues := replyWrapper(resp)
+		require.Equal(t, "test-op-id", opID)
+		require.Empty(t, issues)
+	})
+
+	t.Run("StatusResponse", func(t *testing.T) {
+		resp := &Ydb_Query.BeginTransactionResponse{
+			Status: Ydb.StatusIds_SUCCESS,
+		}
+
+		opID, issues := replyWrapper(resp)
+		require.Empty(t, opID)
+		require.Empty(t, issues)
+	})
+
+	t.Run("NonOperationResponse", func(t *testing.T) {
+		resp := &Ydb_Discovery.WhoAmIRequest{}
+
+		opID, issues := replyWrapper(resp)
+		require.Empty(t, opID)
+		require.Empty(t, issues)
+	})
+}
+
+func TestConn_StateManagement(t *testing.T) {
+	t.Run("NewConnHasCreatedState", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+		require.Equal(t, Created, c.GetState())
+	})
+
+	t.Run("IsStateChecksMultipleStates", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+		c.setState(context.Background(), Online)
+		require.True(t, c.IsState(Online))
+		require.True(t, c.IsState(Online, Offline))
+		require.False(t, c.IsState(Offline))
+		require.False(t, c.IsState(Banned, Destroyed))
+	})
+
+	t.Run("EndpointMethodsWork", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
+		c := newConn(e, config)
+		require.Equal(t, "test-endpoint:2135", c.Address())
+		require.Equal(t, uint32(123), c.NodeID())
+		require.NotNil(t, c.Endpoint())
+	})
+
+	t.Run("NilConnHandling", func(t *testing.T) {
+		var c *conn
+		require.Equal(t, uint32(0), c.NodeID())
+		require.Nil(t, c.Endpoint())
+	})
+}
+
+func TestStatsHandler(t *testing.T) {
+	t.Run("TagRPC", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx := context.Background()
+		newCtx := handler.TagRPC(ctx, &stats.RPCTagInfo{})
+		require.Equal(t, ctx, newCtx)
+	})
+
+	t.Run("TagConn", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx := context.Background()
+		newCtx := handler.TagConn(ctx, &stats.ConnTagInfo{})
+		require.Equal(t, ctx, newCtx)
+	})
+
+	t.Run("HandleConn", func(t *testing.T) {
+		handler := statsHandler{}
+		// Should not panic
+		handler.HandleConn(context.Background(), &stats.ConnBegin{})
+	})
+
+	t.Run("HandleRPC_Begin", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx, mark := markContext(context.Background())
+		require.True(t, mark.canRetry())
+		handler.HandleRPC(ctx, &stats.Begin{})
+		// Begin should not mark as dirty
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("HandleRPC_End", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx, mark := markContext(context.Background())
+		require.True(t, mark.canRetry())
+		handler.HandleRPC(ctx, &stats.End{})
+		// End should not mark as dirty
+		require.True(t, mark.canRetry())
+	})
+
+	t.Run("HandleRPC_Other", func(t *testing.T) {
+		handler := statsHandler{}
+		ctx, mark := markContext(context.Background())
+		require.True(t, mark.canRetry())
+		handler.HandleRPC(ctx, &stats.InPayload{})
+		// Other stats should mark as dirty
+		require.False(t, mark.canRetry())
+	})
+}
+
+func TestConn_OnClose(t *testing.T) {
+	t.Run("OnCloseCalledOnClose", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		called := false
+		onClose := func(c *conn) {
+			called = true
+		}
+		c := newConn(e, config, withOnClose(onClose))
+		err := c.Close(context.Background())
+		require.NoError(t, err)
+		require.True(t, called)
+	})
+
+	t.Run("MultipleOnCloseCalled", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+
+		called1 := false
+		called2 := false
+
+		c := newConn(e, config,
+			withOnClose(func(c *conn) { called1 = true }),
+			withOnClose(func(c *conn) { called2 = true }),
+		)
+
+		err := c.Close(context.Background())
+		require.NoError(t, err)
+		require.True(t, called1)
+		require.True(t, called2)
+	})
+
+	t.Run("OnCloseWithNilCallback", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+
+		c := newConn(e, config, withOnClose(nil))
+
+		err := c.Close(context.Background())
+		require.NoError(t, err)
+	})
+}
+
+func TestConn_OnTransportError(t *testing.T) {
+	t.Run("OnTransportErrorCalledOnError", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+
+		var capturedConn Conn
+		var capturedErr error
+
+		onTransportError := func(ctx context.Context, cc Conn, cause error) {
+			capturedConn = cc
+			capturedErr = cause
+		}
+
+		c := newConn(e, config, withOnTransportError(onTransportError))
+
+		testErr := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
+		c.onTransportError(context.Background(), testErr)
+
+		require.Equal(t, c, capturedConn)
+		require.Equal(t, testErr, capturedErr)
+	})
+
+	t.Run("OnTransportErrorWithNilCallback", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+
+		c := newConn(e, config, withOnTransportError(nil))
+
+		// Should not panic
+		testErr := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
+		c.onTransportError(context.Background(), testErr)
+	})
+}
+
+func TestIsAvailable(t *testing.T) {
+	t.Run("NilConnIsNotAvailable", func(t *testing.T) {
+		require.False(t, isAvailable(nil))
+	})
+}
+
+func TestConn_Park(t *testing.T) {
+	t.Run("ParkingClosedConnectionSucceeds", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+
+		// Close the connection first
+		err := c.Close(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, Destroyed, c.GetState())
+
+		// Parking a closed connection should succeed without error
+		err = c.park(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("ParkingConnectionWithNoGrpcConnSucceeds", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+
+		// Connection is created but never dialed (grpcConn is nil)
+		require.Nil(t, c.grpcConn)
+
+		// Parking should succeed (no-op since grpcConn is nil)
+		err := c.park(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("ParkingMultipleTimesSucceeds", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+
+		// Park multiple times (should all be no-ops since no grpcConn)
+		err := c.park(context.Background())
+		require.NoError(t, err)
+
+		err = c.park(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("ParkDoesNotErrorOnNilGrpcConn", func(t *testing.T) {
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		c := newConn(e, config)
+
+		// Set to Online but don't actually dial
+		c.setState(context.Background(), Online)
+		require.Nil(t, c.grpcConn)
+
+		// Park should succeed without error (grpcConn is nil so it's a no-op)
+		err := c.park(context.Background())
+		require.NoError(t, err)
+
+		// State should remain Online since grpcConn was nil
+		require.Equal(t, Online, c.GetState())
 	})
 }

@@ -1,4 +1,18 @@
 * Added support for nullable `Date32`, `Datetime64`, `Timestamp64`, and `Interval64` types in the `optional` parameter builder
+* Fixed race in `readerReconnector`
+
+## v3.117.1
+* Fixed scan a column of type `Decimal(precision,scale)` into a struct field of type `types.Decimal{}` using `ScanStruct()`
+* Fixed race in integration test `TestTopicWriterLogMessagesWithoutData`
+* Fixed traces handling in `topic.Reader`
+
+## v3.117.0
+* Fixed `conn/pool.Get()` behaviour for YDB databases with public IPs. Bug was introduced in v3.116.2
+* Added helper methods `log.WithFields` and `log.FieldsFromContext` for working with structured logging fields via context.
+  These methods allow adding custom fields to the context, which are later extracted by the logger.
+
+## v3.116.4
+* Fixed error handling in `internaltopicreader.addOnTransactionCompletedHandler`
 
 ## v3.116.3
 * Default grpc message size adjusted to the server's defaults
