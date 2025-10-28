@@ -1,6 +1,6 @@
 module github.com/ydb-platform/ydb-go-sdk/v3
 
-go 1.22.5
+go 1.23.9
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.5.2

@@ -159,10 +159,6 @@ func newResult(
 
 		r.lastPart = part
 
-		if part.GetExecStats() != nil && r.statsCallback != nil {
-			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
-		}
-
 		return &r, nil
 	}
 }
@@ -209,6 +205,10 @@ func (r *streamResult) nextPart(ctx context.Context) (
 			for _, f := range r.onTxMeta {
 				f(txMeta)
 			}
+		}
+
+		if part.GetExecStats() != nil && r.statsCallback != nil {
+			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 		}
 
 		return part, nil
@@ -286,9 +286,6 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
-			if part.GetExecStats() != nil && r.statsCallback != nil {
-				r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
-			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
 				r.closer.Close(nil)
 
@@ -326,9 +323,6 @@ func (r *streamResult) nextPartFunc(
 				return nil, xerrors.WithStackTrace(err)
 			}
 			r.lastPart = part
-			if part.GetExecStats() != nil && r.statsCallback != nil {
-				r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
-			}
 			if part.GetResultSetIndex() > nextResultSetIndex {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"result set (index=%d) receive part (index=%d) for next result set: %w (%w)",

@@ -1,3 +1,5 @@
+* Added support for `Result.RowsAffected()` for YDB `database/sql` driver
+* Upgraded minimal version of Go to 1.23.9
 * Fixed race in `readerReconnector`
 
 ## v3.117.1

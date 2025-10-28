@@ -1,8 +1,6 @@
 module examples
 
-go 1.23.0
-
-toolchain go1.23.6
+go 1.23.9
 
 require (
 	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40

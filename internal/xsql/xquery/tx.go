@@ -30,12 +30,15 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 		opts = append(opts, options.WithTxControl(txControl))
 	}
 
+	r := &resultWithStats{}
+	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
+
 	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return resultNoRows{}, nil
+	return r, nil
 }
 
 func (t *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
