@@ -212,9 +212,21 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 	r.closeOnce.Do(func() {
 		closeErr = r.background.Close(ctx, reason)
 
-		if r.streamVal != nil {
-			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
-			r.streamContextCancel(errReaderClosed)
+		// Get references under lock
+		var streamVal batchedStreamReader
+		var streamCancel context.CancelCauseFunc
+
+		r.m.WithLock(func() {
+			streamVal = r.streamVal
+			streamCancel = r.streamContextCancel
+		})
+
+		// Make I/O calls outside the lock
+		if streamVal != nil {
+			streamCloseErr := streamVal.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
+			if streamCancel != nil {
+				streamCancel(errReaderClosed)
+			}
 			if closeErr == nil {
 				closeErr = streamCloseErr
 			}
