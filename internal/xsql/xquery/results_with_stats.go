@@ -22,8 +22,7 @@ func (r *resultWithStats) RowsAffected() (int64, error) {
 	var rowsAffected uint64
 	for queryPhase := range r.stats.QueryPhases() {
 		for tableAccess := range queryPhase.TableAccess() {
-			rowsAffected += tableAccess.Deletes.Rows
-			rowsAffected += tableAccess.Updates.Rows
+			rowsAffected += tableAccess.Deletes.Rows + tableAccess.Updates.Rows
 		}
 	}
 
