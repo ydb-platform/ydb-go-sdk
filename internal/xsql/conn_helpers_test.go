@@ -117,12 +117,6 @@ func TestConn_LastUsage(t *testing.T) {
 	require.True(t, newLastUsage.After(lastUsage) || newLastUsage.Equal(lastUsage))
 }
 
-func TestConn_GetDatabaseName(t *testing.T) {
-	// We can't easily mock ydbDriver, so this test is covered
-	// by integration tests instead
-	t.Skip("requires full ydbDriver mock")
-}
-
 func TestConn_normalizePath(t *testing.T) {
 	tests := []struct {
 		name       string
