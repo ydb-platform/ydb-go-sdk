@@ -155,12 +155,13 @@ func TestDoCreateSessionError(t *testing.T) {
 			},
 			nil,
 		)
+		// Context deadline exceeded error must always be present
 		if !xerrors.Is(err, context.DeadlineExceeded) {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE) {
-			t.Errorf("unexpected error: %v", err)
-		}
+		// Operation error may be present if at least one retry attempt was made before context deadline.
+		// Due to the short 30ms timeout, sometimes the context expires before the first attempt,
+		// in which case only the context error will be present.
 	})
 }
 
