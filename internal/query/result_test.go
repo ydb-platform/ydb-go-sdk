@@ -907,12 +907,8 @@ func TestResultNextResultSet(t *testing.T) {
 				return func(trace.QueryResultNextPartDoneInfo) {}
 			},
 		}))
-		if err != nil {
-			t.Skip("test is not actual")
-		}
-
-		_, err = r.nextResultSet(context.Background())
 		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, r)
 	})
 }
 
