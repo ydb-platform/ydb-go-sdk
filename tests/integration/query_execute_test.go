@@ -806,6 +806,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	)
 	require.NoError(t, err)
 	t.Run("Query with declare", func(t *testing.T) {
+		collector := make([]*Ydb_Issue.IssueMessage, 0)
 		q := db.Query()
 		_, err := q.Query(ctx, `
 				DECLARE $x as String;
@@ -815,35 +816,38 @@ func TestIssue1872QueryWarning(t *testing.T) {
 			query.WithSyntax(query.SyntaxYQL),
 			query.WithIdempotent(),
 			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
-				require.Equal(t, 1, len(issueList))
-				require.Equal(t, "Symbol $x is not used", issueList[0].Message)
+				collector = append(collector, issueList...)
 			}),
 		)
 		require.NoError(t, err)
+		require.Equal(t, 1, len(collector))
+		require.Equal(t, "Symbol $x is not used", collector[0].Message)
 	})
 	t.Run("Exec with declare", func(t *testing.T) {
+		collector := make([]*Ydb_Issue.IssueMessage, 0)
 		q := db.Query()
 		_, err := q.Query(ctx, `
-				DECLARE $x as String;
-				SELECT 42;
-				SELECT 43;
-	        `,
+					DECLARE $x as String;
+					SELECT 42;
+					SELECT 43;
+		        `,
 			query.WithSyntax(query.SyntaxYQL),
 			query.WithIdempotent(),
 			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
-				require.Equal(t, 1, len(issueList))
-				require.Equal(t, "Symbol $x is not used", issueList[0].Message)
+				collector = append(collector, issueList...)
 			}),
 		)
 		require.NoError(t, err)
+		require.Equal(t, 1, len(collector))
+		require.Equal(t, "Symbol $x is not used", collector[0].Message)
 	})
 	issueCount := -1
 	t.Run("Query no issues", func(t *testing.T) {
 		q := db.Query()
 		_, err := q.Query(ctx, `
-			SELECT 42;
-			SELECT 43;
-        `,
+				SELECT 42;
+				SELECT 43;
+	        `,
 			query.WithSyntax(query.SyntaxYQL),
 			query.WithIdempotent(),
 			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
@@ -857,9 +861,9 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	t.Run("Exec no issues", func(t *testing.T) {
 		q := db.Query()
 		_, err := q.Query(ctx, `
-			SELECT 42;
-			SELECT 43;
-        `,
+				SELECT 42;
+				SELECT 43;
+	        `,
 			query.WithSyntax(query.SyntaxYQL),
 			query.WithIdempotent(),
 			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
@@ -873,9 +877,9 @@ func TestIssue1872QueryWarning(t *testing.T) {
 		var issueList []*Ydb_Issue.IssueMessage
 		q := db.Query()
 		err := q.Exec(ctx, `
-		insert into TestIssue1872QueryWarning (Id, Amount) 
-		values (-7, Decimal("37.01",22,9));
-		`,
+			insert into TestIssue1872QueryWarning (Id, Amount)
+			values (-7, Decimal("37.01",22,9));
+			`,
 			query.WithIssuesHandler(func(issues []*Ydb_Issue.IssueMessage) {
 				issueList = issues
 			}),
@@ -885,64 +889,68 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	})
 
 	t.Run("Exec complex", func(t *testing.T) {
+		collector := make([]*Ydb_Issue.IssueMessage, 0)
 		err = db.Query().Exec(ctx,
 			`DECLARE $x as String;
-		    DECLARE $x1 as String;
-			SELECT 42;
-			insert into TestIssue1872QueryWarning (Id, Amount) values (-3, Decimal("3.01",22,9));
-			SELECT 43;`,
+				    DECLARE $x1 as String;
+					SELECT 42;
+					insert into TestIssue1872QueryWarning (Id, Amount) values (-3, Decimal("3.01",22,9));
+					SELECT 43;`,
 			query.WithParameters(
 				ydb.ParamsBuilder().
 					Param("$p1").Text("test1").
 					Build(),
 			),
 			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
-				require.Equal(t, 3, len(issueList))
-				require.Equal(t, "Symbol $x is not used", issueList[0].Message)
-				require.Equal(t, "Symbol $x1 is not used", issueList[1].Message)
-				require.Equal(t, "Type annotation", issueList[2].Message)
-				require.Equal(t, 1, len(issueList[2].Issues))
-				require.Equal(t, "At function: KiWriteTable!", issueList[2].Issues[0].Message)
-				require.Equal(t,
-					"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
-					issueList[2].Issues[0].Issues[0].Message)
+				collector = append(collector, issueList...)
 			}),
 		)
 		require.NoError(t, err)
+		require.Equal(t, 3, len(collector))
+		require.Equal(t, "Symbol $x is not used", collector[0].Message)
+		require.Equal(t, "Symbol $x1 is not used", collector[1].Message)
+		require.Equal(t, "Type annotation", collector[2].Message)
+		require.Equal(t, 1, len(collector[2].Issues))
+		require.Equal(t, "At function: KiWriteTable!", collector[2].Issues[0].Message)
+		require.Equal(t,
+			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
+			collector[2].Issues[0].Issues[0].Message)
 	})
 	t.Run("Query complex", func(t *testing.T) {
+		collector := make([]*Ydb_Issue.IssueMessage, 0)
 		err = db.Query().Exec(ctx,
 			`	DECLARE $x as String;
-		    DECLARE $x1 as String;
-			SELECT 42;
-			insert into TestIssue1872QueryWarning (Id, Amount) values (-6, Decimal("3.01",22,9));
-			SELECT 43;`,
+				    DECLARE $x1 as String;
+					SELECT 42;
+					insert into TestIssue1872QueryWarning (Id, Amount) values (-6, Decimal("3.01",22,9));
+					SELECT 43;`,
 			query.WithParameters(
 				ydb.ParamsBuilder().
 					Param("$p1").Text("test1").
 					Build(),
 			),
 			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
-				require.Equal(t, 3, len(issueList))
-				require.Equal(t, "Symbol $x is not used", issueList[0].Message)
-				require.Equal(t, "Symbol $x1 is not used", issueList[1].Message)
-				require.Equal(t, "Type annotation", issueList[2].Message)
-				require.Equal(t, 1, len(issueList[2].Issues))
-				require.Equal(t, "At function: KiWriteTable!", issueList[2].Issues[0].Message)
-				require.Equal(t,
-					"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
-					issueList[2].Issues[0].Issues[0].Message)
+				collector = append(collector, issueList...)
 			}),
 		)
 		require.NoError(t, err)
+		require.Equal(t, 3, len(collector))
+		require.Equal(t, "Symbol $x is not used", collector[0].Message)
+		require.Equal(t, "Symbol $x1 is not used", collector[1].Message)
+		require.Equal(t, "Type annotation", collector[2].Message)
+		require.Equal(t, 1, len(collector[2].Issues))
+		require.Equal(t, "At function: KiWriteTable!", collector[2].Issues[0].Message)
+		require.Equal(t,
+			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
+			collector[2].Issues[0].Issues[0].Message)
 	})
 	t.Run("Query 2 inserts", func(t *testing.T) {
 		var issueList []*Ydb_Issue.IssueMessage
 		q := db.Query()
 		_, err := q.Query(ctx, `
-        insert into TestIssue1872QueryWarning (Id, Amount) values (-9, Decimal("3.01",22,9));
-		insert into TestIssue1872QueryWarning (Id, Amount) values (-5, Decimal("5.01",22,9));
-        `,
+		        insert into TestIssue1872QueryWarning (Id, Amount) values (-9, Decimal("3.01",22,9));
+				insert into TestIssue1872QueryWarning (Id, Amount) values (-5, Decimal("5.01",22,9));
+		        `,
 			query.WithParameters(
 				ydb.ParamsBuilder().
 					Param("$p1").Text("test").
@@ -967,9 +975,9 @@ func TestIssue1872QueryWarning(t *testing.T) {
 		var issueList []*Ydb_Issue.IssueMessage
 		q := db.Query()
 		_, err := q.Query(ctx, `
-        insert into TestIssue1872QueryWarning (Id, Amount) values (-19, Decimal("3.01",22,9));
-		insert into TestIssue1872QueryWarning (Id, Amount) values (-15, Decimal("5.01",22,9));
-        `,
+		        insert into TestIssue1872QueryWarning (Id, Amount) values (-19, Decimal("3.01",22,9));
+				insert into TestIssue1872QueryWarning (Id, Amount) values (-15, Decimal("5.01",22,9));
+		        `,
 			query.WithParameters(
 				ydb.ParamsBuilder().
 					Param("$p1").Text("test").

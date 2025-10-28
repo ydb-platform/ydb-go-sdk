@@ -42,7 +42,6 @@ type (
 		issuesCallback func(issues []*Ydb_Issue.IssueMessage)
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
-		issuesList     []*Ydb_Issue.IssueMessage
 		closeTimeout   time.Duration
 	}
 	resultOption func(s *streamResult)
@@ -92,6 +91,12 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, err
 func withStreamResultTrace(t *trace.Query) resultOption {
 	return func(s *streamResult) {
 		s.trace = t
+	}
+}
+
+func withIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) resultOption {
+	return func(s *streamResult) {
+		s.issuesCallback = callback
 	}
 }
 
@@ -161,9 +166,7 @@ func newResult(
 		}
 
 		r.lastPart = part
-		if r.issuesCallback != nil {
-			r.issuesCallback(r.issuesList)
-		}
+
 		return &r, nil
 	}
 }
@@ -199,7 +202,10 @@ func (r *streamResult) nextPart(ctx context.Context) (
 
 		part, err = nextPart(r.stream)
 		if part != nil {
-			r.issuesList = append(r.issuesList, part.GetIssues()...)
+			issues := part.GetIssues()
+			if r.issuesCallback != nil && len(issues) > 0 {
+				r.issuesCallback(issues)
+			}
 		}
 		if err != nil {
 			for _, callback := range r.onNextPartErr {
