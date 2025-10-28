@@ -58,6 +58,7 @@ func WithStatsMode(mode options.StatsMode, callback func(Stats)) ExecuteOption {
 	return options.WithStatsMode(mode, callback)
 }
 
+// WithIssuesHandler is the option which helps collect issues generated during query execution
 func WithIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) ExecuteOption {
 	return options.WithIssuesHandler(callback)
 }
