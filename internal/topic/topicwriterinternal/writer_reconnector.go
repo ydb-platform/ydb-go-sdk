@@ -489,7 +489,7 @@ func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context) (
 	writer *SingleStreamWriter,
 	err error,
 ) {
-	connectCtx, stopConnectCtx := xcontext.WithStoppableTimeout(streamCtx, w.cfg.connectTimeout)
+	connectCtx, stopConnectCtx := xcontext.WithStoppableTimeoutCause(streamCtx, w.cfg.connectTimeout, errConnTimeout)
 	defer stopConnectCtx()
 
 	stream, err := w.connectWithTimeout(connectCtx)
