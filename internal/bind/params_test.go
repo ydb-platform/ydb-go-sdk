@@ -1095,6 +1095,46 @@ func TestSQLNullTypes(t *testing.T) {
 			src:      sql.Null[int64]{V: 0, Valid: false},
 			expected: value.NullValue(types.Int64),
 		},
+		{
+			name:     "sql.Null[bool] valid",
+			src:      sql.Null[bool]{V: true, Valid: true},
+			expected: value.OptionalValue(value.BoolValue(true)),
+		},
+		{
+			name:     "sql.Null[bool] invalid",
+			src:      sql.Null[bool]{V: false, Valid: false},
+			expected: value.NullValue(types.Bool),
+		},
+		{
+			name:     "sql.Null[float64] valid",
+			src:      sql.Null[float64]{V: 3.14, Valid: true},
+			expected: value.OptionalValue(value.DoubleValue(3.14)),
+		},
+		{
+			name:     "sql.Null[float64] invalid",
+			src:      sql.Null[float64]{V: 0, Valid: false},
+			expected: value.NullValue(types.Double),
+		},
+		{
+			name:     "sql.Null[time.Time] valid",
+			src:      sql.Null[time.Time]{V: time.Date(2024, 2, 3, 4, 5, 6, 7, time.UTC), Valid: true},
+			expected: value.OptionalValue(value.TimestampValueFromTime(time.Date(2024, 2, 3, 4, 5, 6, 7, time.UTC))),
+		},
+		{
+			name:     "sql.Null[time.Time] invalid",
+			src:      sql.Null[time.Time]{V: time.Time{}, Valid: false},
+			expected: value.NullValue(types.Timestamp),
+		},
+		{
+			name:     "sql.Null[[]byte] valid",
+			src:      sql.Null[[]byte]{V: []byte("abc"), Valid: true},
+			expected: value.OptionalValue(value.BytesValue([]byte("abc"))),
+		},
+		{
+			name:     "sql.Null[[]byte] invalid",
+			src:      sql.Null[[]byte]{V: nil, Valid: false},
+			expected: value.NullValue(types.Bytes),
+		},
 	}
 
 	for _, tt := range tests {

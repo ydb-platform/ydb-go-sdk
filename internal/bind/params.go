@@ -51,50 +51,30 @@ func asUUID(v any) (value.Value, bool) {
 func asSQLNull(v any) (value.Value, bool) {
 	switch x := v.(type) {
 	case sql.NullBool:
-		if x.Valid {
-			return value.OptionalValue(value.BoolValue(x.Bool)), true
-		}
-		
-		return value.NullValue(types.Bool), true
+		return wrapWithNulls(x.Valid, value.BoolValue(x.Bool), types.Bool), true
 	case sql.NullFloat64:
-		if x.Valid {
-			return value.OptionalValue(value.DoubleValue(x.Float64)), true
-		}
-
-		return value.NullValue(types.Double), true
+		return wrapWithNulls(x.Valid, value.DoubleValue(x.Float64), types.Double), true
 	case sql.NullInt16:
-		if x.Valid {
-			return value.OptionalValue(value.Int16Value(x.Int16)), true
-		}
-
-		return value.NullValue(types.Int16), true
+		return wrapWithNulls(x.Valid, value.Int16Value(x.Int16), types.Int16), true
 	case sql.NullInt32:
-		if x.Valid {
-			return value.OptionalValue(value.Int32Value(x.Int32)), true
-		}
-
-		return value.NullValue(types.Int32), true
+		return wrapWithNulls(x.Valid, value.Int32Value(x.Int32), types.Int32), true
 	case sql.NullInt64:
-		if x.Valid {
-			return value.OptionalValue(value.Int64Value(x.Int64)), true
-		}
-
-		return value.NullValue(types.Int64), true
+		return wrapWithNulls(x.Valid, value.Int64Value(x.Int64), types.Int64), true
 	case sql.NullString:
-		if x.Valid {
-			return value.OptionalValue(value.TextValue(x.String)), true
-		}
-
-		return value.NullValue(types.Text), true
+		return wrapWithNulls(x.Valid, value.TextValue(x.String), types.Text), true
 	case sql.NullTime:
-		if x.Valid {
-			return value.OptionalValue(value.TimestampValueFromTime(x.Time)), true
-		}
-
-		return value.NullValue(types.Timestamp), true
+		return wrapWithNulls(x.Valid, value.TimestampValueFromTime(x.Time), types.Timestamp), true
 	}
 
 	return asSQLNullGeneric(v)
+}
+
+func wrapWithNulls(valid bool, val value.Value, t types.Type) value.Value {
+	if valid {
+		return value.OptionalValue(val)
+	}
+
+	return value.NullValue(t)
 }
 
 func asSQLNullGeneric(v any) (value.Value, bool) {
