@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
@@ -769,5 +770,232 @@ func TestIssue1785FillDecimalFields(t *testing.T) {
 		require.NoError(t, err)
 		expectedVal := types.Decimal{Bytes: [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0}, Precision: 22, Scale: 9}
 		require.EqualValues(t, expectedVal, rd.DecimalVal)
+	})
+}
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1872
+func TestIssue1872QueryWarning(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.INFO),
+				),
+				trace.QueryEvents,
+			),
+		),
+	)
+	require.NoError(t, err)
+	_ = db.Query().Exec(ctx,
+		`drop table TestIssue1872QueryWarning;`,
+	)
+	err = db.Query().Exec(ctx,
+		`create table TestIssue1872QueryWarning
+			(Id uint64, Amount decimal(22,9) , primary key(Id));`,
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$p1").Text("test1").
+				Build(),
+		),
+	)
+	require.NoError(t, err)
+	t.Run("Query with declare", func(t *testing.T) {
+		collector := make([]*Ydb_Issue.IssueMessage, 0)
+		q := db.Query()
+		_, err := q.Query(ctx, `
+				DECLARE $x as String;
+				SELECT 42;
+				SELECT 43;
+	        `,
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
+				collector = append(collector, issueList...)
+			}),
+		)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(collector))
+		require.Equal(t, "Symbol $x is not used", collector[0].Message)
+	})
+	t.Run("Exec with declare", func(t *testing.T) {
+		collector := make([]*Ydb_Issue.IssueMessage, 0)
+		q := db.Query()
+		_, err := q.Query(ctx, `
+					DECLARE $x as String;
+					SELECT 42;
+					SELECT 43;
+		        `,
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
+				collector = append(collector, issueList...)
+			}),
+		)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(collector))
+		require.Equal(t, "Symbol $x is not used", collector[0].Message)
+	})
+	issueCount := -1
+	t.Run("Query no issues", func(t *testing.T) {
+		q := db.Query()
+		_, err := q.Query(ctx, `
+				SELECT 42;
+				SELECT 43;
+	        `,
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
+				issueCount = len(issueList)
+			}),
+		)
+		require.NoError(t, err)
+	})
+	require.Equal(t, -1, issueCount)
+	issueCount = -1
+	t.Run("Exec no issues", func(t *testing.T) {
+		q := db.Query()
+		_, err := q.Query(ctx, `
+				SELECT 42;
+				SELECT 43;
+	        `,
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
+				issueCount = len(issueList)
+			}),
+		)
+		require.NoError(t, err)
+	})
+	require.Equal(t, -1, issueCount)
+	t.Run("Exec insert", func(t *testing.T) {
+		var issueList []*Ydb_Issue.IssueMessage
+		q := db.Query()
+		err := q.Exec(ctx, `
+			insert into TestIssue1872QueryWarning (Id, Amount)
+			values (-7, Decimal("37.01",22,9));
+			`,
+			query.WithIssuesHandler(func(issues []*Ydb_Issue.IssueMessage) {
+				issueList = issues
+			}),
+		)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(issueList))
+	})
+
+	t.Run("Exec complex", func(t *testing.T) {
+		collector := make([]*Ydb_Issue.IssueMessage, 0)
+		err = db.Query().Exec(ctx,
+			`DECLARE $x as String;
+				    DECLARE $x1 as String;
+					SELECT 42;
+					insert into TestIssue1872QueryWarning (Id, Amount) values (-3, Decimal("3.01",22,9));
+					SELECT 43;`,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$p1").Text("test1").
+					Build(),
+			),
+			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
+				collector = append(collector, issueList...)
+			}),
+		)
+		require.NoError(t, err)
+		require.Equal(t, 3, len(collector))
+		require.Equal(t, "Symbol $x is not used", collector[0].Message)
+		require.Equal(t, "Symbol $x1 is not used", collector[1].Message)
+		require.Equal(t, "Type annotation", collector[2].Message)
+		require.Equal(t, 1, len(collector[2].Issues))
+		require.Equal(t, "At function: KiWriteTable!", collector[2].Issues[0].Message)
+		require.Equal(t,
+			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
+			collector[2].Issues[0].Issues[0].Message)
+	})
+	t.Run("Query complex", func(t *testing.T) {
+		collector := make([]*Ydb_Issue.IssueMessage, 0)
+		err = db.Query().Exec(ctx,
+			`	DECLARE $x as String;
+				    DECLARE $x1 as String;
+					SELECT 42;
+					insert into TestIssue1872QueryWarning (Id, Amount) values (-6, Decimal("3.01",22,9));
+					SELECT 43;`,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$p1").Text("test1").
+					Build(),
+			),
+			query.WithIssuesHandler(func(issueList []*Ydb_Issue.IssueMessage) {
+				collector = append(collector, issueList...)
+			}),
+		)
+		require.NoError(t, err)
+		require.Equal(t, 3, len(collector))
+		require.Equal(t, "Symbol $x is not used", collector[0].Message)
+		require.Equal(t, "Symbol $x1 is not used", collector[1].Message)
+		require.Equal(t, "Type annotation", collector[2].Message)
+		require.Equal(t, 1, len(collector[2].Issues))
+		require.Equal(t, "At function: KiWriteTable!", collector[2].Issues[0].Message)
+		require.Equal(t,
+			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
+			collector[2].Issues[0].Issues[0].Message)
+	})
+	t.Run("Query 2 inserts", func(t *testing.T) {
+		var issueList []*Ydb_Issue.IssueMessage
+		q := db.Query()
+		_, err := q.Query(ctx, `
+		        insert into TestIssue1872QueryWarning (Id, Amount) values (-9, Decimal("3.01",22,9));
+				insert into TestIssue1872QueryWarning (Id, Amount) values (-5, Decimal("5.01",22,9));
+		        `,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$p1").Text("test").
+					Build(),
+			),
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+			query.WithIssuesHandler(func(issues []*Ydb_Issue.IssueMessage) {
+				issueList = issues
+			}),
+		)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(issueList))
+		require.Equal(t, "Type annotation", issueList[0].Message)
+		require.Equal(t, 2, len(issueList[0].Issues))
+		require.Equal(t, "At function: KiWriteTable!", issueList[0].Issues[0].Message)
+		require.Equal(t,
+			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
+			issueList[0].Issues[0].Issues[0].Message)
+	})
+	t.Run("Exec 2 inserts", func(t *testing.T) {
+		var issueList []*Ydb_Issue.IssueMessage
+		q := db.Query()
+		_, err := q.Query(ctx, `
+		        insert into TestIssue1872QueryWarning (Id, Amount) values (-19, Decimal("3.01",22,9));
+				insert into TestIssue1872QueryWarning (Id, Amount) values (-15, Decimal("5.01",22,9));
+		        `,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$p1").Text("test").
+					Build(),
+			),
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+			query.WithIssuesHandler(func(issues []*Ydb_Issue.IssueMessage) {
+				issueList = issues
+			}),
+		)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(issueList))
+		require.Equal(t, "Type annotation", issueList[0].Message)
+		require.Equal(t, 2, len(issueList[0].Issues))
+		require.Equal(t, "At function: KiWriteTable!", issueList[0].Issues[0].Message)
+		require.Equal(t,
+			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
+			issueList[0].Issues[0].Issues[0].Message)
 	})
 }
