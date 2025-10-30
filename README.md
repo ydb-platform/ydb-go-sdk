@@ -25,7 +25,7 @@ That is, the latest two versions of Go (or more, but with no guarantees for extr
 
 ## Versioning Policy
 
-`ydb-go-sdk` comply to guidelines from [SemVer2.0.0](https://semver.org/) with an several [exceptions](VERSIONING.md).
+`ydb-go-sdk` comply to guidelines from [SemVer2.0.0](https://semver.org/) with several [exceptions](VERSIONING.md).
 
 ## Installation
 
