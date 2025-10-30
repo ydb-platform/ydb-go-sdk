@@ -89,6 +89,7 @@ func newGrpcMock(listener net.Listener, topicServiceImpl Ydb_Topic_V1.TopicServi
 
 type mockDiscoveryService struct {
 	Ydb_Discovery_V1.UnimplementedDiscoveryServiceServer
+
 	host string
 	port uint32
 }

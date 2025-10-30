@@ -26,6 +26,7 @@ type (
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	listOperationsWithNextToken[PT metadata.Constraint[T], T metadata.TypesConstraint] struct {
 		listOperations[PT, T]
+
 		NextToken string
 	}
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
@@ -41,6 +42,7 @@ type (
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	typedOperation[PT metadata.Constraint[T], T metadata.TypesConstraint] struct {
 		operation
+
 		Metadata *T
 	}
 )

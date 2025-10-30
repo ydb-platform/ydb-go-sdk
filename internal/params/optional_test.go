@@ -318,6 +318,26 @@ func TestOptional(t *testing.T) {
 			},
 		},
 		{
+			method: "Interval64",
+			args:   []any{p(time.Duration(123456789))},
+			expected: expected{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL64},
+							},
+						},
+					},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 123456789, // nanoseconds
+					},
+				},
+			},
+		},
+		{
 			method: "Datetime",
 			args:   []any{p(time.Unix(123456789, 456))},
 
@@ -334,6 +354,26 @@ func TestOptional(t *testing.T) {
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123456789,
+					},
+				},
+			},
+		},
+		{
+			method: "Datetime64",
+			args:   []any{p(time.Unix(123456789, 456))},
+			expected: expected{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME64},
+							},
+						},
+					},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 123456789,
 					},
 				},
 			},
@@ -360,6 +400,26 @@ func TestOptional(t *testing.T) {
 			},
 		},
 		{
+			method: "Date32",
+			args:   []any{p(time.Unix(123456789, 456))},
+			expected: expected{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE32},
+							},
+						},
+					},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int32Value{
+						Int32Value: 1428,
+					},
+				},
+			},
+		},
+		{
 			method: "Timestamp",
 			args:   []any{p(time.Unix(123456789, 456))},
 
@@ -376,6 +436,26 @@ func TestOptional(t *testing.T) {
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint64Value{
 						Uint64Value: 123456789000000,
+					},
+				},
+			},
+		},
+		{
+			method: "Timestamp64",
+			args:   []any{p(time.Unix(123456789, 123456000))},
+			expected: expected{
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP64},
+							},
+						},
+					},
+				},
+				Value: &Ydb.Value{
+					Value: &Ydb.Value_Int64Value{
+						Int64Value: 123456789123456, // microseconds
 					},
 				},
 			},

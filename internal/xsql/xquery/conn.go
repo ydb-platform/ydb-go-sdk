@@ -15,13 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
 
-type resultNoRows struct{}
-
-func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
-func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
-
-var _ driver.Result = resultNoRows{}
-
 type Parent interface {
 	Query() *query.Client
 }
@@ -39,7 +32,7 @@ func (c *Conn) NodeID() uint32 {
 }
 
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
-	result driver.Result, finalErr error,
+	driver.Result, error,
 ) {
 	if !c.IsValid() {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
@@ -63,12 +56,15 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		opts = append(opts, options.WithTxControl(txControl))
 	}
 
+	r := &resultWithStats{}
+	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
+
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return resultNoRows{}, nil
+	return r, nil
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (

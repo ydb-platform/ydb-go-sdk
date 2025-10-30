@@ -136,6 +136,7 @@ func IteratorFunc[T any](
 
 type TypedTopicMessage[T any] struct {
 	*topicreader.Message
+
 	Data T
 }
 

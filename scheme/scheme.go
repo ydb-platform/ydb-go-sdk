@@ -20,6 +20,7 @@ type EntryType uint
 
 type Directory struct {
 	Entry
+
 	Children []Entry
 }
 

@@ -10,6 +10,7 @@ jobs:
     concurrency:
       group: broken-changes-${{ github.ref }}
       cancel-in-progress: true
+    if: (!contains(github.event.pull_request.labels.*.name, 'broken changes'))
     runs-on: ubuntu-latest
     permissions: 
       pull-requests: write
@@ -24,11 +25,10 @@ jobs:
       - name: Install gorelease
         run: test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
       - name: Check broken API changes
-        run: gorelease -base=$GITHUB_BASE_REF 2>&1 > changes.txt | true
-      - name: Print API changes
-        run: cat changes.txt
+        run: set -o pipefail && gorelease | tee changes.txt
+      # Skip comment for forks - GITHUB_TOKEN doesn't have write permissions for external PRs
       - name: Comment Report
-        if: always()
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           path: changes.txt

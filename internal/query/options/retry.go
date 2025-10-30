@@ -33,6 +33,7 @@ type (
 
 	doTxSettings struct {
 		doSettings
+
 		txSettings tx.Settings
 	}
 
