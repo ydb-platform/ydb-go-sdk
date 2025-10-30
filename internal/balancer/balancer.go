@@ -207,7 +207,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 	}()
 
-	connections := endpointsToConnections(b.pool, newest)
+	connections := conn.EndpointsToConnections(b.pool, newest)
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
 		c.Endpoint().Touch()
@@ -452,13 +452,4 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	}
 
 	return c, nil
-}
-
-func endpointsToConnections(p *conn.Pool, endpoints []endpoint.Endpoint) []conn.Conn {
-	conns := make([]conn.Conn, 0, len(endpoints))
-	for _, e := range endpoints {
-		conns = append(conns, p.Get(e))
-	}
-
-	return conns
 }
