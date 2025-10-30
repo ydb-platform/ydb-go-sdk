@@ -53,8 +53,6 @@ linters:
     errcheck:
       check-type-assertions: false
       check-blank: false
-    # funlen:
-    #   lines: 80
     goconst:
       min-len: 2
       min-occurrences: 2
