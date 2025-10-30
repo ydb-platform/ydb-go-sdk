@@ -45,6 +45,10 @@ linters:
     - iface
     - gosmopolitan
     - funcorder
+
+    # introduced v2.4.0
+    - noinlineerr
+    - wsl_v5
   settings:
     errcheck:
       check-type-assertions: false
@@ -117,6 +121,10 @@ linters:
         - name: if-return
         - name: increment-decrement
         - name: var-naming
+          arguments:
+            - [] # AllowList
+            - [] # DenyList
+            - - skip-package-name-checks: true
         - name: var-declaration
         - name: package-comments
         - name: range

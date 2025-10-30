@@ -30,6 +30,15 @@ type Pool struct {
 	done        chan struct{}
 }
 
+func EndpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
+	conns := make([]Conn, 0, len(endpoints))
+	for _, e := range endpoints {
+		conns = append(conns, p.Get(e))
+	}
+
+	return conns
+}
+
 func (p *Pool) DialTimeout() time.Duration {
 	return p.config.DialTimeout()
 }

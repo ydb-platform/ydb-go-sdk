@@ -1,6 +1,7 @@
 package options
 
 import (
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
@@ -42,6 +43,7 @@ type (
 		callOptions            []grpc.CallOption
 		txControl              *tx.Control
 		retryOptions           []retry.Option
+		issueCallback          func(issues []*Ydb_Issue.IssueMessage)
 		responsePartLimitBytes int64
 		label                  string
 	}
@@ -70,6 +72,9 @@ type (
 	}
 	execModeOption         = ExecMode
 	responsePartLimitBytes int64
+	issuesOption           struct {
+		callback func([]*Ydb_Issue.IssueMessage)
+	}
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -78,6 +83,10 @@ func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
 
 func (s *executeSettings) RetryOpts() []retry.Option {
 	return s.retryOptions
+}
+
+func (s *executeSettings) IssuesOpts() func([]*Ydb_Issue.IssueMessage) {
+	return s.issueCallback
 }
 
 func (s *executeSettings) StatsCallback() func(stats.QueryStats) {
@@ -117,6 +126,10 @@ func (mode StatsMode) applyExecuteOption(s *executeSettings) {
 
 func (mode ExecMode) applyExecuteOption(s *executeSettings) {
 	s.execMode = mode
+}
+
+func (opts issuesOption) applyExecuteOption(s *executeSettings) {
+	s.issueCallback = opts.callback
 }
 
 const (
@@ -240,6 +253,12 @@ func (opt statsModeOption) applyExecuteOption(s *executeSettings) {
 func WithStatsMode(mode StatsMode, callback func(stats.QueryStats)) statsModeOption {
 	return statsModeOption{
 		mode:     mode,
+		callback: callback,
+	}
+}
+
+func WithIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) issuesOption {
+	return issuesOption{
 		callback: callback,
 	}
 }

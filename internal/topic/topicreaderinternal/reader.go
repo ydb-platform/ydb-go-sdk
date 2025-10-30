@@ -248,10 +248,10 @@ func (r *Reader) CommitRanges(ctx context.Context, ranges []topicreadercommon.Pu
 
 type ReaderConfig struct {
 	config.Common
+	topicStreamReaderConfig
 
 	RetrySettings      topic.RetrySettings
 	DefaultBatchConfig ReadMessageBatchOptions
-	topicStreamReaderConfig
 }
 
 type PublicReaderOption func(cfg *ReaderConfig)

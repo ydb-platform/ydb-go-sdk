@@ -128,6 +128,7 @@ func (c *Client) FetchScriptResults(ctx context.Context,
 
 type executeScriptSettings struct {
 	executeSettings
+
 	ttl             time.Duration
 	operationParams *Ydb_Operations.OperationParams
 }
@@ -348,7 +349,8 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
+		streamResult, err := s.execute(ctx, q, settings,
+			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -397,7 +399,8 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 ) {
 	settings := options.ExecuteSettings(opts...)
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
+		streamResult, err := s.execute(ctx, q, settings,
+			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
