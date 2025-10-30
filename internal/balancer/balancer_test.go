@@ -14,6 +14,9 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
 func TestBalancer_discoveryConn(t *testing.T) {
@@ -69,6 +72,52 @@ func TestBalancer_discoveryConn(t *testing.T) {
 
 	_, err := balancer.discoveryConn(ctx)
 	require.NoError(t, err)
+}
+
+func TestApplyDiscoveredEndpoints(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { _ = pool.Release(ctx) }()
+
+	b := &Balancer{
+		driverConfig:   cfg,
+		pool:           pool,
+		balancerConfig: balancerConfig.Config{},
+	}
+
+	initial := newConnectionsState(nil, b.balancerConfig.Filter, balancerConfig.Info{}, b.balancerConfig.AllowFallback)
+	b.connectionsState.Store(initial)
+
+	e1 := endpoint.New("e1.example:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
+	e2 := endpoint.New("e2.example:2135", endpoint.WithIPV6([]string{"2001:db8::2"}), endpoint.WithID(2))
+
+	// call with two endpoints
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
+
+	// connectionsState should be updated and reflect the endpoints
+	after := b.connections()
+	require.NotNil(t, after)
+	all := after.All()
+	require.Equal(t, 2, len(all))
+	require.Equal(t, e1.Address(), all[0].Address())
+	require.Equal(t, e1.NodeID(), all[0].NodeID())
+	require.Equal(t, e2.Address(), all[1].Address())
+	require.Equal(t, e2.NodeID(), all[1].NodeID())
+
+	// partially replace endpoints
+	e3 := endpoint.New("e3.example:2135", endpoint.WithIPV6([]string{"2001:db8::3"}), endpoint.WithID(1))
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e2, e3}, "")
+	// connectionsState should be updated and reflect the endpoints
+	after = b.connections()
+	require.NotNil(t, after)
+	all = after.All()
+	require.Equal(t, 2, len(all))
+	require.Equal(t, e2.Address(), all[0].Address())
+	require.Equal(t, e2.NodeID(), all[0].NodeID())
+	require.Equal(t, e3.Address(), all[1].Address())
+	require.Equal(t, e3.NodeID(), all[1].NodeID())
 }
 
 // Mock resolver
