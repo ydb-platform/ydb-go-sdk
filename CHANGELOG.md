@@ -1,4 +1,5 @@
 * Added method `query.WithIssuesHandler` to get query issues
+* Fixed connection timeout issue in topics writer
 
 ## v3.117.2
 * Added support for `Result.RowsAffected()` for YDB `database/sql` driver
