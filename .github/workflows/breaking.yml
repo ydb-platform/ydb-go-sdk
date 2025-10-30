@@ -10,6 +10,7 @@ jobs:
     concurrency:
       group: broken-changes-${{ github.ref }}
       cancel-in-progress: true
+    if: (!contains(github.event.pull_request.labels.*.name, 'broken changes'))
     runs-on: ubuntu-latest
     permissions: 
       pull-requests: write
