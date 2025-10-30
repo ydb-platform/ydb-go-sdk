@@ -128,6 +128,7 @@ func (c *Client) FetchScriptResults(ctx context.Context,
 
 type executeScriptSettings struct {
 	executeSettings
+
 	ttl             time.Duration
 	operationParams *Ydb_Operations.OperationParams
 }

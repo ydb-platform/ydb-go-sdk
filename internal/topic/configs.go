@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	config.Common
+
 	Trace              *trace.Topic
 	MaxGrpcMessageSize int
 }

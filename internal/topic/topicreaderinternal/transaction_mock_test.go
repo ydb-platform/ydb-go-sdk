@@ -18,6 +18,7 @@ func newMockTransactionWrapper(sessionID, transactinID string) *mockTransaction 
 
 type mockTransaction struct {
 	tx.Identifier
+
 	materializedID tx.Identifier
 	materialized   bool
 	sessionID      string

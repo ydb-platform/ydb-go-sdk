@@ -68,6 +68,7 @@ func (l GrpcLogger) StreamClientInterceptor(
 
 type grpcLoggerStream struct {
 	grpc.ClientStream
+
 	streamID int64
 	t        testing.TB
 }

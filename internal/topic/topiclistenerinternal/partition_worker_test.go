@@ -28,6 +28,7 @@ import (
 // syncMessageSender extends mockMessageSender with synchronization capabilities
 type syncMessageSender struct {
 	*mockMessageSender
+
 	messageReceived empty.Chan
 }
 
