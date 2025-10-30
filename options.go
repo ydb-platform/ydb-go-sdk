@@ -2,7 +2,6 @@ package ydb
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"os"
@@ -483,18 +482,6 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 				return xerrors.WithStackTrace(err)
 			}
 		}
-
-		return nil
-	}
-}
-
-// WithTLSConfig replaces older TLS config
-//
-// Warning: all early TLS config changes (such as WithCertificate, WithCertificatesFromFile, WithCertificatesFromPem,
-// WithMinTLSVersion, WithTLSSInsecureSkipVerify) will be lost
-func WithTLSConfig(tlsConfig *tls.Config) Option {
-	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithTLSConfig(tlsConfig))
 
 		return nil
 	}
