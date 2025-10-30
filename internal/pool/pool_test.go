@@ -41,6 +41,7 @@ type (
 	}
 	testWaitChPool struct {
 		xsync.Pool[chan *testItem]
+
 		testHookGetWaitCh func()
 	}
 )

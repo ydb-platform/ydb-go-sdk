@@ -12,12 +12,14 @@ import (
 
 type dnsBuilder struct {
 	resolver.Builder
+
 	scheme string
 	trace  *trace.Driver
 }
 
 type clientConn struct {
 	resolver.ClientConn
+
 	target resolver.Target
 	trace  *trace.Driver
 }

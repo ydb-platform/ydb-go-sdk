@@ -28,6 +28,7 @@ func StartReader(ctx context.Context, db *ydb.Driver) (*topiclistener.TopicListe
 
 type TopicEventsHandler struct {
 	topiclistener.BaseHandler
+
 	listener *topiclistener.TopicListener
 
 	m     sync.Mutex

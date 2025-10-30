@@ -12,8 +12,9 @@ func MakeSyncedTest(t *testing.T) *SyncedTest {
 }
 
 type SyncedTest struct {
-	m sync.Mutex
 	*testing.T
+
+	m sync.Mutex
 }
 
 func (s *SyncedTest) Cleanup(f func()) {

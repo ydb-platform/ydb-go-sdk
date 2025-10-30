@@ -7,7 +7,7 @@ on:
   pull_request:
   workflow_dispatch:
 env:
-  GOLANGCI_LINT_VERSION: v2.1.6
+  GOLANGCI_LINT_VERSION: v2.4.0
   GO_VERSION: '1.25'
 jobs:
   golangci:

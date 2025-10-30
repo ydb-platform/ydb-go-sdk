@@ -62,6 +62,7 @@ func (e *stackError) Unwrap() error {
 
 type stackTransportError struct {
 	stackError
+
 	status *grpcStatus.Status
 }
 

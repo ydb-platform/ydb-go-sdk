@@ -40,6 +40,7 @@ type (
 	}
 	resultSetWithClose struct {
 		*resultSet
+
 		close func(ctx context.Context) error
 	}
 )
