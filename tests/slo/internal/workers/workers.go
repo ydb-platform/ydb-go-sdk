@@ -35,6 +35,10 @@ func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers
 	}, nil
 }
 
+func (w *Workers) FailOnError() {
+	w.m.FailOnError()
+}
+
 func (w *Workers) Close() error {
 	return w.m.Reset()
 }

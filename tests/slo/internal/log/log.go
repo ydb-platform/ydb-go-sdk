@@ -16,3 +16,7 @@ func Printf(format string, args ...any) {
 func Println(args ...any) {
 	fmt.Println(append([]any{timestampPrefix()}, args...)...)
 }
+
+func Panicf(format string, args ...any) {
+	panic(fmt.Sprintf(timestampPrefix()+format, args...))
+}
