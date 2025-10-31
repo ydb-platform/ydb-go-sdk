@@ -39,6 +39,7 @@ func asUUID(v any) (value.Value, bool) {
 	case uuidPtrType:
 		vv := v.(*uuid.UUID) //nolint:forcetypeassert
 		if vv == nil {
+
 			return value.NullValue(types.UUID), true
 		}
 
