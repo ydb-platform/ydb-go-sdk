@@ -38,4 +38,30 @@ func TestWithStoppableTimeoutCause(t *testing.T) {
 			t.Fatal("context shouldn't be canceled")
 		}
 	})
+
+	synctest.Test(t, func(t *testing.T) {
+		_, stop := xcontext.WithStoppableTimeoutCause(context.Background(), 10*time.Second, wantErr)
+
+		time.Sleep(1 * time.Second)
+
+		assert.True(t, stop())
+	})
+
+	synctest.Test(t, func(t *testing.T) {
+		_, stop := xcontext.WithStoppableTimeoutCause(context.Background(), 10*time.Second, wantErr)
+
+		time.Sleep(1 * time.Second)
+
+		stop()
+
+		assert.False(t, stop())
+	})
+
+	synctest.Test(t, func(t *testing.T) {
+		_, stop := xcontext.WithStoppableTimeoutCause(context.Background(), 10*time.Second, wantErr)
+
+		time.Sleep(15 * time.Second)
+
+		assert.False(t, stop())
+	})
 }

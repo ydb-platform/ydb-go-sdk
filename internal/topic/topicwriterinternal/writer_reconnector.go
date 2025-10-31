@@ -440,7 +440,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			attempt,
 		)
 
-		writer, err := w.startWriteStream(ctx, streamCtx)
+		writer, err := w.startWriteStream(streamCtx)
 		w.onWriterChange(writer)
 		onStreamError := onWriterStarted(err)
 		if err == nil {
@@ -485,12 +485,17 @@ func (w *WriterReconnector) handleReconnectRetry(
 	return false
 }
 
-func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context) (
-	writer *SingleStreamWriter,
-	err error,
-) {
-	connectCtx, stopConnectCtx := xcontext.WithStoppableTimeoutCause(streamCtx, w.cfg.connectTimeout, errConnTimeout)
-	defer stopConnectCtx()
+func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *SingleStreamWriter, err error) {
+	// connectCtx with timeout applies only to the connection phase,
+	// allowing the main stream context to remain active after exiting this method
+	connectCtx, stopConnectCtx := xcontext.WithStoppableTimeoutCause(ctx, w.cfg.connectTimeout, errConnTimeout)
+	defer func() {
+		// If the context was cancelled during connection (the stream was cancelled),
+		// we should return a timeout error
+		if err == nil && !stopConnectCtx() {
+			err = context.Cause(connectCtx)
+		}
+	}()
 
 	stream, err := w.connectWithTimeout(connectCtx)
 	if err != nil {
@@ -499,7 +504,7 @@ func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context) (
 
 	w.queue.ResetSentProgress()
 
-	return NewSingleStreamWriter(ctx, w.createWriterStreamConfig(stream))
+	return NewSingleStreamWriter(connectCtx, w.createWriterStreamConfig(stream))
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
