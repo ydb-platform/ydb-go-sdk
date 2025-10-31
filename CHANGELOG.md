@@ -1,3 +1,5 @@
+## v3.118.0
+* Added support for nullable `Date32`, `Datetime64`, `Timestamp64`, and `Interval64` types in the `optional` parameter builder
 * Added method `query.WithIssuesHandler` to get query issues
 * Fixed connection timeout issue in topics writer
 

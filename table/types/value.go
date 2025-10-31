@@ -38,11 +38,20 @@ func DoubleValue(v float64) Value { return value.DoubleValue(v) }
 // DateValue returns ydb date value by given days since Epoch
 func DateValue(v uint32) Value { return value.DateValue(v) }
 
+// Date32Value returns ydb date32 value by given days since Epoch
+func Date32Value(v int32) Value { return value.Date32Value(v) }
+
 // DatetimeValue makes ydb datetime value from seconds since Epoch
 func DatetimeValue(v uint32) Value { return value.DatetimeValue(v) }
 
+// Datetime64Value returns ydb datetime64 value by given seconds since Epoch
+func Datetime64Value(v int64) Value { return value.Datetime64Value(v) }
+
 // TimestampValue makes ydb timestamp value from microseconds since Epoch
 func TimestampValue(v uint64) Value { return value.TimestampValue(v) }
+
+// Timestamp64Value returns ydb timestamp64 value by given microseconds since Epoch (int64)
+func Timestamp64Value(v int64) Value { return value.Timestamp64Value(v) }
 
 // IntervalValueFromMicroseconds makes Value from given microseconds value
 func IntervalValueFromMicroseconds(v int64) Value { return value.IntervalValue(v) }
@@ -53,6 +62,9 @@ func IntervalValueFromMicroseconds(v int64) Value { return value.IntervalValue(v
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func IntervalValue(v int64) Value { return value.IntervalValue(v) }
+
+// Interval64ValueFromNanoseconds returns ydb interval64 value by given nanoseconds
+func Interval64ValueFromNanoseconds(v int64) Value { return value.Interval64Value(v) }
 
 // TzDateValue makes TzDate value from string
 func TzDateValue(v string) Value { return value.TzDateValue(v) }
@@ -334,6 +346,14 @@ func NullableDateValueFromTime(v *time.Time) Value {
 	return value.NullableDateValueFromTime(v)
 }
 
+func NullableDate32Value(v *int32) Value {
+	return value.NullableDate32Value(v)
+}
+
+func NullableDate32ValueFromTime(v *time.Time) Value {
+	return value.NullableDate32ValueFromTime(v)
+}
+
 func NullableDecimalValue(v *[16]byte, precision, scale uint32) Value {
 	return value.NullableDecimalValue(v, precision, scale)
 }
@@ -348,6 +368,14 @@ func NullableDatetimeValue(v *uint32) Value {
 
 func NullableDatetimeValueFromTime(v *time.Time) Value {
 	return value.NullableDatetimeValueFromTime(v)
+}
+
+func NullableDatetime64Value(v *int64) Value {
+	return value.NullableDatetime64Value(v)
+}
+
+func NullableDatetime64ValueFromTime(v *time.Time) Value {
+	return value.NullableDatetime64ValueFromTime(v)
 }
 
 func NullableTzDateValue(v *string) Value {
@@ -374,6 +402,14 @@ func NullableTimestampValueFromTime(v *time.Time) Value {
 	return value.NullableTimestampValueFromTime(v)
 }
 
+func NullableTimestamp64Value(v *int64) Value {
+	return value.NullableTimestamp64Value(v)
+}
+
+func NullableTimestamp64ValueFromTime(v *time.Time) Value {
+	return value.NullableTimestamp64ValueFromTime(v)
+}
+
 func NullableTzTimestampValue(v *string) Value {
 	return value.NullableTzTimestampValue(v)
 }
@@ -397,6 +433,14 @@ func NullableIntervalValueFromMicroseconds(v *int64) Value {
 
 func NullableIntervalValueFromDuration(v *time.Duration) Value {
 	return value.NullableIntervalValueFromDuration(v)
+}
+
+func NullableInterval64ValueFromNanoseconds(v *int64) Value {
+	return value.NullableInterval64ValueFromNanoseconds(v)
+}
+
+func NullableInterval64ValueFromDuration(v *time.Duration) Value {
+	return value.NullableInterval64ValueFromDuration(v)
 }
 
 // NullableStringValue
