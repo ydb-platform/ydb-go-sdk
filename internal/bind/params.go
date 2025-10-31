@@ -39,7 +39,6 @@ func asUUID(v any) (value.Value, bool) {
 	case uuidPtrType:
 		vv := v.(*uuid.UUID) //nolint:forcetypeassert
 		if vv == nil {
-
 			return value.NullValue(types.UUID), true
 		}
 
@@ -111,6 +110,7 @@ func asSQLNullGeneric(v any) (value.Value, bool) {
 		if err != nil {
 			return value.NullValue(types.Text), true
 		}
+
 		return value.NullValue(nullType), true
 	}
 
