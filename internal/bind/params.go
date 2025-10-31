@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,6 +46,84 @@ func asUUID(v any) (value.Value, bool) {
 	}
 
 	return nil, false
+}
+
+func asSQLNull(v any) (value.Value, bool) {
+	switch x := v.(type) {
+	case sql.NullBool:
+		return wrapWithNulls(x.Valid, value.BoolValue(x.Bool), types.Bool), true
+	case sql.NullFloat64:
+		return wrapWithNulls(x.Valid, value.DoubleValue(x.Float64), types.Double), true
+	case sql.NullInt16:
+		return wrapWithNulls(x.Valid, value.Int16Value(x.Int16), types.Int16), true
+	case sql.NullInt32:
+		return wrapWithNulls(x.Valid, value.Int32Value(x.Int32), types.Int32), true
+	case sql.NullInt64:
+		return wrapWithNulls(x.Valid, value.Int64Value(x.Int64), types.Int64), true
+	case sql.NullString:
+		return wrapWithNulls(x.Valid, value.TextValue(x.String), types.Text), true
+	case sql.NullTime:
+		return wrapWithNulls(x.Valid, value.TimestampValueFromTime(x.Time), types.Timestamp), true
+	}
+
+	return asSQLNullGeneric(v)
+}
+
+func wrapWithNulls(valid bool, val value.Value, t types.Type) value.Value {
+	if valid {
+		return value.OptionalValue(val)
+	}
+
+	return value.NullValue(t)
+}
+
+func asSQLNullGeneric(v any) (value.Value, bool) {
+	if v == nil {
+		return nil, false
+	}
+
+	rv := reflect.ValueOf(v)
+	rt := rv.Type()
+
+	if rv.Kind() != reflect.Struct {
+		return nil, false
+	}
+
+	vField := rv.FieldByName("V")
+	validField := rv.FieldByName("Valid")
+
+	if !vField.IsValid() || !validField.IsValid() {
+		return nil, false
+	}
+
+	if validField.Kind() != reflect.Bool {
+		return nil, false
+	}
+
+	if !strings.HasPrefix(rt.String(), "sql.Null[") {
+		return nil, false
+	}
+
+	valid := validField.Bool()
+	if !valid {
+		nullType, err := toType(vField.Interface())
+		if err != nil {
+			return value.NullValue(types.Text), true
+		}
+
+		return value.NullValue(nullType), true
+	}
+
+	return asSQLNullValue(vField.Interface())
+}
+
+func asSQLNullValue(v any) (value.Value, bool) {
+	val, err := toValue(v)
+	if err != nil {
+		return nil, false
+	}
+
+	return value.OptionalValue(val), true
 }
 
 func toType(v any) (_ types.Type, err error) { //nolint:funlen
@@ -161,6 +240,10 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen
 func toValue(v any) (_ value.Value, err error) {
 	if x, ok := asUUID(v); ok {
 		return x, nil
+	}
+
+	if nullValue, ok := asSQLNull(v); ok {
+		return nullValue, nil
 	}
 
 	if valuer, ok := v.(driver.Valuer); ok {

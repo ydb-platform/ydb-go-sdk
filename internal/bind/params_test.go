@@ -998,3 +998,151 @@ func BenchmarkAsUUIDUsingReflect(b *testing.B) {
 		require.Equal(b, expUUIDValue, v)
 	}
 }
+
+func TestSQLNullTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      any
+		expected value.Value
+	}{
+		{
+			name:     "NullBool valid",
+			src:      sql.NullBool{Bool: true, Valid: true},
+			expected: value.OptionalValue(value.BoolValue(true)),
+		},
+		{
+			name:     "NullBool invalid",
+			src:      sql.NullBool{Bool: false, Valid: false},
+			expected: value.NullValue(types.Bool),
+		},
+		{
+			name:     "NullFloat64 valid",
+			src:      sql.NullFloat64{Float64: 3.14, Valid: true},
+			expected: value.OptionalValue(value.DoubleValue(3.14)),
+		},
+		{
+			name:     "NullFloat64 invalid",
+			src:      sql.NullFloat64{Float64: 0, Valid: false},
+			expected: value.NullValue(types.Double),
+		},
+		{
+			name:     "NullInt16 valid",
+			src:      sql.NullInt16{Int16: 42, Valid: true},
+			expected: value.OptionalValue(value.Int16Value(42)),
+		},
+		{
+			name:     "NullInt16 invalid",
+			src:      sql.NullInt16{Int16: 0, Valid: false},
+			expected: value.NullValue(types.Int16),
+		},
+		{
+			name:     "NullInt32 valid",
+			src:      sql.NullInt32{Int32: 42, Valid: true},
+			expected: value.OptionalValue(value.Int32Value(42)),
+		},
+		{
+			name:     "NullInt32 invalid",
+			src:      sql.NullInt32{Int32: 0, Valid: false},
+			expected: value.NullValue(types.Int32),
+		},
+		{
+			name:     "NullInt64 valid",
+			src:      sql.NullInt64{Int64: 42, Valid: true},
+			expected: value.OptionalValue(value.Int64Value(42)),
+		},
+		{
+			name:     "NullInt64 invalid",
+			src:      sql.NullInt64{Int64: 0, Valid: false},
+			expected: value.NullValue(types.Int64),
+		},
+		{
+			name:     "NullString valid",
+			src:      sql.NullString{String: "hello", Valid: true},
+			expected: value.OptionalValue(value.TextValue("hello")),
+		},
+		{
+			name:     "NullString invalid",
+			src:      sql.NullString{String: "", Valid: false},
+			expected: value.NullValue(types.Text),
+		},
+		{
+			name:     "NullTime valid",
+			src:      sql.NullTime{Time: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC), Valid: true},
+			expected: value.OptionalValue(value.TimestampValueFromTime(time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC))),
+		},
+		{
+			name:     "NullTime invalid",
+			src:      sql.NullTime{Time: time.Time{}, Valid: false},
+			expected: value.NullValue(types.Timestamp),
+		},
+		{
+			name:     "sql.Null[string] valid",
+			src:      sql.Null[string]{V: "hello", Valid: true},
+			expected: value.OptionalValue(value.TextValue("hello")),
+		},
+		{
+			name:     "sql.Null[string] invalid",
+			src:      sql.Null[string]{V: "", Valid: false},
+			expected: value.NullValue(types.Text),
+		},
+		{
+			name:     "sql.Null[int64] valid",
+			src:      sql.Null[int64]{V: 42, Valid: true},
+			expected: value.OptionalValue(value.Int64Value(42)),
+		},
+		{
+			name:     "sql.Null[int64] invalid",
+			src:      sql.Null[int64]{V: 0, Valid: false},
+			expected: value.NullValue(types.Int64),
+		},
+		{
+			name:     "sql.Null[bool] valid",
+			src:      sql.Null[bool]{V: true, Valid: true},
+			expected: value.OptionalValue(value.BoolValue(true)),
+		},
+		{
+			name:     "sql.Null[bool] invalid",
+			src:      sql.Null[bool]{V: false, Valid: false},
+			expected: value.NullValue(types.Bool),
+		},
+		{
+			name:     "sql.Null[float64] valid",
+			src:      sql.Null[float64]{V: 3.14, Valid: true},
+			expected: value.OptionalValue(value.DoubleValue(3.14)),
+		},
+		{
+			name:     "sql.Null[float64] invalid",
+			src:      sql.Null[float64]{V: 0, Valid: false},
+			expected: value.NullValue(types.Double),
+		},
+		{
+			name:     "sql.Null[time.Time] valid",
+			src:      sql.Null[time.Time]{V: time.Date(2024, 2, 3, 4, 5, 6, 7, time.UTC), Valid: true},
+			expected: value.OptionalValue(value.TimestampValueFromTime(time.Date(2024, 2, 3, 4, 5, 6, 7, time.UTC))),
+		},
+		{
+			name:     "sql.Null[time.Time] invalid",
+			src:      sql.Null[time.Time]{V: time.Time{}, Valid: false},
+			expected: value.NullValue(types.Timestamp),
+		},
+		{
+			name:     "sql.Null[[]byte] valid",
+			src:      sql.Null[[]byte]{V: []byte("abc"), Valid: true},
+			expected: value.OptionalValue(value.BytesValue([]byte("abc"))),
+		},
+		{
+			name:     "sql.Null[[]byte] invalid",
+			src:      sql.Null[[]byte]{V: nil, Valid: false},
+			expected: value.NullValue(types.Bytes),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := toValue(tt.src)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected.Type(), result.Type())
+			require.Equal(t, tt.expected.Yql(), result.Yql())
+		})
+	}
+}
