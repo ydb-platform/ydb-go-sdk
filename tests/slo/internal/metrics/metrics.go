@@ -1,12 +1,17 @@
 package metrics
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+
+	"slo/internal/log"
 )
 
 const (
@@ -20,7 +25,8 @@ type (
 		ref   string
 		label string
 
-		errorsTotal *prometheus.CounterVec
+		errorsTotal   *prometheus.CounterVec
+		timeoutsTotal *prometheus.CounterVec
 
 		operationsTotal         *prometheus.CounterVec
 		operationsSuccessTotal  *prometheus.CounterVec
@@ -59,6 +65,13 @@ func New(url, ref, label, jobName string) (*Metrics, error) {
 			Help: "Total number of errors encountered, categorized by error type.",
 		},
 		[]string{"error_type"},
+	)
+	m.timeoutsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "sdk_timeouts_total",
+			Help: "Total number of timeout errors",
+		},
+		[]string{},
 	)
 
 	m.operationsTotal = prometheus.NewCounterVec(
@@ -208,6 +221,9 @@ func (j Span) Finish(err error, attempts int) {
 	j.m.retryAttemptsTotal.WithLabelValues(j.name).Add(float64(attempts))
 
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			j.m.timeoutsTotal.WithLabelValues().Add(1)
+		}
 		j.m.errorsTotal.WithLabelValues(err.Error()).Add(1)
 		j.m.retriesFailureTotal.WithLabelValues(j.name).Add(float64(attempts))
 		j.m.operationsFailureTotal.WithLabelValues(j.name).Add(1)
@@ -216,5 +232,49 @@ func (j Span) Finish(err error, attempts int) {
 		j.m.retriesSuccessTotal.WithLabelValues(j.name).Add(float64(attempts))
 		j.m.operationsSuccessTotal.WithLabelValues(j.name).Add(1)
 		j.m.operationLatencySeconds.WithLabelValues(j.name, OperationStatusSuccess).Observe(latency.Seconds())
+	}
+}
+
+func getCounterVecTotal(counterVec *prometheus.CounterVec) float64 {
+	ch := make(chan prometheus.Metric, 100)
+	go func() {
+		counterVec.Collect(ch)
+		close(ch)
+	}()
+
+	var total float64
+	for m := range ch {
+		pb := &dto.Metric{}
+		_ = m.Write(pb)
+		if pb.GetCounter() != nil {
+			total += pb.GetCounter().GetValue()
+		}
+	}
+
+	return total
+}
+
+func (m *Metrics) OperationsTotal() float64 {
+	return getCounterVecTotal(m.operationsTotal)
+}
+
+func (m *Metrics) ErrorsTotal() float64 {
+	return getCounterVecTotal(m.errorsTotal)
+}
+
+func (m *Metrics) TimeoutsTotal() float64 {
+	return getCounterVecTotal(m.timeoutsTotal)
+}
+
+func (m *Metrics) FailOnError() {
+	if m.ErrorsTotal() > 0 {
+		log.Panicf(
+			"unretriable (or not successfully retried) errors: %.0f errors out of %.0f operations",
+			m.ErrorsTotal(),
+			m.OperationsTotal(),
+		)
+	}
+	if m.TimeoutsTotal() > 0 {
+		log.Panicf("there are user timeouts: %.0f timeouts", m.TimeoutsTotal())
 	}
 }
