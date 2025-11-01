@@ -492,7 +492,7 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 	defer func() {
 		// If the context was cancelled during connection (the stream was cancelled),
 		// we should return a timeout error
-		if err == nil && !stopConnectCtx() {
+		if !stopConnectCtx() && err == nil {
 			err = context.Cause(connectCtx)
 		}
 	}()
