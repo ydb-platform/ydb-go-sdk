@@ -319,6 +319,10 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	} else {
 		// initialization of balancer state
 		if err := b.clusterDiscovery(ctx); err != nil {
+			// Don't wrap context errors with stack trace - let higher levels handle them
+			if xerrors.IsContextError(err) {
+				return nil, err
+			}
 			return nil, xerrors.WithStackTrace(err)
 		}
 		// run background discovering

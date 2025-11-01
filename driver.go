@@ -455,6 +455,10 @@ func (d *Driver) connect(ctx context.Context) error {
 	if d.metaBalancer.balancer == nil {
 		b, err := balancer.New(ctx, d.config, d.pool, d.discoveryOptions...)
 		if err != nil {
+			// Don't wrap context errors with stack trace - let higher levels handle them
+			if xerrors.IsContextError(err) {
+				return err
+			}
 			return xerrors.WithStackTrace(err)
 		}
 		d.metaBalancer.balancer = b

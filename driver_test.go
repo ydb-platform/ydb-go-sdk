@@ -8,12 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOpen(t *testing.T) {
+func TestOpenWithExpiredContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel()
 
 	time.Sleep(10 * time.Nanosecond)
 
 	_, err := Open(ctx, "grpc://localhost:2136/local")
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Contains(t, err.Error(), "context deadline exceeded")
+	require.Contains(t, err.Error(), "Open(driver.go:")
+	// Verify that the error doesn't have multiple stack traces (no "retry failed on attempt")
+	require.NotContains(t, err.Error(), "retry failed")
 }

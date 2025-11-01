@@ -267,6 +267,10 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		return nil, nil //nolint:nilnil
 	}, opts...)
 	if err != nil {
+		// Don't wrap context errors with stack trace - let higher levels handle them
+		if xerrors.IsContextError(err) {
+			return err
+		}
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -329,6 +333,12 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 	defer func() {
 		onDone(attempts, finalErr)
 	}()
+	// Check if context is already done before entering retry loop
+	select {
+	case <-ctx.Done():
+		return zeroValue, ctx.Err()
+	default:
+	}
 	for {
 		i++
 		attempts++
