@@ -1,9 +1,9 @@
+* Fixed connection timeout issue in topics writer
 * Supported `sql.Null*` from `database/sql` as query params in `toValue` func
 
 ## v3.118.0
 * Added support for nullable `Date32`, `Datetime64`, `Timestamp64`, and `Interval64` types in the `optional` parameter builder
 * Added method `query.WithIssuesHandler` to get query issues
-* Fixed connection timeout issue in topics writer
 
 ## v3.117.2
 * Added support for `Result.RowsAffected()` for YDB `database/sql` driver
