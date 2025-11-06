@@ -33,6 +33,7 @@ func (g *Generator) Generate() (Row, error) {
 		ID:               id,
 		PayloadDouble:    func(a float64) *float64 { return &a }(rand.Float64()), //nolint:gosec // speed more important
 		PayloadTimestamp: func(a time.Time) *time.Time { return &a }(time.Now()),
+		PayloadHash:      func(a uint64) *uint64 { return &a }(rand.Uint64()), //nolint:gosec
 	}
 
 	var err error
