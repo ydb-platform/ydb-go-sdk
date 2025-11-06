@@ -440,7 +440,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			attempt,
 		)
 
-		writer, err := w.startWriteStream(ctx, streamCtx)
+		writer, err := w.startWriteStream(streamCtx)
 		w.onWriterChange(writer)
 		onStreamError := onWriterStarted(err)
 		if err == nil {
@@ -485,18 +485,26 @@ func (w *WriterReconnector) handleReconnectRetry(
 	return false
 }
 
-func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context) (
-	writer *SingleStreamWriter,
-	err error,
-) {
-	stream, err := w.connectWithTimeout(streamCtx)
+func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *SingleStreamWriter, err error) {
+	// connectCtx with timeout applies only to the connection phase,
+	// allowing the main stream context to remain active after exiting this method
+	connectCtx, stopConnectCtx := xcontext.WithStoppableTimeoutCause(ctx, w.cfg.connectTimeout, errConnTimeout)
+	defer func() {
+		// If the context was cancelled during connection (the stream was cancelled),
+		// we should return a timeout error
+		if !stopConnectCtx() && err == nil {
+			err = context.Cause(connectCtx)
+		}
+	}()
+
+	stream, err := w.connectWithTimeout(connectCtx)
 	if err != nil {
 		return nil, err
 	}
 
 	w.queue.ResetSentProgress()
 
-	return NewSingleStreamWriter(ctx, w.createWriterStreamConfig(stream))
+	return NewSingleStreamWriter(connectCtx, w.createWriterStreamConfig(stream))
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
@@ -505,45 +513,16 @@ func (w *WriterReconnector) needReceiveLastSeqNo() bool {
 	return res
 }
 
-func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Context) (RawTopicWriterStream, error) {
-	connectCtx, connectCancel := xcontext.WithCancel(streamLifetimeContext)
-
-	type resT struct {
-		stream RawTopicWriterStream
-		err    error
-	}
-	resCh := make(chan resT, 1)
-
-	go func() {
-		defer func() {
-			p := recover()
-			if p != nil {
-				resCh <- resT{
-					stream: nil,
-					err:    xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: panic while connect to topic writer: %+v", p))),
-				}
-			}
-		}()
-
-		stream, err := w.cfg.Connect(connectCtx, w.cfg.Tracer)
-		resCh <- resT{stream: stream, err: err}
+func (w *WriterReconnector) connectWithTimeout(ctx context.Context) (stream RawTopicWriterStream, err error) {
+	defer func() {
+		p := recover()
+		if p != nil {
+			stream = nil
+			err = xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: panic while connect to topic writer: %+v", p)))
+		}
 	}()
 
-	timer := time.NewTimer(w.cfg.connectTimeout)
-	defer timer.Stop()
-
-	select {
-	case <-timer.C:
-		connectCancel()
-
-		return nil, xerrors.WithStackTrace(errConnTimeout)
-	case res := <-resCh:
-		// force no cancel connect context - because it will break stream
-		// context will cancel by cancel streamLifetimeContext while reconnect or stop connection
-		_ = connectCancel
-
-		return res.stream, res.err
-	}
+	return w.cfg.Connect(ctx, w.cfg.Tracer)
 }
 
 func (w *WriterReconnector) onAckReceived(count int) {
