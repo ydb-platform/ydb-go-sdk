@@ -33,19 +33,33 @@ func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limite
 	}
 }
 
-func (w *Workers) write(ctx context.Context, gen *generator.Generator) error {
-	row, err := gen.Generate()
-	if err != nil {
-		log.Printf("generate error: %v", err)
-
-		return err
-	}
-
+func (w *Workers) write(ctx context.Context, gen *generator.Generator) (finalErr error) {
 	m := w.m.Start(metrics.OperationTypeWrite)
+	var attempts int
+	if w.s != nil {
+		row, err := gen.Generate()
+		if err != nil {
+			log.Printf("generate error: %v", err)
 
-	attempts, err := w.s.Write(ctx, row)
+			return err
+		}
 
-	m.Finish(err, attempts)
+		attempts, finalErr = w.s.Write(ctx, row)
+	} else {
+		rows := make([]generator.Row, 0, w.cfg.BatchSize)
+		for range w.cfg.BatchSize {
+			row, err := gen.Generate()
+			if err != nil {
+				log.Printf("generate error: %v", err)
 
-	return err
+				return err
+			}
+			rows = append(rows, row)
+		}
+
+		attempts, finalErr = w.sb.WriteBatch(ctx, rows)
+	}
+	m.Finish(finalErr, attempts)
+
+	return finalErr
 }

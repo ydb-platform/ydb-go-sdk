@@ -52,6 +52,10 @@ jobs:
             name: native-table-over-query-service
             path: ./native/table/over/query/service
             label: native/table/over/query/service
+          - id: native_bulk_upsert
+            name: native-bulk-upsert
+            path: ./native/bulk-upsert
+            label: native/bulk-upsert
           - id: gorm_table
             name: gorm-table
             path: ./gorm/table
@@ -103,6 +107,11 @@ jobs:
 
       - name: Run SLO Tests
         run: |
+          EXTRA_ARGS=""
+          if [ "${{ matrix.sdk.id }}" = "native_bulk_upsert" ]; then
+            EXTRA_ARGS="--batch-size=10"
+          fi
+
           ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 run grpc://localhost:2135 /Root/testdb \
             -prom-pgw localhost:9091 \
             -report-period 250 \
@@ -110,7 +119,8 @@ jobs:
             -read-rps ${{inputs.slo_workload_read_max_rps || 1000}} \
             -write-rps ${{inputs.slo_workload_write_max_rps || 100}} \
             -read-timeout 1000 \
-            -write-timeout 1000 || true
+            -write-timeout 1000 \
+            $EXTRA_ARGS
 
       - if: always()
         name: Store ydb chaos testing logs

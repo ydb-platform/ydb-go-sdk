@@ -33,6 +33,8 @@ type Config struct {
 
 	Time         int
 	ShutdownTime int
+
+	BatchSize int
 }
 
 func New() (*Config, error) {
@@ -100,6 +102,8 @@ func New() (*Config, error) {
 
 		fs.IntVar(&cfg.Time, "time", 600, "run time in seconds")
 		fs.IntVar(&cfg.ShutdownTime, "shutdown-time", 30, "time to wait before force kill workers")
+
+		fs.IntVar(&cfg.BatchSize, "batch-size", 1, "batch size (used for bulk_upsert/read_rows operations)")
 	default:
 		fmt.Print(mainHelp)
 

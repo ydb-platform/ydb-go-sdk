@@ -14,9 +14,15 @@ type ReadWriter interface {
 	Write(ctx context.Context, row generator.Row) (attempts int, err error)
 }
 
+type BatchReadWriter interface {
+	ReadBatch(ctx context.Context, rowIDs []generator.RowID) (_ []generator.Row, attempts int, err error)
+	WriteBatch(ctx context.Context, rows []generator.Row) (attempts int, err error)
+}
+
 type Workers struct {
 	cfg *config.Config
 	s   ReadWriter
+	sb  BatchReadWriter
 	m   *metrics.Metrics
 }
 
@@ -31,6 +37,21 @@ func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers
 	return &Workers{
 		cfg: cfg,
 		s:   s,
+		m:   m,
+	}, nil
+}
+
+func NewWithBatch(cfg *config.Config, s BatchReadWriter, ref, label, jobName string) (*Workers, error) {
+	m, err := metrics.New(cfg.PushGateway, ref, label, jobName)
+	if err != nil {
+		log.Printf("create metrics failed: %v", err)
+
+		return nil, err
+	}
+
+	return &Workers{
+		cfg: cfg,
+		sb:  s,
 		m:   m,
 	}, nil
 }

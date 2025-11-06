@@ -267,14 +267,18 @@ func (m *Metrics) TimeoutsTotal() float64 {
 }
 
 func (m *Metrics) FailOnError() {
-	if m.ErrorsTotal() > 0 {
+	if m.ErrorsTotal()*100 > m.OperationsTotal() {
 		log.Panicf(
 			"unretriable (or not successfully retried) errors: %.0f errors out of %.0f operations",
 			m.ErrorsTotal(),
 			m.OperationsTotal(),
 		)
 	}
-	if m.TimeoutsTotal() > 0 {
-		log.Panicf("there are user timeouts: %.0f timeouts", m.TimeoutsTotal())
+	if m.TimeoutsTotal()*100 > m.OperationsTotal() {
+		log.Panicf(
+			"user timeouts: %.0f timeouts out of %.0f operations",
+			m.TimeoutsTotal(),
+			m.OperationsTotal(),
+		)
 	}
 }

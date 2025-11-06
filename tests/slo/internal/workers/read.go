@@ -34,11 +34,21 @@ func (w *Workers) Read(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter
 }
 
 func (w *Workers) read(ctx context.Context) error {
-	id := uint64(rand.Intn(int(w.cfg.InitialDataCount))) //nolint:gosec // speed more important
-
-	m := w.m.Start(metrics.OperationTypeRead)
-
-	_, attempts, err := w.s.Read(ctx, id)
+	var m metrics.Span
+	var attempts int
+	var err error
+	if w.s != nil {
+		id := uint64(rand.Intn(int(w.cfg.InitialDataCount))) //nolint:gosec // speed more important
+		m = w.m.Start(metrics.OperationTypeRead)
+		_, attempts, err = w.s.Read(ctx, id)
+	} else {
+		ids := make([]uint64, 0, w.cfg.BatchSize)
+		for range w.cfg.BatchSize {
+			ids = append(ids, uint64(rand.Intn(int(w.cfg.InitialDataCount)))) //nolint:gosec
+		}
+		m = w.m.Start(metrics.OperationTypeRead)
+		_, attempts, err = w.sb.ReadBatch(ctx, ids)
+	}
 
 	m.Finish(err, attempts)
 

@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -18,14 +18,10 @@ import (
 	"slo/internal/workers"
 )
 
-func init() { //nolint:gochecknoinits
-	os.Setenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE", "true")
-}
-
 var (
 	ref     string
 	label   string
-	jobName string
+	jobName = "slo_native_bulk_upsert"
 )
 
 func main() {
@@ -43,23 +39,37 @@ func main() {
 	ctx, cancel = context.WithTimeout(ctx, time.Duration(cfg.Time)*time.Second)
 	defer cancel()
 
-	s, err := NewStorage(cfg, cfg.ReadRPS+cfg.WriteRPS)
+	go func() {
+		<-ctx.Done()
+		log.Println("exiting...")
+	}()
+
+	// pool size similar to query variant
+	s, err := NewStorage(ctx, cfg, cfg.ReadRPS+cfg.WriteRPS, "no_session")
 	if err != nil {
 		panic(fmt.Errorf("create storage failed: %w", err))
 	}
 	defer func() {
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(),
-			time.Duration(cfg.ShutdownTime)*time.Second)
+		var (
+			shutdownCtx    context.Context
+			shutdownCancel context.CancelFunc
+		)
+		if cfg.ShutdownTime > 0 {
+			shutdownCtx, shutdownCancel = context.WithTimeout(context.Background(),
+				time.Duration(cfg.ShutdownTime)*time.Second)
+		} else {
+			shutdownCtx, shutdownCancel = context.WithCancel(context.Background())
+		}
 		defer shutdownCancel()
 
-		_ = s.close(shutdownCtx)
+		_ = s.Close(shutdownCtx)
 	}()
 
 	log.Println("db init ok")
 
 	switch cfg.Mode {
 	case config.CreateMode:
-		err = s.createTable(ctx)
+		err = s.CreateTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
@@ -76,7 +86,7 @@ func main() {
 					return err
 				}
 
-				_, err = s.Write(ctx, e)
+				_, err = s.WriteBatch(ctx, []generator.Row{e})
 				if err != nil {
 					return err
 				}
@@ -85,11 +95,14 @@ func main() {
 			})
 		}
 
-		_ = g.Wait()
+		err = g.Wait()
+		if err != nil {
+			panic(err)
+		}
 
 		log.Println("entries write ok")
 	case config.CleanupMode:
-		err = s.dropTable(ctx)
+		err = s.DropTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
@@ -98,7 +111,7 @@ func main() {
 	case config.RunMode:
 		gen := generator.New(cfg.InitialDataCount)
 
-		w, err := workers.New(cfg, s, ref, label, jobName)
+		w, err := workers.NewWithBatch(cfg, s, ref, label, jobName)
 		if err != nil {
 			panic(fmt.Errorf("create workers failed: %w", err))
 		}
@@ -117,12 +130,14 @@ func main() {
 		for i := 0; i < cfg.ReadRPS; i++ {
 			go w.Read(ctx, &wg, readRL)
 		}
+		log.Println("started " + strconv.Itoa(cfg.ReadRPS) + " read workers")
 
 		writeRL := rate.NewLimiter(rate.Limit(cfg.WriteRPS), 1)
 		wg.Add(cfg.WriteRPS)
 		for i := 0; i < cfg.WriteRPS; i++ {
 			go w.Write(ctx, &wg, writeRL, gen)
 		}
+		log.Println("started " + strconv.Itoa(cfg.WriteRPS) + " write workers")
 
 		metricsRL := rate.NewLimiter(rate.Every(time.Duration(cfg.ReportPeriod)*time.Millisecond), 1)
 		wg.Add(1)
