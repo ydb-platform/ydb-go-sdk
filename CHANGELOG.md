@@ -1,3 +1,5 @@
+* Fixed `context` checking in `ydb.Open`
+
 ## v3.118.1
 * Fixed connection timeout issue in topics writer
 * Supported `sql.Null*` from `database/sql` as query params in `toValue` func
