@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/resolver"
@@ -143,3 +144,14 @@ type mockResolver struct{}
 
 func (r *mockResolver) ResolveNow(resolver.ResolveNowOptions) {}
 func (r *mockResolver) Close()                                {}
+
+func TestNew(t *testing.T) {
+	t.Run("context already canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err := New(ctx, config.New(), nil)
+		require.ErrorIs(t, err, context.Canceled)
+		assert.Regexp(t, "^context canceled at", err.Error())
+	})
+}
