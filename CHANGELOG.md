@@ -1,3 +1,4 @@
+## v3.118.2
 * Fixed checking GRPC transport error in `discovery`
 
 ## v3.118.1
