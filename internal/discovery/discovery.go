@@ -52,7 +52,9 @@ func Discover(
 
 	response, err = client.ListEndpoints(ctx, &request)
 	if err != nil {
-		return nil, location, xerrors.WithStackTrace(err)
+		return nil, location, xerrors.WithStackTrace(
+			xerrors.TransportError(err),
+		)
 	}
 
 	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
