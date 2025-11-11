@@ -282,6 +282,10 @@ func makeDiscoveryFunc(
 func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts ...discoveryConfig.Option) (
 	b *Balancer, finalErr error,
 ) {
+	if ctx.Err() != nil {
+		return nil, xerrors.WithStackTrace(ctx.Err())
+	}
+
 	onDone := trace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
 		driverConfig.Balancer().String(),
