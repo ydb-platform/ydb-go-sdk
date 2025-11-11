@@ -316,7 +316,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		b.balancerConfig = *config
 	}
 
-	if b.balancerConfig.SingleConn {
+	if b.balancerConfig.NoDiscovery {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 			endpoint.New(driverConfig.Endpoint()),
 		}, "")
