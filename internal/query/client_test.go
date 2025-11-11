@@ -1087,6 +1087,241 @@ func TestClient(t *testing.T) {
 				require.Nil(t, r3)
 			}
 		})
+		t.Run("ConcurrentResultSets", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			r, err := clientQuery(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					Status: Ydb.StatusIds_SUCCESS,
+					TxMeta: &Ydb_Query.TransactionMeta{
+						Id: "456",
+					},
+					ResultSetIndex: 0,
+					ResultSet: &Ydb.ResultSet{
+						Columns: []*Ydb.Column{
+							{
+								Name: "a",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									},
+								},
+							},
+							{
+								Name: "b",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UTF8,
+									},
+								},
+							},
+						},
+						Rows: []*Ydb.Value{
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 1,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "1",
+									},
+								}},
+							},
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 2,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "2",
+									},
+								}},
+							},
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 3,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "3",
+									},
+								}},
+							},
+						},
+					},
+				}, nil)
+				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					Status:         Ydb.StatusIds_SUCCESS,
+					ResultSetIndex: 1,
+					ResultSet: &Ydb.ResultSet{
+						Columns: []*Ydb.Column{
+							{
+								Name: "c",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									},
+								},
+							},
+							{
+								Name: "d",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UTF8,
+									},
+								},
+							},
+							{
+								Name: "e",
+								Type: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_BOOL,
+									},
+								},
+							},
+						},
+						Rows: []*Ydb.Value{
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 1,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "1",
+									},
+								}, {
+									Value: &Ydb.Value_BoolValue{
+										BoolValue: true,
+									},
+								}},
+							},
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 2,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "2",
+									},
+								}, {
+									Value: &Ydb.Value_BoolValue{
+										BoolValue: false,
+									},
+								}},
+							},
+						},
+					},
+				}, nil)
+				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					Status:         Ydb.StatusIds_SUCCESS,
+					ResultSetIndex: 0,
+					ResultSet: &Ydb.ResultSet{
+						Rows: []*Ydb.Value{
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 4,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "4",
+									},
+								}},
+							},
+							{
+								Items: []*Ydb.Value{{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 5,
+									},
+								}, {
+									Value: &Ydb.Value_TextValue{
+										TextValue: "5",
+									},
+								}},
+							},
+						},
+					},
+				}, nil)
+				stream.EXPECT().Recv().Return(nil, io.EOF)
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+				return newTestSessionWithClient("123", client, true), nil
+			}), "", query.WithConcurrentResultSets(true))
+			require.NoError(t, err)
+			{
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+				r1, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				var (
+					a uint64
+					b string
+				)
+				err = r1.Scan(&a, &b)
+				require.NoError(t, err)
+				require.EqualValues(t, 1, a)
+				require.EqualValues(t, "1", b)
+				r2, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				err = r2.Scan(&a, &b)
+				require.NoError(t, err)
+				require.EqualValues(t, 2, a)
+				require.EqualValues(t, "2", b)
+				r3, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				err = r3.Scan(&a, &b)
+				require.NoError(t, err)
+				require.EqualValues(t, 3, a)
+				require.EqualValues(t, "3", b)
+				r4, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				err = r4.Scan(&a, &b)
+				require.NoError(t, err)
+				require.EqualValues(t, 4, a)
+				require.EqualValues(t, "4", b)
+				r5, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				err = r5.Scan(&a, &b)
+				require.NoError(t, err)
+				require.EqualValues(t, 5, a)
+				require.EqualValues(t, "5", b)
+				r6, err := rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+				require.Nil(t, r6)
+			}
+			{
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+				r1, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				var (
+					a uint64
+					b string
+					c bool
+				)
+				err = r1.Scan(&a, &b, &c)
+				require.NoError(t, err)
+				require.EqualValues(t, 1, a)
+				require.EqualValues(t, "1", b)
+				require.EqualValues(t, true, c)
+				r2, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				err = r2.Scan(&a, &b, &c)
+				require.NoError(t, err)
+				require.EqualValues(t, 2, a)
+				require.EqualValues(t, "2", b)
+				require.EqualValues(t, false, c)
+				r3, err := rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+				require.Nil(t, r3)
+			}
+		})
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
 			_, err := mockClientForImplicitSessionTest(ctx, t).
 				Query(ctx, "SELECT 1")
