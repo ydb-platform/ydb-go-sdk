@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 func TestDiscover(t *testing.T) {
@@ -85,7 +86,7 @@ func TestDiscover(t *testing.T) {
 		client := NewMockDiscoveryServiceClient(ctrl)
 		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
 			Database: "test",
-		}).Return(nil, xerrors.Transport(status.Error(grpcCodes.Unavailable, "")))
+		}).Return(nil, status.Error(grpcCodes.Unavailable, ""))
 		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 		))
@@ -93,6 +94,7 @@ func TestDiscover(t *testing.T) {
 		require.Empty(t, endpoints)
 		require.Equal(t, "", location)
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
+		require.True(t, retry.Check(err).MustRetry(true), "must retry")
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		ctx := xtest.Context(t)
