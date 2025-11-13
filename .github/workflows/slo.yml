@@ -94,7 +94,7 @@ jobs:
           chmod +x .bin/${{matrix.sdk.id}}_linux_amd64
 
       - name: Inititialize YDB SLO
-        uses: qrort/ydb-slo-action/init@rolling-restart
+        uses: qrort/ydb-slo-action/init@server-metrics
         with:
           github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
