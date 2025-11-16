@@ -441,6 +441,7 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 		columns []*Ydb.Column
 	}
 	resultSetByIndex := make(map[int64]resultSet)
+	maxIndex := int64(-1)
 
 	for {
 		if ctx.Err() != nil {
@@ -450,18 +451,19 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 			return nil, xerrors.WithStackTrace(r.closer.Err())
 		}
 
-		rs := resultSetByIndex[r.lastPart.GetResultSetIndex()]
+		curIndex := r.lastPart.GetResultSetIndex()
+		maxIndex = max(maxIndex, curIndex)
+
+		rs := resultSetByIndex[curIndex]
 		if len(rs.columns) == 0 {
 			rs.columns = r.lastPart.GetResultSet().GetColumns()
 		}
-
 		rows := make([]query.Row, len(r.lastPart.GetResultSet().GetRows()))
 		for i := range r.lastPart.GetResultSet().GetRows() {
 			rows[i] = NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i])
 		}
 		rs.rows = append(rs.rows, rows...)
-
-		resultSetByIndex[r.lastPart.GetResultSetIndex()] = rs
+		resultSetByIndex[curIndex] = rs
 
 		var err error
 		r.lastPart, err = r.nextPart(ctx)
@@ -477,7 +479,7 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 		}
 	}
 
-	resultSets := make([]result.Set, len(resultSetByIndex))
+	resultSets := make([]result.Set, maxIndex+1)
 	for rsIndex, rs := range resultSetByIndex {
 		columnNames := make([]string, len(rs.columns))
 		columnTypes := make([]types.Type, len(rs.columns))
