@@ -852,475 +852,460 @@ func TestClient(t *testing.T) {
 		})
 	})
 	t.Run("Query", func(t *testing.T) {
+		_uint64 := func(v uint64) *Ydb.Value {
+			return &Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: v}}
+		}
+		_str := func(v string) *Ydb.Value {
+			return &Ydb.Value{Value: &Ydb.Value_TextValue{TextValue: v}}
+		}
+		_bool := func(v bool) *Ydb.Value {
+			return &Ydb.Value{Value: &Ydb.Value_BoolValue{BoolValue: v}}
+		}
+		_respPart := func(idx int, columns []*Ydb.Column, rows [][]*Ydb.Value) *Ydb_Query.ExecuteQueryResponsePart {
+			return &Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+				ResultSetIndex: int64(idx),
+				ResultSet: &Ydb.ResultSet{
+					Columns: columns,
+					Rows: func() []*Ydb.Value {
+						out := make([]*Ydb.Value, len(rows))
+						for i, items := range rows {
+							out[i] = &Ydb.Value{Items: items}
+						}
+
+						return out
+					}(),
+				},
+			}
+		}
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			r, err := clientQuery(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-					Status: Ydb.StatusIds_SUCCESS,
-					TxMeta: &Ydb_Query.TransactionMeta{
-						Id: "456",
-					},
-					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
-						Columns: []*Ydb.Column{
-							{
-								Name: "a",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
-								Name: "b",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
-						},
-						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 3,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "3",
-									},
-								}},
-							},
-						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-					Status:         Ydb.StatusIds_SUCCESS,
-					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
-						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 4,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "4",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 5,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "5",
-									},
-								}},
-							},
-						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-					Status:         Ydb.StatusIds_SUCCESS,
-					ResultSetIndex: 1,
-					ResultSet: &Ydb.ResultSet{
-						Columns: []*Ydb.Column{
-							{
-								Name: "c",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
-								Name: "d",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
-							{
-								Name: "e",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_BOOL,
-									},
-								},
-							},
-						},
-						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}, {
-									Value: &Ydb.Value_BoolValue{
-										BoolValue: true,
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}, {
-									Value: &Ydb.Value_BoolValue{
-										BoolValue: false,
-									},
-								}},
-							},
-						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(nil, io.EOF)
-				client := NewMockQueryServiceClient(ctrl)
-				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
+			colsAB := []*Ydb.Column{
+				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+			}
+
+			colsCDE := []*Ydb.Column{
+				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+				{Name: "d", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+				{Name: "e", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
+			}
+
+			respParts := []struct {
+				idx     int
+				columns []*Ydb.Column
+				rows    [][]*Ydb.Value
+			}{
+				{
+					idx:     0,
+					columns: colsAB,
+					rows: [][]*Ydb.Value{
+						{_uint64(1), _str("1")},
+						{_uint64(2), _str("2")},
+						{_uint64(3), _str("3")},
+					},
+				},
+				{
+					idx: 0,
+					rows: [][]*Ydb.Value{
+						{_uint64(4), _str("4")},
+						{_uint64(5), _str("5")},
+					},
+				},
+				{
+					idx:     1,
+					columns: colsCDE,
+					rows: [][]*Ydb.Value{
+						{_uint64(1), _str("1"), _bool(true)},
+						{_uint64(2), _str("2"), _bool(false)},
+					},
+				},
+			}
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+
+			for _, p := range respParts {
+				stream.EXPECT().Recv().Return(
+					_respPart(p.idx, p.columns, p.rows),
+					nil,
+				)
+			}
+
+			stream.EXPECT().Recv().Return(nil, io.EOF)
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), "")
 			require.NoError(t, err)
+
 			{
 				rs, err := r.NextResultSet(ctx)
 				require.NoError(t, err)
-				r1, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				var (
+				for _, want := range []struct {
 					a uint64
 					b string
-				)
-				err = r1.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 1, a)
-				require.EqualValues(t, "1", b)
-				r2, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r2.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 2, a)
-				require.EqualValues(t, "2", b)
-				r3, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r3.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 3, a)
-				require.EqualValues(t, "3", b)
-				r4, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r4.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 4, a)
-				require.EqualValues(t, "4", b)
-				r5, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r5.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 5, a)
-				require.EqualValues(t, "5", b)
-				r6, err := rs.NextRow(ctx)
+				}{
+					{1, "1"},
+					{2, "2"},
+					{3, "3"},
+					{4, "4"},
+					{5, "5"},
+				} {
+					row, err := rs.NextRow(ctx)
+					if want.a == 5 {
+						require.NoError(t, err)
+					}
+					if errors.Is(err, io.EOF) {
+						require.Fail(t, "unexpected EOF")
+					}
+					var a uint64
+					var b string
+					require.NoError(t, row.Scan(&a, &b))
+					require.EqualValues(t, want.a, a)
+					require.EqualValues(t, want.b, b)
+				}
+				row, err := rs.NextRow(ctx)
 				require.ErrorIs(t, err, io.EOF)
-				require.Nil(t, r6)
+				require.Nil(t, row)
 			}
+
 			{
 				rs, err := r.NextResultSet(ctx)
 				require.NoError(t, err)
-				r1, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				var (
+
+				for _, want := range []struct {
 					a uint64
 					b string
 					c bool
-				)
-				err = r1.Scan(&a, &b, &c)
-				require.NoError(t, err)
-				require.EqualValues(t, 1, a)
-				require.EqualValues(t, "1", b)
-				require.EqualValues(t, true, c)
-				r2, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r2.Scan(&a, &b, &c)
-				require.NoError(t, err)
-				require.EqualValues(t, 2, a)
-				require.EqualValues(t, "2", b)
-				require.EqualValues(t, false, c)
-				r3, err := rs.NextRow(ctx)
+				}{
+					{1, "1", true},
+					{2, "2", false},
+				} {
+					row, err := rs.NextRow(ctx)
+					require.NoError(t, err)
+					var a uint64
+					var b string
+					var c bool
+					require.NoError(t, row.Scan(&a, &b, &c))
+					require.EqualValues(t, want.a, a)
+					require.EqualValues(t, want.b, b)
+					require.EqualValues(t, want.c, c)
+				}
+
+				row, err := rs.NextRow(ctx)
 				require.ErrorIs(t, err, io.EOF)
-				require.Nil(t, r3)
+				require.Nil(t, row)
+			}
+		})
+		t.Run("ResultSetIndexesWithGaps", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			colsAB := []*Ydb.Column{
+				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+			}
+
+			colsCDE := []*Ydb.Column{
+				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+				{Name: "d", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+				{Name: "e", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
+			}
+
+			respParts := []struct {
+				idx     int
+				columns []*Ydb.Column
+				rows    [][]*Ydb.Value
+			}{
+				{
+					idx:     0,
+					columns: colsAB,
+					rows: [][]*Ydb.Value{
+						{_uint64(1), _str("1")},
+						{_uint64(2), _str("2")},
+						{_uint64(3), _str("3")},
+					},
+				},
+				{
+					idx: 0,
+					rows: [][]*Ydb.Value{
+						{_uint64(4), _str("4")},
+						{_uint64(5), _str("5")},
+					},
+				},
+				{
+					idx:     2,
+					columns: colsCDE,
+					rows: [][]*Ydb.Value{
+						{_uint64(1), _str("1"), _bool(true)},
+						{_uint64(2), _str("2"), _bool(false)},
+					},
+				},
+			}
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+
+			for _, p := range respParts {
+				stream.EXPECT().Recv().Return(
+					_respPart(p.idx, p.columns, p.rows),
+					nil,
+				)
+			}
+
+			stream.EXPECT().Recv().Return(nil, io.EOF)
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
+				return newTestSessionWithClient("123", client, true), nil
+			}), "")
+			require.NoError(t, err)
+
+			{
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+				for _, want := range []struct {
+					a uint64
+					b string
+				}{
+					{1, "1"},
+					{2, "2"},
+					{3, "3"},
+					{4, "4"},
+					{5, "5"},
+				} {
+					row, err := rs.NextRow(ctx)
+					if want.a == 5 {
+						require.NoError(t, err)
+					}
+					if errors.Is(err, io.EOF) {
+						require.Fail(t, "unexpected EOF")
+					}
+					var a uint64
+					var b string
+					require.NoError(t, row.Scan(&a, &b))
+					require.EqualValues(t, want.a, a)
+					require.EqualValues(t, want.b, b)
+				}
+				row, err := rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+				require.Nil(t, row)
+			}
+
+			{
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+
+				for _, want := range []struct {
+					a uint64
+					b string
+					c bool
+				}{
+					{1, "1", true},
+					{2, "2", false},
+				} {
+					row, err := rs.NextRow(ctx)
+					require.NoError(t, err)
+					var a uint64
+					var b string
+					var c bool
+					require.NoError(t, row.Scan(&a, &b, &c))
+					require.EqualValues(t, want.a, a)
+					require.EqualValues(t, want.b, b)
+					require.EqualValues(t, want.c, c)
+				}
+
+				row, err := rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+				require.Nil(t, row)
 			}
 		})
 		t.Run("ConcurrentResultSets", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			r, err := clientQuery(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-					Status: Ydb.StatusIds_SUCCESS,
-					TxMeta: &Ydb_Query.TransactionMeta{
-						Id: "456",
-					},
-					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
-						Columns: []*Ydb.Column{
-							{
-								Name: "a",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
-								Name: "b",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
-						},
-						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 3,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "3",
-									},
-								}},
-							},
-						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-					Status:         Ydb.StatusIds_SUCCESS,
-					ResultSetIndex: 1,
-					ResultSet: &Ydb.ResultSet{
-						Columns: []*Ydb.Column{
-							{
-								Name: "c",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
-								Name: "d",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
-							{
-								Name: "e",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_BOOL,
-									},
-								},
-							},
-						},
-						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}, {
-									Value: &Ydb.Value_BoolValue{
-										BoolValue: true,
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}, {
-									Value: &Ydb.Value_BoolValue{
-										BoolValue: false,
-									},
-								}},
-							},
-						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-					Status:         Ydb.StatusIds_SUCCESS,
-					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
-						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 4,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "4",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 5,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "5",
-									},
-								}},
-							},
-						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(nil, io.EOF)
-				client := NewMockQueryServiceClient(ctrl)
-				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
+			colsAB := []*Ydb.Column{
+				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+			}
+
+			colsCDE := []*Ydb.Column{
+				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+				{Name: "d", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+				{Name: "e", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
+			}
+
+			respParts := []struct {
+				idx     int
+				columns []*Ydb.Column
+				rows    [][]*Ydb.Value
+			}{
+				{
+					idx:     0,
+					columns: colsAB,
+					rows: [][]*Ydb.Value{
+						{_uint64(1), _str("1")},
+						{_uint64(2), _str("2")},
+						{_uint64(3), _str("3")},
+					},
+				},
+				{
+					idx:     1,
+					columns: colsCDE,
+					rows: [][]*Ydb.Value{
+						{_uint64(1), _str("1"), _bool(true)},
+						{_uint64(2), _str("2"), _bool(false)},
+					},
+				},
+				{
+					idx: 0,
+					rows: [][]*Ydb.Value{
+						{_uint64(4), _str("4")},
+						{_uint64(5), _str("5")},
+					},
+				},
+			}
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+
+			for _, p := range respParts {
+				stream.EXPECT().Recv().Return(
+					_respPart(p.idx, p.columns, p.rows),
+					nil,
+				)
+			}
+
+			stream.EXPECT().Recv().Return(nil, io.EOF)
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), "", query.WithConcurrentResultSets(true))
 			require.NoError(t, err)
+
 			{
 				rs, err := r.NextResultSet(ctx)
 				require.NoError(t, err)
-				r1, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				var (
+
+				for _, want := range []struct {
 					a uint64
 					b string
-				)
-				err = r1.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 1, a)
-				require.EqualValues(t, "1", b)
-				r2, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r2.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 2, a)
-				require.EqualValues(t, "2", b)
-				r3, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r3.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 3, a)
-				require.EqualValues(t, "3", b)
-				r4, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r4.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 4, a)
-				require.EqualValues(t, "4", b)
-				r5, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r5.Scan(&a, &b)
-				require.NoError(t, err)
-				require.EqualValues(t, 5, a)
-				require.EqualValues(t, "5", b)
-				r6, err := rs.NextRow(ctx)
+				}{
+					{1, "1"},
+					{2, "2"},
+					{3, "3"},
+					{4, "4"},
+					{5, "5"},
+				} {
+					row, err := rs.NextRow(ctx)
+					if errors.Is(err, io.EOF) {
+						require.Fail(t, "unexpected EOF in RS0")
+					}
+					require.NoError(t, err)
+					var a uint64
+					var b string
+					require.NoError(t, row.Scan(&a, &b))
+					require.EqualValues(t, want.a, a)
+					require.EqualValues(t, want.b, b)
+				}
+
+				row, err := rs.NextRow(ctx)
 				require.ErrorIs(t, err, io.EOF)
-				require.Nil(t, r6)
+				require.Nil(t, row)
 			}
+
 			{
 				rs, err := r.NextResultSet(ctx)
 				require.NoError(t, err)
-				r1, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				var (
+
+				for _, want := range []struct {
 					a uint64
 					b string
 					c bool
-				)
-				err = r1.Scan(&a, &b, &c)
-				require.NoError(t, err)
-				require.EqualValues(t, 1, a)
-				require.EqualValues(t, "1", b)
-				require.EqualValues(t, true, c)
-				r2, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				err = r2.Scan(&a, &b, &c)
-				require.NoError(t, err)
-				require.EqualValues(t, 2, a)
-				require.EqualValues(t, "2", b)
-				require.EqualValues(t, false, c)
-				r3, err := rs.NextRow(ctx)
+				}{
+					{1, "1", true},
+					{2, "2", false},
+				} {
+					row, err := rs.NextRow(ctx)
+					require.NoError(t, err)
+					var a uint64
+					var b string
+					var c bool
+					require.NoError(t, row.Scan(&a, &b, &c))
+					require.EqualValues(t, want.a, a)
+					require.EqualValues(t, want.b, b)
+					require.EqualValues(t, want.c, c)
+				}
+
+				row, err := rs.NextRow(ctx)
 				require.ErrorIs(t, err, io.EOF)
-				require.Nil(t, r3)
+				require.Nil(t, row)
 			}
+		})
+		t.Run("CancelWhileReadResult", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			executeCtx, cancel := context.WithCancel(xtest.Context(t))
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+				cancel()
+
+				<-executeCtx.Done()
+
+				return nil, executeCtx.Err()
+			})
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+			_, err := clientQuery(executeCtx, testPool(ctx, func(context.Context) (*Session, error) {
+				return newTestSessionWithClient("123", client, true), nil
+			}), "", query.WithConcurrentResultSets(true))
+
+			require.ErrorIs(t, err, context.Canceled)
+		})
+		t.Run("EmptyResultSet", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+
+			stream.EXPECT().Recv().Return(
+				&Ydb_Query.ExecuteQueryResponsePart{
+					Status:         Ydb.StatusIds_SUCCESS,
+					TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+					ResultSetIndex: int64(0),
+					ResultSet: &Ydb.ResultSet{
+						Columns: []*Ydb.Column{
+							{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+						},
+						Rows: []*Ydb.Value{},
+					},
+				},
+				nil,
+			)
+
+			stream.EXPECT().Recv().Return(nil, io.EOF)
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
+				return newTestSessionWithClient("123", client, true), nil
+			}), "", query.WithConcurrentResultSets(true))
+			require.NoError(t, err)
+
+			rs, err := r.NextResultSet(ctx)
+			require.NoError(t, err)
+
+			row, err := rs.NextRow(ctx)
+			require.ErrorIs(t, err, io.EOF)
+			require.Nil(t, row)
 		})
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
 			_, err := mockClientForImplicitSessionTest(ctx, t).

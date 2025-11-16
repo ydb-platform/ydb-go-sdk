@@ -1,10 +1,12 @@
 package query
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -443,25 +445,17 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 	resultSetByIndex := make(map[int64]resultSet)
 
 	for {
-		if ctx.Err() != nil {
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		}
-		if r.closer.Err() != nil {
-			return nil, xerrors.WithStackTrace(r.closer.Err())
-		}
+		curIndex := r.lastPart.GetResultSetIndex()
 
-		rs := resultSetByIndex[r.lastPart.GetResultSetIndex()]
+		rs := resultSetByIndex[curIndex]
 		if len(rs.columns) == 0 {
 			rs.columns = r.lastPart.GetResultSet().GetColumns()
 		}
 
-		rows := make([]query.Row, len(r.lastPart.GetResultSet().GetRows()))
 		for i := range r.lastPart.GetResultSet().GetRows() {
-			rows[i] = NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i])
+			rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
 		}
-		rs.rows = append(rs.rows, rows...)
-
-		resultSetByIndex[r.lastPart.GetResultSetIndex()] = rs
+		resultSetByIndex[curIndex] = rs
 
 		var err error
 		r.lastPart, err = r.nextPart(ctx)
@@ -472,12 +466,9 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 
 			return nil, xerrors.WithStackTrace(err)
 		}
-		if r.lastPart.GetExecStats() != nil && r.statsCallback != nil {
-			r.statsCallback(stats.FromQueryStats(r.lastPart.GetExecStats()))
-		}
 	}
 
-	resultSets := make([]result.Set, len(resultSetByIndex))
+	resultSets := make([]result.Set, 0, len(resultSetByIndex))
 	for rsIndex, rs := range resultSetByIndex {
 		columnNames := make([]string, len(rs.columns))
 		columnTypes := make([]types.Type, len(rs.columns))
@@ -487,8 +478,11 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 			columnTypes[i] = types.TypeFromYDB(rs.columns[i].GetType())
 		}
 
-		resultSets[rsIndex] = MaterializedResultSet(int(rsIndex), columnNames, columnTypes, rs.rows)
+		resultSets = append(resultSets, MaterializedResultSet(int(rsIndex), columnNames, columnTypes, rs.rows))
 	}
+	slices.SortFunc(resultSets, func(a, b result.Set) int {
+		return cmp.Compare(a.Index(), b.Index())
+	})
 
 	return &materializedResult{
 		resultSets: resultSets,

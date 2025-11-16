@@ -73,11 +73,9 @@ type (
 	}
 	execModeOption         = ExecMode
 	responsePartLimitBytes int64
-
-	issuesOption struct {
+	issuesOption           struct {
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
-
 	concurrentResultSets bool
 )
 
