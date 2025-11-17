@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -26,11 +27,20 @@ func Struct(data *Data) StructScanner {
 }
 
 func fieldName(f reflect.StructField, tagName string) string { //nolint:gocritic
-	if name, has := f.Tag.Lookup(tagName); has {
-		return name
+	if tagValue, has := f.Tag.Lookup(tagName); has {
+		tag := parseFieldTag(tagValue)
+		return tag.columnName
 	}
 
 	return f.Name
+}
+
+func fieldTag(f reflect.StructField, tagName string) structFieldTag { //nolint:gocritic
+	if tagValue, has := f.Tag.Lookup(tagName); has {
+		return parseFieldTag(tagValue)
+	}
+
+	return structFieldTag{columnName: f.Name}
 }
 
 func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (err error) {
@@ -55,19 +65,36 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 	missingColumns := make([]string, 0, len(s.data.columns))
 	existingFields := make(map[string]struct{}, tt.NumField())
 	for i := 0; i < tt.NumField(); i++ {
-		name := fieldName(tt.Field(i), settings.TagName)
-		if name == "-" {
+		tag := fieldTag(tt.Field(i), settings.TagName)
+		if tag.columnName == "-" {
 			continue
 		}
 
-		v, err := s.data.seekByName(name)
+		v, err := s.data.seekByName(tag.columnName)
 		if err != nil {
-			missingColumns = append(missingColumns, name)
+			missingColumns = append(missingColumns, tag.columnName)
 		} else {
-			if err = value.CastTo(v, ptr.Elem().Field(i).Addr().Interface()); err != nil {
-				return xerrors.WithStackTrace(fmt.Errorf("scan error on struct field name '%s': %w", name, err))
+			// Validate type if type annotation is present
+			if tag.ydbType != "" {
+				expectedType, err := parseYDBType(tag.ydbType)
+				if err != nil {
+					return xerrors.WithStackTrace(fmt.Errorf("invalid type annotation for field '%s': %w", tag.columnName, err))
+				}
+				actualType := types.TypeFromYDB(v.Type().ToYDB())
+				if !types.Equal(expectedType, actualType) {
+					return xerrors.WithStackTrace(fmt.Errorf(
+						"type mismatch for field '%s': expected %s, got %s",
+						tag.columnName,
+						expectedType.String(),
+						actualType.String(),
+					))
+				}
 			}
-			existingFields[name] = struct{}{}
+
+			if err = value.CastTo(v, ptr.Elem().Field(i).Addr().Interface()); err != nil {
+				return xerrors.WithStackTrace(fmt.Errorf("scan error on struct field name '%s': %w", tag.columnName, err))
+			}
+			existingFields[tag.columnName] = struct{}{}
 		}
 	}
 
