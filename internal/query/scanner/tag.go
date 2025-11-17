@@ -56,7 +56,7 @@ func parseFieldTag(tagValue string) structFieldTag {
 
 	// Find first top-level comma (outside angle brackets)
 	commaPos := findTopLevelComma(tagValue)
-	
+
 	var columnName, typeAnnotation string
 	if commaPos == -1 {
 		// No comma found, just column name

@@ -31,16 +31,6 @@ func (d Data) seekByName(name string) (value.Value, error) {
 	return nil, xerrors.WithStackTrace(fmt.Errorf("'%s': %w", name, ErrColumnsNotFoundInRow))
 }
 
-func (d Data) columnTypeByName(name string) (*Ydb.Type, error) {
-	for i := range d.columns {
-		if d.columns[i].GetName() == name {
-			return d.columns[i].GetType(), nil
-		}
-	}
-
-	return nil, xerrors.WithStackTrace(fmt.Errorf("'%s': %w", name, ErrColumnsNotFoundInRow))
-}
-
 func (d Data) seekByIndex(idx int) value.Value {
 	return value.FromYDB(d.columns[idx].GetType(), d.values[idx])
 }

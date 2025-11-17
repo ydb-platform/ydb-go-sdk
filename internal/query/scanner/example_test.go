@@ -82,11 +82,11 @@ func Example_typeAnnotations() {
 // This still works, but provides less validation and documentation.
 func Example_withoutTypeAnnotations() {
 	type Series struct {
-		SeriesID    []byte  `sql:"series_id"`
-		Title       string  `sql:"title"`
-		ReleaseDate string  `sql:"release_date"`
+		SeriesID    []byte   `sql:"series_id"`
+		Title       string   `sql:"title"`
+		ReleaseDate string   `sql:"release_date"`
 		Tags        []string `sql:"tags"`
-		Rating      *uint64 `sql:"rating"`
+		Rating      *uint64  `sql:"rating"`
 	}
 
 	// This works the same way, but doesn't validate types
