@@ -8,6 +8,36 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+// YDB Type Annotations
+//
+// This package supports type annotations in struct field tags to validate that database
+// column types match the expected types. Type annotations are optional but provide:
+//   - Runtime validation of type compatibility
+//   - Better code documentation
+//   - Early detection of schema changes
+//
+// Syntax:
+//   type MyStruct struct {
+//       Name string `sql:"column_name,type:Text"`
+//       Age  uint64 `sql:"age,type:Uint64"`
+//   }
+//
+// Supported type formats:
+//   - Primitive types: Bool, Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64,
+//     Float, Double, Date, Datetime, Timestamp, Text, Bytes, JSON, UUID, etc.
+//   - List types: List<T> where T is any valid type
+//   - Optional types: Optional<T> where T is any valid type
+//   - Dict types: Dict<K,V> where K and V are valid types
+//   - Nested types: List<Optional<Text>>, Optional<List<Uint64>>, etc.
+//
+// Example:
+//   type Product struct {
+//       ID       uint64    `sql:"product_id,type:Uint64"`
+//       Name     string    `sql:"name,type:Text"`
+//       Tags     []string  `sql:"tags,type:List<Text>"`
+//       Rating   *float64  `sql:"rating,type:Optional<Double>"`
+//   }
+
 // structFieldTag represents parsed struct field tag information
 type structFieldTag struct {
 	columnName string
