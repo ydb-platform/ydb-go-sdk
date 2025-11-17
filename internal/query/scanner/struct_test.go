@@ -1376,3 +1376,23 @@ func TestStructOptionalWithoutTypeAnnotation(t *testing.T) {
 	require.Equal(t, "optional-value", *row.A)
 }
 
+func TestStructWithDictTypeAnnotation(t *testing.T) {
+	// Test that Dict type annotation with comma in the type is parsed correctly
+	// This validates the fix for parseFieldTag to use findTopLevelComma
+	
+	// First verify the tag parsing works for Dict types
+	tag := parseFieldTag("metadata,type:Dict<Text,Uint64>")
+	require.Equal(t, "metadata", tag.columnName)
+	require.Equal(t, "Dict<Text,Uint64>", tag.ydbType)
+	
+	// Verify the type can be parsed
+	dictType, err := parseYDBType("Dict<Text,Uint64>")
+	require.NoError(t, err)
+	require.NotNil(t, dictType)
+	require.Equal(t, "Dict<Utf8,Uint64>", dictType.String())
+}
+
+
+
+
+

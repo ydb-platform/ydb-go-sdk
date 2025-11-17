@@ -81,7 +81,7 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 					return xerrors.WithStackTrace(fmt.Errorf("invalid type annotation for field '%s': %w", tag.columnName, err))
 				}
 				actualType := types.TypeFromYDB(v.Type().ToYDB())
-				if expectedType.String() != actualType.String() {
+				if !types.Equal(expectedType, actualType) {
 					return xerrors.WithStackTrace(fmt.Errorf(
 						"type mismatch for field '%s': expected %s, got %s",
 						tag.columnName,

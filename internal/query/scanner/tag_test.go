@@ -44,6 +44,16 @@ func TestParseFieldTag(t *testing.T) {
 			tagValue: "id,type:Optional<Uint64>",
 			want:     structFieldTag{columnName: "id", ydbType: "Optional<Uint64>"},
 		},
+		{
+			name:     "dict type with comma",
+			tagValue: "metadata,type:Dict<Text,Uint64>",
+			want:     structFieldTag{columnName: "metadata", ydbType: "Dict<Text,Uint64>"},
+		},
+		{
+			name:     "dict type with spaces",
+			tagValue: "metadata , type:Dict<Text, Uint64>",
+			want:     structFieldTag{columnName: "metadata", ydbType: "Dict<Text, Uint64>"},
+		},
 	}
 
 	for _, tt := range tests {

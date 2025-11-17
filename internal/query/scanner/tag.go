@@ -54,21 +54,26 @@ func parseFieldTag(tagValue string) structFieldTag {
 		return structFieldTag{columnName: tagValue}
 	}
 
-	// Split by comma to separate column name from options
-	parts := strings.Split(tagValue, ",")
-	tag := structFieldTag{
-		columnName: strings.TrimSpace(parts[0]),
-	}
-
-	// Parse options (e.g., type:List<Text>)
-	for i := 1; i < len(parts); i++ {
-		option := strings.TrimSpace(parts[i])
-		if strings.HasPrefix(option, "type:") {
-			tag.ydbType = strings.TrimSpace(strings.TrimPrefix(option, "type:"))
+	// Find first top-level comma (outside angle brackets)
+	commaPos := findTopLevelComma(tagValue)
+	
+	var columnName, typeAnnotation string
+	if commaPos == -1 {
+		// No comma found, just column name
+		columnName = strings.TrimSpace(tagValue)
+	} else {
+		columnName = strings.TrimSpace(tagValue[:commaPos])
+		// Parse options after the comma
+		options := strings.TrimSpace(tagValue[commaPos+1:])
+		if strings.HasPrefix(options, "type:") {
+			typeAnnotation = strings.TrimSpace(strings.TrimPrefix(options, "type:"))
 		}
 	}
 
-	return tag
+	return structFieldTag{
+		columnName: columnName,
+		ydbType:    typeAnnotation,
+	}
 }
 
 // parseYDBType parses a YDB type string and returns the corresponding types.Type
