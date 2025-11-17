@@ -1005,3 +1005,185 @@ func TestScannerDecimalBigDecimal(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedVal, row.A)
 }
+
+func TestStructWithTypeAnnotation(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+			{
+				Name: "B",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UINT64,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test-value",
+				},
+			},
+			{
+				Value: &Ydb.Value_Uint64Value{
+					Uint64Value: 42,
+				},
+			},
+		},
+	))
+	var row struct {
+		A string `sql:"A,type:Text"`
+		B uint64 `sql:"B,type:Uint64"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, "test-value", row.A)
+	require.Equal(t, uint64(42), row.B)
+}
+
+func TestStructWithListTypeAnnotation(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_ListType{
+						ListType: &Ydb.ListType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Items: []*Ydb.Value{
+					{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "item1",
+						},
+					},
+					{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "item2",
+						},
+					},
+				},
+			},
+		},
+	))
+	var row struct {
+		A []string `sql:"A,type:List<Text>"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, []string{"item1", "item2"}, row.A)
+}
+
+func TestStructWithOptionalTypeAnnotation(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_NestedValue{
+					NestedValue: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "optional-value",
+						},
+					},
+				},
+			},
+		},
+	))
+	var row struct {
+		A *string `sql:"A,type:Optional<Text>"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.NotNil(t, row.A)
+	require.Equal(t, "optional-value", *row.A)
+}
+
+func TestStructWithTypeMismatch(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var row struct {
+		A string `sql:"A,type:Uint64"` // Wrong type annotation
+	}
+	err := scanner.ScanStruct(&row)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "type mismatch")
+}
+
+func TestStructWithInvalidTypeAnnotation(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var row struct {
+		A string `sql:"A,type:InvalidType"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid type annotation")
+}
+
