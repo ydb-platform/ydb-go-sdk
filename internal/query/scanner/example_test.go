@@ -99,9 +99,6 @@ func Example_withoutTypeAnnotations() {
 // Example_complexTypes shows using complex nested type annotations.
 func Example_complexTypes() {
 	type Product struct {
-		// Dict type: mapping from string to uint64
-		Metadata map[string]uint64 `sql:"metadata,type:Dict<Text,Uint64>"`
-
 		// List of optional values
 		AlternateNames []*string `sql:"alternate_names,type:List<Optional<Text>>"`
 
