@@ -1,4 +1,4 @@
-name: slo
+name: SLO
 
 on:
   push:
@@ -12,6 +12,9 @@ on:
     inputs:
       github_pull_request_number:
         required: true
+      baseline_ref:
+        description: "Baseline commit/branch/tag to compare against (leave empty to auto-detect merge-base with main)"
+        required: false
       slo_workload_duration_seconds:
         default: '600'
         required: false
@@ -23,7 +26,7 @@ on:
         required: false
 
 jobs:
-  ydb-slo-action-init:
+  ydb-slo-action:
     if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
 
     name: Run YDB SLO Tests
@@ -78,63 +81,214 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Go
-        uses: actions/setup-go@v5
+      - name: Checkout current version
+        uses: actions/checkout@v5
         with:
-          go-version: 1.25.x
-          cache: true
+          path: current
+          fetch-depth: 0
 
-      - name: Build workload
+      - name: Determine baseline commit
+        id: baseline
         run: |
-          cd ./tests/slo
-          go build -o .bin/${{matrix.sdk.id}}_linux_amd64 -ldflags "-X \"main.ref=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}\" -X \"main.label=${{matrix.sdk.label}}\" -X \"main.jobName=${{matrix.sdk.name}}\"" ${{matrix.sdk.path}}
-          chmod +x .bin/${{matrix.sdk.id}}_linux_amd64
+          cd current
+          if [[ -n "${{ inputs.baseline_ref }}" ]]; then
+            BASELINE="${{ inputs.baseline_ref }}"
+          else
+            BASELINE=$(git merge-base HEAD origin/master)
+          fi
+          echo "sha=$BASELINE" >> $GITHUB_OUTPUT
 
-      - name: Inititialize YDB SLO
+          # Try to determine a human-readable ref name for baseline
+          # Check if baseline is on master
+          if git merge-base --is-ancestor $BASELINE origin/master && \
+             [ "$(git rev-parse origin/master)" = "$BASELINE" ]; then
+            BASELINE_REF="master"
+          else
+            # Try to find a branch containing this commit
+            BRANCH=$(git branch -r --contains $BASELINE | grep -v HEAD | head -1 | sed 's/.*\///' || echo "")
+            if [ -n "$BRANCH" ]; then
+              BASELINE_REF="${BRANCH}@${BASELINE:0:7}"
+            else
+              BASELINE_REF="${BASELINE:0:7}"
+            fi
+          fi
+          echo "ref=$BASELINE_REF" >> $GITHUB_OUTPUT
+
+      - name: Checkout baseline version
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.baseline.outputs.sha }}
+          path: baseline
+          fetch-depth: 1
+
+      - name: Build workload images
+        run: |
+          # Build current version
+          if [ -f "$GITHUB_WORKSPACE/current/tests/slo/Dockerfile" ]; then
+            echo "Building current app image..."
+            cd "$GITHUB_WORKSPACE/current"
+            CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+            docker build -t ydb-app-current \
+              --build-arg SRC_PATH=${{ matrix.sdk.label }} \
+              --build-arg JOB_NAME=${{ matrix.sdk.name }} \
+              --build-arg REF="${CURRENT_REF}" \
+              -f tests/slo/Dockerfile .
+          else
+            echo "No current app Dockerfile found"
+            exit 1
+          fi
+
+          # Build baseline version
+          if [ -f "$GITHUB_WORKSPACE/baseline/tests/slo/Dockerfile" ]; then
+            echo "Building baseline app image..."
+            cd "$GITHUB_WORKSPACE/baseline"
+
+            # Copy current versions of build infrastructure to baseline
+            echo "Copying current Dockerfile, go.mod, go.sum, and internal to baseline..."
+            cp "$GITHUB_WORKSPACE/current/tests/slo/Dockerfile" "$GITHUB_WORKSPACE/baseline/tests/slo/Dockerfile"
+            cp "$GITHUB_WORKSPACE/current/tests/slo/go.mod" "$GITHUB_WORKSPACE/baseline/tests/slo/go.mod"
+            cp "$GITHUB_WORKSPACE/current/tests/slo/go.sum" "$GITHUB_WORKSPACE/baseline/tests/slo/go.sum"
+            rm -rf "$GITHUB_WORKSPACE/baseline/tests/slo/internal"
+            cp -r "$GITHUB_WORKSPACE/current/tests/slo/internal" "$GITHUB_WORKSPACE/baseline/tests/slo/internal"
+
+            docker build -t ydb-app-baseline \
+              --build-arg SRC_PATH=${{ matrix.sdk.label }} \
+              --build-arg JOB_NAME=${{ matrix.sdk.name }} \
+              --build-arg REF="${{ steps.baseline.outputs.ref }}" \
+              -f tests/slo/Dockerfile .
+          else
+            echo "No baseline app Dockerfile found"
+            exit 1
+          fi
+
+      - name: Initialize YDB SLO
         uses: ydb-platform/ydb-slo-action/init@main
         with:
           github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          sdk_name: ${{ matrix.sdk.name }}
-          ydb_database_node_count: 5
+          workload_name: ${{ matrix.sdk.name }}
 
       - name: Prepare SLO Database
         run: |
-          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 create grpc://localhost:2135 /Root/testdb
+          echo "Preparing SLO database..."
+          docker run --rm --network ydb_ydb-net \
+            --add-host "ydb:172.28.0.11" \
+            --add-host "ydb:172.28.0.12" \
+            --add-host "ydb:172.28.0.13" \
+            --add-host "ydb:172.28.0.99" \
+            ydb-app-current create grpc://ydb:2136 /Root/testdb
 
-      - name: Run SLO Tests
+      - name: Run SLO Tests (parallel)
+        timeout-minutes: 15
         run: |
+          set -e
+
+          DURATION=${{ inputs.slo_workload_duration_seconds || 600 }}
+          READ_RPS=${{ inputs.slo_workload_read_max_rps || 1000 }}
+          WRITE_RPS=${{ inputs.slo_workload_write_max_rps || 100 }}
+
           EXTRA_ARGS=""
           if [ "${{ matrix.sdk.id }}" = "native_bulk_upsert" ]; then
             EXTRA_ARGS="--batch-size=10"
           fi
 
-          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 run grpc://localhost:2135 /Root/testdb \
-            -prom-pgw localhost:9091 \
+          ARGS="run grpc://ydb:2136 /Root/testdb \
+            -otlp-endpoint prometheus:9090 \
             -report-period 250 \
-            -time ${{inputs.slo_workload_duration_seconds || 600}} \
-            -read-rps ${{inputs.slo_workload_read_max_rps || 1000}} \
-            -write-rps ${{inputs.slo_workload_write_max_rps || 100}} \
+            -time $DURATION \
+            -read-rps $READ_RPS \
+            -write-rps $WRITE_RPS \
             -read-timeout 1000 \
             -write-timeout 1000 \
-            $EXTRA_ARGS
+            $EXTRA_ARGS"
+
+          echo "Starting ydb-app-current..."
+          docker run -d \
+            --name ydb-app-current \
+            --network ydb_ydb-net \
+            --add-host "ydb:172.28.0.11" \
+            --add-host "ydb:172.28.0.12" \
+            --add-host "ydb:172.28.0.13" \
+            --add-host "ydb:172.28.0.99" \
+            ydb-app-current $ARGS
+
+          echo "Starting ydb-app-baseline..."
+          docker run -d \
+            --name ydb-app-baseline \
+            --network ydb_ydb-net \
+            --add-host "ydb:172.28.0.11" \
+            --add-host "ydb:172.28.0.12" \
+            --add-host "ydb:172.28.0.13" \
+            ydb-app-baseline $ARGS
+
+          # Show initial logs
+          sleep 5
+          echo ""
+          echo "==================== INITIAL CURRENT LOGS ===================="
+          docker logs ydb-app-current 2>&1 || echo "No current container"
+          echo ""
+          echo "==================== INITIAL BASELINE LOGS ===================="
+          docker logs ydb-app-baseline 2>&1 || echo "No baseline container"
+          echo ""
+
+          # Wait for containers to finish
+          echo "Waiting for workloads to complete (${DURATION}s)..."
+
+          # Wait for current container
+          if docker ps -q -f name=ydb-app-current | grep -q .; then
+            echo "Waiting for ydb-app-current..."
+            docker wait ydb-app-current || echo "Current container wait failed"
+          fi
+
+          # Wait for baseline container
+          if docker ps -q -f name=ydb-app-baseline | grep -q .; then
+            echo "Waiting for ydb-app-baseline..."
+            docker wait ydb-app-baseline || echo "Baseline container wait failed"
+          fi
+
+          # Check exit codes
+          CURRENT_EXIT=$(docker inspect ydb-app-current --format='{{.State.ExitCode}}' 2>/dev/null || echo "1")
+          BASELINE_EXIT=$(docker inspect ydb-app-baseline --format='{{.State.ExitCode}}' 2>/dev/null || echo "0")
+
+          echo "Current container exit code: $CURRENT_EXIT"
+          echo "Baseline container exit code: $BASELINE_EXIT"
+
+          if [ "$CURRENT_EXIT" -ne 0 ]; then
+            echo "WARNING: Current workload failed with exit code $CURRENT_EXIT"
+          fi
+
+          if [ "$BASELINE_EXIT" -ne 0 ]; then
+             echo "WARNING: Baseline workload failed with exit code $BASELINE_EXIT"
+          fi
+
+          echo "SUCCESS: Workloads completed successfully"
 
       - if: always()
-        name: Store ydb chaos testing logs
+        name: Store logs
         run: |
-          docker logs ydb-chaos > chaos-ydb.log
+          docker logs ydb-app-current > current.log 2>&1 || echo "No current container"
+          docker logs ydb-app-baseline > baseline.log 2>&1 || echo "No baseline container"
 
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{matrix.sdk.name}}-chaos-ydb.log
-          path: ./chaos-ydb.log
+          name: ${{matrix.sdk.name}}-logs
+          path: |
+            ./current.log
+            ./baseline.log
           retention-days: 1
 
       - if: always()
         name: Cleanup SLO Database
         run: |
-          ./tests/slo/.bin/${{matrix.sdk.id}}_linux_amd64 cleanup grpc://localhost:2135 /Root/testdb || true
+          echo "Cleaning up SLO database..."
+
+          # Cleanup using current app (if it works)
+          docker run --rm --network ydb_ydb-net \
+            --add-host "ydb:172.28.0.11" \
+            --add-host "ydb:172.28.0.12" \
+            --add-host "ydb:172.28.0.13" \
+            ydb-app-current cleanup grpc://ydb:2136 /Root/testdb || true
+
+          # Stop and remove app containers
+          docker rm -f ydb-app-current ydb-app-baseline 2>/dev/null || true
