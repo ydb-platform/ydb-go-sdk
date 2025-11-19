@@ -33,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         sdk:
           - id: database_sql_table
@@ -237,18 +238,28 @@ jobs:
           echo "Waiting for workloads to complete (${DURATION}s)..."
 
           # Add extra time for graceful shutdown
-          WAIT_TIMEOUT=$((DURATION + 10))
+          WAIT_TIMEOUT=$((DURATION + 120))
 
           # Wait for current container with timeout
+          CURRENT_WAIT_RESULT=0
           if docker ps -q -f name=ydb-app-current | grep -q .; then
             echo "Waiting for ydb-app-current (timeout: ${WAIT_TIMEOUT}s)..."
-            timeout ${WAIT_TIMEOUT}s docker wait ydb-app-current || echo "Current container timeout or wait failed"
+            if ! timeout ${WAIT_TIMEOUT}s docker wait ydb-app-current; then
+              echo "ERROR: Current container did not finish in time, stopping it..."
+              docker stop ydb-app-current || true
+              CURRENT_WAIT_RESULT=1
+            fi
           fi
 
           # Wait for baseline container with timeout
+          BASELINE_WAIT_RESULT=0
           if docker ps -q -f name=ydb-app-baseline | grep -q .; then
             echo "Waiting for ydb-app-baseline (timeout: ${WAIT_TIMEOUT}s)..."
-            timeout ${WAIT_TIMEOUT}s docker wait ydb-app-baseline || echo "Baseline container timeout or wait failed"
+            if ! timeout ${WAIT_TIMEOUT}s docker wait ydb-app-baseline; then
+              echo "ERROR: Baseline container did not finish in time, stopping it..."
+              docker stop ydb-app-baseline || true
+              BASELINE_WAIT_RESULT=1
+            fi
           fi
 
           # Check exit codes
@@ -258,12 +269,26 @@ jobs:
           echo "Current container exit code: $CURRENT_EXIT"
           echo "Baseline container exit code: $BASELINE_EXIT"
 
-          if [ "$CURRENT_EXIT" -ne 0 ]; then
-            echo "WARNING: Current workload failed with exit code $CURRENT_EXIT"
+          # Determine overall success
+          OVERALL_FAILED=0
+
+          if [ "$CURRENT_WAIT_RESULT" -ne 0 ]; then
+            echo "ERROR: Current workload timed out"
+            OVERALL_FAILED=1
+          elif [ "$CURRENT_EXIT" -ne 0 ]; then
+            echo "ERROR: Current workload failed with exit code $CURRENT_EXIT"
+            OVERALL_FAILED=1
           fi
 
-          if [ "$BASELINE_EXIT" -ne 0 ]; then
-             echo "WARNING: Baseline workload failed with exit code $BASELINE_EXIT"
+          if [ "$BASELINE_WAIT_RESULT" -ne 0 ]; then
+            echo "WARNING: Baseline workload timed out (non-critical)"
+          elif [ "$BASELINE_EXIT" -ne 0 ]; then
+            echo "WARNING: Baseline workload failed with exit code $BASELINE_EXIT (non-critical)"
+          fi
+
+          if [ "$OVERALL_FAILED" -ne 0 ]; then
+            echo "FAILURE: Current workload did not complete successfully"
+            exit 1
           fi
 
           echo "SUCCESS: Workloads completed successfully"
