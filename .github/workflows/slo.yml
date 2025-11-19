@@ -167,6 +167,8 @@ jobs:
           github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workload_name: ${{ matrix.sdk.name }}
+          workload_current_ref: ${{ github.head_ref || github.ref_name }}
+          workload_baseline_ref: ${{ steps.baseline.outputs.ref }}
 
       - name: Prepare SLO Database
         run: |
