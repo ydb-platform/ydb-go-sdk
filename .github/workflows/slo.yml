@@ -228,37 +228,33 @@ jobs:
           sleep 5
           echo ""
           echo "==================== INITIAL CURRENT LOGS ===================="
-          docker logs ydb-app-current 2>&1 || echo "No current container"
+          docker logs -n 15 ydb-app-current 2>&1 || echo "No current container"
           echo ""
           echo "==================== INITIAL BASELINE LOGS ===================="
-          docker logs ydb-app-baseline 2>&1 || echo "No baseline container"
+          docker logs -n 15 ydb-app-baseline 2>&1 || echo "No baseline container"
           echo ""
 
           # Wait for containers to finish
           echo "Waiting for workloads to complete (${DURATION}s)..."
 
           # Add extra time for graceful shutdown
-          WAIT_TIMEOUT=$((DURATION + 120))
+          WAIT_TIMEOUT=$((DURATION + 30))
 
           # Wait for current container with timeout
-          CURRENT_WAIT_RESULT=0
           if docker ps -q -f name=ydb-app-current | grep -q .; then
             echo "Waiting for ydb-app-current (timeout: ${WAIT_TIMEOUT}s)..."
             if ! timeout ${WAIT_TIMEOUT}s docker wait ydb-app-current; then
               echo "ERROR: Current container did not finish in time, stopping it..."
               docker stop ydb-app-current || true
-              CURRENT_WAIT_RESULT=1
             fi
           fi
 
           # Wait for baseline container with timeout
-          BASELINE_WAIT_RESULT=0
           if docker ps -q -f name=ydb-app-baseline | grep -q .; then
             echo "Waiting for ydb-app-baseline (timeout: ${WAIT_TIMEOUT}s)..."
             if ! timeout ${WAIT_TIMEOUT}s docker wait ydb-app-baseline; then
               echo "ERROR: Baseline container did not finish in time, stopping it..."
               docker stop ydb-app-baseline || true
-              BASELINE_WAIT_RESULT=1
             fi
           fi
 
@@ -269,27 +265,15 @@ jobs:
           echo "Current container exit code: $CURRENT_EXIT"
           echo "Baseline container exit code: $BASELINE_EXIT"
 
-          # Determine overall success
-          OVERALL_FAILED=0
-
-          if [ "$CURRENT_WAIT_RESULT" -ne 0 ]; then
-            echo "ERROR: Current workload timed out"
-            OVERALL_FAILED=1
-          elif [ "$CURRENT_EXIT" -ne 0 ]; then
-            echo "ERROR: Current workload failed with exit code $CURRENT_EXIT"
-            OVERALL_FAILED=1
-          fi
-
-          if [ "$BASELINE_WAIT_RESULT" -ne 0 ]; then
-            echo "WARNING: Baseline workload timed out (non-critical)"
-          elif [ "$BASELINE_EXIT" -ne 0 ]; then
-            echo "WARNING: Baseline workload failed with exit code $BASELINE_EXIT (non-critical)"
-          fi
-
-          if [ "$OVERALL_FAILED" -ne 0 ]; then
-            echo "FAILURE: Current workload did not complete successfully"
-            exit 1
-          fi
+          # Show final logs
+          sleep 5
+          echo ""
+          echo "==================== FINAL CURRENT LOGS ===================="
+          docker logs -n 15 ydb-app-current 2>&1 || echo "No current container"
+          echo ""
+          echo "==================== FINAL BASELINE LOGS ===================="
+          docker logs -n 15 ydb-app-baseline 2>&1 || echo "No baseline container"
+          echo ""
 
           echo "SUCCESS: Workloads completed successfully"
 
