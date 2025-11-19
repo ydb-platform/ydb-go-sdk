@@ -234,16 +234,19 @@ jobs:
           # Wait for containers to finish
           echo "Waiting for workloads to complete (${DURATION}s)..."
 
-          # Wait for current container
+          # Add extra time for graceful shutdown
+          WAIT_TIMEOUT=$((DURATION + 10))
+
+          # Wait for current container with timeout
           if docker ps -q -f name=ydb-app-current | grep -q .; then
-            echo "Waiting for ydb-app-current..."
-            docker wait ydb-app-current || echo "Current container wait failed"
+            echo "Waiting for ydb-app-current (timeout: ${WAIT_TIMEOUT}s)..."
+            timeout ${WAIT_TIMEOUT}s docker wait ydb-app-current || echo "Current container timeout or wait failed"
           fi
 
-          # Wait for baseline container
+          # Wait for baseline container with timeout
           if docker ps -q -f name=ydb-app-baseline | grep -q .; then
-            echo "Waiting for ydb-app-baseline..."
-            docker wait ydb-app-baseline || echo "Baseline container wait failed"
+            echo "Waiting for ydb-app-baseline (timeout: ${WAIT_TIMEOUT}s)..."
+            timeout ${WAIT_TIMEOUT}s docker wait ydb-app-baseline || echo "Baseline container timeout or wait failed"
           fi
 
           # Check exit codes
