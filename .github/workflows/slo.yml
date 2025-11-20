@@ -60,22 +60,6 @@ jobs:
             name: native-bulk-upsert
             path: ./native/bulk-upsert
             label: native/bulk-upsert
-          - id: gorm_table
-            name: gorm-table
-            path: ./gorm/table
-            label: gorm/table
-          - id: gorm_query
-            name: gorm-query
-            path: ./gorm/query
-            label: gorm/query
-          - id: xorm_table
-            name: xorm-table
-            path: ./xorm/table
-            label: xorm/table
-          - id: xorm_query
-            name: xorm-query
-            path: ./xorm/query
-            label: xorm/query
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
