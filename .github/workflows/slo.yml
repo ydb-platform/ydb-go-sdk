@@ -201,8 +201,8 @@ jobs:
             -time $DURATION \
             -read-rps $READ_RPS \
             -write-rps $WRITE_RPS \
-            -read-timeout 1000 \
-            -write-timeout 1000 \
+            -read-timeout 500 \
+            -write-timeout 100 \
             $EXTRA_ARGS"
 
           echo "Starting ydb-app-current..."
