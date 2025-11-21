@@ -68,11 +68,8 @@ jobs:
     steps:
       - name: Update packages and Docker
         run: |
-          sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc | cut -f1)
-
           # Install Docker
           sudo apt update
-          sudo apt install ca-certificates curl
           curl -fsSL https://get.docker.com -o get-docker.sh
           sudo sh ./get-docker.sh
 
@@ -168,7 +165,7 @@ jobs:
           fi
 
       - name: Initialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@main
+        uses: ydb-platform/ydb-slo-action/init@03a5ba0cdb6c36f81886122a8a91dc14461e0ecd
         with:
           github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
