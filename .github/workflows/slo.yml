@@ -30,7 +30,7 @@ jobs:
     if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
 
     name: Run YDB SLO Tests
-    runs-on: ${{ github.actor == 'polrk' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: 'ubuntu-latest'
 
     strategy:
       fail-fast: false
