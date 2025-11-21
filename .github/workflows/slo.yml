@@ -175,7 +175,7 @@ jobs:
           fi
 
       - name: Initialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@03a5ba0cdb6c36f81886122a8a91dc14461e0ecd
+        uses: ydb-platform/ydb-slo-action/init@0be7e92a90f356b263bf1a39b7ecb5bc7fb4614b
         with:
           github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
