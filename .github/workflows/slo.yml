@@ -66,6 +66,27 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      - name: Update packages and Docker
+        run: |
+          sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc | cut -f1)
+
+          # Install Docker
+          sudo apt update
+          sudo apt install ca-certificates curl
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh ./get-docker.sh
+
+          # Install yq
+          VERSION=v4.40.5
+          PLATFORM=linux_amd64
+          sudo curl -L https://github.com/mikefarah/yq/releases/download/${VERSION}/yq_${PLATFORM} -o /usr/local/bin/yq && \
+            sudo chmod +x /usr/local/bin/yq
+
+          # Show versions
+          yq --version
+          docker --version
+          docker compose version
+
       - name: Checkout current version
         uses: actions/checkout@v5
         with:
