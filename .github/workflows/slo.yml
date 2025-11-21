@@ -198,7 +198,7 @@ jobs:
         run: |
           DURATION=${{ inputs.slo_workload_duration_seconds || 600 }}
           READ_RPS=${{ inputs.slo_workload_read_max_rps || 1000 }}
-          WRITE_RPS=${{ inputs.slo_workload_write_max_rps || 100 }}
+          WRITE_RPS=${{ inputs.slo_workload_write_max_rps || 1000 }}
 
           EXTRA_ARGS=""
           if [ "${{ matrix.sdk.id }}" = "native_bulk_upsert" ]; then
@@ -211,7 +211,7 @@ jobs:
             -time $DURATION \
             -read-rps $READ_RPS \
             -write-rps $WRITE_RPS \
-            -read-timeout 500 \
+            -read-timeout 100 \
             -write-timeout 100 \
             $EXTRA_ARGS"
 
@@ -232,6 +232,7 @@ jobs:
             --add-host "ydb:172.28.0.11" \
             --add-host "ydb:172.28.0.12" \
             --add-host "ydb:172.28.0.13" \
+            --add-host "ydb:172.28.0.99" \
             ydb-app-baseline $ARGS
 
           # Show initial logs
@@ -286,18 +287,3 @@ jobs:
             ./current.log
             ./baseline.log
           retention-days: 1
-
-      - if: always()
-        name: Cleanup SLO Database
-        run: |
-          echo "Cleaning up SLO database..."
-
-          # Cleanup using current app (if it works)
-          docker run --rm --network ydb_ydb-net \
-            --add-host "ydb:172.28.0.11" \
-            --add-host "ydb:172.28.0.12" \
-            --add-host "ydb:172.28.0.13" \
-            ydb-app-current cleanup grpc://ydb:2136 /Root/testdb || true
-
-          # Stop and remove app containers
-          docker rm -f ydb-app-current ydb-app-baseline 2>/dev/null || true
