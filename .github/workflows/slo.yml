@@ -30,7 +30,7 @@ jobs:
     if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
 
     name: Run YDB SLO Tests
-    runs-on: 'ubuntu-latest'
+    runs-on: 'large-runner'
 
     strategy:
       fail-fast: false
