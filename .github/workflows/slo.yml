@@ -207,7 +207,6 @@ jobs:
             ydb-app-baseline $ARGS
 
           # Show initial logs
-          sleep 5
           echo ""
           echo "==================== INITIAL CURRENT LOGS ===================="
           docker logs -n 15 ydb-app-current 2>&1 || echo "No current container"
@@ -220,23 +219,12 @@ jobs:
           echo "Waiting for workloads to complete (${DURATION}s)..."
           sleep ${DURATION}
 
-          # Stop containers gracefully after workload duration
+          # Stop containers after workload duration and wait for graceful shutdown
           echo "Stopping containers after ${DURATION}s..."
-          docker stop ydb-app-current ydb-app-baseline 2>/dev/null || true
-
-          # Wait 30 seconds for graceful shutdown
-          echo "Waiting 30s for graceful shutdown..."
-          sleep 30
+          docker stop --timeout=30 ydb-app-current ydb-app-baseline 2>&1 || true
 
           # Force kill if still running
-          if docker ps -q -f name=ydb-app-current | grep -q .; then
-            echo "Current container still running, force killing..."
-            docker kill ydb-app-current 2>/dev/null || true
-          fi
-          if docker ps -q -f name=ydb-app-baseline | grep -q .; then
-            echo "Baseline container still running, force killing..."
-            docker kill ydb-app-baseline 2>/dev/null || true
-          fi
+          docker kill ydb-app-current ydb-app-baseline 2>&1 || true
 
           # Check exit codes
           CURRENT_EXIT=$(docker inspect ydb-app-current --format='{{.State.ExitCode}}' 2>/dev/null || echo "1")
@@ -246,7 +234,6 @@ jobs:
           echo "Baseline container exit code: $BASELINE_EXIT"
 
           # Show final logs
-          sleep 5
           echo ""
           echo "==================== FINAL CURRENT LOGS ===================="
           docker logs -n 15 ydb-app-current 2>&1 || echo "No current container"
