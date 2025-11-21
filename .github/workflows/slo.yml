@@ -66,22 +66,32 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Update packages and Docker
+      - name: Install dependencies
         run: |
-          # Install Docker
-          sudo apt update
-          curl -fsSL https://get.docker.com -o get-docker.sh
-          sudo sh ./get-docker.sh
+          YQ_VERSION=v4.48.2
+          BUILDX_VERSION=0.30.1
+          COMPOSE_VERSION=2.40.3
 
-          # Install yq
-          VERSION=v4.40.5
-          PLATFORM=linux_amd64
-          sudo curl -L https://github.com/mikefarah/yq/releases/download/${VERSION}/yq_${PLATFORM} -o /usr/local/bin/yq && \
+          sudo curl -L https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 -o /usr/local/bin/yq && \
             sudo chmod +x /usr/local/bin/yq
 
-          # Show versions
+          echo "Updating Docker plugins..."
+          sudo mkdir -p /usr/local/lib/docker/cli-plugins
+
+          echo "Installing Docker Buildx ${BUILDX_VERSION}..."
+          sudo curl -fLo /usr/local/lib/docker/cli-plugins/docker-buildx \
+            "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-amd64"
+          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+
+          echo "Installing Docker Compose ${COMPOSE_VERSION}..."
+          sudo curl -fLo /usr/local/lib/docker/cli-plugins/docker-compose \
+            "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-x86_64"
+          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+          echo "Installed versions:"
           yq --version
           docker --version
+          docker buildx version
           docker compose version
 
       - name: Checkout current version
