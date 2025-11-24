@@ -34,9 +34,8 @@ func (c Codec) ToRaw(r *rawtopiccommon.Codec) {
 
 // Consumer contains info about topic consumer
 type Consumer struct {
-	Name      string
-	Important bool
-	// SupportedCodecs is list of codecs supported by the consumer
+	Name            string
+	Important       bool
 	SupportedCodecs []Codec
 	ReadFrom        time.Time
 	Attributes      map[string]string
