@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -63,6 +64,72 @@ func Example_alterTopic() {
 	)
 	if err != nil {
 		log.Printf("failed alter topic: %v", err)
+
+		return
+	}
+}
+
+func Example_createTopicWithConsumerAvailabilityPeriod() {
+	ctx := context.TODO()
+	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+	if connectionString == "" {
+		connectionString = "grpc://localhost:2136/local"
+	}
+	db, err := ydb.Open(ctx, connectionString)
+	if err != nil {
+		log.Printf("failed connect: %v", err)
+
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+
+	// Create topic with consumer that has 24-hour availability period
+	// Messages for this consumer won't expire for at least 24 hours even if not committed
+	err = db.Topic().Create(ctx, "topic-path",
+		topicoptions.CreateWithConsumer(topictypes.Consumer{
+			Name:               "my-consumer",
+			Important:          true,
+			AvailabilityPeriod: 24 * time.Hour, // Messages available for at least 24 hours
+			SupportedCodecs:    []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip},
+		}),
+	)
+	if err != nil {
+		log.Printf("failed create topic: %v", err)
+
+		return
+	}
+}
+
+func Example_alterConsumerAvailabilityPeriod() {
+	ctx := context.TODO()
+	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+	if connectionString == "" {
+		connectionString = "grpc://localhost:2136/local"
+	}
+	db, err := ydb.Open(ctx, connectionString)
+	if err != nil {
+		log.Printf("failed connect: %v", err)
+
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+
+	// Set availability period to 48 hours for existing consumer
+	err = db.Topic().Alter(ctx, "topic-path",
+		topicoptions.AlterConsumerWithAvailabilityPeriod("my-consumer", 48*time.Hour),
+	)
+	if err != nil {
+		log.Printf("failed alter consumer availability period: %v", err)
+
+		return
+	}
+
+	// Reset availability period to default value
+	err = db.Topic().Alter(ctx, "topic-path",
+		topicoptions.AlterConsumerResetAvailabilityPeriod("my-consumer"),
+	)
+	if err != nil {
+		log.Printf("failed reset consumer availability period: %v", err)
 
 		return
 	}

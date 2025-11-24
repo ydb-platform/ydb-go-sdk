@@ -1,3 +1,4 @@
+* Added the `AvailabilityPeriod` to the Consumer type in topics
 * Fixed `context` checking in `ydb.Open`
 
 ## v3.118.2

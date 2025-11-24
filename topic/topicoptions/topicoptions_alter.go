@@ -114,6 +114,53 @@ func AlterConsumerWithAttributes(name string, attributes map[string]string) Alte
 	}
 }
 
+// AlterConsumerWithAvailabilityPeriod sets the availability period for the consumer.
+//
+// The availability period specifies the minimum time during which messages for this consumer
+// will not expire due to retention, even if they are not committed. This ensures that uncommitted
+// messages remain available for at least this duration, giving the consumer time to process them.
+//
+// Parameters:
+//   - name: the name of the consumer to modify
+//   - availabilityPeriod: the minimum time period to keep uncommitted messages available
+//
+// Example usage:
+//
+//	// Set availability period to 24 hours for consumer "my-consumer"
+//	err := db.Topic().Alter(ctx, "my-topic",
+//	    topicoptions.AlterConsumerWithAvailabilityPeriod("my-consumer", 24*time.Hour),
+//	)
+//
+//	// Set availability period to 7 days for critical consumer
+//	err := db.Topic().Alter(ctx, "my-topic",
+//	    topicoptions.AlterConsumerWithAvailabilityPeriod("critical-consumer", 7*24*time.Hour),
+//	)
+func AlterConsumerWithAvailabilityPeriod(name string, availabilityPeriod time.Duration) AlterOption {
+	return withConsumerWithAvailabilityPeriod{
+		name:               name,
+		availabilityPeriod: availabilityPeriod,
+	}
+}
+
+// AlterConsumerResetAvailabilityPeriod resets the availability period for the consumer to the server default value.
+//
+// This removes any custom availability period setting and reverts to the default behavior.
+//
+// Parameters:
+//   - name: the name of the consumer to modify
+//
+// Example usage:
+//
+//	// Reset availability period to default for consumer "my-consumer"
+//	err := db.Topic().Alter(ctx, "my-topic",
+//	    topicoptions.AlterConsumerResetAvailabilityPeriod("my-consumer"),
+//	)
+func AlterConsumerResetAvailabilityPeriod(name string) AlterOption {
+	return withConsumerResetAvailabilityPeriod{
+		name: name,
+	}
+}
+
 // AlterWithMaxActivePartitions change max active partitions of the topic
 func AlterWithMaxActivePartitions(maxActivePartitions int64) AlterOption {
 	return alterWithMaxActivePartitions(maxActivePartitions)

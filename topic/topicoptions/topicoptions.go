@@ -196,3 +196,25 @@ func (consumerAttributes withConsumerWithAttributes) ApplyAlterOption(req *rawto
 	req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, consumerAttributes.name)
 	req.AlterConsumers[index].AlterAttributes = consumerAttributes.attributes
 }
+
+type withConsumerWithAvailabilityPeriod struct {
+	name               string
+	availabilityPeriod time.Duration
+}
+
+func (consumerAvailability withConsumerWithAvailabilityPeriod) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	var index int
+	req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, consumerAvailability.name)
+	req.AlterConsumers[index].SetAvailabilityPeriod.HasValue = true
+	req.AlterConsumers[index].SetAvailabilityPeriod.Value = consumerAvailability.availabilityPeriod
+}
+
+type withConsumerResetAvailabilityPeriod struct {
+	name string
+}
+
+func (consumerReset withConsumerResetAvailabilityPeriod) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	var index int
+	req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, consumerReset.name)
+	req.AlterConsumers[index].ResetAvailabilityPeriod = true
+}

@@ -34,11 +34,23 @@ func (c Codec) ToRaw(r *rawtopiccommon.Codec) {
 
 // Consumer contains info about topic consumer
 type Consumer struct {
-	Name            string
-	Important       bool
+	Name      string
+	Important bool
+	// SupportedCodecs is list of codecs supported by the consumer
 	SupportedCodecs []Codec
-	ReadFrom        time.Time
-	Attributes      map[string]string
+	// ReadFrom sets the message read mode.
+	// If set, the consumer will read messages starting from the specified timestamp.
+	ReadFrom time.Time
+	// AvailabilityPeriod specifies the minimum time period during which messages for this consumer
+	// will not expire due to retention, even if they are not committed.
+	// This ensures that uncommitted messages remain available for at least this duration.
+	// Zero value means the server default will be used.
+	//
+	// Example: Setting AvailabilityPeriod to 24 hours ensures messages won't be deleted
+	// by retention for at least 24 hours, giving the consumer time to process and commit them.
+	AvailabilityPeriod time.Duration
+	// Attributes is a map of custom attributes for the consumer
+	Attributes map[string]string
 }
 
 // ToRaw public format to internal. Used internally only.
@@ -56,6 +68,12 @@ func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 		raw.ReadFrom.HasValue = true
 		raw.ReadFrom.Value = c.ReadFrom
 	}
+
+	if c.AvailabilityPeriod > 0 {
+		raw.AvailabilityPeriod.HasValue = true
+		raw.AvailabilityPeriod.Value = c.AvailabilityPeriod
+	}
+
 	raw.Attributes = c.Attributes
 }
 
@@ -72,6 +90,10 @@ func (c *Consumer) FromRaw(raw *rawtopic.Consumer) {
 
 	if raw.ReadFrom.HasValue {
 		c.ReadFrom = raw.ReadFrom.Value
+	}
+
+	if raw.AvailabilityPeriod.HasValue {
+		c.AvailabilityPeriod = raw.AvailabilityPeriod.Value
 	}
 }
 

@@ -2,6 +2,7 @@ package rawtopic
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -68,19 +69,33 @@ func (r *AlterTopicResult) FromProto(proto *Ydb_Topic.AlterTopicResponse) error 
 }
 
 type AlterConsumer struct {
-	Name               string
-	SetImportant       rawoptional.Bool
-	SetReadFrom        rawoptional.Time
-	SetSupportedCodecs rawtopiccommon.SupportedCodecs
-	AlterAttributes    map[string]string
+	Name                    string
+	SetImportant            rawoptional.Bool
+	SetReadFrom             rawoptional.Time
+	SetSupportedCodecs      rawtopiccommon.SupportedCodecs
+	SetAvailabilityPeriod   rawoptional.Duration
+	ResetAvailabilityPeriod bool
+	AlterAttributes         map[string]string
 }
 
 func (c *AlterConsumer) ToProto() *Ydb_Topic.AlterConsumer {
-	return &Ydb_Topic.AlterConsumer{
+	res := &Ydb_Topic.AlterConsumer{
 		Name:               c.Name,
 		SetImportant:       c.SetImportant.ToProto(),
 		SetReadFrom:        c.SetReadFrom.ToProto(),
 		SetSupportedCodecs: c.SetSupportedCodecs.ToProto(),
 		AlterAttributes:    c.AlterAttributes,
 	}
+
+	if c.SetAvailabilityPeriod.HasValue {
+		res.AvailabilityPeriodAction = &Ydb_Topic.AlterConsumer_SetAvailabilityPeriod{
+			SetAvailabilityPeriod: c.SetAvailabilityPeriod.ToProto(),
+		}
+	} else if c.ResetAvailabilityPeriod {
+		res.AvailabilityPeriodAction = &Ydb_Topic.AlterConsumer_ResetAvailabilityPeriod{
+			ResetAvailabilityPeriod: &emptypb.Empty{},
+		}
+	}
+
+	return res
 }
