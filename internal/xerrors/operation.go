@@ -192,6 +192,7 @@ func (e *operationError) Type() Type {
 		if e.hasSchemaOperationsLimitExceeded() {
 			return TypeRetryable
 		}
+
 		return TypeUndefined
 	default:
 		return TypeUndefined
@@ -230,6 +231,7 @@ func (e *operationError) BackoffType() backoff.Type {
 		if e.hasSchemaOperationsLimitExceeded() {
 			return backoff.TypeSlow
 		}
+
 		return backoff.TypeNoBackoff
 	default:
 		return backoff.TypeNoBackoff

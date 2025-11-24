@@ -187,8 +187,8 @@ func Test_operationError_Error(t *testing.T) {
 
 func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
 	for _, tt := range []struct {
-		err            error
-		expectedType   Type
+		err             error
+		expectedType    Type
 		expectedBackoff backoff.Type
 	}{
 		{
@@ -198,7 +198,7 @@ func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
 					Message: "Request exceeded a limit on the number of schema operations, try again later",
 				}}),
 			),
-			expectedType:   TypeRetryable,
+			expectedType:    TypeRetryable,
 			expectedBackoff: backoff.TypeSlow,
 		},
 		{
@@ -208,7 +208,7 @@ func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
 					Message: "Some other error message",
 				}}),
 			),
-			expectedType:   TypeUndefined,
+			expectedType:    TypeUndefined,
 			expectedBackoff: backoff.TypeNoBackoff,
 		},
 		{
@@ -220,7 +220,7 @@ func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
 					}},
 				}}),
 			),
-			expectedType:   TypeRetryable,
+			expectedType:    TypeRetryable,
 			expectedBackoff: backoff.TypeSlow,
 		},
 	} {
