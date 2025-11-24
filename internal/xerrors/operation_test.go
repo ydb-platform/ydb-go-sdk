@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 )
 
 func TestIsOperationError(t *testing.T) {
@@ -179,6 +181,54 @@ func Test_operationError_Error(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.text, tt.err.Error())
+		})
+	}
+}
+
+func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
+	for _, tt := range []struct {
+		err            error
+		expectedType   Type
+		expectedBackoff backoff.Type
+	}{
+		{
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
+				WithIssues([]*Ydb_Issue.IssueMessage{{
+					Message: "Request exceeded a limit on the number of schema operations, try again later",
+				}}),
+			),
+			expectedType:   TypeRetryable,
+			expectedBackoff: backoff.TypeSlow,
+		},
+		{
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
+				WithIssues([]*Ydb_Issue.IssueMessage{{
+					Message: "Some other error message",
+				}}),
+			),
+			expectedType:   TypeUndefined,
+			expectedBackoff: backoff.TypeNoBackoff,
+		},
+		{
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
+				WithIssues([]*Ydb_Issue.IssueMessage{{
+					Issues: []*Ydb_Issue.IssueMessage{{
+						Message: "Request exceeded a limit on the number of schema operations, try again later",
+					}},
+				}}),
+			),
+			expectedType:   TypeRetryable,
+			expectedBackoff: backoff.TypeSlow,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			var op *operationError
+			require.ErrorAs(t, tt.err, &op)
+			require.Equal(t, tt.expectedType, op.Type())
+			require.Equal(t, tt.expectedBackoff, op.BackoffType())
 		})
 	}
 }
