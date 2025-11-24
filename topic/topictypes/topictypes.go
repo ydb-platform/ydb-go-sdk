@@ -38,9 +38,9 @@ type Consumer struct {
 	Important bool
 	// SupportedCodecs is list of codecs supported by the consumer
 	SupportedCodecs []Codec
-	// ReadFrom sets the message read mode.
-	// If set, the consumer will read messages starting from the specified timestamp.
-	ReadFrom time.Time
+	ReadFrom        time.Time
+	Attributes      map[string]string
+
 	// AvailabilityPeriod specifies the minimum time period during which messages for this consumer
 	// will not expire due to retention, even if they are not committed.
 	// This ensures that uncommitted messages remain available for at least this duration.
@@ -49,8 +49,6 @@ type Consumer struct {
 	// Example: Setting AvailabilityPeriod to 24 hours ensures messages won't be deleted
 	// by retention for at least 24 hours, giving the consumer time to process and commit them.
 	AvailabilityPeriod time.Duration
-	// Attributes is a map of custom attributes for the consumer
-	Attributes map[string]string
 }
 
 // ToRaw public format to internal. Used internally only.
