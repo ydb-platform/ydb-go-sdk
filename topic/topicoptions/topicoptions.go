@@ -207,6 +207,7 @@ func (consumerAvailability withConsumerWithAvailabilityPeriod) ApplyAlterOption(
 	req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, consumerAvailability.name)
 	req.AlterConsumers[index].SetAvailabilityPeriod.HasValue = true
 	req.AlterConsumers[index].SetAvailabilityPeriod.Value = consumerAvailability.availabilityPeriod
+	req.AlterConsumers[index].ResetAvailabilityPeriod = false
 }
 
 type withConsumerResetAvailabilityPeriod struct {
@@ -217,4 +218,5 @@ func (consumerReset withConsumerResetAvailabilityPeriod) ApplyAlterOption(req *r
 	var index int
 	req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, consumerReset.name)
 	req.AlterConsumers[index].ResetAvailabilityPeriod = true
+	req.AlterConsumers[index].SetAvailabilityPeriod.HasValue = false
 }

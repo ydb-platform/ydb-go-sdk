@@ -51,7 +51,8 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 							CodecRaw,
 							CodecGzip,
 						},
-						ReadFrom: time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
+						ReadFrom:           time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
+						AvailabilityPeriod: 48 * time.Hour,
 					},
 				},
 				Path: "some/path",
@@ -183,6 +184,10 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 							Value:    time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
 							HasValue: true,
 						},
+						AvailabilityPeriod: rawoptional.Duration{
+							Value:    48 * time.Hour,
+							HasValue: true,
+						},
 					},
 				},
 				MeteringMode: rawtopic.MeteringModeRequestUnits,
@@ -234,7 +239,8 @@ func TestTopicConsumerDescriptionFromRaw(t *testing.T) {
 					SupportedCodecs: []Codec{
 						CodecRaw,
 					},
-					ReadFrom: time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
+					ReadFrom:           time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
+					AvailabilityPeriod: 24 * time.Hour,
 				},
 				Partitions: []DescribeConsumerPartitionInfo{
 					{
@@ -288,6 +294,10 @@ func TestTopicConsumerDescriptionFromRaw(t *testing.T) {
 					SupportedCodecs: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
 					ReadFrom: rawoptional.Time{
 						Value:    time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
+						HasValue: true,
+					},
+					AvailabilityPeriod: rawoptional.Duration{
+						Value:    24 * time.Hour,
 						HasValue: true,
 					},
 					Attributes: map[string]string{
