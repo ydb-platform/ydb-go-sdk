@@ -1,3 +1,4 @@
+## v3.120.0
 * Added support of `SnapshotReadWrite` isolation mode into query and table clients
 
 ## v3.119.0
