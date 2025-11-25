@@ -91,7 +91,8 @@ func (c *AlterConsumer) ToProto() *Ydb_Topic.AlterConsumer {
 		res.AvailabilityPeriodAction = &Ydb_Topic.AlterConsumer_SetAvailabilityPeriod{
 			SetAvailabilityPeriod: c.SetAvailabilityPeriod.ToProto(),
 		}
-	} else if c.ResetAvailabilityPeriod {
+	}
+	if c.ResetAvailabilityPeriod {
 		res.AvailabilityPeriodAction = &Ydb_Topic.AlterConsumer_ResetAvailabilityPeriod{
 			ResetAvailabilityPeriod: &emptypb.Empty{},
 		}

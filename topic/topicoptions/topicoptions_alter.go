@@ -116,9 +116,8 @@ func AlterConsumerWithAttributes(name string, attributes map[string]string) Alte
 
 // AlterConsumerWithAvailabilityPeriod sets the availability period for the consumer.
 //
-// The availability period specifies the minimum time during which messages for this consumer
-// will not expire due to retention, even if they are not committed. This ensures that uncommitted
-// messages remain available for at least this duration, giving the consumer time to process them.
+// Message for this consumer will not expire due to retention for at least availability_period
+// if they aren't committed.
 //
 // Parameters:
 //   - name: the name of the consumer to modify

@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	fourPM = time.Date(2024, 0o1, 0o1, 16, 0, 0, 0, time.UTC)
-	hour   = time.Hour
+	fourPM            = time.Date(2024, 0o1, 0o1, 16, 0, 0, 0, time.UTC)
+	hour              = time.Hour
+	availabilityPeriod = 48 * time.Hour
 )
 
 func TestTopicDescriptionFromRaw(t *testing.T) {
@@ -52,7 +53,7 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 							CodecGzip,
 						},
 						ReadFrom:           time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
-						AvailabilityPeriod: 48 * time.Hour,
+						AvailabilityPeriod: &availabilityPeriod,
 					},
 				},
 				Path: "some/path",
@@ -240,7 +241,7 @@ func TestTopicConsumerDescriptionFromRaw(t *testing.T) {
 						CodecRaw,
 					},
 					ReadFrom:           time.Date(2022, time.March, 8, 12, 12, 12, 0, time.UTC),
-					AvailabilityPeriod: 24 * time.Hour,
+					AvailabilityPeriod: &availabilityPeriod,
 				},
 				Partitions: []DescribeConsumerPartitionInfo{
 					{
@@ -297,7 +298,7 @@ func TestTopicConsumerDescriptionFromRaw(t *testing.T) {
 						HasValue: true,
 					},
 					AvailabilityPeriod: rawoptional.Duration{
-						Value:    24 * time.Hour,
+						Value:    48 * time.Hour,
 						HasValue: true,
 					},
 					Attributes: map[string]string{

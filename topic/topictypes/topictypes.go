@@ -41,13 +41,9 @@ type Consumer struct {
 	Attributes      map[string]string
 
 	// AvailabilityPeriod specifies the minimum time period during which messages for this consumer
-	// will not expire due to retention, even if they are not committed.
-	// This ensures that uncommitted messages remain available for at least this duration.
-	// Zero value means the server default will be used.
-	//
-	// Example: Setting AvailabilityPeriod to 24 hours ensures messages won't be deleted
-	// by retention for at least 24 hours, giving the consumer time to process and commit them.
-	AvailabilityPeriod time.Duration
+	// will not expire due to retention if they aren't committed.
+	// Nil value means the server default will be used.
+	AvailabilityPeriod *time.Duration
 }
 
 // ToRaw public format to internal. Used internally only.
@@ -66,9 +62,9 @@ func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 		raw.ReadFrom.Value = c.ReadFrom
 	}
 
-	if c.AvailabilityPeriod > 0 {
+	if c.AvailabilityPeriod != nil {
 		raw.AvailabilityPeriod.HasValue = true
-		raw.AvailabilityPeriod.Value = c.AvailabilityPeriod
+		raw.AvailabilityPeriod.Value = *c.AvailabilityPeriod
 	}
 
 	raw.Attributes = c.Attributes
@@ -90,7 +86,9 @@ func (c *Consumer) FromRaw(raw *rawtopic.Consumer) {
 	}
 
 	if raw.AvailabilityPeriod.HasValue {
-		c.AvailabilityPeriod = raw.AvailabilityPeriod.Value
+		c.AvailabilityPeriod = &raw.AvailabilityPeriod.Value
+	} else {
+		c.AvailabilityPeriod = nil
 	}
 }
 

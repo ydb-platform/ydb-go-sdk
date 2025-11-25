@@ -85,11 +85,12 @@ func Example_createTopicWithConsumerAvailabilityPeriod() {
 
 	// Create topic with consumer that has 24-hour availability period
 	// Messages for this consumer won't expire for at least 24 hours even if not committed
+	availabilityPeriod := 24 * time.Hour
 	err = db.Topic().Create(ctx, "topic-path",
 		topicoptions.CreateWithConsumer(topictypes.Consumer{
 			Name:               "my-consumer",
 			Important:          true,
-			AvailabilityPeriod: 24 * time.Hour, // Messages available for at least 24 hours
+			AvailabilityPeriod: &availabilityPeriod, // Messages available for at least 24 hours
 			SupportedCodecs:    []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip},
 		}),
 	)
