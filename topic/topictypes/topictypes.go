@@ -39,6 +39,11 @@ type Consumer struct {
 	SupportedCodecs []Codec
 	ReadFrom        time.Time
 	Attributes      map[string]string
+
+	// AvailabilityPeriod specifies the minimum time period during which messages for this consumer
+	// will not expire due to retention if they aren't committed.
+	// Nil value means the server default will be used.
+	AvailabilityPeriod *time.Duration
 }
 
 // ToRaw public format to internal. Used internally only.
@@ -56,6 +61,12 @@ func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 		raw.ReadFrom.HasValue = true
 		raw.ReadFrom.Value = c.ReadFrom
 	}
+
+	if c.AvailabilityPeriod != nil {
+		raw.AvailabilityPeriod.HasValue = true
+		raw.AvailabilityPeriod.Value = *c.AvailabilityPeriod
+	}
+
 	raw.Attributes = c.Attributes
 }
 
@@ -72,6 +83,12 @@ func (c *Consumer) FromRaw(raw *rawtopic.Consumer) {
 
 	if raw.ReadFrom.HasValue {
 		c.ReadFrom = raw.ReadFrom.Value
+	}
+
+	if raw.AvailabilityPeriod.HasValue {
+		c.AvailabilityPeriod = &raw.AvailabilityPeriod.Value
+	} else {
+		c.AvailabilityPeriod = nil
 	}
 }
 

@@ -1,4 +1,5 @@
 * Fixed deadlock in `Endpoint.String()` method
+* Added the `AvailabilityPeriod` to the Consumer type in topics
 
 ## v3.118.3
 * Fixed `context` checking in `ydb.Open`

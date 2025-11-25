@@ -4,6 +4,7 @@ go 1.23.9
 
 require (
 	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/client_model v0.6.0
 	github.com/ydb-platform/gorm-driver v0.1.3
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.67.0
@@ -28,12 +29,11 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/prometheus/client_model v0.6.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20211115083454-9ca41db5ed9e // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20250911135631-b3beddd517d9 // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20251124083616-76378b253633 // indirect
 	github.com/ydb-platform/ydb-go-yc v0.12.1 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1 // indirect
 	golang.org/x/net v0.38.0 // indirect
