@@ -1,3 +1,5 @@
+* Fixed deadlock in `Endpoint.String()` method
+
 ## v3.118.3
 * Fixed `context` checking in `ydb.Open`
 
