@@ -1,3 +1,4 @@
+* Made error "Request exceeded a limit on the number of schema operations, try again later" retryable
 * Fixed deadlock in `Endpoint.String()` method
 * Added the `AvailabilityPeriod` to the Consumer type in topics
 
