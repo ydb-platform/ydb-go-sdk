@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	fourPM            = time.Date(2024, 0o1, 0o1, 16, 0, 0, 0, time.UTC)
-	hour              = time.Hour
+	fourPM             = time.Date(2024, 0o1, 0o1, 16, 0, 0, 0, time.UTC)
+	hour               = time.Hour
 	availabilityPeriod = 48 * time.Hour
 )
 
