@@ -66,7 +66,8 @@ func TestToYDB(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSnapshot),
 				ReadOnly:  false,
 			},
-			err: true,
+			txControl: table.WithSnapshotReadWrite(),
+			err:       false,
 		},
 		{
 			name: xtest.CurrentFileLine(),
