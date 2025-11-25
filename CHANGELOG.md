@@ -1,6 +1,7 @@
+* Fixed deadlock in `Endpoint.String()` method
+
 ## v3.118.3
 * Fixed `context` checking in `ydb.Open`
-* Fixed deadlock in `Endpoint.String()` method
 
 ## v3.118.2
 * Fixed checking GRPC transport error in `discovery`
