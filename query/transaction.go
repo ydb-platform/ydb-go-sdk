@@ -94,6 +94,11 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 	)
 }
 
+// SnapshotReadWriteTxControl returns snapshot read-write transaction control
+func SnapshotReadWriteTxControl(opts ...tx.ControlOption) *TransactionControl {
+	return tx.SnapshotReadWriteTxControl(opts...)
+}
+
 // TxSettings returns transaction settings
 func TxSettings(opts ...tx.SettingsOption) TransactionSettings {
 	return opts
@@ -109,6 +114,10 @@ func WithSerializableReadWrite() TransactionOption {
 
 func WithSnapshotReadOnly() TransactionOption {
 	return tx.WithSnapshotReadOnly()
+}
+
+func WithSnapshotReadWrite() TransactionOption {
+	return tx.WithSnapshotReadWrite()
 }
 
 func WithStaleReadOnly() TransactionOption {

@@ -1,3 +1,5 @@
+* Added support of `SnapshotReadWrite` isolation mode into query and table clients
+
 ## v3.119.0
 * Made error "Request exceeded a limit on the number of schema operations, try again later" retryable
 * Fixed deadlock in `Endpoint.String()` method
