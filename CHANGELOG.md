@@ -1,5 +1,6 @@
-## v3.118.3
 * Made error "Request exceeded a limit on the number of schema operations, try again later" retryable
+
+## v3.118.3
 * Fixed `context` checking in `ydb.Open`
 
 ## v3.118.2
