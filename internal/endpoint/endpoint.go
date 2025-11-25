@@ -87,7 +87,7 @@ func (e *endpoint) String() string {
 
 	return fmt.Sprintf(`{id:%d,address:%q,local:%t,location:%q,loadFactor:%f,lastUpdated:%q}`,
 		e.id,
-		e.Address(),
+		e.getAddress(), // Use getAddress() to avoid deadlock from nested RLock in Address()
 		e.local,
 		e.location,
 		e.loadFactor,
@@ -125,6 +125,12 @@ func (e *endpoint) Address() (address string) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
+	return e.getAddress()
+}
+
+// getAddress returns the address without acquiring a lock.
+// Caller must ensure the lock is held.
+func (e *endpoint) getAddress() string {
 	if len(e.ipv4) != 0 {
 		return getResolvedAddr(e, false)
 	}
