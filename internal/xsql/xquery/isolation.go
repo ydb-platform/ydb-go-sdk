@@ -21,6 +21,7 @@ func toYDB(opts driver.TxOptions) (txcControl tx.SettingsOption, err error) {
 		if opts.ReadOnly {
 			return query.WithSnapshotReadOnly(), nil
 		}
+
 		return query.WithSnapshotReadWrite(), nil
 	}
 
