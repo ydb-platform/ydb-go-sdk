@@ -10,19 +10,19 @@ on:
       - release-*
   workflow_dispatch:
     inputs:
-      github_pull_request_number:
+      github_issue:
         required: true
       baseline_ref:
         description: "Baseline commit/branch/tag to compare against (leave empty to auto-detect merge-base with main)"
         required: false
       slo_workload_duration_seconds:
-        default: '600'
+        default: "600"
         required: false
       slo_workload_read_max_rps:
-        default: '1000'
+        default: "1000"
         required: false
       slo_workload_write_max_rps:
-        default: '100'
+        default: "100"
         required: false
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
     if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
 
     name: Run YDB SLO Tests
-    runs-on: 'large-runner'
+    runs-on: "large-runner"
 
     strategy:
       fail-fast: false
@@ -175,9 +175,9 @@ jobs:
           fi
 
       - name: Initialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@0be7e92a90f356b263bf1a39b7ecb5bc7fb4614b
+        uses: ydb-platform/ydb-slo-action/init@main
         with:
-          github_pull_request_number: ${{ github.event.inputs.github_pull_request_number }}
+          github_issue: ${{ github.event.inputs.github_issue }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workload_name: ${{ matrix.sdk.name }}
           workload_current_ref: ${{ github.head_ref || github.ref_name }}
