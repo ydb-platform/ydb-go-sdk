@@ -47,6 +47,9 @@ func TxControl(opts ...tx.ControlOption) *TransactionControl {
 }
 
 // EmptyTxControl defines transaction control inference on server-side by query content
+// Deprecated: Use ImplicitTxControl instead.
+// Will be removed after May 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func EmptyTxControl() *TransactionControl {
 	return ImplicitTxControl()
 }
@@ -60,7 +63,7 @@ func ImplicitTxControl() *TransactionControl {
 
 // NoTx defines nil transaction control
 // This is wrong name for transaction control inference on server-side by query content
-// Deprecated: Use EmptyTxControl instead.
+// Deprecated: Use ImplicitTxControl instead.
 // Will be removed after Oct 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func NoTx() *TransactionControl {
