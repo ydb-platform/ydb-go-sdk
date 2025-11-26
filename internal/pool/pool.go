@@ -876,10 +876,19 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
+	if lastErr != nil {
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("failed to get item from pool after %d attempts and %v, pool has %d items (%d busy, "+
+				"%d idle, %d create_in_progress): %w", attempt, p.config.clock.Since(start), len(p.index),
+				len(p.index)-p.idle.Len(), p.idle.Len(), p.createInProgress, lastErr,
+			),
+		)
+	}
+
 	return nil, xerrors.WithStackTrace(
 		fmt.Errorf("failed to get item from pool after %d attempts and %v, pool has %d items (%d busy, "+
-			"%d idle, %d create_in_progress): %w", attempt, p.config.clock.Since(start), len(p.index),
-			len(p.index)-p.idle.Len(), p.idle.Len(), p.createInProgress, lastErr,
+			"%d idle, %d create_in_progress)", attempt, p.config.clock.Since(start), len(p.index),
+			len(p.index)-p.idle.Len(), p.idle.Len(), p.createInProgress,
 		),
 	)
 }
