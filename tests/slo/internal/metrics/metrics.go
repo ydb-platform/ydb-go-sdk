@@ -4,11 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
-	dto "github.com/prometheus/client_model/go"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	otelmetric "go.opentelemetry.io/otel/metric"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 
 	"slo/internal/log"
@@ -21,183 +26,223 @@ const (
 
 type (
 	Metrics struct {
-		p     *push.Pusher
+		mp     *sdkmetric.MeterProvider
+		meter  otelmetric.Meter
+		ctx    context.Context
+		cancel context.CancelFunc
+
+		// Labels for metrics
 		ref   string
 		label string
 
-		errorsTotal   *prometheus.CounterVec
-		timeoutsTotal *prometheus.CounterVec
+		// OTel instruments
+		errorsTotal             otelmetric.Int64Counter
+		timeoutsTotal           otelmetric.Int64Counter
+		operationsTotal         otelmetric.Int64Counter
+		operationsSuccessTotal  otelmetric.Int64Counter
+		operationsFailureTotal  otelmetric.Int64Counter
+		operationLatencySeconds otelmetric.Float64Histogram
+		retryAttempts           otelmetric.Int64Gauge
+		retryAttemptsTotal      otelmetric.Int64Counter
+		retriesSuccessTotal     otelmetric.Int64Counter
+		retriesFailureTotal     otelmetric.Int64Counter
+		pendingOperations       otelmetric.Int64UpDownCounter
 
-		operationsTotal         *prometheus.CounterVec
-		operationsSuccessTotal  *prometheus.CounterVec
-		operationsFailureTotal  *prometheus.CounterVec
-		operationLatencySeconds *prometheus.HistogramVec
-
-		retryAttempts       *prometheus.GaugeVec
-		retryAttemptsTotal  *prometheus.CounterVec
-		retriesSuccessTotal *prometheus.CounterVec
-		retriesFailureTotal *prometheus.CounterVec
-
-		pendingOperations *prometheus.GaugeVec
-		// sdk_cpu_usage_seconds_total *prometheus.CounterVec
-		// sdk_memory_usage_bytes *prometheus.GaugeVec
-		// sdk_connections_open *prometheus.GaugeVec
-		// sdk_load_balancing_decisions_total *prometheus.CounterVec
-		// sdk_requests_by_node_total *prometheus.CounterVec
-		// sdk_timeouts_total *prometheus.CounterVec
-		// sdk_connection_errors_total *prometheus.CounterVec
-		// sdk_circuit_breaker_trips_total *prometheus.CounterVec
-		// sdk_request_queue_size_total *prometheus.CounterVec
-		// sdk_throttling_events_total *prometheus.CounterVec
-		// sdk_current_load_factor *prometheus.GaugeVec
+		// Local counters for fail-on-error logic
+		errorsCount   atomic.Int64
+		timeoutsCount atomic.Int64
+		opsCount      atomic.Int64
 	}
 )
 
-func New(url, ref, label, jobName string) (*Metrics, error) {
+func New(endpoint, ref, label, jobName string, reportPeriodMs int) (*Metrics, error) {
 	m := &Metrics{
 		ref:   ref,
 		label: label,
 	}
 
-	m.errorsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "sdk_errors_total",
-			Help: "Total number of errors encountered, categorized by error type.",
-		},
-		[]string{"error_type"},
-	)
-	m.timeoutsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "sdk_timeouts_total",
-			Help: "Total number of timeout errors",
-		},
-		[]string{},
-	)
+	// Create context for meter provider
+	m.ctx, m.cancel = context.WithCancel(context.Background())
 
-	m.operationsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "sdk_operations_total",
-			Help: "Total number of operations, categorized by type attempted by the SDK.",
-		},
-		[]string{"operation_type"},
-	)
+	if endpoint == "" {
+		log.Printf("Warning: no OTLP endpoint provided, metrics will not be exported")
+		return m, nil
+	}
 
-	m.operationsSuccessTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "sdk_operations_success_total",
-			Help: "Total number of successful operations, categorized by type.",
-		},
-		[]string{"operation_type"},
+	// Create OTLP HTTP exporter
+	exporter, err := otlpmetrichttp.New(
+		m.ctx,
+		otlpmetrichttp.WithEndpoint(endpoint),
+		otlpmetrichttp.WithURLPath("/api/v1/otlp/v1/metrics"),
+		otlpmetrichttp.WithInsecure(), // Assuming internal network
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
+	}
 
-	m.operationsFailureTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "sdk_operations_failure_total",
-			Help: "Total number of failed operations, categorized by type.",
-		},
-		[]string{"operation_type"},
+	// Create resource with labels
+	res, err := resource.New(
+		m.ctx,
+		resource.WithAttributes(
+			semconv.ServiceName(jobName),
+			attribute.String("ref", ref),
+			attribute.String("sdk", fmt.Sprintf("%s-%s", sdk, label)),
+			attribute.String("sdk_version", sdkVersion),
+		),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
 
-	m.operationLatencySeconds = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "sdk_operation_latency_seconds",
-			Help: "Latency of operations performed by the SDK in seconds, categorized by type and status.",
-			Buckets: []float64{
-				0.001,  // 1 ms
-				0.002,  // 2 ms
-				0.003,  // 3 ms
-				0.004,  // 4 ms
-				0.005,  // 5 ms
-				0.0075, // 7.5 ms
-				0.010,  // 10 ms
-				0.020,  // 20 ms
-				0.050,  // 50 ms
-				0.100,  // 100 ms
-				0.200,  // 200 ms
-				0.500,  // 500 ms
-				1.000,  // 1 s
-			},
-		},
-		[]string{"operation_type", "operation_status"},
+	// Create meter provider with configurable export interval
+	exportInterval := time.Duration(reportPeriodMs) * time.Millisecond
+	if exportInterval == 0 {
+		exportInterval = 250 * time.Millisecond // Default 250ms
+	}
+
+	m.mp = sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(res),
+		sdkmetric.WithReader(
+			sdkmetric.NewPeriodicReader(
+				exporter,
+				sdkmetric.WithInterval(exportInterval),
+			),
+		),
 	)
 
-	m.retryAttempts = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "sdk_retry_attempts",
-			Help: "Current retry attempts, categorized by operation type.",
-		},
-		[]string{"operation_type"},
+	// Create meter
+	m.meter = m.mp.Meter("slo-workload")
+
+	// Initialize counters
+	m.errorsTotal, err = m.meter.Int64Counter(
+		"sdk.errors.total",
+		otelmetric.WithDescription("Total number of errors encountered, categorized by error type"),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create errorsTotal counter: %w", err)
+	}
 
-	m.retryAttemptsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "sdk_retry_attempts_total",
-			Help: "Total number of retry attempts, categorized by operation type.",
-		},
-		[]string{"operation_type"},
+	m.timeoutsTotal, err = m.meter.Int64Counter(
+		"sdk.timeouts.total",
+		otelmetric.WithDescription("Total number of timeout errors"),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create timeoutsTotal counter: %w", err)
+	}
 
-	m.retriesSuccessTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "sdk_retries_success_total",
-			Help: "Total number of successful retries, categorized by operation type.",
-		},
-		[]string{"operation_type"},
+	m.operationsTotal, err = m.meter.Int64Counter(
+		"sdk.operations.total",
+		otelmetric.WithDescription("Total number of operations, categorized by type"),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create operationsTotal counter: %w", err)
+	}
 
-	m.retriesFailureTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "sdk_retries_failure_total",
-			Help: "Total number of failed retries, categorized by operation type.",
-		},
-		[]string{"operation_type"},
+	m.operationsSuccessTotal, err = m.meter.Int64Counter(
+		"sdk.operations.success.total",
+		otelmetric.WithDescription("Total number of successful operations, categorized by type"),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create operationsSuccessTotal counter: %w", err)
+	}
 
-	m.pendingOperations = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "sdk_pending_operations",
-			Help: "Current number of pending operations, categorized by type.",
-		},
-		[]string{"operation_type"},
+	m.operationsFailureTotal, err = m.meter.Int64Counter(
+		"sdk.operations.failure.total",
+		otelmetric.WithDescription("Total number of failed operations, categorized by type"),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create operationsFailureTotal counter: %w", err)
+	}
 
-	m.p = push.New(url, jobName).
-		Grouping("ref", m.ref).
-		Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
-		Grouping("sdk_version", sdkVersion).
-		Collector(m.operationsTotal).
-		Collector(m.operationsSuccessTotal).
-		Collector(m.operationsFailureTotal).
-		Collector(m.operationLatencySeconds).
-		Collector(m.retryAttempts).
-		Collector(m.retryAttemptsTotal).
-		Collector(m.retriesSuccessTotal).
-		Collector(m.retriesFailureTotal).
-		Collector(m.pendingOperations)
+	m.operationLatencySeconds, err = m.meter.Float64Histogram(
+		"sdk.operation.latency.seconds",
+		otelmetric.WithDescription("Latency of operations performed by the SDK in seconds"),
+		otelmetric.WithExplicitBucketBoundaries(
+			0.001, 0.002, 0.003, 0.004, 0.005, 0.0075,
+			0.010, 0.020, 0.050, 0.100, 0.200, 0.500, 1.000,
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create operationLatencySeconds histogram: %w", err)
+	}
 
-	return m, m.Reset() //nolint:gocritic
+	m.retryAttemptsTotal, err = m.meter.Int64Counter(
+		"sdk.retry.attempts.total",
+		otelmetric.WithDescription("Total number of retry attempts, categorized by operation type"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create retryAttemptsTotal counter: %w", err)
+	}
+
+	m.retriesSuccessTotal, err = m.meter.Int64Counter(
+		"sdk.retries.success.total",
+		otelmetric.WithDescription("Total number of successful retries, categorized by operation type"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create retriesSuccessTotal counter: %w", err)
+	}
+
+	m.retriesFailureTotal, err = m.meter.Int64Counter(
+		"sdk.retries.failure.total",
+		otelmetric.WithDescription("Total number of failed retries, categorized by operation type"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create retriesFailureTotal counter: %w", err)
+	}
+
+	// Create synchronous gauges
+	m.retryAttempts, err = m.meter.Int64Gauge(
+		"sdk.retry.attempts",
+		otelmetric.WithDescription("Current retry attempts, categorized by operation type"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create retryAttempts gauge: %w", err)
+	}
+
+	m.pendingOperations, err = m.meter.Int64UpDownCounter(
+		"sdk.pending.operations",
+		otelmetric.WithDescription("Current number of pending operations, categorized by type"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pendingOperations counter: %w", err)
+	}
+
+	return m, nil
 }
 
 func (m *Metrics) Push() error {
-	return m.p.Push()
+	if m.mp == nil {
+		return nil
+	}
+	// Force flush
+	return m.mp.ForceFlush(m.ctx)
 }
 
 func (m *Metrics) Reset() error {
-	m.errorsTotal.Reset()
+	// Reset local counters for fail-on-error logic
+	m.errorsCount.Store(0)
+	m.timeoutsCount.Store(0)
+	m.opsCount.Store(0)
 
-	m.operationsTotal.Reset()
-	m.operationsSuccessTotal.Reset()
-	m.operationsFailureTotal.Reset()
-	m.operationLatencySeconds.Reset()
-
-	m.retryAttempts.Reset()
-	m.retryAttemptsTotal.Reset()
-	m.retriesSuccessTotal.Reset()
-	m.retriesFailureTotal.Reset()
-
-	m.pendingOperations.Reset()
-
+	// Note: OTel counters/gauges are cumulative and cannot be reset
+	// This is just for local state
 	return m.Push()
+}
+
+func (m *Metrics) Close() error {
+	if m.mp == nil {
+		return nil
+	}
+	m.cancel()
+	return m.mp.Shutdown(context.Background())
+}
+
+// commonAttrs returns common attributes for all metrics
+func (m *Metrics) commonAttrs(additional ...attribute.KeyValue) []attribute.KeyValue {
+	attrs := []attribute.KeyValue{
+		attribute.String("ref", m.ref),
+	}
+	return append(attrs, additional...)
 }
 
 func (m *Metrics) Start(name SpanName) Span {
@@ -207,63 +252,77 @@ func (m *Metrics) Start(name SpanName) Span {
 		m:     m,
 	}
 
-	m.pendingOperations.WithLabelValues(name).Add(1)
+	if m.meter != nil {
+		m.pendingOperations.Add(m.ctx, 1, otelmetric.WithAttributes(
+			m.commonAttrs(attribute.String("operation_type", name))...,
+		))
+	}
 
 	return j
 }
 
 func (j Span) Finish(err error, attempts int) {
-	latency := time.Since(j.start)
-	j.m.pendingOperations.WithLabelValues(j.name).Sub(1)
+	if j.m.meter == nil {
+		return
+	}
 
-	j.m.retryAttempts.WithLabelValues(j.name).Set(float64(attempts))
-	j.m.operationsTotal.WithLabelValues(j.name).Add(1)
-	j.m.retryAttemptsTotal.WithLabelValues(j.name).Add(float64(attempts))
+	latency := time.Since(j.start)
+
+	attrs := j.m.commonAttrs(attribute.String("operation_type", j.name))
+
+	// Decrement pending operations
+	j.m.pendingOperations.Add(j.m.ctx, -1, otelmetric.WithAttributes(attrs...))
+
+	// Record retry attempts gauge
+	j.m.retryAttempts.Record(j.m.ctx, int64(attempts), otelmetric.WithAttributes(attrs...))
+
+	// Increment counters
+	j.m.operationsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
+	j.m.retryAttemptsTotal.Add(j.m.ctx, int64(attempts), otelmetric.WithAttributes(attrs...))
+
+	// Local counters for fail-on-error
+	j.m.opsCount.Add(1)
 
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			j.m.timeoutsTotal.WithLabelValues().Add(1)
+			j.m.timeoutsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
+			j.m.timeoutsCount.Add(1)
 		}
-		j.m.errorsTotal.WithLabelValues(err.Error()).Add(1)
-		j.m.retriesFailureTotal.WithLabelValues(j.name).Add(float64(attempts))
-		j.m.operationsFailureTotal.WithLabelValues(j.name).Add(1)
-		j.m.operationLatencySeconds.WithLabelValues(j.name, OperationStatusFailue).Observe(latency.Seconds())
+		j.m.errorsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(
+			j.m.commonAttrs(attribute.String("error_type", err.Error()))...,
+		))
+		j.m.errorsCount.Add(1)
+
+		j.m.retriesFailureTotal.Add(j.m.ctx, int64(attempts), otelmetric.WithAttributes(attrs...))
+		j.m.operationsFailureTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
+		j.m.operationLatencySeconds.Record(j.m.ctx, latency.Seconds(), otelmetric.WithAttributes(
+			j.m.commonAttrs(
+				attribute.String("operation_type", j.name),
+				attribute.String("operation_status", OperationStatusFailue),
+			)...,
+		))
 	} else {
-		j.m.retriesSuccessTotal.WithLabelValues(j.name).Add(float64(attempts))
-		j.m.operationsSuccessTotal.WithLabelValues(j.name).Add(1)
-		j.m.operationLatencySeconds.WithLabelValues(j.name, OperationStatusSuccess).Observe(latency.Seconds())
+		j.m.retriesSuccessTotal.Add(j.m.ctx, int64(attempts), otelmetric.WithAttributes(attrs...))
+		j.m.operationsSuccessTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
+		j.m.operationLatencySeconds.Record(j.m.ctx, latency.Seconds(), otelmetric.WithAttributes(
+			j.m.commonAttrs(
+				attribute.String("operation_type", j.name),
+				attribute.String("operation_status", OperationStatusSuccess),
+			)...,
+		))
 	}
-}
-
-func getCounterVecTotal(counterVec *prometheus.CounterVec) float64 {
-	ch := make(chan prometheus.Metric, 100)
-	go func() {
-		counterVec.Collect(ch)
-		close(ch)
-	}()
-
-	var total float64
-	for m := range ch {
-		pb := &dto.Metric{}
-		_ = m.Write(pb)
-		if pb.GetCounter() != nil {
-			total += pb.GetCounter().GetValue()
-		}
-	}
-
-	return total
 }
 
 func (m *Metrics) OperationsTotal() float64 {
-	return getCounterVecTotal(m.operationsTotal)
+	return float64(m.opsCount.Load())
 }
 
 func (m *Metrics) ErrorsTotal() float64 {
-	return getCounterVecTotal(m.errorsTotal)
+	return float64(m.errorsCount.Load())
 }
 
 func (m *Metrics) TimeoutsTotal() float64 {
-	return getCounterVecTotal(m.timeoutsTotal)
+	return float64(m.timeoutsCount.Load())
 }
 
 func (m *Metrics) FailOnError() {
