@@ -11,19 +11,23 @@ on:
   workflow_dispatch:
     inputs:
       github_issue:
+        description: "GitHub issue number where the SLO results will be reported"
         required: true
       baseline_ref:
         description: "Baseline commit/branch/tag to compare against (leave empty to auto-detect merge-base with main)"
         required: false
       slo_workload_duration_seconds:
+        description: "Duration of the SLO workload in seconds"
+        required: false
         default: "600"
-        required: false
       slo_workload_read_max_rps:
+        description: "Maximum read RPS for the SLO workload"
+        required: false
         default: "1000"
-        required: false
       slo_workload_write_max_rps:
-        default: "100"
+        description: "Maximum write RPS for the SLO workload"
         required: false
+        default: "100"
 
 jobs:
   ydb-slo-action:
