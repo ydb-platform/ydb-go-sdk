@@ -22,7 +22,7 @@ type Config struct {
 	PartitionSize      uint64
 	InitialDataCount   uint64
 
-	PushGateway  string
+	OTLPEndpoint string
 	ReportPeriod int
 
 	ReadRPS     int
@@ -33,6 +33,8 @@ type Config struct {
 
 	Time         int
 	ShutdownTime int
+
+	BatchSize int
 }
 
 func New() (*Config, error) {
@@ -91,8 +93,8 @@ func New() (*Config, error) {
 		fs.Uint64Var(&cfg.InitialDataCount,
 			"c", 1000, "amount of initially created rows (shorthand)")
 
-		fs.StringVar(&cfg.PushGateway, "prom-pgw", "", "prometheus push gateway")
-		fs.IntVar(&cfg.ReportPeriod, "report-period", 250, "prometheus push period in milliseconds")
+		fs.StringVar(&cfg.OTLPEndpoint, "otlp-endpoint", "", "OTLP HTTP endpoint for metrics")
+		fs.IntVar(&cfg.ReportPeriod, "report-period", 250, "metrics reporting period in milliseconds")
 
 		fs.IntVar(&cfg.ReadRPS, "read-rps", 1000, "read RPS")
 		fs.IntVar(&cfg.WriteRPS, "write-rps", 100, "write RPS")
@@ -100,6 +102,8 @@ func New() (*Config, error) {
 
 		fs.IntVar(&cfg.Time, "time", 600, "run time in seconds")
 		fs.IntVar(&cfg.ShutdownTime, "shutdown-time", 30, "time to wait before force kill workers")
+
+		fs.IntVar(&cfg.BatchSize, "batch-size", 1, "batch size (used for bulk_upsert/read_rows operations)")
 	default:
 		fmt.Print(mainHelp)
 

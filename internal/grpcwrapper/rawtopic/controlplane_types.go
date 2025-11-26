@@ -17,11 +17,12 @@ var (
 )
 
 type Consumer struct {
-	Name            string
-	Important       bool
-	SupportedCodecs rawtopiccommon.SupportedCodecs
-	ReadFrom        rawoptional.Time
-	Attributes      map[string]string
+	Name               string
+	Important          bool
+	SupportedCodecs    rawtopiccommon.SupportedCodecs
+	ReadFrom           rawoptional.Time
+	AvailabilityPeriod rawoptional.Duration
+	Attributes         map[string]string
 }
 
 func (c *Consumer) MustFromProto(consumer *Ydb_Topic.Consumer) {
@@ -29,16 +30,18 @@ func (c *Consumer) MustFromProto(consumer *Ydb_Topic.Consumer) {
 	c.Important = consumer.GetImportant()
 	c.Attributes = consumer.GetAttributes()
 	c.ReadFrom.MustFromProto(consumer.GetReadFrom())
+	c.AvailabilityPeriod.MustFromProto(consumer.GetAvailabilityPeriod())
 	c.SupportedCodecs.MustFromProto(consumer.GetSupportedCodecs())
 }
 
 func (c *Consumer) ToProto() *Ydb_Topic.Consumer {
 	return &Ydb_Topic.Consumer{
-		Name:            c.Name,
-		Important:       c.Important,
-		ReadFrom:        c.ReadFrom.ToProto(),
-		SupportedCodecs: c.SupportedCodecs.ToProto(),
-		Attributes:      c.Attributes,
+		Name:               c.Name,
+		Important:          c.Important,
+		ReadFrom:           c.ReadFrom.ToProto(),
+		AvailabilityPeriod: c.AvailabilityPeriod.ToProto(),
+		SupportedCodecs:    c.SupportedCodecs.ToProto(),
+		Attributes:         c.Attributes,
 	}
 }
 

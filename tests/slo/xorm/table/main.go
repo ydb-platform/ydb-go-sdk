@@ -85,10 +85,7 @@ func main() {
 			})
 		}
 
-		err = g.Wait()
-		if err != nil {
-			panic(err)
-		}
+		_ = g.Wait()
 
 		log.Println("entries write ok")
 	case config.CleanupMode:

@@ -133,6 +133,44 @@ func TestControl(t *testing.T) {
 				CommitTx: true,
 			},
 		},
+		{
+			ctrl: SnapshotReadWriteTxControl(),
+			tableTxControl: &Ydb_Table.TransactionControl{
+				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
+					BeginTx: &Ydb_Table.TransactionSettings{
+						TxMode: &Ydb_Table.TransactionSettings_SnapshotReadWrite{},
+					},
+				},
+				CommitTx: false,
+			},
+			queryTxControl: &Ydb_Query.TransactionControl{
+				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
+					BeginTx: &Ydb_Query.TransactionSettings{
+						TxMode: &Ydb_Query.TransactionSettings_SnapshotReadWrite{},
+					},
+				},
+				CommitTx: false,
+			},
+		},
+		{
+			ctrl: SnapshotReadWriteTxControl(CommitTx()),
+			tableTxControl: &Ydb_Table.TransactionControl{
+				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
+					BeginTx: &Ydb_Table.TransactionSettings{
+						TxMode: &Ydb_Table.TransactionSettings_SnapshotReadWrite{},
+					},
+				},
+				CommitTx: true,
+			},
+			queryTxControl: &Ydb_Query.TransactionControl{
+				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
+					BeginTx: &Ydb_Query.TransactionSettings{
+						TxMode: &Ydb_Query.TransactionSettings_SnapshotReadWrite{},
+					},
+				},
+				CommitTx: true,
+			},
+		},
 	} {
 		t.Run("", func(t *testing.T) {
 			require.Equal(t,

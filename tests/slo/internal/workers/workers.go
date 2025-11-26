@@ -14,14 +14,20 @@ type ReadWriter interface {
 	Write(ctx context.Context, row generator.Row) (attempts int, err error)
 }
 
+type BatchReadWriter interface {
+	ReadBatch(ctx context.Context, rowIDs []generator.RowID) (_ []generator.Row, attempts int, err error)
+	WriteBatch(ctx context.Context, rows []generator.Row) (attempts int, err error)
+}
+
 type Workers struct {
 	cfg *config.Config
 	s   ReadWriter
+	sb  BatchReadWriter
 	m   *metrics.Metrics
 }
 
 func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers, error) {
-	m, err := metrics.New(cfg.PushGateway, ref, label, jobName)
+	m, err := metrics.New(cfg.OTLPEndpoint, ref, label, jobName, cfg.ReportPeriod)
 	if err != nil {
 		log.Printf("create metrics failed: %v", err)
 
@@ -35,10 +41,29 @@ func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers
 	}, nil
 }
 
+func NewWithBatch(cfg *config.Config, s BatchReadWriter, ref, label, jobName string) (*Workers, error) {
+	m, err := metrics.New(cfg.OTLPEndpoint, ref, label, jobName, cfg.ReportPeriod)
+	if err != nil {
+		log.Printf("create metrics failed: %v", err)
+
+		return nil, err
+	}
+
+	return &Workers{
+		cfg: cfg,
+		sb:  s,
+		m:   m,
+	}, nil
+}
+
 func (w *Workers) FailOnError() {
 	w.m.FailOnError()
 }
 
 func (w *Workers) Close() error {
-	return w.m.Reset()
+	if w.m != nil {
+		return w.m.Close()
+	}
+
+	return nil
 }

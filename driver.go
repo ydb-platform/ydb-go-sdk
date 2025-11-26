@@ -280,6 +280,10 @@ func (d *Driver) Topic() topic.Client {
 //
 //nolint:nonamedreturns
 func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) {
+	if ctx.Err() != nil {
+		return nil, xerrors.WithStackTrace(ctx.Err())
+	}
+
 	opts = append(append(make([]Option, 0, len(opts)+1), WithConnectionString(dsn)), opts...)
 
 	for parserIdx := range dsnParsers {
@@ -436,6 +440,10 @@ func (d *Driver) connect(ctx context.Context) error {
 
 	if d.config.Database() == "" {
 		return xerrors.WithStackTrace(errors.New("configuration: empty database")) //nolint:err113
+	}
+
+	if ctx.Err() != nil {
+		return xerrors.WithStackTrace(ctx.Err())
 	}
 
 	if d.userInfo != nil {

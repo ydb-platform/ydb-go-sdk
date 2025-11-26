@@ -197,3 +197,12 @@ func SnapshotReadOnlyTxControl() *Control {
 		CommitTx(), // open transactions not supported for StaleReadOnly
 	)
 }
+
+// SnapshotReadWriteTxControl returns snapshot read-write transaction control
+func SnapshotReadWriteTxControl(opts ...ControlOption) *Control {
+	return NewControl(
+		append([]ControlOption{
+			BeginTx(WithSnapshotReadWrite()),
+		}, opts...)...,
+	)
+}

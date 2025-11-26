@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
@@ -187,6 +188,12 @@ func (e *operationError) Type() Type {
 		}
 
 		return TypeRetryable
+	case Ydb.StatusIds_GENERIC_ERROR:
+		if e.hasSchemaOperationsLimitExceeded() {
+			return TypeRetryable
+		}
+
+		return TypeUndefined
 	default:
 		return TypeUndefined
 	}
@@ -195,6 +202,12 @@ func (e *operationError) Type() Type {
 func (e *operationError) hasIssueCodes(codes ...Ydb.StatusIds_StatusCode) bool {
 	return iterateByIssues(e, func(message string, code Ydb.StatusIds_StatusCode, severity uint32) (stop bool) {
 		return slices.Contains(codes, code)
+	})
+}
+
+func (e *operationError) hasSchemaOperationsLimitExceeded() bool {
+	return iterateByIssues(e, func(message string, code Ydb.StatusIds_StatusCode, severity uint32) (stop bool) {
+		return strings.Contains(message, "Request exceeded a limit on the number of schema operations, try again later")
 	})
 }
 
@@ -214,6 +227,12 @@ func (e *operationError) BackoffType() backoff.Type {
 		}
 
 		return backoff.TypeFast
+	case Ydb.StatusIds_GENERIC_ERROR:
+		if e.hasSchemaOperationsLimitExceeded() {
+			return backoff.TypeSlow
+		}
+
+		return backoff.TypeNoBackoff
 	default:
 		return backoff.TypeNoBackoff
 	}
