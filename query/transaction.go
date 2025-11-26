@@ -52,6 +52,7 @@ func EmptyTxControl() *TransactionControl {
 }
 
 // ImplicitTxControl defines transaction control inference on server-side by query content
+// See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
 func ImplicitTxControl() *TransactionControl {
 	return nil
 }
