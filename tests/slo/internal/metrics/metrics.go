@@ -7,14 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	otelmetric "go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 
 	"slo/internal/log"
 )
