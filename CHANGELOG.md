@@ -1,3 +1,5 @@
+* Added `SnapshotReadWrite` isolation mode support to `database/sql` driver using `sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: false}`
+
 ## v3.120.0
 * Added support of `SnapshotReadWrite` isolation mode into query and table clients
 

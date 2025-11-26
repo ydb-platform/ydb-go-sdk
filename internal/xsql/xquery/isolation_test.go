@@ -1,4 +1,4 @@
-package xtable
+package xquery
 
 import (
 	"database/sql"
@@ -7,15 +7,16 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestToYDB(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
 		txOptions driver.TxOptions
-		txControl table.TxOption
+		txControl tx.SettingsOption
 		err       bool
 	}{
 		// read-write
@@ -25,7 +26,7 @@ func TestToYDB(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelDefault),
 				ReadOnly:  false,
 			},
-			txControl: table.WithSerializableReadWrite(),
+			txControl: query.WithSerializableReadWrite(),
 			err:       false,
 		},
 		{
@@ -66,7 +67,7 @@ func TestToYDB(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSnapshot),
 				ReadOnly:  false,
 			},
-			txControl: table.WithSnapshotReadWrite(),
+			txControl: query.WithSnapshotReadWrite(),
 			err:       false,
 		},
 		{
@@ -75,7 +76,7 @@ func TestToYDB(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSerializable),
 				ReadOnly:  false,
 			},
-			txControl: table.WithSerializableReadWrite(),
+			txControl: query.WithSerializableReadWrite(),
 			err:       false,
 		},
 		{
@@ -134,7 +135,7 @@ func TestToYDB(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSnapshot),
 				ReadOnly:  true,
 			},
-			txControl: table.WithSnapshotReadOnly(),
+			txControl: query.WithSnapshotReadOnly(),
 			err:       false,
 		},
 		{
@@ -155,10 +156,10 @@ func TestToYDB(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			toYDB, err := toYDB(tt.txOptions)
+			result, err := toYDB(tt.txOptions)
 			if !tt.err {
 				require.NoError(t, err)
-				require.Equal(t, table.TxSettings(tt.txControl), table.TxSettings(toYDB))
+				require.Equal(t, tx.NewSettings(tt.txControl), tx.NewSettings(result))
 			} else {
 				require.Error(t, err)
 			}

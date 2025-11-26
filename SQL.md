@@ -154,14 +154,21 @@ if err = rows.Err(); err != nil { // always check final rows err
 ### Queries on transaction object <a name="queries-tx"></a>
 
 `database/sql` driver over `ydb-go-sdk/v3` supports next isolation leveles:
-- read-write (mapped to `SerializableReadWrite` transaction control)
+- read-write with serializable isolation (mapped to `SerializableReadWrite` transaction control)
   ```go
   rw := sql.TxOption{
     ReadOnly: false,
     Isolation: sql.LevelDefault,
   }
   ```
-- read-only (mapped to `OnlineReadOnly` transaction settings on each request, will be mapped to true `SnapshotReadOnly` soon)
+- read-write with snapshot isolation (mapped to `SnapshotReadWrite` transaction control)
+  ```go
+  rw := sql.TxOption{
+    ReadOnly: false,
+    Isolation: sql.LevelSnapshot,
+  }
+  ```
+- read-only with snapshot isolation (mapped to `SnapshotReadOnly` transaction settings)
   ```go
   ro := sql.TxOption{
     ReadOnly: true,
