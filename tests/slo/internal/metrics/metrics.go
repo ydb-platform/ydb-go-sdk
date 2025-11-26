@@ -27,7 +27,7 @@ type (
 	Metrics struct {
 		mp     *sdkmetric.MeterProvider
 		meter  otelmetric.Meter
-		ctx    context.Context
+		ctx    context.Context //nolint:containedctx
 		cancel context.CancelFunc
 
 		// Labels for metrics
