@@ -7,14 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	otelmetric "go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 
 	"slo/internal/log"
 )
@@ -28,7 +27,7 @@ type (
 	Metrics struct {
 		mp     *sdkmetric.MeterProvider
 		meter  otelmetric.Meter
-		ctx    context.Context
+		ctx    context.Context //nolint:containedctx
 		cancel context.CancelFunc
 
 		// Labels for metrics
@@ -66,6 +65,7 @@ func New(endpoint, ref, label, jobName string, reportPeriodMs int) (*Metrics, er
 
 	if endpoint == "" {
 		log.Printf("Warning: no OTLP endpoint provided, metrics will not be exported")
+
 		return m, nil
 	}
 
@@ -214,6 +214,7 @@ func (m *Metrics) Push() error {
 	if m.mp == nil {
 		return nil
 	}
+
 	// Force flush
 	return m.mp.ForceFlush(m.ctx)
 }
@@ -234,6 +235,7 @@ func (m *Metrics) Close() error {
 		return nil
 	}
 	m.cancel()
+
 	return m.mp.Shutdown(context.Background())
 }
 
@@ -242,6 +244,7 @@ func (m *Metrics) commonAttrs(additional ...attribute.KeyValue) []attribute.KeyV
 	attrs := []attribute.KeyValue{
 		attribute.String("ref", m.ref),
 	}
+
 	return append(attrs, additional...)
 }
 

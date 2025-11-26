@@ -64,5 +64,6 @@ func (w *Workers) Close() error {
 	if w.m != nil {
 		return w.m.Close()
 	}
+
 	return nil
 }
