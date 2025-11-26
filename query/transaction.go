@@ -48,6 +48,13 @@ func TxControl(opts ...tx.ControlOption) *TransactionControl {
 
 // EmptyTxControl defines transaction control inference on server-side by query content
 func EmptyTxControl() *TransactionControl {
+	return ImplicitTxControl()
+}
+
+// ImplicitTxControl defines transaction control inference on server-side by query content
+// See more about implicit transactions on
+// [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
+func ImplicitTxControl() *TransactionControl {
 	return nil
 }
 
@@ -57,7 +64,7 @@ func EmptyTxControl() *TransactionControl {
 // Will be removed after Oct 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func NoTx() *TransactionControl {
-	return EmptyTxControl()
+	return ImplicitTxControl()
 }
 
 // DefaultTxControl returns default transaction control for use default tx control on server-side
