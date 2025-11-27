@@ -1,0 +1,61 @@
+name: Check SLO Label
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  check-slo-label:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      statuses: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get PR labels
+        id: get-labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Получаем JSON с данными PR, включая лейблы
+          response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}")
+          
+          # Извлекаем массив лейблов
+          labels=$(echo "$response" | jq -r '.labels[].name // empty')
+          
+          # Проверяем, есть ли лейбл "SLO"
+          if echo "$labels" | grep -q "^SLO$"; then
+            echo "label-found=true" >> $GITHUB_OUTPUT
+          else
+            echo "label-found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set failure status if SLO label is missing
+        if: steps.get-labels.outputs.label-found == 'false'
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+            -d '{
+              "state": "failure",
+              "context": "SLO Label Check",
+              "description": "PR must have the \"SLO\" label to proceed."
+            }'
+
+      - name: Set success status if SLO label is present
+        if: steps.get-labels.outputs.label-found == 'true'
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+            -d '{
+              "state": "success",
+              "context": "SLO Label Check",
+              "description": "SLO label is present."
+            }'
