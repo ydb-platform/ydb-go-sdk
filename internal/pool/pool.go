@@ -883,7 +883,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 	)
 
 	if lastErr != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf(errMsg + ": %w", lastErr))
+		return nil, xerrors.WithStackTrace(fmt.Errorf(errMsg+": %w", lastErr))
 	}
 
 	return nil, xerrors.WithStackTrace(errors.New(errMsg))
