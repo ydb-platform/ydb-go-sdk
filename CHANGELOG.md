@@ -4,6 +4,7 @@
 
 ## v3.120.0
 * Added support of `SnapshotReadWrite` isolation mode into query and table clients
+* Move `internal/ratelimiter/options` to `ratelimiter/options` for public usage
 
 ## v3.119.0
 * Made error "Request exceeded a limit on the number of schema operations, try again later" retryable
