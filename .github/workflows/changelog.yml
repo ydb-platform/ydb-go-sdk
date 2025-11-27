@@ -4,6 +4,10 @@ on:
 jobs:
   changelog:
     name: changelog
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: read
     concurrency:
       group: changelog-${{ github.ref }}
       cancel-in-progress: true
