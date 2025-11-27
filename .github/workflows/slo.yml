@@ -5,7 +5,7 @@ on:
     branches:
       - master
   pull_request:
-    types: [labeled]
+    types: [opened, reopened, synchronize, labeled]
     branches:
       - master
       - release-*
@@ -32,7 +32,7 @@ on:
 
 jobs:
   ydb-slo-action:
-    if: ${{ github.event.label.name == 'SLO' }}
+    if: ${{ github.event_name == 'pull_request' && (github.event.action == 'labeled' && github.event.label.name == 'SLO' || contains(github.event.pull_request.labels.*.name, 'SLO')) || github.event_name == 'push' }}
 
     name: Run YDB SLO Tests
     runs-on: "large-runner"
