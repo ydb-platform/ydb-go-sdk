@@ -47,17 +47,27 @@ func TxControl(opts ...tx.ControlOption) *TransactionControl {
 }
 
 // EmptyTxControl defines transaction control inference on server-side by query content
+// Deprecated: Use ImplicitTxControl instead.
+// Will be removed after May 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func EmptyTxControl() *TransactionControl {
+	return ImplicitTxControl()
+}
+
+// ImplicitTxControl defines transaction control inference on server-side by query content
+// See more about implicit transactions on
+// [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
+func ImplicitTxControl() *TransactionControl {
 	return nil
 }
 
 // NoTx defines nil transaction control
 // This is wrong name for transaction control inference on server-side by query content
-// Deprecated: Use EmptyTxControl instead.
+// Deprecated: Use ImplicitTxControl instead.
 // Will be removed after Oct 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func NoTx() *TransactionControl {
-	return EmptyTxControl()
+	return ImplicitTxControl()
 }
 
 // DefaultTxControl returns default transaction control for use default tx control on server-side
@@ -94,6 +104,11 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 	)
 }
 
+// SnapshotReadWriteTxControl returns snapshot read-write transaction control
+func SnapshotReadWriteTxControl(opts ...tx.ControlOption) *TransactionControl {
+	return tx.SnapshotReadWriteTxControl(opts...)
+}
+
 // TxSettings returns transaction settings
 func TxSettings(opts ...tx.SettingsOption) TransactionSettings {
 	return opts
@@ -109,6 +124,10 @@ func WithSerializableReadWrite() TransactionOption {
 
 func WithSnapshotReadOnly() TransactionOption {
 	return tx.WithSnapshotReadOnly()
+}
+
+func WithSnapshotReadWrite() TransactionOption {
+	return tx.WithSnapshotReadWrite()
 }
 
 func WithStaleReadOnly() TransactionOption {

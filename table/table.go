@@ -287,6 +287,10 @@ func WithSnapshotReadOnly() TxOption {
 	return tx.WithSnapshotReadOnly()
 }
 
+func WithSnapshotReadWrite() TxOption {
+	return tx.WithSnapshotReadWrite()
+}
+
 func WithStaleReadOnly() TxOption {
 	return tx.WithStaleReadOnly()
 }
@@ -352,6 +356,11 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 		BeginTx(WithSnapshotReadOnly()),
 		CommitTx(), // open transactions not supported for StaleReadOnly
 	)
+}
+
+// SnapshotReadWriteTxControl returns snapshot read-write transaction control
+func SnapshotReadWriteTxControl(opts ...TxControlOption) *TransactionControl {
+	return tx.SnapshotReadWriteTxControl(opts...)
 }
 
 // QueryParameters
