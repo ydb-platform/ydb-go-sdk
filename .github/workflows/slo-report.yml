@@ -22,11 +22,12 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_run_id: ${{ github.event.workflow_run.id }}
   remove-slo-label:
+    needs: test-ydb-slo-action
+    if: always() && github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     name: Remove SLO Label
     permissions:
       pull-requests: write
-    if: github.event.workflow_run.event == 'pull_request'
     steps:
       - name: Remove SLO label from PR
         uses: actions/github-script@v7
