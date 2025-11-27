@@ -999,3 +999,50 @@ func TestIssue1872QueryWarning(t *testing.T) {
 			issueList[0].Issues[0].Issues[0].Message)
 	})
 }
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1878
+func TestIssue1878ConcurrentResultSet(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.INFO),
+				),
+				trace.QueryEvents,
+			),
+		),
+	)
+	require.NoError(t, err)
+	t.Run("Select with enabled option", func(t *testing.T) {
+		q := db.Query()
+		res, err := q.Query(ctx, `
+				SELECT 1;
+				SELECT 2;
+				SELECT 3;
+				SELECT 4;
+				SELECT 5;
+	        `,
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+			query.WithConcurrentResultSets(true),
+		)
+		require.NoError(t, err)
+		rsCount := 0
+		for rs, err := range res.ResultSets(ctx) {
+			rsCount++
+			require.NoError(t, err)
+			row, err := rs.NextRow(ctx)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(row.Values()))
+			require.EqualValues(t, rsCount, row.Values()[0])
+		}
+		require.NoError(t, res.Close(ctx))
+		require.Equal(t, 5, rsCount)
+	})
+}
