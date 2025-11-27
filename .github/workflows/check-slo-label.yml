@@ -32,28 +32,8 @@ jobs:
             echo "label-found=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Set failure status if SLO label is missing
+      - name: Fail if SLO label is missing
         if: steps.get-labels.outputs.label-found == 'false'
         run: |
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
-            -d '{
-              "state": "failure",
-              "context": "SLO Label Check",
-              "description": "PR must have the \"SLO\" label to proceed."
-            }'
-
-      - name: Set success status if SLO label is present
-        if: steps.get-labels.outputs.label-found == 'true'
-        run: |
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
-            -d '{
-              "state": "success",
-              "context": "SLO Label Check",
-              "description": "SLO label is present."
-            }'
+          echo "PR must have the \"SLO\" label to proceed."
+          exit 1
