@@ -9,17 +9,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check for SLO label
-        id: check-label
-        run: |
-          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'SLO') }}" == "true" ]]; then
-            echo "label-found=true" >> $GITHUB_OUTPUT
-          else
-            echo "label-found=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Fail if SLO label is missing
-        if: steps.check-label.outputs.label-found == 'false'
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'SLO') }}
         run: |
           echo "PR must have the \"SLO\" label to proceed."
           exit 1
