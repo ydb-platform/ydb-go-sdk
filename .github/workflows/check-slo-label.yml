@@ -10,7 +10,7 @@ jobs:
 
     steps:
       - name: Fail if SLO label is missing
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'SLO') }}
+        if: "!contains(github.event.pull_request.labels.*.name, 'SLO')"
         run: |
           echo "PR must have the \"SLO\" label to proceed."
           exit 1
