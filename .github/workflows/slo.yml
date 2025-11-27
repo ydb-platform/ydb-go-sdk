@@ -31,7 +31,7 @@ on:
 
 jobs:
   ydb-slo-action:
-    if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
+    if: contains(github.event.pull_request.labels.*.name, 'SLO')
 
     name: Run YDB SLO Tests
     runs-on: "large-runner"
