@@ -1,3 +1,15 @@
+* Added `query.ImplicitTxControl()` transaction control (the same as `query.NoTx()` and `query.EmptyTxControl()`). See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
+* Added `SnapshotReadWrite` isolation mode support to `database/sql` driver using `sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: false}`
+
+## v3.120.0
+* Added support of `SnapshotReadWrite` isolation mode into query and table clients
+
+## v3.119.0
+* Made error "Request exceeded a limit on the number of schema operations, try again later" retryable
+* Fixed deadlock in `Endpoint.String()` method
+* Added the `AvailabilityPeriod` to the Consumer type in topics
+
+## v3.118.3
 * Fixed `context` checking in `ydb.Open`
 
 ## v3.118.2

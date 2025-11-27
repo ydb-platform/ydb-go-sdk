@@ -27,7 +27,7 @@ type Workers struct {
 }
 
 func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers, error) {
-	m, err := metrics.New(cfg.PushGateway, ref, label, jobName)
+	m, err := metrics.New(cfg.OTLPEndpoint, ref, label, jobName, cfg.ReportPeriod)
 	if err != nil {
 		log.Printf("create metrics failed: %v", err)
 
@@ -42,7 +42,7 @@ func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers
 }
 
 func NewWithBatch(cfg *config.Config, s BatchReadWriter, ref, label, jobName string) (*Workers, error) {
-	m, err := metrics.New(cfg.PushGateway, ref, label, jobName)
+	m, err := metrics.New(cfg.OTLPEndpoint, ref, label, jobName, cfg.ReportPeriod)
 	if err != nil {
 		log.Printf("create metrics failed: %v", err)
 
@@ -61,5 +61,9 @@ func (w *Workers) FailOnError() {
 }
 
 func (w *Workers) Close() error {
-	return w.m.Reset()
+	if w.m != nil {
+		return w.m.Close()
+	}
+
+	return nil
 }
