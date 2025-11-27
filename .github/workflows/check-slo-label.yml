@@ -7,33 +7,19 @@ on:
 jobs:
   check-slo-label:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-      statuses: write
 
     steps:
-
-      - name: Get PR labels
-        id: get-labels
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check for SLO label
+        id: check-label
         run: |
-          # Get PR JSON data including labels
-          response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}")
-          
-          # Extract labels array
-          labels=$(echo "$response" | jq -r '.labels[].name // empty')
-          
-          # Check if SLO label exists
-          if echo "$labels" | grep -q "^SLO$"; then
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'SLO') }}" == "true" ]]; then
             echo "label-found=true" >> $GITHUB_OUTPUT
           else
             echo "label-found=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Fail if SLO label is missing
-        if: steps.get-labels.outputs.label-found == 'false'
+        if: steps.check-label.outputs.label-found == 'false'
         run: |
           echo "PR must have the \"SLO\" label to proceed."
           exit 1
