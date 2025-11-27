@@ -2,7 +2,7 @@ name: slo-report
 
 on:
   workflow_run:
-    workflows: ["slo"]
+    workflows: ["SLO"]
     types:
       - completed
 
@@ -21,3 +21,37 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_run_id: ${{ github.event.workflow_run.id }}
+  remove-slo-label:
+    needs: test-ydb-slo-action
+    if: always() && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Remove SLO Label
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove SLO label from PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pullRequests = context.payload.workflow_run.pull_requests;
+            if (pullRequests && pullRequests.length > 0) {
+              for (const pr of pullRequests) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    name: 'SLO'
+                  });
+                  console.log(`Removed SLO label from PR #${pr.number}`);
+                } catch (error) {
+                  if (error.status === 404) {
+                    console.log(`SLO label not found on PR #${pr.number}, skipping`);
+                  } else {
+                    throw error;
+                  }
+                }
+              }
+            } else {
+              console.log('No pull requests associated with this workflow run');
+            }
