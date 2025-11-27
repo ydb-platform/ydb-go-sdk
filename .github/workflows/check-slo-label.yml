@@ -12,8 +12,6 @@ jobs:
       statuses: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
       - name: Get PR labels
         id: get-labels
