@@ -32,7 +32,7 @@ on:
 
 jobs:
   ydb-slo-action:
-    if: contains(github.event.pull_request.labels.*.name, 'SLO')
+    if: ${{ github.event.label.name == 'SLO' }}
 
     name: Run YDB SLO Tests
     runs-on: "large-runner"
