@@ -2,9 +2,10 @@
 * Added `query.ImplicitTxControl()` transaction control (the same as `query.NoTx()` and `query.EmptyTxControl()`). See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
 * Added `SnapshotReadWrite` isolation mode support to `database/sql` driver using `sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: false}`
 
+* Move `internal/ratelimiter/options` to `ratelimiter/options` for public usage
+
 ## v3.120.0
 * Added support of `SnapshotReadWrite` isolation mode into query and table clients
-* Move `internal/ratelimiter/options` to `ratelimiter/options` for public usage
 
 ## v3.119.0
 * Made error "Request exceeded a limit on the number of schema operations, try again later" retryable
