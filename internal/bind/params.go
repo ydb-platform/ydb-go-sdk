@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"net/url"
 	"reflect"
 	"sort"
@@ -293,6 +294,10 @@ func toValue(v any) (_ value.Value, err error) {
 	switch x := v.(type) {
 	case value.Value:
 		return x, nil
+	case Ydb.TypedValue:
+		return value.FromProtobuf(&x), nil
+	case *Ydb.TypedValue:
+		return value.FromProtobuf(x), nil
 	case bool:
 		return value.BoolValue(x), nil
 	case int:
