@@ -18,7 +18,31 @@ const (
 	blockDeclare
 	blockYQL
 	blockCastArgs
+	blockCustomConverter        // Custom parameter converters
+	blockCustomNamedConverter   // Custom named value converters
 )
+
+// CustomConverter is a marker binding that enables custom converters
+type CustomConverter struct{}
+
+func (CustomConverter) ToYdb(sql string, args ...any) (string, []any, error) {
+	return sql, args, nil
+}
+
+func (CustomConverter) blockID() blockID {
+	return blockCustomConverter
+}
+
+// CustomNamedValueConverter is a marker binding that enables custom named value converters
+type CustomNamedValueConverter struct{}
+
+func (CustomNamedValueConverter) ToYdb(sql string, args ...any) (string, []any, error) {
+	return sql, args, nil
+}
+
+func (CustomNamedValueConverter) blockID() blockID {
+	return blockCustomNamedConverter
+}
 
 type Bind interface {
 	ToYdb(sql string, args ...any) (

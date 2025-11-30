@@ -238,6 +238,11 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen
 
 //nolint:gocyclo,funlen
 func toValue(v any) (_ value.Value, err error) {
+	// Try custom converters first
+	if customValue, ok := convertWithCustomConverters(v); ok {
+		return customValue, nil
+	}
+
 	if x, ok := asUUID(v); ok {
 		return x, nil
 	}
@@ -251,6 +256,11 @@ func toValue(v any) (_ value.Value, err error) {
 		if err != nil {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("driver.Valuer error: %w", err))
 		}
+	}
+
+	// Try custom converters again after valuer conversion
+	if customValue, ok := convertWithCustomConverters(v); ok {
+		return customValue, nil
 	}
 
 	if x, ok := asUUID(v); ok {
@@ -439,6 +449,21 @@ func supportNewTypeLink(x any) string {
 
 func toYdbParam(name string, value any) (*params.Parameter, error) {
 	if nv, has := value.(driver.NamedValue); has {
+		// Try custom named value converters first
+		if customValue, ok := convertNamedValueWithCustomConverters(nv); ok {
+			n, v := nv.Name, customValue
+			if n != "" {
+				name = n
+			}
+			if name == "" {
+				return nil, xerrors.WithStackTrace(errUnnamedParam)
+			}
+			if name[0] != '$' {
+				name = "$" + name
+			}
+			return params.Named(name, v), nil
+		}
+
 		n, v := nv.Name, nv.Value
 		if n != "" {
 			name = n
