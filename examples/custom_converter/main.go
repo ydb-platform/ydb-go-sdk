@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/bind"
 )
 
 // CustomTime wraps time.Time with custom formatting logic
