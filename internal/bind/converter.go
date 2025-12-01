@@ -15,7 +15,7 @@ import (
 // Converter defines the interface for custom conversion of database/sql query parameters
 // to YDB values. Implementations can handle specific types that require special conversion
 // logic beyond the standard type conversions.
-type Converter interface {
+	// Convert converts a value to a YDB Value.
 	// Convert converts a value to a YDB Value.
 	// Returns the converted value and true if the converter can handle the type,
 	// or nil/zero value and false if the converter cannot handle the type.
@@ -125,10 +125,6 @@ type JSONConverter struct{}
 
 func (c *JSONConverter) Convert(v any) (value.Value, bool) {
 	if v == nil {
-		return nil, false
-	}
-	// Check if the value is a nil time.Time pointer
-	if timePtr, ok := v.(*time.Time); ok && timePtr == nil {
 		return nil, false
 	}
 	// Don't handle time.Time at all - let it fall through to standard conversion
