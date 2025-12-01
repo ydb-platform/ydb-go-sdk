@@ -30,15 +30,22 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 	}
 	// Create custom converters
 	timeConverter := bind.NewCustomTypeConverter(
-		func(v any) bool { _, ok := v.(CustomTime); return ok },
+		func(v any) bool {
+			_, ok := v.(CustomTime)
+			return ok
+		},
 		func(v any) (value.Value, error) {
 			ct := v.(CustomTime)
+
 			return value.TextValue(ct.Format("2006-01-02 15:04:05")), nil
 		},
 	)
-	
+
 	idConverter := bind.NewCustomTypeConverter(
-		func(v any) bool { _, ok := v.(CustomID); return ok },
+		func(v any) bool {
+			_, ok := v.(CustomID)
+			return ok
+		},
 		func(v any) (value.Value, error) {
 			cid := v.(CustomID)
 
@@ -95,9 +102,9 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 
 		// Query back the data
 		var (
-			id         string
-			name       string
-			createdAt  string
+			id        string
+			name      string
+			createdAt string
 		)
 		err = db.QueryRowContext(ctx, `
 			SELECT id, name, created_at 

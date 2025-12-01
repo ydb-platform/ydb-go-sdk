@@ -18,8 +18,8 @@ const (
 	blockDeclare
 	blockYQL
 	blockCastArgs
-	blockCustomConverter        // Custom parameter converters
-	blockCustomNamedConverter   // Custom named value converters
+	blockCustomConverter      // Custom parameter converters
+	blockCustomNamedConverter // Custom named value converters
 )
 
 // CustomConverter is a marker binding that enables custom converters

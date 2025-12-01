@@ -16,7 +16,7 @@ import (
 // to YDB values. Implementations can handle specific types that require special conversion
 // logic beyond the standard type conversions.
 type Converter interface {
-	// Convert converts a value to a YDB Value. 
+	// Convert converts a value to a YDB Value.
 	// Returns the converted value and true if the converter can handle the type,
 	// or nil/zero value and false if the converter cannot handle the type.
 	Convert(v any) (value.Value, bool)
@@ -48,6 +48,7 @@ func (r *ConverterRegistry) Convert(v any) (value.Value, bool) {
 			return result, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -100,6 +101,7 @@ func (r *NamedValueConverterRegistry) Convert(nv driver.NamedValue) (value.Value
 			return result, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -172,19 +174,19 @@ type UUIDConverter struct{}
 func (c *UUIDConverter) Convert(v any) (value.Value, bool) {
 	uuidType := reflect.TypeOf(uuid.UUID{})
 	uuidPtrType := reflect.TypeOf((*uuid.UUID)(nil))
-	
+
 	switch reflect.TypeOf(v) {
 	case uuidType:
 		vv, ok := v.(uuid.UUID)
 		if !ok {
-				return nil, false
+			return nil, false
 		}
 
 		return value.Uuid(vv), true
 	case uuidPtrType:
 		vv, ok := v.(*uuid.UUID)
 		if !ok {
-				return nil, false
+			return nil, false
 		}
 
 		if vv == nil {
