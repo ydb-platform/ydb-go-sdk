@@ -25,7 +25,6 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 	type CustomTime struct {
 		time.Time
 	}
-	
 	type CustomID struct {
 		ID string
 	}
