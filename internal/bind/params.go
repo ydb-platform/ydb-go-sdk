@@ -455,9 +455,11 @@ func toYdbParam(name string, value any) (*params.Parameter, error) {
 			if n != "" {
 				name = n
 			}
+
 			if name == "" {
 				return nil, xerrors.WithStackTrace(errUnnamedParam)
 			}
+
 			if name[0] != '$' {
 				name = "$" + name
 			}
@@ -480,9 +482,11 @@ func toYdbParam(name string, value any) (*params.Parameter, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	if name == "" {
 		return nil, xerrors.WithStackTrace(errUnnamedParam)
 	}
+
 	if name[0] != '$' {
 		name = "$" + name
 	}

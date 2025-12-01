@@ -32,6 +32,7 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 	timeConverter := bind.NewCustomTypeConverter(
 		func(v any) bool {
 			_, ok := v.(CustomTime)
+
 			return ok
 		},
 		func(v any) (value.Value, error) {
@@ -44,6 +45,7 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 	idConverter := bind.NewCustomTypeConverter(
 		func(v any) bool {
 			_, ok := v.(CustomID)
+
 			return ok
 		},
 		func(v any) (value.Value, error) {
@@ -92,8 +94,7 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 		// Insert using custom types
 		_, err = db.ExecContext(ctx, `
 			INSERT INTO custom_converter_test (id, name, created_at) 
-			VALUES ($id, $name, $created_at)
-		`,
+			VALUES ($id, $name, $created_at)`,
 			sql.Named("id", customID),
 			sql.Named("name", "test_name"),
 			sql.Named("created_at", customTime),
@@ -163,8 +164,7 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 		// Insert using named parameters
 		_, err = db.ExecContext(ctx, `
 			INSERT INTO named_converter_test (id, value) 
-			VALUES ($id, $value)
-		`,
+			VALUES ($id, $value)`,
 			sql.Named("id", "test_id"),
 			sql.Named("value", "original_value"),
 		)
@@ -228,8 +228,7 @@ func TestDatabaseSQL_CustomConverter_UUID(t *testing.T) {
 		testID := uuid.New()
 		_, err = db.ExecContext(ctx, `
 			INSERT INTO uuid_test (id, name) 
-			VALUES ($id, $name)
-		`,
+			VALUES ($id, $name)`,
 			testID,
 			"test_name",
 		)
@@ -283,8 +282,7 @@ func TestDatabaseSQL_CustomConverter_UUID(t *testing.T) {
 		testID := uuid.New()
 		_, err = db.ExecContext(ctx, `
 			INSERT INTO uuid_ptr_test (id, name) 
-			VALUES ($id, $name)
-		`,
+			VALUES ($id, $name)`,
 			&testID,
 			"test_name_ptr",
 		)
@@ -335,11 +333,10 @@ func TestDatabaseSQL_CustomConverter_UUID(t *testing.T) {
 		}()
 
 		// Test nil UUID pointer insertion
-		var idPtr *uuid.UUID = nil
+		var idPtr *uuid.UUID
 		_, err = db.ExecContext(ctx, `
 			INSERT INTO uuid_null_test (id, name) 
-			VALUES ($id, $name)
-		`,
+			VALUES ($id, $name)`,
 			idPtr,
 			"null_test",
 		)

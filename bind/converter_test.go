@@ -21,6 +21,7 @@ func TestConverterRegistry(t *testing.T) {
 		converter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(string)
+
 				return ok
 			},
 			func(v any) (value.Value, error) { return value.TextValue("converted_" + v.(string)), nil },
@@ -44,6 +45,7 @@ func TestConverterRegistry(t *testing.T) {
 		stringConverter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(string)
+
 				return ok
 			},
 			func(v any) (value.Value, error) { return value.TextValue("string_" + v.(string)), nil },
@@ -54,6 +56,7 @@ func TestConverterRegistry(t *testing.T) {
 		intConverter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(int)
+
 				return ok
 			},
 			func(v any) (value.Value, error) { return value.Int32Value(int32(v.(int))), nil },
@@ -87,6 +90,7 @@ func TestNamedValueConverterRegistry(t *testing.T) {
 		converter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(string)
+
 				return ok
 			},
 			func(v any) (value.Value, error) { return value.TextValue("named_" + v.(string)), nil },
@@ -169,6 +173,7 @@ func TestCustomTypeConverter(t *testing.T) {
 		converter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(time.Time)
+
 				return ok
 			},
 			func(v any) (value.Value, error) {
@@ -188,6 +193,7 @@ func TestCustomTypeConverter(t *testing.T) {
 		converter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(time.Time)
+
 				return ok
 			},
 			func(v any) (value.Value, error) {
@@ -205,6 +211,7 @@ func TestCustomTypeConverter(t *testing.T) {
 		converter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(time.Time)
+
 				return ok
 			},
 			func(v any) (value.Value, error) {
@@ -233,6 +240,7 @@ func TestDefaultConverterRegistry(t *testing.T) {
 		converter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(string)
+
 				return ok
 			},
 			func(v any) (value.Value, error) { return value.TextValue("default_" + v.(string)), nil },
@@ -261,6 +269,7 @@ func TestDefaultNamedValueConverterRegistry(t *testing.T) {
 		converter := bind.NewCustomTypeConverter(
 			func(v any) bool {
 				_, ok := v.(string)
+
 				return ok
 			},
 			func(v any) (value.Value, error) { return value.TextValue("named_default_" + v.(string)), nil },
