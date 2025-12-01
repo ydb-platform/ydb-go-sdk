@@ -142,6 +142,7 @@ func (c *JSONConverter) Convert(v any) (value.Value, bool) {
 		if err != nil {
 			return nil, false
 		}
+
 		return value.JSONValue(string(bytes)), true
 	}
 	// Only handle specific types that should be JSON
@@ -152,6 +153,7 @@ func (c *JSONConverter) Convert(v any) (value.Value, bool) {
 		if err != nil {
 			return nil, false
 		}
+
 		return value.JSONValue(string(bytes)), true
 	default:
 		// Don't handle other types - let them fall through to standard conversion
@@ -178,8 +180,10 @@ func (c *UUIDConverter) Convert(v any) (value.Value, bool) {
 		if vv == nil {
 			return value.NullValue(types.UUID), true
 		}
+
 		return value.OptionalValue(value.Uuid(*(vv))), true
 	}
+
 	return nil, false
 }
 
@@ -209,6 +213,7 @@ func (c *CustomTypeConverter) Convert(v any) (value.Value, bool) {
 	if err != nil {
 		return nil, false
 	}
+
 	return result, true
 }
 

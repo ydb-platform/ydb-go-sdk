@@ -157,6 +157,7 @@ func TestCustomTypeConverter(t *testing.T) {
 			func(v any) bool { _, ok := v.(time.Time); return ok },
 			func(v any) (value.Value, error) {
 				t := v.(time.Time)
+
 				return value.TextValue(t.Format(time.RFC3339)), nil
 			},
 		)
@@ -172,6 +173,7 @@ func TestCustomTypeConverter(t *testing.T) {
 			func(v any) bool { _, ok := v.(time.Time); return ok },
 			func(v any) (value.Value, error) {
 				t := v.(time.Time)
+
 				return value.TextValue(t.Format(time.RFC3339)), nil
 			},
 		)

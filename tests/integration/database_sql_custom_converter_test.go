@@ -42,6 +42,7 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 		func(v any) bool { _, ok := v.(CustomID); return ok },
 		func(v any) (value.Value, error) {
 			cid := v.(CustomID)
+
 			return value.TextValue("ID_" + cid.ID), nil
 		},
 	)

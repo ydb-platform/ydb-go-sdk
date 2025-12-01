@@ -215,6 +215,7 @@ func WithAutoDeclare() QueryBindConnectorOption {
 //	connector, err := ydb.Connector(driver, ydb.WithCustomConverter(&MyCustomConverter{}))
 func WithCustomConverter(converter bind.Converter) QueryBindConnectorOption {
 	bind.RegisterConverter(converter)
+
 	return xsql.WithQueryBind(bind.CustomConverter{})
 }
 
@@ -237,6 +238,7 @@ func WithCustomConverter(converter bind.Converter) QueryBindConnectorOption {
 //	connector, err := ydb.Connector(driver, ydb.WithCustomNamedValueConverter(&MyNamedConverter{}))
 func WithCustomNamedValueConverter(converter bind.NamedValueConverter) QueryBindConnectorOption {
 	bind.RegisterNamedValueConverter(converter)
+
 	return xsql.WithQueryBind(bind.CustomNamedValueConverter{})
 }
 

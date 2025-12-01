@@ -461,6 +461,7 @@ func toYdbParam(name string, value any) (*params.Parameter, error) {
 			if name[0] != '$' {
 				name = "$" + name
 			}
+
 			return params.Named(name, v), nil
 		}
 
