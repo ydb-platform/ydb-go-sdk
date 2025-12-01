@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -269,7 +270,8 @@ func TestRegisterDefaultConverters(t *testing.T) {
 	result, ok := bind.DefaultConverterRegistry.Convert(data)
 	require.True(t, ok)
 	
-	expectedJSON, _ := json.Marshal(data)
+	expectedJSON, err := json.Marshal(data)
+	require.NoError(t, err)
 	require.Equal(t, "Json(@@"+string(expectedJSON)+"@@)", result.Yql())
 	
 	// Test that UUID converter is registered

@@ -28,7 +28,6 @@ func TestDatabaseSQL_CustomConverter(t *testing.T) {
 	type CustomID struct {
 		ID string
 	}
-	
 	// Create custom converters
 	timeConverter := bind.NewCustomTypeConverter(
 		func(v any) bool { _, ok := v.(CustomTime); return ok },

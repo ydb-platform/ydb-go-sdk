@@ -15,7 +15,6 @@ import (
 func TestConverterRegistry(t *testing.T) {
 	t.Run("register and convert", func(t *testing.T) {
 		registry := NewConverterRegistry()
-		
 		// Register a simple converter
 		converter := NewCustomTypeConverter(
 			func(v any) bool { _, ok := v.(string); return ok },
@@ -285,7 +284,8 @@ func TestRegisterDefaultConverters(t *testing.T) {
 	result, ok := DefaultConverterRegistry.Convert(data)
 	require.True(t, ok)
 	
-	expectedJSON, _ := json.Marshal(data)
+	expectedJSON, err := json.Marshal(data)
+	require.NoError(t, err)
 	require.Equal(t, "Json(@@"+string(expectedJSON)+"@@)", result.Yql())
 	
 	// Test that UUID converter is registered

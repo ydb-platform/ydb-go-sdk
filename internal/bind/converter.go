@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -174,9 +175,18 @@ func (c *UUIDConverter) Convert(v any) (value.Value, bool) {
 	
 	switch reflect.TypeOf(v) {
 	case uuidType:
-		return value.Uuid(v.(uuid.UUID)), true
+		vv, ok := v.(uuid.UUID)
+		if !ok {
+				return nil, false
+		}
+
+		return value.Uuid(vv), true
 	case uuidPtrType:
-		vv := v.(*uuid.UUID)
+		vv, ok := v.(*uuid.UUID)
+		if !ok {
+				return nil, false
+		}
+
 		if vv == nil {
 			return value.NullValue(types.UUID), true
 		}
