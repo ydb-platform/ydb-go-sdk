@@ -25,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -228,12 +227,14 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 	tx tx.Transaction,
 	batch *topicreadercommon.PublicBatch,
 ) error {
-	if err := tx.UnLazy(ctx); err != nil {
+	err := tx.UnLazy(ctx)
+	if err != nil {
 		return fmt.Errorf("ydb: failed to materialize transaction: %w", err)
 	}
 
 	req := r.createUpdateOffsetRequest(ctx, batch, tx)
-	updateOffsetInTransactionErr := retry.Retry(ctx, func(ctx context.Context) (err error) {
+
+	tx.OnBeforeCommit(func(ctx context.Context) error {
 		logCtx := r.cfg.BaseContext
 		onDone := trace.TopicOnReaderUpdateOffsetsInTransaction(
 			r.cfg.Trace,
@@ -243,6 +244,7 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 			tx.SessionID(),
 			tx,
 		)
+
 		defer func() {
 			onDone(err)
 		}()
@@ -251,67 +253,21 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 		// Otherwise, errors such as `Database coordinators are unavailable` may occur.
 		ctx = endpoint.WithNodeID(ctx, tx.NodeID())
 
-		err = r.topicClient.UpdateOffsetsInTransaction(ctx, req)
+		err := r.topicClient.UpdateOffsetsInTransaction(ctx, req)
+		if err != nil {
+			err = fmt.Errorf("updating offsets in transaction: %w", err)
+			_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.Retryable(err)))
 
-		return err
+			return xerrors.WithStackTrace(err)
+		}
+
+		commitRange := topicreadercommon.GetCommitRange(batch)
+		topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+
+		return nil
 	})
-	if updateOffsetInTransactionErr == nil {
-		r.addOnTransactionCompletedHandler(ctx, tx, batch)
-	} else {
-		_ = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			logCtx := r.cfg.BaseContext
-			onDone := trace.TopicOnReaderTransactionRollback(
-				r.cfg.Trace,
-				&logCtx,
-				r.readerID,
-				r.readConnectionID,
-				tx.SessionID(),
-				tx,
-			)
-			defer func() {
-				onDone(err)
-			}()
-
-			return tx.Rollback(ctx)
-		})
-
-		_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.Retryable(
-			fmt.Errorf("ydb: failed add topic offsets in transaction: %w", updateOffsetInTransactionErr),
-		)))
-
-		return updateOffsetInTransactionErr
-	}
 
 	return nil
-}
-
-func (r *topicStreamReaderImpl) addOnTransactionCompletedHandler(
-	ctx context.Context,
-	tx tx.Transaction,
-	batch *topicreadercommon.PublicBatch,
-) {
-	commitRange := topicreadercommon.GetCommitRange(batch)
-	tx.OnCompleted(func(transactionResult error) {
-		logCtx := r.cfg.BaseContext
-		onDone := trace.TopicOnReaderTransactionCompleted(
-			r.cfg.Trace,
-			&logCtx,
-			r.readerID,
-			r.readConnectionID,
-			tx.SessionID(),
-			tx,
-			transactionResult,
-		)
-		defer onDone()
-
-		if transactionResult == nil {
-			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
-		} else {
-			_ = r.CloseWithError(xcontext.ValueOnly(ctx), xerrors.WithStackTrace(xerrors.Retryable(
-				fmt.Errorf("ydb: failed batch commit because transaction doesn't committed: %w", transactionResult),
-			)))
-		}
-	})
 }
 
 func (r *topicStreamReaderImpl) createUpdateOffsetRequest(
