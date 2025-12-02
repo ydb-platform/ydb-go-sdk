@@ -449,29 +449,24 @@ func supportNewTypeLink(x any) string {
 
 func toYdbParam(name string, value any) (*params.Parameter, error) {
 	if nv, has := value.(driver.NamedValue); has {
+		if nv.Name != "" {
+			name = nv.Name
+		}
+
+		if name == "" {
+			return nil, xerrors.WithStackTrace(errUnnamedParam)
+		}
+
+		if name[0] != '$' {
+			name = "$" + name
+		}
+
 		// Try custom named value converters first
 		if customValue, ok := convertNamedValueWithCustomConverters(nv); ok {
-			n, v := nv.Name, customValue
-			if n != "" {
-				name = n
-			}
-
-			if name == "" {
-				return nil, xerrors.WithStackTrace(errUnnamedParam)
-			}
-
-			if name[0] != '$' {
-				name = "$" + name
-			}
-
-			return params.Named(name, v), nil
+			return params.Named(name, customValue), nil
 		}
 
-		n, v := nv.Name, nv.Value
-		if n != "" {
-			name = n
-		}
-		value = v
+		value = nv.Value
 	}
 
 	if nv, ok := value.(params.NamedValue); ok {

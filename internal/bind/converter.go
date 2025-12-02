@@ -15,7 +15,7 @@ import (
 // Converter defines the interface for custom conversion of database/sql query parameters
 // to YDB values. Implementations can handle specific types that require special conversion
 // logic beyond the standard type conversions.
-	// Convert converts a value to a YDB Value.
+type Converter interface {
 	// Convert converts a value to a YDB Value.
 	// Returns the converted value and true if the converter can handle the type,
 	// or nil/zero value and false if the converter cannot handle the type.
