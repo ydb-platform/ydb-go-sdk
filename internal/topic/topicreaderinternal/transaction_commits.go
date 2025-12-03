@@ -46,6 +46,7 @@ func (s *TransactionCommitsStorage) getTransactionCommits(transaction tx.Transac
 
 func (s *TransactionCommitsStorage) newTransactionCommits(transaction tx.Transaction) *transactionCommits {
 	ranges := topicreadercommon.NewCommitRangesWithCapacity(1)
+
 	return &transactionCommits{
 		tx:           transaction,
 		commitRanges: &ranges,
@@ -192,6 +193,7 @@ func (tc *transactionCommits) commitRangesToUpdateOffsetsRequest() *rawtopic.Upd
 			if tc.commitRanges.Ranges[j].PartitionSession.StreamPartitionSessionID == po.PartitionSessionID {
 				topic = tc.commitRanges.Ranges[j].PartitionSession.Topic
 				partitionID = tc.commitRanges.Ranges[j].PartitionSession.PartitionID
+
 				break
 			}
 		}
