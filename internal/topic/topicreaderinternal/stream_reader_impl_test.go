@@ -1336,33 +1336,6 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		txID := "test-tx-id"
 		sessionID := "test-session-id"
 
-		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), &rawtopic.UpdateOffsetsInTransactionRequest{
-			OperationParams: rawydb.OperationParams{
-				OperationMode: rawydb.OperationParamsModeSync,
-			},
-			Tx: rawtopiccommon.TransactionIdentity{
-				ID:      txID,
-				Session: sessionID,
-			},
-			Topics: []rawtopic.UpdateOffsetsInTransactionRequest_TopicOffsets{
-				{
-					Path: e.partitionSession.Topic,
-					Partitions: []rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
-						{
-							PartitionID: e.partitionSession.PartitionID,
-							PartitionOffsets: []rawtopiccommon.OffsetRange{
-								{
-									Start: initialCommitOffset,
-									End:   initialCommitOffset + 1,
-								},
-							},
-						},
-					},
-				},
-			},
-			Consumer: e.reader.cfg.Consumer,
-		})
-
 		txMock := newMockTransactionWrapper(sessionID, txID)
 
 		batch, err := topicreadercommon.NewBatch(e.partitionSession, []*topicreadercommon.PublicMessage{
@@ -1373,6 +1346,28 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		})
 		require.NoError(t, err)
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.NoError(t, err)
+
+		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), gomock.Cond(func(x any) bool {
+			req, ok := x.(*rawtopic.UpdateOffsetsInTransactionRequest)
+			if !ok {
+				return false
+			}
+
+			return req.OperationParams.OperationMode == rawydb.OperationParamsModeSync &&
+				req.Tx.ID == txID &&
+				req.Tx.Session == sessionID &&
+				req.Consumer == e.reader.cfg.Consumer &&
+				len(req.Topics) == 1 &&
+				req.Topics[0].Path == e.partitionSession.Topic &&
+				len(req.Topics[0].Partitions) == 1 &&
+				req.Topics[0].Partitions[0].PartitionID == e.partitionSession.PartitionID &&
+				len(req.Topics[0].Partitions[0].PartitionOffsets) == 1 &&
+				req.Topics[0].Partitions[0].PartitionOffsets[0].Start == initialCommitOffset &&
+				req.Topics[0].Partitions[0].PartitionOffsets[0].End == initialCommitOffset+1
+		}))
+
+		err = txMock.onBeforeCommit[0](e.ctx)
 		require.NoError(t, err)
 
 		require.Len(t, txMock.onCompleted, 1)
@@ -1400,14 +1395,18 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		})
 		require.NoError(t, err)
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.NoError(t, err)
+
+		require.NotEmpty(t, txMock.onBeforeCommit)
+		err = txMock.onBeforeCommit[0](e.ctx)
 		require.ErrorIs(t, err, testError)
-		require.NoError(t, xerrors.RetryableError(err))
-		require.Empty(t, txMock.onCompleted)
+
+		txMock.onCompleted[0](err)
 
 		require.True(t, e.reader.closed)
 		require.ErrorIs(t, e.reader.err, testError)
 		require.Error(t, xerrors.RetryableError(e.reader.err))
-		require.True(t, txMock.RolledBack)
+		require.False(t, txMock.RolledBack, "Rollback is an responsibility of tx itself")
 		require.True(t, txMock.materialized)
 	})
 	t.Run("UpdateOffsetsInTransaction must be executed on the tx Node", func(t *testing.T) {
@@ -1416,6 +1415,12 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 
 		txMock := newMockTransactionWrapper("test-session-id", "test-tx-id")
 		txMock.nodeID = 123
+
+		batch, err := topicreadercommon.NewBatch(e.partitionSession, nil)
+		require.NoError(t, err)
+
+		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.NoError(t, err)
 
 		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, _ *rawtopic.UpdateOffsetsInTransactionRequest) error {
@@ -1427,10 +1432,7 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 				return nil
 			})
 
-		batch, err := topicreadercommon.NewBatch(e.partitionSession, nil)
-		require.NoError(t, err)
-
-		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		err = txMock.onBeforeCommit[0](e.ctx)
 		require.NoError(t, err)
 	})
 }
