@@ -3,6 +3,7 @@ package ydb
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -148,4 +149,19 @@ func extractTablePathPrefixFromBinderName(binderName string) (string, error) {
 	}
 
 	return ss[0][1], nil
+}
+
+// sanitizeDSN masks the password in the DSN for secure logging.
+func sanitizeDSN(dsn string) string {
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return dsn
+	}
+	if u.User != nil {
+		if _, hasPassword := u.User.Password(); hasPassword {
+			u.User = url.UserPassword(u.User.Username(), "***")
+		}
+	}
+
+	return u.String()
 }
