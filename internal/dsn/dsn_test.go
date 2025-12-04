@@ -194,6 +194,21 @@ func TestSanitizeDSN(t *testing.T) {
 			dsn:      "not a valid url :",
 			expected: "not a valid url :",
 		},
+		{
+			name:     "no scheme with password",
+			dsn:      "user:password@localhost:2135/local",
+			expected: "user:%2A%2A%2A@localhost:2135/local",
+		},
+		{
+			name:     "no scheme without password",
+			dsn:      "localhost:2135/local",
+			expected: "localhost:2135/local",
+		},
+		{
+			name:     "no scheme with username only",
+			dsn:      "user@localhost:2135/local",
+			expected: "user@localhost:2135/local",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			result := SanitizeDSN(tt.dsn)

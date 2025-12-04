@@ -69,7 +69,14 @@ func Parse(dsn string) (info parsedInfo, err error) {
 // SanitizeDSN masks the password in the DSN for secure logging.
 // The password is replaced with "***" (URL-encoded as "%2A%2A%2A" in the output).
 func SanitizeDSN(dsn string) string {
-	u, err := url.Parse(dsn)
+	// Apply the same normalization as Parse - add scheme if missing
+	normalizedDSN := dsn
+	hadScheme := reScheme.MatchString(dsn)
+	if !hadScheme {
+		normalizedDSN = secureSchema + "://" + dsn
+	}
+
+	u, err := url.Parse(normalizedDSN)
 	if err != nil {
 		return dsn
 	}
@@ -79,5 +86,11 @@ func SanitizeDSN(dsn string) string {
 		}
 	}
 
-	return u.String()
+	result := u.String()
+	// If we added the scheme for parsing, remove it from the result
+	if !hadScheme {
+		result = result[len(secureSchema)+3:] // Remove "grpcs://"
+	}
+
+	return result
 }
