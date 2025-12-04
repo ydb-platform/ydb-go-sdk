@@ -45,7 +45,6 @@ func (s *batchTxStorage) Add(transaction tx.Transaction, batch *topicreadercommo
 
 // GetBatches returns all batches stored for the given transaction.
 // Returns an empty slice (nil) if no batches are stored for the transaction.
-// The returned slice is a copy to prevent external modifications.
 // This method is thread-safe.
 func (s *batchTxStorage) GetBatches(transaction tx.Transaction) []*topicreadercommon.PublicBatch {
 	s.m.RLock()
@@ -56,11 +55,7 @@ func (s *batchTxStorage) GetBatches(transaction tx.Transaction) []*topicreaderco
 		return nil
 	}
 
-	// Return a copy to prevent external modifications
-	result := make([]*topicreadercommon.PublicBatch, len(batches))
-	copy(result, batches)
-
-	return result
+	return batches
 }
 
 // GetUpdateOffsetsInTransactionRequest builds an UpdateOffsetsInTransactionRequest
