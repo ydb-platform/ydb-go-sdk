@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"net/url"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -22,6 +23,21 @@ var d = &sqlDriver{} //nolint:gochecknoglobals
 func init() { //nolint:gochecknoinits
 	sql.Register("ydb", d)
 	sql.Register("ydb/v3", d)
+}
+
+// sanitizeDSN masks the password in the DSN for secure logging.
+func sanitizeDSN(dsn string) string {
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return dsn
+	}
+	if u.User != nil {
+		if _, hasPassword := u.User.Password(); hasPassword {
+			u.User = url.UserPassword(u.User.Username(), "***")
+		}
+	}
+
+	return u.String()
 }
 
 func withConnectorOptions(opts ...ConnectorOption) Option {
@@ -47,7 +63,7 @@ func (d *sqlDriver) Open(string) (driver.Conn, error) {
 func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, error) {
 	db, err := Open(context.Background(), dataSourceName)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", sanitizeDSN(dataSourceName), err))
 	}
 
 	c, err := Connector(db, append(db.databaseSQLOptions,
