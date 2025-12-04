@@ -152,6 +152,7 @@ func extractTablePathPrefixFromBinderName(binderName string) (string, error) {
 }
 
 // sanitizeDSN masks the password in the DSN for secure logging.
+// The password is replaced with "***" (URL-encoded as "%2A%2A%2A" in the output).
 func sanitizeDSN(dsn string) string {
 	u, err := url.Parse(dsn)
 	if err != nil {
