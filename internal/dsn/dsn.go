@@ -36,7 +36,7 @@ func Parse(dsn string) (info parsedInfo, err error) {
 		return secureSchema + "://" + dsn
 	}())
 	if err != nil {
-		return info, xerrors.WithStackTrace(err)
+		return info, xerrors.WithStackTrace(fmt.Errorf("failed to parse DSN '%s': %w", SanitizeDSN(dsn), err))
 	}
 	if port := uri.Port(); port == "" {
 		return info, xerrors.WithStackTrace(fmt.Errorf("bad connection string '%s': port required", SanitizeDSN(dsn)))
