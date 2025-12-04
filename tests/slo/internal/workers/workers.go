@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"time"
 
 	"slo/internal/config"
 	"slo/internal/generator"
@@ -24,6 +25,7 @@ type Workers struct {
 	s   ReadWriter
 	sb  BatchReadWriter
 	m   *metrics.Metrics
+	Gen generator.Generator
 }
 
 func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers, error) {
@@ -56,8 +58,14 @@ func NewWithBatch(cfg *config.Config, s BatchReadWriter, ref, label, jobName str
 	}, nil
 }
 
-func (w *Workers) FailOnError() {
-	w.m.FailOnError()
+func (w *Workers) ReportNodeHintMisses(val int64) {
+	if w.m != nil {
+		w.m.ReportNodeHintMisses(val)
+	}
+}
+
+func (w *Workers) ExportInterval() time.Duration {
+	return w.m.ExportInterval
 }
 
 func (w *Workers) Close() error {
