@@ -62,7 +62,7 @@ type topicStreamReaderImpl struct {
 	started bool
 	closed  bool
 
-	batchTxStorage BatchTxStorage
+	batchTxStorage *batchTxStorage
 }
 
 type topicStreamReaderConfig struct {
@@ -174,6 +174,8 @@ func newTopicStreamReaderStopped(
 	res.committer.BufferTimeLagTrigger = cfg.CommitterBatchTimeLag
 	res.committer.BufferCountTrigger = cfg.CommitterBatchCounterTrigger
 	res.freeBytes <- cfg.BufferSizeProtoBytes
+
+	res.batchTxStorage = newBatchTxStorage(cfg.Consumer)
 
 	return res
 }
