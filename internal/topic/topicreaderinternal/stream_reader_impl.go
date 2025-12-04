@@ -14,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
@@ -56,11 +57,12 @@ type topicStreamReaderImpl struct {
 	readConnectionID string
 	readerID         int64
 
-	m                  xsync.RWMutex
-	err                error
-	started            bool
-	closed             bool
-	transactionCommits *TransactionCommitsStorage
+	m       xsync.RWMutex
+	err     error
+	started bool
+	closed  bool
+
+	batchTxStorage BatchTxStorage
 }
 
 type topicStreamReaderConfig struct {
@@ -166,11 +168,6 @@ func newTopicStreamReaderStopped(
 		rawMessagesFromBuffer: make(chan rawtopicreader.ServerMessage, 1),
 	}
 
-	res.transactionCommits = &TransactionCommitsStorage{
-		reader:  res,
-		commits: make(map[string]*transactionCommits),
-	}
-
 	res.backgroundWorkers = *background.NewWorker(stopPump, "topic-reader-stream-background")
 
 	res.committer = topicreadercommon.NewCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
@@ -245,20 +242,81 @@ func (r *topicStreamReaderImpl) PopMessagesBatchTx(
 // within the transaction's pre-commit hook and will cause the transaction to fail.
 func (r *topicStreamReaderImpl) commitWithTransaction(
 	ctx context.Context,
-	transaction tx.Transaction,
+	tx tx.Transaction,
 	batch *topicreadercommon.PublicBatch,
 ) error {
-	err := transaction.UnLazy(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to materialize transaction: %w", err)
+	if err := tx.UnLazy(ctx); err != nil {
+		return fmt.Errorf("ydb: failed to materialize transaction: %w", err)
 	}
 
-	r.transactionCommits.Append(transaction, batch)
+	if r.batchTxStorage.Add(tx, batch) {
+		// tx hooks already configured - exiting
+		return nil
+	}
 
-	transaction.OnBeforeCommit(r.transactionCommits.BeforeCommitFn(transaction))
-	transaction.OnCompleted(r.transactionCommits.CompletedFn(transaction))
+	tx.OnBeforeCommit(r.txBeforeCommitFn(tx))
+
+	tx.OnCompleted(func(err error) {
+		logCtx := r.cfg.BaseContext
+		onDone := trace.TopicOnReaderTransactionCompleted(
+			r.cfg.Trace,
+			&logCtx,
+			r.readerID,
+			r.readConnectionID,
+			tx.SessionID(),
+			tx,
+			err,
+		)
+		defer onDone()
+
+		defer r.batchTxStorage.Clear(tx)
+
+		if err != nil {
+			// mark error as retryable - for proper reconnector working
+			err = xerrors.Retryable(err)
+
+			_ = r.CloseWithError(xcontext.ValueOnly(ctx), fmt.Errorf("transaction failed: %w", err))
+
+			return
+		}
+
+		for _, batch := range r.batchTxStorage.GetBatches(tx) {
+			commitRange := topicreadercommon.GetCommitRange(batch)
+			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+		}
+	})
 
 	return nil
+}
+
+func (r *topicStreamReaderImpl) txBeforeCommitFn(tx tx.Transaction) tx.OnTransactionBeforeCommit {
+	return func(ctx context.Context) (err error) {
+		logCtx := r.cfg.BaseContext
+		onDone := trace.TopicOnReaderUpdateOffsetsInTransaction(
+			r.cfg.Trace,
+			&logCtx,
+			r.readerID,
+			r.readConnectionID,
+			tx.SessionID(),
+			tx,
+		)
+		defer func() {
+			onDone(err)
+		}()
+
+		// UpdateOffsetsInTransaction operation must be executed on the same Node where the transaction was initiated.
+		// Otherwise, errors such as `Database coordinators are unavailable` may occur.
+		ctx = endpoint.WithNodeID(ctx, tx.NodeID())
+
+		req := r.batchTxStorage.GetUpdateOffsetsInTransactionRequest(tx)
+
+		err = r.topicClient.UpdateOffsetsInTransaction(ctx, req)
+		if err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("updating offsets in transaction: %w", err))
+		}
+
+		return nil
+	}
 }
 
 func (r *topicStreamReaderImpl) ReadMessageBatch(
