@@ -290,7 +290,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 		if parser := dsnParsers[parserIdx]; parser != nil {
 			optsFromParser, err := parser(dsn)
 			if err != nil {
-				return nil, xerrors.WithStackTrace(fmt.Errorf("data source name '%s' wrong: %w", dsn, err))
+				return nil, xerrors.WithStackTrace(fmt.Errorf("data source name '%s' wrong: %w", sanitizeDSN(dsn), err))
 			}
 			opts = append(opts, optsFromParser...)
 		}

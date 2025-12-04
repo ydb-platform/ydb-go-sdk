@@ -39,7 +39,7 @@ func Parse(dsn string) (info parsedInfo, err error) {
 		return info, xerrors.WithStackTrace(err)
 	}
 	if port := uri.Port(); port == "" {
-		return info, xerrors.WithStackTrace(fmt.Errorf("bad connection string '%s': port required", dsn))
+		return info, xerrors.WithStackTrace(fmt.Errorf("bad connection string '%s': port required", SanitizeDSN(dsn)))
 	}
 	info.Options = append(info.Options,
 		config.WithSecure(uri.Scheme != insecureSchema),
@@ -64,4 +64,20 @@ func Parse(dsn string) (info parsedInfo, err error) {
 	}
 
 	return info, nil
+}
+
+// SanitizeDSN masks the password in the DSN for secure logging.
+// The password is replaced with "***" (URL-encoded as "%2A%2A%2A" in the output).
+func SanitizeDSN(dsn string) string {
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return dsn
+	}
+	if u.User != nil {
+		if _, hasPassword := u.User.Password(); hasPassword {
+			u.User = url.UserPassword(u.User.Username(), "***")
+		}
+	}
+
+	return u.String()
 }
