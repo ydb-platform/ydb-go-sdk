@@ -1,3 +1,5 @@
+* Changed default for `database/sql` driver from TABLE service to QUERY service
+
 ## v3.121.0
 * Changed internal pprof label to pyroscope supported format
 * Added `query.ImplicitTxControl()` transaction control (the same as `query.NoTx()` and `query.EmptyTxControl()`). See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
