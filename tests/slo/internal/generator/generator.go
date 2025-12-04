@@ -13,18 +13,22 @@ const (
 	MaxLength = 40
 )
 
-type Generator struct {
+type Generator interface {
+	Generate() (Row, error)
+}
+
+type GeneratorImpl struct {
 	currentID RowID
 	mu        sync.Mutex
 }
 
-func New(id RowID) *Generator {
-	return &Generator{
+func New(id RowID) *GeneratorImpl {
+	return &GeneratorImpl{
 		currentID: id,
 	}
 }
 
-func (g *Generator) Generate() (Row, error) {
+func (g *GeneratorImpl) Generate() (Row, error) {
 	g.mu.Lock()
 	id := g.currentID
 	g.currentID++
@@ -37,7 +41,7 @@ func (g *Generator) Generate() (Row, error) {
 	}
 
 	var err error
-	e.PayloadStr, err = g.genPayloadString()
+	e.PayloadStr, err = genPayloadString()
 	if err != nil {
 		return Row{}, err
 	}
@@ -45,7 +49,7 @@ func (g *Generator) Generate() (Row, error) {
 	return e, nil
 }
 
-func (g *Generator) genPayloadString() (*string, error) {
+func genPayloadString() (*string, error) {
 	l := MinLength + rand.Intn(MaxLength-MinLength+1) //nolint:gosec // speed more important
 
 	sl := make([]byte, l)
