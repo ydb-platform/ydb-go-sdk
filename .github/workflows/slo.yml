@@ -180,7 +180,7 @@ jobs:
           fi
 
       - name: Initialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@main
+        uses: ydb-platform/ydb-slo-action/init@1d8751d09d66a790a81620ddfb377164d5980f6b
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
