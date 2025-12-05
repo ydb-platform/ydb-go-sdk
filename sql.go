@@ -189,6 +189,59 @@ func WithAutoDeclare() QueryBindConnectorOption {
 	return xsql.WithQueryBind(bind.AutoDeclare{})
 }
 
+// WithCustomConverter registers a custom converter for database/sql query parameters
+//
+// Custom converters allow you to extend the parameter conversion system to handle
+// specific types that require special conversion logic beyond the standard type conversions.
+//
+// The converter will be tried before the standard conversion logic, allowing
+// you to override or extend the default behavior for specific types.
+//
+// Example:
+//
+//	type MyCustomType struct {
+//		Field string
+//	}
+//
+//	type MyCustomConverter struct{}
+//
+//	func (c *MyCustomConverter) Convert(v any) (value.Value, bool) {
+//		if custom, ok := v.(MyCustomType); ok {
+//			return value.TextValue(custom.Field), true
+//		}
+//		return nil, false
+//	}
+//
+//	connector, err := ydb.Connector(driver, ydb.WithCustomConverter(&MyCustomConverter{}))
+func WithCustomConverter(converter bind.Converter) QueryBindConnectorOption {
+	bind.RegisterConverter(converter)
+
+	return xsql.WithQueryBind(bind.CustomConverter{})
+}
+
+// WithCustomNamedValueConverter registers a custom named value converter for database/sql query parameters
+//
+// Named value converters have access to both the name and value of parameters,
+// allowing for more sophisticated conversion logic based on parameter names.
+//
+// Example:
+//
+//	type MyNamedConverter struct{}
+//
+//	func (c *MyNamedConverter) ConvertNamedValue(nv driver.NamedValue) (value.Value, bool) {
+//		if nv.Name == "special_param" {
+//			return value.TextValue(fmt.Sprintf("special_%v", nv.Value)), true
+//		}
+//		return nil, false
+//	}
+//
+//	connector, err := ydb.Connector(driver, ydb.WithCustomNamedValueConverter(&MyNamedConverter{}))
+func WithCustomNamedValueConverter(converter bind.NamedValueConverter) QueryBindConnectorOption {
+	bind.RegisterNamedValueConverter(converter)
+
+	return xsql.WithQueryBind(bind.CustomNamedValueConverter{})
+}
+
 func WithPositionalArgs() QueryBindConnectorOption {
 	return xsql.WithQueryBind(bind.PositionalArgs{})
 }
