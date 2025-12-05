@@ -24,6 +24,7 @@ type Workers struct {
 	s   ReadWriter
 	sb  BatchReadWriter
 	m   *metrics.Metrics
+	Gen generator.Generator
 }
 
 func New(cfg *config.Config, s ReadWriter, ref, label, jobName string) (*Workers, error) {

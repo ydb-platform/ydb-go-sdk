@@ -34,7 +34,8 @@ type Config struct {
 	Time         int
 	ShutdownTime int
 
-	BatchSize int
+	BatchSize          int
+	PrometheusEndpoint string
 }
 
 func New() (*Config, error) {
@@ -95,6 +96,7 @@ func New() (*Config, error) {
 
 		fs.StringVar(&cfg.OTLPEndpoint, "otlp-endpoint", "", "OTLP HTTP endpoint for metrics")
 		fs.IntVar(&cfg.ReportPeriod, "report-period", 250, "metrics reporting period in milliseconds")
+		fs.StringVar(&cfg.PrometheusEndpoint, "prometheus-endpoint", "", "Prometheus endpoint")
 
 		fs.IntVar(&cfg.ReadRPS, "read-rps", 1000, "read RPS")
 		fs.IntVar(&cfg.WriteRPS, "write-rps", 100, "write RPS")
