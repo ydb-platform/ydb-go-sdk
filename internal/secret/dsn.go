@@ -9,13 +9,14 @@ import (
 func DSN(dsn string) string {
 	u, err := url.Parse(dsn)
 	if err != nil {
-		return dsn
+		return "<invalid DSN>"
 	}
 
 	values := u.Query()
 	delete(values, "login")
 	delete(values, "user")
 	delete(values, "password")
+	delete(values, "token")
 
 	buffer := xstring.Buffer()
 	defer buffer.Free()
