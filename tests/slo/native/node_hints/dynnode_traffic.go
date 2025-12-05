@@ -58,12 +58,12 @@ func getMetricValue(ctx context.Context, cfg *config.Config, query string) float
 }
 
 func formatNodeID(v model.LabelValue) uint32 {
-	id, err := strconv.Atoi(string(v))
+	i64, err := strconv.ParseUint(string(v), 10, 32)
 	if err != nil {
 		log.Panicf("formatNodeID failed: %v", err)
 	}
 
-	return uint32(id)
+	return uint32(i64)
 }
 
 func NewEstimator(ctx context.Context, storage *Storage) *Estimator {
