@@ -413,8 +413,6 @@ func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 	return path.Join(scope.Folder(), scope.TableName(opts...))
 }
 
-func (scope *scopeT) DeleteSession(ctx context.Context, sessionID string) {
-	baConfig := config.New(
 // logger for tests
 type testLogger struct {
 	test     *xtest.SyncedTest
