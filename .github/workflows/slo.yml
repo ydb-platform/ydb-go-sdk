@@ -45,26 +45,44 @@ jobs:
             name: database-sql-table
             path: ./database/sql/table
             label: database/sql/table
+            run_extra_args: ''
+            create_extra_args: ''
           - id: database_sql_query
             name: database-sql-query
             path: ./database/sql/query
             label: database/sql/query
+            run_extra_args: ''
+            create_extra_args: ''
           - id: native_query
             name: native-query
             path: ./native/query
             label: native/query
+            run_extra_args: ''
+            create_extra_args: ''
           - id: native_table
             name: native-table
             path: ./native/table
             label: native/table
+            run_extra_args: ''
+            create_extra_args: ''
           - id: native_table_over_query_service
             name: native-table-over-query-service
             path: ./native/table/over/query/service
             label: native/table/over/query/service
+            run_extra_args: ''
+            create_extra_args: ''
           - id: native_bulk_upsert
             name: native-bulk-upsert
             path: ./native/bulk-upsert
             label: native/bulk-upsert
+            run_extra_args: '-batch-size=10'
+            create_extra_args: ''
+          - id: native_node_hints
+            name: native-node-hints
+            path: ./native/node_hints
+            label: native/node_hints
+            run_extra_args: '-prometheus-endpoint http://172.28.0.2:9090 -batch-size=10'
+            create_extra_args: '-min-partitions-count 10'
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
@@ -159,23 +177,25 @@ jobs:
             --job-name "${{ matrix.sdk.name }}"
 
       - name: Initialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@main
+        uses: ydb-platform/ydb-slo-action/init@21473ae781c9bc8f16b42dedc79489c1867c6e50
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workload_name: ${{ matrix.sdk.name }}
           workload_current_ref: ${{ github.head_ref || github.ref_name }}
           workload_baseline_ref: ${{ steps.baseline.outputs.ref }}
+          disable_compose_profiles: "${{ matrix.sdk.id == 'native_node_hints' && 'chaos' || '' }}"
 
       - name: Prepare SLO Database
         run: |
           echo "Preparing SLO database..."
+          CREATE_EXTRA_ARGS="${{ matrix.sdk.create_extra_args }}"
           docker run --rm --network ydb_ydb-net \
             --add-host "ydb:172.28.0.11" \
             --add-host "ydb:172.28.0.12" \
             --add-host "ydb:172.28.0.13" \
             --add-host "ydb:172.28.0.99" \
-            ydb-app-current create grpc://ydb:2136 /Root/testdb
+            ydb-app-current create grpc://ydb:2136 /Root/testdb $CREATE_EXTRA_ARGS
 
       - name: Run SLO Tests (parallel)
         timeout-minutes: 15
@@ -183,11 +203,7 @@ jobs:
           DURATION=${{ inputs.slo_workload_duration_seconds || 600 }}
           READ_RPS=${{ inputs.slo_workload_read_max_rps || 1000 }}
           WRITE_RPS=${{ inputs.slo_workload_write_max_rps || 1000 }}
-
-          EXTRA_ARGS=""
-          if [ "${{ matrix.sdk.id }}" = "native_bulk_upsert" ]; then
-            EXTRA_ARGS="--batch-size=10"
-          fi
+          RUN_EXTRA_ARGS="${{ matrix.sdk.run_extra_args }}"
 
           ARGS="run grpc://ydb:2136 /Root/testdb \
             -otlp-endpoint prometheus:9090 \
@@ -197,7 +213,7 @@ jobs:
             -write-rps $WRITE_RPS \
             -read-timeout 100 \
             -write-timeout 100 \
-            $EXTRA_ARGS"
+            $RUN_EXTRA_ARGS"
 
           echo "Starting ydb-app-current..."
           docker run -d \

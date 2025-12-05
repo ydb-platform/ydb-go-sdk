@@ -46,6 +46,7 @@ func (g *SeededGenerator) Generate() (Row, error) {
 	} else {
 		row.ID = g.setRange.Left + g.rng.Uint64()%(g.setRange.Right-g.setRange.Left)
 	}
+
 	return row, nil
 }
 

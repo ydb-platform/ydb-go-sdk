@@ -108,7 +108,7 @@ func main() {
 
 		log.Println("cleanup table ok")
 	case config.RunMode:
-		//to wait for correct partitions boundaries
+		// to wait for correct partitions boundaries
 		time.Sleep(10 * time.Second)
 		w, err := workers.NewWithBatch(cfg, s, ref, label, jobName)
 		if err != nil {
@@ -127,9 +127,9 @@ func main() {
 			log.Println("workers close ok")
 		}()
 
-		//collect metrics
+		// collect metrics
 		estimator := NewEstimator(ctx, s)
-		//run workers
+		// run workers
 		wg := sync.WaitGroup{}
 		readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
 		wg.Add(cfg.ReadRPS)
@@ -150,7 +150,8 @@ func main() {
 		go w.Metrics(ctx, &wg, metricsRL)
 
 		wg.Wait()
-		//check all load is sent to a single node
+		w.FailOnError()
+		// check all load is sent to a single node
 		ectx, ecancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer ecancel()
 		estimator.OnlyThisNode(ectx, nodeID)

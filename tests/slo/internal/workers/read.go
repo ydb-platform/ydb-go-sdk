@@ -41,6 +41,7 @@ func (w *Workers) ReadID() uint64 {
 	if err != nil {
 		log.Panicf("generate error: %v", err)
 	}
+
 	return row.ID
 }
 
@@ -57,6 +58,7 @@ func (w *Workers) ReadIDs() []uint64 {
 			ids = append(ids, row.ID)
 		}
 	}
+
 	return ids
 }
 

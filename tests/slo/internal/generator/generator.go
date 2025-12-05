@@ -17,18 +17,18 @@ type Generator interface {
 	Generate() (Row, error)
 }
 
-type GeneratorImpl struct {
+type Impl struct {
 	currentID RowID
 	mu        sync.Mutex
 }
 
-func New(id RowID) *GeneratorImpl {
-	return &GeneratorImpl{
+func New(id RowID) *Impl {
+	return &Impl{
 		currentID: id,
 	}
 }
 
-func (g *GeneratorImpl) Generate() (Row, error) {
+func (g *Impl) Generate() (Row, error) {
 	g.mu.Lock()
 	id := g.currentID
 	g.currentID++
