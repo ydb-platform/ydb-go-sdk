@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"slo/internal/node_hints"
 	"sync/atomic"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 
 	"slo/internal/config"
 	"slo/internal/generator"
+	"slo/internal/node_hints"
 )
 
 const createTableQuery = `
@@ -74,7 +74,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label str
 
 	var nsPtr *atomic.Pointer[node_hints.NodeSelector]
 	if cfg.Mode == config.RunMode {
-		nsPtr, err = node_hints.RunUpdates(ctx, db, tablePath, time.Second*10)
+		nsPtr, err = node_hints.RunUpdates(ctx, db, tablePath, time.Second*5)
 		if err != nil {
 			return nil, fmt.Errorf("create node selector: %w", err)
 		}
@@ -173,8 +173,8 @@ func (s *Storage) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (
 	} else {
 		reqCtx = ctx
 	}
-	//reqCtx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
-	//defer cancel()
+	reqCtx, cancel := context.WithTimeout(reqCtx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
+	defer cancel()
 
 	res, err := s.db.Table().ReadRows(reqCtx, s.tablePath, types.ListValue(keys...), []options.ReadRowsOption{},
 		table.WithRetryOptions([]retry.Option{ //nolint:staticcheck
@@ -226,6 +226,7 @@ func (s *Storage) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (
 func (s *Storage) CreateTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
+
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			fmt.Println(fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount))
