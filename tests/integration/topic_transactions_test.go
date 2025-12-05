@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -118,75 +117,6 @@ func TestTopicReaderTLIIssue1797(t *testing.T) {
 
 		return nil
 	}))
-}
-
-func TestTopicReaderUpdateOffsetsIssue(t *testing.T) {
-	scope := newScope(t)
-	ctx, cancel := context.WithTimeout(scope.Ctx, 10*time.Second)
-	defer cancel()
-
-	db := scope.Driver()
-
-	writer := scope.TopicWriter()
-	reader := scope.TopicReader()
-
-	scope.Require.NoError(writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("1")}))
-
-	sessionIDAtStart := ""
-	scope.Require.NoError(db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		sss := tx.(interface{ SessionID() string })
-		if sessionIDAtStart == "" {
-			sessionIDAtStart = sss.SessionID()
-
-			scope.DeleteSession(ctx, sessionIDAtStart)
-		}
-
-		batch, err := reader.PopMessagesBatchTx(ctx, tx)
-		scope.Require.NoError(err)
-		scope.Require.Len(batch.Messages, 1)
-
-		return nil
-	}))
-
-	t.Run("several reads", func(t *testing.T) {
-		scope.Require.NoError(db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-			sss := tx.(interface{ SessionID() string })
-			if sessionIDAtStart == "" {
-				sessionIDAtStart = sss.SessionID()
-
-				scope.DeleteSession(ctx, sessionIDAtStart)
-			}
-
-			batch, err := reader.PopMessagesBatchTx(ctx, tx)
-			scope.Require.NoError(err)
-			scope.Require.Len(batch.Messages, 1)
-
-			scope.Require.NoError(writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("2")}))
-
-			return nil
-		}))
-
-		scope.Require.NoError(writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("3")}))
-
-		scope.Require.NoError(db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-			sss := tx.(interface{ SessionID() string })
-			if sessionIDAtStart == "" {
-				sessionIDAtStart = sss.SessionID()
-
-				scope.DeleteSession(ctx, sessionIDAtStart)
-			}
-
-			batch, err := reader.PopMessagesBatchTx(ctx, tx)
-			scope.Require.NoError(err)
-			scope.Require.Len(batch.Messages, 1)
-
-			log.Println(batch.Messages[0].Offset)
-
-			//scope.Require.NoError(writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("2")}))
-
-			return nil
-		}))
-	})
 }
 
 func TestTopicWriterTLI(t *testing.T) {

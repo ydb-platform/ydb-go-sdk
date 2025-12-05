@@ -19,12 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -419,19 +415,6 @@ func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 
 func (scope *scopeT) DeleteSession(ctx context.Context, sessionID string) {
 	baConfig := config.New(
-		config.WithEndpoint("localhost:2136"), // TODO:
-		config.WithDatabase("/local"))
-
-	ba, err := balancer.New(ctx, baConfig, conn.NewPool(ctx, baConfig))
-	scope.Require.NoError(err)
-
-	c := Ydb_Query_V1.NewQueryServiceClient(ba)
-	_, err = c.DeleteSession(ctx, &Ydb_Query.DeleteSessionRequest{
-		SessionId: sessionID,
-	})
-	scope.Require.NoError(err)
-}
-
 // logger for tests
 type testLogger struct {
 	test     *xtest.SyncedTest
