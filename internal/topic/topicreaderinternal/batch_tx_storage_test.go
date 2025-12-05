@@ -374,7 +374,12 @@ func (s *BatchTxStorageTestSuite) TestMultipleTransactions() {
 
 // Helper methods
 
-func (s *BatchTxStorageTestSuite) createTestBatch(topic string, partitionID int64, startOffset, endOffset int64, sessionID int) *topicreadercommon.PublicBatch {
+func (s *BatchTxStorageTestSuite) createTestBatch(
+	topic string,
+	partitionID int64,
+	startOffset, endOffset int64,
+	sessionID int,
+) *topicreadercommon.PublicBatch {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

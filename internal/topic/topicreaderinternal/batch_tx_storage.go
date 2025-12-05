@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
@@ -64,7 +65,9 @@ func (s *batchTxStorage) GetBatches(transaction tx.Transaction) []*topicreaderco
 // and grouped by topic and partition.
 // Returns nil if no batches are stored for the transaction.
 // This method is thread-safe.
-func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(transaction tx.Transaction) *rawtopic.UpdateOffsetsInTransactionRequest {
+func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
+	transaction tx.Transaction,
+) *rawtopic.UpdateOffsetsInTransactionRequest {
 	s.m.RLock()
 	batches, ok := s.batches[transaction.ID()]
 	s.m.RUnlock()
@@ -90,6 +93,20 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(transaction tx.Tra
 	}
 
 	// Group partition offsets by topic
+	topicMap := s.buildPartitionOffsetsMap(partitionOffsets, batches)
+	if len(topicMap) == 0 {
+		return nil
+	}
+
+	// Build request
+	return s.buildUpdateOffsetsRequest(transaction, topicMap)
+}
+
+// buildPartitionOffsetsMap groups partition offsets by topic.
+func (s *batchTxStorage) buildPartitionOffsetsMap(
+	partitionOffsets []rawtopicreader.PartitionCommitOffset,
+	batches []*topicreadercommon.PublicBatch,
+) map[string][]rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets {
 	topicMap := make(map[string][]rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets)
 	for i := range partitionOffsets {
 		po := &partitionOffsets[i]
@@ -112,7 +129,14 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(transaction tx.Tra
 		})
 	}
 
-	// Build request
+	return topicMap
+}
+
+// buildUpdateOffsetsRequest creates the final UpdateOffsetsInTransactionRequest.
+func (s *batchTxStorage) buildUpdateOffsetsRequest(
+	transaction tx.Transaction,
+	topicMap map[string][]rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets,
+) *rawtopic.UpdateOffsetsInTransactionRequest {
 	req := &rawtopic.UpdateOffsetsInTransactionRequest{
 		OperationParams: rawydb.NewRawOperationParamsFromProto(
 			operation.Params(context.Background(), 0, 0, operation.ModeSync),
