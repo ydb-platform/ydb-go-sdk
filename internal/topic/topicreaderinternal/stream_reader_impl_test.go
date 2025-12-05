@@ -1335,7 +1335,6 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		initialCommitOffset := e.partitionSession.CommittedOffset()
 		txID := "test-tx-id"
 		sessionID := "test-session-id"
-
 		txMock := newMockTransactionWrapper(sessionID, txID)
 
 		batch, err := topicreadercommon.NewBatch(e.partitionSession, []*topicreadercommon.PublicMessage{
@@ -1345,6 +1344,7 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 				Build(),
 		})
 		require.NoError(t, err)
+
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
 		require.NoError(t, err)
 
@@ -1381,12 +1381,10 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 
 		txID := "test-tx-id"
 		sessionID := "test-session-id"
-
 		testError := errors.New("test error")
 		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), gomock.Any()).Return(testError)
 
 		txMock := newMockTransactionWrapper(sessionID, txID)
-
 		batch, err := topicreadercommon.NewBatch(e.partitionSession, []*topicreadercommon.PublicMessage{
 			topicreadercommon.NewPublicMessageBuilder().
 				Offset(e.partitionSession.CommittedOffset().ToInt64()).
@@ -1394,6 +1392,7 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 				Build(),
 		})
 		require.NoError(t, err)
+
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
 		require.NoError(t, err)
 
@@ -1425,7 +1424,6 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		e.TopicClient.EXPECT().UpdateOffsetsInTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, _ *rawtopic.UpdateOffsetsInTransactionRequest) error {
 				nodeID, ok := endpoint.ContextNodeID(ctx)
-
 				require.True(t, ok)
 				require.Equal(t, uint32(123), nodeID)
 

@@ -86,6 +86,9 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	// Optimize ranges (merge adjacent ranges)
 	commitRanges.Optimize()
 
+	// Build sessionID -> (topic, partitionID) map for efficient lookup
+	sessionInfoMap := s.buildSessionInfoMap(batches)
+
 	// Convert to partition offsets
 	partitionOffsets := commitRanges.ToPartitionsOffsets()
 	if len(partitionOffsets) == 0 {
@@ -93,7 +96,7 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	}
 
 	// Group partition offsets by topic
-	topicMap := s.buildPartitionOffsetsMap(partitionOffsets, batches)
+	topicMap := s.buildPartitionOffsetsMap(partitionOffsets, sessionInfoMap)
 	if len(topicMap) == 0 {
 		return nil
 	}
@@ -102,29 +105,46 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	return s.buildUpdateOffsetsRequest(transaction, topicMap)
 }
 
+type sessionInfo struct {
+	topic       string
+	partitionID int64
+}
+
+// buildSessionInfoMap creates a map from partition session ID to topic and partition ID.
+func (s *batchTxStorage) buildSessionInfoMap(
+	batches []*topicreadercommon.PublicBatch,
+) map[rawtopicreader.PartitionSessionID]sessionInfo {
+	sessionInfoMap := make(map[rawtopicreader.PartitionSessionID]sessionInfo)
+	for _, batch := range batches {
+		commitRange := topicreadercommon.GetCommitRange(batch)
+		sessionID := commitRange.PartitionSession.StreamPartitionSessionID
+		if _, exists := sessionInfoMap[sessionID]; !exists {
+			sessionInfoMap[sessionID] = sessionInfo{
+				topic:       commitRange.PartitionSession.Topic,
+				partitionID: commitRange.PartitionSession.PartitionID,
+			}
+		}
+	}
+
+	return sessionInfoMap
+}
+
 // buildPartitionOffsetsMap groups partition offsets by topic.
 func (s *batchTxStorage) buildPartitionOffsetsMap(
 	partitionOffsets []rawtopicreader.PartitionCommitOffset,
-	batches []*topicreadercommon.PublicBatch,
+	sessionInfoMap map[rawtopicreader.PartitionSessionID]sessionInfo,
 ) map[string][]rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets {
 	topicMap := make(map[string][]rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets)
 	for i := range partitionOffsets {
 		po := &partitionOffsets[i]
-		// Find the corresponding partition session to get topic and partition ID
-		var topic string
-		var partitionID int64
-		for _, batch := range batches {
-			commitRange := topicreadercommon.GetCommitRange(batch)
-			if commitRange.PartitionSession.StreamPartitionSessionID == po.PartitionSessionID {
-				topic = commitRange.PartitionSession.Topic
-				partitionID = commitRange.PartitionSession.PartitionID
-
-				break
-			}
+		info, ok := sessionInfoMap[po.PartitionSessionID]
+		if !ok {
+			// Skip if session info not found (should not happen in normal flow)
+			continue
 		}
 
-		topicMap[topic] = append(topicMap[topic], rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
-			PartitionID:      partitionID,
+		topicMap[info.topic] = append(topicMap[info.topic], rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
+			PartitionID:      info.partitionID,
 			PartitionOffsets: po.Offsets,
 		})
 	}

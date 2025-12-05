@@ -41,32 +41,45 @@ func TestBatchTxStorage(t *testing.T) {
 	suite.Run(t, new(TopicReaderUpdateOffsetsSuite))
 }
 
-func (t *TopicReaderUpdateOffsetsSuite) TestSingleTransaction() {
-	var (
-		once  sync.Once
-		batch *topicreader.Batch
-	)
+// Helper methods for test setup
 
-	ctx, cancel := context.WithTimeout(t.scope.Ctx, 10*time.Second)
+func (t *TopicReaderUpdateOffsetsSuite) testContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(t.scope.Ctx, 10*time.Second)
+}
+
+func (t *TopicReaderUpdateOffsetsSuite) doTransactionWithDeletedSession(
+	ctx context.Context,
+	fn func(ctx context.Context, tr query.TxActor) error,
+) error {
+	var once sync.Once
+	return t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
+		once.Do(func() {
+			t.deleteTxSession(ctx, tr.(tx.Transaction))
+		})
+		return fn(ctx, tr)
+	})
+}
+
+func (t *TopicReaderUpdateOffsetsSuite) TestSingleTransaction() {
+	ctx, cancel := t.testContext()
 	defer cancel()
 
 	t.writeMessage(ctx, "1")
 
-	err := t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) (err error) {
-		once.Do(func() {
-			t.deleteTxSession(ctx, tr.(tx.Transaction))
-		})
-
+	var batch *topicreader.Batch
+	err := t.doTransactionWithDeletedSession(ctx, func(ctx context.Context, tr query.TxActor) error {
+		var err error
 		batch, err = t.reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
+
 	t.NoError(err)
 	t.Len(batch.Messages, 1)
 	t.MsgEqualString("1", batch.Messages[0])
 }
 
 func (t *TopicReaderUpdateOffsetsSuite) TestSeveralReads() {
-	ctx, cancel := context.WithTimeout(t.scope.Ctx, 10*time.Second)
+	ctx, cancel := t.testContext()
 	defer cancel()
 
 	t.writeMessage(ctx, "1")
@@ -84,42 +97,30 @@ func (t *TopicReaderUpdateOffsetsSuite) TestSeveralReads() {
 
 		return nil
 	})
+	t.Require().NoError(err)
 
 	msg, err := t.reader.ReadMessage(ctx)
 	t.Require().NoError(err)
-
 	t.MsgEqualString("3", msg)
 }
 
 func (t *TopicReaderUpdateOffsetsSuite) TestSeveralTransactions() {
-	var (
-		onceTx1 sync.Once
-		onceTx2 sync.Once
-		batch   *topicreader.Batch
-	)
-
-	ctx, cancel := context.WithTimeout(t.scope.Ctx, 10*time.Second)
+	ctx, cancel := t.testContext()
 	defer cancel()
 
 	t.writeMessage(ctx, "1")
 
-	err := t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) (err error) {
-		onceTx1.Do(func() {
-			t.deleteTxSession(ctx, tr.(tx.Transaction))
-		})
-
-		_, err = t.reader.PopMessagesBatchTx(ctx, tr)
+	err := t.doTransactionWithDeletedSession(ctx, func(ctx context.Context, tr query.TxActor) error {
+		_, err := t.reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
 	t.NoError(err)
 
 	t.writeMessage(ctx, "2")
 
-	err = t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) (err error) {
-		onceTx2.Do(func() {
-			t.deleteTxSession(ctx, tr.(tx.Transaction))
-		})
-
+	var batch *topicreader.Batch
+	err = t.doTransactionWithDeletedSession(ctx, func(ctx context.Context, tr query.TxActor) error {
+		var err error
 		batch, err = t.reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
