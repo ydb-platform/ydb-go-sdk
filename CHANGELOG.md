@@ -1,3 +1,5 @@
+* Excluded the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
+
 ## v3.121.0
 * Changed internal pprof label to pyroscope supported format
 * Added `query.ImplicitTxControl()` transaction control (the same as `query.NoTx()` and `query.EmptyTxControl()`). See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
