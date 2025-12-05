@@ -24,6 +24,7 @@ type mockTransaction struct {
 	sessionID      string
 	nodeID         uint32
 	onCompleted    []tx.OnTransactionCompletedFunc
+	onBeforeCommit []tx.OnTransactionBeforeCommit
 	RolledBack     bool
 }
 
@@ -43,6 +44,7 @@ func (m *mockTransaction) NodeID() uint32 {
 }
 
 func (m *mockTransaction) OnBeforeCommit(f tx.OnTransactionBeforeCommit) {
+	m.onBeforeCommit = append(m.onBeforeCommit, f)
 }
 
 func (m *mockTransaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
