@@ -14,6 +14,7 @@ import (
 
 type BatchTxStorageTestSuite struct {
 	suite.Suite
+
 	storage *batchTxStorage
 }
 

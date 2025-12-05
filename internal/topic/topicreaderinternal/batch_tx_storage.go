@@ -101,6 +101,7 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(transaction tx.Tra
 			if commitRange.PartitionSession.StreamPartitionSessionID == po.PartitionSessionID {
 				topic = commitRange.PartitionSession.Topic
 				partitionID = commitRange.PartitionSession.PartitionID
+
 				break
 			}
 		}
