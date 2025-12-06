@@ -34,13 +34,13 @@ func DSN(dsn string) string {
 	if len(u.RawQuery) > 0 {
 		buffer.WriteString("?")
 
-		params := strings.Split(u.RawQuery, "&")
+		params := strings.SplitN(u.RawQuery, "&", 2)
 
 		for i, param := range params {
 			if i > 0 {
 				buffer.WriteString("&")
 			}
-			paramValue := strings.Split(param, "=")
+			paramValue := strings.SplitN(param, "=", 2)
 			buffer.WriteString(paramValue[0])
 			if len(paramValue) > 1 {
 				buffer.WriteString("=")
