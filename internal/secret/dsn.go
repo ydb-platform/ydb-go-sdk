@@ -16,7 +16,9 @@ func DSN(dsn string) string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 
-	buffer.WriteString(u.Scheme + "://")
+	if u.Scheme != "" {
+		buffer.WriteString(u.Scheme + "://")
+	}
 
 	if u.User != nil {
 		buffer.WriteString(u.User.Username())
@@ -50,6 +52,10 @@ func DSN(dsn string) string {
 				}
 			}
 		}
+	}
+
+	if u.Fragment != "" {
+		buffer.WriteString("#" + u.Fragment)
 	}
 
 	return buffer.String()

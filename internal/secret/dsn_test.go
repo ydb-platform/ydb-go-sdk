@@ -20,6 +20,14 @@ func TestDSN(t *testing.T) {
 			exp: "grpc://debuguser:d***********d@localhost:2136/local1",
 		},
 		{
+			dsn: "grpc://host/db?password=pass%3Dword",
+			exp: "grpc://host/db?password=p*********d",
+		},
+		{
+			dsn: "grpc://host/db?password=pass%26word",
+			exp: "grpc://host/db?password=p*********d",
+		},
+		{
 			dsn: "grpc://localhost:2136/local1?user=debuguser&password=debugpassword",
 			exp: "grpc://localhost:2136/local1?user=debuguser&password=d***********d",
 		},
