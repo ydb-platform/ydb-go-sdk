@@ -1,4 +1,4 @@
-* Excluded the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
+* Masked the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
 
 ## v3.121.0
 * Changed internal pprof label to pyroscope supported format
