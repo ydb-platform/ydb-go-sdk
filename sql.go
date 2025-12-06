@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
@@ -47,7 +48,10 @@ func (d *sqlDriver) Open(string) (driver.Conn, error) {
 func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, error) {
 	db, err := Open(context.Background(), dataSourceName)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf(
+			"failed to connect by data source name '%s': %w",
+			secret.DSN(dataSourceName), err,
+		))
 	}
 
 	c, err := Connector(db, append(db.databaseSQLOptions,
