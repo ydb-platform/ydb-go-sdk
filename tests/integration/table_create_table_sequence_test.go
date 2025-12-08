@@ -18,7 +18,6 @@ import (
 
 func TestCreateTableWithSequence(sourceTest *testing.T) {
 	scope := newScope(sourceTest)
-	scope.TableName()
 	db := scope.Driver()
 	ctx := scope.Ctx
 	startValue := int64(1000)
