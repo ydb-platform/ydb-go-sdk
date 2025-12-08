@@ -245,3 +245,19 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestWithColumnWithSequence(t *testing.T) {
+	opt := WithColumnWithSequence("id", types.NewOptional(types.Int32), Sequence{StartValue: 1000})
+	req := Ydb_Table.CreateTableRequest{}
+	opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
+
+	require.Len(t, req.GetColumns(), 1)
+	col := req.GetColumns()[0]
+	require.Equal(t, "id", col.GetName())
+	require.Equal(t, types.TypeToYDB(types.NewOptional(types.Int32)), col.GetType())
+
+	fromSequence := col.GetFromSequence()
+	require.NotNil(t, fromSequence)
+	require.Equal(t, "_serial_column_id", fromSequence.GetName())
+	require.Equal(t, int64(1000), fromSequence.GetStartValue())
+}

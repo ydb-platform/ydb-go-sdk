@@ -82,6 +82,43 @@ func WithColumn(name string, typ types.Type) CreateTableOption {
 	}
 }
 
+// Sequence represents sequence configuration for a column
+type Sequence struct {
+	StartValue int64
+}
+
+type columnWithSequence struct {
+	column
+
+	sequence Sequence
+}
+
+func (c columnWithSequence) ApplyCreateTableOption(d *CreateTableDesc) {
+	sequenceName := "_serial_column_" + c.name
+	colMeta := &Ydb_Table.ColumnMeta{
+		Name: c.name,
+		Type: types.TypeToYDB(c.typ),
+		DefaultValue: &Ydb_Table.ColumnMeta_FromSequence{
+			FromSequence: &Ydb_Table.SequenceDescription{
+				Name:       &sequenceName,
+				StartValue: &c.sequence.StartValue,
+			},
+		},
+	}
+	d.Columns = append(d.Columns, colMeta)
+}
+
+// WithColumnWithSequence creates a column with sequence configuration
+func WithColumnWithSequence(name string, typ types.Type, sequence Sequence) CreateTableOption {
+	return columnWithSequence{
+		column: column{
+			name: name,
+			typ:  typ,
+		},
+		sequence: sequence,
+	}
+}
+
 type columnMeta Column
 
 func (c columnMeta) ApplyAlterTableOption(d *AlterTableDesc) {
