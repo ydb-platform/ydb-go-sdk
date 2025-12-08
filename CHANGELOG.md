@@ -1,4 +1,5 @@
 * Masked the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
+* Added support for sequence start value in table creation via `options.WithColumnWithSequence()` function
 
 ## v3.121.0
 * Changed internal pprof label to pyroscope supported format
