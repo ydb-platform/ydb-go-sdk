@@ -17,7 +17,15 @@ func TestPassword(t *testing.T) {
 		},
 		{
 			password: "test-long-password",
-			exp:      "tes*************rd",
+			exp:      "t****************d",
+		},
+		{
+			password: "пароль",
+			exp:      "п****ь",
+		},
+		{
+			password: "пар",
+			exp:      "***",
 		},
 	} {
 		t.Run("", func(t *testing.T) {

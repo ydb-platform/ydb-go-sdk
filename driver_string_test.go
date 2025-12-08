@@ -52,7 +52,7 @@ func TestDriver_String(t *testing.T) {
 				config.WithSecure(true),
 				config.WithCredentials(credentials.NewStaticCredentials("user", "password", "")),
 			)},
-			s: `Driver{Endpoint:"localhost",Database:"local",Secure:true,Credentials:Static{User:"user",Password:"pas***rd",Token:"****(CRC-32c: 00000000)",From:"github.com/ydb-platform/ydb-go-sdk/v3/credentials.NewStaticCredentials(credentials.go:35)"}}`, //nolint:lll
+			s: `Driver{Endpoint:"localhost",Database:"local",Secure:true,Credentials:Static{User:"user",Password:"p******d",Token:"****(CRC-32c: 00000000)",From:"github.com/ydb-platform/ydb-go-sdk/v3/credentials.NewStaticCredentials(credentials.go:35)"}}`, //nolint:lll
 		},
 		{
 			name: xtest.CurrentFileLine(),
