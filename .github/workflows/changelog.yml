@@ -1,9 +1,15 @@
 name: changelog
 on:
   pull_request_target:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
 jobs:
   changelog:
     name: changelog
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: read
     concurrency:
       group: changelog-${{ github.ref }}
       cancel-in-progress: true
