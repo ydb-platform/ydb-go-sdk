@@ -108,7 +108,14 @@ func (c columnWithSequence) ApplyCreateTableOption(d *CreateTableDesc) {
 	d.Columns = append(d.Columns, colMeta)
 }
 
-// WithColumnWithSequence creates a column with sequence configuration
+// WithColumnWithSequence creates a column with a sequence (auto-increment) configuration.
+// The column will auto-increment starting from the specified StartValue in the Sequence parameter.
+// Parameters:
+//   - name: the name of the column to create.
+//   - typ: the data type of the column.
+//   - sequence: the sequence configuration, including the starting value.
+// The column name and type must be specified along with the sequence configuration.
+// Returns a CreateTableOption that adds the column with the specified sequence to the table.
 func WithColumnWithSequence(name string, typ types.Type, sequence Sequence) CreateTableOption {
 	return columnWithSequence{
 		column: column{
