@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -35,7 +34,7 @@ func (t *TopicReaderUpdateOffsetsSuite) SetupTest() {
 	t.scope = newScope(t.T())
 	t.writer = t.scope.TopicWriter()
 	t.reader = t.scope.TopicReader()
-	t.driver = t.scope.DriverWithGRPCLogging()
+	t.driver = t.scope.Driver()
 }
 
 func TestBatchTxStorage(t *testing.T) {
@@ -44,44 +43,35 @@ func TestBatchTxStorage(t *testing.T) {
 
 // Helper methods for test setup
 
-func (t *TopicReaderUpdateOffsetsSuite) testContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(t.scope.Ctx, 10*time.Second)
-}
-
-func (t *TopicReaderUpdateOffsetsSuite) doTransactionWithDeletedSession(
-	ctx context.Context,
-	fn func(ctx context.Context, tr query.TxActor) error,
-) error {
-	var once sync.Once
-	return t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
-		once.Do(func() {
-			t.deleteTxSession(ctx, tr.(tx.Transaction))
-		})
-		return fn(ctx, tr)
-	})
+func (t *TopicReaderUpdateOffsetsSuite) testContext() context.Context {
+	return t.scope.Ctx
 }
 
 func (t *TopicReaderUpdateOffsetsSuite) TestSingleTransaction() {
-	ctx, cancel := t.testContext()
-	defer cancel()
+	ctx := t.testContext()
 
 	t.writeMessage(ctx, "1")
 
 	var batch *topicreader.Batch
-	err := t.doTransactionWithDeletedSession(ctx, func(ctx context.Context, tr query.TxActor) error {
+
+	var once sync.Once
+	err := t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
+		once.Do(func() {
+			t.deleteTxSession(ctx, tr.(tx.Transaction))
+		})
+
 		var err error
 		batch, err = t.reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
 
-	t.NoError(err)
-	t.Len(batch.Messages, 1)
+	t.Require().NoError(err)
+	t.Require().Len(batch.Messages, 1)
 	t.MsgEqualString("1", batch.Messages[0])
 }
 
 func (t *TopicReaderUpdateOffsetsSuite) TestSeveralReads() {
-	ctx, cancel := t.testContext()
-	defer cancel()
+	ctx := t.testContext()
 
 	t.writeMessage(ctx, "1")
 
@@ -106,12 +96,20 @@ func (t *TopicReaderUpdateOffsetsSuite) TestSeveralReads() {
 }
 
 func (t *TopicReaderUpdateOffsetsSuite) TestSeveralTransactions() {
-	ctx, cancel := t.testContext()
-	defer cancel()
+	ctx := t.testContext()
 
 	t.writeMessage(ctx, "1")
 
-	err := t.doTransactionWithDeletedSession(ctx, func(ctx context.Context, tr query.TxActor) error {
+	var (
+		once1 sync.Once
+		once2 sync.Once
+	)
+
+	err := t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
+		once1.Do(func() {
+			t.deleteTxSession(ctx, tr.(tx.Transaction))
+		})
+
 		_, err := t.reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
@@ -120,12 +118,16 @@ func (t *TopicReaderUpdateOffsetsSuite) TestSeveralTransactions() {
 	t.writeMessage(ctx, "2")
 
 	var batch *topicreader.Batch
-	err = t.doTransactionWithDeletedSession(ctx, func(ctx context.Context, tr query.TxActor) error {
+	err = t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
+		once2.Do(func() {
+			t.deleteTxSession(ctx, tr.(tx.Transaction))
+		})
+
 		var err error
 		batch, err = t.reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
-	t.NoError(err)
+	t.Require().NoError(err)
 
 	t.MsgEqualString("2", batch.Messages[0])
 }
