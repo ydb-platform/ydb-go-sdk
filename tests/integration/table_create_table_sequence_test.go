@@ -25,16 +25,6 @@ func TestCreateTableWithSequence(sourceTest *testing.T) {
 
 	tablePath := path.Join(scope.Folder(), "table")
 
-	// conn, err := grpc.NewClient(scope.Endpoint(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	// require.NoError(t, err)
-	// defer func(conn *grpc.ClientConn) {
-	// 	err := conn.Close()
-	// 	require.NoError(t, err)
-	// }(conn)
-
-	// //db := scope.Driver(ydb.WithSessionPoolSizeLimit(1), ydb.WithExecuteDataQueryOverQueryClient(true))
-	// queryClient := Ydb_Query_V1.NewQueryServiceClient(conn)
-
 	_ = db.Table().Do(scope.Ctx, func(ctx context.Context, session table.Session) error {
 		return session.DropTable(ctx, tablePath)
 	})
@@ -66,10 +56,8 @@ func TestCreateTableWithSequence(sourceTest *testing.T) {
 			_ = res.Close()
 		}()
 
-		res.NextResultSet(ctx)
-
-		ok := res.NextRow()
-		scope.Require.True(ok)
+		scope.Require.True(res.NextResultSet(ctx))
+		scope.Require.True(res.NextRow())
 
 		var id int32
 		err = res.ScanNamed(
