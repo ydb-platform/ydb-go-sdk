@@ -63,7 +63,6 @@ func TestCreateTableWithSequence(sourceTest *testing.T) {
 			named.Required("id", &id),
 		)
 		scope.Require.NoError(err)
-		scope.Require.NotNil(id)
 		scope.Require.Equal(int32(startValue), id)
 
 		return nil
