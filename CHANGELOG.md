@@ -1,3 +1,4 @@
+* Masked the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
 * Fixed issue with topic offsets update in transactions
 
 ## v3.121.0
