@@ -18,7 +18,7 @@ import (
 type batchTxStorage struct {
 	batches  map[string][]*topicreadercommon.PublicBatch
 	consumer string
-	m        xsync.RWMutex
+	m        xsync.Mutex
 }
 
 // newBatchTxStorage creates a new batch transaction storage with the given consumer name.
@@ -48,8 +48,8 @@ func (s *batchTxStorage) Add(transaction tx.Transaction, batch *topicreadercommo
 // Returns an empty slice (nil) if no batches are stored for the transaction.
 // This method is thread-safe.
 func (s *batchTxStorage) GetBatches(transaction tx.Transaction) []*topicreadercommon.PublicBatch {
-	s.m.RLock()
-	defer s.m.RUnlock()
+	s.m.Lock()
+	defer s.m.Unlock()
 
 	batches, ok := s.batches[transaction.ID()]
 	if !ok {
@@ -68,9 +68,9 @@ func (s *batchTxStorage) GetBatches(transaction tx.Transaction) []*topicreaderco
 func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	transaction tx.Transaction,
 ) *rawtopic.UpdateOffsetsInTransactionRequest {
-	s.m.RLock()
+	s.m.Lock()
 	batches, ok := s.batches[transaction.ID()]
-	s.m.RUnlock()
+	s.m.Unlock()
 
 	if !ok || len(batches) == 0 {
 		return nil

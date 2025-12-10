@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
@@ -14,109 +16,102 @@ import (
 
 type BatchTxStorageTestSuite struct {
 	suite.Suite
-
-	storage *batchTxStorage
-}
-
-func (s *BatchTxStorageTestSuite) SetupTest() {
-	s.storage = newBatchTxStorage("test-consumer")
 }
 
 // Helper methods for test setup
-
-func (s *BatchTxStorageTestSuite) newTransaction(sessionID, txID string) *mockTransaction {
-	tx := newMockTransactionWrapper(sessionID, txID)
-	_ = tx.UnLazy(context.Background())
-
-	return tx
-}
-
-func (s *BatchTxStorageTestSuite) addBatches(tx *mockTransaction, batches ...*topicreadercommon.PublicBatch) {
-	for _, batch := range batches {
-		_ = s.storage.Add(tx, batch)
-	}
-}
 
 func TestBatchTxStorage(t *testing.T) {
 	suite.Run(t, new(BatchTxStorageTestSuite))
 }
 
-func (s *BatchTxStorageTestSuite) TestAdd_NewTransaction() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch := s.createTestBatch("topic-1", 1, 10, 20, 1)
+func TestBatchTxStorageAdd_NewTransaction(t *testing.T) {
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch := createTestBatch("topic-1", 1, 10, 20, 1)
 
-	exists := s.storage.Add(tx, batch)
+	exists := newBatchTxStorage("test-consumer").Add(tx, batch)
 
-	s.False(exists)
+	assert.False(t, exists)
 }
 
-func (s *BatchTxStorageTestSuite) TestAdd_ExistingTransaction() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-1", 1, 20, 30, 1)
-	s.addBatches(tx, batch1)
+func TestBatchTxStorageAdd_ExistingTransaction(t *testing.T) {
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-1", 1, 20, 30, 1)
 
-	exists := s.storage.Add(tx, batch2)
+	storage := newBatchTxStorage("test-consumer")
 
-	s.True(exists)
+	storage.Add(tx, batch1)
+	exists := storage.Add(tx, batch2)
+
+	assert.True(t, exists)
 }
 
-func (s *BatchTxStorageTestSuite) TestGetBatches_Empty() {
-	tx := s.newTransaction("session-1", "tx-1")
+func TestBatchTxStorageGetBatches_Empty(t *testing.T) {
+	tx := newMockTransactionWrapper("session-1", "tx-1")
 
-	batches := s.storage.GetBatches(tx)
+	batches := newBatchTxStorage("test-consumer").GetBatches(tx)
 
-	s.Empty(batches)
+	assert.Empty(t, batches)
 }
 
-func (s *BatchTxStorageTestSuite) TestGetBatches_WithBatches() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-1", 1, 20, 30, 1)
-	s.addBatches(tx, batch1, batch2)
+func TestBatchTxStorageGetBatches_WithBatches(t *testing.T) {
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-1", 1, 20, 30, 1)
 
-	batches := s.storage.GetBatches(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch1)
+	storage.Add(tx, batch2)
 
-	s.Len(batches, 2)
-	s.Equal(batch1, batches[0])
-	s.Equal(batch2, batches[1])
+	batches := storage.GetBatches(tx)
+
+	require.Len(t, batches, 2)
+	assert.Equal(t, batch1, batches[0])
+	assert.Equal(t, batch2, batches[1])
 }
 
-func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_Empty() {
-	tx := s.newTransaction("session-1", "tx-1")
+func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_Empty(t *testing.T) {
+	tx := newMockTransactionWrapper("session-1", "tx-1")
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	req := newBatchTxStorage("test-consumer").GetUpdateOffsetsInTransactionRequest(tx)
 
-	s.Nil(req)
+	assert.Nil(t, req)
 }
 
-func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_SingleBatch() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	s.addBatches(tx, batch)
+func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_SingleBatch(t *testing.T) {
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	_ = tx.UnLazy(context.TODO())
+	batch := createTestBatch("topic-1", 1, 10, 20, 1)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	storage := newBatchTxStorage("test-consumer")
 
-	s.Require().NotNil(req)
-	s.Equal("test-consumer", req.Consumer)
-	s.Equal("tx-1", req.Tx.ID)
-	s.Equal("session-1", req.Tx.Session)
-	s.Len(req.Topics, 1)
-	s.Equal("topic-1", req.Topics[0].Path)
-	s.Len(req.Topics[0].Partitions, 1)
-	s.Equal(int64(1), req.Topics[0].Partitions[0].PartitionID)
-	s.Len(req.Topics[0].Partitions[0].PartitionOffsets, 1)
-	s.Equal(rawtopiccommon.Offset(10), req.Topics[0].Partitions[0].PartitionOffsets[0].Start)
-	s.Equal(rawtopiccommon.Offset(20), req.Topics[0].Partitions[0].PartitionOffsets[0].End)
+	storage.Add(tx, batch)
+
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
+
+	require.NotNil(t, req)
+	assert.Equal(t, "test-consumer", req.Consumer)
+	assert.Equal(t, "tx-1", req.Tx.ID)
+	assert.Equal(t, "session-1", req.Tx.Session)
+	require.Len(t, req.Topics, 1)
+	assert.Equal(t, "topic-1", req.Topics[0].Path)
+	require.Len(t, req.Topics[0].Partitions, 1)
+	assert.Equal(t, int64(1), req.Topics[0].Partitions[0].PartitionID)
+	require.Len(t, req.Topics[0].Partitions[0].PartitionOffsets, 1)
+	assert.Equal(t, rawtopiccommon.Offset(10), req.Topics[0].Partitions[0].PartitionOffsets[0].Start)
+	assert.Equal(t, rawtopiccommon.Offset(20), req.Topics[0].Partitions[0].PartitionOffsets[0].End)
 }
 
 func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_MultipleBatches() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-1", 1, 20, 30, 1)
-	s.addBatches(tx, batch1, batch2)
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-1", 1, 20, 30, 1)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch1)
+	storage.Add(tx, batch2)
+
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
 	s.Require().NotNil(req)
 	s.Len(req.Topics, 1)
@@ -127,12 +122,15 @@ func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_Multi
 }
 
 func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_MultipleTopics() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-2", 2, 30, 40, 2)
-	s.addBatches(tx, batch1, batch2)
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-2", 2, 30, 40, 2)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch1)
+	storage.Add(tx, batch2)
+
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
 	s.Require().NotNil(req)
 	s.Len(req.Topics, 2)
@@ -142,12 +140,15 @@ func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_Multi
 }
 
 func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_MultiplePartitionsSameTopic() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-1", 2, 30, 40, 2)
-	s.addBatches(tx, batch1, batch2)
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-1", 2, 30, 40, 2)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch1)
+	storage.Add(tx, batch2)
+
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
 	s.Require().NotNil(req)
 	s.Len(req.Topics, 1)
@@ -166,12 +167,15 @@ func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_Multi
 }
 
 func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_NonAdjacentBatches() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-1", 1, 30, 40, 1)
-	s.addBatches(tx, batch1, batch2)
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-1", 1, 30, 40, 1)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch1)
+	storage.Add(tx, batch2)
+
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
 	s.Require().NotNil(req)
 	s.Len(req.Topics, 1)
@@ -184,14 +188,19 @@ func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_NonAd
 }
 
 func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_MultiplePartitionsMultipleTopics() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-1", 2, 30, 40, 2)
-	batch3 := s.createTestBatch("topic-2", 1, 50, 60, 3)
-	batch4 := s.createTestBatch("topic-2", 2, 70, 80, 4)
-	s.addBatches(tx, batch1, batch2, batch3, batch4)
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-1", 2, 30, 40, 2)
+	batch3 := createTestBatch("topic-2", 1, 50, 60, 3)
+	batch4 := createTestBatch("topic-2", 2, 70, 80, 4)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch1)
+	storage.Add(tx, batch2)
+	storage.Add(tx, batch3)
+	storage.Add(tx, batch4)
+
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
 	s.Require().NotNil(req)
 	s.Len(req.Topics, 2)
@@ -212,14 +221,19 @@ func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_Multi
 }
 
 func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_ComplexOptimization() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-1", 1, 20, 30, 1)
-	batch3 := s.createTestBatch("topic-1", 1, 30, 40, 1)
-	batch4 := s.createTestBatch("topic-1", 1, 50, 60, 1)
-	s.addBatches(tx, batch1, batch2, batch3, batch4)
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-1", 1, 20, 30, 1)
+	batch3 := createTestBatch("topic-1", 1, 30, 40, 1)
+	batch4 := createTestBatch("topic-1", 1, 50, 60, 1)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch1)
+	storage.Add(tx, batch2)
+	storage.Add(tx, batch3)
+	storage.Add(tx, batch4)
+
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
 	s.Require().NotNil(req)
 	s.Len(req.Topics, 1)
@@ -232,15 +246,21 @@ func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_Compl
 }
 
 func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_MixedPartitionsAndTopics() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-1", 1, 20, 30, 1)
-	batch3 := s.createTestBatch("topic-1", 2, 40, 50, 2)
-	batch4 := s.createTestBatch("topic-1", 2, 60, 70, 2)
-	batch5 := s.createTestBatch("topic-2", 1, 80, 90, 3)
-	s.addBatches(tx, batch1, batch2, batch3, batch4, batch5)
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-1", 1, 20, 30, 1)
+	batch3 := createTestBatch("topic-1", 2, 40, 50, 2)
+	batch4 := createTestBatch("topic-1", 2, 60, 70, 2)
+	batch5 := createTestBatch("topic-2", 1, 80, 90, 3)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch1)
+	storage.Add(tx, batch2)
+	storage.Add(tx, batch3)
+	storage.Add(tx, batch4)
+	storage.Add(tx, batch5)
+
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
 	s.Require().NotNil(req)
 	s.Len(req.Topics, 2)
@@ -268,40 +288,46 @@ func (s *BatchTxStorageTestSuite) TestGetUpdateOffsetsInTransactionRequest_Mixed
 }
 
 func (s *BatchTxStorageTestSuite) TestClear() {
-	tx := s.newTransaction("session-1", "tx-1")
-	batch := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	s.addBatches(tx, batch)
+	tx := newMockTransactionWrapper("session-1", "tx-1")
+	batch := createTestBatch("topic-1", 1, 10, 20, 1)
 
-	s.storage.Clear(tx)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx, batch)
 
-	batches := s.storage.GetBatches(tx)
+	storage.Clear(tx)
+
+	batches := storage.GetBatches(tx)
 	s.Empty(batches)
 
-	req := s.storage.GetUpdateOffsetsInTransactionRequest(tx)
+	req := storage.GetUpdateOffsetsInTransactionRequest(tx)
 	s.Nil(req)
 }
 
 func (s *BatchTxStorageTestSuite) TestMultipleTransactions() {
-	tx1 := s.newTransaction("session-1", "tx-1")
-	tx2 := s.newTransaction("session-2", "tx-2")
-	batch1 := s.createTestBatch("topic-1", 1, 10, 20, 1)
-	batch2 := s.createTestBatch("topic-2", 2, 30, 40, 2)
-	s.addBatches(tx1, batch1)
-	s.addBatches(tx2, batch2)
+	tx1 := newMockTransactionWrapper("session-1", "tx-1")
+	_ = tx1.UnLazy(context.TODO())
+	tx2 := newMockTransactionWrapper("session-2", "tx-2")
+	_ = tx1.UnLazy(context.TODO())
+	batch1 := createTestBatch("topic-1", 1, 10, 20, 1)
+	batch2 := createTestBatch("topic-2", 2, 30, 40, 2)
 
-	batches1 := s.storage.GetBatches(tx1)
-	batches2 := s.storage.GetBatches(tx2)
+	storage := newBatchTxStorage("test-consumer")
+	storage.Add(tx1, batch1)
+	storage.Add(tx2, batch2)
+
+	batches1 := storage.GetBatches(tx1)
+	batches2 := storage.GetBatches(tx2)
 
 	s.Len(batches1, 1)
 	s.Equal(batch1, batches1[0])
 	s.Len(batches2, 1)
 	s.Equal(batch2, batches2[0])
 
-	s.storage.Clear(tx1)
+	storage.Clear(tx1)
 
-	batches1 = s.storage.GetBatches(tx1)
+	batches1 = storage.GetBatches(tx1)
 	s.Empty(batches1)
-	batches2 = s.storage.GetBatches(tx2)
+	batches2 = storage.GetBatches(tx2)
 	s.Len(batches2, 1)
 	s.Equal(batch2, batches2[0])
 }
@@ -343,7 +369,7 @@ func (s *BatchTxStorageTestSuite) buildPartitionMap(
 
 // Helper methods for test data creation
 
-func (s *BatchTxStorageTestSuite) createTestBatch(
+func createTestBatch(
 	topic string,
 	partitionID int64,
 	startOffset, endOffset int64,
@@ -363,8 +389,7 @@ func (s *BatchTxStorageTestSuite) createTestBatch(
 		rawtopiccommon.Offset(0),
 	)
 
-	batch, err := topicreadercommon.NewBatch(session, nil)
-	s.Require().NoError(err)
+	batch, _ := topicreadercommon.NewBatch(session, nil)
 
 	commitRange := topicreadercommon.CommitRange{
 		CommitOffsetStart: rawtopiccommon.Offset(startOffset),
