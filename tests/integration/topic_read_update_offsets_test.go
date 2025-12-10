@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
@@ -21,126 +21,113 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
-type TopicReaderUpdateOffsetsSuite struct {
-	suite.Suite
+func TestSingleTransaction(t *testing.T) {
+	scope := newScope(t)
+	writer := scope.TopicWriter()
+	reader := scope.TopicReader()
+	driver := scope.Driver()
+	ctx := scope.Ctx
 
-	scope  *scopeT
-	writer *topicwriter.Writer
-	reader *topicreader.Reader
-	driver *ydb.Driver
-}
-
-func (t *TopicReaderUpdateOffsetsSuite) SetupTest() {
-	t.scope = newScope(t.T())
-	t.writer = t.scope.TopicWriter()
-	t.reader = t.scope.TopicReader()
-	t.driver = t.scope.Driver()
-}
-
-func TestBatchTxStorage(t *testing.T) {
-	suite.Run(t, new(TopicReaderUpdateOffsetsSuite))
-}
-
-// Helper methods for test setup
-
-func (t *TopicReaderUpdateOffsetsSuite) testContext() context.Context {
-	return t.scope.Ctx
-}
-
-func (t *TopicReaderUpdateOffsetsSuite) TestSingleTransaction() {
-	ctx := t.testContext()
-
-	t.writeMessage(ctx, "1")
+	writeMessage(t, ctx, writer, "1")
 
 	var batch *topicreader.Batch
 
 	var once sync.Once
-	err := t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
+	err := driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
 		once.Do(func() {
-			t.deleteTxSession(ctx, tr.(tx.Transaction))
+			deleteTxSession(t, ctx, driver, tr.(tx.Transaction))
 		})
 
 		var err error
-		batch, err = t.reader.PopMessagesBatchTx(ctx, tr)
+		batch, err = reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
 
-	t.Require().NoError(err)
-	t.Require().Len(batch.Messages, 1)
-	t.MsgEqualString("1", batch.Messages[0])
+	require.NoError(t, err)
+	require.Len(t, batch.Messages, 1)
+	msgEqualString(t, "1", batch.Messages[0])
 }
 
-func (t *TopicReaderUpdateOffsetsSuite) TestSeveralReads() {
-	ctx := t.testContext()
+func TestSeveralReads(t *testing.T) {
+	scope := newScope(t)
+	writer := scope.TopicWriter()
+	reader := scope.TopicReader()
+	driver := scope.Driver()
+	ctx := scope.Ctx
 
-	t.writeMessage(ctx, "1")
+	writeMessage(t, ctx, writer, "1")
 
-	err := t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
-		_, err := t.reader.PopMessagesBatchTx(ctx, tr)
-		t.Require().NoError(err)
+	err := driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
+		_, err := reader.PopMessagesBatchTx(ctx, tr)
+		require.NoError(t, err)
 
-		t.writeMessage(ctx, "2")
+		writeMessage(t, ctx, writer, "2")
 
-		_, err = t.reader.PopMessagesBatchTx(ctx, tr)
-		t.Require().NoError(err)
+		_, err = reader.PopMessagesBatchTx(ctx, tr)
+		require.NoError(t, err)
 
-		t.writeMessage(ctx, "3")
+		writeMessage(t, ctx, writer, "3")
 
 		return nil
 	})
-	t.Require().NoError(err)
+	require.NoError(t, err)
 
-	msg, err := t.reader.ReadMessage(ctx)
-	t.Require().NoError(err)
-	t.MsgEqualString("3", msg)
+	msg, err := reader.ReadMessage(ctx)
+	require.NoError(t, err)
+	msgEqualString(t, "3", msg)
 }
 
-func (t *TopicReaderUpdateOffsetsSuite) TestSeveralTransactions() {
-	ctx := t.testContext()
+func TestSeveralTransactions(t *testing.T) {
+	scope := newScope(t)
+	writer := scope.TopicWriter()
+	reader := scope.TopicReader()
+	driver := scope.Driver()
+	ctx := scope.Ctx
 
-	t.writeMessage(ctx, "1")
+	writeMessage(t, ctx, writer, "1")
 
 	var (
 		once1 sync.Once
 		once2 sync.Once
 	)
 
-	err := t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
+	err := driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
 		once1.Do(func() {
-			t.deleteTxSession(ctx, tr.(tx.Transaction))
+			deleteTxSession(t, ctx, driver, tr.(tx.Transaction))
 		})
 
-		_, err := t.reader.PopMessagesBatchTx(ctx, tr)
+		_, err := reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
-	t.NoError(err)
+	require.NoError(t, err)
 
-	t.writeMessage(ctx, "2")
+	writeMessage(t, ctx, writer, "2")
 
 	var batch *topicreader.Batch
-	err = t.driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
+	err = driver.Query().DoTx(ctx, func(ctx context.Context, tr query.TxActor) error {
 		once2.Do(func() {
-			t.deleteTxSession(ctx, tr.(tx.Transaction))
+			deleteTxSession(t, ctx, driver, tr.(tx.Transaction))
 		})
 
 		var err error
-		batch, err = t.reader.PopMessagesBatchTx(ctx, tr)
+		batch, err = reader.PopMessagesBatchTx(ctx, tr)
 		return err
 	})
-	t.Require().NoError(err)
+	require.NoError(t, err)
 
-	t.MsgEqualString("2", batch.Messages[0])
+	msgEqualString(t, "2", batch.Messages[0])
 }
 
 // Helper methods
 
-func (t *TopicReaderUpdateOffsetsSuite) writeMessage(ctx context.Context, msg string) {
-	err := t.writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(msg)})
-	t.NoError(err)
+func writeMessage(t *testing.T, ctx context.Context, writer *topicwriter.Writer, msg string) {
+	t.Helper()
+	err := writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(msg)})
+	require.NoError(t, err)
 }
 
-func (t *TopicReaderUpdateOffsetsSuite) MsgEqualString(expected string, msg *topicreader.Message) {
-	t.T().Helper()
+func msgEqualString(t *testing.T, expected string, msg *topicreader.Message) {
+	t.Helper()
 
 	var actual string
 
@@ -149,17 +136,19 @@ func (t *TopicReaderUpdateOffsetsSuite) MsgEqualString(expected string, msg *top
 		return nil
 	})
 
-	t.Equal(expected, actual)
+	require.Equal(t, expected, actual)
 }
 
-func (t *TopicReaderUpdateOffsetsSuite) deleteTxSession(ctx context.Context, tx tx.Transaction) {
-	t.deleteSession(ctx, tx.SessionID())
+func deleteTxSession(t *testing.T, ctx context.Context, driver *ydb.Driver, tx tx.Transaction) {
+	t.Helper()
+	deleteSession(t, ctx, driver, tx.SessionID())
 }
 
-func (t *TopicReaderUpdateOffsetsSuite) deleteSession(ctx context.Context, sessionID string) {
-	_, err := Ydb_Query_V1.NewQueryServiceClient(ydb.GRPCConn(t.driver)).
+func deleteSession(t *testing.T, ctx context.Context, driver *ydb.Driver, sessionID string) {
+	t.Helper()
+	_, err := Ydb_Query_V1.NewQueryServiceClient(ydb.GRPCConn(driver)).
 		DeleteSession(ctx, &Ydb_Query.DeleteSessionRequest{
 			SessionId: sessionID,
 		})
-	t.NoError(err)
+	require.NoError(t, err)
 }
