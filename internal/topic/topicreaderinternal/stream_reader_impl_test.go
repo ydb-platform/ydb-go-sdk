@@ -1049,7 +1049,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 		e := newTopicReaderTestEnv(t)
 		e.Start()
 
-		nextDataRequested := sendMessageWithFullBuffer(e)
+		nextDataRequested := sendMessageWithFullBuffer(&e)
 
 		// wait message received to internal buffer
 		xtest.SpinWaitCondition(t, &e.reader.batcher.m, func() bool {
@@ -1098,7 +1098,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 			return len(e.reader.batcher.hasNewMessages) == 0
 		})
 
-		nextDataRequested := sendMessageWithFullBuffer(e)
+		nextDataRequested := sendMessageWithFullBuffer(&e)
 
 		<-readCompleted
 		require.NoError(t, readErr)
@@ -1183,7 +1183,7 @@ type testStreamResult struct {
 	waitOnly            bool
 }
 
-func newTopicReaderTestEnv(t testing.TB) *streamEnv {
+func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	ctx := xtest.Context(t)
 
 	mc := gomock.NewController(t)
@@ -1218,7 +1218,7 @@ func newTopicReaderTestEnv(t testing.TB) *streamEnv {
 	)
 	require.NoError(t, reader.sessionController.Add(session))
 
-	env := &streamEnv{
+	env := streamEnv{
 		TopicClient:                topicClientMock,
 		ctx:                        ctx,
 		t:                          t,
@@ -1260,6 +1260,7 @@ func newTopicReaderTestEnv(t testing.TB) *streamEnv {
 		}
 	})
 
+	//nolint:govet
 	return env
 }
 
