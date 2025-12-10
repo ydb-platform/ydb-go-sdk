@@ -251,14 +251,56 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 		return fmt.Errorf("ydb: failed to materialize transaction: %w", err)
 	}
 
-	if r.batchTxStorage.Add(tx, batch) {
+	txAlreadyExists := r.batchTxStorage.Add(tx, batch)
+	if txAlreadyExists {
 		// tx hooks already configured - exiting
 		return nil
 	}
 
 	tx.OnBeforeCommit(r.txBeforeCommitFn(tx))
+	tx.OnCompleted(r.txOnCompletedFn(ctx, tx))
 
-	tx.OnCompleted(func(err error) {
+	return nil
+}
+
+func (r *topicStreamReaderImpl) txBeforeCommitFn(tx tx.Transaction) tx.OnTransactionBeforeCommit {
+	return func(ctx context.Context) (err error) {
+		logCtx := r.cfg.BaseContext
+		onDone := trace.TopicOnReaderUpdateOffsetsInTransaction(
+			r.cfg.Trace,
+			&logCtx,
+			r.readerID,
+			r.readConnectionID,
+			tx.SessionID(),
+			tx,
+		)
+		defer func() {
+			onDone(err)
+		}()
+
+		// UpdateOffsetsInTransaction operation must be executed on the same Node where the transaction was initiated.
+		// Otherwise, errors such as `Database coordinators are unavailable` may occur.
+		ctx = endpoint.WithNodeID(ctx, tx.NodeID())
+
+		req, err := r.batchTxStorage.GetUpdateOffsetsInTransactionRequest(tx)
+		if err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("building update offsets request: %w", err))
+		}
+		if req == nil {
+			return nil
+		}
+
+		err = r.topicClient.UpdateOffsetsInTransaction(ctx, req)
+		if err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("updating offsets in transaction: %w", err))
+		}
+
+		return nil
+	}
+}
+
+func (r *topicStreamReaderImpl) txOnCompletedFn(ctx context.Context, tx tx.Transaction) tx.OnTransactionCompletedFunc {
+	return func(err error) {
 		logCtx := r.cfg.BaseContext
 		onDone := trace.TopicOnReaderTransactionCompleted(
 			r.cfg.Trace,
@@ -286,38 +328,6 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 			commitRange := topicreadercommon.GetCommitRange(batch)
 			topicreadercommon.BatchGetPartitionSession(batch).SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
 		}
-	})
-
-	return nil
-}
-
-func (r *topicStreamReaderImpl) txBeforeCommitFn(tx tx.Transaction) tx.OnTransactionBeforeCommit {
-	return func(ctx context.Context) (err error) {
-		logCtx := r.cfg.BaseContext
-		onDone := trace.TopicOnReaderUpdateOffsetsInTransaction(
-			r.cfg.Trace,
-			&logCtx,
-			r.readerID,
-			r.readConnectionID,
-			tx.SessionID(),
-			tx,
-		)
-		defer func() {
-			onDone(err)
-		}()
-
-		// UpdateOffsetsInTransaction operation must be executed on the same Node where the transaction was initiated.
-		// Otherwise, errors such as `Database coordinators are unavailable` may occur.
-		ctx = endpoint.WithNodeID(ctx, tx.NodeID())
-
-		req := r.batchTxStorage.GetUpdateOffsetsInTransactionRequest(tx)
-
-		err = r.topicClient.UpdateOffsetsInTransaction(ctx, req)
-		if err != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("updating offsets in transaction: %w", err))
-		}
-
-		return nil
 	}
 }
 

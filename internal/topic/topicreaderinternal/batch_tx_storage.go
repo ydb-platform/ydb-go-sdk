@@ -2,6 +2,7 @@ package topicreaderinternal
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -63,17 +64,18 @@ func (s *batchTxStorage) GetBatches(transaction tx.Transaction) []*topicreaderco
 // from all batches stored for the given transaction.
 // The batches are converted to commit ranges, optimized (adjacent ranges are merged),
 // and grouped by topic and partition.
-// Returns nil if no batches are stored for the transaction.
+// Returns nil, nil if no batches are stored for the transaction.
+// Returns an error if session info is missing for any partition offset.
 // This method is thread-safe.
 func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	transaction tx.Transaction,
-) *rawtopic.UpdateOffsetsInTransactionRequest {
+) (*rawtopic.UpdateOffsetsInTransactionRequest, error) {
 	s.m.Lock()
 	batches, ok := s.batches[transaction.ID()]
 	s.m.Unlock()
 
 	if !ok || len(batches) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Convert batches to CommitRanges
@@ -92,17 +94,20 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	// Convert to partition offsets
 	partitionOffsets := commitRanges.ToPartitionsOffsets()
 	if len(partitionOffsets) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Group partition offsets by topic
-	topicMap := s.buildPartitionOffsetsMap(partitionOffsets, sessionInfoMap)
+	topicMap, err := s.buildPartitionOffsetsMap(partitionOffsets, sessionInfoMap)
+	if err != nil {
+		return nil, err
+	}
 	if len(topicMap) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Build request
-	return s.buildUpdateOffsetsRequest(transaction, topicMap)
+	return s.buildUpdateOffsetsRequest(transaction, topicMap), nil
 }
 
 type sessionInfo struct {
@@ -133,14 +138,13 @@ func (s *batchTxStorage) buildSessionInfoMap(
 func (s *batchTxStorage) buildPartitionOffsetsMap(
 	partitionOffsets []rawtopicreader.PartitionCommitOffset,
 	sessionInfoMap map[rawtopicreader.PartitionSessionID]sessionInfo,
-) map[string][]rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets {
+) (map[string][]rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets, error) {
 	topicMap := make(map[string][]rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets)
 	for i := range partitionOffsets {
 		po := &partitionOffsets[i]
 		info, ok := sessionInfoMap[po.PartitionSessionID]
 		if !ok {
-			// Skip if session info not found (should not happen in normal flow)
-			continue
+			return nil, fmt.Errorf("session info not found for partition session ID %d", po.PartitionSessionID)
 		}
 
 		topicMap[info.topic] = append(topicMap[info.topic], rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
@@ -149,7 +153,7 @@ func (s *batchTxStorage) buildPartitionOffsetsMap(
 		})
 	}
 
-	return topicMap
+	return topicMap, nil
 }
 
 // buildUpdateOffsetsRequest creates the final UpdateOffsetsInTransactionRequest.
