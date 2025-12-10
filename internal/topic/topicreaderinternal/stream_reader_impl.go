@@ -284,10 +284,11 @@ func (r *topicStreamReaderImpl) txBeforeCommitFn(tx tx.Transaction) tx.OnTransac
 
 		req, err := r.batchTxStorage.GetUpdateOffsetsInTransactionRequest(tx)
 		if err != nil {
+			if errors.Is(err, errNoBatches) {
+				return nil
+			}
+
 			return xerrors.WithStackTrace(fmt.Errorf("building update offsets request: %w", err))
-		}
-		if req == nil {
-			return nil
 		}
 
 		err = r.topicClient.UpdateOffsetsInTransaction(ctx, req)

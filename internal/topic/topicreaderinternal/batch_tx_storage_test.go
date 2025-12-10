@@ -2,6 +2,7 @@ package topicreaderinternal
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,7 +65,8 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_Empty(t *testing.T) 
 
 	req, err := newBatchTxStorage("test-consumer").GetUpdateOffsetsInTransactionRequest(tx)
 
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, errNoBatches))
 	assert.Nil(t, req)
 }
 
@@ -298,7 +300,8 @@ func TestBatchTxStorageClear(t *testing.T) {
 	assert.Empty(t, batches)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, errNoBatches))
 	assert.Nil(t, req)
 }
 

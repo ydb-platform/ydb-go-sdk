@@ -2,6 +2,7 @@ package topicreaderinternal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
@@ -13,6 +14,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
+
+// errNoBatches is returned when there are no batches to process for a transaction.
+var errNoBatches = errors.New("no batches for transaction")
 
 // batchTxStorage stores batches associated with transactions for commit within transaction.
 // It is thread-safe and allows multiple transactions to be managed concurrently.
@@ -75,7 +79,7 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	s.m.Unlock()
 
 	if !ok || len(batches) == 0 {
-		return nil, nil
+		return nil, errNoBatches
 	}
 
 	// Convert batches to CommitRanges
@@ -94,7 +98,7 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	// Convert to partition offsets
 	partitionOffsets := commitRanges.ToPartitionsOffsets()
 	if len(partitionOffsets) == 0 {
-		return nil, nil
+		return nil, errNoBatches
 	}
 
 	// Group partition offsets by topic
@@ -103,7 +107,7 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 		return nil, err
 	}
 	if len(topicMap) == 0 {
-		return nil, nil
+		return nil, errNoBatches
 	}
 
 	// Build request
