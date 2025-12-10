@@ -18,9 +18,11 @@ func TestBatchTxStorageAdd_NewTransaction(t *testing.T) {
 	tx := newMockTransactionWrapper("session-1", "tx-1")
 	batch := createTestBatch("topic-1", 1, 10, 20, 1)
 
-	exists := newBatchTxStorage("test-consumer").Add(tx, batch)
+	storage := newBatchTxStorage("test-consumer")
+	txBatches, isNew := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch)
 
-	assert.False(t, exists)
+	assert.True(t, isNew)
 }
 
 func TestBatchTxStorageAdd_ExistingTransaction(t *testing.T) {
@@ -30,10 +32,12 @@ func TestBatchTxStorageAdd_ExistingTransaction(t *testing.T) {
 
 	storage := newBatchTxStorage("test-consumer")
 
-	storage.Add(tx, batch1)
-	exists := storage.Add(tx, batch2)
+	txBatches1, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches1.AddBatch(batch1)
+	_, isNew := storage.GetOrCreateTransactionBatches(tx)
+	txBatches1.AddBatch(batch2)
 
-	assert.True(t, exists)
+	assert.False(t, isNew)
 }
 
 func TestBatchTxStorageGetBatches_Empty(t *testing.T) {
@@ -50,8 +54,9 @@ func TestBatchTxStorageGetBatches_WithBatches(t *testing.T) {
 	batch2 := createTestBatch("topic-1", 1, 20, 30, 1)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch1)
-	storage.Add(tx, batch2)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch1)
+	txBatches.AddBatch(batch2)
 
 	batches := storage.GetBatches(tx)
 
@@ -77,7 +82,8 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_SingleBatch(t *testi
 
 	storage := newBatchTxStorage("test-consumer")
 
-	storage.Add(tx, batch)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
@@ -101,8 +107,9 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_MultipleBatches(t *t
 	batch2 := createTestBatch("topic-1", 1, 20, 30, 1)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch1)
-	storage.Add(tx, batch2)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch1)
+	txBatches.AddBatch(batch2)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
@@ -121,8 +128,9 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_MultipleTopics(t *te
 	batch2 := createTestBatch("topic-2", 2, 30, 40, 2)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch1)
-	storage.Add(tx, batch2)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch1)
+	txBatches.AddBatch(batch2)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
@@ -140,8 +148,9 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_MultiplePartitionsSa
 	batch2 := createTestBatch("topic-1", 2, 30, 40, 2)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch1)
-	storage.Add(tx, batch2)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch1)
+	txBatches.AddBatch(batch2)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
@@ -168,8 +177,9 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_NonAdjacentBatches(t
 	batch2 := createTestBatch("topic-1", 1, 30, 40, 1)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch1)
-	storage.Add(tx, batch2)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch1)
+	txBatches.AddBatch(batch2)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
@@ -192,10 +202,11 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_MultiplePartitionsMu
 	batch4 := createTestBatch("topic-2", 2, 70, 80, 4)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch1)
-	storage.Add(tx, batch2)
-	storage.Add(tx, batch3)
-	storage.Add(tx, batch4)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch1)
+	txBatches.AddBatch(batch2)
+	txBatches.AddBatch(batch3)
+	txBatches.AddBatch(batch4)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
@@ -226,10 +237,11 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_ComplexOptimization(
 	batch4 := createTestBatch("topic-1", 1, 50, 60, 1)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch1)
-	storage.Add(tx, batch2)
-	storage.Add(tx, batch3)
-	storage.Add(tx, batch4)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch1)
+	txBatches.AddBatch(batch2)
+	txBatches.AddBatch(batch3)
+	txBatches.AddBatch(batch4)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
@@ -253,11 +265,12 @@ func TestBatchTxStorageGetUpdateOffsetsInTransactionRequest_MixedPartitionsAndTo
 	batch5 := createTestBatch("topic-2", 1, 80, 90, 3)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch1)
-	storage.Add(tx, batch2)
-	storage.Add(tx, batch3)
-	storage.Add(tx, batch4)
-	storage.Add(tx, batch5)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch1)
+	txBatches.AddBatch(batch2)
+	txBatches.AddBatch(batch3)
+	txBatches.AddBatch(batch4)
+	txBatches.AddBatch(batch5)
 
 	req, err := storage.GetUpdateOffsetsInTransactionRequest(tx)
 
@@ -292,7 +305,8 @@ func TestBatchTxStorageClear(t *testing.T) {
 	batch := createTestBatch("topic-1", 1, 10, 20, 1)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx, batch)
+	txBatches, _ := storage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch)
 
 	storage.Clear(tx)
 
@@ -314,8 +328,10 @@ func TestBatchTxStorageMultipleTransactions(t *testing.T) {
 	batch2 := createTestBatch("topic-2", 2, 30, 40, 2)
 
 	storage := newBatchTxStorage("test-consumer")
-	storage.Add(tx1, batch1)
-	storage.Add(tx2, batch2)
+	txBatches1, _ := storage.GetOrCreateTransactionBatches(tx1)
+	txBatches1.AddBatch(batch1)
+	txBatches2, _ := storage.GetOrCreateTransactionBatches(tx2)
+	txBatches2.AddBatch(batch2)
 
 	batches1 := storage.GetBatches(tx1)
 	batches2 := storage.GetBatches(tx2)

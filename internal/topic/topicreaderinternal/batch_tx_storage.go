@@ -18,35 +18,56 @@ import (
 // errNoBatches is returned when there are no batches to process for a transaction.
 var errNoBatches = errors.New("no batches for transaction")
 
+// transactionBatches stores batches for a single transaction.
+// It is not thread-safe and should be accessed only through batchTxStorage methods.
+type transactionBatches struct {
+	batches []*topicreadercommon.PublicBatch
+}
+
+// AddBatch adds a batch to the transaction.
+func (tb *transactionBatches) AddBatch(batch *topicreadercommon.PublicBatch) {
+	tb.batches = append(tb.batches, batch)
+}
+
+// GetBatches returns all batches stored for this transaction.
+func (tb *transactionBatches) GetBatches() []*topicreadercommon.PublicBatch {
+	return tb.batches
+}
+
 // batchTxStorage stores batches associated with transactions for commit within transaction.
 // It is thread-safe and allows multiple transactions to be managed concurrently.
 type batchTxStorage struct {
-	batches  map[string][]*topicreadercommon.PublicBatch
-	consumer string
-	m        xsync.Mutex
+	transactions map[string]*transactionBatches
+	consumer     string
+	m            xsync.Mutex
 }
 
 // newBatchTxStorage creates a new batch transaction storage with the given consumer name.
 // The consumer name is used when building UpdateOffsetsInTransactionRequest.
 func newBatchTxStorage(consumer string) *batchTxStorage {
 	return &batchTxStorage{
-		batches:  make(map[string][]*topicreadercommon.PublicBatch),
-		consumer: consumer,
+		transactions: make(map[string]*transactionBatches),
+		consumer:     consumer,
 	}
 }
 
-// Add adds a batch to the transaction storage.
-// It returns true if the transaction already exists (has been added before), false otherwise.
+// GetOrCreateTransactionBatches gets or creates a transaction batches handler for the given transaction.
+// It returns the handler and a flag indicating whether the transaction is new (true) or already existed (false).
 // This method is thread-safe.
-func (s *batchTxStorage) Add(transaction tx.Transaction, batch *topicreadercommon.PublicBatch) (txAlreadyExists bool) {
+func (s *batchTxStorage) GetOrCreateTransactionBatches(transaction tx.Transaction) (*transactionBatches, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	txID := transaction.ID()
-	_, exists := s.batches[txID]
-	s.batches[txID] = append(s.batches[txID], batch)
+	txBatches, exists := s.transactions[txID]
+	if !exists {
+		txBatches = &transactionBatches{
+			batches: make([]*topicreadercommon.PublicBatch, 0),
+		}
+		s.transactions[txID] = txBatches
+	}
 
-	return exists
+	return txBatches, !exists
 }
 
 // GetBatches returns all batches stored for the given transaction.
@@ -56,12 +77,12 @@ func (s *batchTxStorage) GetBatches(transaction tx.Transaction) []*topicreaderco
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	batches, ok := s.batches[transaction.ID()]
+	txBatches, ok := s.transactions[transaction.ID()]
 	if !ok {
 		return nil
 	}
 
-	return batches
+	return txBatches.GetBatches()
 }
 
 // GetUpdateOffsetsInTransactionRequest builds an UpdateOffsetsInTransactionRequest
@@ -75,10 +96,15 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	transaction tx.Transaction,
 ) (*rawtopic.UpdateOffsetsInTransactionRequest, error) {
 	s.m.Lock()
-	batches, ok := s.batches[transaction.ID()]
+	txBatches, ok := s.transactions[transaction.ID()]
 	s.m.Unlock()
 
-	if !ok || len(batches) == 0 {
+	if !ok {
+		return nil, errNoBatches
+	}
+
+	batches := txBatches.GetBatches()
+	if len(batches) == 0 {
 		return nil, errNoBatches
 	}
 
@@ -195,5 +221,5 @@ func (s *batchTxStorage) Clear(transaction tx.Transaction) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	delete(s.batches, transaction.ID())
+	delete(s.transactions, transaction.ID())
 }

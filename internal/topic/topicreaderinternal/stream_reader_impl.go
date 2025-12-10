@@ -251,8 +251,9 @@ func (r *topicStreamReaderImpl) commitWithTransaction(
 		return fmt.Errorf("ydb: failed to materialize transaction: %w", err)
 	}
 
-	txAlreadyExists := r.batchTxStorage.Add(tx, batch)
-	if txAlreadyExists {
+	txBatches, isNew := r.batchTxStorage.GetOrCreateTransactionBatches(tx)
+	txBatches.AddBatch(batch)
+	if !isNew {
 		// tx hooks already configured - exiting
 		return nil
 	}
