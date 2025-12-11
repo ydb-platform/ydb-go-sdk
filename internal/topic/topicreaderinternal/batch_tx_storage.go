@@ -54,7 +54,9 @@ func newBatchTxStorage(consumer string) *batchTxStorage {
 
 // GetOrCreateTransactionBatches gets or creates a transaction batches handler for the given transaction.
 // This method is thread-safe.
-func (s *batchTxStorage) GetOrCreateTransactionBatches(transaction tx.Transaction) (batches *transactionBatches, created bool) {
+func (s *batchTxStorage) GetOrCreateTransactionBatches(
+	transaction tx.Transaction,
+) (batches *transactionBatches, created bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -175,7 +177,9 @@ func (s *batchTxStorage) buildPartitionOffsetsMap(
 		po := &partitionOffsets[i]
 		info, ok := sessionInfoMap[po.PartitionSessionID]
 		if !ok {
-			return nil, xerrors.WithStackTrace(fmt.Errorf("session info not found for partition session ID %d", po.PartitionSessionID))
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("session info not found for partition session ID %d", po.PartitionSessionID),
+			)
 		}
 
 		topicMap[info.topic] = append(topicMap[info.topic], rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
