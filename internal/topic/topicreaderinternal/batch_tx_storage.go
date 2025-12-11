@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
@@ -52,9 +53,8 @@ func newBatchTxStorage(consumer string) *batchTxStorage {
 }
 
 // GetOrCreateTransactionBatches gets or creates a transaction batches handler for the given transaction.
-// It returns the handler and a flag indicating whether the transaction is new (true) or already existed (false).
 // This method is thread-safe.
-func (s *batchTxStorage) GetOrCreateTransactionBatches(transaction tx.Transaction) (*transactionBatches, bool) {
+func (s *batchTxStorage) GetOrCreateTransactionBatches(transaction tx.Transaction) (batches *transactionBatches, created bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -65,9 +65,10 @@ func (s *batchTxStorage) GetOrCreateTransactionBatches(transaction tx.Transactio
 			batches: make([]*topicreadercommon.PublicBatch, 0),
 		}
 		s.transactions[txID] = txBatches
+		created = true
 	}
 
-	return txBatches, !exists
+	return txBatches, created
 }
 
 // GetBatches returns all batches stored for the given transaction.
@@ -100,12 +101,12 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	s.m.Unlock()
 
 	if !ok {
-		return nil, errNoBatches
+		return nil, xerrors.WithStackTrace(errNoBatches)
 	}
 
 	batches := txBatches.GetBatches()
 	if len(batches) == 0 {
-		return nil, errNoBatches
+		return nil, xerrors.WithStackTrace(errNoBatches)
 	}
 
 	// Convert batches to CommitRanges
@@ -124,7 +125,7 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 	// Convert to partition offsets
 	partitionOffsets := commitRanges.ToPartitionsOffsets()
 	if len(partitionOffsets) == 0 {
-		return nil, errNoBatches
+		return nil, xerrors.WithStackTrace(errNoBatches)
 	}
 
 	// Group partition offsets by topic
@@ -133,7 +134,7 @@ func (s *batchTxStorage) GetUpdateOffsetsInTransactionRequest(
 		return nil, err
 	}
 	if len(topicMap) == 0 {
-		return nil, errNoBatches
+		return nil, xerrors.WithStackTrace(errNoBatches)
 	}
 
 	// Build request
@@ -174,7 +175,7 @@ func (s *batchTxStorage) buildPartitionOffsetsMap(
 		po := &partitionOffsets[i]
 		info, ok := sessionInfoMap[po.PartitionSessionID]
 		if !ok {
-			return nil, fmt.Errorf("session info not found for partition session ID %d", po.PartitionSessionID)
+			return nil, xerrors.WithStackTrace(fmt.Errorf("session info not found for partition session ID %d", po.PartitionSessionID))
 		}
 
 		topicMap[info.topic] = append(topicMap[info.topic], rawtopic.UpdateOffsetsInTransactionRequest_PartitionOffsets{
