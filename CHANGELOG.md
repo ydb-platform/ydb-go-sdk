@@ -1,5 +1,6 @@
 * Added support for `Timestamp64` type in `value.Any` converter
 * Masked the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
+* Fixed issue with topic offsets update in transactions
 
 ## v3.121.0
 * Changed internal pprof label to pyroscope supported format

@@ -1374,6 +1374,8 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		require.NoError(t, err)
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
 		require.NoError(t, err)
+		err = txMock.onBeforeCommit[0](e.ctx)
+		require.NoError(t, err)
 
 		require.Len(t, txMock.onCompleted, 1)
 		txMock.onCompleted[0](nil)
@@ -1400,14 +1402,17 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		})
 		require.NoError(t, err)
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.NoError(t, err)
+
+		require.NotEmpty(t, txMock.onBeforeCommit)
+		err = txMock.onBeforeCommit[0](e.ctx)
 		require.ErrorIs(t, err, testError)
-		require.NoError(t, xerrors.RetryableError(err))
-		require.Empty(t, txMock.onCompleted)
+		txMock.onCompleted[0](err)
 
 		require.True(t, e.reader.closed)
 		require.ErrorIs(t, e.reader.err, testError)
 		require.Error(t, xerrors.RetryableError(e.reader.err))
-		require.True(t, txMock.RolledBack)
+		require.False(t, txMock.RolledBack, "Rollback is an responsibility of tx itself")
 		require.True(t, txMock.materialized)
 	})
 	t.Run("UpdateOffsetsInTransaction must be executed on the tx Node", func(t *testing.T) {
@@ -1431,6 +1436,9 @@ func TestUpdateCommitInTransaction(t *testing.T) {
 		require.NoError(t, err)
 
 		err = e.reader.commitWithTransaction(e.ctx, txMock, batch)
+		require.NoError(t, err)
+
+		err = txMock.onBeforeCommit[0](e.ctx)
 		require.NoError(t, err)
 	})
 }
