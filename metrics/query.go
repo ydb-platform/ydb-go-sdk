@@ -34,6 +34,21 @@ func query(config Config) (t trace.Query) {
 			}
 		}
 		{
+			nodeHintMiss := poolConfig.CounterVec("node_hint_miss", "preferred_node_id", "session_node_id")
+			t.OnPoolGet = func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
+				return func(info trace.QueryPoolGetDoneInfo) {
+					if poolConfig.Details()&trace.QueryPoolEvents != 0 {
+						if info.NodeHintInfo != nil {
+							nodeHintMiss.With(map[string]string{
+								"preferred_node_id": idToString(info.NodeHintInfo.PreferredNodeID),
+								"session_node_id":   idToString(info.NodeHintInfo.SessionNodeID),
+							}).Inc()
+						}
+					}
+				}
+			}
+		}
+		{
 			sizeConfig := poolConfig.WithSystem("size")
 			limit := sizeConfig.GaugeVec("limit")
 			idle := sizeConfig.GaugeVec("idle")
