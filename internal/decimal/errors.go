@@ -6,10 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var (
-	errSyntax   = xerrors.Wrap(fmt.Errorf("invalid syntax"))
-	errOverflow = xerrors.Wrap(fmt.Errorf("overflow"))
-)
+var errSyntax = xerrors.Wrap(fmt.Errorf("invalid syntax"))
 
 type ParseError struct {
 	Err   error
