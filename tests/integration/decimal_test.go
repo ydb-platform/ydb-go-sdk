@@ -285,12 +285,13 @@ func TestQueryDecimalParam(t *testing.T) {
 	t.Run("DirectScan", func(t *testing.T) {
 		d, err := types.DecimalValueFromString("100.5", 33, 12)
 		require.NoError(t, err)
-		row, err := db.Query().QueryRow(ctx, `SELECT $p`,
-			query.WithParameters(ydb.ParamsBuilder().
-				Param("$p").Any(d).
-				Build(),
-			), query.WithIdempotent(),
-		)
+		row, err := db.Query().QueryRow(ctx, `
+			DECLARE $p2 AS Decimal(33,12);
+			SELECT $p;
+		`, query.WithParameters(ydb.ParamsBuilder().
+			Param("$p").Any(d).
+			Build(),
+		), query.WithIdempotent())
 		require.NoError(t, err)
 
 		var dst types.Decimal
@@ -307,12 +308,13 @@ func TestQueryDecimalParam(t *testing.T) {
 	t.Run("DirectScanNegative", func(t *testing.T) {
 		d, err := types.DecimalValueFromString("-5.33", 22, 9)
 		require.NoError(t, err)
-		row, err := db.Query().QueryRow(ctx, `SELECT $p`,
-			query.WithParameters(ydb.ParamsBuilder().
-				Param("$p").Any(d).
-				Build(),
-			), query.WithIdempotent(),
-		)
+		row, err := db.Query().QueryRow(ctx, `
+			DECLARE $p2 AS Decimal(22,9);
+			SELECT $p;
+		`, query.WithParameters(ydb.ParamsBuilder().
+			Param("$p").Any(d).
+			Build(),
+		), query.WithIdempotent())
 		require.NoError(t, err)
 
 		var dst types.Decimal
@@ -329,13 +331,15 @@ func TestQueryDecimalParam(t *testing.T) {
 	t.Run("DirectScanWithOtherTypes", func(t *testing.T) {
 		d, err := types.DecimalValueFromString("10.01", 22, 9)
 		require.NoError(t, err)
-		row, err := db.Query().QueryRow(ctx, `SELECT $p1 AS id, $p2 AS amount`,
-			query.WithParameters(ydb.ParamsBuilder().
-				Param("$p1").Uint64(42).
-				Param("$p2").Any(d).
-				Build(),
-			), query.WithIdempotent(),
-		)
+		row, err := db.Query().QueryRow(ctx, `
+			DECLARE $p1 AS Uint64;
+			DECLARE $p2 AS Decimal(22,9);
+			SELECT $p1 AS id, $p2 AS amount;
+		`, query.WithParameters(ydb.ParamsBuilder().
+			Param("$p1").Uint64(42).
+			Param("$p2").Any(d).
+			Build(),
+		), query.WithIdempotent())
 		require.NoError(t, err)
 
 		var id uint64
@@ -378,7 +382,10 @@ func TestDatabaseSqlDecimalParam(t *testing.T) {
 	t.Run("DirectScan", func(t *testing.T) {
 		d, err := types.DecimalValueFromString("100.5", 33, 12)
 		require.NoError(t, err)
-		row := db.QueryRowContext(ctx, `SELECT $p`, sql.Named("p", d))
+		row := db.QueryRowContext(ctx, `
+			DECLARE $p AS Decimal(33,12);
+			SELECT $p;
+		`, sql.Named("p", d))
 
 		var dst types.Decimal
 		err = row.Scan(&dst)
@@ -394,7 +401,10 @@ func TestDatabaseSqlDecimalParam(t *testing.T) {
 	t.Run("DirectScanNegative", func(t *testing.T) {
 		d, err := types.DecimalValueFromString("-5.33", 22, 9)
 		require.NoError(t, err)
-		row := db.QueryRowContext(ctx, `SELECT $p`, sql.Named("p", d))
+		row := db.QueryRowContext(ctx, `
+			DECLARE $p AS Decimal(22,9);
+			SELECT $p;
+		`, sql.Named("p", d))
 
 		var dst types.Decimal
 		err = row.Scan(&dst)
@@ -410,7 +420,11 @@ func TestDatabaseSqlDecimalParam(t *testing.T) {
 	t.Run("DirectScanWithOtherTypes", func(t *testing.T) {
 		d, err := types.DecimalValueFromString("10.01", 22, 9)
 		require.NoError(t, err)
-		row := db.QueryRowContext(ctx, `SELECT $p1 AS id, $p2 AS amount`, sql.Named("p1", uint64(42)), sql.Named("p2", d))
+		row := db.QueryRowContext(ctx, `
+			DECLARE $p1 AS Uint64;
+			DECLARE $p2 AS Decimal(22,9);
+			SELECT $p1 AS id, $p2 AS amount;
+		`, sql.Named("p1", uint64(42)), sql.Named("p2", d))
 
 		var id uint64
 		var amount types.Decimal
