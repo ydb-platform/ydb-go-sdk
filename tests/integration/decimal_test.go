@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -39,12 +40,12 @@ func TestIssue1234UnexpectedDecimalRepresentation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			expected := types.Decimal{
+			expected := decimal.Decimal{
 				Bytes:     tt.bts,
 				Precision: tt.precision,
 				Scale:     tt.scale,
 			}
-			var actual types.Decimal
+			var actual decimal.Decimal
 
 			err := driver.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
 				_, result, err := s.Execute(ctx, table.DefaultTxControl(), `
@@ -94,7 +95,7 @@ func TestQueryDecimalScan(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		var dst types.Decimal
+		var dst decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Equal(t, uint32(12), dst.Scale)
@@ -112,7 +113,7 @@ func TestQueryDecimalScan(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		var dst types.Decimal
+		var dst decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Equal(t, uint32(22), dst.Precision)
@@ -131,7 +132,7 @@ func TestQueryDecimalScan(t *testing.T) {
 		require.NoError(t, err)
 
 		var id uint64
-		var amount types.Decimal
+		var amount decimal.Decimal
 		err = row.Scan(&id, &amount)
 		require.NoError(t, err)
 		require.Equal(t, uint64(42), id)
@@ -150,7 +151,7 @@ func TestQueryDecimalScan(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		var dst *types.Decimal
+		var dst *decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Nil(t, dst)
@@ -163,7 +164,7 @@ func TestQueryDecimalScan(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		var dst *types.Decimal
+		var dst *decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.NotNil(t, dst)
@@ -202,7 +203,7 @@ func TestDatabaseSqlDecimalScan(t *testing.T) {
 	t.Run("DirectScan", func(t *testing.T) {
 		row := db.QueryRowContext(ctx, `SELECT Decimal('100.500', 33, 12)`)
 
-		var dst types.Decimal
+		var dst decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Equal(t, uint32(33), dst.Precision)
@@ -216,7 +217,7 @@ func TestDatabaseSqlDecimalScan(t *testing.T) {
 	t.Run("DirectScanNegative", func(t *testing.T) {
 		row := db.QueryRowContext(ctx, `SELECT Decimal('-5.33', 22, 9)`)
 
-		var dst types.Decimal
+		var dst decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Equal(t, uint32(22), dst.Precision)
@@ -231,7 +232,7 @@ func TestDatabaseSqlDecimalScan(t *testing.T) {
 		row := db.QueryRowContext(ctx, `SELECT 42u AS id, Decimal('10.01', 22, 9) AS amount`)
 
 		var id uint64
-		var amount types.Decimal
+		var amount decimal.Decimal
 		err = row.Scan(&id, &amount)
 		require.NoError(t, err)
 
@@ -247,7 +248,7 @@ func TestDatabaseSqlDecimalScan(t *testing.T) {
 	t.Run("DirectScanOptional", func(t *testing.T) {
 		row := db.QueryRowContext(ctx, `SELECT CAST(NULL AS Decimal(22, 9))`)
 
-		var dst *types.Decimal
+		var dst *decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Nil(t, dst)
@@ -256,7 +257,7 @@ func TestDatabaseSqlDecimalScan(t *testing.T) {
 	t.Run("DirectScanOptionalNonNull", func(t *testing.T) {
 		row := db.QueryRowContext(ctx, `SELECT JUST(Decimal('99.99', 22, 9))`)
 
-		var dst *types.Decimal
+		var dst *decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.NotNil(t, dst)
@@ -286,7 +287,7 @@ func TestQueryDecimalParam(t *testing.T) {
 		d, err := types.DecimalValueFromString("100.5", 33, 12)
 		require.NoError(t, err)
 		row, err := db.Query().QueryRow(ctx, `
-			DECLARE $p2 AS Decimal(33,12);
+			DECLARE $p AS Decimal(33,12);
 			SELECT $p;
 		`, query.WithParameters(ydb.ParamsBuilder().
 			Param("$p").Any(d).
@@ -294,7 +295,7 @@ func TestQueryDecimalParam(t *testing.T) {
 		), query.WithIdempotent())
 		require.NoError(t, err)
 
-		var dst types.Decimal
+		var dst decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Equal(t, uint32(12), dst.Scale)
@@ -309,7 +310,7 @@ func TestQueryDecimalParam(t *testing.T) {
 		d, err := types.DecimalValueFromString("-5.33", 22, 9)
 		require.NoError(t, err)
 		row, err := db.Query().QueryRow(ctx, `
-			DECLARE $p2 AS Decimal(22,9);
+			DECLARE $p AS Decimal(22,9);
 			SELECT $p;
 		`, query.WithParameters(ydb.ParamsBuilder().
 			Param("$p").Any(d).
@@ -317,7 +318,7 @@ func TestQueryDecimalParam(t *testing.T) {
 		), query.WithIdempotent())
 		require.NoError(t, err)
 
-		var dst types.Decimal
+		var dst decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Equal(t, uint32(22), dst.Precision)
@@ -343,7 +344,7 @@ func TestQueryDecimalParam(t *testing.T) {
 		require.NoError(t, err)
 
 		var id uint64
-		var amount types.Decimal
+		var amount decimal.Decimal
 		err = row.Scan(&id, &amount)
 		require.NoError(t, err)
 		require.Equal(t, uint64(42), id)
@@ -387,7 +388,7 @@ func TestDatabaseSqlDecimalParam(t *testing.T) {
 			SELECT $p;
 		`, sql.Named("p", d))
 
-		var dst types.Decimal
+		var dst decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Equal(t, uint32(33), dst.Precision)
@@ -406,7 +407,7 @@ func TestDatabaseSqlDecimalParam(t *testing.T) {
 			SELECT $p;
 		`, sql.Named("p", d))
 
-		var dst types.Decimal
+		var dst decimal.Decimal
 		err = row.Scan(&dst)
 		require.NoError(t, err)
 		require.Equal(t, uint32(22), dst.Precision)
@@ -427,7 +428,7 @@ func TestDatabaseSqlDecimalParam(t *testing.T) {
 		`, sql.Named("p1", uint64(42)), sql.Named("p2", d))
 
 		var id uint64
-		var amount types.Decimal
+		var amount decimal.Decimal
 		err = row.Scan(&id, &amount)
 		require.NoError(t, err)
 

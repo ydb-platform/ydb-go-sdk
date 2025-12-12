@@ -1,7 +1,7 @@
 package value
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
