@@ -61,17 +61,15 @@ func ParseDecimal(s string) (_ *big.Int, exp uint32, _ error) {
 }
 
 func (d *Decimal) apply(value any) error {
-	if v, has := value.(Interface); has {
-		d.Bytes, d.Precision, d.Scale = v.Decimal()
-
-		return nil
-	}
-
 	switch v := value.(type) {
 	case *Decimal:
 		d.Bytes = v.Bytes
 		d.Precision = v.Precision
 		d.Scale = v.Scale
+
+		return nil
+	case Interface:
+		d.Bytes, d.Precision, d.Scale = v.Decimal()
 
 		return nil
 	case string:
@@ -266,6 +264,8 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 //nolint:funlen
 func Format(x *big.Int, precision, scale uint32, trimTrailingZeros bool) string {
 	switch {
+	case x == nil:
+		return "0"
 	case x.CmpAbs(inf) == 0:
 		if x.Sign() < 0 {
 			return "-inf"
@@ -278,8 +278,6 @@ func Format(x *big.Int, precision, scale uint32, trimTrailingZeros bool) string 
 		}
 
 		return "nan"
-	case x == nil:
-		return "0"
 	}
 
 	v := big.NewInt(0).Set(x)
