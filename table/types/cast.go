@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -45,12 +46,8 @@ func Unwrap(v Value) Value {
 
 // ToDecimal returns Decimal struct from abstract Value
 func ToDecimal(v Value) (*Decimal, error) {
-	if valuer, isDecimalValuer := v.(value.DecimalValuer); isDecimalValuer {
-		return &Decimal{
-			Bytes:     valuer.Value(),
-			Precision: valuer.Precision(),
-			Scale:     valuer.Scale(),
-		}, nil
+	if d, has := v.(decimal.Interface); has {
+		return decimal.ToDecimal(d), nil
 	}
 
 	return nil, xerrors.WithStackTrace(fmt.Errorf("value type '%s' is not decimal type", v.Type().Yql()))
