@@ -110,6 +110,10 @@ func TestAny(t *testing.T) {
 			exp: time.Unix(0, int64(123*time.Microsecond)).Local(),
 		},
 		{
+			src: timestamp64Value(123),
+			exp: time.Unix(0, int64(123*time.Microsecond)).Local(),
+		},
+		{
 			src: intervalValue(123),
 			exp: 123 * time.Microsecond,
 		},

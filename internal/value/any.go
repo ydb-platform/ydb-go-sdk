@@ -52,6 +52,8 @@ func Any(v Value) (any, error) { //nolint:funlen,gocyclo
 		return uint64(vv), nil
 	case timestampValue:
 		return TimestampToTime(uint64(vv)), nil
+	case timestamp64Value:
+		return Timestamp64ToTime(int64(vv)), nil
 	case int64Value:
 		return int64(vv), nil
 	case intervalValue:
