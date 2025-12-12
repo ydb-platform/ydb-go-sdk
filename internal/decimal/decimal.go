@@ -80,16 +80,9 @@ func (d *Decimal) apply(value any) error {
 			return xerrors.WithStackTrace(err)
 		}
 
-		bb := vv.Bytes()
-		if len(bb) > 16 {
-			return xerrors.WithStackTrace(errOverflow)
-		}
-
 		d.Scale = exp
 		d.Precision = bufferSize - exp - 3
-		var bytes [16]byte
-		copy(bytes[:], bb)
-		d.Bytes = bytes
+		d.Bytes = BigIntToByte(vv, d.Precision)
 
 		return nil
 	case driver.Valuer:
