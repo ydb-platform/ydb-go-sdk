@@ -593,18 +593,6 @@ func (v *decimalValue) Decimal() (bytes [16]byte, precision uint32, scale uint32
 }
 
 func (v *decimalValue) castTo(dst any) error {
-	//if scanner, has := dst.(sql.Scanner); has {
-	//	if err := scanner.Scan(decimal.Decimal{
-	//		Bytes:     v.value,
-	//		Precision: v.Precision(),
-	//		Scale:     v.Scale(),
-	//	}.Format(false)); err != nil {
-	//		return xerrors.WithStackTrace(err)
-	//	}
-	//
-	//	return nil
-	//}
-	//
 	switch dstValue := dst.(type) {
 	case *driver.Value:
 		*dstValue = v
