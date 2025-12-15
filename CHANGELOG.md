@@ -1,3 +1,4 @@
+## v3.123.0
 * Moved `internal/decimal` package to `pkg/decimal` for public usage
 
 ## v3.122.0
