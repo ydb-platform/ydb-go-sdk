@@ -20,6 +20,7 @@ func table(config Config) (t trace.Table) {
 	get := config.CounterVec("get")
 	put := config.CounterVec("put")
 	with := config.GaugeVec("with")
+	nodeHintMiss := config.CounterVec("node_hint_miss", "preferred_node_id", "session_node_id")
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
 			if config.Details()&trace.TableEvents != 0 {
@@ -58,8 +59,16 @@ func table(config Config) (t trace.Table) {
 	}
 	t.OnPoolGet = func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 		return func(info trace.TablePoolGetDoneInfo) {
-			if info.Error == nil && config.Details()&trace.TablePoolEvents != 0 {
-				get.With(nil).Inc()
+			if config.Details()&trace.TablePoolEvents != 0 {
+				if info.Error == nil {
+					get.With(nil).Inc()
+				}
+				if info.NodeHintInfo != nil {
+					nodeHintMiss.With(map[string]string{
+						"preferred_node_id": idToString(info.NodeHintInfo.PreferredNodeID),
+						"session_node_id":   idToString(info.NodeHintInfo.SessionNodeID),
+					}).Inc()
+				}
 			}
 		}
 	}

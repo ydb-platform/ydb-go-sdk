@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type (
@@ -771,9 +772,10 @@ func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[
 
 func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { //nolint:funlen
 	var (
-		start   = p.config.clock.Now()
-		attempt int
-		lastErr error
+		start        = p.config.clock.Now()
+		attempt      int
+		lastErr      error
+		nodeHintInfo *trace.NodeHintInfo
 	)
 
 	if onGet := p.config.trace.OnGet; onGet != nil {
@@ -782,7 +784,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		)
 		if onDone != nil {
 			defer func() {
-				onDone(item, attempt, finalErr)
+				onDone(item, attempt, nodeHintInfo, finalErr)
 			}()
 		}
 	}
@@ -809,7 +811,15 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 				}
 			}
 
-			return p.removeFirstIdle()
+			idle := p.removeFirstIdle()
+			if hasPreferredNodeID {
+				nodeHintInfo = &trace.NodeHintInfo{
+					PreferredNodeID: preferredNodeID,
+					SessionNodeID:   idle.NodeID(),
+				}
+			}
+
+			return idle
 		}); item != nil {
 			if item.IsAlive() {
 				info := xsync.WithLock(&p.mu, func() itemInfo[PT, T] {
