@@ -1,9 +1,13 @@
 package decimal
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"math/big"
 	"math/bits"
+	"strings"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
@@ -31,6 +35,70 @@ const (
 	errorTag = "<error>"
 )
 
+// ParseDecimal parses a decimal string into a big.Int and exponent.
+// Returns (n, e) such that n * 10^(-e) equals the original number.
+func ParseDecimal(s string) (_ *big.Int, exp uint32, _ error) {
+	dotIndex := strings.Index(s, ".")
+	if dotIndex == -1 {
+		n := &big.Int{}
+		if _, ok := n.SetString(s, 10); !ok {
+			return nil, 0, xerrors.WithStackTrace(fmt.Errorf("invalid integer: %s", s))
+		}
+
+		return n, 0, nil
+	}
+
+	integerPart := s[:dotIndex]
+	fractionalPart := s[dotIndex+1:]
+
+	combined := integerPart + fractionalPart
+	n := &big.Int{}
+	if _, ok := n.SetString(combined, 10); !ok {
+		return nil, 0, xerrors.WithStackTrace(fmt.Errorf("invalid number: %s", s))
+	}
+
+	return n, uint32(len(fractionalPart)), nil
+}
+
+func (d *Decimal) apply(value any) error {
+	switch v := value.(type) {
+	case *Decimal:
+		d.Bytes = v.Bytes
+		d.Precision = v.Precision
+		d.Scale = v.Scale
+
+		return nil
+	case Interface:
+		d.Bytes, d.Precision, d.Scale = v.Decimal()
+
+		return nil
+	case string:
+		vv, exp, err := ParseDecimal(v)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		d.Scale = exp
+		d.Precision = bufferSize - exp - 3
+		d.Bytes = BigIntToByte(vv, d.Precision)
+
+		return nil
+	case driver.Valuer:
+		vv, err := v.Value()
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		if err := d.apply(vv); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf("cannot apply '%T' to '%T'", v, d))
+	}
+}
+
 // IsInf reports whether x is an infinity.
 func IsInf(x *big.Int) bool { return x.CmpAbs(inf) == 0 }
 
@@ -54,7 +122,7 @@ func Err() *big.Int { return big.NewInt(0).Set(err) }
 //
 // If given bytes contains value that is greater than given precision it
 // returns infinity or negative infinity value accordingly the bytes sign.
-func FromBytes(bts []byte, precision, scale uint32) *big.Int {
+func FromBytes(bts []byte, precision uint32) *big.Int {
 	v := big.NewInt(0)
 	if len(bts) == 0 {
 		return v
@@ -82,8 +150,8 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 
 // FromInt128 returns big integer from given array. That is, it interprets
 // 16-byte array as 128-bit integer.
-func FromInt128(p [16]byte, precision, scale uint32) *big.Int {
-	return FromBytes(p[:], precision, scale)
+func FromInt128(p [16]byte, precision uint32) *big.Int {
+	return FromBytes(p[:], precision)
 }
 
 // Parse interprets a string s with the given precision and scale and returns
@@ -194,24 +262,22 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 // scale.
 //
 //nolint:funlen
-func Format(x *big.Int, precision, scale uint32) string {
+func Format(x *big.Int, precision, scale uint32, trimTrailingZeros bool) string {
 	switch {
+	case x == nil:
+		return "0"
 	case x.CmpAbs(inf) == 0:
 		if x.Sign() < 0 {
 			return "-inf"
 		}
 
 		return "inf"
-
-	case x.CmpAbs(nan) == 0:
+	case x.CmpAbs(nan) == 0, precision == 0:
 		if x.Sign() < 0 {
 			return "-nan"
 		}
 
 		return "nan"
-
-	case x == nil:
-		return "0"
 	}
 
 	v := big.NewInt(0).Set(x)
@@ -237,12 +303,17 @@ func Format(x *big.Int, precision, scale uint32) string {
 		d := int(digit.Int64())
 		if d != 0 || scale == 0 || pos > 0 {
 			const numbers = "0123456789"
-			pos--
-			bts[pos] = numbers[d]
+			if d != 0 {
+				trimTrailingZeros = false
+			}
+			if !trimTrailingZeros {
+				pos--
+				bts[pos] = numbers[d]
+			}
 		}
 		if scale > 0 {
 			scale--
-			if scale == 0 && pos > 0 {
+			if scale == 0 && pos > 0 && pos < bufferSize {
 				pos--
 				bts[pos] = '.'
 			}
@@ -277,7 +348,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 //
 // If x value does not fit in 16 bytes with given precision, it returns 16-byte
 // representation of infinity or negative infinity value accordingly to x's sign.
-func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
+func BigIntToByte(x *big.Int, precision uint32) (p [16]byte) {
 	if !IsInf(x) && !IsNaN(x) && !IsErr(x) && x.CmpAbs(pow(ten, precision)) >= 0 {
 		if x.Sign() < 0 {
 			x = neginf

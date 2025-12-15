@@ -1,3 +1,5 @@
+* Moved `internal/decimal` package to `pkg/decimal` for public usage
+
 ## v3.122.0
 * Added `trace.NodeHintInfo` field for OnPoolGet trace callback which stores info for node hint misses
 * Added `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics for node hint misses
@@ -11,7 +13,7 @@
 * Changed internal pprof label to pyroscope supported format
 * Added `query.ImplicitTxControl()` transaction control (the same as `query.NoTx()` and `query.EmptyTxControl()`). See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
 * Added `SnapshotReadWrite` isolation mode support to `database/sql` driver using `sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: false}`
-* Move `internal/ratelimiter/options` to `ratelimiter/options` for public usage
+* Moved `internal/ratelimiter/options` to `ratelimiter/options` for public usage
 
 ## v3.120.0
 * Added support of `SnapshotReadWrite` isolation mode into query and table clients

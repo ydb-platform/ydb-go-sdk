@@ -139,17 +139,17 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 							}
 
 							_, err = db.ExecContext(ctx, `
-						CREATE TABLE `+"`"+tablePath+"`"+` (
-							series_id Uint64,
-							title UTF8,
-							series_info UTF8,
-							release_date Date,
-							comment UTF8,
-							PRIMARY KEY (
-								series_id
-							)
-						);
-					`)
+								CREATE TABLE `+"`"+tablePath+"`"+` (
+									series_id Uint64,
+									title UTF8,
+									series_info UTF8,
+									release_date Date,
+									comment UTF8,
+									PRIMARY KEY (
+										series_id
+									)
+								);
+							`)
 							require.NoError(t, err)
 						})
 						t.Run("seasons", func(t *testing.T) {
@@ -168,18 +168,18 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 							}
 
 							_, err = db.ExecContext(ctx, `
-						CREATE TABLE `+"`"+tablePath+"`"+` (
-							series_id Uint64,
-							season_id Uint64,
-							title UTF8,
-							first_aired Date,
-							last_aired Date,
-							PRIMARY KEY (
-								series_id,
-								season_id
-							)
-						);
-					`)
+								CREATE TABLE `+"`"+tablePath+"`"+` (
+									series_id Uint64,
+									season_id Uint64,
+									title UTF8,
+									first_aired Date,
+									last_aired Date,
+									PRIMARY KEY (
+										series_id,
+										season_id
+									)
+								);
+							`)
 							require.NoError(t, err)
 						})
 						t.Run("episodes", func(t *testing.T) {
@@ -198,20 +198,20 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 							}
 
 							_, err = db.ExecContext(ctx, `
-						CREATE TABLE `+"`"+tablePath+"`"+` (
-							series_id Uint64,
-							season_id Uint64,
-							episode_id Uint64,
-							title UTF8,
-							air_date Date,
-							views Uint64,
-							PRIMARY KEY (
-								series_id,
-								season_id,
-								episode_id
-							)
-						);
-					`)
+								CREATE TABLE `+"`"+tablePath+"`"+` (
+									series_id Uint64,
+									season_id Uint64,
+									episode_id Uint64,
+									title UTF8,
+									air_date Date,
+									views Uint64,
+									PRIMARY KEY (
+										series_id,
+										season_id,
+										episode_id
+									)
+								);
+							`)
 							require.NoError(t, err)
 						})
 					})
@@ -221,35 +221,35 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 					t.Run("upsert", func(t *testing.T) {
 						err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 							stmt, err := cc.PrepareContext(ctx, `
-						PRAGMA TablePathPrefix("`+path.Join(nativeDriver.Name(), folder)+`");
-						
-						DECLARE $seriesData AS List<Struct<
-							series_id: Uint64,
-							title: Text,
-							series_info: Text,
-							release_date: Date,
-							comment: Optional<Text>>>;
+								PRAGMA TablePathPrefix("`+path.Join(nativeDriver.Name(), folder)+`");
+								
+								DECLARE $seriesData AS List<Struct<
+									series_id: Uint64,
+									title: Text,
+									series_info: Text,
+									release_date: Date,
+									comment: Optional<Text>>>;
+				
+								DECLARE $seasonsData AS List<Struct<
+									series_id: Uint64,
+									season_id: Uint64,
+									title: Text,
+									first_aired: Date,
+									last_aired: Date>>;
+				
+								DECLARE $episodesData AS List<Struct<
+									series_id: Uint64,
+									season_id: Uint64,
+									episode_id: Uint64,
+									title: Text,
+									air_date: Date>>;
+								
+								REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
 		
-						DECLARE $seasonsData AS List<Struct<
-							series_id: Uint64,
-							season_id: Uint64,
-							title: Text,
-							first_aired: Date,
-							last_aired: Date>>;
+								REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
 		
-						DECLARE $episodesData AS List<Struct<
-							series_id: Uint64,
-							season_id: Uint64,
-							episode_id: Uint64,
-							title: Text,
-							air_date: Date>>;
-						
-						REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
-
-						REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
-
-						REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
-					`)
+								REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
+							`)
 							if err != nil {
 								return fmt.Errorf("failed to prepare query: %w", err)
 							}
@@ -269,18 +269,18 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 
 				t.Run("query", func(t *testing.T) {
 					query := `
-				PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
-
-				DECLARE $seriesID AS Uint64;
-				DECLARE $seasonID AS Uint64;
-				DECLARE $episodeID AS Uint64;
-
-				SELECT views 
-				FROM episodes 
-				WHERE 
-					series_id = $seriesID AND 
-					season_id = $seasonID AND 
-					episode_id = $episodeID;`
+						PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
+		
+						DECLARE $seriesID AS Uint64;
+						DECLARE $seasonID AS Uint64;
+						DECLARE $episodeID AS Uint64;
+		
+						SELECT views 
+						FROM episodes 
+						WHERE 
+							series_id = $seriesID AND 
+							season_id = $seasonID AND 
+							episode_id = $episodeID;`
 					t.Run("explain", func(t *testing.T) {
 						row := db.QueryRowContext(
 							ydb.WithQueryMode(ctx, ydb.ExplainQueryMode), query,
@@ -322,16 +322,16 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 								}
 								// increment `views`
 								_, err = tx.ExecContext(ctx, `
-								PRAGMA TablePathPrefix("`+path.Join(nativeDriver.Name(), folder)+`");
-				
-								DECLARE $seriesID AS Uint64;
-								DECLARE $seasonID AS Uint64;
-								DECLARE $episodeID AS Uint64;
-								DECLARE $views AS Uint64;
-				
-								UPSERT INTO episodes ( series_id, season_id, episode_id, views )
-								VALUES ( $seriesID, $seasonID, $episodeID, $views );
-							`,
+									PRAGMA TablePathPrefix("`+path.Join(nativeDriver.Name(), folder)+`");
+						
+										DECLARE $seriesID AS Uint64;
+										DECLARE $seasonID AS Uint64;
+										DECLARE $episodeID AS Uint64;
+										DECLARE $views AS Uint64;
+						
+										UPSERT INTO episodes ( series_id, season_id, episode_id, views )
+										VALUES ( $seriesID, $seasonID, $episodeID, $views );
+									`,
 									sql.Named("seriesID", uint64(1)),
 									sql.Named("seasonID", uint64(1)),
 									sql.Named("episodeID", uint64(1)),
@@ -349,18 +349,18 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 						t.Run("isolation", func(t *testing.T) {
 							t.Run("snapshot", func(t *testing.T) {
 								query := `
-							PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
-				
-							DECLARE $seriesID AS Uint64;
-							DECLARE $seasonID AS Uint64;
-							DECLARE $episodeID AS Uint64;
-			
-							SELECT views FROM episodes 
-							WHERE 
-								series_id = $seriesID AND 
-								season_id = $seasonID AND 
-								episode_id = $episodeID;
-						`
+									PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
+						
+									DECLARE $seriesID AS Uint64;
+									DECLARE $seasonID AS Uint64;
+									DECLARE $episodeID AS Uint64;
+					
+									SELECT views FROM episodes 
+									WHERE 
+										series_id = $seriesID AND 
+										season_id = $seasonID AND 
+										episode_id = $episodeID;
+								`
 								err = retry.DoTx(ctx, db,
 									func(ctx context.Context, tx *sql.Tx) error {
 										row := tx.QueryRowContext(ctx, query,
@@ -401,27 +401,27 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 									airDate   *time.Time
 									views     sql.NullFloat64
 									query     = `
-								PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
-					
-								DECLARE $seriesID AS Optional<Uint64>;
-								DECLARE $seasonID AS Optional<Uint64>;
-								DECLARE $episodeID AS Optional<Uint64>;
-				
-								SELECT 
-									series_id,
-									season_id,
-									episode_id,
-									title,
-									air_date,
-									views
-								FROM episodes
-								WHERE 
-									(series_id >= $seriesID OR $seriesID IS NULL) AND
-									(season_id >= $seasonID OR $seasonID IS NULL) AND
-									(episode_id >= $episodeID OR $episodeID IS NULL) 
-								ORDER BY 
-									series_id, season_id, episode_id;
-							`
+										PRAGMA TablePathPrefix("` + path.Join(nativeDriver.Name(), folder) + `");
+							
+										DECLARE $seriesID AS Optional<Uint64>;
+										DECLARE $seasonID AS Optional<Uint64>;
+										DECLARE $episodeID AS Optional<Uint64>;
+						
+										SELECT 
+											series_id,
+											season_id,
+											episode_id,
+											title,
+											air_date,
+											views
+										FROM episodes
+										WHERE 
+											(series_id >= $seriesID OR $seriesID IS NULL) AND
+											(season_id >= $seasonID OR $seasonID IS NULL) AND
+											(episode_id >= $episodeID OR $episodeID IS NULL) 
+										ORDER BY 
+											series_id, season_id, episode_id;
+									`
 								)
 								err := retry.DoTx(ctx, db,
 									func(ctx context.Context, tx *sql.Tx) error {
