@@ -658,4 +658,4 @@ db := sql.OpenDB(connector)
 
 ## Example of usage <a name="example"></a>
 
-[Basic example](https://github.com/ydb-platform/ydb-go-sdk/tree/master/examples/basic/native/query) about series written with `database/sql` driver for `YDB` placed in [examples repository](https://github.com/ydb-platform/ydb-go-sdk/tree/master/examples/database/sql)  
+[Basic example](https://github.com/ydb-platform/ydb-go-sdk/tree/master/examples/basic/native/query) about series written with `database/sql` driver for `YDB` placed in [examples repository](https://github.com/ydb-platform/ydb-go-sdk/tree/master/examples/basic/database/sql)  
