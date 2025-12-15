@@ -1,3 +1,4 @@
+## v3.122.0
 * Added `trace.NodeHintInfo` field for OnPoolGet trace callback which stores info for node hint misses
 * Added `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics for node hint misses
 
