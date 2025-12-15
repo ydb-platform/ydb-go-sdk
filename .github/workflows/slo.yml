@@ -81,7 +81,7 @@ jobs:
             name: native-node-hints
             path: ./native/node_hints
             label: native/node_hints
-            run_extra_args: '-prometheus-endpoint http://172.28.0.2:9090 -batch-size=10'
+            run_extra_args: '-batch-size=10'
             create_extra_args: '-min-partitions-count 10'
 
     concurrency:
@@ -177,7 +177,8 @@ jobs:
             --job-name "${{ matrix.sdk.name }}"
 
       - name: Initialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@21473ae781c9bc8f16b42dedc79489c1867c6e50
+        id: ydb_slo
+        uses: ydb-platform/ydb-slo-action/init@9036ef6c618e0a36c9ef44aef5da767cd3a0db59
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -199,12 +200,12 @@ jobs:
 
       - name: Run SLO Tests (parallel)
         timeout-minutes: 15
+        env:
+          DURATION: ${{ inputs.slo_workload_duration_seconds || 600 }}
+          READ_RPS: ${{ inputs.slo_workload_read_max_rps || 1000 }}
+          WRITE_RPS: ${{ inputs.slo_workload_write_max_rps || 1000 }}
+          RUN_EXTRA_ARGS: ${{ format('{0} -prometheus-endpoint {1}',matrix.sdk.run_extra_args,steps.ydb_slo.outputs.ydb-prometheus-url)}}
         run: |
-          DURATION=${{ inputs.slo_workload_duration_seconds || 600 }}
-          READ_RPS=${{ inputs.slo_workload_read_max_rps || 1000 }}
-          WRITE_RPS=${{ inputs.slo_workload_write_max_rps || 1000 }}
-          RUN_EXTRA_ARGS="${{ matrix.sdk.run_extra_args }}"
-
           ARGS="run grpc://ydb:2136 /Root/testdb \
             -otlp-endpoint prometheus:9090 \
             -report-period 250 \
