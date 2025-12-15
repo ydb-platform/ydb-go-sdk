@@ -1,4 +1,4 @@
-* Moved `internal/decimal` package to `decimal` for public usage
+* Moved `internal/decimal` package to `pkg/decimal` for public usage
 
 ## v3.121.1
 * Added support for `Timestamp64` type in `value.Any` converter
