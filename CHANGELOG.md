@@ -1,3 +1,6 @@
+* Added `trace.NodeHintInfo` field for OnPoolGet trace callback which stores info for node hint misses
+* Added `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics for node hint misses
+
 ## v3.121.1
 * Added support for `Timestamp64` type in `value.Any` converter
 * Masked the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
