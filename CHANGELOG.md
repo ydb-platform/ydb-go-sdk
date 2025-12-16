@@ -1,3 +1,10 @@
+* Added support for YDB type annotations in struct field tags for runtime type validation
+  - Struct tags now support optional type annotations: `sql:"column,type:YDBType"`
+  - Runtime validation ensures database column types match annotations during `ScanStruct()`
+  - Supports all YDB types: primitives, `List<T>`, `Optional<T>`, `Dict<K,V>`, and nested combinations
+  - Type annotations are completely optional and backward compatible
+  - Works with both query client and database/sql APIs
+
 ## v3.123.1
 * Fixed `pool.getItem()` panics, if unable to give session for preferred node ID
 

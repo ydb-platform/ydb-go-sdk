@@ -1005,3 +1005,389 @@ func TestScannerDecimalBigDecimal(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedVal, row.A)
 }
+
+func TestStructWithTypeAnnotation(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+			{
+				Name: "B",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UINT64,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test-value",
+				},
+			},
+			{
+				Value: &Ydb.Value_Uint64Value{
+					Uint64Value: 42,
+				},
+			},
+		},
+	))
+	var row struct {
+		A string `sql:"A,type:Text"`
+		B uint64 `sql:"B,type:Uint64"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, "test-value", row.A)
+	require.Equal(t, uint64(42), row.B)
+}
+
+func TestStructWithListTypeAnnotation(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_ListType{
+						ListType: &Ydb.ListType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Items: []*Ydb.Value{
+					{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "item1",
+						},
+					},
+					{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "item2",
+						},
+					},
+				},
+			},
+		},
+	))
+	var row struct {
+		A []string `sql:"A,type:List<Text>"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, []string{"item1", "item2"}, row.A)
+}
+
+func TestStructWithOptionalTypeAnnotation(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_NestedValue{
+					NestedValue: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "optional-value",
+						},
+					},
+				},
+			},
+		},
+	))
+	var row struct {
+		A *string `sql:"A,type:Optional<Text>"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.NotNil(t, row.A)
+	require.Equal(t, "optional-value", *row.A)
+}
+
+func TestStructWithTypeMismatch(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var row struct {
+		A string `sql:"A,type:Uint64"` // Wrong type annotation
+	}
+	err := scanner.ScanStruct(&row)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "type mismatch")
+}
+
+func TestStructWithInvalidTypeAnnotation(t *testing.T) {
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var row struct {
+		A string `sql:"A,type:InvalidType"`
+	}
+	err := scanner.ScanStruct(&row)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid type annotation")
+}
+
+// Tests for backward compatibility - ensure old behavior works without type annotations
+
+func TestStructWithoutTypeAnnotation(t *testing.T) {
+	// Test that struct without type annotations still works (backward compatibility)
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+			{
+				Name: "B",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UINT64,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test-value",
+				},
+			},
+			{
+				Value: &Ydb.Value_Uint64Value{
+					Uint64Value: 42,
+				},
+			},
+		},
+	))
+	var row struct {
+		A string `sql:"A"` // No type annotation
+		B uint64 `sql:"B"` // No type annotation
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, "test-value", row.A)
+	require.Equal(t, uint64(42), row.B)
+}
+
+func TestStructMixedTypeAnnotations(t *testing.T) {
+	// Test that mixing fields with and without type annotations works
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+			{
+				Name: "B",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UINT64,
+					},
+				},
+			},
+			{
+				Name: "C",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_BOOL,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+			{
+				Value: &Ydb.Value_Uint64Value{
+					Uint64Value: 100,
+				},
+			},
+			{
+				Value: &Ydb.Value_BoolValue{
+					BoolValue: true,
+				},
+			},
+		},
+	))
+	var row struct {
+		A string `sql:"A,type:Text"` // With type annotation
+		B uint64 `sql:"B"`           // Without type annotation
+		C bool   `sql:"C,type:Bool"` // With type annotation
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, "test", row.A)
+	require.Equal(t, uint64(100), row.B)
+	require.Equal(t, true, row.C)
+}
+
+func TestStructListWithoutTypeAnnotation(t *testing.T) {
+	// Test that List type works without type annotation (backward compatibility)
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_ListType{
+						ListType: &Ydb.ListType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Items: []*Ydb.Value{
+					{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "item1",
+						},
+					},
+					{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "item2",
+						},
+					},
+				},
+			},
+		},
+	))
+	var row struct {
+		A []string `sql:"A"` // No type annotation for List
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.Equal(t, []string{"item1", "item2"}, row.A)
+}
+
+func TestStructOptionalWithoutTypeAnnotation(t *testing.T) {
+	// Test that Optional type works without type annotation (backward compatibility)
+	scanner := Struct(NewData(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_OptionalType{
+						OptionalType: &Ydb.OptionalType{
+							Item: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_NestedValue{
+					NestedValue: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "optional-value",
+						},
+					},
+				},
+			},
+		},
+	))
+	var row struct {
+		A *string `sql:"A"` // No type annotation for Optional
+	}
+	err := scanner.ScanStruct(&row)
+	require.NoError(t, err)
+	require.NotNil(t, row.A)
+	require.Equal(t, "optional-value", *row.A)
+}
+
+func TestStructWithDictTypeAnnotation(t *testing.T) {
+	// Test that Dict type annotation with comma in the type is parsed correctly
+	// This validates the fix for parseFieldTag to use findTopLevelComma
+
+	// First verify the tag parsing works for Dict types
+	tag := parseFieldTag("metadata,type:Dict<Text,Uint64>")
+	require.Equal(t, "metadata", tag.columnName)
+	require.Equal(t, "Dict<Text,Uint64>", tag.ydbType)
+
+	// Verify the type can be parsed
+	dictType, err := parseYDBType("Dict<Text,Uint64>")
+	require.NoError(t, err)
+	require.NotNil(t, dictType)
+	require.Equal(t, "Dict<Utf8,Uint64>", dictType.String())
+}
