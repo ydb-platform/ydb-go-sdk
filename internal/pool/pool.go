@@ -770,13 +770,32 @@ func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[
 	return false
 }
 
+func getNodeHintInfo[PT ItemConstraint[T], T any](
+	item PT,
+	preferredNodeID uint32,
+	hasPreferredNodeID bool,
+) *trace.NodeHintInfo {
+	if !hasPreferredNodeID {
+		return nil
+	}
+	res := &trace.NodeHintInfo{
+		PreferredNodeID: preferredNodeID,
+	}
+	if item != nil {
+		res.SessionNodeID = item.NodeID()
+	}
+
+	return res
+}
+
 func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { //nolint:funlen
 	var (
-		start        = p.config.clock.Now()
-		attempt      int
-		lastErr      error
-		nodeHintInfo *trace.NodeHintInfo
+		start   = p.config.clock.Now()
+		attempt int
+		lastErr error
 	)
+
+	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
 	if onGet := p.config.trace.OnGet; onGet != nil {
 		onDone := onGet(&ctx,
@@ -784,12 +803,10 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		)
 		if onDone != nil {
 			defer func() {
-				onDone(item, attempt, nodeHintInfo, finalErr)
+				onDone(item, attempt, getNodeHintInfo(item, preferredNodeID, hasPreferredNodeID), finalErr)
 			}()
 		}
 	}
-
-	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
 	for ; attempt < maxAttempts; attempt++ {
 		select {
@@ -812,12 +829,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			}
 
 			idle := p.removeFirstIdle()
-			if hasPreferredNodeID {
-				nodeHintInfo = &trace.NodeHintInfo{
-					PreferredNodeID: preferredNodeID,
-					SessionNodeID:   idle.NodeID(),
-				}
-			}
 
 			return idle
 		}); item != nil {

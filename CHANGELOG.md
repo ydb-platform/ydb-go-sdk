@@ -1,3 +1,5 @@
+* Fixed `pool.getItem()` panics, if unable to give session for preferred node ID
+
 ## v3.123.0
 * Moved `internal/decimal` package to `pkg/decimal` for public usage
 
