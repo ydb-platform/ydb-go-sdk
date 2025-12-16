@@ -275,12 +275,13 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 					delete(p.index, newItem)
 				})
 
+				closeCtx := createCtx
 				if t := p.config.closeTimeout; t > 0 {
 					var cancel context.CancelFunc
-					createCtx, cancel = context.WithTimeout(createCtx, t)
+					closeCtx, cancel = context.WithTimeout(closeCtx, t)
 					defer cancel()
 				}
-				p.config.closeItemFunc(createCtx, newItem)
+				p.config.closeItemFunc(closeCtx, newItem)
 			}
 		}()
 
