@@ -141,43 +141,22 @@ jobs:
 
       - name: Build workload images
         run: |
-          # Build current version
-          if [ -f "$GITHUB_WORKSPACE/current/tests/slo/Dockerfile" ]; then
-            echo "Building current app image..."
-            cd "$GITHUB_WORKSPACE/current"
-            CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
-            docker build -t ydb-app-current \
-              --build-arg SRC_PATH=${{ matrix.sdk.label }} \
-              --build-arg JOB_NAME=${{ matrix.sdk.name }} \
-              --build-arg REF="${CURRENT_REF}" \
-              -f tests/slo/Dockerfile .
-          else
-            echo "No current app Dockerfile found"
-            exit 1
-          fi
+          SCRIPT="$GITHUB_WORKSPACE/current/.github/scripts/build-slo-image.sh"
+          CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
 
-          # Build baseline version
-          if [ -f "$GITHUB_WORKSPACE/baseline/tests/slo/Dockerfile" ]; then
-            echo "Building baseline app image..."
-            cd "$GITHUB_WORKSPACE/baseline"
+          bash "$SCRIPT" \
+            --context "$GITHUB_WORKSPACE/current" \
+            --tag "ydb-app-current" \
+            --ref "${CURRENT_REF}" \
+            --src-path "${{ matrix.sdk.label }}" \
+            --job-name "${{ matrix.sdk.name }}"
 
-            # Copy current versions of build infrastructure to baseline
-            echo "Copying current Dockerfile, go.mod, go.sum, and internal to baseline..."
-            cp "$GITHUB_WORKSPACE/current/tests/slo/Dockerfile" "$GITHUB_WORKSPACE/baseline/tests/slo/Dockerfile"
-            cp "$GITHUB_WORKSPACE/current/tests/slo/go.mod" "$GITHUB_WORKSPACE/baseline/tests/slo/go.mod"
-            cp "$GITHUB_WORKSPACE/current/tests/slo/go.sum" "$GITHUB_WORKSPACE/baseline/tests/slo/go.sum"
-            rm -rf "$GITHUB_WORKSPACE/baseline/tests/slo/internal"
-            cp -r "$GITHUB_WORKSPACE/current/tests/slo/internal" "$GITHUB_WORKSPACE/baseline/tests/slo/internal"
-
-            docker build -t ydb-app-baseline \
-              --build-arg SRC_PATH=${{ matrix.sdk.label }} \
-              --build-arg JOB_NAME=${{ matrix.sdk.name }} \
-              --build-arg REF="${{ steps.baseline.outputs.ref }}" \
-              -f tests/slo/Dockerfile .
-          else
-            echo "No baseline app Dockerfile found"
-            exit 1
-          fi
+          bash "$SCRIPT" \
+            --context "$GITHUB_WORKSPACE/baseline" \
+            --tag "ydb-app-baseline" \
+            --ref "${{ steps.baseline.outputs.ref }}" \
+            --src-path "${{ matrix.sdk.label }}" \
+            --job-name "${{ matrix.sdk.name }}"
 
       - name: Initialize YDB SLO
         uses: ydb-platform/ydb-slo-action/init@main
