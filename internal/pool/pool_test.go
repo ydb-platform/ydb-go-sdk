@@ -290,6 +290,12 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.EqualValues(t, 100, preferredID)
 			require.EqualValues(t, item.NodeID(), sessionID)
 			require.EqualValues(t, 3, newItemCalled)
+			_, _ = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			_, _ = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			// should not panic
+			_, _ = p.getItem(endpoint.WithNodeID(ctx, 32))
 		})
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
 			var newItemCalled uint32
