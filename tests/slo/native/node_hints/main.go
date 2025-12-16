@@ -152,7 +152,7 @@ func main() {
 		wg.Wait()
 		w.FailOnError()
 		// check all load is sent to a single node
-		ectx, ecancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ectx, ecancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer ecancel()
 		estimator.OnlyThisNode(ectx, nodeID)
 

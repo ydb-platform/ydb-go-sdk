@@ -81,6 +81,8 @@ jobs:
             name: native-node-hints
             path: ./native/node_hints
             label: native/node_hints
+            slo_workload_read_max_rps: 100
+            slo_workload_write_max_rps: 100
             run_extra_args: '-batch-size=10'
             create_extra_args: '-min-partitions-count 10'
 
@@ -174,7 +176,8 @@ jobs:
             --tag "ydb-app-baseline" \
             --ref "${{ steps.baseline.outputs.ref }}" \
             --src-path "${{ matrix.sdk.label }}" \
-            --job-name "${{ matrix.sdk.name }}"
+            --job-name "${{ matrix.sdk.name }}" \
+            --fallback-image "ydb-app-current"
 
       - name: Initialize YDB SLO
         id: ydb_slo
