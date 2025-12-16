@@ -5,6 +5,36 @@
   - Type annotations are completely optional and backward compatible
   - Works with both query client and database/sql APIs
 
+## v3.123.1
+* Fixed `pool.getItem()` panics, if unable to give session for preferred node ID
+
+## v3.123.0
+* Moved `internal/decimal` package to `pkg/decimal` for public usage
+
+## v3.122.0
+* Added `trace.NodeHintInfo` field for OnPoolGet trace callback which stores info for node hint misses
+* Added `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics for node hint misses
+
+## v3.121.1
+* Added support for `Timestamp64` type in `value.Any` converter
+* Masked the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
+* Fixed issue with topic offsets update in transactions
+
+## v3.121.0
+* Changed internal pprof label to pyroscope supported format
+* Added `query.ImplicitTxControl()` transaction control (the same as `query.NoTx()` and `query.EmptyTxControl()`). See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
+* Added `SnapshotReadWrite` isolation mode support to `database/sql` driver using `sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: false}`
+* Moved `internal/ratelimiter/options` to `ratelimiter/options` for public usage
+
+## v3.120.0
+* Added support of `SnapshotReadWrite` isolation mode into query and table clients
+
+## v3.119.0
+* Made error "Request exceeded a limit on the number of schema operations, try again later" retryable
+* Fixed deadlock in `Endpoint.String()` method
+* Added the `AvailabilityPeriod` to the Consumer type in topics
+
+## v3.118.3
 * Fixed `context` checking in `ydb.Open`
 
 ## v3.118.2

@@ -1,0 +1,16 @@
+name: Check SLO Label
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  check-slo-label:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if SLO label is missing
+        if: "!contains(github.event.pull_request.labels.*.name, 'SLO')"
+        run: |
+          echo "PR must have the \"SLO\" label to proceed."
+          exit 1

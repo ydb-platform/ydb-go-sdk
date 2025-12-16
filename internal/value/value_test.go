@@ -1926,9 +1926,10 @@ func TestDecimalValue(t *testing.T) {
 		decBytes := [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 		v := DecimalValue(decBytes, 22, 9)
 		require.NotNil(t, v)
-		require.Equal(t, decBytes, v.Value())
-		require.Equal(t, uint32(22), v.Precision())
-		require.Equal(t, uint32(9), v.Scale())
+		bytes, precision, scale := v.Decimal()
+		require.Equal(t, decBytes, bytes)
+		require.Equal(t, uint32(22), precision)
+		require.Equal(t, uint32(9), scale)
 	})
 
 	t.Run("FromString", func(t *testing.T) {

@@ -15,9 +15,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
@@ -581,29 +581,15 @@ func Datetime64ValueFromTime(t time.Time) datetime64Value {
 	return datetime64Value(t.Unix())
 }
 
-var _ DecimalValuer = (*decimalValue)(nil)
+var _ decimal.Interface = (*decimalValue)(nil)
 
 type decimalValue struct {
 	value     [16]byte
 	innerType *types.Decimal
 }
 
-func (v *decimalValue) Value() [16]byte {
-	return v.value
-}
-
-func (v *decimalValue) Precision() uint32 {
-	return v.innerType.Precision()
-}
-
-func (v *decimalValue) Scale() uint32 {
-	return v.innerType.Scale()
-}
-
-type DecimalValuer interface {
-	Value() [16]byte
-	Precision() uint32
-	Scale() uint32
+func (v *decimalValue) Decimal() (bytes [16]byte, precision uint32, scale uint32) {
+	return v.value, v.innerType.Precision(), v.innerType.Scale()
 }
 
 func (v *decimalValue) castTo(dst any) error {
@@ -613,8 +599,7 @@ func (v *decimalValue) castTo(dst any) error {
 
 		return nil
 	case *decimal.Decimal:
-		decVal := decimal.Decimal{Bytes: v.value, Precision: v.Precision(), Scale: v.Scale()}
-		*dstValue = decVal
+		*dstValue = *decimal.ToDecimal(v)
 
 		return nil
 	default:
@@ -631,7 +616,7 @@ func (v *decimalValue) Yql() string {
 	buffer.WriteString(v.innerType.Name())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
-	s := decimal.FromBytes(v.value[:], v.innerType.Precision(), v.innerType.Scale()).String()
+	s := decimal.FromBytes(v.value[:], v.innerType.Precision()).String()
 	if len(s) < int(v.innerType.Scale()) {
 		s = strings.Repeat("0", int(v.innerType.Scale())-len(s)) + s
 	}
@@ -665,7 +650,7 @@ func (v *decimalValue) toYDB() *Ydb.Value {
 }
 
 func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) *decimalValue {
-	b := decimal.BigIntToByte(v, precision, scale)
+	b := decimal.BigIntToByte(v, precision)
 
 	return DecimalValue(b, precision, scale)
 }

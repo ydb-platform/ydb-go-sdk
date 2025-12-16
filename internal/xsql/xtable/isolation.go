@@ -24,6 +24,8 @@ func toYDB(opts driver.TxOptions) (tx.SettingsOption, error) {
 		if opts.ReadOnly {
 			return tx.WithSnapshotReadOnly(), nil
 		}
+
+		return tx.WithSnapshotReadWrite(), nil
 	}
 
 	return nil, xerrors.WithStackTrace(fmt.Errorf(
