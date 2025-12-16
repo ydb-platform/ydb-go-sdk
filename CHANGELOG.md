@@ -1,3 +1,4 @@
+## v3.123.1
 * Fixed `pool.getItem()` panics, if unable to give session for preferred node ID
 
 ## v3.123.0
