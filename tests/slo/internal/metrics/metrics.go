@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -25,10 +24,11 @@ const (
 
 type (
 	Metrics struct {
-		mp     *sdkmetric.MeterProvider
-		meter  otelmetric.Meter
-		ctx    context.Context //nolint:containedctx
-		cancel context.CancelFunc
+		mp             *sdkmetric.MeterProvider
+		meter          otelmetric.Meter
+		ctx            context.Context //nolint:containedctx
+		cancel         context.CancelFunc
+		ExportInterval time.Duration
 
 		// Labels for metrics
 		ref   string
@@ -46,11 +46,7 @@ type (
 		retriesSuccessTotal     otelmetric.Int64Counter
 		retriesFailureTotal     otelmetric.Int64Counter
 		pendingOperations       otelmetric.Int64UpDownCounter
-
-		// Local counters for fail-on-error logic
-		errorsCount   atomic.Int64
-		timeoutsCount atomic.Int64
-		opsCount      atomic.Int64
+		nodeHintMissesPresent   otelmetric.Int64Counter
 	}
 )
 
@@ -99,7 +95,7 @@ func New(endpoint, ref, label, jobName string, reportPeriodMs int) (*Metrics, er
 	if exportInterval == 0 {
 		exportInterval = 250 * time.Millisecond // Default 250ms
 	}
-
+	m.ExportInterval = exportInterval
 	m.mp = sdkmetric.NewMeterProvider(
 		sdkmetric.WithResource(res),
 		sdkmetric.WithReader(
@@ -206,6 +202,13 @@ func New(endpoint, ref, label, jobName string, reportPeriodMs int) (*Metrics, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pendingOperations counter: %w", err)
 	}
+	m.nodeHintMissesPresent, err = m.meter.Int64Counter(
+		"workload.node_hints.misses",
+		otelmetric.WithDescription("Exclusively for node_hints SLO workload: Signals GRPC requests to wrong node"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nodeHintMissesPresent counter: %w", err)
+	}
 
 	return m, nil
 }
@@ -220,11 +223,6 @@ func (m *Metrics) Push() error {
 }
 
 func (m *Metrics) Reset() error {
-	// Reset local counters for fail-on-error logic
-	m.errorsCount.Store(0)
-	m.timeoutsCount.Store(0)
-	m.opsCount.Store(0)
-
 	// Note: OTel counters/gauges are cumulative and cannot be reset
 	// This is just for local state
 	return m.Push()
@@ -264,6 +262,12 @@ func (m *Metrics) Start(name SpanName) Span {
 	return j
 }
 
+func (m *Metrics) ReportNodeHintMisses() {
+	if m.meter != nil {
+		m.nodeHintMissesPresent.Add(m.ctx, 1)
+	}
+}
+
 func (j Span) Finish(err error, attempts int) {
 	if j.m.meter == nil {
 		return
@@ -283,18 +287,13 @@ func (j Span) Finish(err error, attempts int) {
 	j.m.operationsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
 	j.m.retryAttemptsTotal.Add(j.m.ctx, int64(attempts), otelmetric.WithAttributes(attrs...))
 
-	// Local counters for fail-on-error
-	j.m.opsCount.Add(1)
-
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			j.m.timeoutsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
-			j.m.timeoutsCount.Add(1)
 		}
 		j.m.errorsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(
 			j.m.commonAttrs(attribute.String("error_type", err.Error()))...,
 		))
-		j.m.errorsCount.Add(1)
 
 		j.m.retriesFailureTotal.Add(j.m.ctx, int64(attempts), otelmetric.WithAttributes(attrs...))
 		j.m.operationsFailureTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
@@ -313,34 +312,5 @@ func (j Span) Finish(err error, attempts int) {
 				attribute.String("operation_status", OperationStatusSuccess),
 			)...,
 		))
-	}
-}
-
-func (m *Metrics) OperationsTotal() float64 {
-	return float64(m.opsCount.Load())
-}
-
-func (m *Metrics) ErrorsTotal() float64 {
-	return float64(m.errorsCount.Load())
-}
-
-func (m *Metrics) TimeoutsTotal() float64 {
-	return float64(m.timeoutsCount.Load())
-}
-
-func (m *Metrics) FailOnError() {
-	if m.ErrorsTotal()*20 > m.OperationsTotal() { // 95%
-		log.Panicf(
-			"unretriable (or not successfully retried) errors: %.0f errors out of %.0f operations",
-			m.ErrorsTotal(),
-			m.OperationsTotal(),
-		)
-	}
-	if m.TimeoutsTotal()*20 > m.OperationsTotal() {
-		log.Panicf(
-			"user timeouts: %.0f timeouts out of %.0f operations",
-			m.TimeoutsTotal(),
-			m.OperationsTotal(),
-		)
 	}
 }

@@ -21,6 +21,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_run_id: ${{ github.event.workflow_run.id }}
+          thresholds_yaml_path: "${{ github.workspace }}/current/.github/resources/slo-report-thresholds.yaml"
   remove-slo-label:
     needs: test-ydb-slo-action
     if: always() && github.event.workflow_run.event == 'pull_request'

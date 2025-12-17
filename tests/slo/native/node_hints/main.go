@@ -144,18 +144,15 @@ func main() {
 			go w.Write(ctx, &wg, writeRL, gen)
 		}
 		log.Println("started " + strconv.Itoa(cfg.WriteRPS) + " write workers")
-
-		metricsRL := rate.NewLimiter(rate.Every(time.Duration(cfg.ReportPeriod)*time.Millisecond), 1)
-		wg.Add(1)
-		go w.Metrics(ctx, &wg, metricsRL)
-
 		wg.Wait()
-		w.FailOnError()
 		// check all load is sent to a single node
 		ectx, ecancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer ecancel()
-		estimator.OnlyThisNode(ectx, nodeID)
-
+		err = estimator.OnlyThisNode(ectx, nodeID)
+		if err != nil {
+			w.ReportNodeHintMisses()
+			time.Sleep(w.ExportInterval())
+		}
 	default:
 		panic(fmt.Errorf("unknown mode: %v", cfg.Mode))
 	}

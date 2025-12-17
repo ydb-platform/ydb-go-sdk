@@ -133,14 +133,15 @@ func (e *Estimator) ClusterRWCounter(ctx context.Context) float64 {
 	return e.ClusterGrpcAPICounter(ctx, "ReadRows") + e.ClusterGrpcAPICounter(ctx, "BulkUpsert")
 }
 
-func (e *Estimator) OnlyThisNode(ctx context.Context, nodeID uint32) {
+func (e *Estimator) OnlyThisNode(ctx context.Context, nodeID uint32) error {
 	clusterNow := e.ClusterRWCounter(ctx)
 	nodeNow := e.NodeRWCounter(ctx, nodeID)
 	if clusterNow-e.ClusterCounter > nodeNow-e.NodeRequests[nodeID] {
-		log.Panicf("requests were served by other nodes: cluster %f -> %f, node %d %f -> %f",
+		return fmt.Errorf("requests were served by other nodes: cluster %f -> %f, node %d %f -> %f",
 			e.ClusterCounter, clusterNow,
 			nodeID,
 			e.NodeRequests[nodeID], nodeNow,
 		)
 	}
+	return nil
 }

@@ -1,0 +1,71 @@
+# Default SLO thresholds configuration
+# Users can override/extend by providing custom thresholds via:
+#   - thresholds_yaml input (inline YAML)
+#   - thresholds_yaml_path input (file path, default: .slo/thresholds.yaml)
+#
+# Example custom config:
+#   metrics:
+#     - name: read_latency_ms              # Override specific metric
+#       warning_change_percent: 10.0
+#     - pattern: critical_*                # Add new pattern
+#       critical_change_percent: 25.0
+
+# Global threshold for considering change as "neutral" (stable)
+neutral_change_percent: 5.0
+
+# Default thresholds applied to all metrics unless overridden
+default:
+  # Regression/improvement percentage thresholds
+  warning_change_percent: 20.0 # > 20% change triggers warning
+  critical_change_percent: 50.0 # > 50% change triggers failure
+
+# Metric-specific thresholds
+# Patterns support wildcards: *_availability, read_*, etc.
+metrics:
+  # Availability metrics (should stay high)
+  - pattern: "*_availability"
+    direction: higher_is_better
+    warning_min: 99.0 # < 99% triggers warning
+    critical_min: 95.0 # < 95% triggers failure
+    warning_change_percent: 1.0 # > 1% drop is significant
+
+  # Latency metrics (should stay low)
+  - pattern: "*_latency_*"
+    direction: lower_is_better
+    warning_change_percent: 30.0 # > 30% increase triggers warning
+    critical_change_percent: 100.0 # > 100% (2x) triggers failure
+
+  - pattern: "*_duration_*"
+    direction: lower_is_better
+    warning_change_percent: 30.0
+    critical_change_percent: 100.0
+
+  # Throughput metrics (should stay stable or increase)
+  - pattern: "*_throughput"
+    direction: higher_is_better
+    warning_change_percent: 25.0 # > 25% drop triggers warning
+    critical_change_percent: 50.0 # > 50% drop triggers failure
+
+  - pattern: "*_qps"
+    direction: higher_is_better
+    warning_change_percent: 25.0
+    critical_change_percent: 50.0
+
+  - pattern: "*_rps"
+    direction: higher_is_better
+    warning_change_percent: 25.0
+    critical_change_percent: 50.0
+
+  # Error/failure metrics (should stay at zero)
+  - pattern: "*_error*"
+    direction: lower_is_better
+    warning_max: 0.1 # Any errors trigger warning
+    critical_max: 1.0 # > 1% error rate triggers failure
+
+  - pattern: "*_failure*"
+    direction: lower_is_better
+    warning_max: 0.1
+    critical_max: 1.0
+  - pattern: "*_node_hints.misses*"
+    direction: lower_is_better
+    critical_max: 0 # more than zero and node_hints workload fails
