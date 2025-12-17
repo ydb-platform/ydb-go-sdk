@@ -275,6 +275,10 @@ jobs:
           docker logs -n 15 ydb-app-baseline 2>&1 || echo "No baseline container"
           echo ""
 
+          if [ "$CURRENT_EXIT" -ne 0 ]; then
+            echo "ERROR: current workload exited with code $CURRENT_EXIT"
+            exit 1
+          fi
           echo "SUCCESS: Workloads completed successfully"
 
       - if: always()
