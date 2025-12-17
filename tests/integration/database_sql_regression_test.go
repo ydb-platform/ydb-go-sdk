@@ -462,7 +462,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
 		row := db.QueryRow(`
-			DECLARE $val AS Text;
+			DECLARE $val AS Utf8;
 			SELECT CAST($val AS UUID)`,
 			sql.Named("val", idString),
 		)
