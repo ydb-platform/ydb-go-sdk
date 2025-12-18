@@ -1,7 +1,9 @@
 package xtable
 
 import (
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
 type valuer struct {
@@ -15,5 +17,14 @@ func (v *valuer) UnmarshalYDB(raw scanner.RawValue) error {
 }
 
 func (v *valuer) Value() interface{} {
-	return v.v
+	// convert types to one of safe database sql types:
+	// https://pkg.go.dev/database/sql/driver@go1.25.5#Value
+	switch val := v.v.(type) {
+	case uuid.UUID:
+		return val.String()
+	case value.UUIDIssue1501FixedBytesWrapper:
+		return val.PublicRevertReorderForIssue1501().String()
+	default:
+		return val
+	}
 }

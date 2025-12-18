@@ -451,7 +451,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		require.Equal(t, id.String(), res.String())
 	})
-	t.Run("issue-1515-scan-uuid-with-sql-scanner", func(t *testing.T) {
+	t.Run("good-receive-as-uuid", func(t *testing.T) {
 		// Regression test for https://github.com/ydb-platform/ydb-go-sdk/issues/1515
 		// Before fix: scanning UUID into uuid.UUID (which implements sql.Scanner) would fail
 		// After fix: should work correctly
@@ -473,6 +473,29 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		err := row.Scan(&res)
 		require.NoError(t, err)
 		require.Equal(t, strings.ToLower(idString), res.String())
+	})
+	t.Run("good-receive-uuid-as-string", func(t *testing.T) {
+		// Regression test for https://github.com/ydb-platform/ydb-go-sdk/issues/1515
+		// Before fix: scanning UUID into string would fail
+		// After fix: should work correctly
+		var (
+			scope = newScope(t)
+			db    = scope.SQLDriver()
+		)
+
+		idString := "6E73B41C-4EDE-4D08-9CFB-B7462D9E498B"
+		row := db.QueryRow(`
+			DECLARE $val AS Utf8;
+			SELECT CAST($val AS UUID)`,
+			sql.Named("val", idString),
+		)
+
+		require.NoError(t, row.Err())
+
+		var res string
+		err := row.Scan(&res)
+		require.NoError(t, err)
+		require.Equal(t, strings.ToLower(idString), res)
 	})
 }
 

@@ -415,7 +415,7 @@ func (s *valueScanner) any() interface{} {
 		return s.bytes()
 	case internalTypes.UUID:
 		// return proper uuid.UUID type that can be used with sql.Scanner
-		return s.uuid()
+		return s.uuidBytesWithIssue1501()
 	case internalTypes.Uint32:
 		return s.uint32()
 	case internalTypes.Date:
