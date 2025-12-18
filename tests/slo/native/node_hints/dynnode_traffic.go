@@ -143,5 +143,6 @@ func (e *Estimator) OnlyThisNode(ctx context.Context, nodeID uint32) error {
 			e.NodeRequests[nodeID], nodeNow,
 		)
 	}
+
 	return nil
 }

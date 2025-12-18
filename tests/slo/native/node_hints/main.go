@@ -114,6 +114,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("create workers failed: %w", err))
 		}
+		w.ReportNodeHintMisses(1)
 		ns := s.nodeSelector.Load()
 		idx, nodeID := ns.GetRandomNodeID(gen)
 		log.Println("all requests to node id: ", nodeID)
@@ -150,7 +151,7 @@ func main() {
 		defer ecancel()
 		err = estimator.OnlyThisNode(ectx, nodeID)
 		if err != nil {
-			w.ReportNodeHintMisses()
+			w.ReportNodeHintMisses(-1)
 			time.Sleep(w.ExportInterval())
 		}
 	default:

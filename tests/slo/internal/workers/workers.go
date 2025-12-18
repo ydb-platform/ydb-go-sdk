@@ -58,9 +58,9 @@ func NewWithBatch(cfg *config.Config, s BatchReadWriter, ref, label, jobName str
 	}, nil
 }
 
-func (w *Workers) ReportNodeHintMisses() {
+func (w *Workers) ReportNodeHintMisses(val int64) {
 	if w.m != nil {
-		w.m.ReportNodeHintMisses()
+		w.m.ReportNodeHintMisses(val)
 	}
 }
 

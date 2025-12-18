@@ -66,6 +66,6 @@ metrics:
     direction: lower_is_better
     warning_max: 0.1
     critical_max: 1.0
-  - pattern: "*_node_hints.misses*"
+  - pattern: "*_node_hints_misses_total*"
     direction: lower_is_better
     critical_max: 0 # more than zero and node_hints workload fails

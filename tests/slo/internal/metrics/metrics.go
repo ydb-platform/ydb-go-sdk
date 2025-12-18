@@ -46,7 +46,7 @@ type (
 		retriesSuccessTotal     otelmetric.Int64Counter
 		retriesFailureTotal     otelmetric.Int64Counter
 		pendingOperations       otelmetric.Int64UpDownCounter
-		nodeHintMissesPresent   otelmetric.Int64Counter
+		nodeHintMissesPresent   otelmetric.Int64UpDownCounter
 	}
 )
 
@@ -202,7 +202,7 @@ func New(endpoint, ref, label, jobName string, reportPeriodMs int) (*Metrics, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pendingOperations counter: %w", err)
 	}
-	m.nodeHintMissesPresent, err = m.meter.Int64Counter(
+	m.nodeHintMissesPresent, err = m.meter.Int64UpDownCounter(
 		"workload.node_hints.misses",
 		otelmetric.WithDescription("Exclusively for node_hints SLO workload: Signals GRPC requests to wrong node"),
 	)
@@ -262,9 +262,9 @@ func (m *Metrics) Start(name SpanName) Span {
 	return j
 }
 
-func (m *Metrics) ReportNodeHintMisses() {
+func (m *Metrics) ReportNodeHintMisses(val int64) {
 	if m.meter != nil {
-		m.nodeHintMissesPresent.Add(m.ctx, 1)
+		m.nodeHintMissesPresent.Add(m.ctx, val)
 	}
 }
 
