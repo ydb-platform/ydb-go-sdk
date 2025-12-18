@@ -21,7 +21,7 @@ import (
 var (
 	ref     string
 	label   string
-	jobName = "slo_native_bulk_upsert"
+	jobName = "slo_native_node_hints"
 )
 
 func main() {
@@ -129,7 +129,7 @@ func main() {
 		}()
 
 		// collect metrics
-		estimator := NewEstimator(ctx, s)
+		//estimator := NewEstimator(ctx, s)
 		// run workers
 		wg := sync.WaitGroup{}
 		readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
@@ -147,13 +147,13 @@ func main() {
 		log.Println("started " + strconv.Itoa(cfg.WriteRPS) + " write workers")
 		wg.Wait()
 		// check all load is sent to a single node
-		ectx, ecancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer ecancel()
-		err = estimator.OnlyThisNode(ectx, nodeID)
-		if err != nil {
-			w.ReportNodeHintMisses(-1)
-			time.Sleep(w.ExportInterval())
-		}
+		//ectx, ecancel := context.WithTimeout(context.Background(), 10*time.Second)
+		//defer ecancel()
+		//err = estimator.OnlyThisNode(ectx, nodeID)
+		//if err == nil {
+		//	w.ReportNodeHintMisses(-1)
+		//	time.Sleep(w.ExportInterval())
+		//}
 	default:
 		panic(fmt.Errorf("unknown mode: %v", cfg.Mode))
 	}
