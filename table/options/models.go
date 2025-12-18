@@ -10,19 +10,38 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	tableTypes "github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type Column struct {
-	Name   string
-	Type   types.Type
-	Family string
+	Name         string
+	Type         types.Type
+	Family       string
+	NotNull      bool
+	DefaultValue tableTypes.DefaultValue
 }
 
 func (c Column) toYDB() *Ydb_Table.ColumnMeta {
-	return &Ydb_Table.ColumnMeta{
-		Name:   c.Name,
-		Type:   types.TypeToYDB(c.Type),
-		Family: c.Family,
+	meta := &Ydb_Table.ColumnMeta{
+		Name:    c.Name,
+		Type:    types.TypeToYDB(c.Type),
+		Family:  c.Family,
+		NotNull: &c.NotNull,
+	}
+	setDefaultValue(meta, c.DefaultValue)
+	return meta
+}
+
+func setDefaultValue(meta *Ydb_Table.ColumnMeta, defaultValue tableTypes.DefaultValue) {
+	if meta == nil || defaultValue == nil {
+		return
+	}
+
+	switch v := defaultValue.(type) {
+	case tableTypes.DefaultLiteralValue:
+		meta.DefaultValue = v.ToYDB()
+	case tableTypes.DefaultSequenceValue:
+		meta.DefaultValue = v.ToYDB()
 	}
 }
 

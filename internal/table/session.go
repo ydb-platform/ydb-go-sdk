@@ -38,6 +38,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	tableTypes "github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -620,9 +621,11 @@ func processColumns(columns []*Ydb_Table.ColumnMeta) []options.Column {
 	cs := make([]options.Column, len(columns))
 	for i, c := range columns {
 		cs[i] = options.Column{
-			Name:   c.GetName(),
-			Type:   types.TypeFromYDB(c.GetType()),
-			Family: c.GetFamily(),
+			Name:         c.GetName(),
+			Type:         types.TypeFromYDB(c.GetType()),
+			Family:       c.GetFamily(),
+			NotNull:      *c.NotNull,
+			DefaultValue: tableTypes.FromYDB(c),
 		}
 	}
 
