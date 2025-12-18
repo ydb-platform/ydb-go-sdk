@@ -29,6 +29,7 @@ func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 		NotNull: &c.NotNull,
 	}
 	setDefaultValue(meta, c.DefaultValue)
+
 	return meta
 }
 
