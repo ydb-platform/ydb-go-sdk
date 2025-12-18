@@ -20,7 +20,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -236,12 +235,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		var res [16]byte
 
 		err := row.Scan(&res)
-		switch driverEngine(db) {
-		case xsql.TABLE:
-			require.Error(t, err)
-		case xsql.QUERY:
-			require.NoError(t, err)
-		}
+		require.Error(t, err)
 	})
 	t.Run("old-receive-to-bytes-with-force-wrapper", func(t *testing.T) {
 		// test old behavior - for test way of safe work with data, written with bagged API version
@@ -263,14 +257,9 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		var res types.UUIDBytesWithIssue1501Type
 
 		err := row.Scan(&res)
-		switch driverEngine(db) {
-		case xsql.TABLE:
-			require.NoError(t, err)
-			resUUID := uuid.UUID(res.AsBytesArray())
-			require.Equal(t, expectedResultWithBug, resUUID.String())
-		case xsql.QUERY:
-			require.Error(t, err)
-		}
+		require.NoError(t, err)
+		resUUID := uuid.UUID(res.AsBytesArray())
+		require.Equal(t, expectedResultWithBug, resUUID.String())
 	})
 
 	t.Run("old-send-receive", func(t *testing.T) {
@@ -310,14 +299,9 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		var resBytes types.UUIDBytesWithIssue1501Type
 		err := row.Scan(&resBytes)
-		switch driverEngine(db) {
-		case xsql.TABLE:
-			require.NoError(t, err)
-			resUUID := uuid.UUID(resBytes.AsBytesArray())
-			require.Equal(t, id, resUUID)
-		case xsql.QUERY:
-			require.Error(t, err)
-		}
+		require.NoError(t, err)
+		resUUID := uuid.UUID(resBytes.AsBytesArray())
+		require.Equal(t, id, resUUID)
 	})
 	t.Run("old-send-uuid-receive-error-bad-request", func(t *testing.T) {
 		var (
@@ -377,15 +361,10 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 		var resFromDB types.UUIDBytesWithIssue1501Type
 
 		err := row.Scan(&resFromDB)
-		switch driverEngine(db) {
-		case xsql.TABLE:
-			require.NoError(t, err)
-			resUUID := resFromDB.PublicRevertReorderForIssue1501()
-			resString := strings.ToUpper(resUUID.String())
-			require.Equal(t, idString, resString)
-		case xsql.QUERY:
-			require.Error(t, err)
-		}
+		require.NoError(t, err)
+		resUUID := resFromDB.PublicRevertReorderForIssue1501()
+		resString := strings.ToUpper(resUUID.String())
+		require.Equal(t, idString, resString)
 	})
 	t.Run("good-send-receive", func(t *testing.T) {
 		var (

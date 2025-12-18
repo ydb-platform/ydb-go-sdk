@@ -1,10 +1,8 @@
 package xtable
 
 import (
-	"github.com/google/uuid"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
 
 type valuer struct {
@@ -18,14 +16,5 @@ func (v *valuer) UnmarshalYDB(raw scanner.RawValue) error {
 }
 
 func (v *valuer) Value() interface{} {
-	// convert types to one of safe database sql types for scan it by scanners
-	// https://pkg.go.dev/database/sql@go1.25.5#Scanner
-	switch val := v.v.(type) {
-	case uuid.UUID:
-		return val.String()
-	case value.UUIDIssue1501FixedBytesWrapper:
-		return val.PublicRevertReorderForIssue1501().String()
-	default:
-		return val
-	}
+	return common.ToDatabaseSQLValue(v.v)
 }
