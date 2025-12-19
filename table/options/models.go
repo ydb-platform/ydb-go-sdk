@@ -28,7 +28,9 @@ func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 		Family:  c.Family,
 		NotNull: &c.NotNull,
 	}
-	c.DefaultValue.ToYDB(meta)
+	if c.DefaultValue != nil {
+		c.DefaultValue.ToYDB(meta)
+	}
 
 	return meta
 }
