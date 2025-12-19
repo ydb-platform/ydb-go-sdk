@@ -72,6 +72,7 @@ func (d *DefaultValue) Literal() value.Value {
 	if ok {
 		return literal
 	}
+
 	return nil
 }
 
@@ -80,6 +81,7 @@ func (d *DefaultValue) Sequence() *DefaultSequenceValue {
 	if ok {
 		return &seq
 	}
+
 	return nil
 }
 
