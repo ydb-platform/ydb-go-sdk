@@ -1,3 +1,4 @@
+## v3.124.0
 * Fixed UUID scanning with `database/sql` when using types implementing `sql.Scanner` interface (like `uuid.UUID`)
 
 ## v3.123.1
