@@ -1,3 +1,5 @@
+* Fixed UUID scanning with `database/sql` when using types implementing `sql.Scanner` interface (like `uuid.UUID`)
+
 ## v3.123.1
 * Fixed `pool.getItem()` panics, if unable to give session for preferred node ID
 
