@@ -62,6 +62,10 @@ func GetDefaultFromYDB(column *Ydb_Table.ColumnMeta) *DefaultValue {
 		underlyingValue = seq
 	}
 
+	if underlyingValue == nil {
+		return nil
+	}
+
 	return &DefaultValue{
 		underlyingValue: underlyingValue,
 	}
