@@ -7,7 +7,9 @@ import (
 )
 
 type (
-	DefaultValue any
+	DefaultValue struct {
+		underlyingValue any
+	}
 
 	DefaultLiteralValue struct {
 		value.Value
@@ -30,57 +32,78 @@ type (
 	}
 )
 
-func FromYDB(column *Ydb_Table.ColumnMeta) DefaultValue {
+func GetDefaultFromYDB(column *Ydb_Table.ColumnMeta) *DefaultValue {
 	if column == nil {
 		return nil
 	}
 
-	if literal := column.GetFromLiteral(); literal != nil {
-		return DefaultLiteralValue{
-			Value: value.FromYDB(literal.GetType(), literal.GetValue()),
+	var underlyingValue any
+	if protoLiteral := column.GetFromLiteral(); protoLiteral != nil {
+		underlyingValue = DefaultLiteralValue{
+			Value: value.FromYDB(protoLiteral.GetType(), protoLiteral.GetValue()),
 		}
 	}
-
-	if seq := column.GetFromSequence(); seq != nil {
-		result := DefaultSequenceValue{
-			Name:       seq.Name,
-			MinValue:   seq.MinValue,
-			MaxValue:   seq.MaxValue,
-			StartValue: seq.StartValue,
-			Cache:      seq.Cache,
-			Increment:  seq.Increment,
-			Cycle:      seq.Cycle,
+	if protoSeq := column.GetFromSequence(); protoSeq != nil {
+		seq := DefaultSequenceValue{
+			Name:       protoSeq.Name,
+			MinValue:   protoSeq.MinValue,
+			MaxValue:   protoSeq.MaxValue,
+			StartValue: protoSeq.StartValue,
+			Cache:      protoSeq.Cache,
+			Increment:  protoSeq.Increment,
+			Cycle:      protoSeq.Cycle,
 		}
-
-		if setVal := seq.GetSetVal(); setVal != nil {
-			result.SetVal = &SequenceSetVal{
+		if setVal := protoSeq.GetSetVal(); setVal != nil {
+			seq.SetVal = &SequenceSetVal{
 				NextValue: setVal.NextValue,
 				NextUsed:  setVal.NextUsed,
 			}
 		}
-
-		return result
+		underlyingValue = seq
 	}
 
+	return &DefaultValue{
+		underlyingValue: underlyingValue,
+	}
+}
+
+func (d *DefaultValue) Literal() value.Value {
+	literal, ok := d.underlyingValue.(DefaultLiteralValue)
+	if ok {
+		return literal
+	}
 	return nil
 }
 
-func (l *DefaultLiteralValue) ToYDB() *Ydb_Table.ColumnMeta_FromLiteral {
-	if l == nil {
-		return nil
+func (d *DefaultValue) Sequence() *DefaultSequenceValue {
+	seq, ok := d.underlyingValue.(DefaultSequenceValue)
+	if ok {
+		return &seq
+	}
+	return nil
+}
+
+func (d *DefaultValue) ToYDB(targetColumn *Ydb_Table.ColumnMeta) {
+	if targetColumn == nil {
+		return
 	}
 
+	switch value := d.underlyingValue.(type) {
+	case DefaultLiteralValue:
+		targetColumn.DefaultValue = value.toYDB()
+	case DefaultSequenceValue:
+		targetColumn.DefaultValue = value.toYDB()
+	}
+}
+
+func (l *DefaultLiteralValue) toYDB() *Ydb_Table.ColumnMeta_FromLiteral {
 	return &Ydb_Table.ColumnMeta_FromLiteral{
 		FromLiteral: value.ToYDB(l.Value),
 	}
 }
 
-func (s *DefaultSequenceValue) ToYDB() *Ydb_Table.ColumnMeta_FromSequence {
-	if s == nil {
-		return nil
-	}
-
-	seq := &Ydb_Table.SequenceDescription{
+func (s *DefaultSequenceValue) toYDB() *Ydb_Table.ColumnMeta_FromSequence {
+	protoSeq := &Ydb_Table.SequenceDescription{
 		Name:       s.Name,
 		MinValue:   s.MinValue,
 		MaxValue:   s.MaxValue,
@@ -91,13 +114,13 @@ func (s *DefaultSequenceValue) ToYDB() *Ydb_Table.ColumnMeta_FromSequence {
 	}
 
 	if s.SetVal != nil {
-		seq.SetVal = &Ydb_Table.SequenceDescription_SetVal{
+		protoSeq.SetVal = &Ydb_Table.SequenceDescription_SetVal{
 			NextValue: s.SetVal.NextValue,
 			NextUsed:  s.SetVal.NextUsed,
 		}
 	}
 
 	return &Ydb_Table.ColumnMeta_FromSequence{
-		FromSequence: seq,
+		FromSequence: protoSeq,
 	}
 }

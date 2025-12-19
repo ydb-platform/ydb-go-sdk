@@ -625,7 +625,7 @@ func processColumns(columns []*Ydb_Table.ColumnMeta) []options.Column {
 			Type:         types.TypeFromYDB(c.GetType()),
 			Family:       c.GetFamily(),
 			NotNull:      c.GetNotNull(),
-			DefaultValue: tableTypes.FromYDB(c),
+			DefaultValue: tableTypes.GetDefaultFromYDB(c),
 		}
 	}
 

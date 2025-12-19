@@ -18,7 +18,7 @@ type Column struct {
 	Type         types.Type
 	Family       string
 	NotNull      bool
-	DefaultValue tableTypes.DefaultValue
+	DefaultValue *tableTypes.DefaultValue
 }
 
 func (c Column) toYDB() *Ydb_Table.ColumnMeta {
@@ -28,22 +28,9 @@ func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 		Family:  c.Family,
 		NotNull: &c.NotNull,
 	}
-	setDefaultValue(meta, c.DefaultValue)
+	c.DefaultValue.ToYDB(meta)
 
 	return meta
-}
-
-func setDefaultValue(meta *Ydb_Table.ColumnMeta, defaultValue tableTypes.DefaultValue) {
-	if meta == nil || defaultValue == nil {
-		return
-	}
-
-	switch v := defaultValue.(type) {
-	case tableTypes.DefaultLiteralValue:
-		meta.DefaultValue = v.ToYDB()
-	case tableTypes.DefaultSequenceValue:
-		meta.DefaultValue = v.ToYDB()
-	}
 }
 
 func NewTableColumn(name string, typ types.Type, family string) Column {
