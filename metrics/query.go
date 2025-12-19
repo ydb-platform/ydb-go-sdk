@@ -46,14 +46,10 @@ func query(config Config) (t trace.Query) {
 						if info.NodeHintInfo != nil {
 							preferred := idToString(info.NodeHintInfo.PreferredNodeID)
 							actual := idToString(info.NodeHintInfo.SessionNodeID)
-							hit := falseStr
-							if preferred == actual {
-								hit = trueStr
-							}
 							nodeHint.With(map[string]string{
 								"preferred_node_id": preferred,
 								"session_node_id":   actual,
-								"hit":               hit,
+								"hit":               nodeHintHitString(preferred, actual),
 							}).Inc()
 						}
 					}
