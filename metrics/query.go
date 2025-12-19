@@ -6,6 +6,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+const (
+	trueStr  = "true"
+	falseStr = "false"
+)
+
 //nolint:funlen
 func query(config Config) (t trace.Query) {
 	queryConfig := config.WithSystem("query")
@@ -34,14 +39,21 @@ func query(config Config) (t trace.Query) {
 			}
 		}
 		{
-			nodeHintMiss := poolConfig.CounterVec("node_hint_miss", "preferred_node_id", "session_node_id")
+			nodeHint := poolConfig.CounterVec("node_hint", "preferred_node_id", "session_node_id", "hit")
 			t.OnPoolGet = func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
 				return func(info trace.QueryPoolGetDoneInfo) {
 					if poolConfig.Details()&trace.QueryPoolEvents != 0 {
 						if info.NodeHintInfo != nil {
-							nodeHintMiss.With(map[string]string{
-								"preferred_node_id": idToString(info.NodeHintInfo.PreferredNodeID),
-								"session_node_id":   idToString(info.NodeHintInfo.SessionNodeID),
+							preferred := idToString(info.NodeHintInfo.PreferredNodeID)
+							actual := idToString(info.NodeHintInfo.SessionNodeID)
+							hit := falseStr
+							if preferred == actual {
+								hit = trueStr
+							}
+							nodeHint.With(map[string]string{
+								"preferred_node_id": preferred,
+								"session_node_id":   actual,
+								"hit":               hit,
 							}).Inc()
 						}
 					}
