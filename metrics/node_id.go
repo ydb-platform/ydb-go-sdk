@@ -17,6 +17,5 @@ func nodeHintHitString(preferred, actual string) string {
 	if preferred == actual {
 		return trueStr
 	}
-
 	return falseStr
 }
