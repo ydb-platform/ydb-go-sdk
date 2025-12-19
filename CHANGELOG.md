@@ -1,3 +1,7 @@
+* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to
+  `ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to
+  distinguish between hits and misses
+
 ## v3.125.0
 * Added `WithConcurrentResultSets` option for `db.Query().Query()`
 * Added `DefaultValue` field to `table/options.Column` struct
