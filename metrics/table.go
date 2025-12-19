@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -20,7 +21,7 @@ func table(config Config) (t trace.Table) {
 	get := config.CounterVec("get")
 	put := config.CounterVec("put")
 	with := config.GaugeVec("with")
-	nodeHintMiss := config.CounterVec("node_hint_miss", "preferred_node_id", "session_node_id")
+	nodeHint := config.CounterVec("node_hint", "preferred_node_id", "session_node_id", "hit")
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
 			if config.Details()&trace.TableEvents != 0 {
@@ -64,9 +65,12 @@ func table(config Config) (t trace.Table) {
 					get.With(nil).Inc()
 				}
 				if info.NodeHintInfo != nil {
-					nodeHintMiss.With(map[string]string{
-						"preferred_node_id": idToString(info.NodeHintInfo.PreferredNodeID),
-						"session_node_id":   idToString(info.NodeHintInfo.SessionNodeID),
+					preferred := idToString(info.NodeHintInfo.PreferredNodeID)
+					actual := idToString(info.NodeHintInfo.SessionNodeID)
+					nodeHint.With(map[string]string{
+						"preferred_node_id": preferred,
+						"session_node_id":   actual,
+						"hit":               strconv.FormatBool(preferred == actual),
 					}).Inc()
 				}
 			}
