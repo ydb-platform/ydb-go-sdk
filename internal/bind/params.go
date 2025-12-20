@@ -335,9 +335,9 @@ func toValue(v any) (_ value.Value, err error) {
 	case [16]byte:
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
-		return value.TimestampValueFromTime(x), nil
+		return value.Timestamp64ValueFromTime(x), nil
 	case time.Duration:
-		return value.IntervalValueFromDuration(x), nil
+		return value.Interval64ValueFromDuration(x), nil
 	case json.Marshaler:
 		bytes, err := x.MarshalJSON()
 		if err != nil {
@@ -467,9 +467,11 @@ func toYdbParam(name string, value any) (*params.Parameter, error) {
 func Params(args ...any) ([]*params.Parameter, error) {
 	parameters := make([]*params.Parameter, 0, len(args))
 	for i, arg := range args {
-		var newParam *params.Parameter
-		var newParams []*params.Parameter
-		var err error
+		var (
+			newParam  *params.Parameter
+			newParams []*params.Parameter
+			err       error
+		)
 		switch x := arg.(type) {
 		case driver.NamedValue:
 			newParams, err = paramHandleNamedValue(x, i, len(args))

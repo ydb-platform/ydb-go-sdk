@@ -38,7 +38,7 @@ func IntervalToDuration(n int64) time.Duration {
 
 // Interval64ToDuration returns time.Duration from given nanoseconds
 func Interval64ToDuration(n int64) time.Duration {
-	return time.Duration(n) * time.Nanosecond
+	return time.Duration(n) * time.Microsecond
 }
 
 // durationToMicroseconds returns microseconds from given time.Duration
