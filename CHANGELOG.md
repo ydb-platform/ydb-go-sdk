@@ -1,3 +1,4 @@
+## v3.124.1
 * Fixed bug with incorrect conversion of `time.Duration` to `Interval64`, which was previously using nanoseconds instead of microseconds
 
 ## v3.124.0
