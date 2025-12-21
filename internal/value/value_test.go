@@ -2182,7 +2182,7 @@ func TestIntervalValueCastTo(t *testing.T) {
 }
 
 func TestInterval64ValueCastTo(t *testing.T) {
-	v := Interval64Value(1000000000) // 1 second in nanoseconds
+	v := Interval64Value(1000000) // 1 second in microseconds
 
 	t.Run("CastToDuration", func(t *testing.T) {
 		var result time.Duration
@@ -2195,7 +2195,7 @@ func TestInterval64ValueCastTo(t *testing.T) {
 		var result int64
 		err := v.castTo(&result)
 		require.NoError(t, err)
-		require.Equal(t, int64(1000000000), result)
+		require.Equal(t, int64(1000000), result)
 	})
 
 	t.Run("CastToInvalid", func(t *testing.T) {

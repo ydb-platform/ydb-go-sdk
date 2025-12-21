@@ -1346,7 +1346,7 @@ func Interval64Value(v int64) interval64Value {
 }
 
 func Interval64ValueFromDuration(v time.Duration) interval64Value {
-	return interval64Value(durationToNanoseconds(v))
+	return interval64Value(durationToMicroseconds(v))
 }
 
 type jsonValue string

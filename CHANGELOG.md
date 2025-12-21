@@ -1,3 +1,5 @@
+* Fixed bug with incorrect conversion of `time.Duration` to `Interval64`, which was previously using nanoseconds instead of microseconds
+
 ## v3.124.0
 * Fixed UUID scanning with `database/sql` when using types implementing `sql.Scanner` interface (like `uuid.UUID`)
 
