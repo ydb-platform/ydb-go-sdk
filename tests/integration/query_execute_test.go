@@ -674,8 +674,8 @@ func TestQueryWideIntervalTypes(t *testing.T) {
 				CAST("PT20M34.56789S" AS Interval64),
 				CAST("PT20M34.56789S" AS Interval64),
 			;`,
-			expYdbValue: value.OptionalValue(value.Interval64ValueFromDuration(time.Duration(1234567890))),
-			expGoValue:  time.Duration(1234567890),
+			expYdbValue: value.OptionalValue(value.Interval64ValueFromDuration(1234567890 * time.Microsecond)),
+			expGoValue:  1234567890 * time.Microsecond,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

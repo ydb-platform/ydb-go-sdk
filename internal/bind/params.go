@@ -335,9 +335,9 @@ func toValue(v any) (_ value.Value, err error) {
 	case [16]byte:
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
-		return value.Timestamp64ValueFromTime(x), nil
+		return value.TimestampValueFromTime(x), nil
 	case time.Duration:
-		return value.Interval64ValueFromDuration(x), nil
+		return value.IntervalValueFromDuration(x), nil
 	case json.Marshaler:
 		bytes, err := x.MarshalJSON()
 		if err != nil {

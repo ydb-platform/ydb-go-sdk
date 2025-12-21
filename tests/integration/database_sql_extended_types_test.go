@@ -34,6 +34,7 @@ func TestDatabaseSqlExtendedTypes(t *testing.T) {
 	connector, err := ydb.Connector(nativeDriver,
 		ydb.WithQueryService(true),
 		ydb.WithAutoDeclare(),
+		ydb.WithWideTimeTypes(true),
 	)
 	require.NoError(t, err)
 	defer func() {
