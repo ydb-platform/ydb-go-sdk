@@ -10,14 +10,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	tableTypes "github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type Column struct {
 	Name         string
 	Type         types.Type // if column is nullable, its type will be [internal/types.Optional]
 	Family       string
-	DefaultValue *tableTypes.DefaultValue
+	DefaultValue *value.DefaultValue
 }
 
 func (c Column) toYDB() *Ydb_Table.ColumnMeta {

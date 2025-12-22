@@ -38,7 +38,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	tableTypes "github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -624,7 +623,7 @@ func processColumns(columns []*Ydb_Table.ColumnMeta) []options.Column {
 			Name:         c.GetName(),
 			Type:         types.TypeFromYDB(c.GetType()),
 			Family:       c.GetFamily(),
-			DefaultValue: tableTypes.GetDefaultFromYDB(c),
+			DefaultValue: value.GetDefaultFromYDB(c),
 		}
 	}
 

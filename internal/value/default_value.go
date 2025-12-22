@@ -1,9 +1,7 @@
-package types
+package value
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
 type (
@@ -12,7 +10,7 @@ type (
 	}
 
 	DefaultLiteralValue struct {
-		value.Value
+		Value
 	}
 
 	DefaultSequenceValue struct {
@@ -40,7 +38,7 @@ func GetDefaultFromYDB(column *Ydb_Table.ColumnMeta) *DefaultValue {
 	var underlyingValue any
 	if protoLiteral := column.GetFromLiteral(); protoLiteral != nil {
 		underlyingValue = DefaultLiteralValue{
-			Value: value.FromYDB(protoLiteral.GetType(), protoLiteral.GetValue()),
+			Value: FromYDB(protoLiteral.GetType(), protoLiteral.GetValue()),
 		}
 	}
 	if protoSeq := column.GetFromSequence(); protoSeq != nil {
@@ -71,10 +69,10 @@ func GetDefaultFromYDB(column *Ydb_Table.ColumnMeta) *DefaultValue {
 	}
 }
 
-func (d *DefaultValue) Literal() value.Value {
+func (d *DefaultValue) Literal() *DefaultLiteralValue {
 	literal, ok := d.underlyingValue.(DefaultLiteralValue)
 	if ok {
-		return literal
+		return &literal
 	}
 
 	return nil
@@ -104,7 +102,7 @@ func (d *DefaultValue) ToYDB(targetColumn *Ydb_Table.ColumnMeta) {
 
 func (l *DefaultLiteralValue) toYDB() *Ydb_Table.ColumnMeta_FromLiteral {
 	return &Ydb_Table.ColumnMeta_FromLiteral{
-		FromLiteral: value.ToYDB(l.Value),
+		FromLiteral: ToYDB(l.Value),
 	}
 }
 
