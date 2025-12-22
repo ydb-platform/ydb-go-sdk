@@ -1,4 +1,4 @@
-* added DefaultValue field to `table/options.Column` struct
+* Added `DefaultValue` field to `table/options.Column` struct
 
 ## v3.124.1
 * Fixed bug with incorrect conversion of `time.Duration` to `Interval64`, which was previously using nanoseconds instead of microseconds
