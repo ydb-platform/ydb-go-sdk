@@ -15,18 +15,16 @@ import (
 
 type Column struct {
 	Name         string
-	Type         types.Type
+	Type         types.Type // if column is nullable, its type will be [internal/types.Optional]
 	Family       string
-	NotNull      bool
 	DefaultValue *tableTypes.DefaultValue
 }
 
 func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 	meta := &Ydb_Table.ColumnMeta{
-		Name:    c.Name,
-		Type:    types.TypeToYDB(c.Type),
-		Family:  c.Family,
-		NotNull: &c.NotNull,
+		Name:   c.Name,
+		Type:   types.TypeToYDB(c.Type),
+		Family: c.Family,
 	}
 	if c.DefaultValue != nil {
 		c.DefaultValue.ToYDB(meta)
