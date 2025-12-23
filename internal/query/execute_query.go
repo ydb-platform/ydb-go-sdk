@@ -32,6 +32,7 @@ type executeSettings interface {
 	ResourcePool() string
 	ResponsePartLimitSizeBytes() int64
 	Label() string
+	ConcurrentResultSets() bool
 }
 
 type executeScriptConfig interface {
@@ -92,7 +93,7 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 		},
 		Parameters:             params,
 		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
-		ConcurrentResultSets:   false,
+		ConcurrentResultSets:   cfg.ConcurrentResultSets(),
 		PoolId:                 cfg.ResourcePool(),
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
 	}
