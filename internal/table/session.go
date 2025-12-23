@@ -620,9 +620,10 @@ func processColumns(columns []*Ydb_Table.ColumnMeta) []options.Column {
 	cs := make([]options.Column, len(columns))
 	for i, c := range columns {
 		cs[i] = options.Column{
-			Name:   c.GetName(),
-			Type:   types.TypeFromYDB(c.GetType()),
-			Family: c.GetFamily(),
+			Name:         c.GetName(),
+			Type:         types.TypeFromYDB(c.GetType()),
+			Family:       c.GetFamily(),
+			DefaultValue: value.GetDefaultFromYDB(c),
 		}
 	}
 
