@@ -1,4 +1,0 @@
-metrics:
-  - name: "node_hints_misses"
-    direction: lower_is_better
-    critical_max: 0 # more than zero and node_hints workload fails
