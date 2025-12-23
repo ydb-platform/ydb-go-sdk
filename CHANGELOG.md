@@ -1,3 +1,4 @@
+## v3.125.0
 * Added `WithConcurrentResultSets` option for `db.Query().Query()`
 * Added `DefaultValue` field to `table/options.Column` struct
 
