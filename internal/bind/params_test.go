@@ -663,7 +663,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testString) *testString { return &v }(testString("test")),
+			src:  func() *testString { v := testString("test"); return &v }(),
 			dst:  value.OptionalValue(value.TextValue("test")),
 			err:  nil,
 		},
@@ -681,7 +681,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testInt32) *testInt32 { return &v }(testInt32(-1234567890)),
+			src:  func() *testInt32 { v := testInt32(-1234567890); return &v }(),
 			dst:  value.OptionalValue(value.Int32Value(-1234567890)),
 			err:  nil,
 		},
@@ -699,7 +699,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testUInt32) *testUInt32 { return &v }(testUInt32(1234567890)),
+			src:  func() *testUInt32 { v := testUInt32(1234567890); return &v }(),
 			dst:  value.OptionalValue(value.Uint32Value(1234567890)),
 			err:  nil,
 		},
@@ -717,7 +717,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testBool) *testBool { return &v }(testBool(true)),
+			src:  func() *testBool { v := testBool(true); return &v }(),
 			dst:  value.OptionalValue(value.BoolValue(true)),
 			err:  nil,
 		},
@@ -735,7 +735,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testInt) *testInt { return &v }(testInt(42)),
+			src:  func() *testInt { v := testInt(42); return &v }(),
 			dst:  value.OptionalValue(value.Int32Value(42)),
 			err:  nil,
 		},
@@ -753,7 +753,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testInt8) *testInt8 { return &v }(testInt8(42)),
+			src:  func() *testInt8 { v := testInt8(42); return &v }(),
 			dst:  value.OptionalValue(value.Int8Value(42)),
 			err:  nil,
 		},
@@ -771,7 +771,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testInt16) *testInt16 { return &v }(testInt16(42)),
+			src:  func() *testInt16 { v := testInt16(42); return &v }(),
 			dst:  value.OptionalValue(value.Int16Value(42)),
 			err:  nil,
 		},
@@ -789,7 +789,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testInt64) *testInt64 { return &v }(testInt64(42)),
+			src:  func() *testInt64 { v := testInt64(42); return &v }(),
 			dst:  value.OptionalValue(value.Int64Value(42)),
 			err:  nil,
 		},
@@ -807,7 +807,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testUint) *testUint { return &v }(testUint(42)),
+			src:  func() *testUint { v := testUint(42); return &v }(),
 			dst:  value.OptionalValue(value.Uint32Value(42)),
 			err:  nil,
 		},
@@ -825,7 +825,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testUint8) *testUint8 { return &v }(testUint8(42)),
+			src:  func() *testUint8 { v := testUint8(42); return &v }(),
 			dst:  value.OptionalValue(value.Uint8Value(42)),
 			err:  nil,
 		},
@@ -843,7 +843,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testUint16) *testUint16 { return &v }(testUint16(42)),
+			src:  func() *testUint16 { v := testUint16(42); return &v }(),
 			dst:  value.OptionalValue(value.Uint16Value(42)),
 			err:  nil,
 		},
@@ -861,7 +861,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testUint64) *testUint64 { return &v }(testUint64(42)),
+			src:  func() *testUint64 { v := testUint64(42); return &v }(),
 			dst:  value.OptionalValue(value.Uint64Value(42)),
 			err:  nil,
 		},
@@ -879,7 +879,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testFloat32) *testFloat32 { return &v }(testFloat32(3.14)),
+			src:  func() *testFloat32 { v := testFloat32(3.14); return &v }(),
 			dst:  value.OptionalValue(value.FloatValue(3.14)),
 			err:  nil,
 		},
@@ -897,7 +897,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testFloat64) *testFloat64 { return &v }(testFloat64(3.14)),
+			src:  func() *testFloat64 { v := testFloat64(3.14); return &v }(),
 			dst:  value.OptionalValue(value.DoubleValue(3.14)),
 			err:  nil,
 		},
@@ -915,7 +915,7 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			src:  func(v testBytes) *testBytes { return &v }(testBytes([]byte("test"))),
+			src:  func() *testBytes { v := testBytes([]byte("test")); return &v }(),
 			dst:  value.OptionalValue(value.BytesValue([]byte("test"))),
 			err:  nil,
 		},
