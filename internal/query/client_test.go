@@ -1137,6 +1137,154 @@ func TestClient(t *testing.T) {
 				require.Nil(t, row)
 			}
 		})
+		t.Run("ConcurrentResultSetsNonSequentialIndices", func(t *testing.T) {
+			// Этот тест демонстрирует критическую проблему (BUG) с непоследовательными индексами result sets.
+			//
+			// Проблема: Когда result sets имеют непоследовательные индексы (например, 0, 2, 5 вместо 0, 1, 2),
+			// текущая реализация в resultToMaterializedResult создает слайс размером len(resultSetByIndex) = 3,
+			// но затем пытается записать result set с индексом 5 в этот слайс, что приводит к панике:
+			// "runtime error: index out of range [5] with length 3"
+			//
+			// Ожидаемое поведение: Код должен найти максимальный индекс (5) и создать слайс размером maxIndex+1,
+			// чтобы вместить все result sets независимо от их индексов.
+			//
+			// Этот тест должен падать с паникой до исправления бага и проходить после исправления.
+			ctrl := gomock.NewController(t)
+
+			colsRS0 := []*Ydb.Column{
+				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+			}
+
+			colsRS2 := []*Ydb.Column{
+				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+			}
+
+			colsRS5 := []*Ydb.Column{
+				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
+			}
+
+			// Создаем result sets с непоследовательными индексами: 0, 2, 5
+			respParts := []struct {
+				idx     int
+				columns []*Ydb.Column
+				rows    [][]*Ydb.Value
+			}{
+				{
+					idx:     0,
+					columns: colsRS0,
+					rows: [][]*Ydb.Value{
+						{mkU64(100)},
+					},
+				},
+				{
+					idx:     2,
+					columns: colsRS2,
+					rows: [][]*Ydb.Value{
+						{mkStr("result_set_2")},
+					},
+				},
+				{
+					idx:     5,
+					columns: colsRS5,
+					rows: [][]*Ydb.Value{
+						{mkBool(true)},
+					},
+				},
+			}
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+
+			for _, p := range respParts {
+				stream.EXPECT().Recv().Return(
+					&Ydb_Query.ExecuteQueryResponsePart{
+						Status:         Ydb.StatusIds_SUCCESS,
+						TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+						ResultSetIndex: int64(p.idx),
+						ResultSet: &Ydb.ResultSet{
+							Columns: p.columns,
+							Rows: func() []*Ydb.Value {
+								out := make([]*Ydb.Value, len(p.rows))
+								for i, items := range p.rows {
+									out[i] = &Ydb.Value{Items: items}
+								}
+
+								return out
+							}(),
+						},
+					},
+					nil,
+				)
+			}
+
+			stream.EXPECT().Recv().Return(nil, io.EOF)
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+			// Этот вызов должен привести к панике из-за выхода за границы массива
+			// при попытке записать result set с индексом 5 в слайс размером 3
+			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
+				return newTestSessionWithClient("123", client, true), nil
+			}), "", query.WithConcurrentResultSets(true))
+
+			// Если код исправлен правильно, ошибки не должно быть
+			// Если код содержит баг, здесь будет паника: "runtime error: index out of range [5] with length 3"
+			require.NoError(t, err)
+
+			// Проверяем, что все result sets доступны в правильном порядке
+			{
+				// Result set 0
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+				require.Equal(t, 0, rs.Index())
+
+				row, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				var a uint64
+				require.NoError(t, row.Scan(&a))
+				require.EqualValues(t, 100, a)
+
+				row, err = rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+			}
+
+			{
+				// Result set 2
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+				require.Equal(t, 2, rs.Index())
+
+				row, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				var b string
+				require.NoError(t, row.Scan(&b))
+				require.EqualValues(t, "result_set_2", b)
+
+				row, err = rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+			}
+
+			{
+				// Result set 5
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+				require.Equal(t, 5, rs.Index())
+
+				row, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				var c bool
+				require.NoError(t, row.Scan(&c))
+				require.EqualValues(t, true, c)
+
+				row, err = rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+			}
+
+			// Проверяем, что больше нет result sets
+			rs, err := r.NextResultSet(ctx)
+			require.ErrorIs(t, err, io.EOF)
+			require.Nil(t, rs)
+		})
 		t.Run("CancelWhileReadResult", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			executeCtx, cancel := context.WithCancel(xtest.Context(t))
