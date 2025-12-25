@@ -21,6 +21,24 @@ type testValuer struct {
 	value driver.Value
 }
 
+type (
+	testString  string
+	testUInt32  uint32
+	testInt32   int32
+	testBool    bool
+	testInt     int
+	testInt8    int8
+	testInt16   int16
+	testInt64   int64
+	testUint    uint
+	testUint8   uint8
+	testUint16  uint16
+	testUint64  uint64
+	testFloat32 float32
+	testFloat64 float64
+	testBytes   []byte
+)
+
 func (v testValuer) Value() (driver.Value, error) {
 	return v.value, nil
 }
@@ -637,12 +655,283 @@ func TestToValue(t *testing.T) {
 			dst:  value.NullValue(types.Text),
 			err:  nil,
 		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testString("test"),
+			dst:  value.TextValue("test"),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testString) *testString { return &v }(testString("test")),
+			dst:  value.OptionalValue(value.TextValue("test")),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testString { return nil }(),
+			dst:  value.NullValue(types.Text),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testInt32(-1234567890),
+			dst:  value.Int32Value(-1234567890),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testInt32) *testInt32 { return &v }(testInt32(-1234567890)),
+			dst:  value.OptionalValue(value.Int32Value(-1234567890)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testInt32 { return nil }(),
+			dst:  value.NullValue(types.Int32),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testUInt32(1234567890),
+			dst:  value.Uint32Value(1234567890),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testUInt32) *testUInt32 { return &v }(testUInt32(1234567890)),
+			dst:  value.OptionalValue(value.Uint32Value(1234567890)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testUInt32 { return nil }(),
+			dst:  value.NullValue(types.Uint32),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testBool(true),
+			dst:  value.BoolValue(true),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testBool) *testBool { return &v }(testBool(true)),
+			dst:  value.OptionalValue(value.BoolValue(true)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testBool { return nil }(),
+			dst:  value.NullValue(types.Bool),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testInt(42),
+			dst:  value.Int32Value(42),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testInt) *testInt { return &v }(testInt(42)),
+			dst:  value.OptionalValue(value.Int32Value(42)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testInt { return nil }(),
+			dst:  value.NullValue(types.Int32),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testInt8(42),
+			dst:  value.Int8Value(42),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testInt8) *testInt8 { return &v }(testInt8(42)),
+			dst:  value.OptionalValue(value.Int8Value(42)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testInt8 { return nil }(),
+			dst:  value.NullValue(types.Int8),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testInt16(42),
+			dst:  value.Int16Value(42),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testInt16) *testInt16 { return &v }(testInt16(42)),
+			dst:  value.OptionalValue(value.Int16Value(42)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testInt16 { return nil }(),
+			dst:  value.NullValue(types.Int16),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testInt64(42),
+			dst:  value.Int64Value(42),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testInt64) *testInt64 { return &v }(testInt64(42)),
+			dst:  value.OptionalValue(value.Int64Value(42)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testInt64 { return nil }(),
+			dst:  value.NullValue(types.Int64),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testUint(42),
+			dst:  value.Uint32Value(42),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testUint) *testUint { return &v }(testUint(42)),
+			dst:  value.OptionalValue(value.Uint32Value(42)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testUint { return nil }(),
+			dst:  value.NullValue(types.Uint32),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testUint8(42),
+			dst:  value.Uint8Value(42),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testUint8) *testUint8 { return &v }(testUint8(42)),
+			dst:  value.OptionalValue(value.Uint8Value(42)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testUint8 { return nil }(),
+			dst:  value.NullValue(types.Uint8),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testUint16(42),
+			dst:  value.Uint16Value(42),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testUint16) *testUint16 { return &v }(testUint16(42)),
+			dst:  value.OptionalValue(value.Uint16Value(42)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testUint16 { return nil }(),
+			dst:  value.NullValue(types.Uint16),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testUint64(42),
+			dst:  value.Uint64Value(42),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testUint64) *testUint64 { return &v }(testUint64(42)),
+			dst:  value.OptionalValue(value.Uint64Value(42)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testUint64 { return nil }(),
+			dst:  value.NullValue(types.Uint64),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testFloat32(3.14),
+			dst:  value.FloatValue(3.14),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testFloat32) *testFloat32 { return &v }(testFloat32(3.14)),
+			dst:  value.OptionalValue(value.FloatValue(3.14)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testFloat32 { return nil }(),
+			dst:  value.NullValue(types.Float),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testFloat64(3.14),
+			dst:  value.DoubleValue(3.14),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testFloat64) *testFloat64 { return &v }(testFloat64(3.14)),
+			dst:  value.OptionalValue(value.DoubleValue(3.14)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testFloat64 { return nil }(),
+			dst:  value.NullValue(types.Double),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testBytes([]byte("test")),
+			dst:  value.BytesValue([]byte("test")),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v testBytes) *testBytes { return &v }(testBytes([]byte("test"))),
+			dst:  value.OptionalValue(value.BytesValue([]byte("test"))),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testBytes { return nil }(),
+			dst:  value.NullValue(types.Bytes),
+			err:  nil,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			dst, err := toValue(tt.src)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {
+				require.NoError(t, err)
 				require.Equal(t, tt.dst.Yql(), dst.Yql())
 			}
 		})
