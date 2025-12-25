@@ -1,4 +1,5 @@
 * Added support for custom types derived from primitive types in `database/sql` driver
+* Bumped `golang.org/x/net` from 0.35.0 to 0.38.0
 
 ## v3.125.0
 * Added `WithConcurrentResultSets` option for `db.Query().Query()`
