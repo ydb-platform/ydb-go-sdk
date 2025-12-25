@@ -665,6 +665,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testString {
 				v := testString("test")
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.TextValue("test")),
@@ -686,6 +687,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testInt32 {
 				v := testInt32(-1234567890)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Int32Value(-1234567890)),
@@ -707,6 +709,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testUInt32 {
 				v := testUInt32(1234567890)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Uint32Value(1234567890)),
@@ -728,6 +731,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testBool {
 				v := testBool(true)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.BoolValue(true)),
@@ -749,6 +753,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testInt {
 				v := testInt(42)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Int32Value(42)),
@@ -770,6 +775,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testInt8 {
 				v := testInt8(42)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Int8Value(42)),
@@ -791,6 +797,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testInt16 {
 				v := testInt16(42)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Int16Value(42)),
@@ -812,6 +819,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testInt64 {
 				v := testInt64(42)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Int64Value(42)),
@@ -833,6 +841,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testUint {
 				v := testUint(42)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Uint32Value(42)),
@@ -854,6 +863,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testUint8 {
 				v := testUint8(42)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Uint8Value(42)),
@@ -875,6 +885,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testUint16 {
 				v := testUint16(42)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Uint16Value(42)),
@@ -896,6 +907,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testUint64 {
 				v := testUint64(42)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.Uint64Value(42)),
@@ -917,6 +929,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testFloat32 {
 				v := testFloat32(3.14)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.FloatValue(3.14)),
@@ -938,6 +951,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testFloat64 {
 				v := testFloat64(3.14)
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.DoubleValue(3.14)),
@@ -959,6 +973,7 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src: func() *testBytes {
 				v := testBytes([]byte("test"))
+
 				return &v
 			}(),
 			dst: value.OptionalValue(value.BytesValue([]byte("test"))),
