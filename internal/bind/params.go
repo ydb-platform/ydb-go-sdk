@@ -346,8 +346,36 @@ func toValue(v any) (_ value.Value, err error) {
 
 		return value.JSONValue(xstring.FromBytes(bytes)), nil
 	default:
-		kind := reflect.TypeOf(x).Kind()
-		switch kind {
+		rv := reflect.ValueOf(x)
+		switch rv.Kind() {
+		case reflect.String:
+			return value.TextValue(rv.String()), nil
+		case reflect.Int:
+			return value.Int32Value(int32(rv.Int())), nil
+		case reflect.Int8:
+			return value.Int8Value(int8(rv.Int())), nil
+		case reflect.Int16:
+			return value.Int16Value(int16(rv.Int())), nil
+		case reflect.Int32:
+			return value.Int32Value(int32(rv.Int())), nil
+		case reflect.Int64:
+			return value.Int64Value(rv.Int()), nil
+		case reflect.Uint:
+			return value.Uint32Value(uint32(rv.Uint())), nil
+		case reflect.Uint8:
+			return value.Uint8Value(uint8(rv.Uint())), nil
+		case reflect.Uint16:
+			return value.Uint16Value(uint16(rv.Uint())), nil
+		case reflect.Uint32:
+			return value.Uint32Value(uint32(rv.Uint())), nil
+		case reflect.Uint64:
+			return value.Uint64Value(rv.Uint()), nil
+		case reflect.Float32:
+			return value.FloatValue(float32(rv.Float())), nil
+		case reflect.Float64:
+			return value.DoubleValue(rv.Float()), nil
+		case reflect.Bool:
+			return value.BoolValue(rv.Bool()), nil
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
 			list := make([]value.Value, v.Len())
