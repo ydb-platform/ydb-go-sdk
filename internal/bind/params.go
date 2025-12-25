@@ -250,7 +250,7 @@ func reflectKindToType(x any) (types.Type, error) { //nolint:funlen
 			tt, err := toType(v.Field(i).Interface())
 			if err != nil {
 				return nil, xerrors.WithStackTrace(
-					fmt.Errorf("cannot parse %v as values of dict: %w",
+					fmt.Errorf("cannot parse %v as values of struct: %w",
 						v.Field(i).Interface(), errUnsupportedType,
 					),
 				)
