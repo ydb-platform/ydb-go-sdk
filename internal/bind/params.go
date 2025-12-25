@@ -167,8 +167,40 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen
 	default:
 		kind := reflect.TypeOf(x).Kind()
 		switch kind {
+		case reflect.String:
+			return types.Text, nil
+		case reflect.Int:
+			return types.Int32, nil
+		case reflect.Int8:
+			return types.Int8, nil
+		case reflect.Int16:
+			return types.Int16, nil
+		case reflect.Int32:
+			return types.Int32, nil
+		case reflect.Int64:
+			return types.Int64, nil
+		case reflect.Uint:
+			return types.Uint32, nil
+		case reflect.Uint8:
+			return types.Uint8, nil
+		case reflect.Uint16:
+			return types.Uint16, nil
+		case reflect.Uint32:
+			return types.Uint32, nil
+		case reflect.Uint64:
+			return types.Uint64, nil
+		case reflect.Float32:
+			return types.Float, nil
+		case reflect.Float64:
+			return types.Double, nil
+		case reflect.Bool:
+			return types.Bool, nil
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
+			// Special handling for byte slices ([]byte and type aliases)
+			if v.Type().Elem().Kind() == reflect.Uint8 {
+				return types.Bytes, nil
+			}
 			t, err := toType(reflect.New(v.Type().Elem()).Elem().Interface())
 			if err != nil {
 				return nil, xerrors.WithStackTrace(
@@ -378,6 +410,10 @@ func toValue(v any) (_ value.Value, err error) {
 			return value.BoolValue(rv.Bool()), nil
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
+			// Special handling for byte slices ([]byte and type aliases)
+			if v.Type().Elem().Kind() == reflect.Uint8 {
+				return value.BytesValue(v.Bytes()), nil
+			}
 			list := make([]value.Value, v.Len())
 
 			for i := range list {
