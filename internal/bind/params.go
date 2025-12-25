@@ -126,6 +126,49 @@ func asSQLNullValue(v any) (value.Value, bool) {
 	return value.OptionalValue(val), true
 }
 
+func toType(v any) (_ types.Type, err error) {
+	switch x := v.(type) {
+	case bool:
+		return types.Bool, nil
+	case int:
+		return types.Int32, nil
+	case uint:
+		return types.Uint32, nil
+	case int8:
+		return types.Int8, nil
+	case uint8:
+		return types.Uint8, nil
+	case int16:
+		return types.Int16, nil
+	case uint16:
+		return types.Uint16, nil
+	case int32:
+		return types.Int32, nil
+	case uint32:
+		return types.Uint32, nil
+	case int64:
+		return types.Int64, nil
+	case uint64:
+		return types.Uint64, nil
+	case float32:
+		return types.Float, nil
+	case float64:
+		return types.Double, nil
+	case []byte:
+		return types.Bytes, nil
+	case string:
+		return types.Text, nil
+	case [16]byte:
+		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
+	case time.Time:
+		return types.Timestamp, nil
+	case time.Duration:
+		return types.Interval, nil
+	default:
+		return reflectKindToType(x)
+	}
+}
+
 func reflectKindToType(x any) (types.Type, error) { //nolint:funlen
 	kind := reflect.TypeOf(x).Kind()
 	switch kind {
@@ -226,49 +269,6 @@ func reflectKindToType(x any) (types.Type, error) { //nolint:funlen
 				x, errUnsupportedType, supportNewTypeLink(x),
 			),
 		)
-	}
-}
-
-func toType(v any) (_ types.Type, err error) {
-	switch x := v.(type) {
-	case bool:
-		return types.Bool, nil
-	case int:
-		return types.Int32, nil
-	case uint:
-		return types.Uint32, nil
-	case int8:
-		return types.Int8, nil
-	case uint8:
-		return types.Uint8, nil
-	case int16:
-		return types.Int16, nil
-	case uint16:
-		return types.Uint16, nil
-	case int32:
-		return types.Int32, nil
-	case uint32:
-		return types.Uint32, nil
-	case int64:
-		return types.Int64, nil
-	case uint64:
-		return types.Uint64, nil
-	case float32:
-		return types.Float, nil
-	case float64:
-		return types.Double, nil
-	case []byte:
-		return types.Bytes, nil
-	case string:
-		return types.Text, nil
-	case [16]byte:
-		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
-	case time.Time:
-		return types.Timestamp, nil
-	case time.Duration:
-		return types.Interval, nil
-	default:
-		return reflectKindToType(x)
 	}
 }
 
