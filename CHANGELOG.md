@@ -1,4 +1,4 @@
-* Added support for custom types derived from primitive types in database/sql driver
+* Added support for custom types derived from primitive types in `database/sql` driver
 
 ## v3.125.0
 * Added `WithConcurrentResultSets` option for `db.Query().Query()`
