@@ -27,6 +27,7 @@ import (
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type (
@@ -67,8 +68,13 @@ var defaultTrace = &Trace{
 		return func(err error) {
 		}
 	},
-	OnGet: func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
-		return func(item any, attempts int, err error) {
+	OnGet: func(ctx *context.Context, call stack.Caller) func(
+		item any,
+		attempts int,
+		nodeHintInfo *trace.NodeHintInfo,
+		err error,
+	) {
+		return func(item any, attempts int, nodeHintInfo *trace.NodeHintInfo, err error) {
 		}
 	},
 	onWait: func() func(item any, err error) {
@@ -183,6 +189,22 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NoError(t, err)
 		})
 		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
+			hintTrace := defaultTrace
+			var preferredID uint32
+			var sessionID uint32
+			hintTrace.OnGet = func(ctx *context.Context, call stack.Caller) func(
+				item any,
+				attempts int,
+				nodeHintInfo *trace.NodeHintInfo,
+				err error,
+			) {
+				return func(item any, attempts int, nodeHintInfo *trace.NodeHintInfo, err error) {
+					if nodeHintInfo != nil {
+						preferredID = nodeHintInfo.PreferredNodeID
+						sessionID = nodeHintInfo.SessionNodeID
+					}
+				}
+			}
 			nextNodeID := uint32(0)
 			var newItemCalled uint32
 			p := New[*testItem, testItem](rootCtx,
@@ -201,6 +223,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 					return &v, nil
 				}),
+				WithLimit[*testItem, testItem](3),
 			)
 
 			item := mustGetItem(t, p)
@@ -262,8 +285,17 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			mustPutItem(t, p, item)
 			mustPutItem(t, p, item2)
 			mustPutItem(t, p, item3)
-
+			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 100))
+			require.NoError(t, err)
+			require.EqualValues(t, 100, preferredID)
+			require.EqualValues(t, item.NodeID(), sessionID)
 			require.EqualValues(t, 3, newItemCalled)
+			_, _ = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			_, _ = p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			// should not panic
+			_, _ = p.getItem(endpoint.WithNodeID(ctx, 32))
 		})
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
 			var newItemCalled uint32
@@ -471,7 +503,12 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					mustGetItem(t, p)
 
 					go func() {
-						p.config.trace.OnGet = func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
+						p.config.trace.OnGet = func(ctx *context.Context, call stack.Caller) func(
+							item any,
+							attempts int,
+							_ *trace.NodeHintInfo,
+							err error,
+						) {
 							get <- struct{}{}
 
 							return nil

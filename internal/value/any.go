@@ -2,6 +2,7 @@ package value
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
@@ -45,16 +46,24 @@ func Any(v Value) (any, error) { //nolint:funlen,gocyclo
 		return uint32(vv), nil
 	case dateValue:
 		return DateToTime(uint32(vv)), nil
+	case date32Value:
+		return Date32ToTime(int32(vv)), nil
 	case datetimeValue:
 		return DatetimeToTime(uint32(vv)), nil
+	case datetime64Value:
+		return Datetime64ToTime(int64(vv)), nil
 	case uint64Value:
 		return uint64(vv), nil
 	case timestampValue:
 		return TimestampToTime(uint64(vv)), nil
+	case timestamp64Value:
+		return Timestamp64ToTime(int64(vv)), nil
 	case int64Value:
 		return int64(vv), nil
 	case intervalValue:
 		return IntervalToDuration(int64(vv)), nil
+	case interval64Value:
+		return Interval64ToDuration(int64(vv)), nil
 	case tzDateValue:
 		t, err := TzDateToTime(string(vv))
 		if err != nil {
@@ -86,6 +95,8 @@ func Any(v Value) (any, error) { //nolint:funlen,gocyclo
 		return xstring.ToBytes(string(vv)), nil
 	case jsonDocumentValue:
 		return xstring.ToBytes(string(vv)), nil
+	case *decimalValue:
+		return decimal.ToDecimal(vv), nil
 	default:
 		return v, nil
 	}

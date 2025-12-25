@@ -22,10 +22,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -674,8 +674,8 @@ func TestQueryWideIntervalTypes(t *testing.T) {
 				CAST("PT20M34.56789S" AS Interval64),
 				CAST("PT20M34.56789S" AS Interval64),
 			;`,
-			expYdbValue: value.OptionalValue(value.Interval64ValueFromDuration(time.Duration(1234567890))),
-			expGoValue:  time.Duration(1234567890),
+			expYdbValue: value.OptionalValue(value.Interval64ValueFromDuration(1234567890 * time.Microsecond)),
+			expGoValue:  1234567890 * time.Microsecond,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -732,8 +732,8 @@ func TestIssue1785FillDecimalFields(t *testing.T) {
 	require.NoError(t, err)
 	t.Run("Query", func(t *testing.T) {
 		type RowData struct {
-			Id         uint64        `sql:"id"`
-			DecimalVal types.Decimal `sql:"dc"`
+			Id         uint64          `sql:"id"`
+			DecimalVal decimal.Decimal `sql:"dc"`
 		}
 		result, err := db.Query().Query(ctx, `
         SELECT id, dc
@@ -757,18 +757,18 @@ func TestIssue1785FillDecimalFields(t *testing.T) {
 		err = row.ScanStruct(&rd)
 		require.NoError(t, err)
 		require.EqualValues(t, uint64(1), rd.Id)
-		require.EqualValues(t, types.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(10010000000), 22, 9), Precision: 22, Scale: 9}, rd.DecimalVal)
+		require.EqualValues(t, decimal.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(10010000000), 22), Precision: 22, Scale: 9}, rd.DecimalVal)
 		row, err = resultSet.NextRow(ctx)
 		require.NoError(t, err)
 		err = row.ScanStruct(&rd)
 		require.NoError(t, err)
 		require.EqualValues(t, uint64(2), rd.Id)
-		require.EqualValues(t, types.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(-5330000000), 22, 9), Precision: 22, Scale: 9}, rd.DecimalVal)
+		require.EqualValues(t, decimal.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(-5330000000), 22), Precision: 22, Scale: 9}, rd.DecimalVal)
 		row, err = resultSet.NextRow(ctx)
 		require.NoError(t, err)
 		err = row.ScanStruct(&rd)
 		require.NoError(t, err)
-		expectedVal := types.Decimal{Bytes: [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0}, Precision: 22, Scale: 9}
+		expectedVal := decimal.Decimal{Bytes: [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0}, Precision: 22, Scale: 9}
 		require.EqualValues(t, expectedVal, rd.DecimalVal)
 	})
 }
@@ -997,5 +997,52 @@ func TestIssue1872QueryWarning(t *testing.T) {
 		require.Equal(t,
 			"Failed to convert type: Struct<'Amount':Decimal(22,9),'Id':Int32> to Struct<'Amount':Decimal(22,9)?,'Id':Uint64?>",
 			issueList[0].Issues[0].Issues[0].Message)
+	})
+}
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1878
+func TestIssue1878ConcurrentResultSet(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.INFO),
+				),
+				trace.QueryEvents,
+			),
+		),
+	)
+	require.NoError(t, err)
+	t.Run("Select with enabled option", func(t *testing.T) {
+		q := db.Query()
+		res, err := q.Query(ctx, `
+				SELECT 1;
+				SELECT 2;
+				SELECT 3;
+				SELECT 4;
+				SELECT 5;
+	        `,
+			query.WithSyntax(query.SyntaxYQL),
+			query.WithIdempotent(),
+			query.WithConcurrentResultSets(true),
+		)
+		require.NoError(t, err)
+		rsCount := 0
+		for rs, err := range res.ResultSets(ctx) {
+			rsCount++
+			require.NoError(t, err)
+			row, err := rs.NextRow(ctx)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(row.Values()))
+			require.EqualValues(t, rsCount, row.Values()[0])
+		}
+		require.NoError(t, res.Close(ctx))
+		require.Equal(t, 5, rsCount)
 	})
 }

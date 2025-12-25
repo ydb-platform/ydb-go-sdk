@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
@@ -154,6 +155,8 @@ func (r *rows) Next(dst []driver.Value) error {
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
+
+				dst[dstI] = common.ToDatabaseSQLValue(dst[dstI])
 			}
 			dstI++
 		}

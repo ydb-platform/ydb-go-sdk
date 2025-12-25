@@ -12,12 +12,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
 	internalTypes "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -414,22 +414,29 @@ func (s *valueScanner) any() interface{} {
 	case internalTypes.Bytes:
 		return s.bytes()
 	case internalTypes.UUID:
-		// replace to good uuid on migration
 		return s.uuidBytesWithIssue1501()
 	case internalTypes.Uint32:
 		return s.uint32()
 	case internalTypes.Date:
 		return value.DateToTime(s.uint32())
+	case internalTypes.Date32:
+		return value.Date32ToTime(s.int32())
 	case internalTypes.Datetime:
 		return value.DatetimeToTime(s.uint32())
+	case internalTypes.Datetime64:
+		return value.Datetime64ToTime(s.int64())
 	case internalTypes.Uint64:
 		return s.uint64()
 	case internalTypes.Timestamp:
 		return value.TimestampToTime(s.uint64())
+	case internalTypes.Timestamp64:
+		return value.Timestamp64ToTime(s.int64())
 	case internalTypes.Int64:
 		return s.int64()
 	case internalTypes.Interval:
 		return value.IntervalToDuration(s.int64())
+	case internalTypes.Interval64:
+		return value.Interval64ToDuration(s.int64())
 	case internalTypes.TzDate:
 		src, err := value.TzDateToTime(s.text())
 		if err != nil {
@@ -459,7 +466,7 @@ func (s *valueScanner) any() interface{} {
 		internalTypes.JSONDocument:
 		return xstring.ToBytes(s.text())
 	default:
-		_ = s.errorf(0, "unknown primitive types")
+		_ = s.errorf(0, "unknown primitive type '%+v'", p)
 
 		return nil
 	}

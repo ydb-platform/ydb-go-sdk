@@ -5,6 +5,7 @@ on:
     branches:
       - master
   pull_request:
+    types: [opened, reopened, synchronize, labeled]
     branches:
       - master
       - release-*
@@ -44,26 +45,46 @@ jobs:
             name: database-sql-table
             path: ./database/sql/table
             label: database/sql/table
+            run_extra_args: ''
+            create_extra_args: ''
           - id: database_sql_query
             name: database-sql-query
             path: ./database/sql/query
             label: database/sql/query
+            run_extra_args: ''
+            create_extra_args: ''
           - id: native_query
             name: native-query
             path: ./native/query
             label: native/query
+            run_extra_args: ''
+            create_extra_args: ''
           - id: native_table
             name: native-table
             path: ./native/table
             label: native/table
+            run_extra_args: ''
+            create_extra_args: ''
           - id: native_table_over_query_service
             name: native-table-over-query-service
             path: ./native/table/over/query/service
             label: native/table/over/query/service
+            run_extra_args: ''
+            create_extra_args: ''
           - id: native_bulk_upsert
             name: native-bulk-upsert
             path: ./native/bulk-upsert
             label: native/bulk-upsert
+            run_extra_args: '-batch-size=10'
+            create_extra_args: ''
+          - id: native_node_hints
+            name: native-node-hints
+            path: ./native/node_hints
+            label: native/node_hints
+            slo_workload_read_max_rps: 100
+            slo_workload_write_max_rps: 100
+            run_extra_args: '-batch-size=10'
+            create_extra_args: '-min-partitions-count 10'
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
@@ -140,75 +161,59 @@ jobs:
 
       - name: Build workload images
         run: |
-          # Build current version
-          if [ -f "$GITHUB_WORKSPACE/current/tests/slo/Dockerfile" ]; then
-            echo "Building current app image..."
-            cd "$GITHUB_WORKSPACE/current"
-            CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
-            docker build -t ydb-app-current \
-              --build-arg SRC_PATH=${{ matrix.sdk.label }} \
-              --build-arg JOB_NAME=${{ matrix.sdk.name }} \
-              --build-arg REF="${CURRENT_REF}" \
-              -f tests/slo/Dockerfile .
-          else
-            echo "No current app Dockerfile found"
-            exit 1
-          fi
+          SCRIPT="$GITHUB_WORKSPACE/current/.github/scripts/build-slo-image.sh"
+          CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
 
-          # Build baseline version
-          if [ -f "$GITHUB_WORKSPACE/baseline/tests/slo/Dockerfile" ]; then
-            echo "Building baseline app image..."
-            cd "$GITHUB_WORKSPACE/baseline"
+          bash "$SCRIPT" \
+            --context "$GITHUB_WORKSPACE/current" \
+            --tag "ydb-app-current" \
+            --ref "${CURRENT_REF}" \
+            --src-path "${{ matrix.sdk.label }}" \
+            --job-name "${{ matrix.sdk.name }}"
 
-            # Copy current versions of build infrastructure to baseline
-            echo "Copying current Dockerfile, go.mod, go.sum, and internal to baseline..."
-            cp "$GITHUB_WORKSPACE/current/tests/slo/Dockerfile" "$GITHUB_WORKSPACE/baseline/tests/slo/Dockerfile"
-            cp "$GITHUB_WORKSPACE/current/tests/slo/go.mod" "$GITHUB_WORKSPACE/baseline/tests/slo/go.mod"
-            cp "$GITHUB_WORKSPACE/current/tests/slo/go.sum" "$GITHUB_WORKSPACE/baseline/tests/slo/go.sum"
-            rm -rf "$GITHUB_WORKSPACE/baseline/tests/slo/internal"
-            cp -r "$GITHUB_WORKSPACE/current/tests/slo/internal" "$GITHUB_WORKSPACE/baseline/tests/slo/internal"
-
-            docker build -t ydb-app-baseline \
-              --build-arg SRC_PATH=${{ matrix.sdk.label }} \
-              --build-arg JOB_NAME=${{ matrix.sdk.name }} \
-              --build-arg REF="${{ steps.baseline.outputs.ref }}" \
-              -f tests/slo/Dockerfile .
-          else
-            echo "No baseline app Dockerfile found"
-            exit 1
-          fi
+          bash "$SCRIPT" \
+            --context "$GITHUB_WORKSPACE/baseline" \
+            --tag "ydb-app-baseline" \
+            --ref "${{ steps.baseline.outputs.ref }}" \
+            --src-path "${{ matrix.sdk.label }}" \
+            --job-name "${{ matrix.sdk.name }}" \
+            --fallback-image "ydb-app-current"
 
       - name: Initialize YDB SLO
-        uses: ydb-platform/ydb-slo-action/init@main
+        id: ydb_slo
+        uses: ydb-platform/ydb-slo-action/init@228eb3f967eb37019e4d56d0cebf854e085202be
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workload_name: ${{ matrix.sdk.name }}
           workload_current_ref: ${{ github.head_ref || github.ref_name }}
           workload_baseline_ref: ${{ steps.baseline.outputs.ref }}
+          disable_compose_profiles: "${{ matrix.sdk.id == 'native_node_hints' && 'chaos' || '' }}"
+          metrics_yaml: |
+            metrics:
+              - name: node_hints_misses
+                type: instant
+                query: sum by(ref) (workload_node_hints_misses)
 
       - name: Prepare SLO Database
         run: |
           echo "Preparing SLO database..."
+          CREATE_EXTRA_ARGS="${{ matrix.sdk.create_extra_args }}"
           docker run --rm --network ydb_ydb-net \
             --add-host "ydb:172.28.0.11" \
             --add-host "ydb:172.28.0.12" \
             --add-host "ydb:172.28.0.13" \
             --add-host "ydb:172.28.0.99" \
-            ydb-app-current create grpc://ydb:2136 /Root/testdb
+            ydb-app-current create grpc://ydb:2136 /Root/testdb $CREATE_EXTRA_ARGS
 
       - name: Run SLO Tests (parallel)
         timeout-minutes: 15
+        env:
+          DURATION: ${{ matrix.sdk.slo_workload_duration_seconds || 600 }}
+          READ_RPS: ${{ matrix.sdk.slo_workload_read_max_rps || 1000 }}
+          WRITE_RPS: ${{ matrix.sdk.slo_workload_write_max_rps || 1000 }}
+          RUN_EXTRA_ARGS: ${{ format('{0} -prometheus-endpoint {1}',matrix.sdk.run_extra_args,steps.ydb_slo.outputs.ydb-prometheus-url)}}
         run: |
-          DURATION=${{ inputs.slo_workload_duration_seconds || 600 }}
-          READ_RPS=${{ inputs.slo_workload_read_max_rps || 1000 }}
-          WRITE_RPS=${{ inputs.slo_workload_write_max_rps || 1000 }}
-
-          EXTRA_ARGS=""
-          if [ "${{ matrix.sdk.id }}" = "native_bulk_upsert" ]; then
-            EXTRA_ARGS="--batch-size=10"
-          fi
-
           ARGS="run grpc://ydb:2136 /Root/testdb \
             -otlp-endpoint prometheus:9090 \
             -report-period 250 \
@@ -217,7 +222,7 @@ jobs:
             -write-rps $WRITE_RPS \
             -read-timeout 100 \
             -write-timeout 100 \
-            $EXTRA_ARGS"
+            $RUN_EXTRA_ARGS"
 
           echo "Starting ydb-app-current..."
           docker run -d \

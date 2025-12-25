@@ -134,7 +134,7 @@ func (b *Worker) init() {
 		b.tasks = make(chan backgroundTask)
 		b.tasksCompleted = make(empty.Chan)
 
-		pprof.Do(b.ctx, pprof.Labels("worker-name", b.name), func(ctx context.Context) {
+		pprof.Do(b.ctx, pprof.Labels("worker_name", b.name), func(ctx context.Context) {
 			go b.starterLoop(ctx)
 		})
 	})

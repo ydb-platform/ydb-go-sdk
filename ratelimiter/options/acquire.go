@@ -2,10 +2,6 @@ package options
 
 import "time"
 
-const (
-	DefaultDecrease = 100 * time.Millisecond
-)
-
 type AcquireType uint8
 
 const (
@@ -37,7 +33,7 @@ func (h *acquireOptionsHolder) OperationTimeout() time.Duration {
 }
 
 func (h *acquireOptionsHolder) OperationCancelAfter() time.Duration {
-	return h.operationTimeout
+	return h.operationCancelAfter
 }
 
 func (h *acquireOptionsHolder) Type() AcquireType {

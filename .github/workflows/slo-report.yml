@@ -17,10 +17,15 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Publish YDB SLO Report
-        uses: ydb-platform/ydb-slo-action/report@main
+        uses: ydb-platform/ydb-slo-action/report@228eb3f967eb37019e4d56d0cebf854e085202be
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_run_id: ${{ github.event.workflow_run.id }}
+          thresholds_yaml: |
+            metrics:
+              - name: "node_hints_misses"
+                direction: lower_is_better
+                critical_max: 0 # more than zero and node_hints workload fails
   remove-slo-label:
     needs: test-ydb-slo-action
     if: always() && github.event.workflow_run.event == 'pull_request'

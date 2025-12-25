@@ -6,8 +6,8 @@ on:
 
 jobs:
   check-slo-label:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
     runs-on: ubuntu-latest
-
     steps:
       - name: Fail if SLO label is missing
         if: "!contains(github.event.pull_request.labels.*.name, 'SLO')"

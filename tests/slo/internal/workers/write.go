@@ -11,7 +11,7 @@ import (
 	"slo/internal/metrics"
 )
 
-func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter, gen *generator.Generator) {
+func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter, gen generator.Generator) {
 	defer wg.Done()
 	for {
 		select {
@@ -33,7 +33,7 @@ func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limite
 	}
 }
 
-func (w *Workers) write(ctx context.Context, gen *generator.Generator) (finalErr error) {
+func (w *Workers) write(ctx context.Context, gen generator.Generator) (finalErr error) {
 	m := w.m.Start(metrics.OperationTypeWrite)
 	var attempts int
 	if w.s != nil {

@@ -127,7 +127,6 @@ func main() {
 		go w.Metrics(ctx, &wg, metricsRL)
 
 		wg.Wait()
-		w.FailOnError()
 	default:
 		panic(fmt.Errorf("unknown mode: %v", cfg.Mode))
 	}
