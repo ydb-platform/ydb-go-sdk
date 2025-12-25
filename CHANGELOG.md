@@ -1,5 +1,33 @@
+## v3.125.0
+* Added `WithConcurrentResultSets` option for `db.Query().Query()`
+* Added `DefaultValue` field to `table/options.Column` struct
+
+## v3.124.1
+* Fixed bug with incorrect conversion of `time.Duration` to `Interval64`, which was previously using nanoseconds instead of microseconds
+
+## v3.124.0
+* Fixed UUID scanning with `database/sql` when using types implementing `sql.Scanner` interface (like `uuid.UUID`)
+
+## v3.123.1
+* Fixed `pool.getItem()` panics, if unable to give session for preferred node ID
+
+## v3.123.0
+* Moved `internal/decimal` package to `pkg/decimal` for public usage
+
+## v3.122.0
+* Added `trace.NodeHintInfo` field for OnPoolGet trace callback which stores info for node hint misses
+* Added `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics for node hint misses
+
+## v3.121.1
+* Added support for `Timestamp64` type in `value.Any` converter
+* Masked the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
+* Fixed issue with topic offsets update in transactions
+
+## v3.121.0
+* Changed internal pprof label to pyroscope supported format
 * Added `query.ImplicitTxControl()` transaction control (the same as `query.NoTx()` and `query.EmptyTxControl()`). See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
 * Added `SnapshotReadWrite` isolation mode support to `database/sql` driver using `sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: false}`
+* Moved `internal/ratelimiter/options` to `ratelimiter/options` for public usage
 
 ## v3.120.0
 * Added support of `SnapshotReadWrite` isolation mode into query and table clients
@@ -18,7 +46,6 @@
 ## v3.118.1
 * Fixed connection timeout issue in topics writer
 * Supported `sql.Null*` from `database/sql` as query params in `toValue` func
-* Added `WithConcurrentResultSets` option for `db.Query().Query()`
 
 ## v3.118.0
 * Added support for nullable `Date32`, `Datetime64`, `Timestamp64`, and `Interval64` types in the `optional` parameter builder

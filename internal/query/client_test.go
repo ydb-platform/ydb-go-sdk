@@ -852,14 +852,32 @@ func TestClient(t *testing.T) {
 		})
 	})
 	t.Run("Query", func(t *testing.T) {
-		mkU64 := func(v uint64) *Ydb.Value {
+		_uint64 := func(v uint64) *Ydb.Value {
 			return &Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: v}}
 		}
-		mkStr := func(v string) *Ydb.Value {
+		_str := func(v string) *Ydb.Value {
 			return &Ydb.Value{Value: &Ydb.Value_TextValue{TextValue: v}}
 		}
-		mkBool := func(v bool) *Ydb.Value {
+		_bool := func(v bool) *Ydb.Value {
 			return &Ydb.Value{Value: &Ydb.Value_BoolValue{BoolValue: v}}
+		}
+		_respPart := func(idx int, columns []*Ydb.Column, rows [][]*Ydb.Value) *Ydb_Query.ExecuteQueryResponsePart {
+			return &Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+				ResultSetIndex: int64(idx),
+				ResultSet: &Ydb.ResultSet{
+					Columns: columns,
+					Rows: func() []*Ydb.Value {
+						out := make([]*Ydb.Value, len(rows))
+						for i, items := range rows {
+							out[i] = &Ydb.Value{Items: items}
+						}
+
+						return out
+					}(),
+				},
+			}
 		}
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -884,24 +902,24 @@ func TestClient(t *testing.T) {
 					idx:     0,
 					columns: colsAB,
 					rows: [][]*Ydb.Value{
-						{mkU64(1), mkStr("1")},
-						{mkU64(2), mkStr("2")},
-						{mkU64(3), mkStr("3")},
+						{_uint64(1), _str("1")},
+						{_uint64(2), _str("2")},
+						{_uint64(3), _str("3")},
 					},
 				},
 				{
 					idx: 0,
 					rows: [][]*Ydb.Value{
-						{mkU64(4), mkStr("4")},
-						{mkU64(5), mkStr("5")},
+						{_uint64(4), _str("4")},
+						{_uint64(5), _str("5")},
 					},
 				},
 				{
 					idx:     1,
 					columns: colsCDE,
 					rows: [][]*Ydb.Value{
-						{mkU64(1), mkStr("1"), mkBool(true)},
-						{mkU64(2), mkStr("2"), mkBool(false)},
+						{_uint64(1), _str("1"), _bool(true)},
+						{_uint64(2), _str("2"), _bool(false)},
 					},
 				},
 			}
@@ -910,22 +928,7 @@ func TestClient(t *testing.T) {
 
 			for _, p := range respParts {
 				stream.EXPECT().Recv().Return(
-					&Ydb_Query.ExecuteQueryResponsePart{
-						Status:         Ydb.StatusIds_SUCCESS,
-						TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
-						ResultSetIndex: int64(p.idx),
-						ResultSet: &Ydb.ResultSet{
-							Columns: p.columns,
-							Rows: func() []*Ydb.Value {
-								out := make([]*Ydb.Value, len(p.rows))
-								for i, items := range p.rows {
-									out[i] = &Ydb.Value{Items: items}
-								}
-
-								return out
-							}(),
-						},
-					},
+					_respPart(p.idx, p.columns, p.rows),
 					nil,
 				)
 			}
@@ -954,7 +957,130 @@ func TestClient(t *testing.T) {
 					{5, "5"},
 				} {
 					row, err := rs.NextRow(ctx)
-					if want.a == 5 { // последний перед EOF
+					if want.a == 5 {
+						require.NoError(t, err)
+					}
+					if errors.Is(err, io.EOF) {
+						require.Fail(t, "unexpected EOF")
+					}
+					var a uint64
+					var b string
+					require.NoError(t, row.Scan(&a, &b))
+					require.EqualValues(t, want.a, a)
+					require.EqualValues(t, want.b, b)
+				}
+				row, err := rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+				require.Nil(t, row)
+			}
+
+			{
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+
+				for _, want := range []struct {
+					a uint64
+					b string
+					c bool
+				}{
+					{1, "1", true},
+					{2, "2", false},
+				} {
+					row, err := rs.NextRow(ctx)
+					require.NoError(t, err)
+					var a uint64
+					var b string
+					var c bool
+					require.NoError(t, row.Scan(&a, &b, &c))
+					require.EqualValues(t, want.a, a)
+					require.EqualValues(t, want.b, b)
+					require.EqualValues(t, want.c, c)
+				}
+
+				row, err := rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+				require.Nil(t, row)
+			}
+		})
+		t.Run("ResultSetIndexesWithGaps", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			colsAB := []*Ydb.Column{
+				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+			}
+
+			colsCDE := []*Ydb.Column{
+				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+				{Name: "d", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+				{Name: "e", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
+			}
+
+			respParts := []struct {
+				idx     int
+				columns []*Ydb.Column
+				rows    [][]*Ydb.Value
+			}{
+				{
+					idx:     0,
+					columns: colsAB,
+					rows: [][]*Ydb.Value{
+						{_uint64(1), _str("1")},
+						{_uint64(2), _str("2")},
+						{_uint64(3), _str("3")},
+					},
+				},
+				{
+					idx: 0,
+					rows: [][]*Ydb.Value{
+						{_uint64(4), _str("4")},
+						{_uint64(5), _str("5")},
+					},
+				},
+				{
+					idx:     2,
+					columns: colsCDE,
+					rows: [][]*Ydb.Value{
+						{_uint64(1), _str("1"), _bool(true)},
+						{_uint64(2), _str("2"), _bool(false)},
+					},
+				},
+			}
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+
+			for _, p := range respParts {
+				stream.EXPECT().Recv().Return(
+					_respPart(p.idx, p.columns, p.rows),
+					nil,
+				)
+			}
+
+			stream.EXPECT().Recv().Return(nil, io.EOF)
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
+				return newTestSessionWithClient("123", client, true), nil
+			}), "")
+			require.NoError(t, err)
+
+			{
+				rs, err := r.NextResultSet(ctx)
+				require.NoError(t, err)
+				for _, want := range []struct {
+					a uint64
+					b string
+				}{
+					{1, "1"},
+					{2, "2"},
+					{3, "3"},
+					{4, "4"},
+					{5, "5"},
+				} {
+					row, err := rs.NextRow(ctx)
+					if want.a == 5 {
 						require.NoError(t, err)
 					}
 					if errors.Is(err, io.EOF) {
@@ -1022,24 +1148,24 @@ func TestClient(t *testing.T) {
 					idx:     0,
 					columns: colsAB,
 					rows: [][]*Ydb.Value{
-						{mkU64(1), mkStr("1")},
-						{mkU64(2), mkStr("2")},
-						{mkU64(3), mkStr("3")},
+						{_uint64(1), _str("1")},
+						{_uint64(2), _str("2")},
+						{_uint64(3), _str("3")},
 					},
 				},
 				{
 					idx:     1,
 					columns: colsCDE,
 					rows: [][]*Ydb.Value{
-						{mkU64(1), mkStr("1"), mkBool(true)},
-						{mkU64(2), mkStr("2"), mkBool(false)},
+						{_uint64(1), _str("1"), _bool(true)},
+						{_uint64(2), _str("2"), _bool(false)},
 					},
 				},
 				{
 					idx: 0,
 					rows: [][]*Ydb.Value{
-						{mkU64(4), mkStr("4")},
-						{mkU64(5), mkStr("5")},
+						{_uint64(4), _str("4")},
+						{_uint64(5), _str("5")},
 					},
 				},
 			}
@@ -1048,22 +1174,7 @@ func TestClient(t *testing.T) {
 
 			for _, p := range respParts {
 				stream.EXPECT().Recv().Return(
-					&Ydb_Query.ExecuteQueryResponsePart{
-						Status:         Ydb.StatusIds_SUCCESS,
-						TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
-						ResultSetIndex: int64(p.idx),
-						ResultSet: &Ydb.ResultSet{
-							Columns: p.columns,
-							Rows: func() []*Ydb.Value {
-								out := make([]*Ydb.Value, len(p.rows))
-								for i, items := range p.rows {
-									out[i] = &Ydb.Value{Items: items}
-								}
-
-								return out
-							}(),
-						},
-					},
+					_respPart(p.idx, p.columns, p.rows),
 					nil,
 				)
 			}
@@ -1136,154 +1247,6 @@ func TestClient(t *testing.T) {
 				require.ErrorIs(t, err, io.EOF)
 				require.Nil(t, row)
 			}
-		})
-		t.Run("ConcurrentResultSetsNonSequentialIndices", func(t *testing.T) {
-			// Этот тест демонстрирует критическую проблему (BUG) с непоследовательными индексами result sets.
-			//
-			// Проблема: Когда result sets имеют непоследовательные индексы (например, 0, 2, 5 вместо 0, 1, 2),
-			// текущая реализация в resultToMaterializedResult создает слайс размером len(resultSetByIndex) = 3,
-			// но затем пытается записать result set с индексом 5 в этот слайс, что приводит к панике:
-			// "runtime error: index out of range [5] with length 3"
-			//
-			// Ожидаемое поведение: Код должен найти максимальный индекс (5) и создать слайс размером maxIndex+1,
-			// чтобы вместить все result sets независимо от их индексов.
-			//
-			// Этот тест должен падать с паникой до исправления бага и проходить после исправления.
-			ctrl := gomock.NewController(t)
-
-			colsRS0 := []*Ydb.Column{
-				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
-			}
-
-			colsRS2 := []*Ydb.Column{
-				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
-			}
-
-			colsRS5 := []*Ydb.Column{
-				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
-			}
-
-			// Создаем result sets с непоследовательными индексами: 0, 2, 5
-			respParts := []struct {
-				idx     int
-				columns []*Ydb.Column
-				rows    [][]*Ydb.Value
-			}{
-				{
-					idx:     0,
-					columns: colsRS0,
-					rows: [][]*Ydb.Value{
-						{mkU64(100)},
-					},
-				},
-				{
-					idx:     2,
-					columns: colsRS2,
-					rows: [][]*Ydb.Value{
-						{mkStr("result_set_2")},
-					},
-				},
-				{
-					idx:     5,
-					columns: colsRS5,
-					rows: [][]*Ydb.Value{
-						{mkBool(true)},
-					},
-				},
-			}
-
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-
-			for _, p := range respParts {
-				stream.EXPECT().Recv().Return(
-					&Ydb_Query.ExecuteQueryResponsePart{
-						Status:         Ydb.StatusIds_SUCCESS,
-						TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
-						ResultSetIndex: int64(p.idx),
-						ResultSet: &Ydb.ResultSet{
-							Columns: p.columns,
-							Rows: func() []*Ydb.Value {
-								out := make([]*Ydb.Value, len(p.rows))
-								for i, items := range p.rows {
-									out[i] = &Ydb.Value{Items: items}
-								}
-
-								return out
-							}(),
-						},
-					},
-					nil,
-				)
-			}
-
-			stream.EXPECT().Recv().Return(nil, io.EOF)
-
-			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
-
-			// Этот вызов должен привести к панике из-за выхода за границы массива
-			// при попытке записать result set с индексом 5 в слайс размером 3
-			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
-				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
-
-			// Если код исправлен правильно, ошибки не должно быть
-			// Если код содержит баг, здесь будет паника: "runtime error: index out of range [5] with length 3"
-			require.NoError(t, err)
-
-			// Проверяем, что все result sets доступны в правильном порядке
-			{
-				// Result set 0
-				rs, err := r.NextResultSet(ctx)
-				require.NoError(t, err)
-				require.Equal(t, 0, rs.Index())
-
-				row, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				var a uint64
-				require.NoError(t, row.Scan(&a))
-				require.EqualValues(t, 100, a)
-
-				row, err = rs.NextRow(ctx)
-				require.ErrorIs(t, err, io.EOF)
-			}
-
-			{
-				// Result set 2
-				rs, err := r.NextResultSet(ctx)
-				require.NoError(t, err)
-				require.Equal(t, 2, rs.Index())
-
-				row, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				var b string
-				require.NoError(t, row.Scan(&b))
-				require.EqualValues(t, "result_set_2", b)
-
-				row, err = rs.NextRow(ctx)
-				require.ErrorIs(t, err, io.EOF)
-			}
-
-			{
-				// Result set 5
-				rs, err := r.NextResultSet(ctx)
-				require.NoError(t, err)
-				require.Equal(t, 5, rs.Index())
-
-				row, err := rs.NextRow(ctx)
-				require.NoError(t, err)
-				var c bool
-				require.NoError(t, row.Scan(&c))
-				require.EqualValues(t, true, c)
-
-				row, err = rs.NextRow(ctx)
-				require.ErrorIs(t, err, io.EOF)
-			}
-
-			// Проверяем, что больше нет result sets
-			rs, err := r.NextResultSet(ctx)
-			require.ErrorIs(t, err, io.EOF)
-			require.Nil(t, rs)
 		})
 		t.Run("CancelWhileReadResult", func(t *testing.T) {
 			ctrl := gomock.NewController(t)

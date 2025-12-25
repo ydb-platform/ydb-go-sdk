@@ -404,7 +404,6 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-
 		defer func() {
 			_ = streamResult.Close(ctx)
 		}()
@@ -686,11 +685,16 @@ func poolTrace(t *trace.Query) *pool.Trace {
 				onDone(err)
 			}
 		},
-		OnGet: func(ctx *context.Context, call stack.Caller) func(item any, attempts int, err error) {
+		OnGet: func(ctx *context.Context, call stack.Caller) func(
+			item any,
+			attempts int,
+			hint *trace.NodeHintInfo,
+			err error,
+		) {
 			onDone := trace.QueryOnPoolGet(t, ctx, call)
 
-			return func(item any, attempts int, err error) {
-				onDone(item.(*Session), attempts, err) //nolint:forcetypeassert
+			return func(item any, attempts int, hint *trace.NodeHintInfo, err error) {
+				onDone(item.(*Session), attempts, hint, err) //nolint:forcetypeassert
 			}
 		},
 		OnChange: func(stats pool.Stats) {
