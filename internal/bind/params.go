@@ -126,8 +126,107 @@ func asSQLNullValue(v any) (value.Value, bool) {
 	return value.OptionalValue(val), true
 }
 
-func toType(v any) (_ types.Type, err error) { //nolint:funlen
-	switch x := v.(type) {
+func basicKindToType(kind reflect.Kind) types.Type {
+	switch kind {
+	case reflect.String:
+		return types.Text
+	case reflect.Int:
+		return types.Int32
+	case reflect.Int8:
+		return types.Int8
+	case reflect.Int16:
+		return types.Int16
+	case reflect.Int32:
+		return types.Int32
+	case reflect.Int64:
+		return types.Int64
+	case reflect.Uint:
+		return types.Uint32
+	case reflect.Uint8:
+		return types.Uint8
+	case reflect.Uint16:
+		return types.Uint16
+	case reflect.Uint32:
+		return types.Uint32
+	case reflect.Uint64:
+		return types.Uint64
+	case reflect.Float32:
+		return types.Float
+	case reflect.Float64:
+		return types.Double
+	case reflect.Bool:
+		return types.Bool
+	default:
+		return nil
+	}
+}
+
+func sliceArrayToType(v reflect.Value, x any) (types.Type, error) {
+	// Special handling for byte slices ([]byte and type aliases)
+	if v.Type().Elem().Kind() == reflect.Uint8 {
+		return types.Bytes, nil
+	}
+	t, err := toType(reflect.New(v.Type().Elem()).Elem().Interface())
+	if err != nil {
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("cannot parse slice item type %T: %w",
+				x, errUnsupportedType,
+			),
+		)
+	}
+
+	return types.NewList(t), nil
+}
+
+func mapToType(v reflect.Value) (types.Type, error) {
+	keyType, err := toType(reflect.New(v.Type().Key()).Interface())
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse %T map key: %w",
+			reflect.New(v.Type().Key()).Interface(), err,
+		)
+	}
+	valueType, err := toType(reflect.New(v.Type().Elem()).Interface())
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse %T map value: %w",
+			v.MapKeys()[0].Interface(), err,
+		)
+	}
+
+	return types.NewDict(keyType, valueType), nil
+}
+
+func structToType(v reflect.Value) (types.Type, error) {
+	fields := make([]types.StructField, v.NumField())
+
+	for i := range fields {
+		kk, has := v.Type().Field(i).Tag.Lookup("sql")
+		if !has {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("cannot parse %v as key field of struct: %w",
+					v.Field(i).Interface(), errUnsupportedType,
+				),
+			)
+		}
+		tt, err := toType(v.Field(i).Interface())
+		if err != nil {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("cannot parse %v as values of dict: %w",
+					v.Field(i).Interface(), errUnsupportedType,
+				),
+			)
+		}
+
+		fields[i] = types.StructField{
+			Name: kk,
+			T:    tt,
+		}
+	}
+
+	return types.NewStruct(fields...), nil
+}
+
+func concreteTypeToType(v any) (types.Type, error) {
+	switch v.(type) {
 	case bool:
 		return types.Bool, nil
 	case int:
@@ -165,106 +264,36 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen
 	case time.Duration:
 		return types.Interval, nil
 	default:
-		kind := reflect.TypeOf(x).Kind()
-		switch kind {
-		case reflect.String:
-			return types.Text, nil
-		case reflect.Int:
-			return types.Int32, nil
-		case reflect.Int8:
-			return types.Int8, nil
-		case reflect.Int16:
-			return types.Int16, nil
-		case reflect.Int32:
-			return types.Int32, nil
-		case reflect.Int64:
-			return types.Int64, nil
-		case reflect.Uint:
-			return types.Uint32, nil
-		case reflect.Uint8:
-			return types.Uint8, nil
-		case reflect.Uint16:
-			return types.Uint16, nil
-		case reflect.Uint32:
-			return types.Uint32, nil
-		case reflect.Uint64:
-			return types.Uint64, nil
-		case reflect.Float32:
-			return types.Float, nil
-		case reflect.Float64:
-			return types.Double, nil
-		case reflect.Bool:
-			return types.Bool, nil
-		case reflect.Slice, reflect.Array:
-			v := reflect.ValueOf(x)
-			// Special handling for byte slices ([]byte and type aliases)
-			if v.Type().Elem().Kind() == reflect.Uint8 {
-				return types.Bytes, nil
-			}
-			t, err := toType(reflect.New(v.Type().Elem()).Elem().Interface())
-			if err != nil {
-				return nil, xerrors.WithStackTrace(
-					fmt.Errorf("cannot parse slice item type %T: %w",
-						x, errUnsupportedType,
-					),
-				)
-			}
+		// Return nil type to indicate that concrete type was not found
+		// This is not an error, just means we need to check reflect.Kind()
+		return nil, nil //nolint:nilnil
+	}
+}
 
-			return types.NewList(t), nil
-		case reflect.Map:
-			v := reflect.ValueOf(x)
+func toType(v any) (_ types.Type, err error) {
+	if t, err := concreteTypeToType(v); err != nil || t != nil {
+		return t, err
+	}
 
-			keyType, err := toType(reflect.New(v.Type().Key()).Interface())
-			if err != nil {
-				return nil, fmt.Errorf("cannot parse %T map key: %w",
-					reflect.New(v.Type().Key()).Interface(), err,
-				)
-			}
-			valueType, err := toType(reflect.New(v.Type().Elem()).Interface())
-			if err != nil {
-				return nil, fmt.Errorf("cannot parse %T map value: %w",
-					v.MapKeys()[0].Interface(), err,
-				)
-			}
+	kind := reflect.TypeOf(v).Kind()
+	if t := basicKindToType(kind); t != nil {
+		return t, nil
+	}
 
-			return types.NewDict(keyType, valueType), nil
-		case reflect.Struct:
-			v := reflect.ValueOf(x)
-
-			fields := make([]types.StructField, v.NumField())
-
-			for i := range fields {
-				kk, has := v.Type().Field(i).Tag.Lookup("sql")
-				if !has {
-					return nil, xerrors.WithStackTrace(
-						fmt.Errorf("cannot parse %v as key field of struct: %w",
-							v.Field(i).Interface(), errUnsupportedType,
-						),
-					)
-				}
-				tt, err := toType(v.Field(i).Interface())
-				if err != nil {
-					return nil, xerrors.WithStackTrace(
-						fmt.Errorf("cannot parse %v as values of dict: %w",
-							v.Field(i).Interface(), errUnsupportedType,
-						),
-					)
-				}
-
-				fields[i] = types.StructField{
-					Name: kk,
-					T:    tt,
-				}
-			}
-
-			return types.NewStruct(fields...), nil
-		default:
-			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("%T: %w. Create issue for support new type %s",
-					x, errUnsupportedType, supportNewTypeLink(x),
-				),
-			)
-		}
+	rv := reflect.ValueOf(v)
+	switch kind {
+	case reflect.Slice, reflect.Array:
+		return sliceArrayToType(rv, v)
+	case reflect.Map:
+		return mapToType(rv)
+	case reflect.Struct:
+		return structToType(rv)
+	default:
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("%T: %w. Create issue for support new type %s",
+				v, errUnsupportedType, supportNewTypeLink(v),
+			),
+		)
 	}
 }
 
