@@ -34,14 +34,17 @@ func query(config Config) (t trace.Query) {
 			}
 		}
 		{
-			nodeHintMiss := poolConfig.CounterVec("node_hint_miss", "preferred_node_id", "session_node_id")
+			nodeHint := poolConfig.CounterVec("node_hint", "preferred_node_id", "session_node_id", "hit")
 			t.OnPoolGet = func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
 				return func(info trace.QueryPoolGetDoneInfo) {
 					if poolConfig.Details()&trace.QueryPoolEvents != 0 {
 						if info.NodeHintInfo != nil {
-							nodeHintMiss.With(map[string]string{
-								"preferred_node_id": idToString(info.NodeHintInfo.PreferredNodeID),
-								"session_node_id":   idToString(info.NodeHintInfo.SessionNodeID),
+							preferred := idToString(info.NodeHintInfo.PreferredNodeID)
+							actual := idToString(info.NodeHintInfo.SessionNodeID)
+							nodeHint.With(map[string]string{
+								"preferred_node_id": preferred,
+								"session_node_id":   actual,
+								"hit":               nodeHintHitString(preferred, actual),
 							}).Inc()
 						}
 					}
