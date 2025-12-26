@@ -26,6 +26,56 @@ const (
 	decimalScale     uint32 = 9
 )
 
+// castToDerivedType attempts to cast a value to a derived type using reflection.
+//
+// This function is called from the default case of each Value.castTo method when
+// the standard type assertions fail. It handles conversion to derived types
+// (type aliases) that have the same underlying kind as the source value.
+//
+// Example: If srcValue is int32(42) and dst is *testInt32 (where testInt32 is
+// defined as `type testInt32 int32`), this function will successfully convert
+// the value.
+//
+// Limitations:
+//   - dst must be a pointer to the target type
+//   - The source and destination must have the same underlying kind
+//   - For slices, only []byte-derived types are supported
+//
+// Returns ErrCannotCast if the conversion is not possible.
+func castToDerivedType(srcValue any, dst any) error {
+	dstValue := reflect.ValueOf(dst)
+	if dstValue.Kind() != reflect.Pointer {
+		return ErrCannotCast
+	}
+
+	dstType := dstValue.Type().Elem()
+	dstKind := dstType.Kind()
+
+	// Get source type and kind - optimize by getting type from value if possible
+	srcType := reflect.TypeOf(srcValue)
+	srcKind := srcType.Kind()
+
+	// Special handling for slices (e.g., []byte -> testBytes where testBytes is []byte)
+	if srcKind == reflect.Slice && dstKind == reflect.Slice {
+		if dstType.Elem().Kind() == reflect.Uint8 {
+			srcVal := reflect.ValueOf(srcValue)
+			dstValue.Elem().Set(srcVal.Convert(dstType))
+
+			return nil
+		}
+	}
+
+	// For other types, check if underlying kinds match
+	if srcKind == dstKind {
+		srcVal := reflect.ValueOf(srcValue)
+		dstValue.Elem().Set(srcVal.Convert(dstType))
+
+		return nil
+	}
+
+	return ErrCannotCast
+}
+
 type Value interface {
 	Type() types.Type
 	Yql() string
@@ -334,6 +384,11 @@ func (v boolValue) castTo(dst any) error {
 
 		return nil
 	default:
+		// Try to handle derived types via reflection
+		if err := castToDerivedType(bool(v), dst); err == nil {
+			return nil
+		}
+
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
 			ErrCannotCast, v.Type().Yql(), v, vv,
@@ -500,6 +555,13 @@ func (v datetimeValue) castTo(dst any) error {
 
 		return nil
 	default:
+		// Try to handle derived types from time.Time via castToDerivedType
+		// First convert datetimeValue to time.Time, then use castToDerivedType
+		dt := DatetimeToTime(uint32(v))
+		if err := castToDerivedType(dt, dst); err == nil {
+			return nil
+		}
+
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
 			ErrCannotCast, v.Type().Yql(), v, vv,
@@ -788,6 +850,11 @@ func (v *doubleValue) castTo(dst any) error {
 
 		return nil
 	default:
+		// Try to handle derived types via reflection
+		if err := castToDerivedType(v.value, dst); err == nil {
+			return nil
+		}
+
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
 			ErrCannotCast, v.Type().Yql(), v, vv,
@@ -1095,6 +1162,11 @@ func (v int32Value) castTo(dst any) error {
 
 		return nil
 	default:
+		// Try to handle derived types via reflection
+		if err := castToDerivedType(int32(v), dst); err == nil {
+			return nil
+		}
+
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
 			ErrCannotCast, v.Type().Yql(), v, vv,
@@ -2441,6 +2513,11 @@ func (v uint64Value) castTo(dst any) error {
 		return nil
 
 	default:
+		// Try to handle derived types via reflection
+		if err := castToDerivedType(uint64(v), dst); err == nil {
+			return nil
+		}
+
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
 			ErrCannotCast, v.Type().Yql(), v, vv,
@@ -2485,6 +2562,11 @@ func (v textValue) castTo(dst any) error {
 
 		return nil
 	default:
+		// Try to handle derived types via reflection
+		if err := castToDerivedType(string(v), dst); err == nil {
+			return nil
+		}
+
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%q)' to '%T' destination",
 			ErrCannotCast, v.Type().Yql(), v, vv,
@@ -3116,6 +3198,11 @@ func (v bytesValue) castTo(dst any) error {
 
 		return nil
 	default:
+		// Try to handle derived types via reflection
+		if err := castToDerivedType([]byte(v), dst); err == nil {
+			return nil
+		}
+
 		return xerrors.WithStackTrace(fmt.Errorf(
 			"%w '%s(%+v)' to '%T' destination",
 			ErrCannotCast, v.Type().Yql(), v, vv,

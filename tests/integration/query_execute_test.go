@@ -1046,3 +1046,73 @@ func TestIssue1878ConcurrentResultSet(t *testing.T) {
 		require.Equal(t, 5, rsCount)
 	})
 }
+
+func TestQueryDerivedTypesScan(t *testing.T) {
+	scope := newScope(t)
+	driver := scope.Driver()
+
+	// Prepare test data with derived types
+	var (
+		inputInt32   = testInt32(42)
+		inputUint64  = testUint64(100)
+		inputFloat64 = testFloat64(3.14)
+		inputString  = testString("hello")
+		inputBool    = testBool(true)
+		inputBytes   = testBytes("world")
+		dt           = time.Date(2023, 3, 1, 16, 34, 18, 0, time.UTC)
+	)
+
+	// Query with parameters and scan into derived types
+	row, err := driver.Query().QueryRow(scope.Ctx, `
+		DECLARE $vInt32 AS Int32;
+		DECLARE $vUint64 AS Uint64;
+		DECLARE $vFloat64 AS Double;
+		DECLARE $vString AS Utf8;
+		DECLARE $vBool AS Bool;
+		DECLARE $vBytes AS String;
+		DECLARE $vDateTime AS DateTime;
+		
+		SELECT 
+			$vInt32 AS vInt32,
+			$vUint64 AS vUint64,
+			$vFloat64 AS vFloat64,
+			$vString AS vString,
+			$vBool AS vBool,
+			$vBytes AS vBytes,
+			$vDateTime AS vDateTime;
+	`,
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$vInt32").Int32(int32(inputInt32)).
+				Param("$vUint64").Uint64(uint64(inputUint64)).
+				Param("$vFloat64").Double(float64(inputFloat64)).
+				Param("$vString").Text(string(inputString)).
+				Param("$vBool").Bool(bool(inputBool)).
+				Param("$vBytes").Bytes([]byte(inputBytes)).
+				Param("$vDateTime").Datetime(dt).
+				Build(),
+		),
+	)
+	scope.Require.NoError(err)
+
+	var (
+		resInt32    testInt32
+		resUint64   testUint64
+		resFloat64  testFloat64
+		resString   testString
+		resBool     testBool
+		resBytes    testBytes
+		resDateTime time.Time
+	)
+
+	err = row.Scan(&resInt32, &resUint64, &resFloat64, &resString, &resBool, &resBytes, &resDateTime)
+	scope.Require.NoError(err)
+
+	scope.Require.Equal(inputInt32, resInt32)
+	scope.Require.Equal(inputUint64, resUint64)
+	scope.Require.Equal(inputFloat64, resFloat64)
+	scope.Require.Equal(inputString, resString)
+	scope.Require.Equal(inputBool, resBool)
+	scope.Require.Equal(inputBytes, resBytes)
+	scope.Require.Equal(dt, resDateTime.UTC())
+}
