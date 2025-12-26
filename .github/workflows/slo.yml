@@ -181,7 +181,7 @@ jobs:
 
       - name: Initialize YDB SLO
         id: ydb_slo
-        uses: ydb-platform/ydb-slo-action/init@228eb3f967eb37019e4d56d0cebf854e085202be
+        uses: ydb-platform/ydb-slo-action/init@main
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
