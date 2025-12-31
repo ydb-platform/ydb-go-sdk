@@ -467,9 +467,11 @@ func toYdbParam(name string, value any) (*params.Parameter, error) {
 func Params(args ...any) ([]*params.Parameter, error) {
 	parameters := make([]*params.Parameter, 0, len(args))
 	for i, arg := range args {
-		var newParam *params.Parameter
-		var newParams []*params.Parameter
-		var err error
+		var (
+			newParam  *params.Parameter
+			newParams []*params.Parameter
+			err       error
+		)
 		switch x := arg.(type) {
 		case driver.NamedValue:
 			newParams, err = paramHandleNamedValue(x, i, len(args))

@@ -1,19 +1,23 @@
 package query
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -433,11 +437,28 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
-func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Result, error) {
-	var resultSets []result.Set
+func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Result, error) {
+	type resultSet struct {
+		rows    []query.Row
+		columns []*Ydb.Column
+	}
+	resultSetByIndex := make(map[int64]resultSet)
 
 	for {
-		rs, err := r.NextResultSet(ctx)
+		curIndex := r.lastPart.GetResultSetIndex()
+
+		rs := resultSetByIndex[curIndex]
+		if len(rs.columns) == 0 {
+			rs.columns = r.lastPart.GetResultSet().GetColumns()
+		}
+
+		for i := range r.lastPart.GetResultSet().GetRows() {
+			rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
+		}
+		resultSetByIndex[curIndex] = rs
+
+		var err error
+		r.lastPart, err = r.nextPart(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				break
@@ -445,23 +466,23 @@ func resultToMaterializedResult(ctx context.Context, r result.Result) (result.Re
 
 			return nil, xerrors.WithStackTrace(err)
 		}
+	}
 
-		var rows []query.Row
-		for {
-			row, err := rs.NextRow(ctx)
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					break
-				}
+	resultSets := make([]result.Set, 0, len(resultSetByIndex))
+	for rsIndex, rs := range resultSetByIndex {
+		columnNames := make([]string, len(rs.columns))
+		columnTypes := make([]types.Type, len(rs.columns))
 
-				return nil, xerrors.WithStackTrace(err)
-			}
-
-			rows = append(rows, row)
+		for i := range rs.columns {
+			columnNames[i] = rs.columns[i].GetName()
+			columnTypes[i] = types.TypeFromYDB(rs.columns[i].GetType())
 		}
 
-		resultSets = append(resultSets, MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
+		resultSets = append(resultSets, MaterializedResultSet(int(rsIndex), columnNames, columnTypes, rs.rows))
 	}
+	slices.SortFunc(resultSets, func(a, b result.Set) int {
+		return cmp.Compare(a.Index(), b.Index())
+	})
 
 	return &materializedResult{
 		resultSets: resultSets,

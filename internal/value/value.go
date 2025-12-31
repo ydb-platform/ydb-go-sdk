@@ -1346,7 +1346,7 @@ func Interval64Value(v int64) interval64Value {
 }
 
 func Interval64ValueFromDuration(v time.Duration) interval64Value {
-	return interval64Value(durationToNanoseconds(v))
+	return interval64Value(durationToMicroseconds(v))
 }
 
 type jsonValue string
@@ -2536,6 +2536,41 @@ func (w UUIDIssue1501FixedBytesWrapper) AsBytesSlice() []byte {
 
 func (w UUIDIssue1501FixedBytesWrapper) AsBrokenString() string {
 	return string(w.val[:])
+}
+
+// implement database/sql.Scanner
+func (w *UUIDIssue1501FixedBytesWrapper) Scan(v any) error {
+	var good uuid.UUID
+	var err error
+	switch val := v.(type) {
+	case string:
+		good, err = uuid.Parse(val)
+	case []byte:
+		good, err = uuid.FromBytes(val)
+	default:
+		return xerrors.WithStackTrace(
+			xerrors.Wrap(
+				fmt.Errorf(
+					"ydb: Unsupported source type for convert to UUIDIssue1501FixedBytesWrapper: '%T'",
+					v,
+				),
+			),
+		)
+	}
+	if err != nil {
+		return xerrors.WithStackTrace(
+			xerrors.Wrap(
+				fmt.Errorf(
+					"ydb: Could not convert to UUIDIssue1501FixedBytesWrapper: '%v'",
+					v,
+				),
+			),
+		)
+	}
+
+	w.val = uuidReorderBytesForReadWithBug(good)
+
+	return nil
 }
 
 type uuidValue struct {

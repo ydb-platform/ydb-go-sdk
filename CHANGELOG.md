@@ -1,3 +1,19 @@
+## v3.125.1
+* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to 
+`ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to 
+distinguish between hits and misses
+* Bumped `golang.org/x/net` from 0.35.0 to 0.38.0
+
+## v3.125.0
+* Added `WithConcurrentResultSets` option for `db.Query().Query()`
+* Added `DefaultValue` field to `table/options.Column` struct
+
+## v3.124.1
+* Fixed bug with incorrect conversion of `time.Duration` to `Interval64`, which was previously using nanoseconds instead of microseconds
+
+## v3.124.0
+* Fixed UUID scanning with `database/sql` when using types implementing `sql.Scanner` interface (like `uuid.UUID`)
+
 ## v3.123.1
 * Fixed `pool.getItem()` panics, if unable to give session for preferred node ID
 
