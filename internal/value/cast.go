@@ -1,6 +1,6 @@
 package value
 
-func CastTo(v Value, dst interface{}) error {
+func CastTo(v Value, dst any) error {
 	if dst == nil {
 		return errNilDestination
 	}
