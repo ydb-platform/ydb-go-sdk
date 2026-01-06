@@ -689,14 +689,15 @@ func TestEndpointsToConnections(t *testing.T) {
 		)
 		// different ipv6 -> different Address()
 		e3 := endpoint.New("example.com:2135", endpoint.WithIPV6([]string{"2001:db8::2"}), endpoint.WithID(2))
+		e4 := endpoint.New("example.com:2135", endpoint.WithIPV6([]string{"2001:db8::3"}), endpoint.WithID(2))
 		// same ipv6 as e1 but different NodeID -> different Key.NodeID
-		e4 := endpoint.New("example.com:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
+		e5 := endpoint.New("example.com:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
 
-		endpoints := []endpoint.Endpoint{e1, e2, e3, e4}
+		endpoints := []endpoint.Endpoint{e1, e2, e3, e4, e5}
 		conns := EndpointsToConnections(pool, endpoints)
 
 		require.Len(t, conns, len(endpoints))
-		require.Equal(t, 4, pool.conns.Len())
+		require.Equal(t, 5, pool.conns.Len())
 
 		for i, e := range endpoints {
 			got := conns[i]
@@ -708,7 +709,8 @@ func TestEndpointsToConnections(t *testing.T) {
 		}
 
 		require.Equal(t, e2.Key().HostOverride, "override")
-		require.Equal(t, e4.Key().NodeID, uint32(1))
+		require.Equal(t, e4.Key().NodeID, uint32(2))
+		require.Equal(t, e5.Key().NodeID, uint32(1))
 	})
 
 	t.Run("AddNewEndpointAndNodeIDVariation", func(t *testing.T) {
