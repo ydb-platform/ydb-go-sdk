@@ -270,7 +270,18 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 					return
 				}
 
-				_ = p.putItem(createCtx, newItem)
+				// Caller canceled before receiving the item, need to remove from index and close
+				p.mu.WithLock(func() {
+					delete(p.index, newItem)
+				})
+
+				closeCtx := createCtx
+				if t := p.config.closeTimeout; t > 0 {
+					var cancel context.CancelFunc
+					closeCtx, cancel = context.WithTimeout(closeCtx, t)
+					defer cancel()
+				}
+				p.config.closeItemFunc(closeCtx, newItem)
 			}
 		}()
 
