@@ -5,6 +5,7 @@ package integration
 
 import (
 	"context"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -66,4 +67,37 @@ func TestQueryReadRow(t *testing.T) {
 	require.EqualValues(t, "test", p1)
 	require.EqualValues(t, 100500000000, p2)
 	require.EqualValues(t, time.Duration(100500000000), p3)
+}
+
+func TestQueryRowNoRows(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithSessionPoolSizeLimit(10),
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.INFO),
+				),
+				trace.QueryEvents,
+			),
+		),
+	)
+	require.NoError(t, err)
+	err = db.Query().Do(ctx, func(ctx context.Context, session query.Session) error {
+		_, err = session.Query(ctx, `CREATE TABLE IF NOT EXISTS TestQueryRowNoRows (id Int64, PRIMARY KEY (id));`)
+		return err
+	})
+	require.NoError(t, err)
+
+	_, err = db.Query().QueryRow(ctx, `
+		SELECT * FROM TestQueryRowNoRows WHERE id = 1;`,
+		query.WithIdempotent(),
+	)
+	require.ErrorIs(t, err, io.EOF)
 }
