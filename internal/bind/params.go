@@ -185,8 +185,7 @@ func tryConvertToBaseType(rv reflect.Value) any {
 	return rv.Convert(baseType).Interface()
 }
 
-//nolint:funlen
-func toType(v any) (_ types.Type, err error) {
+func toType(v any) (_ types.Type, err error) { //nolint:funlen
 	switch x := v.(type) {
 	case reflect.Value:
 		return toType(x.Interface())
