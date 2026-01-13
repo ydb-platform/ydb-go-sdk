@@ -126,8 +126,70 @@ func asSQLNullValue(v any) (value.Value, bool) {
 	return value.OptionalValue(val), true
 }
 
+// isDurationTypeAlias checks if the given type is time.Duration or its type alias.
+func isDurationTypeAlias(rt reflect.Type) bool {
+	if rt.Kind() != reflect.Int64 {
+		return false
+	}
+	durationType := reflect.TypeFor[time.Duration]()
+	int64Type := reflect.TypeFor[int64]()
+	// Check if it's a named type (not just int64) and convertible to time.Duration
+	if rt == int64Type || !rt.ConvertibleTo(durationType) || !durationType.ConvertibleTo(rt) {
+		return false
+	}
+	// Check if the type name suggests it's a duration type
+	typeName := rt.Name()
+
+	return typeName != "" && strings.Contains(typeName, "Duration")
+}
+
+// tryConvertToBaseType attempts to convert a value to a base type and returns the converted value if successful.
+// Returns nil if conversion is not possible or not needed.
+func tryConvertToBaseType(rv reflect.Value) any {
+	rt := rv.Type()
+	// Special handling for time.Duration - check first to avoid converting to int64
+	if isDurationTypeAlias(rt) {
+		durationType := reflect.TypeFor[time.Duration]()
+		if rv.CanConvert(durationType) {
+			return rv.Convert(durationType).Interface()
+		}
+	}
+
+	kind := rt.Kind()
+	baseTypes := map[reflect.Kind]reflect.Type{
+		reflect.String:  reflect.TypeFor[string](),
+		reflect.Int:     reflect.TypeFor[int](),
+		reflect.Int8:    reflect.TypeFor[int8](),
+		reflect.Int16:   reflect.TypeFor[int16](),
+		reflect.Int32:   reflect.TypeFor[int32](),
+		reflect.Int64:   reflect.TypeFor[int64](),
+		reflect.Uint:    reflect.TypeFor[uint](),
+		reflect.Uint8:   reflect.TypeFor[uint8](),
+		reflect.Uint16:  reflect.TypeFor[uint16](),
+		reflect.Uint32:  reflect.TypeFor[uint32](),
+		reflect.Uint64:  reflect.TypeFor[uint64](),
+		reflect.Float32: reflect.TypeFor[float32](),
+		reflect.Float64: reflect.TypeFor[float64](),
+		reflect.Bool:    reflect.TypeFor[bool](),
+	}
+
+	baseType, ok := baseTypes[kind]
+	if !ok {
+		return nil
+	}
+
+	if !rv.CanConvert(baseType) {
+		return nil
+	}
+
+	return rv.Convert(baseType).Interface()
+}
+
+//nolint:funlen
 func toType(v any) (_ types.Type, err error) {
 	switch x := v.(type) {
+	case reflect.Value:
+		return toType(x.Interface())
 	case bool:
 		return types.Bool, nil
 	case int:
@@ -165,12 +227,19 @@ func toType(v any) (_ types.Type, err error) {
 	case time.Duration:
 		return types.Interval, nil
 	default:
+		rv := reflect.ValueOf(x)
+		// Try to convert derived types to base types
+		if converted := tryConvertToBaseType(rv); converted != nil {
+			return toType(converted)
+		}
+
 		return reflectKindToType(x)
 	}
 }
 
 func reflectKindToType(x any) (types.Type, error) { //nolint:funlen
-	kind := reflect.TypeOf(x).Kind()
+	rt := reflect.TypeOf(x)
+	kind := rt.Kind()
 	switch kind {
 	case reflect.String:
 		return types.Text, nil
@@ -183,6 +252,10 @@ func reflectKindToType(x any) (types.Type, error) { //nolint:funlen
 	case reflect.Int32:
 		return types.Int32, nil
 	case reflect.Int64:
+		if isDurationTypeAlias(rt) {
+			return types.Interval, nil
+		}
+
 		return types.Int64, nil
 	case reflect.Uint:
 		return types.Uint32, nil
@@ -296,6 +369,8 @@ func toValue(v any) (_ value.Value, err error) {
 	switch x := v.(type) {
 	case nil:
 		return value.VoidValue(), nil
+	case reflect.Value:
+		return toValue(x.Interface())
 	case value.Value:
 		return x, nil
 	}
@@ -327,6 +402,8 @@ func toValue(v any) (_ value.Value, err error) {
 	}
 
 	switch x := v.(type) {
+	case reflect.Value:
+		return toValue(x.Interface())
 	case value.Value:
 		return x, nil
 	case bool:
@@ -383,35 +460,12 @@ func toValue(v any) (_ value.Value, err error) {
 		return value.JSONValue(xstring.FromBytes(bytes)), nil
 	default:
 		rv := reflect.ValueOf(x)
+		// Try to convert derived types to base types
+		if converted := tryConvertToBaseType(rv); converted != nil {
+			return toValue(converted)
+		}
+
 		switch rv.Kind() {
-		case reflect.String:
-			return value.TextValue(rv.String()), nil
-		case reflect.Int:
-			return value.Int32Value(int32(rv.Int())), nil
-		case reflect.Int8:
-			return value.Int8Value(int8(rv.Int())), nil
-		case reflect.Int16:
-			return value.Int16Value(int16(rv.Int())), nil
-		case reflect.Int32:
-			return value.Int32Value(int32(rv.Int())), nil
-		case reflect.Int64:
-			return value.Int64Value(rv.Int()), nil
-		case reflect.Uint:
-			return value.Uint32Value(uint32(rv.Uint())), nil
-		case reflect.Uint8:
-			return value.Uint8Value(uint8(rv.Uint())), nil
-		case reflect.Uint16:
-			return value.Uint16Value(uint16(rv.Uint())), nil
-		case reflect.Uint32:
-			return value.Uint32Value(uint32(rv.Uint())), nil
-		case reflect.Uint64:
-			return value.Uint64Value(rv.Uint()), nil
-		case reflect.Float32:
-			return value.FloatValue(float32(rv.Float())), nil
-		case reflect.Float64:
-			return value.DoubleValue(rv.Float()), nil
-		case reflect.Bool:
-			return value.BoolValue(rv.Bool()), nil
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
 			// Special handling for byte slices ([]byte and type aliases)

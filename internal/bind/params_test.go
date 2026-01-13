@@ -37,6 +37,7 @@ type (
 	testFloat32 float32
 	testFloat64 float64
 	testBytes   []byte
+	testDuration time.Duration
 )
 
 func (v testValuer) Value() (driver.Value, error) {
@@ -409,6 +410,27 @@ func TestToValue(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			src:  func() *time.Duration { return nil }(),
+			dst:  value.NullValue(types.Interval),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testDuration(42 * time.Microsecond),
+			dst:  value.IntervalValueFromDuration(time.Duration(42 * time.Microsecond)),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src: func() *testDuration {
+				v := testDuration(42 * time.Microsecond)
+				return &v
+			}(),
+			dst: value.OptionalValue(value.IntervalValueFromDuration(time.Duration(42 * time.Microsecond))),
+			err: nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *testDuration { return nil }(),
 			dst:  value.NullValue(types.Interval),
 			err:  nil,
 		},
