@@ -35,9 +35,6 @@ func (retryOptions doRetryOptionsOption) ApplyDoOption(opts *doOptions) {
 }
 
 // WithDoRetryOptions specified retry options
-// Deprecated: use explicit options instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
 	return opts
 }
@@ -135,9 +132,6 @@ func (doTxRetryOptions doTxRetryOptionsOption) ApplyDoTxOption(o *doTxOptions) {
 }
 
 // WithDoTxRetryOptions specified retry options
-// Deprecated: use explicit options instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDoTxRetryOptions(opts ...Option) doTxRetryOptionsOption {
 	return opts
 }
