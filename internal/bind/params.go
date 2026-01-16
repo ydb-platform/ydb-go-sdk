@@ -126,8 +126,69 @@ func asSQLNullValue(v any) (value.Value, bool) {
 	return value.OptionalValue(val), true
 }
 
+// isDurationTypeAlias checks if the given type is time.Duration or its type alias.
+func isDurationTypeAlias(rt reflect.Type) bool {
+	if rt.Kind() != reflect.Int64 {
+		return false
+	}
+	durationType := reflect.TypeFor[time.Duration]()
+	int64Type := reflect.TypeFor[int64]()
+	// Check if it's a named type (not just int64) and convertible to time.Duration
+	if rt == int64Type || !rt.ConvertibleTo(durationType) || !durationType.ConvertibleTo(rt) {
+		return false
+	}
+	// Check if the type name suggests it's a duration type
+	typeName := rt.Name()
+
+	return typeName != "" && strings.Contains(typeName, "Duration")
+}
+
+// tryConvertToBaseType attempts to convert a value to a base type and returns the converted value if successful.
+// Returns nil if conversion is not possible or not needed.
+func tryConvertToBaseType(rv reflect.Value) any {
+	rt := rv.Type()
+	// Special handling for time.Duration - check first to avoid converting to int64
+	if isDurationTypeAlias(rt) {
+		durationType := reflect.TypeFor[time.Duration]()
+		if rv.CanConvert(durationType) {
+			return rv.Convert(durationType).Interface()
+		}
+	}
+
+	kind := rt.Kind()
+	baseTypes := map[reflect.Kind]reflect.Type{
+		reflect.String:  reflect.TypeFor[string](),
+		reflect.Int:     reflect.TypeFor[int](),
+		reflect.Int8:    reflect.TypeFor[int8](),
+		reflect.Int16:   reflect.TypeFor[int16](),
+		reflect.Int32:   reflect.TypeFor[int32](),
+		reflect.Int64:   reflect.TypeFor[int64](),
+		reflect.Uint:    reflect.TypeFor[uint](),
+		reflect.Uint8:   reflect.TypeFor[uint8](),
+		reflect.Uint16:  reflect.TypeFor[uint16](),
+		reflect.Uint32:  reflect.TypeFor[uint32](),
+		reflect.Uint64:  reflect.TypeFor[uint64](),
+		reflect.Float32: reflect.TypeFor[float32](),
+		reflect.Float64: reflect.TypeFor[float64](),
+		reflect.Bool:    reflect.TypeFor[bool](),
+	}
+
+	baseType, ok := baseTypes[kind]
+	if !ok {
+		return nil
+	}
+
+	if !rv.CanConvert(baseType) {
+		return nil
+	}
+
+	return rv.Convert(baseType).Interface()
+}
+
 func toType(v any) (_ types.Type, err error) { //nolint:funlen
 	switch x := v.(type) {
+	case reflect.Value:
+		return toType(x.Interface())
 	case bool:
 		return types.Bool, nil
 	case int:
@@ -165,74 +226,121 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen
 	case time.Duration:
 		return types.Interval, nil
 	default:
-		kind := reflect.TypeOf(x).Kind()
-		switch kind {
-		case reflect.Slice, reflect.Array:
-			v := reflect.ValueOf(x)
-			t, err := toType(reflect.New(v.Type().Elem()).Elem().Interface())
+		rv := reflect.ValueOf(x)
+		// Try to convert derived types to base types
+		if converted := tryConvertToBaseType(rv); converted != nil {
+			return toType(converted)
+		}
+
+		return reflectKindToType(x)
+	}
+}
+
+func reflectKindToType(x any) (types.Type, error) { //nolint:funlen
+	rt := reflect.TypeOf(x)
+	kind := rt.Kind()
+	switch kind {
+	case reflect.String:
+		return types.Text, nil
+	case reflect.Int:
+		return types.Int32, nil
+	case reflect.Int8:
+		return types.Int8, nil
+	case reflect.Int16:
+		return types.Int16, nil
+	case reflect.Int32:
+		return types.Int32, nil
+	case reflect.Int64:
+		if isDurationTypeAlias(rt) {
+			return types.Interval, nil
+		}
+
+		return types.Int64, nil
+	case reflect.Uint:
+		return types.Uint32, nil
+	case reflect.Uint8:
+		return types.Uint8, nil
+	case reflect.Uint16:
+		return types.Uint16, nil
+	case reflect.Uint32:
+		return types.Uint32, nil
+	case reflect.Uint64:
+		return types.Uint64, nil
+	case reflect.Float32:
+		return types.Float, nil
+	case reflect.Float64:
+		return types.Double, nil
+	case reflect.Bool:
+		return types.Bool, nil
+	case reflect.Slice, reflect.Array:
+		v := reflect.ValueOf(x)
+		// Special handling for byte slices ([]byte and type aliases)
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return types.Bytes, nil
+		}
+		t, err := toType(reflect.New(v.Type().Elem()).Elem().Interface())
+		if err != nil {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("cannot parse slice item type %T: %w",
+					x, errUnsupportedType,
+				),
+			)
+		}
+
+		return types.NewList(t), nil
+	case reflect.Map:
+		v := reflect.ValueOf(x)
+
+		keyType, err := toType(reflect.New(v.Type().Key()).Interface())
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse %T map key: %w",
+				reflect.New(v.Type().Key()).Interface(), err,
+			)
+		}
+		valueType, err := toType(reflect.New(v.Type().Elem()).Interface())
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse %T map value: %w",
+				v.MapKeys()[0].Interface(), err,
+			)
+		}
+
+		return types.NewDict(keyType, valueType), nil
+	case reflect.Struct:
+		v := reflect.ValueOf(x)
+
+		fields := make([]types.StructField, v.NumField())
+
+		for i := range fields {
+			kk, has := v.Type().Field(i).Tag.Lookup("sql")
+			if !has {
+				return nil, xerrors.WithStackTrace(
+					fmt.Errorf("cannot parse %v as key field of struct: %w",
+						v.Field(i).Interface(), errUnsupportedType,
+					),
+				)
+			}
+			tt, err := toType(v.Field(i).Interface())
 			if err != nil {
 				return nil, xerrors.WithStackTrace(
-					fmt.Errorf("cannot parse slice item type %T: %w",
-						x, errUnsupportedType,
+					fmt.Errorf("cannot parse %v as values of struct: %w",
+						v.Field(i).Interface(), errUnsupportedType,
 					),
 				)
 			}
 
-			return types.NewList(t), nil
-		case reflect.Map:
-			v := reflect.ValueOf(x)
-
-			keyType, err := toType(reflect.New(v.Type().Key()).Interface())
-			if err != nil {
-				return nil, fmt.Errorf("cannot parse %T map key: %w",
-					reflect.New(v.Type().Key()).Interface(), err,
-				)
+			fields[i] = types.StructField{
+				Name: kk,
+				T:    tt,
 			}
-			valueType, err := toType(reflect.New(v.Type().Elem()).Interface())
-			if err != nil {
-				return nil, fmt.Errorf("cannot parse %T map value: %w",
-					v.MapKeys()[0].Interface(), err,
-				)
-			}
-
-			return types.NewDict(keyType, valueType), nil
-		case reflect.Struct:
-			v := reflect.ValueOf(x)
-
-			fields := make([]types.StructField, v.NumField())
-
-			for i := range fields {
-				kk, has := v.Type().Field(i).Tag.Lookup("sql")
-				if !has {
-					return nil, xerrors.WithStackTrace(
-						fmt.Errorf("cannot parse %v as key field of struct: %w",
-							v.Field(i).Interface(), errUnsupportedType,
-						),
-					)
-				}
-				tt, err := toType(v.Field(i).Interface())
-				if err != nil {
-					return nil, xerrors.WithStackTrace(
-						fmt.Errorf("cannot parse %v as values of dict: %w",
-							v.Field(i).Interface(), errUnsupportedType,
-						),
-					)
-				}
-
-				fields[i] = types.StructField{
-					Name: kk,
-					T:    tt,
-				}
-			}
-
-			return types.NewStruct(fields...), nil
-		default:
-			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("%T: %w. Create issue for support new type %s",
-					x, errUnsupportedType, supportNewTypeLink(x),
-				),
-			)
 		}
+
+		return types.NewStruct(fields...), nil
+	default:
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("%T: %w. Create issue for support new type %s",
+				x, errUnsupportedType, supportNewTypeLink(x),
+			),
+		)
 	}
 }
 
@@ -260,6 +368,8 @@ func toValue(v any) (_ value.Value, err error) {
 	switch x := v.(type) {
 	case nil:
 		return value.VoidValue(), nil
+	case reflect.Value:
+		return toValue(x.Interface())
 	case value.Value:
 		return x, nil
 	}
@@ -291,6 +401,8 @@ func toValue(v any) (_ value.Value, err error) {
 	}
 
 	switch x := v.(type) {
+	case reflect.Value:
+		return toValue(x.Interface())
 	case value.Value:
 		return x, nil
 	case bool:
@@ -346,10 +458,19 @@ func toValue(v any) (_ value.Value, err error) {
 
 		return value.JSONValue(xstring.FromBytes(bytes)), nil
 	default:
-		kind := reflect.TypeOf(x).Kind()
-		switch kind {
+		rv := reflect.ValueOf(x)
+		// Try to convert derived types to base types
+		if converted := tryConvertToBaseType(rv); converted != nil {
+			return toValue(converted)
+		}
+
+		switch rv.Kind() {
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
+			// Special handling for byte slices ([]byte and type aliases)
+			if v.Type().Elem().Kind() == reflect.Uint8 {
+				return value.BytesValue(v.Bytes()), nil
+			}
 			list := make([]value.Value, v.Len())
 
 			for i := range list {
