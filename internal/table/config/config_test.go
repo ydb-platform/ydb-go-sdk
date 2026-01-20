@@ -16,6 +16,7 @@ func TestNew(t *testing.T) {
 		c := New()
 		require.NotNil(t, c)
 		require.Equal(t, DefaultSessionPoolSizeLimit, c.SizeLimit())
+		require.Equal(t, DefaultSessionPoolSizeLimit, c.NodeLimit())
 		require.Equal(t, DefaultSessionPoolCreateSessionTimeout, c.CreateSessionTimeout())
 		require.Equal(t, DefaultSessionPoolDeleteTimeout, c.DeleteTimeout())
 		require.Equal(t, DefaultSessionPoolIdleThreshold, c.IdleThreshold())
@@ -37,13 +38,15 @@ func TestWithSizeLimit(t *testing.T) {
 	})
 
 	t.Run("zero value uses default", func(t *testing.T) {
-		c := New(WithSizeLimit(0))
+		c := New(WithSizeLimit(0), WithNodeLimit(0))
 		require.Equal(t, DefaultSessionPoolSizeLimit, c.SizeLimit())
+		require.Equal(t, DefaultSessionPoolSizeLimit, c.NodeLimit())
 	})
 
 	t.Run("negative value uses default", func(t *testing.T) {
-		c := New(WithSizeLimit(-1))
+		c := New(WithSizeLimit(-1), WithNodeLimit(-1))
 		require.Equal(t, DefaultSessionPoolSizeLimit, c.SizeLimit())
+		require.Equal(t, DefaultSessionPoolSizeLimit, c.NodeLimit())
 	})
 }
 
@@ -247,6 +250,7 @@ func TestConfigGetters(t *testing.T) {
 	t.Run("all getters return expected values", func(t *testing.T) {
 		c := New(
 			WithSizeLimit(100),
+			WithNodeLimit(50),
 			WithSessionPoolSessionUsageLimit[uint64](500),
 			WithIdleThreshold(3*time.Minute),
 			WithCreateSessionTimeout(10*time.Second),
@@ -257,6 +261,7 @@ func TestConfigGetters(t *testing.T) {
 		)
 
 		require.Equal(t, 100, c.SizeLimit())
+		require.Equal(t, 50, c.NodeLimit())
 		require.Equal(t, uint64(500), c.SessionUsageLimit())
 		require.Equal(t, 3*time.Minute, c.IdleThreshold())
 		require.Equal(t, 10*time.Second, c.CreateSessionTimeout())

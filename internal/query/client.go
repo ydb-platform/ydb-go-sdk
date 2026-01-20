@@ -602,6 +602,7 @@ func newWithQueryServiceClient(ctx context.Context,
 		implicitSessionPool: createImplicitSessionPool(ctx, cfg, client, cc),
 		explicitSessionPool: pool.New(ctx,
 			pool.WithLimit[*Session](cfg.PoolLimit()),
+			pool.WithNodeLimit[*Session](cfg.NodeLimit()),
 			pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
 			pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
 			pool.WithTrace[*Session](poolTrace(cfg.Trace())),
@@ -710,6 +711,7 @@ func createImplicitSessionPool(ctx context.Context,
 ) sessionPool {
 	return pool.New(ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
+		pool.WithNodeLimit[*Session](cfg.NodeLimit()),
 		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 			core := &implicitSessionCore{

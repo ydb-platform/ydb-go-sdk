@@ -66,17 +66,18 @@ func (w *Workers) read(ctx context.Context) error {
 	var m metrics.Span
 	var attempts int
 	var err error
+	var missed = false
 	if w.s != nil {
 		id := w.ReadID()
 		m = w.m.Start(metrics.OperationTypeRead)
-		_, attempts, err = w.s.Read(ctx, id)
+		_, attempts, missed, err = w.s.Read(ctx, id)
 	} else {
 		ids := w.ReadIDs()
 		m = w.m.Start(metrics.OperationTypeRead)
 		_, attempts, err = w.sb.ReadBatch(ctx, ids)
 	}
 
-	m.Finish(err, attempts)
+	m.Finish(err, attempts, missed)
 
 	return err
 }

@@ -1252,3 +1252,317 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 	})
 }
+
+func TestNodeCount(t *testing.T) {
+	rootCtx := xtest.Context(t)
+
+	t.Run("NodeCountIncrementsOnCreate", func(t *testing.T) {
+		nextNodeID := uint32(1)
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](10),
+			WithNodeLimit[*testItem, testItem](5),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				nodeID := nextNodeID
+				return &testItem{
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+		)
+		defer mustClose(t, p)
+
+		// Get item from node 1
+		item := mustGetItem(t, p)
+		require.EqualValues(t, 1, item.NodeID())
+
+		count := p.nodeCount[1]
+		require.EqualValues(t, 1, count)
+	})
+
+	t.Run("NodeCountDecrementsOnDelete", func(t *testing.T) {
+		nextNodeID := uint32(2)
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](10),
+			WithNodeLimit[*testItem, testItem](5),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				nodeID := nextNodeID
+				return &testItem{
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+		)
+		defer mustClose(t, p)
+
+		// Get item
+		item := mustGetItem(t, p)
+		p.mu.RLock()
+		count := p.nodeCount[2]
+		p.mu.RUnlock()
+		require.EqualValues(t, 1, count)
+
+		// Close item with delete from pool
+		p.closeItem(context.Background(), item,
+			closeItemWithLock(),
+			closeItemWithDeleteFromPool(),
+		)
+
+		count, exists := p.nodeCount[2]
+		require.True(t, exists, "nodeCount entries are never deleted")
+		require.EqualValues(t, 0, count, "nodeCount should be decremented to 0")
+	})
+
+	t.Run("NodeCountTracksMultipleNodes", func(t *testing.T) {
+		nextNodeID := uint32(0)
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](10),
+			WithNodeLimit[*testItem, testItem](5),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				nodeID := nextNodeID
+				return &testItem{
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+		)
+		defer mustClose(t, p)
+
+		nextNodeID = 10
+		item1 := mustGetItem(t, p)
+		require.EqualValues(t, 10, item1.NodeID())
+		nextNodeID = 20
+		item2 := mustGetItem(t, p)
+		require.EqualValues(t, 20, item2.NodeID())
+		nextNodeID = 10
+		item3 := mustGetItem(t, p)
+		require.EqualValues(t, 10, item3.NodeID())
+
+		count10 := p.nodeCount[10]
+		count20 := p.nodeCount[20]
+		require.EqualValues(t, 2, count10)
+		require.EqualValues(t, 1, count20)
+	})
+
+	t.Run("NodeCountEnforcesNodeLimit", func(t *testing.T) {
+		nextNodeID := uint32(0)
+		createCount := 0
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](10),
+			WithNodeLimit[*testItem, testItem](2),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				createCount++
+				nodeID := nextNodeID
+				return &testItem{
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+		)
+		defer mustClose(t, p)
+
+		nextNodeID = 5
+		// Get 2 items from node 5 (should be at nodeLimit)
+		item1 := mustGetItem(t, p)
+		require.EqualValues(t, 5, item1.NodeID())
+		item2 := mustGetItem(t, p)
+		require.EqualValues(t, 5, item2.NodeID())
+
+		// Try to get another item with node 5 preferred
+		// Should NOT create a new item from node 5 (nodeLimit hit)
+		// and should create from a different node instead
+		ctx := endpoint.WithNodeID(context.Background(), 5)
+		item3, err := p.getItem(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, item3)
+		require.NotEqual(t, item3.NodeID(), 5)
+	})
+
+	t.Run("NodeCountAccuracyWithIdleItems", func(t *testing.T) {
+		nextNodeID := uint32(0)
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](10),
+			WithNodeLimit[*testItem, testItem](5),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				nodeID := nextNodeID
+				return &testItem{
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+		)
+		defer mustClose(t, p)
+
+		nextNodeID = 50
+		// Get item and put it back (becomes idle)
+		item1 := mustGetItem(t, p)
+		mustPutItem(t, p, item1)
+
+		// Verify nodeCount includes idle items
+		p.mu.RLock()
+		count := p.nodeCount[50]
+		p.mu.RUnlock()
+		require.EqualValues(t, 1, count)
+
+		// Get the same item again from idle
+		item2, err := p.getItem(endpoint.WithNodeID(context.Background(), 50))
+		require.NoError(t, err)
+		require.Equal(t, item1, item2)
+
+		// Count should still be 1 (same item)
+		p.mu.RLock()
+		count = p.nodeCount[50]
+		p.mu.RUnlock()
+		require.EqualValues(t, 1, count)
+
+		mustPutItem(t, p, item2)
+	})
+
+	t.Run("NodeCountAfterRemovingIdleItems", func(t *testing.T) {
+		clock := clockwork.NewFakeClock()
+		nextNodeID := uint32(0)
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](10),
+			WithNodeLimit[*testItem, testItem](5),
+			WithClock[*testItem, testItem](clock),
+			WithIdleTimeToLive[*testItem, testItem](100*time.Millisecond),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				nodeID := nextNodeID
+				return &testItem{
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+		)
+		defer mustClose(t, p)
+
+		nextNodeID = 60
+		// Get and put item (becomes idle)
+		item := mustGetItem(t, p)
+		mustPutItem(t, p, item)
+
+		// Verify nodeCount is 1
+		p.mu.RLock()
+		count := p.nodeCount[60]
+		p.mu.RUnlock()
+		require.EqualValues(t, 1, count)
+
+		// Advance time past idle TTL
+		clock.Advance(150 * time.Millisecond)
+
+		// Get another item (this may trigger cleanup of idle items)
+		nextNodeID = 61
+		_ = mustGetItem(t, p)
+
+		count, _ = p.nodeCount[60]
+		require.EqualValues(t, 0, count, "nodeCount should be decremented to 0")
+	})
+
+	t.Run("NodeCountWithConcurrentAccess", func(t *testing.T) {
+		nextNodeID := uint32(0)
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](100),
+			WithNodeLimit[*testItem, testItem](50),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				nodeID := nextNodeID
+				return &testItem{
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+		)
+		defer mustClose(t, p)
+
+		const numGoroutines = 10
+		const itemsPerGoroutine = 5
+		var wg sync.WaitGroup
+
+		items := make([]*testItem, 0, numGoroutines*itemsPerGoroutine)
+		var itemsMu sync.Mutex
+
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(nodeID uint32) {
+				defer wg.Done()
+				nextNodeID = nodeID
+				for j := 0; j < itemsPerGoroutine; j++ {
+					item := mustGetItem(t, p)
+					itemsMu.Lock()
+					items = append(items, item)
+					itemsMu.Unlock()
+				}
+			}(uint32(i))
+		}
+
+		wg.Wait()
+
+		// Verify total nodeCount
+		p.mu.RLock()
+		totalCount := 0
+		for _, count := range p.nodeCount {
+			totalCount += count
+		}
+		p.mu.RUnlock()
+		require.Equal(t, numGoroutines*itemsPerGoroutine, totalCount)
+
+		// Put all items back
+		itemsMu.Lock()
+		for _, item := range items {
+			mustPutItem(t, p, item)
+		}
+		itemsMu.Unlock()
+	})
+
+	t.Run("BothNodeLimitAndSizeLimitHitReturnsOverflow", func(t *testing.T) {
+		nextNodeID := uint32(0)
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](3),
+			WithNodeLimit[*testItem, testItem](2),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				nodeID := nextNodeID
+				return &testItem{
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+			WithCreateItemTimeout[*testItem, testItem](100*time.Millisecond),
+		)
+		defer mustClose(t, p)
+
+		// Fill pool to size limit with items from different nodes
+		// Create 2 items from node 10
+		nextNodeID = 10
+		item1 := mustGetItem(t, p)
+		require.EqualValues(t, 10, item1.NodeID())
+
+		item2 := mustGetItem(t, p)
+		require.EqualValues(t, 10, item2.NodeID())
+
+		// Create 1 item from node 20
+		nextNodeID = 20
+		item3 := mustGetItem(t, p)
+		require.EqualValues(t, 20, item3.NodeID())
+
+		// Pool is now at size limit (3/3 items)
+		require.Equal(t, 3, len(p.index))
+		count10 := p.nodeCount[10]
+		count20 := p.nodeCount[20]
+		require.EqualValues(t, 2, count10)
+		require.EqualValues(t, 1, count20)
+
+		ctx := endpoint.WithNodeID(context.Background(), 10)
+		item, err := p.getItem(ctx)
+
+		// Should return errPoolIsOverflow
+		require.ErrorIs(t, err, errPoolIsOverflow)
+		require.Nil(t, item)
+		require.Equal(t, 3, len(p.index))
+	})
+}

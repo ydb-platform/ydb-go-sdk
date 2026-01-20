@@ -37,6 +37,7 @@ type (
 		trace              *Trace
 		clock              clockwork.Clock
 		limit              int
+		nodeLimit          int
 		createTimeout      time.Duration
 		createItemFunc     func(ctx context.Context) (PT, error)
 		mustDeleteItemFunc func(item PT, err error) bool
@@ -65,6 +66,7 @@ type (
 		createInProgress int // KIKIMR-9163: in-create-process counter
 		index            map[PT]itemInfo[PT, T]
 		idle             xlist.List[PT]
+		nodeCount        map[uint32]int
 		waitQ            xlist.List[*chan PT]
 		waitChPool       waitChPool[PT, T]
 
@@ -111,6 +113,12 @@ func WithLimit[PT ItemConstraint[T], T any](size int) Option[PT, T] {
 	}
 }
 
+func WithNodeLimit[PT ItemConstraint[T], T any](size int) Option[PT, T] {
+	return func(c *Config[PT, T]) {
+		c.nodeLimit = size
+	}
+}
+
 func WithItemUsageLimit[PT ItemConstraint[T], T any](itemUsageLimit uint64) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.itemUsageLimit = itemUsageLimit
@@ -147,9 +155,10 @@ func New[PT ItemConstraint[T], T any](
 ) *Pool[PT, T] {
 	p := &Pool[PT, T]{
 		config: Config[PT, T]{
-			trace: &Trace{},
-			clock: clockwork.NewRealClock(),
-			limit: DefaultLimit,
+			trace:     &Trace{},
+			clock:     clockwork.NewRealClock(),
+			limit:     DefaultLimit,
+			nodeLimit: DefaultLimit,
 			createItemFunc: func(ctx context.Context) (PT, error) {
 				var item T
 
@@ -164,9 +173,10 @@ func New[PT ItemConstraint[T], T any](
 				return !item.IsAlive()
 			},
 		},
-		index: make(map[PT]itemInfo[PT, T]),
-		idle:  xlist.New[PT](),
-		waitQ: xlist.New[*chan PT](),
+		index:     make(map[PT]itemInfo[PT, T]),
+		idle:      xlist.New[PT](),
+		nodeCount: make(map[uint32]int),
+		waitQ:     xlist.New[*chan PT](),
 		waitChPool: &xsync.Pool[chan PT]{
 			New: func() *chan PT {
 				ch := make(chan PT)
@@ -254,6 +264,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 						lastUsage:  now,
 						useCounter: &useCounter,
 					}
+					p.nodeCount[newItem.NodeID()]++
 				})
 			}
 
@@ -358,11 +369,19 @@ func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, opts ...closeItemO
 	if options.withDeleteFromPool {
 		if options.withNotifyStats {
 			p.changeState(func() Stats {
+				if _, has := p.index[item]; has {
+					nodeID := item.NodeID()
+					p.nodeCount[nodeID]--
+				}
 				delete(p.index, item)
 
 				return p.stats()
 			})
 		} else {
+			if _, has := p.index[item]; has {
+				nodeID := item.NodeID()
+				p.nodeCount[nodeID]--
+			}
 			delete(p.index, item)
 		}
 	}
@@ -562,6 +581,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 			wg.Wait()
 
 			p.idle.Clear()
+			p.nodeCount = make(map[uint32]int)
 
 			return p.stats()
 		})
@@ -774,8 +794,9 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 	item PT,
 	preferredNodeID uint32,
 	hasPreferredNodeID bool,
+	finalErr error,
 ) *trace.NodeHintInfo {
-	if !hasPreferredNodeID {
+	if !hasPreferredNodeID || finalErr != nil {
 		return nil
 	}
 	res := &trace.NodeHintInfo{
@@ -796,6 +817,12 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 	)
 
 	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
+	nodeLimitHit := false
+	if hasPreferredNodeID {
+		nodeLimitHit = xsync.WithRLock(&p.mu, func() bool {
+			return p.nodeCount[preferredNodeID] >= p.config.nodeLimit
+		})
+	}
 
 	if onGet := p.config.trace.OnGet; onGet != nil {
 		onDone := onGet(&ctx,
@@ -803,7 +830,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		)
 		if onDone != nil {
 			defer func() {
-				onDone(item, attempt, getNodeHintInfo(item, preferredNodeID, hasPreferredNodeID), finalErr)
+				onDone(item, attempt, getNodeHintInfo(item, preferredNodeID, hasPreferredNodeID, finalErr), finalErr)
 			}()
 		}
 	}
@@ -822,7 +849,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 					return item
 				}
 
-				if len(p.index)+p.createInProgress < p.config.limit {
+				if (len(p.index)+p.createInProgress < p.config.limit) && !nodeLimitHit {
 					// for create item with preferred nodeID
 					return nil
 				}
@@ -864,6 +891,9 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			)
 		}
 
+		if nodeLimitHit {
+			ctx = endpoint.IgnoreNodeID(ctx)
+		}
 		item, err := p.createItemFunc(ctx)
 		if item != nil {
 			return item, nil

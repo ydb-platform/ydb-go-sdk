@@ -14,6 +14,7 @@ func TestNew(t *testing.T) {
 		cfg := New()
 		require.NotNil(t, cfg)
 		require.Equal(t, DefaultPoolMaxSize, cfg.PoolLimit())
+		require.Equal(t, DefaultPoolMaxSize, cfg.NodeLimit())
 		require.Equal(t, DefaultSessionCreateTimeout, cfg.SessionCreateTimeout())
 		require.Equal(t, DefaultSessionDeleteTimeout, cfg.SessionDeleteTimeout())
 		require.NotNil(t, cfg.Trace())
@@ -25,18 +26,22 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("WithPoolLimit", func(t *testing.T) {
-		cfg := New(WithPoolLimit(100))
+		cfg := New(WithPoolLimit(100), WithNodeLimit(50))
 		require.Equal(t, 100, cfg.PoolLimit())
+		require.Equal(t, 50, cfg.NodeLimit())
 	})
 
 	t.Run("WithPoolLimitZero", func(t *testing.T) {
-		cfg := New(WithPoolLimit(0))
+		cfg := New(WithPoolLimit(0), WithNodeLimit(0))
 		require.Equal(t, DefaultPoolMaxSize, cfg.PoolLimit())
+		require.Equal(t, DefaultPoolMaxSize, cfg.NodeLimit())
+
 	})
 
 	t.Run("WithPoolLimitNegative", func(t *testing.T) {
-		cfg := New(WithPoolLimit(-1))
+		cfg := New(WithPoolLimit(-1), WithNodeLimit(-1))
 		require.Equal(t, DefaultPoolMaxSize, cfg.PoolLimit())
+		require.Equal(t, DefaultPoolMaxSize, cfg.NodeLimit())
 	})
 
 	t.Run("WithSessionPoolSessionUsageLimit-Uint64", func(t *testing.T) {
