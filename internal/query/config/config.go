@@ -18,6 +18,7 @@ type Config struct {
 	config.Common
 
 	poolLimit             int
+	nodeLimit             int
 	poolSessionUsageLimit uint64
 	poolSessionUsageTTL   time.Duration
 
@@ -46,6 +47,7 @@ func New(opts ...Option) *Config {
 func defaults() *Config {
 	return &Config{
 		poolLimit:            DefaultPoolMaxSize,
+		nodeLimit:            DefaultPoolMaxSize,
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
 		trace:                &trace.Query{},
@@ -62,6 +64,13 @@ func (c *Config) Trace() *trace.Query {
 // DefaultPoolMaxSize variable is used as a pool limit.
 func (c *Config) PoolLimit() int {
 	return c.poolLimit
+}
+
+// NodeLimit is an upper bound of pooled sessions.
+// If NodeLimit is less than or equal to zero then the
+// DefaultPoolMaxSize variable is used as a pool limit.
+func (c *Config) NodeLimit() int {
+	return c.nodeLimit
 }
 
 func (c *Config) AllowImplicitSessions() bool {

@@ -536,12 +536,20 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 	}
 }
 
-// WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
+// WithSessionPoolSizeLimit set max size of internal sessions pool in (table/query).Client
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.tableOptions = append(d.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
 		d.queryOptions = append(d.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+		return nil
+	}
+}
 
+// WithSessionPoolNodeLimit set max sessions per node in internal sessions pool in (table/query).Client
+func WithSessionPoolNodeLimit(nodeLimit int) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithNodeLimit(nodeLimit))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithNodeLimit(nodeLimit))
 		return nil
 	}
 }

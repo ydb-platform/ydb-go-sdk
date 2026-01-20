@@ -17,3 +17,7 @@ func ContextNodeID(ctx context.Context) (nodeID uint32, ok bool) {
 
 	return 0, false
 }
+
+func IgnoreNodeID(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxEndpointKey{}, nil)
+}

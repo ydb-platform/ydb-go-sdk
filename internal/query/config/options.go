@@ -34,6 +34,21 @@ func WithPoolLimit(size int) Option {
 	}
 }
 
+// WithNodeLimit defines threshold of pool sessions for one node:
+// if pool has less session than node limit it actively tries to create sessions
+// on this node, if queries with preferredNodeID require that.
+// if threshold is reached, pool stops forcing session creation on this node,
+// however sessions can still be created on this node, so it is not a hard limit.
+// If nodeLimit is less than or equal to zero then the
+// DefaultPoolMaxSize variable is used as a nodeLimit.
+func WithNodeLimit(size int) Option {
+	return func(c *Config) {
+		if size > 0 {
+			c.nodeLimit = size
+		}
+	}
+}
+
 // WithSessionPoolSessionUsageLimit set pool session max usage:
 // - if argument type is uint64 - WithSessionPoolSessionUsageLimit limits max usage count of pool session
 // - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session
