@@ -191,7 +191,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
 			hintTrace := defaultTrace
 			var preferredID uint32
-			var sessionID uint32
 			hintTrace.OnGet = func(ctx *context.Context, call stack.Caller) func(
 				item any,
 				attempts int,
@@ -201,22 +200,23 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				return func(item any, attempts int, nodeHintInfo *trace.NodeHintInfo, err error) {
 					if nodeHintInfo != nil {
 						preferredID = nodeHintInfo.PreferredNodeID
-						sessionID = nodeHintInfo.SessionNodeID
 					}
 				}
 			}
-			nextNodeID := uint32(0)
 			var newItemCalled uint32
 			p := New[*testItem, testItem](rootCtx,
 				WithTrace[*testItem, testItem](defaultTrace),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					newItemCalled++
 					var (
-						nodeID = nextNodeID
-						v      = testItem{
+						v = testItem{
 							v: 0,
 							onNodeID: func() uint32 {
-								return nodeID
+								nodeID, has := endpoint.ContextNodeID(ctx)
+								if has {
+									return nodeID
+								}
+								return 0
 							},
 						}
 					)
@@ -231,14 +231,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.EqualValues(t, true, item.IsAlive())
 			mustPutItem(t, p, item)
 
-			nextNodeID = 32
-
 			item, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
 			require.NoError(t, err)
 			require.EqualValues(t, 32, item.NodeID())
 			mustPutItem(t, p, item)
-
-			nextNodeID = 33
 
 			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
 			require.NoError(t, err)
@@ -288,8 +284,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 100))
 			require.NoError(t, err)
 			require.EqualValues(t, 100, preferredID)
-			require.EqualValues(t, item.NodeID(), sessionID)
-			require.EqualValues(t, 3, newItemCalled)
+			require.EqualValues(t, 100, item.NodeID())
+			require.EqualValues(t, 4, newItemCalled)
 			_, _ = p.getItem(endpoint.WithNodeID(context.Background(), 32))
 			_, _ = p.getItem(endpoint.WithNodeID(context.Background(), 32))
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)

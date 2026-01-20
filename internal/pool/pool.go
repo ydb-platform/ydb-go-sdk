@@ -829,8 +829,19 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			}
 
 			idle := p.removeFirstIdle()
+			if hasPreferredNodeID {
+				if idle != nil {
+					//close most idle item to make space for new one with preferred node id
+					p.closeItem(ctx, idle,
+						closeItemNotifyStats(),
+						closeItemWithDeleteFromPool(),
+					)
+				}
+				return nil
+			} else {
+				return idle
+			}
 
-			return idle
 		}); item != nil {
 			if item.IsAlive() {
 				info := xsync.WithLock(&p.mu, func() itemInfo[PT, T] {
