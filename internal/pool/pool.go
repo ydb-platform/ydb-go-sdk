@@ -794,8 +794,9 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 	item PT,
 	preferredNodeID uint32,
 	hasPreferredNodeID bool,
+	finalErr error,
 ) *trace.NodeHintInfo {
-	if !hasPreferredNodeID {
+	if !hasPreferredNodeID || finalErr != nil {
 		return nil
 	}
 	res := &trace.NodeHintInfo{
@@ -829,7 +830,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		)
 		if onDone != nil {
 			defer func() {
-				onDone(item, attempt, getNodeHintInfo(item, preferredNodeID, hasPreferredNodeID), finalErr)
+				onDone(item, attempt, getNodeHintInfo(item, preferredNodeID, hasPreferredNodeID, finalErr), finalErr)
 			}()
 		}
 	}
