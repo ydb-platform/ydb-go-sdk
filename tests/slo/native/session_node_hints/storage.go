@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"slo/internal/node_hints"
 	"sync/atomic"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 
 	"slo/internal/config"
 	"slo/internal/generator"
+	"slo/internal/node_hints"
 )
 
 type Storage struct {
@@ -81,8 +81,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label str
 	var cnt atomic.Int32
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
-		ydb.WithSessionPoolSizeLimit(80),
-		//ydb.WithSessionPoolNodeLimit(40),
+		ydb.WithSessionPoolSizeLimit((cfg.ReadRPS+cfg.WriteRPS)/10),
 		ydb.WithRetryBudget(retryBudget),
 		ydb.WithTraceQuery(trace.Query{
 			OnPoolGet: func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
@@ -126,7 +125,12 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label str
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, missed bool, finalErr error) {
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (
+	_ generator.Row,
+	attempts int,
+	missed bool,
+	finalErr error,
+) {
 	if err := ctx.Err(); err != nil {
 		return generator.Row{}, attempts, false, err
 	}
@@ -204,6 +208,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 	default:
 		missed = false
 	}
+
 	return e, attempts, missed, err
 }
 
@@ -248,6 +253,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, mis
 	default:
 		missed = false
 	}
+
 	return attempts, missed, err
 }
 
@@ -256,6 +262,7 @@ func (s *Storage) CreateTable(ctx context.Context) error {
 	defer cancel()
 
 	fmt.Printf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount)
+
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			return session.Exec(ctx,

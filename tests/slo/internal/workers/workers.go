@@ -31,10 +31,13 @@ type MissesWrapper struct {
 
 func (w *MissesWrapper) Read(ctx context.Context, rowID generator.RowID) (generator.Row, int, bool, error) {
 	row, attempts, err := w.readWriter.Read(ctx, rowID)
+
 	return row, attempts, false, err
 }
+
 func (w *MissesWrapper) Write(ctx context.Context, row generator.Row) (int, bool, error) {
 	attempts, err := w.readWriter.Write(ctx, row)
+
 	return attempts, false, err
 }
 
