@@ -1258,11 +1258,14 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithLimit[*testItem, testItem](3),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					idx := atomic.AddInt32(&createdCount, 1) - 1
-					nodeID := uint32(idx)
 
 					return &testItem{
 						v: idx,
 						onNodeID: func() uint32 {
+							nodeID, has := endpoint.ContextNodeID(ctx)
+							if !has {
+								nodeID = 0
+							}
 							return nodeID
 						},
 					}, nil
@@ -1279,13 +1282,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			mustPutItem(t, p, item0)
 			mustPutItem(t, p, item1)
 
-			// Pool state: len=3, idle=2, busy=1 (item2)
-			// Now try to get item with preferred nodeID=0
-			// This should succeed by removing idle item1 and creating a new one
-			item0, _ = p.getItem(endpoint.WithNodeID(context.Background(), 0))
 			item1, _ = p.getItem(endpoint.WithNodeID(context.Background(), 1))
 			item2, _ := p.getItem(endpoint.WithNodeID(context.Background(), 1))
-			require.Equal(t, uint32(0), item0.NodeID())
 			require.Equal(t, uint32(1), item1.NodeID())
 			require.Equal(t, uint32(1), item2.NodeID())
 

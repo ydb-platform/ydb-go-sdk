@@ -1,3 +1,6 @@
+* Changed behaviour of `table.Client` and `query.Client` internal session pool. When `ydb.WithPreferredNodeID` is set and
+  there is no idle session on preferred node, the pool closes most idle session to create a new one on the preferred node
+
 ## v3.126.4
 * Fixed a bug where the `internal/value.Any()` method was prematurely converting `*decimalValue` to `decimal.Decimal`, preventing users from implementing custom scanners that need to work with the underlying YDB value type.
 
