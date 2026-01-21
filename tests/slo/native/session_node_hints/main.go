@@ -67,10 +67,6 @@ func main() {
 
 	log.Println("db init ok")
 	gen := generator.NewSeeded(120394832798)
-<<<<<<< Updated upstream
-	//gen := generator.New(0)
-=======
->>>>>>> Stashed changes
 	switch cfg.Mode {
 	case config.CreateMode:
 		err = s.CreateTable(ctx)
@@ -117,13 +113,6 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("create workers failed: %w", err))
 		}
-<<<<<<< Updated upstream
-		//ns := s.nodeSelector.Load()
-		//idx, nodeID := ns.GetRandomNodeID(gen)
-		//log.Println("all requests to node id: ", nodeID)
-		//gen.SetRange(ns.LowerBounds[idx], ns.UpperBounds[idx])
-=======
->>>>>>> Stashed changes
 		w.Gen = gen
 		defer func() {
 			err := w.Close()

@@ -89,6 +89,8 @@ jobs:
             name: session-node-hints
             path: ./native/session_node_hints
             label: native/session_node_hints
+            slo_workload_read_max_rps: 1000
+            slo_workload_write_max_rps: 1
             run_extra_args: '-batch-size=10'
             create_extra_args: '-min-partitions-count 10'
 

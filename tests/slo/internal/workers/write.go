@@ -36,7 +36,7 @@ func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limite
 func (w *Workers) write(ctx context.Context, gen generator.Generator) (finalErr error) {
 	m := w.m.Start(metrics.OperationTypeWrite)
 	var attempts int
-	var missed = false
+	missed := false
 	if w.s != nil {
 		row, err := gen.Generate()
 		if err != nil {

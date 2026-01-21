@@ -289,7 +289,7 @@ func (j Span) Finish(err error, attempts int, missed bool) {
 	j.m.operationsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
 	j.m.retryAttemptsTotal.Add(j.m.ctx, int64(attempts), otelmetric.WithAttributes(attrs...))
 
-	var miss int64 = 0
+	var miss int64
 	if missed {
 		miss = 1
 	}
