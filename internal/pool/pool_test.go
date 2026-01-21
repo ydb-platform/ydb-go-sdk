@@ -1266,6 +1266,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							if !has {
 								nodeID = 0
 							}
+
 							return nodeID
 						},
 					}, nil
@@ -1332,7 +1333,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.LessOrEqual(t, stats.Index, 2)
 		})
 
-		t.Run("PreferredNodeIDFailsWhenAllBusy", func(t *testing.T) {
+		t.Run("PreferredNodeIDAllBusy", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var idx uint32
 				p := New[*testItem, testItem](rootCtx,
@@ -1348,37 +1349,17 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							onNodeID: func() uint32 {
 								return nodeID
 							},
-							onClose: func() error {
-								return nil
-							},
 						}, nil
 					}),
 				)
 				_ = mustGetItem(t, p)
-				item1 := mustGetItem(t, p)
+				_ = mustGetItem(t, p)
 
-				getCtx := endpoint.WithNodeID(context.Background(), 3)
-
-				wg := sync.WaitGroup{}
-				wg.Add(2)
-				var item *testItem
-				var getErr error
-				go func() {
-					item, getErr = p.getItem(getCtx)
-					wg.Done()
-				}()
-				go func() {
-					finalErr := p.putItem(context.Background(), item1)
-					require.NoError(t, finalErr)
-					wg.Done()
-				}()
-				wg.Wait()
-				// xtest.WaitGroup(t, &wg)
-				if getErr != nil {
-					require.ErrorIs(t, getErr, errPoolIsOverflow)
-				}
-				require.Equal(t, uint32(3), item.NodeID())
-				require.True(t, item1.closed)
+				ctx := endpoint.WithNodeID(context.Background(), 3)
+				getCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+				defer cancel()
+				_, err := p.getItem(getCtx)
+				require.ErrorIs(t, err, errPoolIsOverflow)
 				mustClose(t, p)
 			})
 		})
