@@ -66,7 +66,7 @@ func (w *Workers) read(ctx context.Context) error {
 	var m metrics.Span
 	var attempts int
 	var err error
-	var missed = false
+	missed := false
 	if w.s != nil {
 		id := w.ReadID()
 		m = w.m.Start(metrics.OperationTypeRead)

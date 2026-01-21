@@ -59,7 +59,7 @@ type (
 	Pool[PT ItemConstraint[T], T any] struct {
 		config Config[PT, T]
 
-		createItemFunc func(ctx context.Context) (PT, error)
+		createItemFunc func(ctx context.Context, withReservedSpace bool) (PT, error)
 
 		mu               xsync.RWMutex
 		createInProgress int // KIKIMR-9163: in-create-process counter
@@ -202,9 +202,12 @@ func New[PT ItemConstraint[T], T any](
 // makeAsyncCreateItemFunc wraps the createItem function with timeout handling
 func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	p *Pool[PT, T],
-) func(ctx context.Context) (PT, error) {
-	return func(ctx context.Context) (PT, error) {
+) func(ctx context.Context, withReservedSpace bool) (PT, error) {
+	return func(ctx context.Context, withReservedSpace bool) (PT, error) {
 		if !xsync.WithLock(&p.mu, func() bool {
+			if withReservedSpace {
+				return true
+			}
 			if len(p.index)+p.createInProgress < p.config.limit {
 				p.createInProgress++
 
@@ -815,7 +818,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			return nil, xerrors.WithStackTrace(errClosedPool)
 		default:
 		}
-
+		reservedSpace := false
 		if item := xsync.WithLock(&p.mu, func() PT { //nolint:nestif
 			if hasPreferredNodeID {
 				item := p.removeIdleByNodeID(preferredNodeID)
@@ -832,17 +835,20 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			idle := p.removeFirstIdle()
 			if hasPreferredNodeID {
 				if idle != nil {
-					//close most idle item to make space for new one with preferred node id
+					// reserve slot in session pool
+					p.createInProgress++
+					reservedSpace = true
+					// close most idle item to make space for new one with preferred node id
 					p.closeItem(ctx, idle,
 						closeItemNotifyStats(),
 						closeItemWithDeleteFromPool(),
 					)
+
+					return nil
 				}
-				return nil
-			} else {
-				return idle
 			}
 
+			return idle
 		}); item != nil {
 			if item.IsAlive() {
 				info := xsync.WithLock(&p.mu, func() itemInfo[PT, T] {
@@ -876,7 +882,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			)
 		}
 
-		item, err := p.createItemFunc(ctx)
+		item, err := p.createItemFunc(ctx, reservedSpace)
 		if item != nil {
 			return item, nil
 		}
