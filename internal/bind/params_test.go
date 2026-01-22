@@ -416,16 +416,17 @@ func TestToValue(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			src:  testInterval(42 * time.Microsecond),
-			dst:  value.IntervalValueFromDuration(time.Duration(42 * time.Microsecond)),
+			dst:  value.IntervalValueFromDuration(42 * time.Microsecond),
 			err:  nil,
 		},
 		{
 			name: xtest.CurrentFileLine(),
 			src: func() *testInterval {
 				v := testInterval(42 * time.Microsecond)
+
 				return &v
 			}(),
-			dst: value.OptionalValue(value.IntervalValueFromDuration(time.Duration(42 * time.Microsecond))),
+			dst: value.OptionalValue(value.IntervalValueFromDuration(42 * time.Microsecond)),
 			err: nil,
 		},
 		{

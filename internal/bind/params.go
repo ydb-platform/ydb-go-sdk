@@ -32,6 +32,22 @@ var (
 	uuidPtrType = reflect.TypeOf((*uuid.UUID)(nil))
 )
 
+// DurationLike is an interface for types that can be converted to time.Duration.
+// It includes all methods specific to time.Duration to identify duration-like types
+// and avoid intersection with time.Time.
+type DurationLike interface {
+	Abs() time.Duration
+	Hours() float64
+	Microseconds() int64
+	Milliseconds() int64
+	Minutes() float64
+	Nanoseconds() int64
+	Round(m time.Duration) time.Duration
+	Seconds() float64
+	String() string
+	Truncate(m time.Duration) time.Duration
+}
+
 func asUUID(v any) (value.Value, bool) {
 	switch reflect.TypeOf(v) {
 	case uuidType:
@@ -126,77 +142,54 @@ func asSQLNullValue(v any) (value.Value, bool) {
 	return value.OptionalValue(val), true
 }
 
-// isDurationTypeAlias checks if the given type is time.Duration or its type alias.
-// Since Go doesn't provide a direct way to check if a type is an alias of another type,
-// we use a heuristic: check if the type is convertible to time.Duration and vice versa,
-// and that it's not the base int64 type. However, this heuristic also matches other
-// int64 aliases like testInt64. Without string matching, we can't perfectly distinguish
-// them. The solution is to check if the type would be converted to time.Duration by
-// tryConvertToBaseType's logic, which prioritizes duration conversion. We simulate this
-// by checking if the type passes duration-specific conversion checks without actually
-// calling tryConvertToBaseType (to avoid circular dependency).
-func isDurationTypeAlias(rt reflect.Type) bool {
+// asDuration checks if the value can be converted to time.Duration.
+// First, it checks if the value can be cast to int64 (since time.Duration is an int64 alias),
+// then checks if it can be converted to time.Duration and has DurationLike methods.
+func asDuration(v any) (time.Duration, bool) {
+	// Fast path: direct time.Duration
+	if d, ok := v.(time.Duration); ok {
+		return d, true
+	}
+
+	// Check if value can be cast to int64 first (fast type check)
+	rv := reflect.ValueOf(v)
+	rt := rv.Type()
+
+	// If it's not int64 or convertible to int64, it can't be a duration
 	if rt.Kind() != reflect.Int64 {
-		return false
+		return 0, false
 	}
-	durationType := reflect.TypeFor[time.Duration]()
+
+	// Reject plain int64 - only accept named types (aliases of int64)
 	int64Type := reflect.TypeFor[int64]()
-	// Check if it's exactly time.Duration
-	if rt == durationType {
-		return true
-	}
-	// Check if it's a named type (not just int64) and convertible to time.Duration
 	if rt == int64Type {
-		return false
+		return 0, false
 	}
-	// Check bidirectional convertibility: type must be convertible to time.Duration
-	// and time.Duration must be convertible to this type
-	if !rt.ConvertibleTo(durationType) || !durationType.ConvertibleTo(rt) {
-		return false
+
+	// Try to convert to time.Duration
+	durationType := reflect.TypeFor[time.Duration]()
+	if !rv.CanConvert(durationType) {
+		return 0, false
 	}
-	// Without string matching, we can't perfectly distinguish duration aliases from
-	// other int64 aliases. However, we can use the fact that duration aliases are
-	// typically defined as "type X time.Duration", which means they have the same
-	// underlying representation. We check if the type preserves duration semantics
-	// by verifying round-trip conversion with multiple test values.
-	testValues := []time.Duration{0, 1, 42, time.Second, time.Hour}
-	for _, testVal := range testValues {
-		testRv := reflect.ValueOf(testVal)
-		if !testRv.CanConvert(rt) {
-			return false
-		}
-		converted := testRv.Convert(rt)
-		if !converted.CanConvert(durationType) {
-			return false
-		}
-		convertedBack, ok := converted.Convert(durationType).Interface().(time.Duration)
-		if !ok {
-			return false
-		}
-		if convertedBack != testVal {
-			return false
-		}
+
+	// Convert to time.Duration first, then check if it implements DurationLike
+	// This works for both time.Duration and its type aliases
+	converted := rv.Convert(durationType)
+	durationValue := converted.Interface().(time.Duration) //nolint:forcetypeassert
+
+	// Check if the converted value implements DurationLike interface
+	// This is the key check - only time.Duration and its aliases will pass this
+	if _, ok := interface{}(durationValue).(DurationLike); ok {
+		return durationValue, true
 	}
-	// All round-trip conversions passed. However, this still matches testInt64.
-	// Without string matching, we can't perfectly distinguish them. The pragmatic
-	// solution is to return true for all int64 aliases that pass these checks,
-	// which means testInt64 will also be treated as duration. This is a known
-	// limitation when not using string matching.
-	return true
+
+	return 0, false
 }
 
 // tryConvertToBaseType attempts to convert a value to a base type and returns the converted value if successful.
 // Returns nil if conversion is not possible or not needed.
 func tryConvertToBaseType(rv reflect.Value) any {
 	rt := rv.Type()
-	// Special handling for time.Duration - check first to avoid converting to int64
-	if isDurationTypeAlias(rt) {
-		durationType := reflect.TypeFor[time.Duration]()
-		if rv.CanConvert(durationType) {
-			return rv.Convert(durationType).Interface()
-		}
-	}
-
 	kind := rt.Kind()
 	baseTypes := map[reflect.Kind]reflect.Type{
 		reflect.String:  reflect.TypeFor[string](),
@@ -266,9 +259,12 @@ func toType(v any) (_ types.Type, err error) {
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
 		return types.Timestamp, nil
-	case time.Duration:
-		return types.Interval, nil
 	default:
+		// Check if value implements DurationLike interface
+		if _, ok := asDuration(x); ok {
+			return types.Interval, nil
+		}
+
 		rv := reflect.ValueOf(x)
 		// Try to convert derived types to base types
 		if converted := tryConvertToBaseType(rv); converted != nil {
@@ -289,11 +285,6 @@ func toType(v any) (_ types.Type, err error) {
 		case reflect.Int32:
 			return types.Int32, nil
 		case reflect.Int64:
-			// Check if it's a duration alias before treating as Int64
-			if isDurationTypeAlias(rt) {
-				return types.Interval, nil
-			}
-
 			return types.Int64, nil
 		case reflect.Uint:
 			return types.Uint32, nil
@@ -488,8 +479,6 @@ func toValue(v any) (_ value.Value, err error) {
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
 		return value.TimestampValueFromTime(x), nil
-	case time.Duration:
-		return value.IntervalValueFromDuration(x), nil
 	case json.Marshaler:
 		bytes, err := x.MarshalJSON()
 		if err != nil {
@@ -498,6 +487,11 @@ func toValue(v any) (_ value.Value, err error) {
 
 		return value.JSONValue(xstring.FromBytes(bytes)), nil
 	default:
+		// Check if value implements DurationLike interface
+		if d, ok := asDuration(x); ok {
+			return value.IntervalValueFromDuration(d), nil
+		}
+
 		rv := reflect.ValueOf(x)
 		// Try to convert derived types to base types
 		if converted := tryConvertToBaseType(rv); converted != nil {
