@@ -199,6 +199,8 @@ func toType(v any) (_ types.Type, err error) {
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
 		return types.Timestamp, nil
+	case time.Duration:
+		return types.Interval, nil
 	default:
 		rv := reflect.ValueOf(x)
 		// Try to convert derived types to base types
@@ -412,10 +414,10 @@ func toValue(v any) (_ value.Value, err error) {
 		return value.UUIDWithIssue1501Value(x.AsBytesArray()), nil
 	case [16]byte:
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
-	case time.Duration:
-		return value.IntervalValueFromDuration(x), nil
 	case time.Time:
 		return value.TimestampValueFromTime(x), nil
+	case time.Duration:
+		return value.IntervalValueFromDuration(x), nil
 	case json.Marshaler:
 		bytes, err := x.MarshalJSON()
 		if err != nil {

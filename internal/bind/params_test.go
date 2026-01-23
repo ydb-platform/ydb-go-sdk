@@ -22,21 +22,21 @@ type testValuer struct {
 }
 
 type (
-	testString   string
-	testUInt32   uint32
-	testInt32    int32
-	testBool     bool
-	testInt      int
-	testInt8     int8
-	testInt16    int16
-	testInt64    int64
-	testUint     uint
-	testUint8    uint8
-	testUint16   uint16
-	testUint64   uint64
-	testFloat32  float32
-	testFloat64  float64
-	testBytes    []byte
+	testString  string
+	testUInt32  uint32
+	testInt32   int32
+	testBool    bool
+	testInt     int
+	testInt8    int8
+	testInt16   int16
+	testInt64   int64
+	testUint    uint
+	testUint8   uint8
+	testUint16  uint16
+	testUint64  uint64
+	testFloat32 float32
+	testFloat64 float64
+	testBytes   []byte
 )
 
 func (v testValuer) Value() (driver.Value, error) {
@@ -404,6 +404,12 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src:  func(v time.Duration) *time.Duration { return &v }(time.Duration(42)),
 			dst:  value.OptionalValue(value.IntervalValueFromDuration(time.Duration(42))),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func() *time.Duration { return nil }(),
+			dst:  value.NullValue(types.Interval),
 			err:  nil,
 		},
 		{
