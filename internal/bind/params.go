@@ -32,44 +32,6 @@ var (
 	uuidPtrType = reflect.TypeOf((*uuid.UUID)(nil))
 )
 
-// DurationLike is an interface for types that can be converted to time.Duration.
-// It includes all methods specific to time.Duration to identify duration-like types
-// and avoid intersection with time.Time.
-type DurationLike interface {
-	Abs() time.Duration
-	Hours() float64
-	Microseconds() int64
-	Milliseconds() int64
-	Minutes() float64
-	Nanoseconds() int64
-	Round(m time.Duration) time.Duration
-	Seconds() float64
-	String() string
-	Truncate(m time.Duration) time.Duration
-}
-
-// TimeLike is an interface for types that can be converted to time.Time.
-// It includes all methods specific to time.Time to identify time-like types
-// and avoid intersection with time.Duration.
-type TimeLike interface {
-	Date() (year int, month time.Month, day int)
-	Day() int
-	Hour() int
-	Minute() int
-	Month() time.Month
-	Second() int
-	Year() int
-	Unix() int64
-	UnixMicro() int64
-	UnixMilli() int64
-	UnixNano() int64
-	IsZero() bool
-	After(u time.Time) bool
-	Before(u time.Time) bool
-	Equal(u time.Time) bool
-	Sub(u time.Time) time.Duration
-}
-
 func asUUID(v any) (value.Value, bool) {
 	switch reflect.TypeOf(v) {
 	case uuidType:
