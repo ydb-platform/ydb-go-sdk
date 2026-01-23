@@ -231,7 +231,7 @@ func TestProcessIndexes(t *testing.T) {
 			},
 		}
 		result := processIndexes(indexes)
-		require.Len(t, result, 2)
+		require.Len(t, result, 3)
 		require.Equal(t, options.IndexTypeGlobal, result[0].Type)
 		require.Equal(t, options.IndexTypeGlobalAsync, result[1].Type)
 		require.Equal(t, options.IndexTypeGlobalUnique, result[2].Type)
