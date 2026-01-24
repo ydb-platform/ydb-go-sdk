@@ -1,3 +1,4 @@
+## v3.125.2
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
 
 ## v3.125.1
