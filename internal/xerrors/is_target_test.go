@@ -9,10 +9,7 @@ import (
 )
 
 func TestErrorWithCastToTargetError(t *testing.T) {
-	err := ErrorWithCastToTargetError{
-		Err:    errors.New("test"),
-		Target: io.EOF,
-	}
+	err := IsTarget(errors.New("test"), io.EOF)
 	require.Equal(t, "test", err.Error())
 	require.ErrorIs(t, err, io.EOF)
 }

@@ -10,38 +10,19 @@ import (
 )
 
 type Error struct {
-	xerrors.ErrorWithCastToTargetError
+	error
 }
 
-func (e Error) Error() string {
-	return e.Err.Error()
-}
-
-func (e Error) As(target interface{}) bool {
-	switch target.(type) {
-	case Error, *Error:
-		return true
-	default:
-		return xerrors.As(e.Err, target)
-	}
+func (e Error) Unwrap() error {
+	return e.error
 }
 
 func New(msg string) error {
-	return &Error{
-		ErrorWithCastToTargetError: xerrors.ErrorWithCastToTargetError{
-			Err:    errors.New(msg),
-			Target: driver.ErrBadConn,
-		},
-	}
+	return &Error{xerrors.IsTarget(errors.New(msg), driver.ErrBadConn)}
 }
 
 func Errorf(format string, args ...interface{}) error {
-	return &Error{
-		ErrorWithCastToTargetError: xerrors.ErrorWithCastToTargetError{
-			Err:    fmt.Errorf(format, args...),
-			Target: driver.ErrBadConn,
-		},
-	}
+	return &Error{xerrors.IsTarget(fmt.Errorf(format, args...), driver.ErrBadConn)}
 }
 
 func Map(err error) error {
@@ -51,12 +32,7 @@ func Map(err error) error {
 	case xerrors.Is(err, io.EOF):
 		return io.EOF
 	case xerrors.MustDeleteTableOrQuerySession(err):
-		return &Error{
-			ErrorWithCastToTargetError: xerrors.ErrorWithCastToTargetError{
-				Err:    err,
-				Target: driver.ErrBadConn,
-			},
-		}
+		return &Error{xerrors.IsTarget(err, driver.ErrBadConn)}
 	default:
 		return err
 	}

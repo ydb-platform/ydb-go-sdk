@@ -94,6 +94,7 @@ func readRow(ctx context.Context, r *streamResult) (_ *Row, finalErr error) {
 		if xerrors.Is(err, io.EOF) {
 			return nil, xerrors.WithStackTrace(ErrNoRows)
 		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
