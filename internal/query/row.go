@@ -1,6 +1,9 @@
 package query
 
 import (
+	"context"
+	"io"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
@@ -74,4 +77,41 @@ func (r Row) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error
 	}
 
 	return nil
+}
+
+func readRow(ctx context.Context, r *streamResult) (_ *Row, finalErr error) {
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+
+	rs, err := r.nextResultSet(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	row, err := rs.nextRow(ctx)
+	if err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return nil, xerrors.WithStackTrace(ErrNoRows)
+		}
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	_, err = rs.nextRow(ctx)
+	if err == nil {
+		return nil, xerrors.WithStackTrace(ErrMoreThanOneRow)
+	}
+	if !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	_, err = r.NextResultSet(ctx)
+	if err == nil {
+		return nil, xerrors.WithStackTrace(ErrMoreThanOneResultSet)
+	}
+	if !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
 }

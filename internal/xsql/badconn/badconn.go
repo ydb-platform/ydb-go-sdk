@@ -10,32 +10,11 @@ import (
 )
 
 type Error struct {
-	err error
-}
-
-func New(msg string) error {
-	return &Error{err: errors.New(msg)}
-}
-
-func Errorf(format string, args ...interface{}) error {
-	return &Error{err: fmt.Errorf(format, args...)}
-}
-
-func (e Error) Origin() error {
-	return e.err
+	xerrors.ErrorWithCastToTargetError
 }
 
 func (e Error) Error() string {
-	return e.err.Error()
-}
-
-func (e Error) Is(err error) bool {
-	//nolint:nolintlint
-	if err == driver.ErrBadConn { //nolint:errorlint
-		return true
-	}
-
-	return xerrors.Is(e.err, err)
+	return e.Err.Error()
 }
 
 func (e Error) As(target interface{}) bool {
@@ -43,7 +22,25 @@ func (e Error) As(target interface{}) bool {
 	case Error, *Error:
 		return true
 	default:
-		return xerrors.As(e.err, target)
+		return xerrors.As(e.Err, target)
+	}
+}
+
+func New(msg string) error {
+	return &Error{
+		ErrorWithCastToTargetError: xerrors.ErrorWithCastToTargetError{
+			Err:    errors.New(msg),
+			Target: driver.ErrBadConn,
+		},
+	}
+}
+
+func Errorf(format string, args ...interface{}) error {
+	return &Error{
+		ErrorWithCastToTargetError: xerrors.ErrorWithCastToTargetError{
+			Err:    fmt.Errorf(format, args...),
+			Target: driver.ErrBadConn,
+		},
 	}
 }
 
@@ -54,7 +51,12 @@ func Map(err error) error {
 	case xerrors.Is(err, io.EOF):
 		return io.EOF
 	case xerrors.MustDeleteTableOrQuerySession(err):
-		return Error{err: err}
+		return &Error{
+			ErrorWithCastToTargetError: xerrors.ErrorWithCastToTargetError{
+				Err:    err,
+				Target: driver.ErrBadConn,
+			},
+		}
 	default:
 		return err
 	}
