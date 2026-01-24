@@ -34,6 +34,12 @@ type (
 
 		// QueryRow execute query and take the exactly single row from exactly single result set from result
 		//
+		// QueryRow returns error if result contains more than one result set or more than one row
+		//
+		// Expected errors:
+		// - ErrNoRows: when query returns no rows
+		// - ErrMoreThanOneRow: when query returns more than one row
+		//
 		// Exec used by default:
 		// - DefaultTxControl
 		QueryRow(ctx context.Context, sql string, opts ...ExecuteOption) (Row, error)
@@ -86,7 +92,12 @@ type (
 
 		// QueryRow is a helper which read only one row from first result set in result
 		//
-		// ReadRow returns error if result contains more than one result set or more than one row
+		// QueryRow returns error if result contains more than one result set or more than one row
+		//
+		// Expected errors:
+		// - ErrNoRows: when query returns no rows
+		// - ErrMoreThanOneRow: when query returns more than one row
+		// - ErrMoreThanOneResultSet: when query returns more than one result set
 		QueryRow(ctx context.Context, sql string, opts ...ExecuteOption) (Row, error)
 
 		// ExecuteScript starts long executing script with polling results later
