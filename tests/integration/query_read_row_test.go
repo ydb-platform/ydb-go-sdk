@@ -4,7 +4,8 @@
 package integration
 
 import (
-	"testing"
+		"io"
+		"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -55,6 +56,7 @@ func TestQueryReadRow(t *testing.T) {
 
 		_, err := db.Query().QueryRow(ctx, `SELECT * FROM (SELECT 1) WHERE 1 = 0;`)
 		require.ErrorIs(t, err, query.ErrNoRows)
+		require.ErrorIs(t, err, io.EOF)
 	})
 
 	t.Run("ExactlyOneRow", func(t *testing.T) {
