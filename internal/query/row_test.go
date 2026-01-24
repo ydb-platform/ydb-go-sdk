@@ -326,7 +326,6 @@ func TestReadRow(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 
-		// Создаем stream с двумя result set'ами
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
