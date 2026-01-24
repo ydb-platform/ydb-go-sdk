@@ -190,7 +190,6 @@ func TestReadRow(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 
-		// Создаем stream с ровно одной строкой
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
@@ -237,7 +236,6 @@ func TestReadRow(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 
-		// Создаем stream с двумя строками
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
@@ -290,7 +288,6 @@ func TestReadRow(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 
-		// Создаем stream без строк
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,

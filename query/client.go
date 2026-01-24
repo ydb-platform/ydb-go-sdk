@@ -97,6 +97,7 @@ type (
 		// Expected errors:
 		// - ErrNoRows: when query returns no rows
 		// - ErrMoreThanOneRow: when query returns more than one row
+		// - ErrMoreThanOneResultSet: when query returns more than one result set
 		QueryRow(ctx context.Context, sql string, opts ...ExecuteOption) (Row, error)
 
 		// ExecuteScript starts long executing script with polling results later
