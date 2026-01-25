@@ -255,9 +255,10 @@ func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettin
 			return nil, xerrors.WithStackTrace(errNilOption)
 		}
 		if _, has := opt.(options.ExecuteNoTx); has {
-			// If the option is TxControl, check if it matches the transaction's TxControl
-			// Since txControlOption is a type alias for tx.Control, we need to cast it back
-			// to *tx.Control to access its methods
+			// ExecuteNoTx options are normally not allowed on transactions.
+			// However, if the option is a TxControl and its value matches the
+			// transaction's TxControl, we allow it to pass through.
+			// TxControlOption is defined as type TxControlOption tx.Control
 			if txControlOpt, ok := opt.(*options.TxControlOption); ok {
 				providedControl := (*baseTx.Control)(txControlOpt)
 				currentControl := tx.txControl()
