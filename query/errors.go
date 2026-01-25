@@ -15,5 +15,5 @@ var (
 	)
 	ErrMoreThanOneResultSet   = errors.New("unexpected more than one result set")
 	ErrNoResultSets           = errors.New("no result sets")
-	ErrTxControlWithoutCommit = errors.New("transaction control with BeginTx must have CommitTx set")
+	ErrTxControlWithoutCommit = errors.New("read-write transaction control with BeginTx requires CommitTx to be set, otherwise data changes will not be committed to the database")
 )
