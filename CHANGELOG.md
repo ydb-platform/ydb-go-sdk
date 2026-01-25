@@ -1,3 +1,5 @@
+* Added check `CommitTx` flag in `query.TxControl` on `db.Query().{Exec,Query,QueryResultSet,QueryRow}` calls before execution
+
 ## v3.125.2
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
 
