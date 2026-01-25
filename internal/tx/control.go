@@ -53,6 +53,18 @@ func (ctrl *Control) Selector() Selector {
 	return ctrl.selector
 }
 
+// IsBeginTxWithoutCommit checks if the control has BeginTx selector but no CommitTx flag set
+func (ctrl *Control) IsBeginTxWithoutCommit() bool {
+	if ctrl == nil {
+		return false
+	}
+	// Check if selector is beginTxOptions and commit is false
+	if _, ok := ctrl.selector.(beginTxOptions); ok && !ctrl.commit {
+		return true
+	}
+	return false
+}
+
 var (
 	_ ControlOption = beginTxOptions{}
 	_ Selector      = beginTxOptions{}

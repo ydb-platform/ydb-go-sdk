@@ -13,6 +13,7 @@ var (
 		errors.New("no rows in result set"),
 		io.EOF, // for compatibility with previously behavior which returns internal error wrapped on io.EOF
 	)
-	ErrMoreThanOneResultSet = errors.New("unexpected more than one result set")
-	ErrNoResultSets         = errors.New("no result sets")
+	ErrMoreThanOneResultSet                = errors.New("unexpected more than one result set")
+	ErrNoResultSets                        = errors.New("no result sets")
+	ErrTxControlWithoutCommit              = errors.New("transaction control with BeginTx must have CommitTx set")
 )
