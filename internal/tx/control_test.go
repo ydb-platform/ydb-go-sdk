@@ -184,3 +184,25 @@ func TestControl(t *testing.T) {
 		})
 	}
 }
+
+func TestIsBeginTxWithoutCommit(t *testing.T) {
+	t.Run("BeginTxWithoutCommit", func(t *testing.T) {
+		ctrl := NewControl(BeginTx(WithSerializableReadWrite()))
+		require.True(t, ctrl.IsBeginTxWithoutCommit())
+	})
+
+	t.Run("BeginTxWithCommit", func(t *testing.T) {
+		ctrl := NewControl(BeginTx(WithSerializableReadWrite()), CommitTx())
+		require.False(t, ctrl.IsBeginTxWithoutCommit())
+	})
+
+	t.Run("WithTxID", func(t *testing.T) {
+		ctrl := NewControl(WithTxID("test-tx-id"))
+		require.False(t, ctrl.IsBeginTxWithoutCommit())
+	})
+
+	t.Run("NilControl", func(t *testing.T) {
+		var ctrl *Control = nil
+		require.False(t, ctrl.IsBeginTxWithoutCommit())
+	})
+}
