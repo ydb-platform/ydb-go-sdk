@@ -626,6 +626,7 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 		tx := &Transaction{
 			LazyID: func() (id baseTx.LazyID) {
 				id.SetTxID(fmt.Sprintf("test-transaction-id-%v", e.T().Name()))
+
 				return id
 			}(),
 			s:          SessionOverGrpcMock(e),
@@ -646,6 +647,7 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 		tx := &Transaction{
 			LazyID: func() (id baseTx.LazyID) {
 				id.SetTxID(fmt.Sprintf("test-transaction-id-%v", e.T().Name()))
+
 				return id
 			}(),
 			s:          SessionOverGrpcMock(e),
@@ -667,6 +669,7 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 		tx := &Transaction{
 			LazyID: func() (id baseTx.LazyID) {
 				id.SetTxID(fmt.Sprintf("test-transaction-id-%v", e.T().Name()))
+
 				return id
 			}(),
 			s:          SessionOverGrpcMock(e),
