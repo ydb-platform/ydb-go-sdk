@@ -1,6 +1,8 @@
 package tx
 
 import (
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 )
@@ -51,6 +53,21 @@ func (ctrl *Control) ToYdbTableTransactionControl() *Ydb_Table.TransactionContro
 
 func (ctrl *Control) Selector() Selector {
 	return ctrl.selector
+}
+
+// Equal compares two Control objects by comparing their protobuf representations
+func (ctrl *Control) Equal(other *Control) bool {
+	if ctrl == nil && other == nil {
+		return true
+	}
+	if ctrl == nil || other == nil {
+		return false
+	}
+
+	return proto.Equal(
+		ctrl.ToYdbQueryTransactionControl(),
+		other.ToYdbQueryTransactionControl(),
+	)
 }
 
 var (

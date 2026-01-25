@@ -184,3 +184,84 @@ func TestControl(t *testing.T) {
 		})
 	}
 }
+
+func TestControlEqual(t *testing.T) {
+	t.Run("SameControls", func(t *testing.T) {
+		ctrl1 := SerializableReadWriteTxControl()
+		ctrl2 := SerializableReadWriteTxControl()
+		require.True(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("SameControlsWithCommit", func(t *testing.T) {
+		ctrl1 := SerializableReadWriteTxControl(CommitTx())
+		ctrl2 := SerializableReadWriteTxControl(CommitTx())
+		require.True(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("DifferentCommitFlag", func(t *testing.T) {
+		ctrl1 := SerializableReadWriteTxControl()
+		ctrl2 := SerializableReadWriteTxControl(CommitTx())
+		require.False(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("DifferentTxModes", func(t *testing.T) {
+		ctrl1 := SerializableReadWriteTxControl()
+		ctrl2 := SnapshotReadOnlyTxControl()
+		require.False(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("SnapshotReadOnly", func(t *testing.T) {
+		ctrl1 := SnapshotReadOnlyTxControl()
+		ctrl2 := SnapshotReadOnlyTxControl()
+		require.True(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("OnlineReadOnly", func(t *testing.T) {
+		ctrl1 := OnlineReadOnlyTxControl()
+		ctrl2 := OnlineReadOnlyTxControl()
+		require.True(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("OnlineReadOnlyWithInconsistentReads", func(t *testing.T) {
+		ctrl1 := OnlineReadOnlyTxControl(WithInconsistentReads())
+		ctrl2 := OnlineReadOnlyTxControl(WithInconsistentReads())
+		require.True(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("OnlineReadOnlyDifferentInconsistentReads", func(t *testing.T) {
+		ctrl1 := OnlineReadOnlyTxControl()
+		ctrl2 := OnlineReadOnlyTxControl(WithInconsistentReads())
+		require.False(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("StaleReadOnly", func(t *testing.T) {
+		ctrl1 := StaleReadOnlyTxControl()
+		ctrl2 := StaleReadOnlyTxControl()
+		require.True(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("NilControls", func(t *testing.T) {
+		var ctrl1 *Control
+		var ctrl2 *Control
+		require.True(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("OneNilControl", func(t *testing.T) {
+		ctrl1 := SerializableReadWriteTxControl()
+		var ctrl2 *Control
+		require.False(t, ctrl1.Equal(ctrl2))
+		require.False(t, ctrl2.Equal(ctrl1))
+	})
+
+	t.Run("WithTxID", func(t *testing.T) {
+		ctrl1 := NewControl(WithTxID("tx-123"))
+		ctrl2 := NewControl(WithTxID("tx-123"))
+		require.True(t, ctrl1.Equal(ctrl2))
+	})
+
+	t.Run("DifferentTxID", func(t *testing.T) {
+		ctrl1 := NewControl(WithTxID("tx-123"))
+		ctrl2 := NewControl(WithTxID("tx-456"))
+		require.False(t, ctrl1.Equal(ctrl2))
+	})
+}
