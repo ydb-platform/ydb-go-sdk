@@ -322,7 +322,7 @@ func clientQueryRow(
 	if err := validateTxControl(settings); err != nil {
 		return nil, err
 	}
-	
+
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		row, err = s.queryRow(ctx, q, settings, resultOpts...)
 		if err != nil {
@@ -363,11 +363,11 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
-	
+
 	if err := validateTxControl(settings); err != nil {
 		return err
 	}
-	
+
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.execute(ctx, q, settings,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
@@ -418,11 +418,11 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	r query.Result, err error,
 ) {
 	settings := options.ExecuteSettings(opts...)
-	
+
 	if err := validateTxControl(settings); err != nil {
 		return nil, err
 	}
-	
+
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.execute(ctx, q, settings,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
@@ -474,7 +474,7 @@ func clientQueryResultSet(
 	if err := validateTxControl(settings); err != nil {
 		return nil, 0, err
 	}
-	
+
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
 		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
 		if err != nil {
