@@ -64,7 +64,7 @@ func (ctrl *Control) IsBeginTxWithoutCommit() bool {
 	if !ok || ctrl.commit {
 		return false
 	}
-	
+
 	// Check if this is a read-write transaction mode
 	// Read-only modes don't require CommitTx
 	for _, opt := range opts {
@@ -77,7 +77,7 @@ func (ctrl *Control) IsBeginTxWithoutCommit() bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
