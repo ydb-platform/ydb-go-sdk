@@ -572,10 +572,16 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 
 		// Try to execute with the same TxControl
 		txControl := baseTx.SerializableReadWriteTxControl()
-		_, err := tx.executeSettings(options.WithTxControl(txControl))
+		settings, err := tx.executeSettings(options.WithTxControl(txControl))
 
 		// Should not return an error since TxControl matches
 		require.NoError(t, err)
+		
+		// Verify that the returned settings use BeginTx selector (not TxID) for lazy transactions
+		actualControl := settings.TxControl().ToYdbQueryTransactionControl()
+		require.NotNil(t, actualControl)
+		require.NotNil(t, actualControl.GetBeginTx(), "Expected BeginTx selector for lazy transaction")
+		require.Empty(t, actualControl.GetTxId(), "Expected no TxID for lazy transaction")
 	})
 
 	t.Run("DifferentTxControlWithLazyTx", func(t *testing.T) {
@@ -635,10 +641,16 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 
 		// Try to execute with a TxControl that matches the txSettings used to begin the transaction
 		txControl := baseTx.SerializableReadWriteTxControl()
-		_, err := tx.executeSettings(options.WithTxControl(txControl))
+		settings, err := tx.executeSettings(options.WithTxControl(txControl))
 
 		// Should not return an error since TxControl matches the original txSettings
 		require.NoError(t, err)
+		
+		// Verify that the returned settings use TxID selector (not BeginTx) for started transactions
+		actualControl := settings.TxControl().ToYdbQueryTransactionControl()
+		require.NotNil(t, actualControl)
+		require.Equal(t, tx.ID(), actualControl.GetTxId(), "Expected TxID selector to match transaction ID")
+		require.Nil(t, actualControl.GetBeginTx(), "Expected no BeginTx selector for started transaction")
 	})
 
 	t.Run("WithDifferentTxID", func(t *testing.T) {
