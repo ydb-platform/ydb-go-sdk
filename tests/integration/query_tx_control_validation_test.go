@@ -261,4 +261,100 @@ func TestQueryTxControlValidation(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("ReadOnlyTransactions", func(t *testing.T) {
+		t.Run("Client", func(t *testing.T) {
+			t.Run("SnapshotReadOnly", func(t *testing.T) {
+				// Read-only transactions should work without CommitTx
+				result, err := db.Query().Query(ctx, "SELECT 1",
+					query.WithTxControl(query.TxControl(
+						query.BeginTx(query.WithSnapshotReadOnly()),
+						// No CommitTx needed for read-only
+					)),
+				)
+				require.NoError(t, err)
+				defer func() { _ = result.Close(ctx) }()
+			})
+
+			t.Run("StaleReadOnly", func(t *testing.T) {
+				// Read-only transactions should work without CommitTx
+				result, err := db.Query().Query(ctx, "SELECT 1",
+					query.WithTxControl(query.TxControl(
+						query.BeginTx(query.WithStaleReadOnly()),
+						// No CommitTx needed for read-only
+					)),
+				)
+				require.NoError(t, err)
+				defer func() { _ = result.Close(ctx) }()
+			})
+
+			t.Run("OnlineReadOnly", func(t *testing.T) {
+				// Read-only transactions should work without CommitTx
+				result, err := db.Query().Query(ctx, "SELECT 1",
+					query.WithTxControl(query.TxControl(
+						query.BeginTx(query.WithOnlineReadOnly()),
+						// No CommitTx needed for read-only
+					)),
+				)
+				require.NoError(t, err)
+				defer func() { _ = result.Close(ctx) }()
+			})
+		})
+
+		t.Run("Session", func(t *testing.T) {
+			t.Run("SnapshotReadOnly", func(t *testing.T) {
+				// Read-only transactions should work without CommitTx
+				err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+					result, err := s.Query(ctx, "SELECT 1",
+						query.WithTxControl(query.TxControl(
+							query.BeginTx(query.WithSnapshotReadOnly()),
+							// No CommitTx needed for read-only
+						)),
+					)
+					if err != nil {
+						return err
+					}
+					defer func() { _ = result.Close(ctx) }()
+					return nil
+				})
+				require.NoError(t, err)
+			})
+
+			t.Run("StaleReadOnly", func(t *testing.T) {
+				// Read-only transactions should work without CommitTx
+				err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+					result, err := s.Query(ctx, "SELECT 1",
+						query.WithTxControl(query.TxControl(
+							query.BeginTx(query.WithStaleReadOnly()),
+							// No CommitTx needed for read-only
+						)),
+					)
+					if err != nil {
+						return err
+					}
+					defer func() { _ = result.Close(ctx) }()
+					return nil
+				})
+				require.NoError(t, err)
+			})
+
+			t.Run("OnlineReadOnly", func(t *testing.T) {
+				// Read-only transactions should work without CommitTx
+				err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+					result, err := s.Query(ctx, "SELECT 1",
+						query.WithTxControl(query.TxControl(
+							query.BeginTx(query.WithOnlineReadOnly()),
+							// No CommitTx needed for read-only
+						)),
+					)
+					if err != nil {
+						return err
+					}
+					defer func() { _ = result.Close(ctx) }()
+					return nil
+				})
+				require.NoError(t, err)
+			})
+		})
+	})
 }
