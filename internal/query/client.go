@@ -313,6 +313,7 @@ func validateTxControl(settings executeSettings) error {
 			return xerrors.WithStackTrace(query.ErrTxControlWithoutCommit)
 		}
 	}
+
 	return nil
 }
 

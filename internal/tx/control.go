@@ -58,10 +58,10 @@ func (ctrl *Control) IsBeginTxWithoutCommit() bool {
 	if ctrl == nil {
 		return false
 	}
-	// Check if selector is beginTxOptions and commit is false
 	if _, ok := ctrl.selector.(beginTxOptions); ok && !ctrl.commit {
 		return true
 	}
+
 	return false
 }
 

@@ -189,10 +189,14 @@ func (m *mockSessionPool) Close(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockSessionPool) With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error {
+func (m *mockSessionPool) With(ctx context.Context,
+	f func(ctx context.Context, s *Session) error,
+	opts ...retry.Option,
+) error {
 	if m.withFunc != nil {
 		return m.withFunc(ctx, f)
 	}
+
 	return nil
 }
 

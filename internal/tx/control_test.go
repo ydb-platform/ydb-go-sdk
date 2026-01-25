@@ -202,7 +202,7 @@ func TestIsBeginTxWithoutCommit(t *testing.T) {
 	})
 
 	t.Run("NilControl", func(t *testing.T) {
-		var ctrl *Control = nil
+		ctrl := (*Control)(nil)
 		require.False(t, ctrl.IsBeginTxWithoutCommit())
 	})
 }
