@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -24,6 +25,7 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 		db    = scope.SQLDriverWithFolder(
 			ydb.WithTablePathPrefix(scope.Folder()),
 			ydb.WithAutoDeclare(),
+			ydb.WithQueryService(true),
 		)
 	)
 	overQueryService := false
@@ -151,7 +153,10 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				"SELECT 1",
 			)
 			return err
-		}, retry.WithIdempotent(true))
+		}, retry.WithIdempotent(true), retry.WithTxOptions(&sql.TxOptions{
+			Isolation: sql.LevelSerializable,
+			ReadOnly:  false,
+		}))
 		require.NoError(t, err)
 	})
 
@@ -166,8 +171,11 @@ func TestDatabaseSqlWithTxControl(t *testing.T) {
 				"SELECT 1",
 			)
 			return err
-		}, retry.WithIdempotent(true))
+		}, retry.WithIdempotent(true), retry.WithTxOptions(&sql.TxOptions{
+			Isolation: sql.LevelSerializable,
+			ReadOnly:  false,
+		}))
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "option is not for execute on transaction")
+		require.ErrorIs(t, err, query.ErrOptionNotForTxExecute)
 	})
 }

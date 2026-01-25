@@ -12,8 +12,8 @@ var (
 	ErrNoRows                 = query.ErrNoRows
 	ErrMoreThanOneResultSet   = query.ErrMoreThanOneResultSet
 	ErrNoResultSets           = query.ErrNoResultSets
+	ErrOptionNotForTxExecute  = query.ErrOptionNotForTxExecute
 	ErrTransactionRollingBack = xerrors.Wrap(errors.New("the transaction is rolling back"))
-	ErrOptionNotForTxExecute  = errors.New("option is not for execute on transaction")
 
 	errNilClient               = xerrors.Wrap(errors.New("table client is not initialized"))
 	errWrongNextResultSetIndex = errors.New("wrong result set index")
