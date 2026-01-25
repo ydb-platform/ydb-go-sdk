@@ -262,13 +262,12 @@ func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettin
 			if txControlOpt, ok := opt.(*options.TxControlOption); ok {
 				providedControl := (*baseTx.Control)(txControlOpt)
 				currentControl := tx.txControl()
-				
-				// Compare using the Equal method
+
 				if providedControl.Equal(currentControl) {
-					// TxControl matches, skip the error
 					continue
 				}
 			}
+
 			return nil, xerrors.WithStackTrace(
 				fmt.Errorf("%T: %w", opt, ErrOptionNotForTxExecute),
 			)

@@ -566,14 +566,14 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 				// Don't set the ID, keep it as LazyTxID
 				return id
 			}(),
-			s: SessionOverGrpcMock(e),
+			s:          SessionOverGrpcMock(e),
 			txSettings: query.TxSettings(query.WithSerializableReadWrite()),
 		}
 
 		// Try to execute with the same TxControl
 		txControl := baseTx.SerializableReadWriteTxControl()
 		_, err := tx.executeSettings(options.WithTxControl(txControl))
-		
+
 		// Should not return an error since TxControl matches
 		require.NoError(t, err)
 	})
@@ -586,14 +586,14 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 				// Don't set the ID, keep it as LazyTxID
 				return id
 			}(),
-			s: SessionOverGrpcMock(e),
+			s:          SessionOverGrpcMock(e),
 			txSettings: query.TxSettings(query.WithSerializableReadWrite()),
 		}
 
 		// Try to execute with a different TxControl (SnapshotReadOnly)
 		txControl := baseTx.SnapshotReadOnlyTxControl()
 		_, err := tx.executeSettings(options.WithTxControl(txControl))
-		
+
 		// Should return an error since TxControl doesn't match
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
@@ -607,14 +607,14 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 				// Don't set the ID, keep it as LazyTxID
 				return id
 			}(),
-			s: SessionOverGrpcMock(e),
+			s:          SessionOverGrpcMock(e),
 			txSettings: query.TxSettings(query.WithSerializableReadWrite()),
 		}
 
 		// Try to execute with the same TxControl but with commit flag
 		txControl := baseTx.SerializableReadWriteTxControl(baseTx.CommitTx())
 		_, err := tx.executeSettings(options.WithTxControl(txControl))
-		
+
 		// Should return an error since commit flag differs
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
@@ -624,11 +624,11 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 		e := fixenv.New(t)
 		tx := TransactionOverGrpcMock(e)
 		// Transaction already has an ID set in the fixture
-		
+
 		// Try to execute with a TxControl that uses the same transaction ID
 		txControl := baseTx.NewControl(baseTx.WithTxID(tx.ID()))
 		_, err := tx.executeSettings(options.WithTxControl(txControl))
-		
+
 		// Should not return an error since TxControl matches
 		require.NoError(t, err)
 	})
@@ -637,11 +637,11 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 		e := fixenv.New(t)
 		tx := TransactionOverGrpcMock(e)
 		// Transaction already has an ID set in the fixture
-		
+
 		// Try to execute with a TxControl that uses a different transaction ID
 		txControl := baseTx.NewControl(baseTx.WithTxID("different-tx-id"))
 		_, err := tx.executeSettings(options.WithTxControl(txControl))
-		
+
 		// Should return an error since TxControl doesn't match
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
@@ -651,11 +651,11 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 		e := fixenv.New(t)
 		tx := TransactionOverGrpcMock(e)
 		// Transaction already has an ID set in the fixture
-		
+
 		// Try to execute with a TxControl that tries to begin a new transaction
 		txControl := baseTx.SerializableReadWriteTxControl()
 		_, err := tx.executeSettings(options.WithTxControl(txControl))
-		
+
 		// Should return an error since the transaction is already started
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
