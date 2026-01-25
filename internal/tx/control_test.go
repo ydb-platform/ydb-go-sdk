@@ -196,6 +196,34 @@ func TestIsBeginTxWithoutCommit(t *testing.T) {
 		require.False(t, ctrl.IsBeginTxWithoutCommit())
 	})
 
+	t.Run("SnapshotReadWriteWithoutCommit", func(t *testing.T) {
+		ctrl := NewControl(BeginTx(WithSnapshotReadWrite()))
+		require.True(t, ctrl.IsBeginTxWithoutCommit())
+	})
+
+	t.Run("SnapshotReadWriteWithCommit", func(t *testing.T) {
+		ctrl := NewControl(BeginTx(WithSnapshotReadWrite()), CommitTx())
+		require.False(t, ctrl.IsBeginTxWithoutCommit())
+	})
+
+	t.Run("ReadOnlyTransactionWithoutCommit", func(t *testing.T) {
+		// Read-only transactions don't need CommitTx
+		ctrl := NewControl(BeginTx(WithSnapshotReadOnly()))
+		require.False(t, ctrl.IsBeginTxWithoutCommit())
+	})
+
+	t.Run("StaleReadOnlyWithoutCommit", func(t *testing.T) {
+		// Read-only transactions don't need CommitTx
+		ctrl := NewControl(BeginTx(WithStaleReadOnly()))
+		require.False(t, ctrl.IsBeginTxWithoutCommit())
+	})
+
+	t.Run("OnlineReadOnlyWithoutCommit", func(t *testing.T) {
+		// Read-only transactions don't need CommitTx
+		ctrl := NewControl(BeginTx(WithOnlineReadOnly()))
+		require.False(t, ctrl.IsBeginTxWithoutCommit())
+	})
+
 	t.Run("WithTxID", func(t *testing.T) {
 		ctrl := NewControl(WithTxID("test-tx-id"))
 		require.False(t, ctrl.IsBeginTxWithoutCommit())
