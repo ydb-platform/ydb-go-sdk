@@ -257,13 +257,16 @@ func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettin
 		if _, has := opt.(options.ExecuteNoTx); has {
 			// ExecuteNoTx options are normally not allowed on transactions.
 			// However, if the option is a TxControl and its value matches the
-			// transaction's TxControl, we allow it to pass through.
+			// transaction's TxControl settings used to begin the transaction,
+			// we allow it to pass through.
 			// TxControlOption is defined as type TxControlOption tx.Control
 			if txControlOpt, ok := opt.(*options.TxControlOption); ok {
 				providedControl := (*baseTx.Control)(txControlOpt)
-				currentControl := tx.txControl()
+				// Compare against the original txSettings used to begin the transaction,
+				// not against the current txControl() which may use TxID
+				expectedControl := baseTx.NewControl(baseTx.BeginTx(tx.txSettings...))
 
-				if providedControl.Equal(currentControl) {
+				if providedControl.Equal(expectedControl) {
 					continue
 				}
 			}
