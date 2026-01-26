@@ -70,7 +70,7 @@ func TestDatabaseSqlJson(t *testing.T) {
 			)
 		)
 
-		t.Run("check ydb type", func(t *testing.T) {
+		t.Run("check ydb type for json string", func(t *testing.T) {
 			row := db.QueryRowContext(scope.Ctx, "SELECT FormatType(TypeOf($a))",
 				ydb.ParamsBuilder().Param("$a").JSON(`{"a":1,"b":"2"}`).Build(),
 			)
@@ -79,9 +79,27 @@ func TestDatabaseSqlJson(t *testing.T) {
 			require.NoError(t, row.Err())
 			require.Equal(t, `Json`, act)
 		})
-		t.Run("get json value", func(t *testing.T) {
+		t.Run("get json value from json string", func(t *testing.T) {
 			row := db.QueryRowContext(scope.Ctx, "SELECT $a",
 				ydb.ParamsBuilder().Param("$a").JSON(`{"a":1,"b":"2"}`).Build(),
+			)
+			var act string
+			require.NoError(t, row.Scan(&act))
+			require.NoError(t, row.Err())
+			require.Equal(t, `{"a":1,"b":"2"}`, act)
+		})
+		t.Run("check ydb type for json bytes", func(t *testing.T) {
+			row := db.QueryRowContext(scope.Ctx, "SELECT FormatType(TypeOf($a))",
+				ydb.ParamsBuilder().Param("$a").JSONFromBytes([]byte(`{"a":1,"b":"2"}`)).Build(),
+			)
+			var act string
+			require.NoError(t, row.Scan(&act))
+			require.NoError(t, row.Err())
+			require.Equal(t, `Json`, act)
+		})
+		t.Run("get json value from json bytes", func(t *testing.T) {
+			row := db.QueryRowContext(scope.Ctx, "SELECT $a",
+				ydb.ParamsBuilder().Param("$a").JSONFromBytes([]byte(`{"a":1,"b":"2"}`)).Build(),
 			)
 			var act string
 			require.NoError(t, row.Scan(&act))

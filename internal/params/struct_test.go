@@ -650,7 +650,77 @@ func TestStruct(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginStruct().Field("col1").JSONFromBytes([]byte(`{"a": 1,"b": "B"}`)).EndStruct(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_StructType{
+							StructType: &Ydb.StructType{
+								Members: []*Ydb.StructMember{
+									{
+										Name: "col1",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_JSON,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_TextValue{
+									TextValue: `{"a": 1,"b": "B"}`,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").JSONDocument(`{"a": 1,"b": "B"}`).EndStruct(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_StructType{
+							StructType: &Ydb.StructType{
+								Members: []*Ydb.StructMember{
+									{
+										Name: "col1",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_JSON_DOCUMENT,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_TextValue{
+									TextValue: `{"a": 1,"b": "B"}`,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").
+				BeginStruct().
+				Field("col1").
+				JSONDocumentFromBytes([]byte(`{"a": 1,"b": "B"}`)).
+				EndStruct(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
