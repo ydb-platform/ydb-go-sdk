@@ -187,8 +187,24 @@ func (d *dictPair) JSON(v string) *dictValue {
 	}
 }
 
+func (d *dictPair) JSONFromBytes(v []byte) *dictValue {
+	d.keyValue = value.JSONValueFromBytes(v)
+
+	return &dictValue{
+		pair: d,
+	}
+}
+
 func (d *dictPair) JSONDocument(v string) *dictValue {
 	d.keyValue = value.JSONDocumentValue(v)
+
+	return &dictValue{
+		pair: d,
+	}
+}
+
+func (d *dictPair) JSONDocumentFromBytes(v []byte) *dictValue {
+	d.keyValue = value.JSONDocumentValueFromBytes(v)
 
 	return &dictValue{
 		pair: d,
