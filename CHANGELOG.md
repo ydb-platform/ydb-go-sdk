@@ -1,4 +1,4 @@
-* added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
+* Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
 
 ## v3.125.2
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
