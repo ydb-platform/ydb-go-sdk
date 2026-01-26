@@ -28,19 +28,19 @@ func TestErrors(t *testing.T) {
 		require.Equal(t, "critical violation of the logic - wrong result set index", errWrongResultSetIndex.Error())
 	})
 
-	t.Run("errMoreThanOneRow", func(t *testing.T) {
-		require.NotNil(t, errMoreThanOneRow)
-		require.Equal(t, "unexpected more than one row in result set", errMoreThanOneRow.Error())
+	t.Run("ErrMoreThanOneRow", func(t *testing.T) {
+		require.NotNil(t, ErrMoreThanOneRow)
+		require.Equal(t, "unexpected more than one row in result set", ErrMoreThanOneRow.Error())
 	})
 
-	t.Run("errMoreThanOneResultSet", func(t *testing.T) {
-		require.NotNil(t, errMoreThanOneResultSet)
-		require.Equal(t, "unexpected more than one result set", errMoreThanOneResultSet.Error())
+	t.Run("ErrMoreThanOneResultSet", func(t *testing.T) {
+		require.NotNil(t, ErrMoreThanOneResultSet)
+		require.Equal(t, "unexpected more than one result set", ErrMoreThanOneResultSet.Error())
 	})
 
-	t.Run("errNoResultSets", func(t *testing.T) {
-		require.NotNil(t, errNoResultSets)
-		require.Equal(t, "no result sets", errNoResultSets.Error())
+	t.Run("ErrNoResultSets", func(t *testing.T) {
+		require.NotNil(t, ErrNoResultSets)
+		require.Equal(t, "no result sets", ErrNoResultSets.Error())
 	})
 
 	t.Run("errNilOption", func(t *testing.T) {
@@ -67,8 +67,8 @@ func TestErrors(t *testing.T) {
 		// Verify that error variables are distinct
 		require.False(t, errors.Is(errNilClient, ErrTransactionRollingBack))
 		require.False(t, errors.Is(errWrongNextResultSetIndex, errWrongResultSetIndex))
-		require.False(t, errors.Is(errMoreThanOneRow, errMoreThanOneResultSet))
-		require.False(t, errors.Is(errNoResultSets, errNilOption))
+		require.False(t, errors.Is(ErrMoreThanOneRow, ErrMoreThanOneResultSet))
+		require.False(t, errors.Is(ErrNoResultSets, errNilOption))
 		require.False(t, errors.Is(ErrOptionNotForTxExecute, errExecuteOnCompletedTx))
 		require.False(t, errors.Is(errExecuteOnCompletedTx, errSessionClosed))
 	})
