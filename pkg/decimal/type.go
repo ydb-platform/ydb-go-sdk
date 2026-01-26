@@ -9,10 +9,7 @@ import (
 
 var (
 	_ sql.Scanner = (*Decimal)(nil)
-	_ sql.Scanner = Decimal{}
-
-	_ Interface = (*Decimal)(nil)
-	_ Interface = Decimal{}
+	_ Interface   = (*Decimal)(nil)
 )
 
 type (
@@ -38,7 +35,7 @@ func (d Decimal) Decimal() (bytes [16]byte, precision uint32, scale uint32) {
 	return d.Bytes, d.Precision, d.Scale
 }
 
-func (d Decimal) Scan(value any) error {
+func (d *Decimal) Scan(value any) error {
 	if err := d.apply(value); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
