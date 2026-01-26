@@ -1,3 +1,6 @@
+## v3.123.3
+* Added optimized helper methods for efficient `string` <-> `[]byte` conversions in `JSON` and `JSONDocument` types.
+
 ## v3.125.2
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
 
