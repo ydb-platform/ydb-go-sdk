@@ -43,7 +43,9 @@ func BenchmarkMemory(b *testing.B) {
 		DecimalValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9),
 		DyNumberValue("123"),
 		JSONValue("{}"),
+		JSONValueFromBytes([]byte("{}")),
 		JSONDocumentValue("{}"),
+		JSONDocumentValueFromBytes([]byte("{}")),
 		TzDateValue("1"),
 		TzDatetimeValue("1"),
 		TzTimestampValue("1"),
@@ -120,7 +122,9 @@ func TestToYDBFromYDB(t *testing.T) {
 		DecimalValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9),
 		DyNumberValue("123"),
 		JSONValue("{}"),
+		JSONValueFromBytes([]byte("{}")),
 		JSONDocumentValue("{}"),
+		JSONDocumentValueFromBytes([]byte("{}")),
 		TzDateValue("1"),
 		TzDatetimeValue("1"),
 		TzTimestampValue("1"),
@@ -539,7 +543,15 @@ func TestValueYql(t *testing.T) {
 			literal: `Json(@@{"a":-1234567890123456}@@)`,
 		},
 		{
+			value:   JSONValueFromBytes([]byte("{\"a\":-1234567890123456}")),
+			literal: `Json(@@{"a":-1234567890123456}@@)`,
+		},
+		{
 			value:   JSONDocumentValue("{\"a\":-1234567890123456}"),
+			literal: `JsonDocument(@@{"a":-1234567890123456}@@)`,
+		},
+		{
+			value:   JSONDocumentValueFromBytes([]byte("{\"a\":-1234567890123456}")),
 			literal: `JsonDocument(@@{"a":-1234567890123456}@@)`,
 		},
 		{
@@ -991,6 +1003,18 @@ func TestNullable(t *testing.T) {
 			exp:  OptionalValue(JSONValue("test")),
 		},
 		{
+			name: "json",
+			t:    types.JSON,
+			v:    func(v string) *string { return &v }("test"),
+			exp:  OptionalValue(JSONValueFromBytes([]byte("test"))),
+		},
+		{
+			name: "json",
+			t:    types.JSON,
+			v:    func(v []byte) *[]byte { return &v }([]byte("test")),
+			exp:  OptionalValue(JSONValueFromBytes([]byte("test"))),
+		},
+		{
 			name: "nil json",
 			t:    types.JSON,
 			v:    func() *string { return nil }(),
@@ -1013,6 +1037,18 @@ func TestNullable(t *testing.T) {
 			t:    types.JSONDocument,
 			v:    func(v []byte) *[]byte { return &v }([]byte("test")),
 			exp:  OptionalValue(JSONDocumentValue("test")),
+		},
+		{
+			name: "jsonDocument",
+			t:    types.JSONDocument,
+			v:    func(v string) *string { return &v }("test"),
+			exp:  OptionalValue(JSONDocumentValueFromBytes([]byte("test"))),
+		},
+		{
+			name: "jsonDocument",
+			t:    types.JSONDocument,
+			v:    func(v []byte) *[]byte { return &v }([]byte("test")),
+			exp:  OptionalValue(JSONDocumentValueFromBytes([]byte("test"))),
 		},
 		{
 			name: "nil jsonDocument",
@@ -2447,8 +2483,50 @@ func TestJSONValueCastTo(t *testing.T) {
 	})
 }
 
+func TestJSONValueFromBytesCastTo(t *testing.T) {
+	v := JSONValueFromBytes([]byte(`{"key": "value"}`))
+
+	t.Run("CastToString", func(t *testing.T) {
+		var result string
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, `{"key": "value"}`, result)
+	})
+
+	t.Run("CastToBytes", func(t *testing.T) {
+		var result []byte
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, []byte(`{"key": "value"}`), result)
+	})
+
+	t.Run("CastToInvalid", func(t *testing.T) {
+		var result int
+		err := v.castTo(&result)
+		require.Error(t, err)
+	})
+}
+
 func TestJSONDocumentValueCastTo(t *testing.T) {
 	v := JSONDocumentValue(`{"key": "value"}`)
+
+	t.Run("CastToString", func(t *testing.T) {
+		var result string
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, `{"key": "value"}`, result)
+	})
+
+	t.Run("CastToBytes", func(t *testing.T) {
+		var result []byte
+		err := v.castTo(&result)
+		require.NoError(t, err)
+		require.Equal(t, []byte(`{"key": "value"}`), result)
+	})
+}
+
+func TestJSONDocumentValueFromBytesCastTo(t *testing.T) {
+	v := JSONDocumentValueFromBytes([]byte(`{"key": "value"}`))
 
 	t.Run("CastToString", func(t *testing.T) {
 		var result string

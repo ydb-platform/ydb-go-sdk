@@ -379,7 +379,7 @@ func exactlyOneRowFromResult(ctx context.Context, r result.Result) (row result.R
 	_, err = rs.NextRow(ctx)
 	switch {
 	case err == nil:
-		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
+		return nil, xerrors.WithStackTrace(ErrMoreThanOneRow)
 	case errors.Is(err, io.EOF):
 		// pass
 	default:
@@ -389,7 +389,7 @@ func exactlyOneRowFromResult(ctx context.Context, r result.Result) (row result.R
 	_, err = r.NextResultSet(ctx)
 	switch {
 	case err == nil:
-		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
+		return nil, xerrors.WithStackTrace(ErrMoreThanOneRow)
 	case errors.Is(err, io.EOF):
 		// pass
 	default:
@@ -404,7 +404,7 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	rs, err = r.NextResultSet(ctx)
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
-			return nil, xerrors.WithStackTrace(errNoResultSets)
+			return nil, xerrors.WithStackTrace(ErrNoResultSets)
 		}
 
 		return nil, xerrors.WithStackTrace(err)
@@ -427,7 +427,7 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	_, err = r.NextResultSet(ctx)
 	switch {
 	case err == nil:
-		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+		return nil, xerrors.WithStackTrace(ErrMoreThanOneResultSet)
 	case errors.Is(err, io.EOF):
 		// pass
 	default:

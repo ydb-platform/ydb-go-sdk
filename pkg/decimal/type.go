@@ -31,7 +31,7 @@ func ToDecimal(v Interface) *Decimal {
 	return &d
 }
 
-func (d *Decimal) Decimal() (bytes [16]byte, precision uint32, scale uint32) {
+func (d Decimal) Decimal() (bytes [16]byte, precision uint32, scale uint32) {
 	return d.Bytes, d.Precision, d.Scale
 }
 

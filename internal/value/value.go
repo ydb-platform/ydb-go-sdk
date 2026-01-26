@@ -1399,6 +1399,10 @@ func JSONValue(v string) jsonValue {
 	return jsonValue(v)
 }
 
+func JSONValueFromBytes(v []byte) jsonValue {
+	return jsonValue(xstring.FromBytes(v))
+}
+
 type jsonDocumentValue string
 
 func (v jsonDocumentValue) castTo(dst any) error {
@@ -1451,6 +1455,10 @@ func (v jsonDocumentValue) toYDB() *Ydb.Value {
 
 func JSONDocumentValue(v string) jsonDocumentValue {
 	return jsonDocumentValue(v)
+}
+
+func JSONDocumentValueFromBytes(v []byte) jsonDocumentValue {
+	return jsonDocumentValue(xstring.FromBytes(v))
 }
 
 type listValue struct {

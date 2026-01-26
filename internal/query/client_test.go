@@ -1627,7 +1627,7 @@ func TestClient(t *testing.T) {
 
 				return newTestSessionWithClient("123", client, true), nil
 			}), "", options.ExecuteSettings())
-			require.ErrorIs(t, err, errMoreThanOneResultSet)
+			require.ErrorIs(t, err, ErrMoreThanOneResultSet)
 			require.Nil(t, rs)
 			require.Equal(t, 0, rowsCount)
 		})
@@ -1774,7 +1774,7 @@ func TestClient(t *testing.T) {
 
 				return newTestSessionWithClient("123", client, true), nil
 			}), "", options.ExecuteSettings())
-			require.ErrorIs(t, err, errMoreThanOneRow)
+			require.ErrorIs(t, err, ErrMoreThanOneRow)
 			require.Nil(t, row)
 		})
 

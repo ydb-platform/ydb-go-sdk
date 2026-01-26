@@ -1,5 +1,9 @@
 * Changed behaviour of `table.Client` and `query.Client` internal session pool. When `ydb.WithPreferredNodeID` is set and
 there is no idle session on preferred node, the pool closes most idle session to create a new one on the preferred node
+* Added optimized helper methods for efficient `[]byte` → `string` conversions in `JSON` and `JSONDocument` types.
+
+## v3.125.2
+* Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
 
 ## v3.125.1
 * Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to 
