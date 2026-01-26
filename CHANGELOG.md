@@ -1,4 +1,5 @@
 * Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
+* Added optimized helper methods for efficient `[]byte` → `string` conversions in `JSON` and `JSONDocument` types.
 
 ## v3.125.2
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
