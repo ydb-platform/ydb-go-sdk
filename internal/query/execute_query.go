@@ -204,45 +204,11 @@ func readMaterializedResultSet(ctx context.Context, r *streamResult) (
 
 	_, err = r.nextResultSet(ctx)
 	if err == nil {
-		return nil, 0, xerrors.WithStackTrace(errMoreThanOneResultSet)
+		return nil, 0, xerrors.WithStackTrace(ErrMoreThanOneResultSet)
 	}
 	if !xerrors.Is(err, io.EOF) {
 		return nil, 0, xerrors.WithStackTrace(err)
 	}
 
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), len(rows), nil
-}
-
-func readRow(ctx context.Context, r *streamResult) (_ *Row, finalErr error) {
-	defer func() {
-		_ = r.Close(ctx)
-	}()
-
-	rs, err := r.nextResultSet(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	row, err := rs.nextRow(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	_, err = rs.nextRow(ctx)
-	if err == nil {
-		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
-	}
-	if !xerrors.Is(err, io.EOF) {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	_, err = r.NextResultSet(ctx)
-	if err == nil {
-		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
-	}
-	if !xerrors.Is(err, io.EOF) {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return row, nil
 }

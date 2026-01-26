@@ -297,6 +297,36 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			// should not panic
 			_, _ = p.getItem(endpoint.WithNodeID(ctx, 32))
 		})
+		t.Run("PreferredNodeTakenAndPoolFull", func(t *testing.T) {
+			var nextNodeID uint32 = 32
+			p := New[*testItem, testItem](rootCtx,
+				WithTrace[*testItem, testItem](defaultTrace),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					var (
+						nodeID = nextNodeID
+						v      = testItem{
+							v:        0,
+							onNodeID: func() uint32 { return nodeID },
+						}
+					)
+
+					return &v, nil
+				}),
+				WithLimit[*testItem, testItem](2),
+			)
+
+			item1 := mustGetItem(t, p)
+			require.EqualValues(t, 32, item1.NodeID())
+			nextNodeID = 33
+			item2 := mustGetItem(t, p)
+			require.EqualValues(t, 33, item2.NodeID())
+
+			mustPutItem(t, p, item2)
+
+			item3, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
+			require.EqualValues(t, 33, item3.NodeID())
+		})
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
 			var newItemCalled uint32
 			p := New[*testItem, testItem](rootCtx,

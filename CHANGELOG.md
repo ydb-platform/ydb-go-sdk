@@ -1,4 +1,8 @@
 * Added support for custom types derived from primitive types in `database/sql` driver
+* Added optimized helper methods for efficient `[]byte` → `string` conversions in `JSON` and `JSONDocument` types.
+
+## v3.125.2
+* Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
 
 ## v3.125.1
 * Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to 

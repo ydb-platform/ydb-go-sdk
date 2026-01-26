@@ -167,8 +167,20 @@ func (p *optional) JSON(v *string) *optionalBuilder {
 	return &optionalBuilder{opt: p}
 }
 
+func (p *optional) JSONFromBytes(v *[]byte) *optionalBuilder {
+	p.value = value.NullableJSONValueFromBytes(v)
+
+	return &optionalBuilder{opt: p}
+}
+
 func (p *optional) JSONDocument(v *string) *optionalBuilder {
 	p.value = value.NullableJSONDocumentValue(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) JSONDocumentFromBytes(v *[]byte) *optionalBuilder {
+	p.value = value.NullableJSONDocumentValueFromBytes(v)
 
 	return &optionalBuilder{opt: p}
 }
