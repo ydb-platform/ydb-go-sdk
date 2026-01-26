@@ -1,4 +1,5 @@
 * Allowed `TxControl` in `database/sql` transaction execution when TxControl equals TxControl on BeginTx
+* Added optimized helper methods for efficient `[]byte` → `string` conversions in `JSON` and `JSONDocument` types.
 
 ## v3.125.2
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
