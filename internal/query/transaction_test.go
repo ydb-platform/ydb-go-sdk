@@ -644,7 +644,6 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 
 		// Should not return an error since TxControl matches the original txSettings
 		require.NoError(t, err)
-		
 		// Verify that the returned settings use TxID selector (not BeginTx) for started transactions
 		actualControl := settings.TxControl().ToYdbQueryTransactionControl()
 		require.NotNil(t, actualControl)
