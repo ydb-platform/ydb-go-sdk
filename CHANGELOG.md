@@ -1,3 +1,4 @@
+* Added support for custom types derived from primitive types in `database/sql` driver
 * Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
 
 ## v3.125.3
