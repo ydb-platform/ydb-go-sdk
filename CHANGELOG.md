@@ -1,3 +1,4 @@
+## v3.125.4
 * Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
 
 ## v3.125.3
