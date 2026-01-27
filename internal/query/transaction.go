@@ -250,8 +250,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 }
 
 func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettings, finalErr error) {
-	var filteredOpts []options.Execute
-	
+	filteredOpts := make([]options.Execute, 0, len(opts))
 	for _, opt := range opts {
 		if opt == nil {
 			return nil, xerrors.WithStackTrace(errNilOption)
