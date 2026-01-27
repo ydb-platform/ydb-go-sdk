@@ -1,4 +1,7 @@
 * Added check `CommitTx` flag in `query.TxControl` on `db.Query().{Exec,Query,QueryResultSet,QueryRow}` calls before execution
+* Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
+
+## v3.125.3
 * Added optimized helper methods for efficient `[]byte` → `string` conversions in `JSON` and `JSONDocument` types.
 
 ## v3.125.2
