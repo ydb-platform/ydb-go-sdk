@@ -1,3 +1,4 @@
+* Added check `CommitTx` flag in `query.TxControl` on `db.Query().{Exec,Query,QueryResultSet,QueryRow}` calls before execution
 * Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
 
 ## v3.125.3

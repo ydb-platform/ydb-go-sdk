@@ -305,9 +305,25 @@ func doTx(
 	return nil
 }
 
+// validateTxControl checks if user provided a TxControl with BeginTx but without CommitTx
+func validateTxControl(settings executeSettings) error {
+	if settings.UserProvidedTxControl() && settings.TxControl() != nil {
+		txControl, ok := settings.TxControl().(*tx.Control)
+		if ok && txControl.IsBeginTxWithoutCommit() {
+			return xerrors.WithStackTrace(query.ErrTxControlWithoutCommit)
+		}
+	}
+
+	return nil
+}
+
 func clientQueryRow(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
 ) (row query.Row, finalErr error) {
+	if err := validateTxControl(settings); err != nil {
+		return nil, err
+	}
+
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		row, err = s.queryRow(ctx, q, settings, resultOpts...)
 		if err != nil {
@@ -348,6 +364,11 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 
 func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
+
+	if err := validateTxControl(settings); err != nil {
+		return err
+	}
+
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.execute(ctx, q, settings,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
@@ -398,6 +419,11 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	r query.Result, err error,
 ) {
 	settings := options.ExecuteSettings(opts...)
+
+	if err := validateTxControl(settings); err != nil {
+		return nil, err
+	}
+
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.execute(ctx, q, settings,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
@@ -446,6 +472,10 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 func clientQueryResultSet(
 	ctx context.Context, pool sessionPool, q string, settings executeSettings, resultOpts ...resultOption,
 ) (rs result.ClosableResultSet, rowsCount int, finalErr error) {
+	if err := validateTxControl(settings); err != nil {
+		return nil, 0, err
+	}
+
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
 		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
 		if err != nil {
