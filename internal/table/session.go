@@ -711,6 +711,8 @@ func processIndexes(indexes []*Ydb_Table.TableIndexDescription) []options.IndexD
 			typ = options.IndexTypeGlobalAsync
 		case *Ydb_Table.TableIndexDescription_GlobalIndex:
 			typ = options.IndexTypeGlobal
+		case *Ydb_Table.TableIndexDescription_GlobalUniqueIndex:
+			typ = options.IndexTypeGlobalUnique
 		}
 		idxs[i] = options.IndexDescription{
 			Name:         idx.GetName(),

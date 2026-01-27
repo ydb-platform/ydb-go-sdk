@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -177,99 +178,6 @@ func TestQueryDecimalScan(t *testing.T) {
 	})
 }
 
-func TestDatabaseSqlDecimalScan(t *testing.T) {
-	ctx, cancel := context.WithCancel(xtest.Context(t))
-	defer cancel()
-
-	nativeDriver, err := ydb.Open(ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-	)
-	require.NoError(t, err)
-	defer func() {
-		_ = nativeDriver.Close(ctx)
-	}()
-
-	connector, err := ydb.Connector(nativeDriver,
-		ydb.WithQueryService(true),
-	)
-	require.NoError(t, err)
-	defer func() {
-		_ = connector.Close()
-	}()
-
-	db := sql.OpenDB(connector)
-
-	t.Run("DirectScan", func(t *testing.T) {
-		row := db.QueryRowContext(ctx, `SELECT Decimal('100.500', 33, 12)`)
-
-		var dst decimal.Decimal
-		err = row.Scan(&dst)
-		require.NoError(t, err)
-		require.Equal(t, uint32(33), dst.Precision)
-		require.Equal(t, uint32(12), dst.Scale)
-		require.Equal(t, big.NewInt(100500000000000), dst.BigInt())
-		require.Equal(t, "100.500000000000", dst.String())
-		require.Equal(t, "100.5", dst.Format(true))
-		require.Equal(t, "100.500000000000", dst.Format(false))
-	})
-
-	t.Run("DirectScanNegative", func(t *testing.T) {
-		row := db.QueryRowContext(ctx, `SELECT Decimal('-5.33', 22, 9)`)
-
-		var dst decimal.Decimal
-		err = row.Scan(&dst)
-		require.NoError(t, err)
-		require.Equal(t, uint32(22), dst.Precision)
-		require.Equal(t, uint32(9), dst.Scale)
-		require.Equal(t, big.NewInt(-5330000000), dst.BigInt())
-		require.Equal(t, "-5.330000000", dst.String())
-		require.Equal(t, "-5.33", dst.Format(true))
-		require.Equal(t, "-5.330000000", dst.Format(false))
-	})
-
-	t.Run("DirectScanWithOtherTypes", func(t *testing.T) {
-		row := db.QueryRowContext(ctx, `SELECT 42u AS id, Decimal('10.01', 22, 9) AS amount`)
-
-		var id uint64
-		var amount decimal.Decimal
-		err = row.Scan(&id, &amount)
-		require.NoError(t, err)
-
-		require.Equal(t, uint64(42), id)
-		require.Equal(t, uint32(22), amount.Precision)
-		require.Equal(t, uint32(9), amount.Scale)
-		require.Equal(t, big.NewInt(10010000000), amount.BigInt())
-		require.Equal(t, "10.010000000", amount.String())
-		require.Equal(t, "10.01", amount.Format(true))
-		require.Equal(t, "10.010000000", amount.Format(false))
-	})
-
-	t.Run("DirectScanOptional", func(t *testing.T) {
-		row := db.QueryRowContext(ctx, `SELECT CAST(NULL AS Decimal(22, 9))`)
-
-		var dst *decimal.Decimal
-		err = row.Scan(&dst)
-		require.NoError(t, err)
-		require.Nil(t, dst)
-	})
-
-	t.Run("DirectScanOptionalNonNull", func(t *testing.T) {
-		row := db.QueryRowContext(ctx, `SELECT JUST(Decimal('99.99', 22, 9))`)
-
-		var dst *decimal.Decimal
-		err = row.Scan(&dst)
-		require.NoError(t, err)
-		require.NotNil(t, dst)
-		require.Equal(t, uint32(22), dst.Precision)
-		require.Equal(t, uint32(9), dst.Scale)
-		require.Equal(t, big.NewInt(99990000000), dst.BigInt())
-		require.Equal(t, "99.990000000", dst.String())
-		require.Equal(t, "99.99", dst.Format(true))
-		require.Equal(t, "99.990000000", dst.Format(false))
-	})
-}
-
 func TestQueryDecimalParam(t *testing.T) {
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
@@ -357,7 +265,7 @@ func TestQueryDecimalParam(t *testing.T) {
 	})
 }
 
-func TestDatabaseSqlDecimalParam(t *testing.T) {
+func TestDatabaseSqlDecimal(t *testing.T) {
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 
@@ -370,74 +278,152 @@ func TestDatabaseSqlDecimalParam(t *testing.T) {
 		_ = nativeDriver.Close(ctx)
 	}()
 
-	connector, err := ydb.Connector(nativeDriver,
-		ydb.WithQueryService(true),
-	)
-	require.NoError(t, err)
-	defer func() {
-		_ = connector.Close()
-	}()
+	for _, useQueryService := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WithQueryService=%v", useQueryService), func(t *testing.T) {
+			connector, err := ydb.Connector(nativeDriver,
+				ydb.WithQueryService(useQueryService),
+			)
 
-	db := sql.OpenDB(connector)
+			require.NoError(t, err)
+			defer func() {
+				_ = connector.Close()
+			}()
 
-	t.Run("DirectScan", func(t *testing.T) {
-		d, err := types.DecimalValueFromString("100.5", 33, 12)
-		require.NoError(t, err)
-		row := db.QueryRowContext(ctx, `
-			DECLARE $p AS Decimal(33,12);
-			SELECT $p;
-		`, sql.Named("p", d))
+			db := sql.OpenDB(connector)
 
-		var dst decimal.Decimal
-		err = row.Scan(&dst)
-		require.NoError(t, err)
-		require.Equal(t, uint32(33), dst.Precision)
-		require.Equal(t, uint32(12), dst.Scale)
-		require.Equal(t, big.NewInt(100500000000000), dst.BigInt())
-		require.Equal(t, "100.500000000000", dst.String())
-		require.Equal(t, "100.5", dst.Format(true))
-		require.Equal(t, "100.500000000000", dst.Format(false))
-	})
+			t.Run("Param", func(t *testing.T) {
+				t.Run("DirectScan", func(t *testing.T) {
+					d, err := types.DecimalValueFromString("100.5", 33, 12)
+					require.NoError(t, err)
+					row := db.QueryRowContext(ctx, `
+						DECLARE $p AS Decimal(33,12);
+						SELECT $p;
+					`, sql.Named("p", d))
 
-	t.Run("DirectScanNegative", func(t *testing.T) {
-		d, err := types.DecimalValueFromString("-5.33", 22, 9)
-		require.NoError(t, err)
-		row := db.QueryRowContext(ctx, `
-			DECLARE $p AS Decimal(22,9);
-			SELECT $p;
-		`, sql.Named("p", d))
+					var dst decimal.Decimal
+					err = row.Scan(&dst)
+					require.NoError(t, err)
+					require.Equal(t, uint32(33), dst.Precision)
+					require.Equal(t, uint32(12), dst.Scale)
+					require.Equal(t, big.NewInt(100500000000000), dst.BigInt())
+					require.Equal(t, "100.500000000000", dst.String())
+					require.Equal(t, "100.5", dst.Format(true))
+					require.Equal(t, "100.500000000000", dst.Format(false))
+				})
 
-		var dst decimal.Decimal
-		err = row.Scan(&dst)
-		require.NoError(t, err)
-		require.Equal(t, uint32(22), dst.Precision)
-		require.Equal(t, uint32(9), dst.Scale)
-		require.Equal(t, big.NewInt(-5330000000), dst.BigInt())
-		require.Equal(t, "-5.330000000", dst.String())
-		require.Equal(t, "-5.33", dst.Format(true))
-		require.Equal(t, "-5.330000000", dst.Format(false))
-	})
+				t.Run("DirectScanNegative", func(t *testing.T) {
+					d, err := types.DecimalValueFromString("-5.33", 22, 9)
+					require.NoError(t, err)
+					row := db.QueryRowContext(ctx, `
+						DECLARE $p AS Decimal(22,9);
+						SELECT $p;
+					`, sql.Named("p", d))
 
-	t.Run("DirectScanWithOtherTypes", func(t *testing.T) {
-		d, err := types.DecimalValueFromString("10.01", 22, 9)
-		require.NoError(t, err)
-		row := db.QueryRowContext(ctx, `
-			DECLARE $p1 AS Uint64;
-			DECLARE $p2 AS Decimal(22,9);
-			SELECT $p1 AS id, $p2 AS amount;
-		`, sql.Named("p1", uint64(42)), sql.Named("p2", d))
+					var dst decimal.Decimal
+					err = row.Scan(&dst)
+					require.NoError(t, err)
+					require.Equal(t, uint32(22), dst.Precision)
+					require.Equal(t, uint32(9), dst.Scale)
+					require.Equal(t, big.NewInt(-5330000000), dst.BigInt())
+					require.Equal(t, "-5.330000000", dst.String())
+					require.Equal(t, "-5.33", dst.Format(true))
+					require.Equal(t, "-5.330000000", dst.Format(false))
+				})
 
-		var id uint64
-		var amount decimal.Decimal
-		err = row.Scan(&id, &amount)
-		require.NoError(t, err)
+				t.Run("DirectScanWithOtherTypes", func(t *testing.T) {
+					d, err := types.DecimalValueFromString("10.01", 22, 9)
+					require.NoError(t, err)
+					row := db.QueryRowContext(ctx, `
+						DECLARE $p1 AS Uint64;
+						DECLARE $p2 AS Decimal(22,9);
+						SELECT $p1 AS id, $p2 AS amount;
+					`, sql.Named("p1", uint64(42)), sql.Named("p2", d))
 
-		require.Equal(t, uint64(42), id)
-		require.Equal(t, uint32(22), amount.Precision)
-		require.Equal(t, uint32(9), amount.Scale)
-		require.Equal(t, big.NewInt(10010000000), amount.BigInt())
-		require.Equal(t, "10.010000000", amount.String())
-		require.Equal(t, "10.01", amount.Format(true))
-		require.Equal(t, "10.010000000", amount.Format(false))
-	})
+					var id uint64
+					var amount decimal.Decimal
+					err = row.Scan(&id, &amount)
+					require.NoError(t, err)
+
+					require.Equal(t, uint64(42), id)
+					require.Equal(t, uint32(22), amount.Precision)
+					require.Equal(t, uint32(9), amount.Scale)
+					require.Equal(t, big.NewInt(10010000000), amount.BigInt())
+					require.Equal(t, "10.010000000", amount.String())
+					require.Equal(t, "10.01", amount.Format(true))
+					require.Equal(t, "10.010000000", amount.Format(false))
+				})
+			})
+
+			t.Run("Scan", func(t *testing.T) {
+				t.Run("DirectScan", func(t *testing.T) {
+					row := db.QueryRowContext(ctx, `SELECT Decimal('100.500', 33, 12)`)
+
+					var dst decimal.Decimal
+					err = row.Scan(&dst)
+					require.NoError(t, err)
+					require.Equal(t, uint32(33), dst.Precision)
+					require.Equal(t, uint32(12), dst.Scale)
+					require.Equal(t, big.NewInt(100500000000000), dst.BigInt())
+					require.Equal(t, "100.500000000000", dst.String())
+					require.Equal(t, "100.5", dst.Format(true))
+					require.Equal(t, "100.500000000000", dst.Format(false))
+				})
+
+				t.Run("DirectScanNegative", func(t *testing.T) {
+					row := db.QueryRowContext(ctx, `SELECT Decimal('-5.33', 22, 9)`)
+
+					var dst decimal.Decimal
+					err = row.Scan(&dst)
+					require.NoError(t, err)
+					require.Equal(t, uint32(22), dst.Precision)
+					require.Equal(t, uint32(9), dst.Scale)
+					require.Equal(t, big.NewInt(-5330000000), dst.BigInt())
+					require.Equal(t, "-5.330000000", dst.String())
+					require.Equal(t, "-5.33", dst.Format(true))
+					require.Equal(t, "-5.330000000", dst.Format(false))
+				})
+
+				t.Run("DirectScanWithOtherTypes", func(t *testing.T) {
+					row := db.QueryRowContext(ctx, `SELECT 42u AS id, Decimal('10.01', 22, 9) AS amount`)
+
+					var id uint64
+					var amount decimal.Decimal
+					err = row.Scan(&id, &amount)
+					require.NoError(t, err)
+
+					require.Equal(t, uint64(42), id)
+					require.Equal(t, uint32(22), amount.Precision)
+					require.Equal(t, uint32(9), amount.Scale)
+					require.Equal(t, big.NewInt(10010000000), amount.BigInt())
+					require.Equal(t, "10.010000000", amount.String())
+					require.Equal(t, "10.01", amount.Format(true))
+					require.Equal(t, "10.010000000", amount.Format(false))
+				})
+
+				t.Run("DirectScanOptional", func(t *testing.T) {
+					row := db.QueryRowContext(ctx, `SELECT CAST(NULL AS Decimal(22, 9))`)
+
+					var dst *decimal.Decimal
+					err = row.Scan(&dst)
+					require.NoError(t, err)
+					require.Nil(t, dst)
+				})
+
+				t.Run("DirectScanOptionalNonNull", func(t *testing.T) {
+					row := db.QueryRowContext(ctx, `SELECT JUST(Decimal('99.99', 22, 9))`)
+
+					var dst *decimal.Decimal
+					err = row.Scan(&dst)
+					require.NoError(t, err)
+					require.NotNil(t, dst)
+					require.Equal(t, uint32(22), dst.Precision)
+					require.Equal(t, uint32(9), dst.Scale)
+					require.Equal(t, big.NewInt(99990000000), dst.BigInt())
+					require.Equal(t, "99.990000000", dst.String())
+					require.Equal(t, "99.99", dst.Format(true))
+					require.Equal(t, "99.990000000", dst.Format(false))
+				})
+			})
+		})
+	}
 }
