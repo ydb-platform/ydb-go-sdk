@@ -1,5 +1,8 @@
 * Changed behaviour of `table.Client` and `query.Client` internal session pool. When `ydb.WithPreferredNodeID` is set and
 there is no idle session on preferred node, the pool closes most idle session to create a new one on the preferred node
+* Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
+
+## v3.125.3
 * Added optimized helper methods for efficient `[]byte` → `string` conversions in `JSON` and `JSONDocument` types.
 
 ## v3.125.2

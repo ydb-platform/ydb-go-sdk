@@ -287,6 +287,7 @@ type (
 const (
 	IndexTypeGlobal = IndexType(iota)
 	IndexTypeGlobalAsync
+	IndexTypeGlobalUnique
 )
 
 func (t IndexType) ApplyIndexOption(d *indexDesc) {
@@ -299,6 +300,10 @@ func (t IndexType) ApplyIndexOption(d *indexDesc) {
 		d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
 			GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
 		}
+	case IndexTypeGlobalUnique:
+		d.Type = &Ydb_Table.TableIndex_GlobalUniqueIndex{
+			GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
+		}
 	}
 }
 
@@ -308,6 +313,10 @@ func GlobalIndex() IndexType {
 
 func GlobalAsyncIndex() IndexType {
 	return IndexTypeGlobalAsync
+}
+
+func GlobalUniqueIndex() IndexType {
+	return IndexTypeGlobalUnique
 }
 
 type PartitioningMode byte

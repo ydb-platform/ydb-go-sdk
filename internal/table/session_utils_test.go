@@ -192,6 +192,23 @@ func TestProcessIndexes(t *testing.T) {
 		require.Equal(t, options.IndexTypeGlobalAsync, result[0].Type)
 	})
 
+	t.Run("global unique index", func(t *testing.T) {
+		indexes := []*Ydb_Table.TableIndexDescription{
+			{
+				Name:         "idx2",
+				IndexColumns: []string{"col1"},
+				Status:       Ydb_Table.TableIndexDescription_STATUS_READY,
+				Type: &Ydb_Table.TableIndexDescription_GlobalUniqueIndex{
+					GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
+				},
+			},
+		}
+		result := processIndexes(indexes)
+		require.Len(t, result, 1)
+		require.Equal(t, "idx2", result[0].Name)
+		require.Equal(t, options.IndexTypeGlobalUnique, result[0].Type)
+	})
+
 	t.Run("multiple indexes", func(t *testing.T) {
 		indexes := []*Ydb_Table.TableIndexDescription{
 			{
@@ -206,11 +223,18 @@ func TestProcessIndexes(t *testing.T) {
 					GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
 				},
 			},
+			{
+				Name: "idx3",
+				Type: &Ydb_Table.TableIndexDescription_GlobalUniqueIndex{
+					GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
+				},
+			},
 		}
 		result := processIndexes(indexes)
-		require.Len(t, result, 2)
+		require.Len(t, result, 3)
 		require.Equal(t, options.IndexTypeGlobal, result[0].Type)
 		require.Equal(t, options.IndexTypeGlobalAsync, result[1].Type)
+		require.Equal(t, options.IndexTypeGlobalUnique, result[2].Type)
 	})
 }
 
