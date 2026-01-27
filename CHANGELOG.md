@@ -1,3 +1,4 @@
+* Allowed `TxControl` in `database/sql` transaction execution when TxControl equals TxControl on BeginTx
 * Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
 
 ## v3.125.3
