@@ -277,7 +277,6 @@ func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettin
 				fmt.Errorf("%T: %w", opt, ErrOptionNotForTxExecute),
 			)
 		}
-		
 		// Add non-ExecuteNoTx options to filtered list
 		filteredOpts = append(filteredOpts, opt)
 	}
