@@ -120,7 +120,9 @@ func (s *Session) Begin(
 		}
 	}()
 
-	if s.lazyTx {
+	lazyTx := baseTx.LazyTxFromContext(ctx, s.lazyTx)
+
+	if lazyTx {
 		return &Transaction{
 			s:          s,
 			txSettings: txSettings,

@@ -1,3 +1,7 @@
+## v3.125.5
+* Added `query.WithLazyTx(bool)` option for `DoTx` calls to enable/disable lazy transactions per operation
+* Added `ydb.WithLazyTxContext(ctx, bool)` to pass lazy transaction setting via context for database/sql
+
 ## v3.125.4
 * Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
 

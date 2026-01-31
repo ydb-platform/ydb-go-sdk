@@ -106,6 +106,17 @@ func WithTxControl(ctx context.Context, txControl *tx.Control) context.Context {
 	return tx.WithTxControl(ctx, txControl)
 }
 
+// WithLazyTxContext modifies context to enable or disable lazy transactions for a specific BeginTx call.
+// When enabled, the Begin call will be a no-op and the first execute will create
+// an interactive transaction with the given transaction settings.
+//
+// This is useful for database/sql usage with BeginTx.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithLazyTxContext(ctx context.Context, lazyTx bool) context.Context {
+	return tx.WithLazyTx(ctx, lazyTx)
+}
+
 type ConnectorOption = xsql.Option
 
 type QueryBindConnectorOption interface {
