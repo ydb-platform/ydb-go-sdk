@@ -1,3 +1,6 @@
+## v3.125.5
+* Added `ydb.WithCommitTxContext(ctx)` to request commit along with query execution in database/sql transactions
+
 ## v3.125.4
 * Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
 

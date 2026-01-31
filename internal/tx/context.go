@@ -7,6 +7,7 @@ import (
 type (
 	ctxTxControlKey     struct{}
 	ctxTxControlHookKey struct{}
+	ctxCommitTxKey      struct{}
 
 	txControlHook func(txControl *Control)
 )
@@ -30,4 +31,17 @@ func ControlFromContext(ctx context.Context, defaultTxControl *Control) (txContr
 	}
 
 	return defaultTxControl
+}
+
+// WithCommitTx returns a new context with the commitTx flag set.
+// This allows requesting commit along with the query execution in database/sql transactions.
+func WithCommitTx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxCommitTxKey{}, true)
+}
+
+// CommitTxFromContext returns true if commitTx flag is set in the context.
+func CommitTxFromContext(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxCommitTxKey{}).(bool)
+
+	return ok && v
 }
