@@ -14,79 +14,70 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
-func TestDatabaseSqlWithLazyTxContext(t *testing.T) {
+func TestDatabaseSqlWithLazyTx(t *testing.T) {
 	scope := newScope(t)
 
-	t.Run("WithLazyTxContextTrue", func(t *testing.T) {
+	t.Run("WithLazyTxTrue", func(t *testing.T) {
 		db := scope.SQLDriverWithFolder(
 			ydb.WithTablePathPrefix(scope.Folder()),
 			ydb.WithAutoDeclare(),
 			ydb.WithQueryService(true),
 		)
 
-		require.NoError(t, retry.DoTx(
-			ydb.WithLazyTxContext(scope.Ctx, true),
-			db, func(ctx context.Context, tx *sql.Tx) error {
-				rows, err := tx.QueryContext(ctx, "SELECT 1")
-				if err != nil {
-					return err
-				}
-				defer func() { _ = rows.Close() }()
-
-				for rows.Next() {
-					var v int
-					if err := rows.Scan(&v); err != nil {
-						return err
-					}
-				}
-
-				return rows.Err()
-			},
-		))
-	})
-
-	t.Run("WithLazyTxContextFalse", func(t *testing.T) {
-		db := scope.SQLDriverWithFolder(
-			ydb.WithTablePathPrefix(scope.Folder()),
-			ydb.WithAutoDeclare(),
-			ydb.WithQueryService(true),
-		)
-
-		require.NoError(t, retry.DoTx(
-			ydb.WithLazyTxContext(scope.Ctx, false),
-			db, func(ctx context.Context, tx *sql.Tx) error {
-				rows, err := tx.QueryContext(ctx, "SELECT 1")
-				if err != nil {
-					return err
-				}
-				defer func() { _ = rows.Close() }()
-
-				for rows.Next() {
-					var v int
-					if err := rows.Scan(&v); err != nil {
-						return err
-					}
-				}
-
-				return rows.Err()
-			},
-		))
-	})
-
-	t.Run("WithLazyTxContextOverridesDriverDefault", func(t *testing.T) {
-		db := scope.SQLDriverWithFolder(
-			ydb.WithTablePathPrefix(scope.Folder()),
-			ydb.WithAutoDeclare(),
-			ydb.WithQueryService(true),
-		)
-
-		require.NoError(t, retry.DoTx(
-			ydb.WithLazyTxContext(scope.Ctx, true),
-			db, func(ctx context.Context, tx *sql.Tx) error {
-				_, err := tx.ExecContext(ctx, "SELECT 1")
-
+		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+			rows, err := tx.QueryContext(ctx, "SELECT 1")
+			if err != nil {
 				return err
-			},
-		))
+			}
+			defer func() { _ = rows.Close() }()
+
+			for rows.Next() {
+				var v int
+				if err := rows.Scan(&v); err != nil {
+					return err
+				}
+			}
+
+			return rows.Err()
+		}, retry.WithLazyTx(true)))
+	})
+
+	t.Run("WithLazyTxFalse", func(t *testing.T) {
+		db := scope.SQLDriverWithFolder(
+			ydb.WithTablePathPrefix(scope.Folder()),
+			ydb.WithAutoDeclare(),
+			ydb.WithQueryService(true),
+		)
+
+		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+			rows, err := tx.QueryContext(ctx, "SELECT 1")
+			if err != nil {
+				return err
+			}
+			defer func() { _ = rows.Close() }()
+
+			for rows.Next() {
+				var v int
+				if err := rows.Scan(&v); err != nil {
+					return err
+				}
+			}
+
+			return rows.Err()
+		}, retry.WithLazyTx(false)))
+	})
+
+	t.Run("WithLazyTxOverridesDriverDefault", func(t *testing.T) {
+		db := scope.SQLDriverWithFolder(
+			ydb.WithTablePathPrefix(scope.Folder()),
+			ydb.WithAutoDeclare(),
+			ydb.WithQueryService(true),
+		)
+
+		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx, "SELECT 1")
+
+			return err
+		}, retry.WithLazyTx(true)))
 	})
 }

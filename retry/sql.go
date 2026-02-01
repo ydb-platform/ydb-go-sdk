@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -116,6 +117,7 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 type doTxOptions struct {
 	txOptions    *sql.TxOptions
 	retryOptions []Option
+	lazyTx       *bool
 }
 
 // doTxOption defines option for redefine default Retry behavior
@@ -151,6 +153,25 @@ func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 	return txOptionsOption{
 		txOptions: txOptions,
 	}
+}
+
+var _ doTxOption = lazyTxOption{}
+
+type lazyTxOption struct {
+	lazyTx bool
+}
+
+func (opt lazyTxOption) ApplyDoTxOption(o *doTxOptions) {
+	o.lazyTx = &opt.lazyTx
+}
+
+// WithLazyTx enables or disables lazy transactions for DoTx call.
+// When enabled, the Begin call will be a no-op and the first execute will create
+// an interactive transaction.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithLazyTx(lazyTx bool) lazyTxOption {
+	return lazyTxOption{lazyTx: lazyTx}
 }
 
 // DoTx is a retryer of database/sql transactions with fallbacks on errors
@@ -202,21 +223,27 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 			opt.ApplyDoTxOption(&options)
 		}
 	}
+
+	// Apply lazyTx to context if explicitly set via option
+	if options.lazyTx != nil {
+		ctx = tx.WithLazyTx(ctx, *options.lazyTx)
+	}
+
 	v, err := RetryWithResult(ctx, func(ctx context.Context) (_ T, finalErr error) {
 		attempts++
-		tx, err := db.BeginTx(ctx, options.txOptions)
+		sqlTx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
 			return zeroValue, xerrors.WithStackTrace(err)
 		}
 		defer func() {
-			_ = tx.Rollback()
+			_ = sqlTx.Rollback()
 		}()
-		v, err := op(xcontext.MarkRetryCall(ctx), tx)
+		v, err := op(xcontext.MarkRetryCall(ctx), sqlTx)
 		if err != nil {
 			return zeroValue, xerrors.WithStackTrace(err)
 		}
-		if err = tx.Commit(); err != nil {
-			// We create and use tx in this method, so if we catch this error, it means context cancellation
+		if err = sqlTx.Commit(); err != nil {
+			// We create and use sqlTx in this method, so if we catch this error, it means context cancellation
 			return zeroValue, xerrors.WithStackTrace(transformCommitError(ctx, err))
 		}
 
