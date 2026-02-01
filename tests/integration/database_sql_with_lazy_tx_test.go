@@ -22,7 +22,6 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	newDB := func(t *testing.T, lazyTxDetected *atomic.Bool, driverOpts ...ydb.Option) (*sql.DB, func()) {
 		baseOpts := []ydb.Option{
-			ydb.WithQueryService(true),
 			ydb.WithTraceQuery(trace.Query{
 				OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(trace.QuerySessionBeginDoneInfo) {
 					return func(info trace.QuerySessionBeginDoneInfo) {
@@ -39,6 +38,7 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 		connector, err := ydb.Connector(driver,
 			ydb.WithTablePathPrefix(scope.Folder()),
 			ydb.WithAutoDeclare(),
+			ydb.WithQueryService(true),
 		)
 		require.NoError(t, err)
 

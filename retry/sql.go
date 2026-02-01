@@ -228,7 +228,6 @@ func DoTxWithResult[T any](
 		}
 	}
 
-	// Apply lazyTx to context if explicitly set via option
 	if options.lazyTx != nil {
 		ctx = tx.WithLazyTx(ctx, *options.lazyTx)
 	}
