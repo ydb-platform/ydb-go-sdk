@@ -194,9 +194,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 }
 
 // DoTxWithResult is a retryer of database/sql transactions with fallbacks on errors
-func DoTxWithResult[T any](
-	ctx context.Context,
-	db *sql.DB,
+func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	op func(context.Context, *sql.Tx) (T, error),
 	opts ...doTxOption,
 ) (T, error) {
@@ -227,11 +225,9 @@ func DoTxWithResult[T any](
 			opt.ApplyDoTxOption(&options)
 		}
 	}
-
 	if options.lazyTx != nil {
 		ctx = tx.WithLazyTx(ctx, *options.lazyTx)
 	}
-
 	v, err := RetryWithResult(ctx, func(ctx context.Context) (_ T, finalErr error) {
 		attempts++
 		sqlTx, err := db.BeginTx(ctx, options.txOptions)
