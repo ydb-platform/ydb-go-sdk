@@ -102,7 +102,7 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	t.Run("WithLazyTxTrueOverridesDriverDefault", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-		db, cleanup := newDB(t, &lazyTxDetected) // Driver without global lazyTx
+		db, cleanup := newDB(t, &lazyTxDetected)
 		defer cleanup()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
@@ -116,7 +116,7 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	t.Run("WithLazyTxFalseOverridesDriverLazyTx", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-		db, cleanup := newDB(t, &lazyTxDetected, ydb.WithLazyTx(true)) // Driver WITH global lazyTx enabled
+		db, cleanup := newDB(t, &lazyTxDetected, ydb.WithLazyTx(true))
 		defer cleanup()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
@@ -126,5 +126,19 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 		}, retry.WithLazyTx(false)))
 
 		require.False(t, lazyTxDetected.Load(), "lazy transaction should be disabled via retry.WithLazyTx(false)")
+	})
+
+	t.Run("DriverLazyTxWithoutOption", func(t *testing.T) {
+		var lazyTxDetected atomic.Bool
+		db, cleanup := newDB(t, &lazyTxDetected, ydb.WithLazyTx(true))
+		defer cleanup()
+
+		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx, "SELECT 1")
+
+			return err
+		}))
+
+		require.True(t, lazyTxDetected.Load(), "lazy transaction should be enabled from driver default when no retry option provided")
 	})
 }

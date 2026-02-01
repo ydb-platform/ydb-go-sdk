@@ -581,7 +581,6 @@ func TestQueryWithLazyTxOption(t *testing.T) {
 	})
 
 	t.Run("WithLazyTxFalseOverridesDriverLazyTx", func(t *testing.T) {
-		// Use NonCachingDriver to ensure ydb.WithLazyTx(true) is applied
 		driver := scope.NonCachingDriver(ydb.WithLazyTx(true))
 		defer func() { _ = driver.Close(scope.Ctx) }()
 
@@ -596,6 +595,27 @@ func TestQueryWithLazyTxOption(t *testing.T) {
 
 			return nil
 		}, query.WithIdempotent(), query.WithLazyTx(false))
+		require.NoError(t, err)
+	})
+
+	t.Run("DriverLazyTxWithoutOption", func(t *testing.T) {
+		driver := scope.NonCachingDriver(ydb.WithLazyTx(true))
+		defer func() { _ = driver.Close(scope.Ctx) }()
+
+		err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			if tx.ID() != baseTx.LazyTxID {
+				return errors.New("transaction should be lazy from driver default when no query option provided")
+			}
+			_, err = tx.Query(ctx, "SELECT 1")
+			if err != nil {
+				return err
+			}
+			if tx.ID() == baseTx.LazyTxID {
+				return errors.New("transaction is lazy yet after query")
+			}
+
+			return nil
+		}, query.WithIdempotent())
 		require.NoError(t, err)
 	})
 
