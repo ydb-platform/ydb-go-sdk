@@ -20,7 +20,7 @@ import (
 func TestDatabaseSqlWithLazyTx(t *testing.T) {
 	scope := newScope(t)
 
-	newDB := func(t *testing.T, lazyTxDetected *atomic.Bool, driverOpts ...ydb.Option) *sql.DB {
+	newDB := func(t *testing.T, lazyTxDetected *atomic.Bool, driverOpts ...ydb.Option) (*sql.DB, func()) {
 		baseOpts := []ydb.Option{
 			ydb.WithQueryService(true),
 			ydb.WithTraceQuery(trace.Query{
@@ -34,7 +34,7 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 			}),
 		}
 
-		driver := scope.Driver(append(baseOpts, driverOpts...)...)
+		driver := scope.NonCachingDriver(append(baseOpts, driverOpts...)...)
 
 		connector, err := ydb.Connector(driver,
 			ydb.WithTablePathPrefix(scope.Folder()),
@@ -42,13 +42,18 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		return sql.OpenDB(connector)
+		db := sql.OpenDB(connector)
+
+		return db, func() {
+			_ = db.Close()
+			_ = driver.Close(scope.Ctx)
+		}
 	}
 
 	t.Run("WithLazyTxTrue", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-		db := newDB(t, &lazyTxDetected)
-		defer func() { _ = db.Close() }()
+		db, cleanup := newDB(t, &lazyTxDetected)
+		defer cleanup()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			rows, err := tx.QueryContext(ctx, "SELECT 1")
@@ -72,8 +77,8 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	t.Run("WithLazyTxFalse", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-		db := newDB(t, &lazyTxDetected)
-		defer func() { _ = db.Close() }()
+		db, cleanup := newDB(t, &lazyTxDetected)
+		defer cleanup()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			rows, err := tx.QueryContext(ctx, "SELECT 1")
@@ -97,8 +102,8 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	t.Run("WithLazyTxTrueOverridesDriverDefault", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-		db := newDB(t, &lazyTxDetected) // Driver without global lazyTx
-		defer func() { _ = db.Close() }()
+		db, cleanup := newDB(t, &lazyTxDetected) // Driver without global lazyTx
+		defer cleanup()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			_, err := tx.ExecContext(ctx, "SELECT 1")
@@ -111,8 +116,8 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	t.Run("WithLazyTxFalseOverridesDriverLazyTx", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-		db := newDB(t, &lazyTxDetected, ydb.WithLazyTx(true)) // Driver WITH global lazyTx enabled
-		defer func() { _ = db.Close() }()
+		db, cleanup := newDB(t, &lazyTxDetected, ydb.WithLazyTx(true)) // Driver WITH global lazyTx enabled
+		defer cleanup()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			_, err := tx.ExecContext(ctx, "SELECT 1")

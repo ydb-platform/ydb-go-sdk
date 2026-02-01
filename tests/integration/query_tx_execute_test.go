@@ -581,7 +581,11 @@ func TestQueryWithLazyTxOption(t *testing.T) {
 	})
 
 	t.Run("WithLazyTxFalseOverridesDriverLazyTx", func(t *testing.T) {
-		err := scope.Driver(ydb.WithLazyTx(true)).Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+		// Use NonCachingDriver to ensure ydb.WithLazyTx(true) is applied
+		driver := scope.NonCachingDriver(ydb.WithLazyTx(true))
+		defer func() { _ = driver.Close(scope.Ctx) }()
+
+		err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
 			if tx.ID() == baseTx.LazyTxID {
 				return errors.New("transaction should not be lazy - query.WithLazyTx(false) did not override driver option")
 			}
