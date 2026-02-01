@@ -7,6 +7,7 @@ import (
 type (
 	ctxTxControlKey     struct{}
 	ctxTxControlHookKey struct{}
+	ctxLazyTxKey        struct{}
 
 	txControlHook func(txControl *Control)
 )
@@ -30,4 +31,16 @@ func ControlFromContext(ctx context.Context, defaultTxControl *Control) (txContr
 	}
 
 	return defaultTxControl
+}
+
+func WithLazyTx(ctx context.Context, lazyTx bool) context.Context {
+	return context.WithValue(ctx, ctxLazyTxKey{}, lazyTx)
+}
+
+func LazyTxFromContext(ctx context.Context, defaultValue bool) bool {
+	if v, ok := ctx.Value(ctxLazyTxKey{}).(bool); ok {
+		return v
+	}
+
+	return defaultValue
 }

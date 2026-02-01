@@ -486,3 +486,171 @@ func TestQueryWithCommitTxFlag(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), count)
 }
+
+func TestQueryWithLazyTxOption(t *testing.T) {
+	scope := newScope(t)
+
+	t.Run("WithLazyTxTrue", func(t *testing.T) {
+		var (
+			columnNames []string
+			columnTypes []string
+		)
+
+		err := scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			if tx.ID() != baseTx.LazyTxID {
+				return errors.New("transaction is not lazy")
+			}
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			if tx.ID() == baseTx.LazyTxID {
+				return errors.New("transaction is lazy yet after query")
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			columnNames = rs.Columns()
+			for _, t := range rs.ColumnTypes() {
+				columnTypes = append(columnTypes, t.Yql())
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			_ = res.Close(ctx)
+
+			return nil
+		}, query.WithIdempotent(), query.WithLazyTx(true))
+		require.NoError(t, err)
+		require.Equal(t, []string{"col1"}, columnNames)
+		require.Equal(t, []string{"Int32"}, columnTypes)
+	})
+
+	t.Run("WithLazyTxFalse", func(t *testing.T) {
+		err := scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			if tx.ID() == baseTx.LazyTxID {
+				return errors.New("transaction should not be lazy")
+			}
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+			_ = res.Close(ctx)
+
+			return nil
+		}, query.WithIdempotent(), query.WithLazyTx(false))
+		require.NoError(t, err)
+	})
+
+	t.Run("WithLazyTxTrueOverridesDriverDefault", func(t *testing.T) {
+		err := scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			if tx.ID() != baseTx.LazyTxID {
+				return errors.New("transaction is not lazy - query.WithLazyTx(true) did not override driver default")
+			}
+			_, err = tx.Query(ctx, "SELECT 1")
+			if err != nil {
+				return err
+			}
+			if tx.ID() == baseTx.LazyTxID {
+				return errors.New("transaction is lazy yet after query")
+			}
+
+			return nil
+		}, query.WithIdempotent(), query.WithLazyTx(true))
+		require.NoError(t, err)
+	})
+
+	t.Run("WithLazyTxFalseOverridesDriverLazyTx", func(t *testing.T) {
+		driver := scope.NonCachingDriver(ydb.WithLazyTx(true))
+		defer func() { _ = driver.Close(scope.Ctx) }()
+
+		err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			if tx.ID() == baseTx.LazyTxID {
+				return errors.New("transaction should not be lazy - query.WithLazyTx(false) did not override driver option")
+			}
+			_, err = tx.Query(ctx, "SELECT 1")
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}, query.WithIdempotent(), query.WithLazyTx(false))
+		require.NoError(t, err)
+	})
+
+	t.Run("DriverLazyTxWithoutOption", func(t *testing.T) {
+		driver := scope.NonCachingDriver(ydb.WithLazyTx(true))
+		defer func() { _ = driver.Close(scope.Ctx) }()
+
+		err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			if tx.ID() != baseTx.LazyTxID {
+				return errors.New("transaction should be lazy from driver default when no query option provided")
+			}
+			_, err = tx.Query(ctx, "SELECT 1")
+			if err != nil {
+				return err
+			}
+			if tx.ID() == baseTx.LazyTxID {
+				return errors.New("transaction is lazy yet after query")
+			}
+
+			return nil
+		}, query.WithIdempotent())
+		require.NoError(t, err)
+	})
+
+	t.Run("WithLazyTxWithTxSettings", func(t *testing.T) {
+		err := scope.Driver().Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) (err error) {
+			if tx.ID() != baseTx.LazyTxID {
+				return errors.New("transaction is not lazy")
+			}
+			res, err := tx.Query(ctx, "SELECT 1 AS col1")
+			if err != nil {
+				return err
+			}
+			if tx.ID() == baseTx.LazyTxID {
+				return errors.New("transaction is lazy yet after query")
+			}
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				return err
+			}
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				return err
+			}
+			var col1 int
+			err = row.ScanNamed(query.Named("col1", &col1))
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+			query.WithIdempotent(),
+			query.WithLazyTx(true),
+			query.WithTxSettings(query.TxSettings(query.WithSnapshotReadOnly())),
+		)
+		require.NoError(t, err)
+	})
+}

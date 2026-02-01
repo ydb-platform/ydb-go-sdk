@@ -14,6 +14,7 @@ var (
 	_ DoTxOption = RetryOptionsOption(nil)
 	_ DoTxOption = TraceOption{}
 	_ DoTxOption = doTxSettingsOption{}
+	_ DoTxOption = lazyTxOption{}
 )
 
 type (
@@ -35,10 +36,14 @@ type (
 		doSettings
 
 		txSettings tx.Settings
+		lazyTx     *bool
 	}
 
 	RetryOptionsOption []retry.Option
-	TraceOption        struct {
+	lazyTxOption       struct {
+		lazyTx bool
+	}
+	TraceOption struct {
 		t *trace.Query
 	}
 	doTxSettingsOption struct {
@@ -82,6 +87,10 @@ func (s *doTxSettings) TxSettings() tx.Settings {
 	return s.txSettings
 }
 
+func (s *doTxSettings) LazyTx() *bool {
+	return s.lazyTx
+}
+
 func (opt TraceOption) applyDoOption(s *doSettings) {
 	s.trace = s.trace.Compose(opt.t)
 }
@@ -102,8 +111,16 @@ func (opt doTxSettingsOption) applyDoTxOption(opts *doTxSettings) {
 	opts.txSettings = opt.txSettings
 }
 
+func (opt lazyTxOption) applyDoTxOption(opts *doTxSettings) {
+	opts.lazyTx = &opt.lazyTx
+}
+
 func WithTxSettings(txSettings tx.Settings) doTxSettingsOption {
 	return doTxSettingsOption{txSettings: txSettings}
+}
+
+func WithLazyTx(lazyTx bool) lazyTxOption {
+	return lazyTxOption{lazyTx: lazyTx}
 }
 
 func WithIdempotent() RetryOptionsOption {
