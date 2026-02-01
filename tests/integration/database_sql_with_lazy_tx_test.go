@@ -20,12 +20,8 @@ import (
 func TestDatabaseSqlWithLazyTx(t *testing.T) {
 	scope := newScope(t)
 
-	t.Run("WithLazyTxTrue", func(t *testing.T) {
-		var lazyTxDetected atomic.Bool
-
-		db := scope.SQLDriverWithFolder(
-			ydb.WithTablePathPrefix(scope.Folder()),
-			ydb.WithAutoDeclare(),
+	newDB := func(t *testing.T, lazyTxDetected *atomic.Bool, driverOpts ...ydb.Option) *sql.DB {
+		baseOpts := []ydb.Option{
 			ydb.WithQueryService(true),
 			ydb.WithTraceQuery(trace.Query{
 				OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(trace.QuerySessionBeginDoneInfo) {
@@ -36,7 +32,23 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 					}
 				},
 			}),
+		}
+
+		driver := scope.Driver(append(baseOpts, driverOpts...)...)
+
+		connector, err := ydb.Connector(driver,
+			ydb.WithTablePathPrefix(scope.Folder()),
+			ydb.WithAutoDeclare(),
 		)
+		require.NoError(t, err)
+
+		return sql.OpenDB(connector)
+	}
+
+	t.Run("WithLazyTxTrue", func(t *testing.T) {
+		var lazyTxDetected atomic.Bool
+		db := newDB(t, &lazyTxDetected)
+		defer func() { _ = db.Close() }()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			rows, err := tx.QueryContext(ctx, "SELECT 1")
@@ -60,21 +72,8 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	t.Run("WithLazyTxFalse", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-
-		db := scope.SQLDriverWithFolder(
-			ydb.WithTablePathPrefix(scope.Folder()),
-			ydb.WithAutoDeclare(),
-			ydb.WithQueryService(true),
-			ydb.WithTraceQuery(trace.Query{
-				OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(trace.QuerySessionBeginDoneInfo) {
-					return func(info trace.QuerySessionBeginDoneInfo) {
-						if info.Error == nil && info.Tx != nil && info.Tx.ID() == baseTx.LazyTxID {
-							lazyTxDetected.Store(true)
-						}
-					}
-				},
-			}),
-		)
+		db := newDB(t, &lazyTxDetected)
+		defer func() { _ = db.Close() }()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			rows, err := tx.QueryContext(ctx, "SELECT 1")
@@ -98,21 +97,8 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	t.Run("WithLazyTxTrueOverridesDriverDefault", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-
-		db := scope.SQLDriverWithFolder(
-			ydb.WithTablePathPrefix(scope.Folder()),
-			ydb.WithAutoDeclare(),
-			ydb.WithQueryService(true),
-			ydb.WithTraceQuery(trace.Query{
-				OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(trace.QuerySessionBeginDoneInfo) {
-					return func(info trace.QuerySessionBeginDoneInfo) {
-						if info.Error == nil && info.Tx != nil && info.Tx.ID() == baseTx.LazyTxID {
-							lazyTxDetected.Store(true)
-						}
-					}
-				},
-			}),
-		)
+		db := newDB(t, &lazyTxDetected) // Driver without global lazyTx
+		defer func() { _ = db.Close() }()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			_, err := tx.ExecContext(ctx, "SELECT 1")
@@ -125,22 +111,8 @@ func TestDatabaseSqlWithLazyTx(t *testing.T) {
 
 	t.Run("WithLazyTxFalseOverridesDriverLazyTx", func(t *testing.T) {
 		var lazyTxDetected atomic.Bool
-
-		db := scope.SQLDriverWithFolder(
-			ydb.WithTablePathPrefix(scope.Folder()),
-			ydb.WithAutoDeclare(),
-			ydb.WithQueryService(true),
-			ydb.WithLazyTx(true),
-			ydb.WithTraceQuery(trace.Query{
-				OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(trace.QuerySessionBeginDoneInfo) {
-					return func(info trace.QuerySessionBeginDoneInfo) {
-						if info.Error == nil && info.Tx != nil && info.Tx.ID() == baseTx.LazyTxID {
-							lazyTxDetected.Store(true)
-						}
-					}
-				},
-			}),
-		)
+		db := newDB(t, &lazyTxDetected, ydb.WithLazyTx(true)) // Driver WITH global lazyTx enabled
+		defer func() { _ = db.Close() }()
 
 		require.NoError(t, retry.DoTx(scope.Ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			_, err := tx.ExecContext(ctx, "SELECT 1")
