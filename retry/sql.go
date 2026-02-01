@@ -169,6 +169,8 @@ func (opt lazyTxOption) ApplyDoTxOption(o *doTxOptions) {
 // When enabled, the Begin call will be a no-op and the first execute will create
 // an interactive transaction.
 //
+// Note: This option works only with query service (ydb.WithQueryService(true) connector option).
+//
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithLazyTx(lazyTx bool) lazyTxOption {
 	return lazyTxOption{lazyTx: lazyTx}
@@ -192,7 +194,9 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 }
 
 // DoTxWithResult is a retryer of database/sql transactions with fallbacks on errors
-func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
+func DoTxWithResult[T any](
+	ctx context.Context,
+	db *sql.DB,
 	op func(context.Context, *sql.Tx) (T, error),
 	opts ...doTxOption,
 ) (T, error) {
