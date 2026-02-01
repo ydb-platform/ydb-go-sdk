@@ -230,19 +230,19 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	}
 	v, err := RetryWithResult(ctx, func(ctx context.Context) (_ T, finalErr error) {
 		attempts++
-		sqlTx, err := db.BeginTx(ctx, options.txOptions)
+		tx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
 			return zeroValue, xerrors.WithStackTrace(err)
 		}
 		defer func() {
-			_ = sqlTx.Rollback()
+			_ = tx.Rollback()
 		}()
-		v, err := op(xcontext.MarkRetryCall(ctx), sqlTx)
+		v, err := op(xcontext.MarkRetryCall(ctx), tx)
 		if err != nil {
 			return zeroValue, xerrors.WithStackTrace(err)
 		}
-		if err = sqlTx.Commit(); err != nil {
-			// We create and use sqlTx in this method, so if we catch this error, it means context cancellation
+		if err = tx.Commit(); err != nil {
+			// We create and use tx in this method, so if we catch this error, it means context cancellation
 			return zeroValue, xerrors.WithStackTrace(transformCommitError(ctx, err))
 		}
 
