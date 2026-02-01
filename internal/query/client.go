@@ -525,6 +525,10 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 		onDone(attempts, finalErr)
 	}()
 
+	if lazyTx := settings.LazyTx(); lazyTx != nil {
+		ctx = tx.WithLazyTx(ctx, *lazyTx)
+	}
+
 	err := doTx(ctx, c.explicitSessionPool, op,
 		settings.TxSettings(),
 		append(
