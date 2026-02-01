@@ -1,4 +1,3 @@
-## v3.125.5
 * Added `query.WithLazyTx(bool)` option for `query.Client.DoTx` calls to enable/disable lazy transactions per operation
 * Added `retry.WithLazyTx(bool)` option for `retry.DoTx` calls to enable/disable lazy transactions for database/sql
 
