@@ -1,4 +1,5 @@
 * Allowed `TxControl` in `database/sql` transaction execution when TxControl equals TxControl on BeginTx
+* Added support for custom types derived from primitive types in `database/sql` driver
 
 ## v3.126.1
 * Added check `CommitTx` flag in `query.TxControl` on `db.Query().{Exec,Query,QueryResultSet,QueryRow}` calls before execution

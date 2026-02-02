@@ -126,8 +126,45 @@ func asSQLNullValue(v any) (value.Value, bool) {
 	return value.OptionalValue(val), true
 }
 
-func toType(v any) (_ types.Type, err error) { //nolint:funlen
+var reflectBaseTypes = map[reflect.Kind]reflect.Type{
+	reflect.String:  reflect.TypeFor[string](),
+	reflect.Int:     reflect.TypeFor[int](),
+	reflect.Int8:    reflect.TypeFor[int8](),
+	reflect.Int16:   reflect.TypeFor[int16](),
+	reflect.Int32:   reflect.TypeFor[int32](),
+	reflect.Int64:   reflect.TypeFor[int64](),
+	reflect.Uint:    reflect.TypeFor[uint](),
+	reflect.Uint8:   reflect.TypeFor[uint8](),
+	reflect.Uint16:  reflect.TypeFor[uint16](),
+	reflect.Uint32:  reflect.TypeFor[uint32](),
+	reflect.Uint64:  reflect.TypeFor[uint64](),
+	reflect.Float32: reflect.TypeFor[float32](),
+	reflect.Float64: reflect.TypeFor[float64](),
+	reflect.Bool:    reflect.TypeFor[bool](),
+}
+
+// tryConvertToBaseType attempts to convert a value to a base type and returns the converted value if successful.
+// Returns nil if conversion is not possible or not needed.
+func tryConvertToBaseType(rv reflect.Value) any {
+	rt := rv.Type()
+	kind := rt.Kind()
+
+	baseType, ok := reflectBaseTypes[kind]
+	if !ok {
+		return nil
+	}
+
+	if !rv.CanConvert(baseType) {
+		return nil
+	}
+
+	return rv.Convert(baseType).Interface()
+}
+
+func toType(v any) (_ types.Type, err error) { //nolint:funlen,gocyclo
 	switch x := v.(type) {
+	case reflect.Value:
+		return toType(x.Interface())
 	case bool:
 		return types.Bool, nil
 	case int:
@@ -165,10 +202,19 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen
 	case time.Duration:
 		return types.Interval, nil
 	default:
+		rv := reflect.ValueOf(x)
+		if converted := tryConvertToBaseType(rv); converted != nil {
+			return toType(converted)
+		}
+
 		kind := reflect.TypeOf(x).Kind()
 		switch kind {
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
+			// Special handling for byte slices ([]byte and type aliases)
+			if v.Type().Elem().Kind() == reflect.Uint8 {
+				return types.Bytes, nil
+			}
 			t, err := toType(reflect.New(v.Type().Elem()).Elem().Interface())
 			if err != nil {
 				return nil, xerrors.WithStackTrace(
@@ -260,6 +306,8 @@ func toValue(v any) (_ value.Value, err error) {
 	switch x := v.(type) {
 	case nil:
 		return value.VoidValue(), nil
+	case reflect.Value:
+		return toValue(x.Interface())
 	case value.Value:
 		return x, nil
 	}
@@ -291,6 +339,8 @@ func toValue(v any) (_ value.Value, err error) {
 	}
 
 	switch x := v.(type) {
+	case reflect.Value:
+		return toValue(x.Interface())
 	case value.Value:
 		return x, nil
 	case bool:
@@ -346,10 +396,19 @@ func toValue(v any) (_ value.Value, err error) {
 
 		return value.JSONValue(xstring.FromBytes(bytes)), nil
 	default:
+		rv := reflect.ValueOf(x)
+		if converted := tryConvertToBaseType(rv); converted != nil {
+			return toValue(converted)
+		}
+
 		kind := reflect.TypeOf(x).Kind()
 		switch kind {
 		case reflect.Slice, reflect.Array:
 			v := reflect.ValueOf(x)
+			// Special handling for byte slices ([]byte and type aliases)
+			if v.Type().Elem().Kind() == reflect.Uint8 {
+				return value.BytesValue(v.Bytes()), nil
+			}
 			list := make([]value.Value, v.Len())
 
 			for i := range list {
