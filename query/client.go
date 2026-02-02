@@ -165,6 +165,15 @@ func WithRetryBudget(b budget.Budget) options.RetryOptionsOption {
 	return options.WithRetryBudget(b)
 }
 
+// WithLazyTx enables or disables lazy transactions for a specific DoTx call.
+// When enabled, the Begin call will be a no-op and the first execute will create
+// an interactive transaction with the given transaction settings.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithLazyTx(lazyTx bool) options.DoTxOption {
+	return options.WithLazyTx(lazyTx)
+}
+
 // AllowImplicitSessions is an option to execute queries using an implicit session
 // which allows the queries to be executed without explicitly creating a session.
 // Please note that requests with this option use a separate session pool.
