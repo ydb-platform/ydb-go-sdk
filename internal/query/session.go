@@ -34,13 +34,19 @@ type (
 func (s *Session) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
 ) (rs result.ClosableResultSet, finalErr error) {
+	settings := options.ExecuteSettings(opts...)
+
+	if err := validateTxControl(settings); err != nil {
+		return nil, err
+	}
+
 	onDone := trace.QueryOnSessionQueryResultSet(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryResultSet"), s, q)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
+	r, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -73,13 +79,19 @@ func (s *Session) queryRow(
 }
 
 func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execute) (_ query.Row, finalErr error) {
+	settings := options.ExecuteSettings(opts...)
+
+	if err := validateTxControl(settings); err != nil {
+		return nil, err
+	}
+
 	onDone := trace.QueryOnSessionQueryRow(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryRow"), s, q)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	row, err := s.queryRow(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
+	row, err := s.queryRow(ctx, q, settings, withStreamResultTrace(s.trace))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -163,6 +175,11 @@ func (s *Session) execute(
 
 func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
 	settings := options.ExecuteSettings(opts...)
+
+	if err := validateTxControl(settings); err != nil {
+		return err
+	}
+
 	onDone := trace.QueryOnSessionExec(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"),
 		s,
@@ -173,7 +190,7 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
+	r, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -191,6 +208,11 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 
 func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) (_ query.Result, finalErr error) {
 	settings := options.ExecuteSettings(opts...)
+
+	if err := validateTxControl(settings); err != nil {
+		return nil, err
+	}
+
 	onDone := trace.QueryOnSessionQuery(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"),
 		s,
@@ -201,7 +223,7 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, options.ExecuteSettings(opts...), withStreamResultTrace(s.trace))
+	r, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

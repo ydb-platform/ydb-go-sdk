@@ -1,5 +1,8 @@
 * Allowed `TxControl` in `database/sql` transaction execution when TxControl equals TxControl on BeginTx
 
+## v3.126.1
+* Added check `CommitTx` flag in `query.TxControl` on `db.Query().{Exec,Query,QueryResultSet,QueryRow}` calls before execution
+
 ## v3.126.0
 * Added `query.WithLazyTx(bool)` option for `query.Client.DoTx` calls to enable/disable lazy transactions per operation
 * Added `retry.WithLazyTx(bool)` option for `retry.DoTx` calls to enable/disable lazy transactions for database/sql

@@ -69,6 +69,34 @@ func (ctrl *Control) Equal(other *Control) bool {
 	)
 }
 
+// IsBeginTxWithoutCommit checks if the control has BeginTx selector but no CommitTx flag set
+// This only returns true for READ-WRITE transactions without commit.
+// Read-only transactions don't need CommitTx.
+func (ctrl *Control) IsBeginTxWithoutCommit() bool {
+	if ctrl == nil {
+		return false
+	}
+	opts, ok := ctrl.selector.(beginTxOptions)
+	if !ok || ctrl.commit {
+		return false
+	}
+
+	// Check if this is a read-write transaction mode
+	// Read-only modes don't require CommitTx
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		// Check if it's a read-write mode
+		switch opt.(type) {
+		case serializableReadWriteTxSettingsOption, snapshotReadWriteTxSettingsOption:
+			return true
+		}
+	}
+
+	return false
+}
+
 var (
 	_ ControlOption = beginTxOptions{}
 	_ Selector      = beginTxOptions{}

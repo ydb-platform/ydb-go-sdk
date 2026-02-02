@@ -42,6 +42,7 @@ type (
 		statsCallback          func(queryStats stats.QueryStats)
 		callOptions            []grpc.CallOption
 		txControl              *tx.Control
+		userProvidedTxControl  bool // track if user explicitly provided TxControl
 		retryOptions           []retry.Option
 		issueCallback          func(issues []*Ydb_Issue.IssueMessage)
 		responsePartLimitBytes int64
@@ -102,6 +103,7 @@ func (t txCommitOption) applyExecuteOption(s *executeSettings) {
 
 func (txControl *txControlOption) applyExecuteOption(s *executeSettings) {
 	s.txControl = (*tx.Control)(txControl)
+	s.userProvidedTxControl = true
 }
 
 func (txControl *txControlOption) thisOptionIsNotForExecuteOnTx() {}
@@ -214,6 +216,10 @@ func (s *executeSettings) Label() string {
 
 func (s *executeSettings) ConcurrentResultSets() bool {
 	return s.concurrentResultSets
+}
+
+func (s *executeSettings) UserProvidedTxControl() bool {
+	return s.userProvidedTxControl
 }
 
 func WithParameters(params params.Parameters) parametersOption {
