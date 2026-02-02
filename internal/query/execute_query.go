@@ -33,6 +33,7 @@ type executeSettings interface {
 	ResponsePartLimitSizeBytes() int64
 	Label() string
 	ConcurrentResultSets() bool
+	UserProvidedTxControl() bool
 }
 
 type executeScriptConfig interface {
