@@ -66,7 +66,8 @@ type (
 	parametersOption  struct {
 		params params.Parameters
 	}
-	txControlOption tx.Control
+	TxControlOption tx.Control
+	txControlOption = TxControlOption
 	syntaxOption    = Syntax
 	statsModeOption struct {
 		mode     StatsMode
