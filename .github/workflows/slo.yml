@@ -197,6 +197,7 @@ jobs:
           workload_name: ${{ matrix.sdk.name }}
           workload_current_ref: ${{ github.head_ref || github.ref_name }}
           workload_baseline_ref: ${{ steps.baseline.outputs.ref }}
+          # to disable chaos testing for node hint workloads
           disable_compose_profiles: "${{ (matrix.sdk.id == 'native_node_hints' || matrix.sdk.id == 'session_node_hints') && 'chaos' || '' }}"
           metrics_yaml: |
             metrics:

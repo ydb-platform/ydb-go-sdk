@@ -1480,5 +1480,129 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			mustPutItem(t, p, item0)
 			mustClose(t, p)
 		})
+
+		t.Run("ContextCanceledAfterSlotReservation", func(t *testing.T) {
+			// This test exibits the branch where context is canceled after
+			// reserving a slot in the session pool (p.createInProgress++)
+			// for a preferred node, but before the item is successfully created.
+			// Test ensures that the createInProgress counter is properly
+			// decremented in this scenario to avoid leaking the reservation.
+
+			blockCreation := atomic.Bool{}
+			createdSignal := make(chan struct{})
+			itemIDCounter := atomic.Int32{}
+			enableChannel := false
+			blockCreation.Store(false)
+
+			p := New[*testItem, testItem](rootCtx,
+				WithLimit[*testItem, testItem](3),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					if enableChannel {
+						createdSignal <- struct{}{}
+					}
+					for {
+						select {
+						case <-ctx.Done():
+							return nil, ctx.Err()
+						default:
+						}
+						if !blockCreation.Load() {
+							break
+						}
+					}
+					// Check if context was canceled
+					id := itemIDCounter.Add(1)
+					nodeID, has := endpoint.ContextNodeID(ctx)
+					if !has {
+						nodeID = uint32(id)
+					}
+
+					return &testItem{
+						v: id,
+						onNodeID: func() uint32 {
+							return nodeID
+						},
+					}, nil
+				}),
+				WithTrace[*testItem, testItem](defaultTrace),
+			)
+			defer mustClose(t, p)
+
+			// Pre-fill the pool to capacity (3 items)
+			// Get 3 items to fill the pool
+			_ = mustGetItem(t, p)
+			_ = mustGetItem(t, p)
+			item2 := mustGetItem(t, p)
+
+			// Put back 1 item to make them idle, keep 1 busy
+			mustPutItem(t, p, item2)
+
+			// Verify initial state
+			initialStats := p.Stats()
+			require.Equal(t, 3, initialStats.Index, "Pool should have 3 items")
+			require.Equal(t, 1, initialStats.Idle, "Should have 1 idle item")
+			require.Equal(t, 0, initialStats.CreateInProgress, "No creation in progress initially")
+
+			// Block future creations
+			blockCreation.Store(true)
+
+			// Request item with preferred nodeID that doesn't exist (99)
+			// Pool state: Index=3 (full), Idle=1
+			// Flow:
+			// - removeIdleByNodeID(99) → nil (doesn't exist)
+			// - len(index) + createInProgress < limit → 3 + 0 < 3 → false
+			// - removeFirstIdle() → removes the idle item
+			// - hasPreferredNodeID && idle != nil → increment createInProgress
+
+			getCtx := endpoint.WithNodeID(context.Background(), 99)
+			getCtx, cancel := context.WithCancel(getCtx)
+
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			var getErr error
+			enableChannel = true
+			// Start getItem in background
+			go func() {
+				defer wg.Done()
+				_, getErr = p.getItem(getCtx)
+			}()
+
+			// Wait for creation function to be called (it will block)
+			<-createdSignal
+			enableChannel = false
+			// Check stats - should show slot reservation
+			statsBeforeCancel := p.Stats()
+			t.Logf("Stats before cancel: Index=%d, Idle=%d, CreateInProgress=%d",
+				statsBeforeCancel.Index, statsBeforeCancel.Idle, statsBeforeCancel.CreateInProgress)
+
+			require.Equal(t, 1, statsBeforeCancel.CreateInProgress,
+				"Should have reserved a slot after removing idle item")
+
+			// Cancel the context
+			cancel()
+			// Wait for getItem to complete
+			wg.Wait()
+			blockCreation.Store(false)
+			// Should fail with context canceled
+			require.Error(t, getErr)
+			require.ErrorIs(t, getErr, context.Canceled,
+				"getItem should fail with context canceled: got %v", getErr)
+
+			// Check that createInProgress was cleaned up
+			finalStats := p.Stats()
+			t.Logf("Stats after cancel: Index=%d, Idle=%d, CreateInProgress=%d",
+				finalStats.Index, finalStats.Idle, finalStats.CreateInProgress)
+
+			require.Equal(t, 0, finalStats.CreateInProgress,
+				"createInProgress should be cleaned up after context cancellation")
+
+			// Verify pool can still operate at full capacity
+			item3 := mustGetItem(t, p)
+			require.NotNil(t, item3)
+
+			finalStats2 := p.Stats()
+			require.Equal(t, finalStats2.Index, 3,
+				"Pool should not exceed limit")
+		})
 	})
 }
