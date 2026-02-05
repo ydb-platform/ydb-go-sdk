@@ -2,7 +2,6 @@ package value
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
@@ -95,8 +94,6 @@ func Any(v Value) (any, error) { //nolint:funlen,gocyclo
 		return xstring.ToBytes(string(vv)), nil
 	case jsonDocumentValue:
 		return xstring.ToBytes(string(vv)), nil
-	case *decimalValue:
-		return decimal.ToDecimal(vv), nil
 	default:
 		return v, nil
 	}

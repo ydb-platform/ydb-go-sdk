@@ -1,3 +1,5 @@
+* Fixed a bug where the `internal/value.Any()` method was prematurely converting `*decimalValue` to `decimal.Decimal`, preventing users from implementing custom scanners that need to work with the underlying YDB value type.
+
 ## v3.126.3
 * Allowed `TxControl` in `database/sql` transaction execution when TxControl equals TxControl on BeginTx
 

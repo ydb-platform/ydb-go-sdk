@@ -1,6 +1,7 @@
 package value
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,7 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 )
+
+const (
+	testDecimalPrecision uint32 = 22
+	testDecimalScale     uint32 = 9
+)
+
+var testDecimalBytes = [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}
 
 func must[T any](v T, err error) T {
 	if err != nil {
@@ -298,4 +307,83 @@ func TestAny(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestAny_DecimalValue tests that Any() returns *decimalValue as-is
+// without converting it to decimal.Decimal. This is important for
+// custom scanners that need to work with the underlying YDB value type.
+// See issue #2018.
+func TestAny_DecimalValue(t *testing.T) {
+	// Create a decimal value
+	decVal := DecimalValue(testDecimalBytes, testDecimalPrecision, testDecimalScale)
+
+	// Call Any() and verify it returns the decimalValue as-is
+	result, err := Any(decVal)
+	require.NoError(t, err)
+
+	// The result should be *decimalValue, not decimal.Decimal
+	_, ok := result.(*decimalValue)
+	require.True(t, ok, "Any() should return *decimalValue as-is, not convert to decimal.Decimal")
+
+	// Verify it's the same value
+	require.Equal(t, decVal, result)
+}
+
+// TestAny_DecimalValue_Optional tests that Any() returns *decimalValue as-is
+// even when wrapped in an optional value.
+func TestAny_DecimalValue_Optional(t *testing.T) {
+	// Create a decimal value wrapped in optional
+	decVal := DecimalValue(testDecimalBytes, testDecimalPrecision, testDecimalScale)
+	optDecVal := OptionalValue(decVal)
+
+	// Call Any() and verify it returns the decimalValue as-is
+	result, err := Any(optDecVal)
+	require.NoError(t, err)
+
+	// The result should be *decimalValue, not decimal.Decimal
+	_, ok := result.(*decimalValue)
+	require.True(t, ok, "Any() should return *decimalValue as-is even when wrapped in optional")
+
+	// Verify it's the same value
+	require.Equal(t, decVal, result)
+}
+
+// TestAny_DecimalValue_CustomScanner simulates the use case from issue #2018
+// where a custom scanner needs to check if the value is a Value type and
+// use decimal.ToDecimal() to convert it.
+func TestAny_DecimalValue_CustomScanner(t *testing.T) {
+	// Create a decimal value
+	decVal := DecimalValue(testDecimalBytes, testDecimalPrecision, testDecimalScale)
+
+	// Call Any() to get the result
+	result, err := Any(decVal)
+	require.NoError(t, err)
+
+	// Simulate custom scanner's castToDecimal function from issue #2018
+	castToDecimal := func(x any) (*decimal.Decimal, error) {
+		// First check if it implements decimal.Interface
+		v, ok := x.(decimal.Interface)
+		if ok {
+			// If it implements decimal.Interface, we can use decimal.ToDecimal
+			return decimal.ToDecimal(v), nil
+		}
+
+		// Otherwise, check if it's already a decimal.Decimal
+		dt, ok := x.(decimal.Decimal)
+		if !ok {
+			return nil, fmt.Errorf("cannot cast %T to decimal", x)
+		}
+
+		return &dt, nil
+	}
+
+	// The custom scanner should be able to cast the result
+	decimalResult, err := castToDecimal(result)
+	require.NoError(t, err)
+	require.NotNil(t, decimalResult)
+
+	// Verify the decimal has the correct properties
+	require.Equal(t, testDecimalPrecision, decimalResult.Precision)
+	require.Equal(t, testDecimalScale, decimalResult.Scale)
+	require.Equal(t, testDecimalBytes, decimalResult.Bytes)
 }
