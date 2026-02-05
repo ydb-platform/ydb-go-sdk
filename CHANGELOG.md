@@ -1,3 +1,5 @@
+* Allowed `TxControl` in `database/sql` transaction execution when TxControl equals TxControl on BeginTx
+
 ## v3.126.2
 * Added support for custom types derived from primitive types in `database/sql` driver
 

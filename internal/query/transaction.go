@@ -250,20 +250,40 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 }
 
 func (tx *Transaction) executeSettings(opts ...options.Execute) (_ executeSettings, finalErr error) {
+	filteredOpts := make([]options.Execute, 0, len(opts))
 	for _, opt := range opts {
 		if opt == nil {
 			return nil, xerrors.WithStackTrace(errNilOption)
 		}
 		if _, has := opt.(options.ExecuteNoTx); has {
+			// ExecuteNoTx options are normally not allowed on transactions.
+			// However, if the option is a TxControl and its value matches the
+			// transaction's TxControl settings used to begin the transaction,
+			// we allow it but filter it out (since we'll use tx.txControl() instead).
+			// TxControlOption is defined as type TxControlOption tx.Control
+			if txControlOpt, ok := opt.(*options.TxControlOption); ok {
+				providedControl := (*baseTx.Control)(txControlOpt)
+				// Compare against the original txSettings used to begin the transaction,
+				// not against the current txControl() which may use TxID
+				expectedControl := baseTx.NewControl(baseTx.BeginTx(tx.txSettings...))
+
+				if providedControl.Equal(expectedControl) {
+					// Matching TxControl - skip it and continue (don't add to filteredOpts)
+					continue
+				}
+			}
+
 			return nil, xerrors.WithStackTrace(
 				fmt.Errorf("%T: %w", opt, ErrOptionNotForTxExecute),
 			)
 		}
+		// Add non-ExecuteNoTx options to filtered list
+		filteredOpts = append(filteredOpts, opt)
 	}
 
 	return options.ExecuteSettings(append([]options.Execute{
 		options.WithTxControl(tx.txControl()),
-	}, opts...)...), nil
+	}, filteredOpts...)...), nil
 }
 
 func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Execute) (_ query.Result, finalErr error) {
