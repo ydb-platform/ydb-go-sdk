@@ -145,8 +145,9 @@ func (s *Session) Begin(
 	}
 
 	return &Transaction{
-		LazyID: baseTx.ID(txID),
-		s:      s,
+		LazyID:     baseTx.ID(txID),
+		txSettings: txSettings,
+		s:          s,
 	}, nil
 }
 
