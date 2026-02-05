@@ -1,4 +1,4 @@
-* Fixes a bug where the `internal/value.Any()` method was prematurely converting `*decimalValue` to `decimal.Decimal`, preventing users from implementing custom scanners that need to work with the underlying YDB value type.
+* Fixed a bug where the `internal/value.Any()` method was prematurely converting `*decimalValue` to `decimal.Decimal`, preventing users from implementing custom scanners that need to work with the underlying YDB value type.
 
 ## v3.126.2
 * Added support for custom types derived from primitive types in `database/sql` driver
