@@ -12,6 +12,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 )
 
+const (
+	testDecimalPrecision uint32 = 22
+	testDecimalScale     uint32 = 9
+)
+
+var testDecimalBytes = [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}
+
 func must[T any](v T, err error) T {
 	if err != nil {
 		panic(err)
@@ -308,7 +315,7 @@ func TestAny(t *testing.T) {
 // See issue #2018.
 func TestAny_DecimalValue(t *testing.T) {
 	// Create a decimal value
-	decVal := DecimalValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9)
+	decVal := DecimalValue(testDecimalBytes, testDecimalPrecision, testDecimalScale)
 
 	// Call Any() and verify it returns the decimalValue as-is
 	result, err := Any(decVal)
@@ -326,7 +333,7 @@ func TestAny_DecimalValue(t *testing.T) {
 // even when wrapped in an optional value.
 func TestAny_DecimalValue_Optional(t *testing.T) {
 	// Create a decimal value wrapped in optional
-	decVal := DecimalValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9)
+	decVal := DecimalValue(testDecimalBytes, testDecimalPrecision, testDecimalScale)
 	optDecVal := OptionalValue(decVal)
 
 	// Call Any() and verify it returns the decimalValue as-is
@@ -346,7 +353,7 @@ func TestAny_DecimalValue_Optional(t *testing.T) {
 // use decimal.ToDecimal() to convert it.
 func TestAny_DecimalValue_CustomScanner(t *testing.T) {
 	// Create a decimal value
-	decVal := DecimalValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9)
+	decVal := DecimalValue(testDecimalBytes, testDecimalPrecision, testDecimalScale)
 
 	// Call Any() to get the result
 	result, err := Any(decVal)
@@ -376,7 +383,7 @@ func TestAny_DecimalValue_CustomScanner(t *testing.T) {
 	require.NotNil(t, decimalResult)
 
 	// Verify the decimal has the correct properties
-	require.Equal(t, uint32(22), decimalResult.Precision)
-	require.Equal(t, uint32(9), decimalResult.Scale)
-	require.Equal(t, [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, decimalResult.Bytes)
+	require.Equal(t, testDecimalPrecision, decimalResult.Precision)
+	require.Equal(t, testDecimalScale, decimalResult.Scale)
+	require.Equal(t, testDecimalBytes, decimalResult.Bytes)
 }
