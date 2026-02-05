@@ -265,50 +265,49 @@ func TestQueryDecimalParam(t *testing.T) {
 	})
 }
 
+// Define a custom decimal type similar to the one in issue #2018
+type MyDecimal struct {
+	Bytes     [16]byte
+	Precision uint32
+	Scale     uint32
+}
+
+func (dst *MyDecimal) Scan(x interface{}) error {
+	// This is the critical part from issue #2018:
+	// We need to check if x is a types.Value to use types.ToDecimal
+	v, ok := x.(types.Value)
+	if ok {
+		d, err := types.ToDecimal(v)
+		if err != nil {
+			return err
+		}
+		if d == nil {
+			return fmt.Errorf("nil decimal from types.Value")
+		}
+		dst.Bytes = d.Bytes
+		dst.Precision = d.Precision
+		dst.Scale = d.Scale
+
+		return nil
+	}
+
+	// Fallback: check if it's already a decimal.Decimal
+	dt, ok := x.(decimal.Decimal)
+	if !ok {
+		return fmt.Errorf("cannot cast %T to decimal", x)
+	}
+
+	dst.Bytes = dt.Bytes
+	dst.Precision = dt.Precision
+	dst.Scale = dt.Scale
+
+	return nil
+}
+
 // TestIssue2018CustomDecimalScanner tests that custom decimal scanners work correctly
 // with both query service and table service. This reproduces the scenario from issue #2018
 // where a custom type implements sql.Scanner and needs to work with the underlying YDB value.
 func TestIssue2018CustomDecimalScanner(t *testing.T) {
-	// Define a custom decimal type similar to the one in issue #2018
-	type MyDecimal struct {
-		Bytes     [16]byte
-		Precision uint32
-		Scale     uint32
-	}
-
-	// Implement Scan method that needs to work with types.Value
-	scanFunc := func(dst *MyDecimal) func(x interface{}) error {
-		return func(x interface{}) error {
-			// This is the critical part from issue #2018:
-			// We need to check if x is a types.Value to use types.ToDecimal
-			v, ok := x.(types.Value)
-			if ok {
-				d, err := types.ToDecimal(v)
-				if err != nil {
-					return err
-				}
-				if d == nil {
-					return fmt.Errorf("nil decimal from types.Value")
-				}
-				dst.Bytes = d.Bytes
-				dst.Precision = d.Precision
-				dst.Scale = d.Scale
-				return nil
-			}
-
-			// Fallback: check if it's already a decimal.Decimal
-			dt, ok := x.(decimal.Decimal)
-			if !ok {
-				return fmt.Errorf("cannot cast %T to decimal", x)
-			}
-
-			dst.Bytes = dt.Bytes
-			dst.Precision = dt.Precision
-			dst.Scale = dt.Scale
-			return nil
-		}
-	}
-
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 
@@ -337,13 +336,8 @@ func TestIssue2018CustomDecimalScanner(t *testing.T) {
 			t.Run("CustomScannerWithCast", func(t *testing.T) {
 				row := db.QueryRowContext(ctx, `SELECT CAST("123.456" AS Decimal(22,9))`)
 
-				var result decimal.Decimal
-				err = row.Scan(&result)
-				require.NoError(t, err)
-
-				// Now simulate the custom scanner behavior
 				var myDecimal MyDecimal
-				err = scanFunc(&myDecimal)(result)
+				err = row.Scan(&myDecimal)
 				require.NoError(t, err)
 
 				require.Equal(t, uint32(22), myDecimal.Precision)
@@ -354,12 +348,8 @@ func TestIssue2018CustomDecimalScanner(t *testing.T) {
 			t.Run("CustomScannerWithDirectValue", func(t *testing.T) {
 				row := db.QueryRowContext(ctx, `SELECT Decimal("99.99", 22, 9)`)
 
-				var result decimal.Decimal
-				err = row.Scan(&result)
-				require.NoError(t, err)
-
 				var myDecimal MyDecimal
-				err = scanFunc(&myDecimal)(result)
+				err = row.Scan(&myDecimal)
 				require.NoError(t, err)
 
 				require.Equal(t, uint32(22), myDecimal.Precision)
@@ -370,12 +360,8 @@ func TestIssue2018CustomDecimalScanner(t *testing.T) {
 			t.Run("CustomScannerWithNegativeValue", func(t *testing.T) {
 				row := db.QueryRowContext(ctx, `SELECT Decimal("-5.33", 22, 9)`)
 
-				var result decimal.Decimal
-				err = row.Scan(&result)
-				require.NoError(t, err)
-
 				var myDecimal MyDecimal
-				err = scanFunc(&myDecimal)(result)
+				err = row.Scan(&myDecimal)
 				require.NoError(t, err)
 
 				require.Equal(t, uint32(22), myDecimal.Precision)
@@ -386,14 +372,10 @@ func TestIssue2018CustomDecimalScanner(t *testing.T) {
 			t.Run("CustomScannerWithOptionalValue", func(t *testing.T) {
 				row := db.QueryRowContext(ctx, `SELECT JUST(Decimal("42.01", 22, 9))`)
 
-				var result *decimal.Decimal
-				err = row.Scan(&result)
+				var myDecimal *MyDecimal
+				err = row.Scan(&myDecimal)
 				require.NoError(t, err)
-				require.NotNil(t, result)
-
-				var myDecimal MyDecimal
-				err = scanFunc(&myDecimal)(*result)
-				require.NoError(t, err)
+				require.NotNil(t, myDecimal)
 
 				require.Equal(t, uint32(22), myDecimal.Precision)
 				require.Equal(t, uint32(9), myDecimal.Scale)
