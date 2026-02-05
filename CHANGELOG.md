@@ -1,3 +1,4 @@
+## v3.126.3
 * Allowed `TxControl` in `database/sql` transaction execution when TxControl equals TxControl on BeginTx
 
 ## v3.126.2
