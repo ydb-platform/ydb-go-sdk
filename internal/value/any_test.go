@@ -345,38 +345,38 @@ func TestAny_DecimalValue_Optional(t *testing.T) {
 // where a custom scanner needs to check if the value is a Value type and
 // use decimal.ToDecimal() to convert it.
 func TestAny_DecimalValue_CustomScanner(t *testing.T) {
-// Create a decimal value
-decVal := DecimalValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9)
+	// Create a decimal value
+	decVal := DecimalValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9)
 
-// Call Any() to get the result
-result, err := Any(decVal)
-require.NoError(t, err)
+	// Call Any() to get the result
+	result, err := Any(decVal)
+	require.NoError(t, err)
 
-// Simulate custom scanner's castToDecimal function from issue #2018
-castToDecimal := func(x any) (*decimal.Decimal, error) {
-// First check if it implements decimal.Interface
-v, ok := x.(decimal.Interface)
-if ok {
-// If it implements decimal.Interface, we can use decimal.ToDecimal
-return decimal.ToDecimal(v), nil
-}
+	// Simulate custom scanner's castToDecimal function from issue #2018
+	castToDecimal := func(x any) (*decimal.Decimal, error) {
+		// First check if it implements decimal.Interface
+		v, ok := x.(decimal.Interface)
+		if ok {
+			// If it implements decimal.Interface, we can use decimal.ToDecimal
+			return decimal.ToDecimal(v), nil
+		}
 
-// Otherwise, check if it's already a decimal.Decimal
-dt, ok := x.(decimal.Decimal)
-if !ok {
-return nil, fmt.Errorf("cannot cast %T to decimal", x)
-}
+		// Otherwise, check if it's already a decimal.Decimal
+		dt, ok := x.(decimal.Decimal)
+		if !ok {
+			return nil, fmt.Errorf("cannot cast %T to decimal", x)
+		}
 
-return &dt, nil
-}
+		return &dt, nil
+	}
 
-// The custom scanner should be able to cast the result
-decimalResult, err := castToDecimal(result)
-require.NoError(t, err)
-require.NotNil(t, decimalResult)
+	// The custom scanner should be able to cast the result
+	decimalResult, err := castToDecimal(result)
+	require.NoError(t, err)
+	require.NotNil(t, decimalResult)
 
-// Verify the decimal has the correct properties
-require.Equal(t, uint32(22), decimalResult.Precision)
-require.Equal(t, uint32(9), decimalResult.Scale)
-require.Equal(t, [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, decimalResult.Bytes)
+	// Verify the decimal has the correct properties
+	require.Equal(t, uint32(22), decimalResult.Precision)
+	require.Equal(t, uint32(9), decimalResult.Scale)
+	require.Equal(t, [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, decimalResult.Bytes)
 }
