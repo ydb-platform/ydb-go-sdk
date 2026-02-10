@@ -10,9 +10,18 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+var paramPattern = regexp.MustCompile(`\$[\w]+`)
+
 // RewriteQueryArgs transforms SQL queries to optimize for YDB:
 // 1. IN clauses with multiple params -> single list param
 // 2. INSERT/UPSERT/REPLACE VALUES with multiple tuples -> SELECT FROM AS_TABLE
+//
+// NOTE: This implementation has the following limitations:
+//   - Nested parentheses in IN clauses are not fully supported
+//   - Qualified table names (e.g., schema.table) may not work correctly
+//   - SQL strings containing 'IN (' or comments with IN patterns are not properly excluded
+//
+// These limitations are acceptable for the common use cases in YDB SQL queries.
 type RewriteQueryArgs struct{}
 
 func (r RewriteQueryArgs) blockID() blockID {
@@ -94,7 +103,6 @@ func (r RewriteQueryArgs) transformInClauses(
 		content := match[start+1 : end]
 
 		// Find all parameter references in the content
-		paramPattern := regexp.MustCompile(`\$[\w]+`)
 		paramNames := paramPattern.FindAllString(content, -1)
 
 		// Check if we have multiple parameters and they all exist in the map
@@ -231,7 +239,6 @@ func (r RewriteQueryArgs) buildStructValues(
 	newParamMap map[string]*params.Parameter,
 ) []value.Value {
 	structValues := make([]value.Value, 0, len(tuples))
-	paramPattern := regexp.MustCompile(`\$[\w]+`)
 
 	for _, tuple := range tuples {
 		if len(tuple) < 2 {

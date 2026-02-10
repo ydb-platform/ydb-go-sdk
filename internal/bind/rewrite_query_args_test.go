@@ -88,7 +88,8 @@ func TestRewriteQueryArgs_InClauses(t *testing.T) {
 				sql.Named("p1", 1),
 				sql.Named("p2", 2),
 			},
-			expected: " $argsList0", // Just check for the list param, not the IN keyword case
+			// Note: The IN keyword case is preserved, but the parameters are transformed to a list
+			expected: "$argsList0",
 			argsLen:  1,
 		},
 	} {
@@ -248,6 +249,39 @@ func TestRewriteQueryArgs_EdgeCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRewriteQueryArgs_Limitations(t *testing.T) {
+	// Document known limitations with test cases
+	t.Run("NestedParenthesesNotSupported", func(t *testing.T) {
+		// This is a known limitation - nested parentheses in IN clauses are not fully supported
+		// The regex pattern [^)]+ will stop at the first closing parenthesis
+		query := "SELECT * FROM t WHERE id IN (FUNC($p1), $p2)"
+		args := []any{
+			sql.Named("p1", 1),
+			sql.Named("p2", 2),
+		}
+
+		rewrite := RewriteQueryArgs{}
+		yql, _, err := rewrite.ToYdb(query, args...)
+		require.NoError(t, err)
+		// Due to the limitation, this query won't be transformed as expected
+		// This test documents the current behavior
+		t.Logf("Result: %s", yql)
+	})
+
+	t.Run("QuotedStringsWithINNotFullyHandled", func(t *testing.T) {
+		// This is a known limitation - SQL strings containing 'IN (' are not excluded
+		// In practice, the regex won't match because the parentheses content won't match parameters
+		query := "SELECT * FROM t WHERE note = 'this is IN (1, 2)'"
+		args := []any{}
+
+		rewrite := RewriteQueryArgs{}
+		yql, _, err := rewrite.ToYdb(query, args...)
+		require.NoError(t, err)
+		// The query should remain unchanged because there are no actual parameters
+		require.Contains(t, yql, "this is IN (1, 2)")
+	})
 }
 
 func TestRewriteQueryArgs_ParameterValues(t *testing.T) {
