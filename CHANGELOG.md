@@ -1,3 +1,5 @@
+* Added `ydb.WithCommitTxContext(ctx)` to request commit along with query execution in database/sql transactions
+
 ## v3.126.4
 * Fixed a bug where the `internal/value.Any()` method was prematurely converting `*decimalValue` to `decimal.Decimal`, preventing users from implementing custom scanners that need to work with the underlying YDB value type.
 
