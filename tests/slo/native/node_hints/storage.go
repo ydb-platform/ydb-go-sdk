@@ -224,9 +224,7 @@ func (s *Storage) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (
 }
 
 func (s *Storage) CreateTable(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
+	// Use parent context (general test timeout) so YDB has time to become ready.
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			fmt.Println(fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount))
@@ -245,9 +243,7 @@ func (s *Storage) DropTable(ctx context.Context) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
+	// Use parent context (general test timeout) for cleanup.
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			return session.Exec(ctx,
