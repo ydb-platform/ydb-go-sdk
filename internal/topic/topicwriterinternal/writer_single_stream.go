@@ -202,6 +202,15 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 
 		switch m := mess.(type) {
 		case *rawtopicwriter.WriteResult:
+			logCtx := w.cfg.LogContext
+			trace.TopicOnWriterReceiveResult(
+				w.cfg.Tracer,
+				&logCtx,
+				w.cfg.reconnectorInstanceID,
+				w.SessionID,
+				m.PartitionID,
+				m,
+			)
 			if err = w.cfg.queue.AcksReceived(m.Acks); err != nil && !errors.Is(err, errCloseClosedMessageQueue) {
 				reason := xerrors.WithStackTrace(err)
 				closeCtx, closeCtxCancel := xcontext.WithCancel(ctx)
