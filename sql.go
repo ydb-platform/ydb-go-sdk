@@ -229,6 +229,13 @@ func WithNumericArgs() QueryBindConnectorOption {
 	return xsql.WithQueryBind(bind.NumericArgs{})
 }
 
+// WithRewriteQueryArgs enables automatic query rewriting for YDB optimization:
+// 1. IN clauses with multiple parameters are transformed into a single list parameter
+// 2. INSERT/UPSERT/REPLACE VALUES with multiple tuples are transformed into SELECT FROM AS_TABLE
+func WithRewriteQueryArgs() QueryBindConnectorOption {
+	return xsql.WithQueryBind(bind.RewriteQueryArgs{})
+}
+
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
 	return xsql.WithTableOptions(xtable.WithDefaultTxControl(txControl))
 }
