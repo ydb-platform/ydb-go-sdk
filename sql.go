@@ -106,6 +106,30 @@ func WithTxControl(ctx context.Context, txControl *tx.Control) context.Context {
 	return tx.WithTxControl(ctx, txControl)
 }
 
+// WithCommitTxContext modifies context to request commit along with the query execution.
+// When used inside a database/sql transaction, the next ExecContext or QueryContext call
+// will commit the transaction together with the query in a single RPC call.
+//
+// This is an optimization to reduce latency by combining Execute + Commit into one call.
+// After commit via context, the subsequent tx.Commit() or tx.Rollback() will be a no-op.
+//
+// Important: when using QueryContext with WithCommitTxContext, the server commits the
+// transaction during query execution. However, on the client side the transaction is marked
+// as completed only after the result rows are fully consumed (rows.Next() until false,
+// then rows.Close()). If tx.Commit() is called before rows are consumed, an extra
+// CommitTx RPC will be sent to the server (which is harmless but redundant).
+//
+// Example:
+//
+//	tx, _ := db.BeginTx(ctx, nil)
+//	tx.ExecContext(ydb.WithCommitTxContext(ctx), "INSERT INTO ...")
+//	// Transaction is already committed, tx.Commit() will be a no-op
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithCommitTxContext(ctx context.Context) context.Context {
+	return tx.WithCommitTx(ctx)
+}
+
 type ConnectorOption = xsql.Option
 
 type QueryBindConnectorOption interface {

@@ -8,6 +8,7 @@ type (
 	ctxTxControlKey     struct{}
 	ctxTxControlHookKey struct{}
 	ctxLazyTxKey        struct{}
+	ctxCommitTxKey      struct{}
 
 	txControlHook func(txControl *Control)
 )
@@ -43,4 +44,14 @@ func LazyTxFromContext(ctx context.Context, defaultValue bool) bool {
 	}
 
 	return defaultValue
+}
+
+func WithCommitTx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxCommitTxKey{}, true)
+}
+
+func CommitTxFromContext(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxCommitTxKey{}).(bool)
+
+	return ok && v
 }
