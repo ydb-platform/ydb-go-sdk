@@ -22,7 +22,7 @@ func Example_listOperations() {
 	for _, op := range operations.Operations {
 		fmt.Printf(" - operation %q:", op.ID)
 		fmt.Printf("   - ConsumedUnits %f", op.ConsumedUnits)
-		fmt.Printf("   - Ready %b", op.Ready)
+		fmt.Printf("   - Ready %v", op.Ready)
 		fmt.Printf("   - Status %q", op.Status)
 		fmt.Printf("   - State %q", op.Metadata.State)
 		fmt.Printf("   - Description %q", op.Metadata.Description)
