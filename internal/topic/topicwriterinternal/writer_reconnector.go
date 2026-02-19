@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
@@ -117,10 +118,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	if cfg.Connect == nil {
-		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
-			RawTopicWriterStream,
-			error,
-		) {
+		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error) {
 			return cfg.rawTopicClient.StreamWrite(xcontext.MergeContexts(ctx, cfg.LogContext), tracer)
 		}
 
@@ -515,14 +513,14 @@ func (w *WriterReconnector) needReceiveLastSeqNo() bool {
 
 func (w *WriterReconnector) connectWithTimeout(ctx context.Context) (stream RawTopicWriterStream, err error) {
 	defer func() {
-		p := recover()
-		if p != nil {
+		if p := recover(); p != nil {
 			stream = nil
 			err = xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: panic while connect to topic writer: %+v", p)))
 		}
 	}()
 
-	return w.cfg.Connect(ctx, w.cfg.Tracer)
+	stream, err = w.cfg.Connect(ctx, w.cfg.Tracer)
+	return stream, err
 }
 
 func (w *WriterReconnector) onAckReceived(count int) {
@@ -610,16 +608,21 @@ func (w *WriterReconnector) waitFirstInitResponse(ctx context.Context) error {
 }
 
 func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream) SingleStreamWriterConfig {
-	cfg := newSingleStreamWriterConfig(
+	var ep trace.EndpointInfo
+	if stream != nil {
+		if withEp, ok := stream.(interface{ Endpoint() endpoint.Endpoint }); ok {
+			ep = withEp.Endpoint()
+		}
+	}
+	return newSingleStreamWriterConfig(
 		w.cfg.WritersCommonConfig,
 		stream,
 		&w.queue,
 		w.encodersMap,
 		w.needReceiveLastSeqNo(),
 		w.writerInstanceID,
+		ep,
 	)
-
-	return cfg
 }
 
 func (w *WriterReconnector) GetSessionID() (sessionID string) {

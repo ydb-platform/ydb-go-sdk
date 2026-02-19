@@ -702,23 +702,25 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		)
 
 		return func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
-			if doneInfo.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "topic writer init stream done",
-					kv.Error(doneInfo.Error),
-					kv.String("topic", info.Topic),
-					kv.String("producer_id", info.ProducerID),
-					kv.String("writer_instance_id", info.WriterInstanceID),
-					kv.Latency(start),
-					kv.String("session_id", doneInfo.SessionID),
+			fields := []Field{
+				kv.String("topic", info.Topic),
+				kv.String("producer_id", info.ProducerID),
+				kv.String("writer_instance_id", info.WriterInstanceID),
+				kv.Latency(start),
+				kv.String("session_id", doneInfo.SessionID),
+			}
+			if doneInfo.Endpoint != nil {
+				fields = append(fields,
+					kv.Int64("node_id", int64(doneInfo.Endpoint.NodeID())),
+					kv.String("address", doneInfo.Endpoint.Address()),
+					kv.String("location", doneInfo.Endpoint.Location()),
 				)
+			}
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, DEBUG), "topic writer init stream done", fields...)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "topic writer init stream failed",
-					kv.Error(doneInfo.Error),
-					kv.String("topic", info.Topic),
-					kv.String("producer_id", info.ProducerID),
-					kv.String("writer_instance_id", info.WriterInstanceID),
-					kv.Latency(start),
-					kv.String("session_id", doneInfo.SessionID),
+					append(append(fields, kv.Error(doneInfo.Error)), kv.Version())...,
 				)
 			}
 		}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -36,7 +37,13 @@ type StreamWriter struct {
 	writtenMessagesCount int
 	sessionID            string
 	LogContext           *context.Context
+	// PeerEndpoint is the endpoint this stream is connected to (for logging).
+	PeerEndpoint endpoint.Endpoint
 }
+
+// Endpoint returns the endpoint this stream is connected to (for logging).
+// Not part of RawTopicWriterStream interface.
+func (w *StreamWriter) Endpoint() endpoint.Endpoint { return w.PeerEndpoint }
 
 //nolint:funlen
 func (w *StreamWriter) Recv() (ServerMessage, error) {
