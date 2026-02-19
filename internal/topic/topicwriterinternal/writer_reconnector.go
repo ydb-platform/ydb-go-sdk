@@ -118,7 +118,10 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	if cfg.Connect == nil {
-		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error) {
+		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
+			RawTopicWriterStream,
+			error,
+		) {
 			return cfg.rawTopicClient.StreamWrite(xcontext.MergeContexts(ctx, cfg.LogContext), tracer)
 		}
 
@@ -513,15 +516,14 @@ func (w *WriterReconnector) needReceiveLastSeqNo() bool {
 
 func (w *WriterReconnector) connectWithTimeout(ctx context.Context) (stream RawTopicWriterStream, err error) {
 	defer func() {
-		if p := recover(); p != nil {
+		p := recover()
+		if p != nil {
 			stream = nil
 			err = xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: panic while connect to topic writer: %+v", p)))
 		}
 	}()
 
-	stream, err = w.cfg.Connect(ctx, w.cfg.Tracer)
-
-	return stream, err
+	return w.cfg.Connect(ctx, w.cfg.Tracer)
 }
 
 func (w *WriterReconnector) onAckReceived(count int) {
@@ -616,7 +618,7 @@ func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream
 		}
 	}
 
-	return newSingleStreamWriterConfig(
+	cfg := newSingleStreamWriterConfig(
 		w.cfg.WritersCommonConfig,
 		stream,
 		&w.queue,
@@ -625,6 +627,8 @@ func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream
 		w.writerInstanceID,
 		ep,
 	)
+
+	return cfg
 }
 
 func (w *WriterReconnector) GetSessionID() (sessionID string) {
