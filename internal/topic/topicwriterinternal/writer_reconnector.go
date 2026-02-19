@@ -17,8 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -520,6 +520,7 @@ func (w *WriterReconnector) connectWithTimeout(ctx context.Context) (stream RawT
 	}()
 
 	stream, err = w.cfg.Connect(ctx, w.cfg.Tracer)
+
 	return stream, err
 }
 
@@ -614,6 +615,7 @@ func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream
 			ep = withEp.Endpoint()
 		}
 	}
+
 	return newSingleStreamWriterConfig(
 		w.cfg.WritersCommonConfig,
 		stream,
