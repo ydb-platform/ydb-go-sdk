@@ -10,9 +10,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/stats"
+	"google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -383,6 +385,10 @@ func invoke(
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return opID, issues, xerrors.WithStackTrace(err)
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil &&
+			(status.Code(err) == codes.Canceled || status.Code(err) == codes.DeadlineExceeded) {
+			return opID, issues, xerrors.WithStackTrace(ctxErr)
 		}
 
 		defer onTransportError(ctx, err)
