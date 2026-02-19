@@ -1,7 +1,5 @@
-## v3.126.6
-* Topic writer init stream logs now include endpoint (node_id, address, location) for the session — makes it easier to see on the server side which node is serving the writer
-
 ## v3.126.5
+* Added endpoint (node_id, address, location) to topic writer init stream logs
 * Invoke `OnWriterReceiveResult` trace callback when topic writer receives ack from server (enables client-side logging for sync write diagnostics)
 * Added `ydb.WithCommitTxContext(ctx)` to request commit along with query execution in database/sql transactions
 
