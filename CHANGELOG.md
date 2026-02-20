@@ -1,4 +1,7 @@
 * Added `endpoint` (`node_id`, `address`, `location`) to topic writer init stream logs
+
+## v3.127.0
+* Changed behaviour of `table.Client` and `query.Client` internal session pool. When `ydb.WithPreferredNodeID` is set and there is no idle session on preferred node, the pool closes most idle session to create a new one on the preferred node
 * Fixed a bug when sometimes in cases of context cancellation returner error was not `errors.Is(err, context.Canceled)`
 
 ## v3.126.5
