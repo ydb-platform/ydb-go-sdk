@@ -42,7 +42,6 @@ type StreamWriter struct {
 }
 
 // Endpoint returns the endpoint this stream is connected to (for logging).
-// Not part of RawTopicWriterStream interface.
 func (w *StreamWriter) Endpoint() endpoint.Endpoint { return w.PeerEndpoint }
 
 //nolint:funlen

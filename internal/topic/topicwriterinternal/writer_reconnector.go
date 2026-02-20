@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -613,9 +612,7 @@ func (w *WriterReconnector) waitFirstInitResponse(ctx context.Context) error {
 func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream) SingleStreamWriterConfig {
 	var ep trace.EndpointInfo
 	if stream != nil {
-		if withEp, ok := stream.(interface{ Endpoint() endpoint.Endpoint }); ok {
-			ep = withEp.Endpoint()
-		}
+		ep = stream.Endpoint() // endpoint.Endpoint implements trace.EndpointInfo
 	}
 
 	cfg := newSingleStreamWriterConfig(

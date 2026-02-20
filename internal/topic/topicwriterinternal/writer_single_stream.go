@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -325,6 +326,7 @@ type RawTopicWriterStream interface {
 	Recv() (rawtopicwriter.ServerMessage, error)
 	Send(mess rawtopicwriter.ClientMessage) error
 	CloseSend() error
+	Endpoint() endpoint.Endpoint
 }
 
 func sendMessagesToStream(
