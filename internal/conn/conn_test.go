@@ -94,6 +94,28 @@ func TestConn(t *testing.T) {
 			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			require.Nil(t, response)
 		})
+		t.Run("ContextCanceledReturnsContextError", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(xtest.Context(t))
+			cancel()
+
+			ctrl := gomock.NewController(t)
+			cc := NewMockClientConnInterface(ctrl)
+			cc.EXPECT().Invoke(
+				gomock.Any(),
+				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
+				&Ydb_Discovery.WhoAmIRequest{},
+				&Ydb_Discovery.WhoAmIResponse{},
+			).Return(grpcStatus.Error(grpcCodes.Canceled, "rpc canceled"))
+
+			client := Ydb_Discovery_V1.NewDiscoveryServiceClient(&connMock{
+				cc,
+			})
+			response, err := client.WhoAmI(ctx, &Ydb_Discovery.WhoAmIRequest{})
+			require.Error(t, err)
+			require.ErrorIs(t, err, context.Canceled)
+			require.False(t, xerrors.IsTransportError(err, grpcCodes.Canceled))
+			require.Nil(t, response)
+		})
 		t.Run("OperationError", func(t *testing.T) {
 			ctx := xtest.Context(t)
 			ctrl := gomock.NewController(t)
