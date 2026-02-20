@@ -78,7 +78,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label str
 
 	misses := make(chan struct{})
 
-	var cnt atomic.Int32
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
 		ydb.WithSessionPoolSizeLimit((cfg.ReadRPS+cfg.WriteRPS)/10),
@@ -88,9 +87,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label str
 				return func(t trace.QueryPoolGetDoneInfo) {
 					if t.NodeHintInfo != nil {
 						if t.NodeHintInfo.SessionNodeID != t.NodeHintInfo.PreferredNodeID {
-							fmt.Printf("node hint info: %+v\n", t.NodeHintInfo)
-							cnt.Add(1)
-							fmt.Println(cnt.Load())
 							misses <- struct{}{}
 						}
 					}
