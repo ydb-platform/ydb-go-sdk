@@ -60,6 +60,7 @@ type WriterReconnectorConfig struct {
 	AutoSetSeqNo                 bool
 	AutoSetCreatedTime           bool
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
+	OnAckReceivedCallback        PublicOnAckReceivedCallback
 	RetrySettings                topic.RetrySettings
 
 	connectTimeout time.Duration
@@ -177,6 +178,7 @@ func newWriterReconnectorStopped(
 	}
 
 	res.queue.OnAckReceived = res.onAckReceived
+	res.queue.AckCallback = res.cfg.OnAckReceivedCallback
 
 	for codec, creator := range cfg.AdditionalEncoders {
 		res.encodersMap.AddEncoder(codec, creator)

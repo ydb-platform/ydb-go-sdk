@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -77,7 +78,8 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		return nil, err
 	}
 	if !meta.Status.IsSuccess() {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
+		opErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_StatusCode(meta.Status)))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %w", opErr))
 	}
 
 	switch v := grpcMsg.GetServerMessage().(type) {
