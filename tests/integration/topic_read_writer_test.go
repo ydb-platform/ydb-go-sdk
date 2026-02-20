@@ -522,12 +522,16 @@ func TestWriterFlushMessagesBeforeClose(t *testing.T) {
 	}
 }
 
+// Upstream YDB bug: server VERIFY crash on 10MB topic messages in nightly.
+// See docs/KNOWN_ISSUES.md and https://github.com/ydb-platform/ydb/issues/19449
+const upstreamIssueTopicLargeMessageNightly = "https://github.com/ydb-platform/ydb/issues/19449"
+
 func TestSendMessagesLargerThenGRPCLimit(t *testing.T) {
 	if version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
 		t.Skip()
 	}
 	if os.Getenv("YDB_VERSION") == "nightly" {
-		t.Skip("bug: https://github.com/ydb-platform/ydb/issues/19449")
+		t.Skip("skip on nightly: upstream bug (YDB server crash on 10MB topic messages): " + upstreamIssueTopicLargeMessageNightly)
 	}
 	scope := newScope(t)
 
