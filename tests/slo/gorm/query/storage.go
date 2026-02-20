@@ -163,9 +163,6 @@ func (s *Storage) createTable(ctx context.Context) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
 	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).
 		Set("gorm:table_options", s.tableOptions).AutoMigrate(&generator.Row{})
 }

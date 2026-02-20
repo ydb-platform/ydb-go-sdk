@@ -58,7 +58,7 @@ func New() (*Config, error) {
 		}
 
 		cfg.Mode = CreateMode
-		cfg.Time = 30
+		cfg.Time = 300
 
 		fs.Uint64Var(&cfg.MinPartitionsCount,
 			"min-partitions-count", 6, "minimum amount of partitions in table")

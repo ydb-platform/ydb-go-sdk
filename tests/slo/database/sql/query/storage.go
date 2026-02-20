@@ -193,9 +193,6 @@ func (s *Storage) createTable(ctx context.Context) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
 	return retry.Do(ctx, s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ctx, s.createQuery)

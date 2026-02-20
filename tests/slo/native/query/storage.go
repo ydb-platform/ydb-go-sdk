@@ -207,9 +207,6 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 }
 
 func (s *Storage) CreateTable(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			return session.Exec(ctx,
