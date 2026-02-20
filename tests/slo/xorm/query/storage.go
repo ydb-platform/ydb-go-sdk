@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"slo/internal/config"
+	"slo/internal/generator"
 	"strconv"
 	"time"
 
@@ -15,9 +17,6 @@ import (
 	"xorm.io/xorm"
 	"xorm.io/xorm/core"
 	"xorm.io/xorm/log"
-
-	"slo/internal/config"
-	"slo/internal/generator"
 )
 
 type mapper struct {
@@ -176,9 +175,6 @@ func (s *Storage) createTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
 
 	return retry.Do(ctx, s.x.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
 		return s.x.Context(ctx).CreateTable(generator.Row{})

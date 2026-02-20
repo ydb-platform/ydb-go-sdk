@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slo/internal/config"
+	"slo/internal/generator"
 	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
@@ -15,9 +17,6 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	gormLogger "gorm.io/gorm/logger"
-
-	"slo/internal/config"
-	"slo/internal/generator"
 )
 
 const optionsTemplate = `
@@ -176,9 +175,6 @@ func (s *Storage) createTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
 
 	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).
 		Set("gorm:table_options", s.tableOptions).AutoMigrate(&generator.Row{})

@@ -5,17 +5,16 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slo/internal/config"
+	"slo/internal/generator"
+	"slo/internal/log"
+	"slo/internal/workers"
 	"sync"
 	"syscall"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
-
-	"slo/internal/config"
-	"slo/internal/generator"
-	"slo/internal/log"
-	"slo/internal/workers"
 )
 
 func init() { //nolint:gochecknoinits
@@ -91,7 +90,7 @@ func main() {
 	case config.CleanupMode:
 		err = s.dropTable(ctx)
 		if err != nil {
-			panic(fmt.Errorf("create table failed: %w", err))
+			panic(fmt.Errorf("drop table failed: %w", err))
 		}
 
 		log.Println("cleanup table ok")

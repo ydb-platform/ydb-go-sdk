@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"path"
+	"slo/internal/config"
+	"slo/internal/generator"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -12,9 +14,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"slo/internal/config"
-	"slo/internal/generator"
 )
 
 const (
@@ -203,9 +202,6 @@ func (s *Storage) createTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
 
 	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {

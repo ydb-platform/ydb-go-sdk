@@ -6,15 +6,14 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slo/internal/config"
+	"slo/internal/generator"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"slo/internal/config"
-	"slo/internal/generator"
 )
 
 type Storage struct {
@@ -207,9 +206,6 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 }
 
 func (s *Storage) CreateTable(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			return session.Exec(ctx,

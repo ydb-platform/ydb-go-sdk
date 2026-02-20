@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"slo/internal/config"
+	"slo/internal/generator"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -15,9 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"slo/internal/config"
-	"slo/internal/generator"
 )
 
 const createTableQuery = `
@@ -200,9 +199,6 @@ func (s *Storage) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (
 }
 
 func (s *Storage) CreateTable(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			fmt.Println(fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
