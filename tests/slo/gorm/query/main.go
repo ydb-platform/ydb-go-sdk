@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"slo/internal/config"
-	"slo/internal/generator"
-	"slo/internal/log"
-	"slo/internal/workers"
 	"sync"
 	"syscall"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
+
+	"slo/internal/config"
+	"slo/internal/generator"
+	"slo/internal/log"
+	"slo/internal/workers"
 )
 
 func init() { //nolint:gochecknoinits

@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"slo/internal/config"
-	"slo/internal/generator"
 	"strconv"
 	"time"
 
@@ -17,6 +15,9 @@ import (
 	"xorm.io/xorm"
 	"xorm.io/xorm/core"
 	"xorm.io/xorm/log"
+
+	"slo/internal/config"
+	"slo/internal/generator"
 )
 
 type mapper struct {

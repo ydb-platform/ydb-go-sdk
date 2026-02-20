@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"slo/internal/config"
-	"slo/internal/generator"
 	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
@@ -17,6 +15,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	gormLogger "gorm.io/gorm/logger"
+
+	"slo/internal/config"
+	"slo/internal/generator"
 )
 
 const optionsTemplate = `

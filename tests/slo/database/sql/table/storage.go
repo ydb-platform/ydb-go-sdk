@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"path"
-	"slo/internal/config"
-	"slo/internal/generator"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -14,6 +12,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
+	"slo/internal/config"
+	"slo/internal/generator"
 )
 
 const (

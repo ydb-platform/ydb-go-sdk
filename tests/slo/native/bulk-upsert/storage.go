@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"slo/internal/config"
-	"slo/internal/generator"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -17,6 +15,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
+	"slo/internal/config"
+	"slo/internal/generator"
 )
 
 const createTableQuery = `
