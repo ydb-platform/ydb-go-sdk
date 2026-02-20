@@ -85,6 +85,15 @@ jobs:
             slo_workload_write_max_rps: 100
             run_extra_args: '-batch-size=10'
             create_extra_args: '-min-partitions-count 10'
+          - id: session_node_hints
+            name: session-node-hints
+            path: ./native/session_node_hints
+            label: native/session_node_hints
+            slo_workload_read_max_rps: 1000
+            slo_workload_write_max_rps: 1
+            run_extra_args: '-batch-size=10'
+            create_extra_args: '-min-partitions-count 10'
+
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
@@ -188,7 +197,8 @@ jobs:
           workload_name: ${{ matrix.sdk.name }}
           workload_current_ref: ${{ github.head_ref || github.ref_name }}
           workload_baseline_ref: ${{ steps.baseline.outputs.ref }}
-          disable_compose_profiles: "${{ matrix.sdk.id == 'native_node_hints' && 'chaos' || '' }}"
+          # to disable chaos testing for node hint workloads
+          disable_compose_profiles: "${{ (matrix.sdk.id == 'native_node_hints' || matrix.sdk.id == 'session_node_hints') && 'chaos' || '' }}"
           metrics_yaml: |
             metrics:
               - name: node_hints_misses

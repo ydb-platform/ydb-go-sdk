@@ -191,7 +191,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
 			hintTrace := defaultTrace
 			var preferredID uint32
-			var sessionID uint32
 			hintTrace.OnGet = func(ctx *context.Context, call stack.Caller) func(
 				item any,
 				attempts int,
@@ -201,25 +200,25 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				return func(item any, attempts int, nodeHintInfo *trace.NodeHintInfo, err error) {
 					if nodeHintInfo != nil {
 						preferredID = nodeHintInfo.PreferredNodeID
-						sessionID = nodeHintInfo.SessionNodeID
 					}
 				}
 			}
-			nextNodeID := uint32(0)
 			var newItemCalled uint32
 			p := New[*testItem, testItem](rootCtx,
 				WithTrace[*testItem, testItem](defaultTrace),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					newItemCalled++
-					var (
-						nodeID = nextNodeID
-						v      = testItem{
-							v: 0,
-							onNodeID: func() uint32 {
+					v := testItem{
+						v: 0,
+						onNodeID: func() uint32 {
+							nodeID, has := endpoint.ContextNodeID(ctx)
+							if has {
 								return nodeID
-							},
-						}
-					)
+							}
+
+							return 0
+						},
+					}
 
 					return &v, nil
 				}),
@@ -231,14 +230,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.EqualValues(t, true, item.IsAlive())
 			mustPutItem(t, p, item)
 
-			nextNodeID = 32
-
 			item, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
 			require.NoError(t, err)
 			require.EqualValues(t, 32, item.NodeID())
 			mustPutItem(t, p, item)
-
-			nextNodeID = 33
 
 			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 33))
 			require.NoError(t, err)
@@ -288,8 +283,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			item, err = p.getItem(endpoint.WithNodeID(context.Background(), 100))
 			require.NoError(t, err)
 			require.EqualValues(t, 100, preferredID)
-			require.EqualValues(t, item.NodeID(), sessionID)
-			require.EqualValues(t, 3, newItemCalled)
+			require.EqualValues(t, 100, item.NodeID())
+			require.EqualValues(t, 4, newItemCalled)
 			_, _ = p.getItem(endpoint.WithNodeID(context.Background(), 32))
 			_, _ = p.getItem(endpoint.WithNodeID(context.Background(), 32))
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -298,34 +293,38 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			_, _ = p.getItem(endpoint.WithNodeID(ctx, 32))
 		})
 		t.Run("PreferredNodeTakenAndPoolFull", func(t *testing.T) {
-			var nextNodeID uint32 = 32
 			p := New[*testItem, testItem](rootCtx,
 				WithTrace[*testItem, testItem](defaultTrace),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
-					var (
-						nodeID = nextNodeID
-						v      = testItem{
-							v:        0,
-							onNodeID: func() uint32 { return nodeID },
-						}
-					)
+					v := testItem{
+						v: 0,
+						onNodeID: func() uint32 {
+							nodeID, has := endpoint.ContextNodeID(ctx)
+							if !has {
+								nodeID = 0
+							}
+
+							return nodeID
+						},
+					}
 
 					return &v, nil
 				}),
 				WithLimit[*testItem, testItem](2),
 			)
 
-			item1 := mustGetItem(t, p)
+			item1, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
+			require.NoError(t, err)
 			require.EqualValues(t, 32, item1.NodeID())
-			nextNodeID = 33
-			item2 := mustGetItem(t, p)
+			item2, err := p.getItem(endpoint.WithNodeID(context.Background(), 33))
+			require.NoError(t, err)
 			require.EqualValues(t, 33, item2.NodeID())
 
 			mustPutItem(t, p, item2)
 
 			item3, err := p.getItem(endpoint.WithNodeID(context.Background(), 32))
 			require.NoError(t, err)
-			require.EqualValues(t, 33, item3.NodeID())
+			require.EqualValues(t, 32, item3.NodeID())
 		})
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
 			var newItemCalled uint32
@@ -780,7 +779,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							time.Duration(r.Int64(int64(time.Second))),
 						)
 						defer childCancel()
-						s, err := p.createItemFunc(childCtx)
+						s, err := p.createItemFunc(childCtx, false)
 						if s == nil && err == nil {
 							errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
 						}
@@ -1249,6 +1248,361 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.Panics(t, func() {
 				_ = p.putItem(context.Background(), item)
 			})
+		})
+	})
+	t.Run("PreferredNodeID", func(t *testing.T) {
+		t.Run("AlwaysSatisfiedWhenIdleAvailable", func(t *testing.T) {
+			var createdCount int32
+
+			p := New[*testItem, testItem](rootCtx,
+				WithLimit[*testItem, testItem](3),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					idx := atomic.AddInt32(&createdCount, 1) - 1
+
+					return &testItem{
+						v: idx,
+						onNodeID: func() uint32 {
+							nodeID, has := endpoint.ContextNodeID(ctx)
+							if !has {
+								nodeID = 0
+							}
+
+							return nodeID
+						},
+					}, nil
+				}),
+			)
+			defer mustClose(t, p)
+
+			// Fill the pool with 3 items (nodeIDs: 0, 1, 2)
+			item0 := mustGetItem(t, p)
+			item1 := mustGetItem(t, p)
+			_ = mustGetItem(t, p)
+
+			// Put back items 0 and 1 to make them idle
+			mustPutItem(t, p, item0)
+			mustPutItem(t, p, item1)
+
+			item1, _ = p.getItem(endpoint.WithNodeID(context.Background(), 1))
+			item2, _ := p.getItem(endpoint.WithNodeID(context.Background(), 1))
+			require.Equal(t, uint32(1), item1.NodeID())
+			require.Equal(t, uint32(1), item2.NodeID())
+
+			// Pool should still be within limit
+			stats := p.Stats()
+			require.Equal(t, 3, stats.Limit)
+			require.LessOrEqual(t, stats.Index, 3)
+		})
+
+		t.Run("RemovesIdleToMakeSpace", func(t *testing.T) {
+			p := New[*testItem, testItem](rootCtx,
+				WithLimit[*testItem, testItem](2),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					nodeID, has := endpoint.ContextNodeID(ctx)
+					if !has {
+						nodeID = 0
+					}
+
+					return &testItem{
+						onNodeID: func() uint32 {
+							return nodeID
+						},
+					}, nil
+				}),
+			)
+			defer mustClose(t, p)
+
+			// Fill pool: 2 items with nodeIDs 0 and 1
+			item0 := mustGetItem(t, p)
+			_ = mustGetItem(t, p)
+
+			// Put back item0 (now idle)
+			mustPutItem(t, p, item0)
+
+			// Pool state: len=2, idle=1 (item0 with nodeID=0), busy=1 (item1)
+			// Try to get item with preferred nodeID=99 (non-existent)
+			// This should remove idle item and create new item with preferred nodeID
+			getCtx := endpoint.WithNodeID(context.Background(), 99)
+			item99, _ := p.getItem(getCtx)
+
+			// Item should have nodeID 99 (newly created with preferred)
+			require.Equal(t, uint32(99), item99.NodeID())
+
+			// Pool should not exceed limit
+			stats := p.Stats()
+			require.LessOrEqual(t, stats.Index, 2)
+		})
+
+		t.Run("PreferredNodeIDAllBusy", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				var idx uint32
+				p := New[*testItem, testItem](rootCtx,
+					WithLimit[*testItem, testItem](2),
+					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+						nodeID, has := endpoint.ContextNodeID(ctx)
+						if !has {
+							nodeID = idx
+						}
+						idx = idx + 1
+
+						return &testItem{
+							onNodeID: func() uint32 {
+								return nodeID
+							},
+						}, nil
+					}),
+				)
+				_ = mustGetItem(t, p)
+				_ = mustGetItem(t, p)
+
+				ctx := endpoint.WithNodeID(context.Background(), 3)
+				getCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+				defer cancel()
+				_, err := p.getItem(getCtx)
+				require.ErrorIs(t, err, errPoolIsOverflow)
+				mustClose(t, p)
+			})
+		})
+
+		t.Run("PreferredNotIDNotSatisfiedWhenWaitChannelUsed", func(t *testing.T) {
+			// This test exercises the branch where getItem receives an item from waitFromCh
+			// (the waiting channel queue) instead of creating a new item.
+			//
+			// Setup:
+			// - Pool with limit=2
+			// - Create function that can be blocked on demand (via sync.Cond)
+			// - Pre-create 2 items to fill the pool
+			//
+			// Flow:
+			// 1. Block item creation
+			// 2. Get both items (pool at capacity, can't create more)
+			// 3. Start waiter that tries getItem (will block in waitFromCh)
+			// 4. Put item1 back (triggers notifyAboutIdle -> sends to waitFromCh)
+			// 5. Waiter receives item1 from the waiting channel
+			// 6. Verify item came from waitFromCh, not from creation
+
+			mu := sync.Mutex{}
+			cond := sync.NewCond(&mu)
+			creationBlocked := true
+			itemID := atomic.Int32{}
+
+			p := New[*testItem, testItem](rootCtx,
+				WithLimit[*testItem, testItem](2),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					// Block creation until explicitly unblocked
+					mu.Lock()
+					for creationBlocked {
+						cond.Wait()
+					}
+					mu.Unlock()
+
+					id := itemID.Add(1)
+					nodeID, has := endpoint.ContextNodeID(ctx)
+					if !has {
+						nodeID = uint32(id)
+					}
+
+					return &testItem{
+						v: id,
+						onNodeID: func() uint32 {
+							return nodeID
+						},
+					}, nil
+				}),
+			)
+
+			// First, enable creation temporarily to pre-create the initial items
+			mu.Lock()
+			creationBlocked = false
+			cond.Broadcast()
+			mu.Unlock()
+
+			// Get the first 2 items (this will create them since pool is empty)
+			item0 := mustGetItem(t, p)
+			item1 := mustGetItem(t, p)
+
+			// Now block creation again for the test
+			mu.Lock()
+			creationBlocked = true
+			mu.Unlock()
+
+			// Pool is now at capacity (2/2) with both items in use
+			// Any new getItem attempt will:
+			// 1. Try to create (will block because creationBlocked=true)
+			// 2. Enter waitFromCh and wait for an item to be returned
+
+			getCtx := endpoint.WithNodeID(context.Background(), 3)
+
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+			var receivedItem *testItem
+			var getErr error
+
+			// Goroutine 1: Waiter that will block in waitFromCh
+			go func() {
+				defer wg.Done()
+				// This will block:
+				// 1. createItemFunc blocks waiting for signal
+				// 2. No idle items available
+				// 3. Enters waitFromCh and waits in select statement
+				receivedItem, getErr = p.getItem(getCtx)
+			}()
+
+			// Goroutine 2: Put item1 back while waiter is in waitFromCh
+			go func() {
+				defer wg.Done()
+				// Wait to ensure waiter is blocked in waitFromCh
+				time.Sleep(100 * time.Millisecond)
+
+				// Put item1 back into the pool
+				// This triggers notifyAboutIdle which:
+				// 1. Iterates through p.waitQ (waiting goroutines)
+				// 2. Sends item1 to the first waiter's channel
+				// 3. Waiter's select statement receives the item
+				finalErr := p.putItem(context.Background(), item1)
+				require.NoError(t, finalErr)
+			}()
+
+			wg.Wait()
+
+			require.NoError(t, getErr)
+			require.NotNil(t, receivedItem)
+
+			require.Equal(t, item1.v, receivedItem.v,
+				"Should receive the exact item that was put back (item1)")
+			require.NotEqual(t,
+				uint32(3),
+				receivedItem.NodeID(),
+				"Item from pool doesn't have requested preferred nodeID - it came from waitFromCh, not creation",
+			)
+
+			mustPutItem(t, p, receivedItem)
+			mustPutItem(t, p, item0)
+			mustClose(t, p)
+		})
+
+		t.Run("ContextCanceledAfterSlotReservation", func(t *testing.T) {
+			// This test exibits the branch where context is canceled after
+			// reserving a slot in the session pool (p.createInProgress++)
+			// for a preferred node, but before the item is successfully created.
+			// Test ensures that the createInProgress counter is properly
+			// decremented in this scenario to avoid leaking the reservation.
+
+			blockCreation := atomic.Bool{}
+			createdSignal := make(chan struct{})
+			itemIDCounter := atomic.Int32{}
+			enableChannel := false
+			blockCreation.Store(false)
+
+			p := New[*testItem, testItem](rootCtx,
+				WithLimit[*testItem, testItem](3),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					if enableChannel {
+						createdSignal <- struct{}{}
+					}
+					for {
+						select {
+						case <-ctx.Done():
+							return nil, ctx.Err()
+						default:
+						}
+						if !blockCreation.Load() {
+							break
+						}
+					}
+					// Check if context was canceled
+					id := itemIDCounter.Add(1)
+					nodeID, has := endpoint.ContextNodeID(ctx)
+					if !has {
+						nodeID = uint32(id)
+					}
+
+					return &testItem{
+						v: id,
+						onNodeID: func() uint32 {
+							return nodeID
+						},
+					}, nil
+				}),
+				WithTrace[*testItem, testItem](defaultTrace),
+			)
+			defer mustClose(t, p)
+
+			// Pre-fill the pool to capacity (3 items)
+			// Get 3 items to fill the pool
+			_ = mustGetItem(t, p)
+			_ = mustGetItem(t, p)
+			item2 := mustGetItem(t, p)
+
+			// Put back 1 item to make them idle, keep 1 busy
+			mustPutItem(t, p, item2)
+
+			// Verify initial state
+			initialStats := p.Stats()
+			require.Equal(t, 3, initialStats.Index, "Pool should have 3 items")
+			require.Equal(t, 1, initialStats.Idle, "Should have 1 idle item")
+			require.Equal(t, 0, initialStats.CreateInProgress, "No creation in progress initially")
+
+			// Block future creations
+			blockCreation.Store(true)
+
+			// Request item with preferred nodeID that doesn't exist (99)
+			// Pool state: Index=3 (full), Idle=1
+			// Flow:
+			// - removeIdleByNodeID(99) → nil (doesn't exist)
+			// - len(index) + createInProgress < limit → 3 + 0 < 3 → false
+			// - removeFirstIdle() → removes the idle item
+			// - hasPreferredNodeID && idle != nil → increment createInProgress
+
+			getCtx := endpoint.WithNodeID(context.Background(), 99)
+			getCtx, cancel := context.WithCancel(getCtx)
+
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			var getErr error
+			enableChannel = true
+			// Start getItem in background
+			go func() {
+				defer wg.Done()
+				_, getErr = p.getItem(getCtx)
+			}()
+
+			// Wait for creation function to be called (it will block)
+			<-createdSignal
+			enableChannel = false
+			// Check stats - should show slot reservation
+			statsBeforeCancel := p.Stats()
+			t.Logf("Stats before cancel: Index=%d, Idle=%d, CreateInProgress=%d",
+				statsBeforeCancel.Index, statsBeforeCancel.Idle, statsBeforeCancel.CreateInProgress)
+
+			require.Equal(t, 1, statsBeforeCancel.CreateInProgress,
+				"Should have reserved a slot after removing idle item")
+
+			// Cancel the context
+			cancel()
+			// Wait for getItem to complete
+			wg.Wait()
+			blockCreation.Store(false)
+			// Should fail with context canceled
+			require.Error(t, getErr)
+			require.ErrorIs(t, getErr, context.Canceled,
+				"getItem should fail with context canceled: got %v", getErr)
+
+			// Check that createInProgress was cleaned up
+			finalStats := p.Stats()
+			t.Logf("Stats after cancel: Index=%d, Idle=%d, CreateInProgress=%d",
+				finalStats.Index, finalStats.Idle, finalStats.CreateInProgress)
+
+			require.Equal(t, 0, finalStats.CreateInProgress,
+				"createInProgress should be cleaned up after context cancellation")
+
+			// Verify pool can still operate at full capacity
+			item3 := mustGetItem(t, p)
+			require.NotNil(t, item3)
+
+			finalStats2 := p.Stats()
+			require.Equal(t, finalStats2.Index, 3,
+				"Pool should not exceed limit")
 		})
 	})
 }

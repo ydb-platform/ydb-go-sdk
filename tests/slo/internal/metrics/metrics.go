@@ -270,7 +270,7 @@ func (m *Metrics) ReportNodeHintMisses(val int64) {
 	}
 }
 
-func (j Span) Finish(err error, attempts int) {
+func (j Span) Finish(err error, attempts int, missed bool) {
 	if j.m.meter == nil {
 		return
 	}
@@ -289,6 +289,11 @@ func (j Span) Finish(err error, attempts int) {
 	j.m.operationsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
 	j.m.retryAttemptsTotal.Add(j.m.ctx, int64(attempts), otelmetric.WithAttributes(attrs...))
 
+	var miss int64
+	if missed {
+		miss = 1
+	}
+	j.m.nodeHintMissesPresent.Add(j.m.ctx, miss)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			j.m.timeoutsTotal.Add(j.m.ctx, 1, otelmetric.WithAttributes(attrs...))
