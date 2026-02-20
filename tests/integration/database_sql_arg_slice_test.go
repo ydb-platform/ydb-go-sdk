@@ -6,14 +6,20 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 func TestDatabaseSqlArgSlice(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "25.1") {
+		t.Skip()
+	}
+
 	scope := newScope(t)
 	db := scope.SQLDriverWithFolder()
 
