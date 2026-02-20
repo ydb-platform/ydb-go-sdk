@@ -2330,16 +2330,17 @@ func TopicOnWriterReconnect(t *Topic, c *context.Context, writerInstanceID strin
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnWriterInitStream(t *Topic, c *context.Context, writerInstanceID string, topic string, producerID string) func(sessionID string, _ error) {
+func TopicOnWriterInitStream(t *Topic, c *context.Context, writerInstanceID string, topic string, producerID string) func(sessionID string, endpoint EndpointInfo, _ error) {
 	var p TopicWriterInitStreamStartInfo
 	p.Context = c
 	p.WriterInstanceID = writerInstanceID
 	p.Topic = topic
 	p.ProducerID = producerID
 	res := t.onWriterInitStream(p)
-	return func(sessionID string, e error) {
+	return func(sessionID string, endpoint EndpointInfo, e error) {
 		var p TopicWriterInitStreamDoneInfo
 		p.SessionID = sessionID
+		p.Endpoint = endpoint
 		p.Error = e
 		res(p)
 	}
