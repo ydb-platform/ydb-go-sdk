@@ -6,4 +6,5 @@ const (
 	CreateMode AppMode = iota
 	CleanupMode
 	RunMode
+	RunAllMode
 )

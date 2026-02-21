@@ -45,55 +45,54 @@ jobs:
             name: database-sql-table
             path: ./database/sql/table
             label: database/sql/table
-            run_extra_args: ''
-            create_extra_args: ''
+            run_extra_args: ""
+            create_extra_args: ""
           - id: database_sql_query
             name: database-sql-query
             path: ./database/sql/query
             label: database/sql/query
-            run_extra_args: ''
-            create_extra_args: ''
+            run_extra_args: ""
+            create_extra_args: ""
           - id: native_query
             name: native-query
             path: ./native/query
             label: native/query
-            run_extra_args: ''
-            create_extra_args: ''
+            run_extra_args: ""
+            create_extra_args: ""
           - id: native_table
             name: native-table
             path: ./native/table
             label: native/table
-            run_extra_args: ''
-            create_extra_args: ''
+            run_extra_args: ""
+            create_extra_args: ""
           - id: native_table_over_query_service
             name: native-table-over-query-service
             path: ./native/table/over/query/service
             label: native/table/over/query/service
-            run_extra_args: ''
-            create_extra_args: ''
+            run_extra_args: ""
+            create_extra_args: ""
           - id: native_bulk_upsert
             name: native-bulk-upsert
             path: ./native/bulk-upsert
             label: native/bulk-upsert
-            run_extra_args: '-batch-size=10'
-            create_extra_args: ''
+            run_extra_args: "-batch-size=10"
+            create_extra_args: ""
           - id: native_node_hints
             name: native-node-hints
             path: ./native/node_hints
             label: native/node_hints
             slo_workload_read_max_rps: 100
             slo_workload_write_max_rps: 100
-            run_extra_args: '-batch-size=10'
-            create_extra_args: '-min-partitions-count 10'
+            run_extra_args: "-batch-size=10"
+            create_extra_args: "-min-partitions-count 10"
           - id: session_node_hints
             name: session-node-hints
             path: ./native/session_node_hints
             label: native/session_node_hints
             slo_workload_read_max_rps: 1000
             slo_workload_write_max_rps: 1
-            run_extra_args: '-batch-size=10'
-            create_extra_args: '-min-partitions-count 10'
-
+            run_extra_args: "-batch-size=10"
+            create_extra_args: "-min-partitions-count 10"
 
     concurrency:
       group: slo-${{ github.ref }}-${{ matrix.sdk.name }}
@@ -188,15 +187,32 @@ jobs:
             --job-name "${{ matrix.sdk.name }}" \
             --fallback-image "ydb-app-current"
 
-      - name: Initialize YDB SLO
-        id: ydb_slo
-        uses: ydb-platform/ydb-slo-action/init@13c687b7d4b2879da79dd12932dee0ed2b65dd1c
+      - name: Run SLO Tests
+        uses: ydb-platform/ydb-slo-action/init@v2
+        timeout-minutes: 15
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workload_name: ${{ matrix.sdk.name }}
+          workload_duration: ${{ inputs.slo_workload_duration_seconds || '600' }}
           workload_current_ref: ${{ github.head_ref || github.ref_name }}
+          workload_current_image: ydb-app-current
+          workload_current_command: >-
+            all grpc://ydb:2136 /Root/testdb
+            ${{ matrix.sdk.create_extra_args }}
+            ${{ matrix.sdk.run_extra_args }}
+            --time ${{ inputs.slo_workload_duration_seconds || '600' }}
+            --read-rps ${{ matrix.sdk.slo_workload_read_max_rps || inputs.slo_workload_read_max_rps || '1000' }}
+            --write-rps ${{ matrix.sdk.slo_workload_write_max_rps || inputs.slo_workload_write_max_rps || '100' }}
           workload_baseline_ref: ${{ steps.baseline.outputs.ref }}
+          workload_baseline_image: ydb-app-baseline
+          workload_baseline_command: >-
+            all grpc://ydb:2136 /Root/testdb
+            ${{ matrix.sdk.create_extra_args }}
+            ${{ matrix.sdk.run_extra_args }}
+            --time ${{ inputs.slo_workload_duration_seconds || '600' }}
+            --read-rps ${{ matrix.sdk.slo_workload_read_max_rps || inputs.slo_workload_read_max_rps || '1000' }}
+            --write-rps ${{ matrix.sdk.slo_workload_write_max_rps || inputs.slo_workload_write_max_rps || '100' }}
           # to disable chaos testing for node hint workloads
           disable_compose_profiles: "${{ (matrix.sdk.id == 'native_node_hints' || matrix.sdk.id == 'session_node_hints') && 'chaos' || '' }}"
           metrics_yaml: |
@@ -205,104 +221,18 @@ jobs:
                 type: instant
                 query: sum by(ref) (workload_node_hints_misses)
 
-      - name: Prepare SLO Database
-        run: |
-          echo "Preparing SLO database..."
-          CREATE_EXTRA_ARGS="${{ matrix.sdk.create_extra_args }}"
-          docker run --rm --network ydb_ydb-net \
-            --add-host "ydb:172.28.0.11" \
-            --add-host "ydb:172.28.0.12" \
-            --add-host "ydb:172.28.0.13" \
-            --add-host "ydb:172.28.0.99" \
-            ydb-app-current create grpc://ydb:2136 /Root/testdb $CREATE_EXTRA_ARGS
-
-      - name: Run SLO Tests (parallel)
-        timeout-minutes: 15
-        env:
-          DURATION: ${{ matrix.sdk.slo_workload_duration_seconds || 600 }}
-          READ_RPS: ${{ matrix.sdk.slo_workload_read_max_rps || 1000 }}
-          WRITE_RPS: ${{ matrix.sdk.slo_workload_write_max_rps || 1000 }}
-          RUN_EXTRA_ARGS: ${{ format('{0} -prometheus-endpoint {1}',matrix.sdk.run_extra_args,steps.ydb_slo.outputs.ydb-prometheus-url)}}
-        run: |
-          ARGS="run grpc://ydb:2136 /Root/testdb \
-            -otlp-endpoint prometheus:9090 \
-            -report-period 250 \
-            -time $DURATION \
-            -read-rps $READ_RPS \
-            -write-rps $WRITE_RPS \
-            -read-timeout 100 \
-            -write-timeout 100 \
-            $RUN_EXTRA_ARGS"
-
-          echo "Starting ydb-app-current..."
-          docker run -d \
-            --name ydb-app-current \
-            --network ydb_ydb-net \
-            --add-host "ydb:172.28.0.11" \
-            --add-host "ydb:172.28.0.12" \
-            --add-host "ydb:172.28.0.13" \
-            --add-host "ydb:172.28.0.99" \
-            ydb-app-current $ARGS
-
-          echo "Starting ydb-app-baseline..."
-          docker run -d \
-            --name ydb-app-baseline \
-            --network ydb_ydb-net \
-            --add-host "ydb:172.28.0.11" \
-            --add-host "ydb:172.28.0.12" \
-            --add-host "ydb:172.28.0.13" \
-            --add-host "ydb:172.28.0.99" \
-            ydb-app-baseline $ARGS
-
-          # Show initial logs
-          echo ""
-          echo "==================== INITIAL CURRENT LOGS ===================="
-          docker logs -n 15 ydb-app-current 2>&1 || echo "No current container"
-          echo ""
-          echo "==================== INITIAL BASELINE LOGS ===================="
-          docker logs -n 15 ydb-app-baseline 2>&1 || echo "No baseline container"
-          echo ""
-
-          # Wait for workloads to complete
-          echo "Waiting for workloads to complete (${DURATION}s)..."
-          sleep ${DURATION}
-
-          # Stop containers after workload duration and wait for graceful shutdown
-          echo "Stopping containers after ${DURATION}s..."
-          docker stop --timeout=30 ydb-app-current ydb-app-baseline 2>&1 || true
-
-          # Force kill if still running
-          docker kill ydb-app-current ydb-app-baseline 2>&1 || true
-
-          # Check exit codes
-          CURRENT_EXIT=$(docker inspect ydb-app-current --format='{{.State.ExitCode}}' 2>/dev/null || echo "1")
-          BASELINE_EXIT=$(docker inspect ydb-app-baseline --format='{{.State.ExitCode}}' 2>/dev/null || echo "0")
-
-          echo "Current container exit code: $CURRENT_EXIT"
-          echo "Baseline container exit code: $BASELINE_EXIT"
-
-          # Show final logs
-          echo ""
-          echo "==================== FINAL CURRENT LOGS ===================="
-          docker logs -n 15 ydb-app-current 2>&1 || echo "No current container"
-          echo ""
-          echo "==================== FINAL BASELINE LOGS ===================="
-          docker logs -n 15 ydb-app-baseline 2>&1 || echo "No baseline container"
-          echo ""
-
-          echo "SUCCESS: Workloads completed successfully"
-
-      - if: always()
-        name: Store logs
-        run: |
-          docker logs ydb-app-current > current.log 2>&1 || echo "No current container"
-          docker logs ydb-app-baseline > baseline.log 2>&1 || echo "No baseline container"
-
-      - if: always()
-        uses: actions/upload-artifact@v4
+  ydb-slo-report:
+    if: always()
+    needs: ydb-slo-action
+    runs-on: ubuntu-latest
+    name: Publish YDB SLO Report
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Publish YDB SLO Report
+        uses: ydb-platform/ydb-slo-action/report@v2
         with:
-          name: ${{matrix.sdk.name}}-logs
-          path: |
-            ./current.log
-            ./baseline.log
-          retention-days: 1
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_run_id: ${{ github.run_id }}
