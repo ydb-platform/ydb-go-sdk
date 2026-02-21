@@ -380,18 +380,23 @@ func (w *worker) run() {
 	}
 }
 
-func (w *Producer) Write(ctx context.Context, messages ...Message) error {
+func (w *Producer) Write(ctx context.Context, messages ...Message) (err error) {
 	for i := range messages {
-		if messages[i].Key != "" {
-			messages[i].PartitionID = w.partitionChooser.ChoosePartition(messages[i].Key)
+		switch {
+		case messages[i].PartitionID != 0:
+		case messages[i].Key != "":
+			messages[i].PartitionID, err = w.partitionChooser.ChoosePartition(messages[i].Key)
+			if err != nil {
+				return
+			}
 		}
 	}
 
-	for i := range messages {
-		w.worker.pushMessage(messages[i])
+	for _, message := range messages {
+		w.worker.pushMessage(message)
 	}
 
-	return nil
+	return
 }
 
 func (w *Producer) Close(ctx context.Context) error {
