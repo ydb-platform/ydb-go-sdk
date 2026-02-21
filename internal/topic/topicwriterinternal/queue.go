@@ -31,6 +31,7 @@ const (
 
 type messageQueue struct {
 	OnAckReceived func(count int)
+	AckCallback   func(seqNo int64)
 
 	hasNewMessages    empty.Chan
 	closedErr         error
@@ -163,6 +164,10 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 	for i := range acks {
 		if err := q.ackReceivedNeedLock(acks[i].SeqNo); err != nil {
 			return err
+		}
+
+		if q.AckCallback != nil {
+			q.AckCallback(acks[i].SeqNo)
 		}
 		ackReceivedCounter++
 	}
