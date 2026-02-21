@@ -106,6 +106,39 @@ func New() (*Config, error) {
 		fs.IntVar(&cfg.ShutdownTime, "shutdown-time", 30, "time to wait before force kill workers")
 
 		fs.IntVar(&cfg.BatchSize, "batch-size", 1, "batch size (used for bulk_upsert/read_rows operations)")
+	case "all":
+		if len(os.Args) < 4 {
+			fmt.Print(allHelp)
+
+			return nil, ErrWrongArgs
+		}
+
+		cfg.Mode = RunAllMode
+
+		fs.Uint64Var(&cfg.MinPartitionsCount,
+			"min-partitions-count", 6, "minimum amount of partitions in table")
+		fs.Uint64Var(&cfg.MaxPartitionsCount,
+			"max-partitions-count", 1000, "maximum amount of partitions in table")
+		fs.Uint64Var(&cfg.PartitionSize,
+			"partition-size", 1, "partition size in mb")
+
+		fs.Uint64Var(&cfg.InitialDataCount,
+			"initial-data-count", 1000, "amount of initially created rows")
+		fs.Uint64Var(&cfg.InitialDataCount,
+			"c", 1000, "amount of initially created rows (shorthand)")
+
+		fs.StringVar(&cfg.OTLPEndpoint, "otlp-endpoint", "", "OTLP HTTP endpoint for metrics")
+		fs.IntVar(&cfg.ReportPeriod, "report-period", 250, "metrics reporting period in milliseconds")
+		fs.StringVar(&cfg.PrometheusEndpoint, "prometheus-endpoint", "", "Prometheus endpoint")
+
+		fs.IntVar(&cfg.ReadRPS, "read-rps", 1000, "read RPS")
+		fs.IntVar(&cfg.WriteRPS, "write-rps", 100, "write RPS")
+		fs.IntVar(&cfg.ReadTimeout, "read-timeout", 10000, "read timeout milliseconds")
+
+		fs.IntVar(&cfg.Time, "time", 600, "run time in seconds")
+		fs.IntVar(&cfg.ShutdownTime, "shutdown-time", 30, "time to wait before force kill workers")
+
+		fs.IntVar(&cfg.BatchSize, "batch-size", 1, "batch size (used for bulk_upsert/read_rows operations)")
 	default:
 		fmt.Print(mainHelp)
 
