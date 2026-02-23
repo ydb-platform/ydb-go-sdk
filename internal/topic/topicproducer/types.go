@@ -2,8 +2,6 @@ package topicproducer
 
 import (
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
 type PartitionInfo struct {
@@ -20,18 +18,6 @@ const (
 	PartitionChooserStrategyBound PartitionChooserStrategy = iota
 	PartitionChooserStrategyHash
 )
-
-type KeyHasher func(key string) string
-
-type ProducerConfig struct {
-	topicwriterinternal.WriterReconnectorConfig
-
-	SubSessionIdleTimeout    time.Duration
-	PartitioningKeyHasher    KeyHasher
-	PartitionChooserStrategy PartitionChooserStrategy
-	ProducerIDPrefix         string
-	TopicPath                string
-}
 
 type subWriterWrapper struct {
 	subWriter

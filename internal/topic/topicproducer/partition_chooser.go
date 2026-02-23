@@ -26,10 +26,11 @@ type hashPartitionChooser struct {
 }
 
 func (c *hashPartitionChooser) ChoosePartition(key string) (int64, error) {
-	const seed = 111111
+	const seed = 0x9E3779B97F4A7C15
 
 	hasher := murmur3.New128()
-	hasher.Write([]byte(key))
+	hasher.Write([]byte(c.cfg.PartitioningKeyHasher(key)))
 	low, high := c.hasher.Sum128()
+
 	return int64((low + high*seed) % c.partitions), nil
 }
