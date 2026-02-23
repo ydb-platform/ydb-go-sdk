@@ -133,6 +133,9 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 	}
 
 	message := indexChain.Front()
+	if message.Value.Value.SeqNo != 0 && message.Value.Value.SeqNo != seqNo {
+		panic("seq no mismatch") // TODO: maybe not panic here?
+	}
 
 	writer, ok := w.subWriters[partitionID]
 	if ok {
@@ -153,7 +156,7 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 	}
 }
 
-func (w *worker) getSubWriter(partitionID int64) (subWriter, error) {
+func (w *worker) getSubWriter(partitionID int64) (*subWriterWrapper, error) {
 	writer, ok := w.subWriters[partitionID]
 	if !ok {
 		writer, err := w.createSubWriter(partitionID)
@@ -166,7 +169,6 @@ func (w *worker) getSubWriter(partitionID int64) (subWriter, error) {
 	}
 
 	w.idleWritersSupervisor.remove(partitionID)
-	writer.inFlightCount++
 
 	return writer, nil
 }
@@ -212,6 +214,7 @@ func (w *worker) step() error {
 			return fmt.Errorf("failed to write message: %w", err)
 		}
 
+		writer.inFlightCount++
 		sentMessages++
 	}
 
