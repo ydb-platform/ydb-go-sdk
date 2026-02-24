@@ -6,10 +6,17 @@ import (
 
 type PartitionInfo struct {
 	ID        int64
+	FromBound []byte
+	ToBound   []byte
+	ParentID  *int64
+	Splitted  bool
+	Children  []int64
+}
+
+type partitionShortInfo struct {
+	ID        int64
 	FromBound string
 	ToBound   string
-	ParentID  int64
-	Splitted  bool
 }
 
 type PartitionChooserStrategy uint8

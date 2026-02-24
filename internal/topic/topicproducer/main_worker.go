@@ -3,13 +3,16 @@ package topicproducer
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 type messagePtr *xlist.Element[Message]
@@ -35,6 +38,10 @@ type worker struct {
 	shutdown empty.Chan
 
 	currentSeqNo int64
+	partitions   map[int64]PartitionInfo
+	initDone     atomic.Bool
+
+	isAutoPartitioningEnabled bool
 }
 
 func newWorker(
@@ -54,6 +61,7 @@ func newWorker(
 		topicClient:      topicClient,
 		ctx:              ctx,
 		stop:             stop,
+		partitions:       make(map[int64]PartitionInfo),
 	}
 
 	w.idleWritersSupervisor = newIdleWritersSupervisor(ctx, w, cfg.SubSessionIdleTimeout)
@@ -62,6 +70,40 @@ func newWorker(
 	})
 
 	return w
+}
+
+func (w *worker) init() (err error) {
+	defer func() {
+		if err == nil {
+			w.initDone.Store(true)
+		}
+	}()
+
+	describeResult, err := w.topicClient.Describe(w.ctx, w.cfg.TopicPath)
+	if err != nil {
+		return
+	}
+
+	for _, partition := range describeResult.Partitions {
+		var parentID *int64
+		if len(partition.ParentPartitionIDs) > 0 {
+			parentID = &partition.ParentPartitionIDs[0]
+		}
+
+		w.partitions[partition.PartitionID] = PartitionInfo{
+			ID:        partition.PartitionID,
+			ParentID:  parentID,
+			Children:  partition.ChildPartitionIDs,
+			FromBound: partition.FromBound,
+			ToBound:   partition.ToBound,
+		}
+	}
+
+	w.isAutoPartitioningEnabled =
+		describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
+			topictypes.AutoPartitioningStrategyDisabled
+
+	return
 }
 
 func (w *worker) pushMessage(msg Message) error {
@@ -78,6 +120,11 @@ func (w *worker) pushMessage(msg Message) error {
 		list.PushBack(newElement)
 	}
 	w.pendingMessages.PushBack(newElement)
+
+	select {
+	case w.msgChan <- empty.Struct{}:
+	default:
+	}
 
 	return nil
 }
@@ -114,6 +161,13 @@ func (w *worker) createSubWriter(partitionID int64) (subWriter, error) {
 		topicoptions.WithWriterProducerID(w.getProducerID(partitionID)),
 		topicoptions.WithOnAckReceivedCallback(func(seqNo int64) {
 			w.onAckReceived(partitionID, seqNo)
+		}),
+		topicoptions.WithWriterCheckRetryErrorFunction(func(args topicoptions.CheckErrorRetryArgs) topicoptions.CheckErrorRetryResult {
+			if ydb.IsOperationErrorOverloaded(args.Error) {
+				w.onPartitionSplit(partitionID)
+				return topicoptions.CheckErrorRetryDecisionStop
+			}
+			return topicoptions.CheckErrorRetryDecisionDefault
 		}),
 	)
 	if err != nil {
@@ -154,6 +208,9 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 	if message.Value.Value.OnAckCallback != nil {
 		message.Value.Value.OnAckCallback()
 	}
+}
+
+func (w *worker) onPartitionSplit(partitionID int64) {
 }
 
 func (w *worker) getSubWriter(partitionID int64) (*subWriterWrapper, error) {
@@ -202,8 +259,9 @@ func (w *worker) step() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	var sentMessages int
-	for msg := w.pendingMessages.Front(); msg != nil; msg = msg.Next() {
+	for w.pendingMessages.Len() > 0 {
+		msg := w.pendingMessages.Front()
+
 		writer, err := w.getSubWriter(msg.Value.Value.PartitionID)
 		if err != nil {
 			return fmt.Errorf("failed to get sub writer: %w", err)
@@ -215,10 +273,6 @@ func (w *worker) step() error {
 		}
 
 		writer.inFlightCount++
-		sentMessages++
-	}
-
-	for range sentMessages {
 		w.pendingMessages.Remove(w.pendingMessages.Front())
 	}
 

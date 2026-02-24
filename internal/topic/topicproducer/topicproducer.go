@@ -46,6 +46,25 @@ func NewProducer(cfg *ProducerConfig, topicClient topic.Client) *Producer {
 	}
 
 	p.background.Start("main worker", func(ctx context.Context) {
+		err := p.worker.init()
+		if err != nil {
+			p.worker.err = err
+			p.worker.stop()
+			return
+		}
+
+		switch cfg.PartitionChooserStrategy {
+		case PartitionChooserStrategyBound:
+			p.partitionChooser, err = newBoundPartitionChooser(cfg, p.worker.partitions)
+			if err != nil {
+				p.worker.err = err
+				p.worker.stop()
+				return
+			}
+		case PartitionChooserStrategyHash:
+			p.partitionChooser = newHashPartitionChooser(cfg, uint64(len(p.worker.partitions)))
+		}
+
 		p.worker.run()
 	})
 
