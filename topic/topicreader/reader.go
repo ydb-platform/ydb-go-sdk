@@ -43,7 +43,7 @@ func (r *Reader) WaitInit(ctx context.Context) error {
 // ReadMessage read exactly one message
 // exactly one of message, error is nil
 func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
 	defer r.outCall(&r.readInFlyght)
@@ -67,7 +67,7 @@ type MessageContentUnmarshaler = topicreadercommon.PublicMessageContentUnmarshal
 // other reader by server.
 // Client code should continue work normally
 func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
-	if err := r.inCall(&r.commitInFlyght); err != nil {
+	if err := r.commitInCall(); err != nil {
 		return err
 	}
 	defer r.outCall(&r.commitInFlyght)
@@ -92,7 +92,7 @@ func (r *Reader) PopMessagesBatchTx(
 	resBatch *Batch,
 	resErr error,
 ) {
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
 	defer r.outCall(&r.readInFlyght)
@@ -134,7 +134,7 @@ type CommitRangeGetter = topicreadercommon.PublicCommitRangeGetter
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) (*Batch, error) {
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
 	defer r.outCall(&r.readInFlyght)
@@ -147,7 +147,7 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) 
 // exactly one of Batch, err is nil
 // if Batch is not nil - reader guarantee about all Batch.Messages are not nil
 func (r *Reader) ReadMessagesBatch(ctx context.Context, opts ...ReadBatchOption) (*Batch, error) {
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
 	defer r.outCall(&r.readInFlyght)
@@ -167,12 +167,12 @@ type ReadBatchOption = topicreaderinternal.PublicReadBatchOption
 func (r *Reader) Close(ctx context.Context) error {
 	// close must be non-concurrent with read and commit
 
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return err
 	}
 	defer r.outCall(&r.readInFlyght)
 
-	if err := r.inCall(&r.commitInFlyght); err != nil {
+	if err := r.commitInCall(); err != nil {
 		return err
 	}
 	defer r.outCall(&r.commitInFlyght)
@@ -180,12 +180,20 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.Close(ctx)
 }
 
-func (r *Reader) inCall(inFlight *atomic.Bool) error {
-	if inFlight.CompareAndSwap(false, true) {
+func (r *Reader) readInCall() error {
+	if r.readInFlyght.CompareAndSwap(false, true) {
 		return nil
 	}
 
-	return xerrors.WithStackTrace(ErrConcurrencyCall)
+	return xerrors.WithStackTrace(ErrConcurrencyCallRead)
+}
+
+func (r *Reader) commitInCall() error {
+	if r.commitInFlyght.CompareAndSwap(false, true) {
+		return nil
+	}
+
+	return xerrors.WithStackTrace(ErrConcurrencyCallCommit)
 }
 
 func (r *Reader) outCall(inFlight *atomic.Bool) {
