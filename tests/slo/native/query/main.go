@@ -103,7 +103,7 @@ func main() {
 	case config.CleanupMode:
 		err = s.DropTable(ctx)
 		if err != nil {
-			panic(fmt.Errorf("create table failed: %w", err))
+			panic(fmt.Errorf("drop table failed: %w", err))
 		}
 
 		log.Println("cleanup table ok")
