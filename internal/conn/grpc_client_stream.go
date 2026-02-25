@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -35,6 +36,12 @@ func (s *grpcClientStream) Trailer() metadata.MD {
 
 func (s *grpcClientStream) Context() context.Context {
 	return s.stream.Context()
+}
+
+// Endpoint returns the endpoint of the connection used by this stream.
+// It implements the optional interface used by topic writer for session logging.
+func (s *grpcClientStream) Endpoint() endpoint.Endpoint {
+	return s.parentConn.Endpoint()
 }
 
 func (s *grpcClientStream) CloseSend() (err error) {

@@ -546,6 +546,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterInitStreamDoneInfo struct {
 		SessionID string
+		Endpoint  EndpointInfo
 		Error     error
 	}
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -26,6 +27,7 @@ type SingleStreamWriterConfig struct {
 	encodersMap           *MultiEncoder
 	getLastSeqNum         bool
 	reconnectorInstanceID string
+	endpoint              trace.EndpointInfo
 }
 
 func newSingleStreamWriterConfig(
@@ -35,6 +37,7 @@ func newSingleStreamWriterConfig(
 	encodersMap *MultiEncoder,
 	getLastSeqNum bool,
 	reconnectorID string,
+	endpoint trace.EndpointInfo,
 ) SingleStreamWriterConfig {
 	return SingleStreamWriterConfig{
 		WritersCommonConfig:   common,
@@ -43,6 +46,7 @@ func newSingleStreamWriterConfig(
 		encodersMap:           encodersMap,
 		getLastSeqNum:         getLastSeqNum,
 		reconnectorInstanceID: reconnectorID,
+		endpoint:              endpoint,
 	}
 }
 
@@ -125,16 +129,16 @@ func (w *SingleStreamWriter) start() {
 }
 
 func (w *SingleStreamWriter) initStream() (err error) {
+	logCtx := w.cfg.LogContext
+	traceOnDone := trace.TopicOnWriterInitStream(
+		w.cfg.Tracer,
+		&logCtx,
+		w.cfg.reconnectorInstanceID,
+		w.cfg.topic,
+		w.cfg.producerID,
+	)
 	defer func() {
-		logCtx := w.cfg.LogContext
-		traceOnDone := trace.TopicOnWriterInitStream(
-			w.cfg.Tracer,
-			&logCtx,
-			w.cfg.reconnectorInstanceID,
-			w.cfg.topic,
-			w.cfg.producerID,
-		)
-		traceOnDone(w.SessionID, err)
+		traceOnDone(w.SessionID, w.cfg.endpoint, err)
 	}()
 
 	req := w.createInitRequest()
@@ -322,6 +326,7 @@ type RawTopicWriterStream interface {
 	Recv() (rawtopicwriter.ServerMessage, error)
 	Send(mess rawtopicwriter.ClientMessage) error
 	CloseSend() error
+	Endpoint() endpoint.Endpoint
 }
 
 func sendMessagesToStream(

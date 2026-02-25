@@ -9,6 +9,7 @@ package topicwriterinternal
 import (
 	reflect "reflect"
 
+	endpoint "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	rawtopicwriter "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -70,6 +71,44 @@ func (c *MockRawTopicWriterStreamCloseSendCall) Do(f func() error) *MockRawTopic
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockRawTopicWriterStreamCloseSendCall) DoAndReturn(f func() error) *MockRawTopicWriterStreamCloseSendCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Endpoint mocks base method.
+func (m *MockRawTopicWriterStream) Endpoint() endpoint.Endpoint {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Endpoint")
+	ret0, _ := ret[0].(endpoint.Endpoint)
+	return ret0
+}
+
+// Endpoint indicates an expected call of Endpoint.
+func (mr *MockRawTopicWriterStreamMockRecorder) Endpoint() *MockRawTopicWriterStreamEndpointCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Endpoint", reflect.TypeOf((*MockRawTopicWriterStream)(nil).Endpoint))
+	return &MockRawTopicWriterStreamEndpointCall{Call: call}
+}
+
+// MockRawTopicWriterStreamEndpointCall wrap *gomock.Call
+type MockRawTopicWriterStreamEndpointCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockRawTopicWriterStreamEndpointCall) Return(arg0 endpoint.Endpoint) *MockRawTopicWriterStreamEndpointCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockRawTopicWriterStreamEndpointCall) Do(f func() endpoint.Endpoint) *MockRawTopicWriterStreamEndpointCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockRawTopicWriterStreamEndpointCall) DoAndReturn(f func() endpoint.Endpoint) *MockRawTopicWriterStreamEndpointCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

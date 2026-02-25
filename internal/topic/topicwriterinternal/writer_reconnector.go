@@ -610,6 +610,11 @@ func (w *WriterReconnector) waitFirstInitResponse(ctx context.Context) error {
 }
 
 func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream) SingleStreamWriterConfig {
+	var ep trace.EndpointInfo
+	if stream != nil {
+		ep = stream.Endpoint() // endpoint.Endpoint implements trace.EndpointInfo
+	}
+
 	cfg := newSingleStreamWriterConfig(
 		w.cfg.WritersCommonConfig,
 		stream,
@@ -617,6 +622,7 @@ func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream
 		w.encodersMap,
 		w.needReceiveLastSeqNo(),
 		w.writerInstanceID,
+		ep,
 	)
 
 	return cfg
