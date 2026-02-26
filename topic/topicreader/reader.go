@@ -187,7 +187,7 @@ func (r *Reader) readInCall() error {
 		return nil
 	}
 
-	return xerrors.WithStackTrace(ErrConcurrencyCallRead)
+	return xerrors.WithStackTrace(errConcurrencyCallRead)
 }
 
 func (r *Reader) commitInCall() error {
@@ -195,7 +195,7 @@ func (r *Reader) commitInCall() error {
 		return nil
 	}
 
-	return xerrors.WithStackTrace(ErrConcurrencyCallCommit)
+	return xerrors.WithStackTrace(errConcurrencyCallCommit)
 }
 
 func (r *Reader) readOutCall()   { r.outCall(&r.readInFlyght) }

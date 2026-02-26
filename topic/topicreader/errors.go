@@ -12,21 +12,16 @@ import (
 // client side must check error with errors.Is
 var ErrUnexpectedCodec = topicreadercommon.ErrPublicUnexpectedCodec
 
-// ErrConcurrencyCall return if method on reader called in concurrency
-// client side must check error with errors.Is
+// ErrConcurrencyCall is returned when methods on [Reader] are called concurrently in a disallowed way.
+// See [Reader] for the concurrency matrix (which pairs of methods may run concurrently).
+// Client code must check the error with errors.Is.
 var ErrConcurrencyCall = xerrors.Wrap(errors.New("ydb: concurrency call denied"))
 
-// ErrConcurrencyCallRead is returned when read methods (ReadMessage, ReadMessagesBatch, etc.) are called concurrently.
-// See [Reader] for concurrency rules.
-// Client code must check the error with errors.Is.
-var ErrConcurrencyCallRead = fmt.Errorf(
+var errConcurrencyCallRead = fmt.Errorf(
 	"%w; possibly, you have read operations from concurrent goroutines", ErrConcurrencyCall,
 )
 
-// ErrConcurrencyCallCommit is returned when Commit is called concurrently.
-// See [Reader] for concurrency rules.
-// Client code must check the error with errors.Is.
-var ErrConcurrencyCallCommit = fmt.Errorf(
+var errConcurrencyCallCommit = fmt.Errorf(
 	"%w; possibly, you have commit operations from concurrent goroutines", ErrConcurrencyCall,
 )
 
