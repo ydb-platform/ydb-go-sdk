@@ -11,17 +11,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Reader allow to read message from YDB topics.
-// ReadMessage or ReadMessageBatch can call concurrency with Commit, other concurrency call is denied.
+// Reader reads messages from YDB topics.
+// ReadMessage or ReadMessagesBatch may run concurrently with Commit; all other concurrent calls are denied.
 //
-// In other words you can have one goroutine for read messages and one goroutine for commit messages.
+// In other words, you can have one goroutine for reading and one for committing.
 //
-// Concurrency table
-// | Method           | ReadMessage | ReadMessageBatch | Commit | Close |
-// | ReadMessage      |      -      |         -        |   +    | -     |
-// | ReadMessageBatch |      -      |         -        |   +    | -     |
-// | Commit           |      +      |         +        |   -    | -     |
-// | Close            |      -      |         -        |   -    | -     |
+// Concurrency matrix (row vs column: + = allowed concurrently, - = not allowed):
+//
+//	| Method           | ReadMessage | ReadMessageBatch | Commit | Close |
+//	| ---------------- | ----------- | ---------------- | ------ | ----- |
+//	| ReadMessage      | -           | -                | +      | -     |
+//	| ReadMessageBatch | -           | -                | +      | -     |
+//	| Commit           | +           | +                | -      | -     |
+//	| Close            | -           | -                | -      | -     |
 type Reader struct {
 	reader         topicreaderinternal.Reader
 	readInFlyght   atomic.Bool
@@ -46,7 +48,7 @@ func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
 	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	return r.reader.ReadMessage(ctx)
 }
@@ -70,7 +72,7 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 	if err := r.commitInCall(); err != nil {
 		return err
 	}
-	defer r.outCall(&r.commitInFlyght)
+	defer r.commitOutCall()
 
 	return r.reader.Commit(ctx, obj)
 }
@@ -95,7 +97,7 @@ func (r *Reader) PopMessagesBatchTx(
 	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	internalTx, err := tx.AsTransaction(transaction)
 	if err != nil {
@@ -137,7 +139,7 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) 
 	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	return r.reader.ReadMessageBatch(ctx, opts...)
 }
@@ -150,7 +152,7 @@ func (r *Reader) ReadMessagesBatch(ctx context.Context, opts ...ReadBatchOption)
 	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	return r.reader.ReadMessageBatch(ctx, opts...)
 }
@@ -170,12 +172,12 @@ func (r *Reader) Close(ctx context.Context) error {
 	if err := r.readInCall(); err != nil {
 		return err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	if err := r.commitInCall(); err != nil {
 		return err
 	}
-	defer r.outCall(&r.commitInFlyght)
+	defer r.commitOutCall()
 
 	return r.reader.Close(ctx)
 }
@@ -195,6 +197,9 @@ func (r *Reader) commitInCall() error {
 
 	return xerrors.WithStackTrace(ErrConcurrencyCallCommit)
 }
+
+func (r *Reader) readOutCall()   { r.outCall(&r.readInFlyght) }
+func (r *Reader) commitOutCall() { r.outCall(&r.commitInFlyght) }
 
 func (r *Reader) outCall(inFlight *atomic.Bool) {
 	if inFlight.CompareAndSwap(true, false) {
