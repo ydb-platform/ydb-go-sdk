@@ -11,17 +11,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Reader allow to read message from YDB topics.
-// ReadMessage or ReadMessageBatch can call concurrency with Commit, other concurrency call is denied.
+// Reader reads messages from YDB topics.
+// ReadMessage or ReadMessagesBatch may run concurrently with Commit; all other concurrent calls are denied.
 //
-// In other words you can have one goroutine for read messages and one goroutine for commit messages.
+// In other words, you can have one goroutine for reading and one for committing.
 //
-// Concurrency table
-// | Method           | ReadMessage | ReadMessageBatch | Commit | Close |
-// | ReadMessage      |      -      |         -        |   +    | -     |
-// | ReadMessageBatch |      -      |         -        |   +    | -     |
-// | Commit           |      +      |         +        |   -    | -     |
-// | Close            |      -      |         -        |   -    | -     |
+// Concurrency matrix (row vs column: + = allowed concurrently, - = not allowed):
+//
+//	| Method           | ReadMessage | ReadMessageBatch | Commit | Close |
+//	| ---------------- | ----------- | ---------------- | ------ | ----- |
+//	| ReadMessage      | -           | -                | +      | -     |
+//	| ReadMessageBatch | -           | -                | +      | -     |
+//	| Commit           | +           | +                | -      | -     |
+//	| Close            | -           | -                | -      | -     |
 type Reader struct {
 	reader         topicreaderinternal.Reader
 	readInFlyght   atomic.Bool
@@ -43,10 +45,10 @@ func (r *Reader) WaitInit(ctx context.Context) error {
 // ReadMessage read exactly one message
 // exactly one of message, error is nil
 func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	return r.reader.ReadMessage(ctx)
 }
@@ -67,10 +69,10 @@ type MessageContentUnmarshaler = topicreadercommon.PublicMessageContentUnmarshal
 // other reader by server.
 // Client code should continue work normally
 func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
-	if err := r.inCall(&r.commitInFlyght); err != nil {
+	if err := r.commitInCall(); err != nil {
 		return err
 	}
-	defer r.outCall(&r.commitInFlyght)
+	defer r.commitOutCall()
 
 	return r.reader.Commit(ctx, obj)
 }
@@ -92,10 +94,10 @@ func (r *Reader) PopMessagesBatchTx(
 	resBatch *Batch,
 	resErr error,
 ) {
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	internalTx, err := tx.AsTransaction(transaction)
 	if err != nil {
@@ -134,10 +136,10 @@ type CommitRangeGetter = topicreadercommon.PublicCommitRangeGetter
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) (*Batch, error) {
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	return r.reader.ReadMessageBatch(ctx, opts...)
 }
@@ -147,10 +149,10 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) 
 // exactly one of Batch, err is nil
 // if Batch is not nil - reader guarantee about all Batch.Messages are not nil
 func (r *Reader) ReadMessagesBatch(ctx context.Context, opts ...ReadBatchOption) (*Batch, error) {
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return nil, err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
 	return r.reader.ReadMessageBatch(ctx, opts...)
 }
@@ -167,26 +169,37 @@ type ReadBatchOption = topicreaderinternal.PublicReadBatchOption
 func (r *Reader) Close(ctx context.Context) error {
 	// close must be non-concurrent with read and commit
 
-	if err := r.inCall(&r.readInFlyght); err != nil {
+	if err := r.readInCall(); err != nil {
 		return err
 	}
-	defer r.outCall(&r.readInFlyght)
+	defer r.readOutCall()
 
-	if err := r.inCall(&r.commitInFlyght); err != nil {
+	if err := r.commitInCall(); err != nil {
 		return err
 	}
-	defer r.outCall(&r.commitInFlyght)
+	defer r.commitOutCall()
 
 	return r.reader.Close(ctx)
 }
 
-func (r *Reader) inCall(inFlight *atomic.Bool) error {
-	if inFlight.CompareAndSwap(false, true) {
+func (r *Reader) readInCall() error {
+	if r.readInFlyght.CompareAndSwap(false, true) {
 		return nil
 	}
 
-	return xerrors.WithStackTrace(ErrConcurrencyCall)
+	return xerrors.WithStackTrace(errConcurrencyCallRead)
 }
+
+func (r *Reader) commitInCall() error {
+	if r.commitInFlyght.CompareAndSwap(false, true) {
+		return nil
+	}
+
+	return xerrors.WithStackTrace(errConcurrencyCallCommit)
+}
+
+func (r *Reader) readOutCall()   { r.outCall(&r.readInFlyght) }
+func (r *Reader) commitOutCall() { r.outCall(&r.commitInFlyght) }
 
 func (r *Reader) outCall(inFlight *atomic.Bool) {
 	if inFlight.CompareAndSwap(true, false) {

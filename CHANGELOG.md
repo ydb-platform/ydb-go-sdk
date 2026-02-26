@@ -1,3 +1,5 @@
+* Topic reader: improved concurrency call errors
+
 ## v3.127.1
 * Added `endpoint` (`node_id`, `address`, `location`) to topic writer init stream logs
 
