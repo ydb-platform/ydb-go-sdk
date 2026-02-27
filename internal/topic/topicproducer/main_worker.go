@@ -3,7 +3,6 @@ package topicproducer
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
@@ -27,6 +26,8 @@ type worker struct {
 	cfg                   *ProducerConfig
 	mu                    xsync.Mutex
 
+	partitionChooser PartitionChooser
+
 	inFlightMessages      xlist.List[Message]
 	inFlightMessagesIndex map[int64]xlist.List[messagePtr]
 	pendingMessages       xlist.List[messagePtr]
@@ -37,9 +38,8 @@ type worker struct {
 	msgChan  empty.Chan
 	shutdown empty.Chan
 
-	currentSeqNo int64
-	partitions   map[int64]PartitionInfo
-	initDone     atomic.Bool
+	partitions map[int64]*PartitionInfo
+	initDone   chan struct{}
 
 	isAutoPartitioningEnabled bool
 }
@@ -61,7 +61,8 @@ func newWorker(
 		topicClient:      topicClient,
 		ctx:              ctx,
 		stop:             stop,
-		partitions:       make(map[int64]PartitionInfo),
+		partitions:       make(map[int64]*PartitionInfo),
+		initDone:         make(chan struct{}),
 	}
 
 	w.idleWritersSupervisor = newIdleWritersSupervisor(ctx, w, cfg.SubSessionIdleTimeout)
@@ -75,7 +76,7 @@ func newWorker(
 func (w *worker) init() (err error) {
 	defer func() {
 		if err == nil {
-			w.initDone.Store(true)
+			close(w.initDone)
 		}
 	}()
 
@@ -90,7 +91,7 @@ func (w *worker) init() (err error) {
 			parentID = &partition.ParentPartitionIDs[0]
 		}
 
-		w.partitions[partition.PartitionID] = PartitionInfo{
+		w.partitions[partition.PartitionID] = &PartitionInfo{
 			ID:        partition.PartitionID,
 			ParentID:  parentID,
 			Children:  partition.ChildPartitionIDs,
@@ -103,22 +104,65 @@ func (w *worker) init() (err error) {
 		describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
 			topictypes.AutoPartitioningStrategyDisabled
 
+	switch w.cfg.PartitionChooserStrategy {
+	case PartitionChooserStrategyBound:
+		w.partitionChooser, err = newBoundPartitionChooser(w.cfg, w.partitions)
+		if err != nil {
+			w.err = err
+			w.stop()
+			return
+		}
+	case PartitionChooserStrategyHash:
+		w.partitionChooser = newHashPartitionChooser(w.cfg, uint64(len(w.partitions)))
+	}
+
 	return
 }
 
-func (w *worker) pushMessage(msg Message) error {
+func (w *worker) choosePartition(msg Message) (partitionID int64, err error) {
+	switch {
+	case msg.PartitionID != 0:
+	case msg.Key != "":
+		partitionID, err = w.partitionChooser.ChoosePartition(msg.Key)
+		if err != nil {
+			return
+		}
+	case w.cfg.CustomChoosePartitionFunc != nil:
+		partitionID, err = w.cfg.CustomChoosePartitionFunc(msg)
+		if err != nil {
+			return
+		}
+	default:
+		partitionID, err = w.partitionChooser.ChoosePartition(w.cfg.ProducerIDPrefix)
+		if err != nil {
+			return
+		}
+	}
+
+	return partitionID, nil
+}
+
+// no concurrent safe
+func (w *worker) addToInFlightMessagesIndex(newElement messagePtr, toPartition int64) {
+	list, ok := w.inFlightMessagesIndex[toPartition]
+	if !ok {
+		list = xlist.New[messagePtr]()
+		w.inFlightMessagesIndex[toPartition] = list
+	}
+	list.PushBack(newElement)
+}
+
+func (w *worker) pushMessage(msg Message) (err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	newElement := w.inFlightMessages.PushBack(msg)
-	list, ok := w.inFlightMessagesIndex[msg.PartitionID]
-	if !ok {
-		newList := xlist.New[messagePtr]()
-		newList.PushBack(newElement)
-		w.inFlightMessagesIndex[msg.PartitionID] = newList
-	} else {
-		list.PushBack(newElement)
+	msg.PartitionID, err = w.choosePartition(msg)
+	if err != nil {
+		return
 	}
+
+	newElement := w.inFlightMessages.PushBack(msg)
+	w.addToInFlightMessagesIndex(newElement, msg.PartitionID)
 	w.pendingMessages.PushBack(newElement)
 
 	select {
@@ -210,7 +254,117 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 	}
 }
 
-func (w *worker) onPartitionSplit(partitionID int64) {
+func (w *worker) getSplittedPartitionAncestors(describeResult *topictypes.TopicDescription, partitionID int64) ([]int64, error) {
+	partitionToParent := make(map[int64]int64)
+	for _, partition := range describeResult.Partitions {
+		if len(partition.ParentPartitionIDs) == 0 {
+			continue
+		}
+		partitionToParent[partition.PartitionID] = partition.ParentPartitionIDs[0]
+	}
+
+	var (
+		ancestors          = []int64{partitionID}
+		currentPartitionID = partitionID
+	)
+
+	for {
+		parentID, ok := partitionToParent[currentPartitionID]
+		if !ok {
+			break
+		}
+
+		ancestors = append(ancestors, parentID)
+		currentPartitionID = parentID
+	}
+
+	return ancestors, nil
+}
+
+func (w *worker) getSplittedPartitionChildren(describeResult *topictypes.TopicDescription, partitionID int64) []int64 {
+	for _, partition := range describeResult.Partitions {
+		if partition.PartitionID == partitionID {
+			return partition.ChildPartitionIDs
+		}
+	}
+
+	return nil
+}
+
+func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error) {
+	inFlightIndexChain, ok := w.inFlightMessagesIndex[partitionID]
+	if !ok {
+		return nil
+	}
+
+	var toResend []messagePtr
+
+	for iter := inFlightIndexChain.Front(); iter != nil; iter = iter.Next() {
+		msg := iter.Value.Value
+		if msg.SeqNo < maxSeqNo {
+			continue
+		}
+
+		msg.PartitionID = 0
+		msg.PartitionID, err = w.choosePartition(msg)
+		if err != nil {
+			return
+		}
+
+		iter.Value.Value.PartitionID = msg.PartitionID
+		w.addToInFlightMessagesIndex(iter.Value, msg.PartitionID)
+		toResend = append(toResend, iter.Value)
+	}
+
+	for i := len(toResend) - 1; i >= 0; i-- {
+		w.pendingMessages.PushFront(toResend[i])
+	}
+
+	return nil
+}
+
+func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
+	describeResult, err := w.topicClient.Describe(w.ctx, w.cfg.TopicPath)
+	if err != nil {
+		return err
+	}
+
+	ancestors, err := w.getSplittedPartitionAncestors(&describeResult, partitionID)
+	if err != nil {
+		return err
+	}
+
+	var maxSeqNo int64
+
+	for _, ancestor := range ancestors {
+		writer, err := w.topicClient.StartWriter(
+			w.cfg.TopicPath,
+			topicoptions.WithWriterProducerID(w.getProducerID(ancestor)),
+		)
+		if err != nil {
+			return err
+		}
+
+		initInfo, err := writer.WaitInitInfo(w.ctx)
+		if err != nil {
+			return err
+		}
+
+		maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
+	}
+
+	w.mu.WithLock(func() {
+		partition := w.partitions[partitionID]
+		partition.Children = w.getSplittedPartitionChildren(&describeResult, partitionID)
+		w.scheduleResendMessages(partitionID, maxSeqNo)
+
+		select {
+		case w.msgChan <- empty.Struct{}:
+		default:
+		}
+	})
+
+	return nil
 }
 
 func (w *worker) getSubWriter(partitionID int64) (*subWriterWrapper, error) {
@@ -277,6 +431,15 @@ func (w *worker) step() error {
 	}
 
 	return nil
+}
+
+func (w *worker) waitInitDone(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-w.initDone:
+		return nil
+	}
 }
 
 func (w *worker) run() {

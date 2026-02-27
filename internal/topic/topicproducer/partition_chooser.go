@@ -22,7 +22,7 @@ type boundPartitionChooser struct {
 	partitions []partitionShortInfo
 }
 
-func newBoundPartitionChooser(cfg *ProducerConfig, partitions map[int64]PartitionInfo) (*boundPartitionChooser, error) {
+func newBoundPartitionChooser(cfg *ProducerConfig, partitions map[int64]*PartitionInfo) (*boundPartitionChooser, error) {
 	partitionShortInfos := make([]partitionShortInfo, 0, len(partitions))
 	for _, partition := range partitions {
 		if len(partitions) > 1 && len(partition.FromBound) == 0 && len(partition.ToBound) == 0 {
