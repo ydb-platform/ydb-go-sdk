@@ -9,8 +9,8 @@ type PartitionInfo struct {
 	FromBound []byte
 	ToBound   []byte
 	ParentID  *int64
-	Splitted  bool
 	Children  []int64
+	Locked    bool
 }
 
 type partitionShortInfo struct {

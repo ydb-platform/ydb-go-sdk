@@ -2,6 +2,7 @@ package topicproducer
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -15,6 +16,8 @@ var (
 
 type PartitionChooser interface {
 	ChoosePartition(key string) (int64, error)
+	AddNewPartition(partitionID int64, fromBound, toBound []byte)
+	RemovePartition(partitionID int64)
 }
 
 type boundPartitionChooser struct {
@@ -76,6 +79,24 @@ func (c *boundPartitionChooser) ChoosePartition(key string) (int64, error) {
 	}
 }
 
+func (c *boundPartitionChooser) AddNewPartition(partitionID int64, fromBound, toBound []byte) {
+	c.partitions = append(c.partitions, partitionShortInfo{
+		ID:        partitionID,
+		FromBound: string(fromBound),
+		ToBound:   string(toBound),
+	})
+
+	sort.Slice(c.partitions, func(i, j int) bool {
+		return strings.Compare(c.partitions[i].FromBound, c.partitions[j].FromBound) < 0
+	})
+}
+
+func (c *boundPartitionChooser) RemovePartition(partitionID int64) {
+	c.partitions = slices.DeleteFunc(c.partitions, func(partition partitionShortInfo) bool {
+		return partition.ID == partitionID
+	})
+}
+
 type hashPartitionChooser struct {
 	cfg        *ProducerConfig
 	partitions uint64
@@ -94,4 +115,12 @@ func (c *hashPartitionChooser) ChoosePartition(key string) (int64, error) {
 	low := hasher.Sum64()
 
 	return int64(low % c.partitions), nil
+}
+
+func (c *hashPartitionChooser) AddNewPartition(_ int64, _, _ []byte) {
+	c.partitions++
+}
+
+func (c *hashPartitionChooser) RemovePartition(_ int64) {
+	c.partitions--
 }

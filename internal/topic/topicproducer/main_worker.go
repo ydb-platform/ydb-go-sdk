@@ -281,6 +281,21 @@ func (w *worker) getSplittedPartitionAncestors(describeResult *topictypes.TopicD
 	return ancestors, nil
 }
 
+func (w *worker) addNewPartitions(describeResult *topictypes.TopicDescription, splittedPartitionID int64) {
+	for _, partition := range describeResult.Partitions {
+		if len(partition.ParentPartitionIDs) > 0 && partition.ParentPartitionIDs[0] == splittedPartitionID {
+			w.partitions[partition.PartitionID] = &PartitionInfo{
+				ID:        partition.PartitionID,
+				ParentID:  &splittedPartitionID,
+				Children:  partition.ChildPartitionIDs,
+				FromBound: partition.FromBound,
+				ToBound:   partition.ToBound,
+				Locked:    true,
+			}
+		}
+	}
+}
+
 func (w *worker) getSplittedPartitionChildren(describeResult *topictypes.TopicDescription, partitionID int64) []int64 {
 	for _, partition := range describeResult.Partitions {
 		if partition.PartitionID == partitionID {
@@ -329,6 +344,18 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 		return err
 	}
 
+	w.mu.WithLock(func() {
+		partition := w.partitions[partitionID]
+		partition.Locked = true
+		partition.Children = w.getSplittedPartitionChildren(&describeResult, partitionID)
+		w.addNewPartitions(&describeResult, partitionID)
+		for _, child := range partition.Children {
+			childPartition := w.partitions[child]
+			w.partitionChooser.AddNewPartition(child, childPartition.FromBound, childPartition.ToBound)
+		}
+		w.partitionChooser.RemovePartition(partitionID)
+	})
+
 	ancestors, err := w.getSplittedPartitionAncestors(&describeResult, partitionID)
 	if err != nil {
 		return err
@@ -355,12 +382,18 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 
 	w.mu.WithLock(func() {
 		partition := w.partitions[partitionID]
-		partition.Children = w.getSplittedPartitionChildren(&describeResult, partitionID)
+		partition.Locked = false
 		w.scheduleResendMessages(partitionID, maxSeqNo)
 
-		select {
-		case w.msgChan <- empty.Struct{}:
-		default:
+		for _, child := range partition.Children {
+			w.partitions[child].Locked = false
+		}
+
+		if w.pendingMessages.Len() > 0 {
+			select {
+			case w.msgChan <- empty.Struct{}:
+			default:
+			}
 		}
 	})
 
@@ -415,6 +448,10 @@ func (w *worker) step() error {
 
 	for w.pendingMessages.Len() > 0 {
 		msg := w.pendingMessages.Front()
+
+		if w.partitions[msg.Value.Value.PartitionID].Locked {
+			break
+		}
 
 		writer, err := w.getSubWriter(msg.Value.Value.PartitionID)
 		if err != nil {
