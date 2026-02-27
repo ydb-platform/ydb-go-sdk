@@ -107,7 +107,9 @@ const (
 	TypeDouble       = types.Double
 	TypeDate         = types.Date
 	TypeDatetime     = types.Datetime
+	TypeDatetime64   = types.Datetime64
 	TypeTimestamp    = types.Timestamp
+	TypeTimestamp64  = types.Timestamp64
 	TypeInterval     = types.Interval
 	TypeTzDate       = types.TzDate
 	TypeTzDatetime   = types.TzDatetime
