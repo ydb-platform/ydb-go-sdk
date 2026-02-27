@@ -1,3 +1,4 @@
+* Added `table/types.{Timestamp64,Datetime64}` type aliases
 * Topic reader: improved concurrency call errors
 
 ## v3.127.1
