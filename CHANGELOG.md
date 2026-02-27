@@ -1,4 +1,4 @@
-* Added `table/types.{Timestamp64,Datetime64}` type aliases
+* Added `table/types.{TypeTimestamp64,TypeDatetime64}` constants (primitive type IDs)
 * Topic reader: improved concurrency call errors
 
 ## v3.127.1
