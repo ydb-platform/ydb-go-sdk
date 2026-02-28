@@ -25,7 +25,7 @@ type worker struct {
 	err  error
 	stop context.CancelFunc
 
-	writers                map[int64]*writerWrapper
+	writers               map[int64]*writerWrapper
 	idleWritersSupervisor *idleWritersSupervisor
 	cfg                   *ProducerConfig
 	mu                    xsync.Mutex
@@ -59,17 +59,19 @@ func newWorker(
 	cfg *ProducerConfig,
 ) *worker {
 	w := &worker{
-		writers:            make(map[int64]*writerWrapper),
-		inFlightMessages:  xlist.New[Message](),
-		cfg:               cfg,
-		msgChan:           make(empty.Chan, 1),
-		shutdown:          shutdown,
-		topicClient:       topicClient,
-		ctx:               ctx,
-		stop:              stop,
-		partitions:        make(map[int64]*PartitionInfo),
-		initDone:          make(chan struct{}),
-		messagesSemaphore: xsync.NewSoftWeightedSemaphore(int64(cfg.MaxQueueLen) / 2),
+		writers:               make(map[int64]*writerWrapper),
+		inFlightMessages:      xlist.New[Message](),
+		cfg:                   cfg,
+		msgChan:               make(empty.Chan, 1),
+		shutdown:              shutdown,
+		topicClient:           topicClient,
+		ctx:                   ctx,
+		stop:                  stop,
+		partitions:            make(map[int64]*PartitionInfo),
+		initDone:              make(chan struct{}),
+		messagesSemaphore:     xsync.NewSoftWeightedSemaphore(int64(cfg.MaxQueueLen) / 2),
+		inFlightMessagesIndex: make(map[int64]xlist.List[messagePtr]),
+		pendingMessages:       xlist.New[messagePtr](),
 	}
 
 	if cfg.writersFactory == nil {
