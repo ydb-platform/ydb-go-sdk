@@ -17,7 +17,6 @@ type ProducerConfig struct {
 	PartitioningKeyHasher     KeyHasher
 	PartitionChooserStrategy  PartitionChooserStrategy
 	ProducerIDPrefix          string
-	TopicPath                 string
 	CustomChoosePartitionFunc ChoosePartitionFunc
 
 	subWritersFactory subWritersFactory

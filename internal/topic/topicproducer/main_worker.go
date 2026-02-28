@@ -106,7 +106,7 @@ func (w *worker) init() (err error) {
 		}
 	}()
 
-	describeResult, err := w.topicClient.Describe(w.ctx, w.cfg.TopicPath)
+	describeResult, err := w.topicClient.Describe(w.ctx, w.cfg.Topic())
 	if err != nil {
 		return
 	}
@@ -396,7 +396,7 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 }
 
 func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
-	describeResult, err := w.topicClient.Describe(w.ctx, w.cfg.TopicPath)
+	describeResult, err := w.topicClient.Describe(w.ctx, w.cfg.Topic())
 	if err != nil {
 		return err
 	}
@@ -427,7 +427,7 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 	for _, ancestor := range ancestors {
 		errGroup.Go(func() error {
 			writer, err := w.topicClient.StartWriter(
-				w.cfg.TopicPath,
+				w.cfg.Topic(),
 				topicwriterinternal.WithProducerID(w.getProducerID(ancestor)),
 			)
 			if err != nil {

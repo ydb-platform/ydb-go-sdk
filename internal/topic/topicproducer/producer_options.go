@@ -8,12 +8,6 @@ import (
 
 type PublicProducerOption func(cfg *ProducerConfig)
 
-func WithProducerTopicPath(path string) PublicProducerOption {
-	return func(cfg *ProducerConfig) {
-		cfg.TopicPath = path
-	}
-}
-
 func WithProducerIDPrefix(prefix string) PublicProducerOption {
 	return func(cfg *ProducerConfig) {
 		cfg.ProducerIDPrefix = prefix
