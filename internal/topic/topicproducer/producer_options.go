@@ -52,8 +52,8 @@ func withTestMode() PublicProducerOption {
 	}
 }
 
-func withSubWritersFactory(subWritersFactory subWritersFactory) PublicProducerOption {
+func withWritersFactory(writersFactory writersFactory) PublicProducerOption {
 	return func(cfg *ProducerConfig) {
-		cfg.subWritersFactory = subWritersFactory
+		cfg.writersFactory = writersFactory
 	}
 }

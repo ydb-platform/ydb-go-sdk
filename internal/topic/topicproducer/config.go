@@ -19,6 +19,6 @@ type ProducerConfig struct {
 	ProducerIDPrefix          string
 	CustomChoosePartitionFunc ChoosePartitionFunc
 
-	subWritersFactory subWritersFactory
-	testMode          bool
+	writersFactory writersFactory
+	testMode       bool
 }

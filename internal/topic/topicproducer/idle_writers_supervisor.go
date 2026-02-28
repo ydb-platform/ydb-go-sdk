@@ -101,6 +101,6 @@ func (s *idleWritersSupervisor) run() {
 			continue
 		}
 
-		s.worker.removeSubWriter(*partitionID)
+		s.worker.removeWriter(*partitionID)
 	}
 }

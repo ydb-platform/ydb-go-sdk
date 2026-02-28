@@ -25,7 +25,7 @@ type worker struct {
 	err  error
 	stop context.CancelFunc
 
-	subWriters            map[int64]*subWriterWrapper
+	writers                map[int64]*writerWrapper
 	idleWritersSupervisor *idleWritersSupervisor
 	cfg                   *ProducerConfig
 	mu                    xsync.Mutex
@@ -59,7 +59,7 @@ func newWorker(
 	cfg *ProducerConfig,
 ) *worker {
 	w := &worker{
-		subWriters:        make(map[int64]*subWriterWrapper),
+		writers:            make(map[int64]*writerWrapper),
 		inFlightMessages:  xlist.New[Message](),
 		cfg:               cfg,
 		msgChan:           make(empty.Chan, 1),
@@ -72,8 +72,8 @@ func newWorker(
 		messagesSemaphore: xsync.NewSoftWeightedSemaphore(int64(cfg.MaxQueueLen) / 2),
 	}
 
-	if cfg.subWritersFactory == nil {
-		cfg.subWritersFactory = newBaseSubWritersFactory(topicClient)
+	if cfg.writersFactory == nil {
+		cfg.writersFactory = newBaseWritersFactory(topicClient)
 	}
 
 	if cfg.PartitioningKeyHasher == nil {
@@ -203,19 +203,19 @@ func (w *worker) pushMessage(ctx context.Context, msg Message) (err error) {
 	return nil
 }
 
-func (w *worker) removeSubWriter(partitionID int64) {
-	var writerToClose subWriter
+func (w *worker) removeWriter(partitionID int64) {
+	var toClose writer
 
 	w.mu.WithLock(func() {
-		writer, ok := w.subWriters[partitionID]
+		wr, ok := w.writers[partitionID]
 		if !ok {
 			return
 		}
-		writerToClose = writer
-		delete(w.subWriters, partitionID)
+		toClose = wr
+		delete(w.writers, partitionID)
 	})
 
-	if err := writerToClose.Close(w.ctx); err != nil {
+	if err := toClose.Close(w.ctx); err != nil {
 		w.mu.WithLock(func() {
 			w.err = err
 			w.stop()
@@ -228,16 +228,16 @@ func (w *worker) getProducerID(partitionID int64) string {
 	return fmt.Sprintf("%s_%d", w.cfg.ProducerIDPrefix, partitionID)
 }
 
-func (w *worker) createSubWriter(partitionID int64) (subWriter, error) {
+func (w *worker) createWriter(partitionID int64) (writer, error) {
 	withCustomCheckRetryErrorFunction := func(callback topic.PublicCheckErrorRetryFunction) topicwriterinternal.PublicWriterOption {
 		return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
 			cfg.RetrySettings.CheckError = callback
 		}
 	}
 
-	subWriterOpts := w.writerOpts
-	subWriterOpts = append(
-		subWriterOpts,
+	opts := w.writerOpts
+	opts = append(
+		opts,
 		topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
 		topicwriterinternal.WithProducerID(w.getProducerID(partitionID)),
 		topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
@@ -254,12 +254,12 @@ func (w *worker) createSubWriter(partitionID int64) (subWriter, error) {
 		topicwriterinternal.WithMaxQueueLen(w.cfg.MaxQueueLen/2),
 	)
 
-	writer, err := w.cfg.subWritersFactory.Create(w.topicPath, subWriterOpts...)
+	wr, err := w.cfg.writersFactory.Create(w.topicPath, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	return writer, nil
+	return wr, nil
 }
 
 func (w *worker) onAckReceived(partitionID, seqNo int64) {
@@ -276,10 +276,10 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 		panic("seq no mismatch") // TODO: maybe not panic here?
 	}
 
-	writer, ok := w.subWriters[partitionID]
+	wr, ok := w.writers[partitionID]
 	if ok {
-		writer.inFlightCount--
-		if writer.inFlightCount == 0 {
+		wr.inFlightCount--
+		if wr.inFlightCount == 0 {
 			w.idleWritersSupervisor.add(partitionID)
 		}
 	}
@@ -470,20 +470,20 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 	return nil
 }
 
-func (w *worker) getSubWriter(partitionID int64) (*subWriterWrapper, error) {
-	writer, ok := w.subWriters[partitionID]
+func (w *worker) getWriter(partitionID int64) (*writerWrapper, error) {
+	wr, ok := w.writers[partitionID]
 	if !ok {
-		writer, err := w.createSubWriter(partitionID)
+		partitionWriter, err := w.createWriter(partitionID)
 		if err != nil {
 			return nil, err
 		}
-		wrapper := &subWriterWrapper{
-			subWriter: writer,
+		wrapper := &writerWrapper{
+			writer: partitionWriter,
 		}
-		w.subWriters[partitionID] = wrapper
+		w.writers[partitionID] = wrapper
 
 		go func() {
-			err = writer.WaitInit(w.ctx)
+			err = partitionWriter.WaitInit(w.ctx)
 			w.mu.WithLock(func() {
 				if err != nil {
 					w.err = err
@@ -493,10 +493,13 @@ func (w *worker) getSubWriter(partitionID int64) (*subWriterWrapper, error) {
 				wrapper.initDone = true
 			})
 		}()
+
+		w.idleWritersSupervisor.remove(partitionID)
+		return wrapper, nil
 	}
 
 	w.idleWritersSupervisor.remove(partitionID)
-	return writer, nil
+	return wr, nil
 }
 
 func (w *worker) getResultErr() error {
@@ -540,21 +543,21 @@ func (w *worker) step() error {
 			continue
 		}
 
-		writer, err := w.getSubWriter(msg.PartitionID)
+		wr, err := w.getWriter(msg.PartitionID)
 		if err != nil {
-			return fmt.Errorf("failed to get sub writer: %w", err)
+			return fmt.Errorf("failed to get writer: %w", err)
 		}
 
-		if !writer.initDone {
+		if !wr.initDone {
 			continue
 		}
 
-		err = writer.Write(w.ctx, msg.PublicMessage)
+		err = wr.Write(w.ctx, msg.PublicMessage)
 		if err != nil {
 			return fmt.Errorf("failed to write message: %w", err)
 		}
 
-		writer.inFlightCount++
+		wr.inFlightCount++
 		w.pendingMessages.Remove(iter)
 	}
 

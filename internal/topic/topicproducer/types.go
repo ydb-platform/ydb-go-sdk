@@ -26,8 +26,8 @@ const (
 	PartitionChooserStrategyHash
 )
 
-type subWriterWrapper struct {
-	subWriter
+type writerWrapper struct {
+	writer
 	inFlightCount int
 	initDone      bool
 }
