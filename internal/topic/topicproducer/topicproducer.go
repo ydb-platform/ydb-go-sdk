@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
+	topicclient "github.com/ydb-platform/ydb-go-sdk/v3/topic"
 )
 
 type Message struct {
@@ -15,6 +15,8 @@ type Message struct {
 	Key           string
 	PartitionID   int64
 	OnAckCallback func()
+	AckReceived   bool
+	Sent          bool
 }
 
 type Producer struct {
@@ -26,20 +28,17 @@ type Producer struct {
 	shutdown   empty.Chan
 }
 
-func NewProducer(cfg *ProducerConfig, topicClient topic.Client) *Producer {
+func NewProducer(topicClient topicclient.Client, cfg ProducerConfig) *Producer {
 	var (
 		ctx, cancel = context.WithCancel(context.Background())
 		shutdown    = make(empty.Chan)
 		background  = background.NewWorker(ctx, "topic producer background")
 	)
 
-	if cfg.SubSessionIdleTimeout == 0 {
-		cfg.SubSessionIdleTimeout = defaultSubWriterIdleTimeout
-	}
-
 	p := &Producer{
-		cfg:        cfg,
-		worker:     newWorker(ctx, cancel, shutdown, cfg, topicClient, background),
+		ctx:        ctx,
+		cfg:        &cfg,
+		worker:     newWorker(ctx, cancel, shutdown, topicClient, background, &cfg),
 		shutdown:   shutdown,
 		background: background,
 	}
@@ -58,34 +57,40 @@ func NewProducer(cfg *ProducerConfig, topicClient topic.Client) *Producer {
 	return p
 }
 
-func (w *Producer) Write(ctx context.Context, messages ...Message) (err error) {
+func (p *Producer) Write(ctx context.Context, messages ...Message) error {
 	for _, message := range messages {
-		w.worker.pushMessage(message)
+		if err := p.worker.pushMessage(ctx, message); err != nil {
+			return err
+		}
 	}
 
-	return
+	if p.cfg.WaitServerAck {
+		return p.worker.flush(ctx)
+	}
+
+	return nil
 }
 
-func (w *Producer) Close(ctx context.Context) error {
-	if w.closed.Swap(true) {
+func (p *Producer) Close(ctx context.Context) error {
+	if p.closed.Swap(true) {
 		return ErrAlreadyClosed
 	}
 
-	w.worker.stop()
-	w.background.Close(ctx, nil)
+	p.worker.stop()
+	p.background.Close(ctx, nil)
 
 	select {
-	case <-w.shutdown:
-		return w.worker.getResultErr()
-	case <-w.ctx.Done():
-		return w.ctx.Err()
+	case <-p.shutdown:
+		return p.worker.getResultErr()
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
-func (w *Producer) Flush(ctx context.Context) error {
-	return w.worker.flush(ctx)
+func (p *Producer) Flush(ctx context.Context) error {
+	return p.worker.flush(ctx)
 }
 
-func (w *Producer) WaitInit(ctx context.Context) error {
-	return w.worker.waitInitDone(ctx)
+func (p *Producer) WaitInit(ctx context.Context) error {
+	return p.worker.waitInitDone(ctx)
 }

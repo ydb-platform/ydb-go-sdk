@@ -3,8 +3,8 @@ package topicproducer
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 )
 
 // Message is a message to be written by Producer.
@@ -37,9 +37,9 @@ type Producer struct {
 
 // NewProducer creates a new Producer instance.
 // It is a thin wrapper around internal topic producer implementation.
-func NewProducer(cfg *ProducerConfig, topicClient topic.Client) *Producer {
+func NewProducer(inner *topicproducer.Producer) *Producer {
 	return &Producer{
-		inner: internal.NewProducer(cfg, topicClient),
+		inner: inner,
 	}
 }
 

@@ -54,7 +54,10 @@ func (c *boundPartitionChooser) ChoosePartition(key string) (int64, error) {
 		return 0, fmt.Errorf("no partitions configured")
 	}
 
-	hashedKey := c.cfg.PartitioningKeyHasher(key)
+	hashedKey := key
+	if c.cfg.PartitioningKeyHasher != nil {
+		hashedKey = c.cfg.PartitioningKeyHasher(key)
+	}
 
 	// Find first partition whose lower bound is strictly greater than hashedKey.
 	// Then take the previous one as the partition for this key.
@@ -111,7 +114,7 @@ func newHashPartitionChooser(cfg *ProducerConfig, partitionsCount uint64) *hashP
 
 func (c *hashPartitionChooser) ChoosePartition(key string) (int64, error) {
 	hasher := murmur3.New64()
-	hasher.Write([]byte(c.cfg.PartitioningKeyHasher(key)))
+	hasher.Write([]byte(key))
 	low := hasher.Sum64()
 
 	return int64(low % c.partitions), nil

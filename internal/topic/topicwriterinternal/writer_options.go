@@ -58,6 +58,12 @@ func WithTokenUpdateInterval(interval time.Duration) PublicWriterOption {
 	}
 }
 
+func WithOnAckReceivedCallback(handler PublicOnAckReceivedCallback) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.OnAckReceivedCallback = handler
+	}
+}
+
 // WithCommonConfig
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental

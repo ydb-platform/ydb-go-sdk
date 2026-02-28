@@ -29,6 +29,7 @@ const (
 type subWriterWrapper struct {
 	subWriter
 	inFlightCount int
+	initDone      bool
 }
 
 type idleWriterInfo struct {

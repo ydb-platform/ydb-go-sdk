@@ -2,16 +2,20 @@ package topicproducer
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 
+	"github.com/spaolacci/murmur3"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	topicclient "github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"golang.org/x/sync/errgroup"
 )
 
 type messagePtr *xlist.Element[Message]
@@ -25,6 +29,8 @@ type worker struct {
 	idleWritersSupervisor *idleWritersSupervisor
 	cfg                   *ProducerConfig
 	mu                    xsync.Mutex
+	messagesSemaphore     *xsync.SoftWeightedSemaphore
+	writerOpts            []topicwriterinternal.PublicWriterOption
 
 	partitionChooser PartitionChooser
 
@@ -32,8 +38,9 @@ type worker struct {
 	inFlightMessagesIndex map[int64]xlist.List[messagePtr]
 	pendingMessages       xlist.List[messagePtr]
 
-	topicClient topic.Client
-	topicPath   string
+	topicClient    topicclient.Client
+	writersFactory subWritersFactory
+	topicPath      string
 
 	msgChan  empty.Chan
 	shutdown empty.Chan
@@ -48,21 +55,32 @@ func newWorker(
 	ctx context.Context,
 	stop context.CancelFunc,
 	shutdown empty.Chan,
-	cfg *ProducerConfig,
-	topicClient topic.Client,
+	topicClient topicclient.Client,
 	background *background.Worker,
+	cfg *ProducerConfig,
 ) *worker {
 	w := &worker{
-		subWriters:       make(map[int64]*subWriterWrapper),
-		inFlightMessages: xlist.New[Message](),
-		cfg:              cfg,
-		msgChan:          make(empty.Chan, 1),
-		shutdown:         shutdown,
-		topicClient:      topicClient,
-		ctx:              ctx,
-		stop:             stop,
-		partitions:       make(map[int64]*PartitionInfo),
-		initDone:         make(chan struct{}),
+		subWriters:        make(map[int64]*subWriterWrapper),
+		inFlightMessages:  xlist.New[Message](),
+		cfg:               cfg,
+		msgChan:           make(empty.Chan, 1),
+		shutdown:          shutdown,
+		topicClient:       topicClient,
+		ctx:               ctx,
+		stop:              stop,
+		partitions:        make(map[int64]*PartitionInfo),
+		initDone:          make(chan struct{}),
+		messagesSemaphore: xsync.NewSoftWeightedSemaphore(int64(cfg.MaxQueueLen) / 2),
+	}
+
+	if cfg.testMode {
+		w.writersFactory = newStubSubWritersFactory(cfg.stubWriterType, cfg)
+	} else {
+		w.writersFactory = newBaseSubWritersFactory(topicClient)
+	}
+
+	if cfg.PartitioningKeyHasher == nil {
+		cfg.PartitioningKeyHasher = w.getDefaultKeyHasher()
 	}
 
 	w.idleWritersSupervisor = newIdleWritersSupervisor(ctx, w, cfg.SubSessionIdleTimeout)
@@ -71,6 +89,17 @@ func newWorker(
 	})
 
 	return w
+}
+
+func (w *worker) getDefaultKeyHasher() KeyHasher {
+	return func(key string) string {
+		// Same as C++ TProducerSettings::DefaultPartitioningKeyHasher:
+		// MurmurHash64 with seed 0, result as 8 bytes in big-endian (network byte order)
+		lo := murmur3.Sum64([]byte(key))
+		out := make([]byte, 8)
+		binary.BigEndian.PutUint64(out, lo)
+		return string(out)
+	}
 }
 
 func (w *worker) init() (err error) {
@@ -152,13 +181,17 @@ func (w *worker) addToInFlightMessagesIndex(newElement messagePtr, toPartition i
 	list.PushBack(newElement)
 }
 
-func (w *worker) pushMessage(msg Message) (err error) {
+func (w *worker) pushMessage(ctx context.Context, msg Message) (err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	msg.PartitionID, err = w.choosePartition(msg)
 	if err != nil {
 		return
+	}
+
+	if err := w.messagesSemaphore.Acquire(ctx, 1); err != nil {
+		return fmt.Errorf("ydb: can not add message due to queue len overflow: %w", err)
 	}
 
 	newElement := w.inFlightMessages.PushBack(msg)
@@ -199,21 +232,34 @@ func (w *worker) getProducerID(partitionID int64) string {
 }
 
 func (w *worker) createSubWriter(partitionID int64) (subWriter, error) {
-	writer, err := w.topicClient.StartWriter(
-		w.cfg.TopicPath,
-		topicoptions.WithWriterPartitionID(partitionID),
-		topicoptions.WithWriterProducerID(w.getProducerID(partitionID)),
-		topicoptions.WithOnAckReceivedCallback(func(seqNo int64) {
+	// type
+
+	withCustomCheckRetryErrorFunction := func(callback topic.PublicCheckErrorRetryFunction) topicwriterinternal.PublicWriterOption {
+		return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+			cfg.RetrySettings.CheckError = callback
+		}
+	}
+
+	subWriterOpts := w.writerOpts
+	subWriterOpts = append(
+		subWriterOpts,
+		topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
+		topicwriterinternal.WithProducerID(w.getProducerID(partitionID)),
+		topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
+			w.cfg.OnAckReceivedCallback(seqNo)
 			w.onAckReceived(partitionID, seqNo)
 		}),
-		topicoptions.WithWriterCheckRetryErrorFunction(func(args topicoptions.CheckErrorRetryArgs) topicoptions.CheckErrorRetryResult {
+		withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 			if ydb.IsOperationErrorOverloaded(args.Error) {
 				w.onPartitionSplit(partitionID)
-				return topicoptions.CheckErrorRetryDecisionStop
+				return topic.PublicRetryDecisionStop
 			}
-			return topicoptions.CheckErrorRetryDecisionDefault
+			return w.cfg.RetrySettings.CheckError(args)
 		}),
+		topicwriterinternal.WithMaxQueueLen(w.cfg.MaxQueueLen/2),
 	)
+
+	writer, err := w.writersFactory.Create(w.topicPath, subWriterOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -243,14 +289,30 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 		}
 	}
 
+	message.Value.Value.AckReceived = true
+
 	w.inFlightMessages.Remove(message.Value)
 	indexChain.Remove(indexChain.Front())
 	if indexChain.Len() == 0 {
 		delete(w.inFlightMessagesIndex, partitionID)
 	}
 
-	if message.Value.Value.OnAckCallback != nil {
-		message.Value.Value.OnAckCallback()
+	w.releaseInFlightMessages()
+}
+
+func (w *worker) releaseInFlightMessages() {
+	for w.inFlightMessages.Len() > 0 {
+		front := w.inFlightMessages.Front()
+		if !front.Value.AckReceived {
+			return
+		}
+
+		if front.Value.OnAckCallback != nil {
+			front.Value.OnAckCallback()
+		}
+
+		w.inFlightMessages.Remove(front)
+		w.messagesSemaphore.Release(1)
 	}
 }
 
@@ -361,23 +423,36 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 		return err
 	}
 
-	var maxSeqNo int64
+	var (
+		maxSeqNo int64
+		mu       xsync.Mutex
+		errGroup errgroup.Group
+	)
 
 	for _, ancestor := range ancestors {
-		writer, err := w.topicClient.StartWriter(
-			w.cfg.TopicPath,
-			topicoptions.WithWriterProducerID(w.getProducerID(ancestor)),
-		)
-		if err != nil {
-			return err
-		}
+		errGroup.Go(func() error {
+			writer, err := w.topicClient.StartWriter(
+				w.cfg.TopicPath,
+				topicwriterinternal.WithProducerID(w.getProducerID(ancestor)),
+			)
+			if err != nil {
+				return err
+			}
 
-		initInfo, err := writer.WaitInitInfo(w.ctx)
-		if err != nil {
-			return err
-		}
+			initInfo, err := writer.WaitInitInfo(w.ctx)
+			if err != nil {
+				return err
+			}
 
-		maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
+			mu.WithLock(func() {
+				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
+			})
+			return nil
+		})
+	}
+
+	if err := errGroup.Wait(); err != nil {
+		return err
 	}
 
 	w.mu.WithLock(func() {
@@ -407,13 +482,25 @@ func (w *worker) getSubWriter(partitionID int64) (*subWriterWrapper, error) {
 		if err != nil {
 			return nil, err
 		}
-		w.subWriters[partitionID] = &subWriterWrapper{
+		wrapper := &subWriterWrapper{
 			subWriter: writer,
 		}
+		w.subWriters[partitionID] = wrapper
+
+		go func() {
+			err = writer.WaitInit(w.ctx)
+			w.mu.WithLock(func() {
+				if err != nil {
+					w.err = err
+					w.stop()
+					return
+				}
+				wrapper.initDone = true
+			})
+		}()
 	}
 
 	w.idleWritersSupervisor.remove(partitionID)
-
 	return writer, nil
 }
 
@@ -429,7 +516,12 @@ func (w *worker) flush(ctx context.Context) error {
 
 	w.mu.WithLock(func() {
 		lastInFlightMessage := w.inFlightMessages.Back()
+		prevAckCallback := lastInFlightMessage.Value.OnAckCallback
 		lastInFlightMessage.Value.OnAckCallback = func() {
+			if prevAckCallback != nil {
+				prevAckCallback()
+			}
+
 			waitCh <- empty.Struct{}
 		}
 	})
@@ -446,25 +538,38 @@ func (w *worker) step() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	for w.pendingMessages.Len() > 0 {
-		msg := w.pendingMessages.Front()
+	for iter := w.pendingMessages.Front(); iter != nil; iter = iter.Next() {
+		msg := iter.Value.Value
 
-		if w.partitions[msg.Value.Value.PartitionID].Locked {
-			break
+		if w.partitions[msg.PartitionID].Locked || msg.Sent {
+			continue
 		}
 
-		writer, err := w.getSubWriter(msg.Value.Value.PartitionID)
+		writer, err := w.getSubWriter(msg.PartitionID)
 		if err != nil {
 			return fmt.Errorf("failed to get sub writer: %w", err)
 		}
 
-		err = writer.Write(w.ctx, msg.Value.Value.PublicMessage)
+		if !writer.initDone {
+			continue
+		}
+
+		err = writer.Write(w.ctx, msg.PublicMessage)
 		if err != nil {
 			return fmt.Errorf("failed to write message: %w", err)
 		}
 
 		writer.inFlightCount++
-		w.pendingMessages.Remove(w.pendingMessages.Front())
+		iter.Value.Value.Sent = true
+	}
+
+	for w.pendingMessages.Len() > 0 {
+		iter := w.pendingMessages.Front()
+		msg := iter.Value.Value
+		if !msg.Sent {
+			break
+		}
+		w.pendingMessages.Remove(iter)
 	}
 
 	return nil

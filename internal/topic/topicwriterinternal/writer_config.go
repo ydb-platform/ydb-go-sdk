@@ -29,3 +29,7 @@ type WritersCommonConfig struct {
 	clock              clockwork.Clock
 	forceCodec         rawtopiccommon.Codec
 }
+
+func (c *WritersCommonConfig) Topic() string {
+	return c.topic
+}

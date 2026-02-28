@@ -226,7 +226,5 @@ func WithWriterLogContext(ctx context.Context) WriterOption {
 
 // WithOnAckReceivedCallback set callback for ack received
 func WithOnAckReceivedCallback(handler topicwriterinternal.PublicOnAckReceivedCallback) WriterOption {
-	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
-		cfg.OnAckReceivedCallback = handler
-	}
+	return topicwriterinternal.WithOnAckReceivedCallback(handler)
 }
