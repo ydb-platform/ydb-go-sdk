@@ -15,6 +15,30 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 )
 
+type stubSubWritersFactory struct {
+	stubWriterType stubs.StubWriterType
+}
+
+func newStubSubWritersFactory(stubWriterType stubs.StubWriterType) *stubSubWritersFactory {
+	return &stubSubWritersFactory{
+		stubWriterType: stubWriterType,
+	}
+}
+
+func (f *stubSubWritersFactory) Create(topicPath string, opts ...topicwriterinternal.PublicWriterOption) (subWriter, error) {
+	switch f.stubWriterType {
+	case stubs.StubWriterTypeBasic:
+		cfg := &topicwriterinternal.WriterReconnectorConfig{}
+		for _, opt := range opts {
+			opt(cfg)
+		}
+
+		return stubs.NewBasicWriter(cfg.OnAckReceivedCallback), nil
+	default:
+		return nil, errors.New("invalid stub writer type")
+	}
+}
+
 func newTestProducer(t testing.TB, client topicclient.Client) *Producer {
 	t.Helper()
 	_ = []topicoptions.WriterOption{

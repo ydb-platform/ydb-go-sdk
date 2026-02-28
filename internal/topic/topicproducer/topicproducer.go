@@ -16,7 +16,6 @@ type Message struct {
 	PartitionID   int64
 	OnAckCallback func()
 	AckReceived   bool
-	Sent          bool
 }
 
 type Producer struct {

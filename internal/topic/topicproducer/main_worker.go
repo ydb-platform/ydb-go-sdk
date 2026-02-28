@@ -536,7 +536,7 @@ func (w *worker) step() error {
 	for iter := w.pendingMessages.Front(); iter != nil; iter = iter.Next() {
 		msg := iter.Value.Value
 
-		if w.partitions[msg.PartitionID].Locked || msg.Sent {
+		if w.partitions[msg.PartitionID].Locked {
 			continue
 		}
 
@@ -555,15 +555,6 @@ func (w *worker) step() error {
 		}
 
 		writer.inFlightCount++
-		iter.Value.Value.Sent = true
-	}
-
-	for w.pendingMessages.Len() > 0 {
-		iter := w.pendingMessages.Front()
-		msg := iter.Value.Value
-		if !msg.Sent {
-			break
-		}
 		w.pendingMessages.Remove(iter)
 	}
 
