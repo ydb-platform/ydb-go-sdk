@@ -3,7 +3,6 @@ package topicproducer
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
@@ -59,8 +58,8 @@ func withTestMode() PublicProducerOption {
 	}
 }
 
-func withStubWriterType(stubWriterType stubs.StubWriterType) PublicProducerOption {
+func withSubWritersFactory(subWritersFactory subWritersFactory) PublicProducerOption {
 	return func(cfg *ProducerConfig) {
-		cfg.stubWriterType = stubWriterType
+		cfg.subWritersFactory = subWritersFactory
 	}
 }

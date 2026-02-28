@@ -38,9 +38,8 @@ type worker struct {
 	inFlightMessagesIndex map[int64]xlist.List[messagePtr]
 	pendingMessages       xlist.List[messagePtr]
 
-	topicClient    topicclient.Client
-	writersFactory subWritersFactory
-	topicPath      string
+	topicClient topicclient.Client
+	topicPath   string
 
 	msgChan  empty.Chan
 	shutdown empty.Chan
@@ -73,10 +72,8 @@ func newWorker(
 		messagesSemaphore: xsync.NewSoftWeightedSemaphore(int64(cfg.MaxQueueLen) / 2),
 	}
 
-	if cfg.testMode {
-		w.writersFactory = newStubSubWritersFactory(cfg.stubWriterType, cfg)
-	} else {
-		w.writersFactory = newBaseSubWritersFactory(topicClient)
+	if cfg.subWritersFactory == nil {
+		cfg.subWritersFactory = newBaseSubWritersFactory(topicClient)
 	}
 
 	if cfg.PartitioningKeyHasher == nil {
@@ -232,8 +229,6 @@ func (w *worker) getProducerID(partitionID int64) string {
 }
 
 func (w *worker) createSubWriter(partitionID int64) (subWriter, error) {
-	// type
-
 	withCustomCheckRetryErrorFunction := func(callback topic.PublicCheckErrorRetryFunction) topicwriterinternal.PublicWriterOption {
 		return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
 			cfg.RetrySettings.CheckError = callback
@@ -259,7 +254,7 @@ func (w *worker) createSubWriter(partitionID int64) (subWriter, error) {
 		topicwriterinternal.WithMaxQueueLen(w.cfg.MaxQueueLen/2),
 	)
 
-	writer, err := w.writersFactory.Create(w.topicPath, subWriterOpts...)
+	writer, err := w.cfg.subWritersFactory.Create(w.topicPath, subWriterOpts...)
 	if err != nil {
 		return nil, err
 	}

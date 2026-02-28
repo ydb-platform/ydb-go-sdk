@@ -3,7 +3,6 @@ package topicproducer
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
@@ -21,6 +20,6 @@ type ProducerConfig struct {
 	TopicPath                 string
 	CustomChoosePartitionFunc ChoosePartitionFunc
 
-	testMode       bool
-	stubWriterType stubs.StubWriterType
+	subWritersFactory subWritersFactory
+	testMode          bool
 }
