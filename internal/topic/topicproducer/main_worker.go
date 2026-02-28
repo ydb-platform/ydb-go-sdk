@@ -41,13 +41,14 @@ type worker struct {
 	topicClient topicclient.Client
 	topicPath   string
 
-	msgChan  empty.Chan
-	shutdown empty.Chan
+	wakeupChan empty.Chan
+	shutdown   empty.Chan
 
 	partitions map[int64]*PartitionInfo
 	initDone   chan struct{}
 
 	isAutoPartitioningEnabled bool
+	background                *background.Worker
 }
 
 func newWorker(
@@ -62,7 +63,7 @@ func newWorker(
 		writers:               make(map[int64]*writerWrapper),
 		inFlightMessages:      xlist.New[Message](),
 		cfg:                   cfg,
-		msgChan:               make(empty.Chan, 1),
+		wakeupChan:            make(empty.Chan, 1),
 		shutdown:              shutdown,
 		topicClient:           topicClient,
 		ctx:                   ctx,
@@ -72,6 +73,7 @@ func newWorker(
 		messagesSemaphore:     xsync.NewSoftWeightedSemaphore(int64(cfg.MaxQueueLen) / 2),
 		inFlightMessagesIndex: make(map[int64]xlist.List[messagePtr]),
 		pendingMessages:       xlist.New[messagePtr](),
+		background:            background,
 	}
 
 	if cfg.writersFactory == nil {
@@ -197,10 +199,7 @@ func (w *worker) pushMessage(ctx context.Context, msg Message) (err error) {
 	w.addToInFlightMessagesIndex(newElement, msg.PartitionID)
 	w.pendingMessages.PushBack(newElement)
 
-	select {
-	case w.msgChan <- empty.Struct{}:
-	default:
-	}
+	w.wakeup()
 
 	return nil
 }
@@ -243,14 +242,21 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 		topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
 		topicwriterinternal.WithProducerID(w.getProducerID(partitionID)),
 		topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
-			w.cfg.OnAckReceivedCallback(seqNo)
-			w.onAckReceived(partitionID, seqNo)
+			if w.cfg.OnAckReceivedCallback != nil {
+				w.cfg.OnAckReceivedCallback(seqNo)
+			}
+			w.background.Start(fmt.Sprintf("on ack received for partition %d, seqNo %d", partitionID, seqNo), func(ctx context.Context) {
+				w.onAckReceived(partitionID, seqNo)
+			})
 		}),
 		withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 			if ydb.IsOperationErrorOverloaded(args.Error) {
-				w.onPartitionSplit(partitionID)
+				w.background.Start(fmt.Sprintf("on partition split for partition %d", partitionID), func(ctx context.Context) {
+					w.onPartitionSplit(partitionID)
+				})
 				return topic.PublicRetryDecisionStop
 			}
+
 			return w.cfg.RetrySettings.CheckError(args)
 		}),
 		topicwriterinternal.WithMaxQueueLen(w.cfg.MaxQueueLen/2),
@@ -288,7 +294,6 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 
 	message.Value.Value.AckReceived = true
 
-	w.inFlightMessages.Remove(message.Value)
 	indexChain.Remove(indexChain.Front())
 	if indexChain.Len() == 0 {
 		delete(w.inFlightMessagesIndex, partitionID)
@@ -462,14 +467,18 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 		}
 
 		if w.pendingMessages.Len() > 0 {
-			select {
-			case w.msgChan <- empty.Struct{}:
-			default:
-			}
+			w.wakeup()
 		}
 	})
 
 	return nil
+}
+
+func (w *worker) wakeup() {
+	select {
+	case w.wakeupChan <- empty.Struct{}:
+	default:
+	}
 }
 
 func (w *worker) getWriter(partitionID int64) (*writerWrapper, error) {
@@ -484,7 +493,7 @@ func (w *worker) getWriter(partitionID int64) (*writerWrapper, error) {
 		}
 		w.writers[partitionID] = wrapper
 
-		go func() {
+		w.background.Start(fmt.Sprintf("wait init for partition %d", partitionID), func(ctx context.Context) {
 			err = partitionWriter.WaitInit(w.ctx)
 			w.mu.WithLock(func() {
 				if err != nil {
@@ -493,8 +502,10 @@ func (w *worker) getWriter(partitionID int64) (*writerWrapper, error) {
 					return
 				}
 				wrapper.initDone = true
+
+				w.wakeup()
 			})
-		}()
+		})
 
 		w.idleWritersSupervisor.remove(partitionID)
 		return wrapper, nil
@@ -582,7 +593,7 @@ func (w *worker) run() {
 		select {
 		case <-w.ctx.Done():
 			return
-		case <-w.msgChan:
+		case <-w.wakeupChan:
 		}
 
 		if err := w.step(); err != nil {
