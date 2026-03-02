@@ -359,7 +359,7 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 		panic("seqNo mismatch")
 	}
 
-	message.Value.Value.AckReceived = true
+	message.Value.Value.ackReceived = true
 
 	indexChain.Remove(message)
 	if indexChain.Len() == 0 {
@@ -379,12 +379,12 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 func (w *worker) releaseInFlightMessages() {
 	for w.inFlightMessages.Len() > 0 {
 		front := w.inFlightMessages.Front()
-		if !front.Value.AckReceived {
+		if !front.Value.ackReceived {
 			return
 		}
 
-		if front.Value.OnAckCallback != nil {
-			front.Value.OnAckCallback()
+		if front.Value.onAckCallback != nil {
+			front.Value.onAckCallback()
 		}
 
 		w.inFlightMessages.Remove(front)
@@ -474,7 +474,7 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 
 		msg := iter.Value.Value
 		if msg.SeqNo < maxSeqNo {
-			if msg.AckReceived {
+			if msg.ackReceived {
 				continue
 			}
 
@@ -492,7 +492,7 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 
 		iter.Value.Value.PartitionID = msg.PartitionID
 		inFlightMessagesToAdd = append(inFlightMessagesToAdd, iter.Value)
-		if iter.Value.Value.Sent {
+		if iter.Value.Value.sent {
 			messagesToResendToAdd = append(messagesToResendToAdd, iter.Value)
 		} else {
 			pendingMessagesToAdd = append(pendingMessagesToAdd, iter.Value)
@@ -664,8 +664,8 @@ func (w *worker) flush(ctx context.Context) error {
 		}
 
 		lastInFlightMessage := w.inFlightMessages.Back()
-		prevAckCallback := lastInFlightMessage.Value.OnAckCallback
-		lastInFlightMessage.Value.OnAckCallback = func() {
+		prevAckCallback := lastInFlightMessage.Value.onAckCallback
+		lastInFlightMessage.Value.onAckCallback = func() {
 			if prevAckCallback != nil {
 				prevAckCallback()
 			}
@@ -712,7 +712,7 @@ func (w *worker) step() error {
 				}
 
 				list.Remove(iter)
-				iter.Value.Value.Sent = true
+				iter.Value.Value.sent = true
 			}
 
 			if list.Len() == 0 {

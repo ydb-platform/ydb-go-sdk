@@ -12,11 +12,12 @@ import (
 type Message struct {
 	topicwriterinternal.PublicMessage
 
-	Key           string
-	PartitionID   int64
-	OnAckCallback func()
-	AckReceived   bool
-	Sent          bool
+	Key         string
+	PartitionID int64
+
+	onAckCallback func()
+	ackReceived   bool
+	sent          bool
 }
 
 type Producer struct {
