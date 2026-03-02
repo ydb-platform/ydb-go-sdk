@@ -33,6 +33,7 @@ const (
 
 type writerWrapper struct {
 	writer
+
 	initDone bool
 }
 

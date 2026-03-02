@@ -13,6 +13,7 @@ type stubTopicClient struct {
 
 func NewStubTopicClient(t testing.TB, desc topictypes.TopicDescription) *stubTopicClient {
 	t.Helper()
+
 	return &stubTopicClient{
 		describe: func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return desc, nil
@@ -22,6 +23,7 @@ func NewStubTopicClient(t testing.TB, desc topictypes.TopicDescription) *stubTop
 
 func NewStubTopicClientWithError(t testing.TB, describeErr error) *stubTopicClient {
 	t.Helper()
+
 	return &stubTopicClient{
 		describe: func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return topictypes.TopicDescription{}, describeErr
@@ -35,6 +37,7 @@ func NewStubTopicClientWithError(t testing.TB, describeErr error) *stubTopicClie
 // and two new partitions with bounds [from, mid) and [mid, to).
 func NewStubTopicClientWithSplits(t testing.TB, state *DescribeWithSplitsState) *stubTopicClient {
 	t.Helper()
+
 	return &stubTopicClient{
 		describe: func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return state.GetDescription(), nil

@@ -20,7 +20,10 @@ type basicWriter struct {
 	currentSeqNo          int64
 }
 
-func NewBasicWriter(onAckReceivedCallback topicwriterinternal.PublicOnAckReceivedCallback, autoSetSeqNo bool) *basicWriter {
+func NewBasicWriter(
+	onAckReceivedCallback topicwriterinternal.PublicOnAckReceivedCallback,
+	autoSetSeqNo bool,
+) *basicWriter {
 	w := &basicWriter{
 		onAckReceivedCallback: onAckReceivedCallback,
 		currentSeqNo:          1,
@@ -67,6 +70,7 @@ func (w *basicWriter) Write(ctx context.Context, messages []topicwriterinternal.
 
 func (w *basicWriter) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
 	time.Sleep(time.Second)
+
 	return topicwriterinternal.InitialInfo{
 		LastSeqNum: w.currentSeqNo,
 	}, nil
@@ -81,5 +85,6 @@ func (w *basicWriter) Close(ctx context.Context) error {
 
 	w.closed = true
 	close(w.closedChan)
+
 	return nil
 }

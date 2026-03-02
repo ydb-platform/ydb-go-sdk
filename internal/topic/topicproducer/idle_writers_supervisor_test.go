@@ -15,6 +15,7 @@ type testWriter struct {
 
 func (w *testWriter) Close(_ context.Context) error {
 	w.closed = true
+
 	return nil
 }
 
@@ -111,4 +112,3 @@ func TestIdleWritersSupervisor_RemovesIdleWriterAfterTimeout(t *testing.T) {
 		t.Fatalf("expected writer to be removed from worker.writers")
 	}
 }
-

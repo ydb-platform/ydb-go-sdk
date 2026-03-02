@@ -4,19 +4,17 @@ import (
 	"context"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
 type idleWritersSupervisor struct {
-	ctx              context.Context
+	ctx              context.Context //nolint:containedctx
 	idleWriters      xlist.List[idleWriterInfo]
 	idleWritersIndex map[int64]*xlist.Element[idleWriterInfo]
 	mu               xsync.Mutex
 	timeout          time.Duration
-	background       *background.Worker
 	wakeupChan       empty.Chan
 	worker           *worker
 }

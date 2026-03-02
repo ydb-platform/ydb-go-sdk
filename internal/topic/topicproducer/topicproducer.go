@@ -11,6 +11,7 @@ import (
 
 type Message struct {
 	topicwriterinternal.PublicMessage
+
 	Key           string
 	PartitionID   int64
 	OnAckCallback func()
@@ -19,7 +20,7 @@ type Message struct {
 }
 
 type Producer struct {
-	ctx        context.Context
+	ctx        context.Context //nolint:containedctx
 	cfg        *ProducerConfig
 	closed     atomic.Bool
 	worker     *worker
@@ -47,6 +48,7 @@ func NewProducer(topicDescriber TopicDescriber, cfg ProducerConfig) *Producer {
 		if err != nil {
 			p.worker.err = err
 			p.worker.stop()
+
 			return
 		}
 

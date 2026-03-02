@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -30,7 +31,6 @@ type writerWithAutopartitioning struct {
 	partitionID           int64
 	onSplit               func(partitionID int64)
 	updateSeqNo           func(producerID string, seqNo int64)
-	maxSeqNo              int64
 	producerIDPrefix      string
 	wakeUpChan            chan empty.Struct
 	closeChan             chan empty.Struct
@@ -111,8 +111,10 @@ func (w *writerWithAutopartitioning) processMessages() {
 			if w.retrySettings.CheckError != nil {
 				needOverloaded = true
 			}
+
 			w.splitted.Store(true)
 			w.onSplit(w.partitionID)
+
 			break
 		}
 
@@ -160,6 +162,7 @@ func (w *writerWithAutopartitioning) Write(ctx context.Context, messages []topic
 
 func (w *writerWithAutopartitioning) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
 	time.Sleep(time.Second)
+
 	return topicwriterinternal.InitialInfo{
 		LastSeqNum: w.currentSeqNo,
 	}, nil
@@ -174,5 +177,6 @@ func (w *writerWithAutopartitioning) Close(ctx context.Context) error {
 
 	w.closed = true
 	close(w.closeChan)
+
 	return nil
 }

@@ -7,6 +7,8 @@ import (
 )
 
 func TestPartitionChooser_Bound(t *testing.T) {
+	t.Parallel()
+
 	t.Run("SinglePartition", func(t *testing.T) {
 		t.Parallel()
 
@@ -121,6 +123,8 @@ func TestPartitionChooser_Bound(t *testing.T) {
 }
 
 func TestPartitionChooser_Hash(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Basic", func(t *testing.T) {
 		t.Parallel()
 

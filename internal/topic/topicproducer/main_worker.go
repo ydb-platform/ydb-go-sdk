@@ -7,6 +7,8 @@ import (
 
 	"github.com/spaolacci/murmur3"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -15,13 +17,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
-	"golang.org/x/sync/errgroup"
 )
 
 type messagePtr *xlist.Element[Message]
 
 type worker struct {
-	ctx  context.Context
+	ctx  context.Context //nolint:containedctx
 	err  error
 	stop context.CancelFunc
 
@@ -39,7 +40,6 @@ type worker struct {
 	messagesToResendIndex map[int64]xlist.List[messagePtr]
 
 	topicDescriber TopicDescriber
-	topicPath      string
 
 	wakeupChan empty.Chan
 	shutdown   empty.Chan
@@ -112,20 +112,17 @@ func (w *worker) getDefaultKeyHasher() KeyHasher {
 		lo := murmur3.Sum64([]byte(key))
 		out := make([]byte, 8)
 		binary.BigEndian.PutUint64(out, lo)
+
 		return string(out)
 	}
 }
 
 func (w *worker) init() (err error) {
-	defer func() {
-		if err == nil {
-			close(w.initDone)
-		}
-	}()
+	defer close(w.initDone)
 
 	describeResult, err := w.topicDescriber(w.ctx, w.cfg.Topic())
 	if err != nil {
-		return
+		return err
 	}
 
 	for _, partition := range describeResult.Partitions {
@@ -143,27 +140,25 @@ func (w *worker) init() (err error) {
 		}
 	}
 
-	w.isAutoPartitioningEnabled =
-		describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
-			topictypes.AutoPartitioningStrategyDisabled
+	w.isAutoPartitioningEnabled = describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
+		topictypes.AutoPartitioningStrategyDisabled
 
 	switch w.cfg.PartitionChooserStrategy {
 	case PartitionChooserStrategyBound:
 		w.partitionChooser, err = newBoundPartitionChooser(w.cfg, w.partitions)
 		if err != nil {
-			w.err = err
-			w.stop()
-			return
+			return err
 		}
 	case PartitionChooserStrategyHash:
 		partitionIDs := make([]int64, 0, len(w.partitions))
 		for id := range w.partitions {
 			partitionIDs = append(partitionIDs, id)
 		}
+
 		w.partitionChooser = newHashPartitionChooser(w.cfg, partitionIDs)
 	}
 
-	return
+	return nil
 }
 
 func (w *worker) choosePartition(msg Message) (partitionID int64, err error) {
@@ -197,6 +192,7 @@ func (w *worker) addToInFlightMessagesIndex(newElement messagePtr, toPartition i
 		list = xlist.New[messagePtr]()
 		w.inFlightMessagesIndex[toPartition] = list
 	}
+
 	if toFront {
 		list.PushFront(newElement)
 	} else {
@@ -211,6 +207,7 @@ func (w *worker) addToPendingMessagesIndex(newElement messagePtr, toPartition in
 		list = xlist.New[messagePtr]()
 		w.pendingMessagesIndex[toPartition] = list
 	}
+
 	if toFront {
 		list.PushFront(newElement)
 	} else {
@@ -225,6 +222,7 @@ func (w *worker) addToMessagesToResendIndex(newElement messagePtr, toPartition i
 		list = xlist.New[messagePtr]()
 		w.messagesToResendIndex[toPartition] = list
 	}
+
 	if toFront {
 		list.PushFront(newElement)
 	} else {
@@ -260,6 +258,7 @@ func (w *worker) removeWriter(partitionID int64) {
 		if !ok {
 			return
 		}
+
 		toClose = wr
 		delete(w.writers, partitionID)
 	})
@@ -273,6 +272,7 @@ func (w *worker) removeWriter(partitionID int64) {
 			w.err = err
 			w.stop()
 		})
+
 		return
 	}
 }
@@ -282,6 +282,7 @@ func (w *worker) closeWriters(ctx context.Context) (finalErr error) {
 		for _, wr := range w.writers {
 			if err := wr.Close(ctx); err != nil {
 				finalErr = err
+
 				return
 			}
 		}
@@ -295,7 +296,9 @@ func (w *worker) getProducerID(partitionID int64) string {
 }
 
 func (w *worker) createWriter(partitionID int64) (writer, error) {
-	withCustomCheckRetryErrorFunction := func(callback topic.PublicCheckErrorRetryFunction) topicwriterinternal.PublicWriterOption {
+	withCustomCheckRetryErrorFunction := func(
+		callback topic.PublicCheckErrorRetryFunction,
+	) topicwriterinternal.PublicWriterOption {
 		return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
 			cfg.RetrySettings.CheckError = callback
 		}
@@ -316,7 +319,13 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 				if isOperationErrorOverloaded(args.Error) {
-					w.onPartitionSplit(partitionID)
+					if err := w.onPartitionSplit(partitionID); err != nil {
+						w.mu.WithLock(func() {
+							w.err = err
+							w.stop()
+						})
+					}
+
 					return topic.PublicRetryDecisionStop
 				}
 
@@ -347,7 +356,7 @@ func (w *worker) onAckReceived(partitionID, seqNo int64) {
 
 	message := indexChain.Front()
 	if message.Value.Value.SeqNo != 0 && message.Value.Value.SeqNo != seqNo {
-		panic("seqNo mismatch") // TODO: maybe not panic here?
+		panic("seqNo mismatch")
 	}
 
 	message.Value.Value.AckReceived = true
@@ -383,7 +392,10 @@ func (w *worker) releaseInFlightMessages() {
 	}
 }
 
-func (w *worker) getSplittedPartitionAncestors(describeResult *topictypes.TopicDescription, partitionID int64) ([]int64, error) {
+func (w *worker) getSplittedPartitionAncestors(
+	describeResult *topictypes.TopicDescription,
+	partitionID int64,
+) []int64 {
 	partitionToParent := make(map[int64]int64)
 	for _, partition := range describeResult.Partitions {
 		if len(partition.ParentPartitionIDs) == 0 {
@@ -407,7 +419,7 @@ func (w *worker) getSplittedPartitionAncestors(describeResult *topictypes.TopicD
 		currentPartitionID = parentID
 	}
 
-	return ancestors, nil
+	return ancestors
 }
 
 func (w *worker) addNewPartitions(describeResult *topictypes.TopicDescription, splittedPartitionID int64) {
@@ -435,18 +447,19 @@ func (w *worker) getSplittedPartitionChildren(describeResult *topictypes.TopicDe
 	return nil
 }
 
+func (w *worker) rechoosePartition(msg *Message) (err error) {
+	msg.PartitionID = 0
+	msg.PartitionID, err = w.choosePartition(*msg)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error) {
 	inFlightIndexChain, ok := w.inFlightMessagesIndex[partitionID]
 	if !ok {
-		return nil
-	}
-
-	rechoosePartition := func(msg *Message) error {
-		msg.PartitionID = 0
-		msg.PartitionID, err = w.choosePartition(*msg)
-		if err != nil {
-			return err
-		}
 		return nil
 	}
 
@@ -469,10 +482,11 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 				w.cfg.OnAckReceivedCallback(msg.SeqNo)
 			}
 			w.onAckReceived(partitionID, msg.SeqNo)
+
 			continue
 		}
 
-		if err := rechoosePartition(&msg); err != nil {
+		if err := w.rechoosePartition(&msg); err != nil {
 			return err
 		}
 
@@ -506,31 +520,8 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 	return nil
 }
 
-func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
-	describeResult, err := w.topicDescriber(w.ctx, w.cfg.Topic())
-	if err != nil {
-		return err
-	}
-
-	w.mu.WithLock(func() {
-		partition := w.partitions[partitionID]
-		partition.Locked = true
-		partition.Children = w.getSplittedPartitionChildren(&describeResult, partitionID)
-		w.addNewPartitions(&describeResult, partitionID)
-		for _, child := range partition.Children {
-			childPartition := w.partitions[child]
-			w.partitionChooser.AddNewPartition(child, childPartition.FromBound, childPartition.ToBound)
-		}
-		w.partitionChooser.RemovePartition(partitionID)
-	})
-
-	ancestors, err := w.getSplittedPartitionAncestors(&describeResult, partitionID)
-	if err != nil {
-		return err
-	}
-
+func (w *worker) getMaxSeqNo(ancestors []int64) (maxSeqNo int64, err error) {
 	var (
-		maxSeqNo int64
 		mu       xsync.Mutex
 		errGroup errgroup.Group
 	)
@@ -555,11 +546,39 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 			mu.WithLock(func() {
 				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
 			})
+
 			return nil
 		})
 	}
 
 	if err := errGroup.Wait(); err != nil {
+		return 0, err
+	}
+
+	return maxSeqNo, nil
+}
+
+func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
+	describeResult, err := w.topicDescriber(w.ctx, w.cfg.Topic())
+	if err != nil {
+		return err
+	}
+
+	w.mu.WithLock(func() {
+		partition := w.partitions[partitionID]
+		partition.Locked = true
+		partition.Children = w.getSplittedPartitionChildren(&describeResult, partitionID)
+		w.addNewPartitions(&describeResult, partitionID)
+		for _, child := range partition.Children {
+			childPartition := w.partitions[child]
+			w.partitionChooser.AddNewPartition(child, childPartition.FromBound, childPartition.ToBound)
+		}
+		w.partitionChooser.RemovePartition(partitionID)
+	})
+
+	ancestors := w.getSplittedPartitionAncestors(&describeResult, partitionID)
+	maxSeqNo, err := w.getMaxSeqNo(ancestors)
+	if err != nil {
 		return err
 	}
 
@@ -570,6 +589,7 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 		if err != nil {
 			w.err = err
 			w.stop()
+
 			return
 		}
 
@@ -595,6 +615,7 @@ func (w *worker) getWriter(partitionID int64) (*writerWrapper, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		wrapper := &writerWrapper{
 			writer: partitionWriter,
 		}
@@ -606,6 +627,7 @@ func (w *worker) getWriter(partitionID int64) (*writerWrapper, error) {
 				if err != nil {
 					w.err = err
 					w.stop()
+
 					return
 				}
 				wrapper.initDone = true
@@ -615,10 +637,12 @@ func (w *worker) getWriter(partitionID int64) (*writerWrapper, error) {
 		})
 
 		w.idleWritersSupervisor.remove(partitionID)
+
 		return wrapper, nil
 	}
 
 	w.idleWritersSupervisor.remove(partitionID)
+
 	return wr, nil
 }
 
@@ -635,6 +659,7 @@ func (w *worker) flush(ctx context.Context) error {
 	w.mu.WithLock(func() {
 		if w.inFlightMessages.Len() == 0 {
 			waitCh <- empty.Struct{}
+
 			return
 		}
 
@@ -702,15 +727,21 @@ func (w *worker) step() error {
 		return nil
 	}
 
-	if err := iterateThroughMessagesIndex(w.messagesToResendIndex, func(msg messagePtr) bool { return false }); err != nil {
+	if err := iterateThroughMessagesIndex(
+		w.messagesToResendIndex,
+		func(msg messagePtr) bool { return false },
+	); err != nil {
 		return err
 	}
 
-	if err := iterateThroughMessagesIndex(w.pendingMessagesIndex, func(msg messagePtr) bool { _, ok := w.messagesToResendIndex[msg.Value.PartitionID]; return ok }); err != nil {
-		return err
-	}
+	return iterateThroughMessagesIndex(
+		w.pendingMessagesIndex,
+		func(msg messagePtr) bool {
+			_, ok := w.messagesToResendIndex[msg.Value.PartitionID]
 
-	return nil
+			return ok
+		},
+	)
 }
 
 func (w *worker) waitInitDone(ctx context.Context) error {
@@ -718,7 +749,7 @@ func (w *worker) waitInitDone(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-w.initDone:
-		return nil
+		return w.getResultErr()
 	}
 }
 
@@ -735,6 +766,7 @@ func (w *worker) run() {
 		if err := w.step(); err != nil {
 			w.err = err
 			w.stop()
+
 			return
 		}
 	}

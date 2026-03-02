@@ -49,6 +49,7 @@ func (s *DescribeWithSplitsState) RecordSplit(partitionID int64) {
 		if p.PartitionID == partitionID {
 			fromBound = p.FromBound
 			toBound = p.ToBound
+
 			break
 		}
 	}
@@ -116,6 +117,7 @@ func midBound(from, to []byte) []byte {
 	fromU := boundToU64(from)
 	toU := boundToU64(to)
 	mid := (fromU + toU) / 2
+
 	return u64ToBound(mid)
 }
 
@@ -127,14 +129,17 @@ func boundToU64(b []byte) uint64 {
 		// pad left with zeros (big-endian)
 		buf := make([]byte, 8)
 		copy(buf[8-len(b):], b)
+
 		return binary.BigEndian.Uint64(buf)
 	}
+
 	return binary.BigEndian.Uint64(b[:8])
 }
 
 func u64ToBound(u uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, u)
+
 	return b
 }
 
@@ -144,5 +149,6 @@ func cloneBytes(b []byte) []byte {
 	}
 	out := make([]byte, len(b))
 	copy(out, b)
+
 	return out
 }

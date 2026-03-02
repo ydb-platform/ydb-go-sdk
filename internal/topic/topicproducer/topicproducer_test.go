@@ -25,7 +25,11 @@ type stubWritersFactory struct {
 	mu               xsync.Mutex
 }
 
-func newStubWritersFactory(stubWriterType stubs.StubWriterType, producerIDPrefix string, describeSplits *stubs.DescribeWithSplitsState) *stubWritersFactory {
+func newStubWritersFactory(
+	stubWriterType stubs.StubWriterType,
+	producerIDPrefix string,
+	describeSplits *stubs.DescribeWithSplitsState,
+) *stubWritersFactory {
 	return &stubWritersFactory{
 		stubWriterType:   stubWriterType,
 		producerIDPrefix: producerIDPrefix,
@@ -55,6 +59,7 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 		f.mu.WithLock(func() {
 			maxSeqNo = f.seqNoMap[producerID]
 		})
+
 		return stubs.NewWriterWithAutopartitioning(
 			cfg.OnAckReceivedCallback,
 			cfg.RetrySettings,
@@ -72,6 +77,7 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 
 func newTestProducer(t testing.TB, describer TopicDescriber) *Producer {
 	t.Helper()
+
 	return NewProducer(describer, ProducerConfig{})
 }
 
@@ -86,6 +92,7 @@ func newTestProducerWithBasicWriter(t testing.TB, describer TopicDescriber) *Pro
 		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	)(&cfg)
+
 	return NewProducer(describer, cfg)
 }
 
@@ -109,6 +116,7 @@ func newTestProducerWithAutopartitioningWriter(
 		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	)(&cfg)
+
 	return NewProducer(describer, cfg)
 }
 
@@ -192,14 +200,17 @@ func TestProducer_Write_WithBasicWriter(t *testing.T) {
 	)
 
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
-	producer := newTestProducerWithBasicWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-		return stubClient.Describe(ctx, path)
-	})
+	producer := newTestProducerWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
 
 	err := producer.WaitInit(ctx)
 	require.NoError(t, err)
 
-	var messages []Message
+	messages := make([]Message, 0, 1000)
 	for i := range 1000 {
 		mu.WithLock(func() {
 			sentTimestamp[int64(i+1)] = time.Now()
@@ -230,16 +241,20 @@ func TestProducer_Write_WithAutopartitioningWriter(t *testing.T) {
 	baseDesc := stubs.DefaultStubTopicDescription()
 	state := stubs.NewDescribeWithSplitsState(baseDesc, 6) // 6 is first free ID after partitions 1..5
 	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
-	producer := newTestProducerWithAutopartitioningWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-		return stubClient.Describe(ctx, path)
-	}, state)
+	producer := newTestProducerWithAutopartitioningWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		state,
+	)
 
 	err := producer.WaitInit(ctx)
 	require.NoError(t, err)
 
 	// Send enough messages so at least one partition hits MessagesBeforeOverloaded and returns OVERLOADED.
 	// onPartitionSplit uses writersFactory.Create + writer.WaitInit (same stub), so split path runs without StartWriter.
-	var messages []Message
+	messages := make([]Message, 0, 1000)
 	for i := range 1000 {
 		messages = append(messages, Message{
 			PublicMessage: topicwriterinternal.PublicMessage{
