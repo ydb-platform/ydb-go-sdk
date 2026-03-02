@@ -28,6 +28,8 @@ func (w *testWriter) Write(_ context.Context, _ []topicwriterinternal.PublicMess
 }
 
 func TestIdleWritersSupervisor_AddAndRemoveUpdatesIndex(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -76,6 +78,8 @@ func TestIdleWritersSupervisor_AddAndRemoveUpdatesIndex(t *testing.T) {
 }
 
 func TestIdleWritersSupervisor_RemovesIdleWriterAfterTimeout(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
