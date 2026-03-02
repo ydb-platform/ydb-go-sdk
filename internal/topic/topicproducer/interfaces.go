@@ -8,10 +8,10 @@ import (
 
 type writer interface {
 	Close(ctx context.Context) error
-	WaitInit(ctx context.Context) error
-	Write(ctx context.Context, messages ...topicwriterinternal.PublicMessage) error
+	WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error)
+	Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error
 }
 
 type writersFactory interface {
-	Create(topicPath string, opts ...topicwriterinternal.PublicWriterOption) (writer, error)
+	Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error)
 }

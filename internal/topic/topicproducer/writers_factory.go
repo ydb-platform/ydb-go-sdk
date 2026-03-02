@@ -19,6 +19,10 @@ func newBaseWritersFactory(client topicclient.Client) *baseWritersFactory {
 	}
 }
 
-func (f *baseWritersFactory) Create(topicPath string, opts ...topicwriterinternal.PublicWriterOption) (writer, error) {
-	return f.client.StartWriter(topicPath, opts...)
+func (f *baseWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return writer, nil
 }

@@ -17,7 +17,7 @@ type idleWritersSupervisor struct {
 	mu               xsync.Mutex
 	timeout          time.Duration
 	background       *background.Worker
-	updateChan       empty.Chan
+	wakeupChan       empty.Chan
 	worker           *worker
 }
 
@@ -30,7 +30,7 @@ func newIdleWritersSupervisor(
 		ctx:              ctx,
 		idleWriters:      xlist.New[idleWriterInfo](),
 		idleWritersIndex: make(map[int64]*xlist.Element[idleWriterInfo]),
-		updateChan:       make(empty.Chan, 1),
+		wakeupChan:       make(empty.Chan, 1),
 		worker:           worker,
 		timeout:          idleTimeout,
 	}
@@ -48,7 +48,7 @@ func (s *idleWritersSupervisor) add(partitionID int64) {
 	s.idleWritersIndex[partitionID] = element
 
 	if wasEmpty {
-		s.updateChan <- empty.Struct{}
+		s.wakeup()
 	}
 }
 
@@ -66,7 +66,14 @@ func (s *idleWritersSupervisor) remove(partitionID int64) {
 	delete(s.idleWritersIndex, partitionID)
 
 	if wasHead {
-		s.updateChan <- empty.Struct{}
+		s.wakeup()
+	}
+}
+
+func (s *idleWritersSupervisor) wakeup() {
+	select {
+	case s.wakeupChan <- empty.Struct{}:
+	default:
 	}
 }
 
@@ -82,7 +89,7 @@ func (s *idleWritersSupervisor) run() {
 		select {
 		case <-s.ctx.Done():
 			return
-		case <-s.updateChan:
+		case <-s.wakeupChan:
 		case <-time.After(nextTimeout):
 		}
 
@@ -92,7 +99,7 @@ func (s *idleWritersSupervisor) run() {
 			if element == nil {
 				return
 			}
-			if element.Value.deadline.After(time.Now()) {
+			if !element.Value.deadline.After(time.Now()) {
 				partitionID = &element.Value.partitionID
 			}
 		})

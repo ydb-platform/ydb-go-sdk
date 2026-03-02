@@ -33,3 +33,14 @@ type WritersCommonConfig struct {
 func (c *WritersCommonConfig) Topic() string {
 	return c.topic
 }
+
+func (c *WritersCommonConfig) PartitionID() (int64, bool) {
+	if c.defaultPartitioning.Type == rawtopicwriter.PartitioningPartitionID {
+		return c.defaultPartitioning.PartitionID, true
+	}
+	return 0, false
+}
+
+func (c *WritersCommonConfig) ProducerID() string {
+	return c.producerID
+}

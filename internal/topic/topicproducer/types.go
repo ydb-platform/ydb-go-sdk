@@ -28,8 +28,7 @@ const (
 
 type writerWrapper struct {
 	writer
-	inFlightCount int
-	initDone      bool
+	initDone bool
 }
 
 type idleWriterInfo struct {

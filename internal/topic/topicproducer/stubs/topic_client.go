@@ -42,6 +42,22 @@ func NewStubTopicClientWithError(t testing.TB, describeErr error) *stubTopicClie
 	}
 }
 
+// NewStubTopicClientWithSplits creates a topic client whose Describe returns the current
+// description from state. When state.RecordSplit(partitionID) is called (e.g. by the
+// writer stub on OVERLOADED), the next Describe returns the partition with ChildPartitionIDs
+// and two new partitions with bounds [from, mid) and [mid, to).
+func NewStubTopicClientWithSplits(t testing.TB, state *DescribeWithSplitsState) *stubTopicClient {
+	t.Helper()
+	return &stubTopicClient{
+		describe: func(ctx context.Context, path string, opts ...topicoptions.DescribeOption) (topictypes.TopicDescription, error) {
+			return state.GetDescription(), nil
+		},
+		startWriter: func(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
+			return nil, nil
+		},
+	}
+}
+
 func (m *stubTopicClient) Describe(ctx context.Context, path string, opts ...topicoptions.DescribeOption) (topictypes.TopicDescription, error) {
 	return m.describe(ctx, path, opts...)
 }

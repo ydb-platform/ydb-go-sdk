@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,29 +12,59 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	topicclient "github.com/ydb-platform/ydb-go-sdk/v3/topic"
 )
 
 type stubWritersFactory struct {
-	stubWriterType stubs.StubWriterType
+	stubWriterType   stubs.StubWriterType
+	producerIDPrefix string
+	describeSplits   *stubs.DescribeWithSplitsState
+	seqNoMap         map[string]int64
+	mu               xsync.Mutex
 }
 
-func newStubWritersFactory(stubWriterType stubs.StubWriterType) *stubWritersFactory {
+func newStubWritersFactory(stubWriterType stubs.StubWriterType, producerIDPrefix string, describeSplits *stubs.DescribeWithSplitsState) *stubWritersFactory {
 	return &stubWritersFactory{
-		stubWriterType: stubWriterType,
+		stubWriterType:   stubWriterType,
+		producerIDPrefix: producerIDPrefix,
+		describeSplits:   describeSplits,
+		seqNoMap:         make(map[string]int64),
 	}
 }
 
-func (f *stubWritersFactory) Create(topicPath string, opts ...topicwriterinternal.PublicWriterOption) (writer, error) {
+func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	switch f.stubWriterType {
 	case stubs.StubWriterTypeBasic:
-		cfg := &topicwriterinternal.WriterReconnectorConfig{}
-		for _, opt := range opts {
-			opt(cfg)
+		return stubs.NewBasicWriter(cfg.OnAckReceivedCallback, cfg.AutoSetSeqNo), nil
+	case stubs.StubWriterTypeWithAutopartitioning:
+		partitionID, _ := cfg.PartitionID()
+		producerID := cfg.ProducerID()
+		var onSplit func(int64)
+		if f.describeSplits != nil {
+			onSplit = f.describeSplits.RecordSplit
+		}
+		updateSeqNo := func(producerID string, seqNo int64) {
+			f.mu.WithLock(func() {
+				f.seqNoMap[producerID] = max(f.seqNoMap[producerID], seqNo)
+			})
 		}
 
-		return stubs.NewBasicWriter(cfg.OnAckReceivedCallback), nil
+		var maxSeqNo int64
+		f.mu.WithLock(func() {
+			maxSeqNo = f.seqNoMap[producerID]
+		})
+		return stubs.NewWriterWithAutopartitioning(
+			cfg.OnAckReceivedCallback,
+			cfg.RetrySettings,
+			cfg.AutoSetSeqNo,
+			partitionID,
+			onSplit,
+			updateSeqNo,
+			maxSeqNo,
+			f.producerIDPrefix,
+		), nil
 	default:
 		return nil, errors.New("invalid stub writer type")
 	}
@@ -48,12 +79,34 @@ func newTestProducer(t testing.TB, client topicclient.Client) *Producer {
 func newTestProducerWithBasicWriter(t testing.TB, client topicclient.Client) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic))(&cfg)
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithBasicWriterOptions(
 		topicwriterinternal.WithTopic("test/topic"),
 		topicwriterinternal.WithMaxQueueLen(100),
-		topicwriterinternal.WithAutoSetSeqNo(true),
+		topicwriterinternal.WithAutosetCreatedTime(false),
+	)(&cfg)
+	return NewProducer(client, cfg)
+}
+
+// newTestProducerWithAutopartitioningWriter creates a producer that uses the autopartitioning stub:
+// client must be from NewStubTopicClientWithSplits(t, state). After 100 messages the writer returns
+// OVERLOADED, main_worker calls onPartitionSplit and Describe; state adds two child partitions
+// with bounds [from, (from+to)/2) and [(from+to)/2, to).
+func newTestProducerWithAutopartitioningWriter(
+	t testing.TB,
+	client topicclient.Client,
+	state *stubs.DescribeWithSplitsState,
+) *Producer {
+	const producerIDPrefix = "test-producer"
+
+	t.Helper()
+	cfg := ProducerConfig{}
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state))(&cfg)
+	WithProducerIDPrefix(producerIDPrefix)(&cfg)
+	WithBasicWriterOptions(
+		topicwriterinternal.WithTopic("test/topic"),
+		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	)(&cfg)
 	return NewProducer(client, cfg)
@@ -124,19 +177,68 @@ func TestProducer_DescribeError(t *testing.T) {
 func TestProducer_Write_WithBasicWriter(t *testing.T) {
 	t.Parallel()
 
-	ctx := xtest.Context(t)
+	var (
+		ctx           = xtest.Context(t)
+		sentTimestamp = make(map[int64]time.Time)
+		mu            = xsync.Mutex{}
+	)
+
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
 	producer := newTestProducerWithBasicWriter(t, stubClient)
 
 	err := producer.WaitInit(ctx)
 	require.NoError(t, err)
 
-	err = producer.Write(ctx, Message{
-		PublicMessage: topicwriterinternal.PublicMessage{
-			Data: bytes.NewReader([]byte("hello")),
-		},
-		Key: "partition-key",
-	})
+	var messages []Message
+	for i := range 1000 {
+		mu.WithLock(func() {
+			sentTimestamp[int64(i+1)] = time.Now()
+		})
+		messages = append(messages, Message{
+			PublicMessage: topicwriterinternal.PublicMessage{
+				Data:  bytes.NewReader([]byte("hello")),
+				SeqNo: int64(i + 1),
+			},
+			Key: fmt.Sprintf("partition-key-%d", i),
+		})
+	}
+
+	err = producer.Write(ctx, messages...)
+	require.NoError(t, err)
+
+	err = producer.Flush(ctx)
+	require.NoError(t, err)
+
+	err = producer.Close(ctx)
+	require.NoError(t, err)
+}
+
+func TestProducer_Write_WithAutopartitioningWriter(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	baseDesc := stubs.DefaultStubTopicDescription()
+	state := stubs.NewDescribeWithSplitsState(baseDesc, 6) // 6 is first free ID after partitions 1..5
+	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
+	producer := newTestProducerWithAutopartitioningWriter(t, stubClient, state)
+
+	err := producer.WaitInit(ctx)
+	require.NoError(t, err)
+
+	// Send enough messages so at least one partition hits MessagesBeforeOverloaded and returns OVERLOADED.
+	// onPartitionSplit uses writersFactory.Create + writer.WaitInit (same stub), so split path runs without StartWriter.
+	var messages []Message
+	for i := range 1000 {
+		messages = append(messages, Message{
+			PublicMessage: topicwriterinternal.PublicMessage{
+				Data:  bytes.NewReader([]byte("hello")),
+				SeqNo: int64(i + 1),
+			},
+			Key: fmt.Sprintf("partition-key-%d", i+1),
+		})
+	}
+
+	err = producer.Write(ctx, messages...)
 	require.NoError(t, err)
 
 	err = producer.Flush(ctx)

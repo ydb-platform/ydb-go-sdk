@@ -16,6 +16,7 @@ type Message struct {
 	PartitionID   int64
 	OnAckCallback func()
 	AckReceived   bool
+	Sent          bool
 }
 
 type Producer struct {
@@ -57,8 +58,12 @@ func NewProducer(topicClient topicclient.Client, cfg ProducerConfig) *Producer {
 }
 
 func (p *Producer) Write(ctx context.Context, messages ...Message) error {
-	for _, message := range messages {
-		if err := p.worker.pushMessage(ctx, message); err != nil {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	for _, msg := range messages {
+		if err := p.worker.pushMessage(ctx, msg); err != nil {
 			return err
 		}
 	}
@@ -77,6 +82,9 @@ func (p *Producer) Close(ctx context.Context) error {
 
 	p.worker.stop()
 	p.background.Close(ctx, nil)
+	if err := p.worker.closeWriters(ctx); err != nil {
+		return err
+	}
 
 	select {
 	case <-p.shutdown:
