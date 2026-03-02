@@ -79,6 +79,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 	}
 	if !meta.Status.IsSuccess() {
 		opErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_StatusCode(meta.Status)))
+
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %w", opErr))
 	}
 
