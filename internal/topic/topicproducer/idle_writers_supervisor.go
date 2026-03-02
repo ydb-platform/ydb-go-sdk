@@ -99,6 +99,7 @@ func (s *idleWritersSupervisor) run() {
 			}
 			if !element.Value.deadline.After(time.Now()) {
 				partitionID = &element.Value.partitionID
+				s.idleWriters.Remove(element)
 			}
 		})
 

@@ -60,8 +60,9 @@ type WriterReconnectorConfig struct {
 	AutoSetSeqNo                 bool
 	AutoSetCreatedTime           bool
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
-	OnAckReceivedCallback        PublicOnAckReceivedCallback
-	RetrySettings                topic.RetrySettings
+	OnAckReceivedCallback        func(seqNo int64)
+
+	RetrySettings topic.RetrySettings
 
 	connectTimeout time.Duration
 }

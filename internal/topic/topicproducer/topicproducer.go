@@ -60,10 +60,6 @@ func NewProducer(topicDescriber TopicDescriber, cfg ProducerConfig) *Producer {
 }
 
 func (p *Producer) Write(ctx context.Context, messages ...Message) error {
-	if len(messages) == 0 {
-		return nil
-	}
-
 	for _, msg := range messages {
 		if err := p.worker.pushMessage(ctx, msg); err != nil {
 			return err
@@ -82,11 +78,16 @@ func (p *Producer) Close(ctx context.Context) error {
 		return ErrAlreadyClosed
 	}
 
-	p.worker.stop()
-	p.background.Close(ctx, nil)
-	if err := p.worker.closeWriters(ctx); err != nil {
+	defer func() {
+		_ = p.worker.closeWriters(ctx)
+	}()
+
+	if err := p.worker.flush(ctx); err != nil {
 		return err
 	}
+
+	p.worker.stop()
+	p.background.Close(ctx, nil)
 
 	select {
 	case <-p.shutdown:
@@ -102,4 +103,8 @@ func (p *Producer) Flush(ctx context.Context) error {
 
 func (p *Producer) WaitInit(ctx context.Context) error {
 	return p.worker.waitInitDone(ctx)
+}
+
+func (p *Producer) getWritersCount() int {
+	return len(p.worker.writers)
 }

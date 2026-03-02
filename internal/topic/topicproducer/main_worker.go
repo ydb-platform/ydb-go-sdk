@@ -236,7 +236,7 @@ func (w *worker) pushMessage(ctx context.Context, msg Message) (err error) {
 		autoSetSeqNo = w.cfg.AutoSetSeqNo
 	})
 
-	if autoSetSeqNo && msg.SeqNo == 0 {
+	if !autoSetSeqNo && msg.SeqNo == 0 {
 		return ErrNoSeqNo
 	}
 
@@ -319,9 +319,6 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 			topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
 			topicwriterinternal.WithProducerID(w.getProducerID(partitionID)),
 			topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
-				if w.cfg.OnAckReceivedCallback != nil {
-					w.cfg.OnAckReceivedCallback(seqNo)
-				}
 				w.mu.WithLock(func() {
 					w.onAckReceived(partitionID, seqNo)
 				})
@@ -459,11 +456,8 @@ func (w *worker) getSplittedPartitionChildren(describeResult *topictypes.TopicDe
 func (w *worker) rechoosePartition(msg *Message) (err error) {
 	msg.PartitionID = 0
 	msg.PartitionID, err = w.choosePartition(*msg)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error) {
@@ -487,9 +481,6 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 				continue
 			}
 
-			if w.cfg.OnAckReceivedCallback != nil {
-				w.cfg.OnAckReceivedCallback(msg.SeqNo)
-			}
 			w.onAckReceived(partitionID, msg.SeqNo)
 
 			continue
@@ -686,6 +677,8 @@ func (w *worker) flush(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-w.ctx.Done():
+		return w.getResultErr()
 	case <-waitCh:
 		return nil
 	}
@@ -773,8 +766,10 @@ func (w *worker) run() {
 		}
 
 		if err := w.step(); err != nil {
-			w.err = err
-			w.stop()
+			w.mu.WithLock(func() {
+				w.err = err
+				w.stop()
+			})
 
 			return
 		}

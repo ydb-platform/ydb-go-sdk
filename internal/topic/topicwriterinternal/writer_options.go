@@ -58,7 +58,7 @@ func WithTokenUpdateInterval(interval time.Duration) PublicWriterOption {
 	}
 }
 
-func WithOnAckReceivedCallback(handler PublicOnAckReceivedCallback) PublicWriterOption {
+func WithOnAckReceivedCallback(handler func(seqNo int64)) func(cfg *WriterReconnectorConfig) {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.OnAckReceivedCallback = handler
 	}

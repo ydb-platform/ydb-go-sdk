@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -17,31 +18,40 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
+var (
+	errTest = errors.New("test error")
+)
+
 type stubWritersFactory struct {
 	stubWriterType   stubs.StubWriterType
 	producerIDPrefix string
 	describeSplits   *stubs.DescribeWithSplitsState
 	seqNoMap         map[string]int64
 	mu               xsync.Mutex
+	ackDelay         time.Duration
 }
 
 func newStubWritersFactory(
 	stubWriterType stubs.StubWriterType,
 	producerIDPrefix string,
 	describeSplits *stubs.DescribeWithSplitsState,
+	ackDelay time.Duration,
 ) *stubWritersFactory {
 	return &stubWritersFactory{
 		stubWriterType:   stubWriterType,
 		producerIDPrefix: producerIDPrefix,
 		describeSplits:   describeSplits,
 		seqNoMap:         make(map[string]int64),
+		ackDelay:         ackDelay,
 	}
 }
 
 func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	switch f.stubWriterType {
 	case stubs.StubWriterTypeBasic:
-		return stubs.NewBasicWriter(cfg.OnAckReceivedCallback, cfg.AutoSetSeqNo), nil
+		return stubs.NewBasicWriter(cfg.OnAckReceivedCallback, cfg.AutoSetSeqNo, f.ackDelay), nil
+	case stubs.StubWriterTypeError:
+		return nil, errTest
 	case stubs.StubWriterTypeWithAutopartitioning:
 		partitionID, _ := cfg.PartitionID()
 		producerID := cfg.ProducerID()
@@ -82,16 +92,19 @@ func newTestProducer(t testing.TB, describer TopicDescriber) *Producer {
 }
 
 // newTestProducerWithBasicWriter creates a producer that uses basicWriter as writer (no real gRPC).
-func newTestProducerWithBasicWriter(t testing.TB, describer TopicDescriber) *Producer {
+func newTestProducerWithBasicWriter(t testing.TB, describer TopicDescriber, opts ...topicwriterinternal.PublicWriterOption) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil))(&cfg)
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
-	WithBasicWriterOptions(
+
+	options := []topicwriterinternal.PublicWriterOption{
 		topicwriterinternal.WithTopic("test/topic"),
 		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
-	)(&cfg)
+	}
+	options = append(options, opts...)
+	WithBasicWriterOptions(options...)(&cfg)
 
 	return NewProducer(describer, cfg)
 }
@@ -109,13 +122,60 @@ func newTestProducerWithAutopartitioningWriter(
 
 	t.Helper()
 	cfg := ProducerConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state))(&cfg)
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state, 0))(&cfg)
 	WithProducerIDPrefix(producerIDPrefix)(&cfg)
 	WithBasicWriterOptions(
 		topicwriterinternal.WithTopic("test/topic"),
 		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	)(&cfg)
+
+	return NewProducer(describer, cfg)
+}
+
+func newTestProducerWithSmallIdleSessionTimeout(t testing.TB, describer TopicDescriber) *Producer {
+	t.Helper()
+	cfg := ProducerConfig{}
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+	WithSubSessionIdleTimeout(1 * time.Second)(&cfg)
+	WithBasicWriterOptions(
+		topicwriterinternal.WithTopic("test/topic"),
+		topicwriterinternal.WithMaxQueueLen(100),
+		topicwriterinternal.WithAutosetCreatedTime(false),
+	)(&cfg)
+
+	return NewProducer(describer, cfg)
+}
+
+func newTestProducerWithAckDelay(t testing.TB, describer TopicDescriber, ackDelay time.Duration, opts ...topicwriterinternal.PublicWriterOption) *Producer {
+	t.Helper()
+	cfg := ProducerConfig{}
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, ackDelay))(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+
+	options := []topicwriterinternal.PublicWriterOption{
+		topicwriterinternal.WithTopic("test/topic"),
+		topicwriterinternal.WithAutosetCreatedTime(false),
+	}
+	options = append(options, opts...)
+	WithBasicWriterOptions(options...)(&cfg)
+
+	return NewProducer(describer, cfg)
+}
+
+func newTestProducerWithCustomWritersFactory(t testing.TB, describer TopicDescriber, writersFactory writersFactory, opts ...topicwriterinternal.PublicWriterOption) *Producer {
+	t.Helper()
+	cfg := ProducerConfig{}
+	withWritersFactory(writersFactory)(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+
+	options := []topicwriterinternal.PublicWriterOption{
+		topicwriterinternal.WithTopic("test/topic"),
+		topicwriterinternal.WithAutosetCreatedTime(false),
+	}
+	options = append(options, opts...)
+	WithBasicWriterOptions(options...)(&cfg)
 
 	return NewProducer(describer, cfg)
 }
@@ -193,11 +253,7 @@ func TestProducer_DescribeError(t *testing.T) {
 func TestProducer_Write_WithBasicWriter(t *testing.T) {
 	t.Parallel()
 
-	var (
-		ctx           = xtest.Context(t)
-		sentTimestamp = make(map[int64]time.Time)
-		mu            = xsync.Mutex{}
-	)
+	ctx := xtest.Context(t)
 
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
 	producer := newTestProducerWithBasicWriter(
@@ -212,9 +268,6 @@ func TestProducer_Write_WithBasicWriter(t *testing.T) {
 
 	messages := make([]Message, 0, 1000)
 	for i := range 1000 {
-		mu.WithLock(func() {
-			sentTimestamp[int64(i+1)] = time.Now()
-		})
 		messages = append(messages, Message{
 			PublicMessage: topicwriterinternal.PublicMessage{
 				Data:  bytes.NewReader([]byte("hello")),
@@ -224,14 +277,226 @@ func TestProducer_Write_WithBasicWriter(t *testing.T) {
 		})
 	}
 
-	err = producer.Write(ctx, messages...)
+	require.NoError(t, producer.Write(ctx, messages...))
+	require.NoError(t, producer.Close(ctx))
+}
+
+func TestProducer_Write_WaitForAck(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	producer := newTestProducerWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		topicwriterinternal.WithWaitAckOnWrite(true),
+	)
+
+	err := producer.WaitInit(ctx)
 	require.NoError(t, err)
 
-	err = producer.Flush(ctx)
+	messages := make([]Message, 0, 1000)
+	for i := range 1000 {
+		messages = append(messages, Message{
+			PublicMessage: topicwriterinternal.PublicMessage{
+				Data:  bytes.NewReader([]byte("hello")),
+				SeqNo: int64(i + 1),
+			},
+			Key: fmt.Sprintf("partition-key-%d", i),
+		})
+	}
+
+	require.NoError(t, producer.Write(ctx, messages...))
+	require.NoError(t, producer.Close(ctx))
+}
+
+func TestProducer_Write_WithErrorWritersFactory(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	producer := newTestProducerWithCustomWritersFactory(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		newStubWritersFactory(stubs.StubWriterTypeError, "test-producer", nil, 0),
+	)
+
+	err := producer.WaitInit(ctx)
 	require.NoError(t, err)
 
-	err = producer.Close(ctx)
+	err = producer.Write(ctx, Message{
+		PublicMessage: topicwriterinternal.PublicMessage{
+			Data:  bytes.NewReader([]byte("hello")),
+			SeqNo: 1,
+		},
+		Key: "partition-key-1",
+	})
 	require.NoError(t, err)
+	require.ErrorIs(t, producer.Flush(ctx), errTest)
+	require.ErrorIs(t, producer.Close(ctx), errTest)
+}
+
+func TestProducer_Write_MaxQueueLenExceeded(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	producer := newTestProducerWithAckDelay(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		time.Second*2,
+		topicwriterinternal.WithMaxQueueLen(10),
+	)
+
+	err := producer.WaitInit(ctx)
+	require.NoError(t, err)
+
+	messages := make([]Message, 0, 5)
+	for i := range 5 {
+		messages = append(messages, Message{
+			PublicMessage: topicwriterinternal.PublicMessage{
+				Data:  bytes.NewReader([]byte("hello")),
+				SeqNo: int64(i + 1),
+			},
+			Key: fmt.Sprintf("partition-key-%d", i),
+		})
+	}
+
+	require.NoError(t, producer.Write(ctx, messages...))
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	require.ErrorIs(t, producer.Write(ctxTimeout, Message{
+		PublicMessage: topicwriterinternal.PublicMessage{
+			Data:  bytes.NewReader([]byte("hello")),
+			SeqNo: 6,
+		},
+		Key: "partition-key-6",
+	}), context.DeadlineExceeded)
+	require.NoError(t, producer.Close(ctx))
+}
+
+func TestProducer_Write_CloseTimeout(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	producer := newTestProducerWithAckDelay(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		time.Second*2,
+	)
+
+	err := producer.WaitInit(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, producer.Write(ctx, Message{
+		PublicMessage: topicwriterinternal.PublicMessage{
+			Data:  bytes.NewReader([]byte("hello")),
+			SeqNo: 1,
+		},
+		Key: "partition-key-1",
+	}))
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	require.ErrorIs(t, producer.Close(ctxTimeout), context.DeadlineExceeded)
+}
+
+func TestProducer_Write_ErrNoSeqNo(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	producer := newTestProducerWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	err := producer.WaitInit(ctx)
+	require.NoError(t, err)
+
+	err = producer.Write(ctx, Message{
+		PublicMessage: topicwriterinternal.PublicMessage{
+			Data: bytes.NewReader([]byte("hello")),
+		},
+		Key: fmt.Sprintf("partition-key-%d", 1),
+	})
+
+	require.ErrorIs(t, err, ErrNoSeqNo)
+	require.NoError(t, producer.Close(ctx))
+}
+
+func TestProducer_CloseOfClosed(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	producer := newTestProducerWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	err := producer.WaitInit(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, producer.Close(ctx))
+	require.ErrorIs(t, producer.Close(ctx), ErrAlreadyClosed)
+}
+
+func TestProducer_Write_Parallel(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	producer := newTestProducerWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		topicwriterinternal.WithAutoSetSeqNo(true),
+	)
+
+	err := producer.WaitInit(ctx)
+	require.NoError(t, err)
+
+	var errgroup errgroup.Group
+	errgroup.SetLimit(10)
+
+	for i := range 1000 {
+		errgroup.Go(func() error {
+			return producer.Write(ctx, Message{
+				PublicMessage: topicwriterinternal.PublicMessage{
+					Data: bytes.NewReader([]byte("hello")),
+				},
+				Key: fmt.Sprintf("partition-key-%d", i+1),
+			})
+		})
+	}
+
+	require.NoError(t, errgroup.Wait())
+	require.NoError(t, producer.Close(ctx))
 }
 
 func TestProducer_Write_WithAutopartitioningWriter(t *testing.T) {
@@ -265,12 +530,56 @@ func TestProducer_Write_WithAutopartitioningWriter(t *testing.T) {
 		})
 	}
 
-	err = producer.Write(ctx, messages...)
+	require.NoError(t, producer.Write(ctx, messages...))
+	require.NoError(t, producer.Close(ctx))
+}
+
+func TestProducer_Write_SmallIdleSessionTimeout(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	baseDesc := stubs.DefaultStubTopicDescription()
+	state := stubs.NewDescribeWithSplitsState(baseDesc, 6) // 6 is first free ID after partitions 1..5
+	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
+	producer := newTestProducerWithSmallIdleSessionTimeout(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	err := producer.WaitInit(ctx)
 	require.NoError(t, err)
 
-	err = producer.Flush(ctx)
-	require.NoError(t, err)
+	// Send enough messages so at least one partition hits MessagesBeforeOverloaded and returns OVERLOADED.
+	// onPartitionSplit uses writersFactory.Create + writer.WaitInit (same stub), so split path runs without StartWriter.
+	messages := make([]Message, 0, 5)
+	for i := range 5 {
+		messages = append(messages, Message{
+			PublicMessage: topicwriterinternal.PublicMessage{
+				Data:  bytes.NewReader([]byte("hello")),
+				SeqNo: int64(i + 1),
+			},
+			Key: fmt.Sprintf("partition-key-%d", i+1),
+		})
+	}
 
-	err = producer.Close(ctx)
-	require.NoError(t, err)
+	require.NoError(t, producer.Write(ctx, messages...))
+	require.NoError(t, producer.Flush(ctx))
+
+	time.Sleep(2 * time.Second)
+	require.Equal(t, 0, producer.getWritersCount())
+	messages = messages[:0]
+	for i := range 5 {
+		messages = append(messages, Message{
+			PublicMessage: topicwriterinternal.PublicMessage{
+				Data:  bytes.NewReader([]byte("hello")),
+				SeqNo: int64(i + 6),
+			},
+			Key: fmt.Sprintf("partition-key-%d", i+6),
+		})
+	}
+
+	require.NoError(t, producer.Write(ctx, messages...))
+	require.NoError(t, producer.Close(ctx))
 }

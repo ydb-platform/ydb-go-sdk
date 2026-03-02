@@ -15,14 +15,16 @@ type basicWriter struct {
 	closedChan            empty.Chan
 	acksChan              chan int64
 	mu                    xsync.Mutex
-	onAckReceivedCallback topicwriterinternal.PublicOnAckReceivedCallback
+	onAckReceivedCallback func(seqNo int64)
 	autoSetSeqNo          bool
 	currentSeqNo          int64
+	ackDelay              time.Duration
 }
 
 func NewBasicWriter(
-	onAckReceivedCallback topicwriterinternal.PublicOnAckReceivedCallback,
+	onAckReceivedCallback func(seqNo int64),
 	autoSetSeqNo bool,
+	ackDelay time.Duration,
 ) *basicWriter {
 	w := &basicWriter{
 		onAckReceivedCallback: onAckReceivedCallback,
@@ -30,6 +32,7 @@ func NewBasicWriter(
 		closedChan:            make(empty.Chan),
 		acksChan:              make(chan int64, 100),
 		autoSetSeqNo:          autoSetSeqNo,
+		ackDelay:              ackDelay,
 	}
 
 	go w.ackProcessor()
@@ -39,7 +42,9 @@ func NewBasicWriter(
 
 func (w *basicWriter) ackProcessor() {
 	for ack := range w.acksChan {
-		// time.Sleep(time.Millisecond * 10)
+		if w.ackDelay > 0 {
+			time.Sleep(w.ackDelay)
+		}
 		w.onAckReceivedCallback(ack)
 	}
 }

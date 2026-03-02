@@ -23,7 +23,7 @@ const MessagesBeforeOverloaded = 100
 type writerWithAutopartitioning struct {
 	closed                bool
 	mu                    *sync.Mutex
-	onAckReceivedCallback topicwriterinternal.PublicOnAckReceivedCallback
+	onAckReceivedCallback func(seqNo int64)
 	retrySettings         topic.RetrySettings
 	autoSetSeqNo          bool
 	currentSeqNo          int64
@@ -43,7 +43,7 @@ type writerWithAutopartitioning struct {
 // When OVERLOADED is returned, onSplit(partitionID) is called so the topic client stub
 // can add child partitions to the next Describe response (split bounds: [from, mid), [mid, to)).
 func NewWriterWithAutopartitioning(
-	onAckReceivedCallback topicwriterinternal.PublicOnAckReceivedCallback,
+	onAckReceivedCallback func(seqNo int64),
 	retrySettings topic.RetrySettings,
 	autoSetSeqNo bool,
 	partitionID int64,
