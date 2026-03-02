@@ -32,7 +32,7 @@ func newBoundPartitionChooser(
 	partitionShortInfos := make([]partitionShortInfo, 0, len(partitions))
 	for _, partition := range partitions {
 		if len(partitions) > 1 && len(partition.FromBound) == 0 && len(partition.ToBound) == 0 {
-			return nil, fmt.Errorf("partition %d has no bounds", partition.ID)
+			return nil, fmt.Errorf("%w: partition %d has no bounds", ErrNoBounds, partition.ID)
 		}
 
 		partitionShortInfos = append(partitionShortInfos, partitionShortInfo{

@@ -231,6 +231,15 @@ func (w *worker) addToMessagesToResendIndex(newElement messagePtr, toPartition i
 }
 
 func (w *worker) pushMessage(ctx context.Context, msg Message) (err error) {
+	var autoSetSeqNo bool
+	w.mu.WithLock(func() {
+		autoSetSeqNo = w.cfg.AutoSetSeqNo
+	})
+
+	if autoSetSeqNo && msg.SeqNo == 0 {
+		return ErrNoSeqNo
+	}
+
 	if err := w.messagesSemaphore.Acquire(ctx, 1); err != nil {
 		return fmt.Errorf("ydb: can not add message due to queue len overflow: %w", err)
 	}
