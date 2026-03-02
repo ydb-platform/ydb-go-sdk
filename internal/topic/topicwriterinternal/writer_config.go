@@ -38,6 +38,7 @@ func (c *WritersCommonConfig) PartitionID() (int64, bool) {
 	if c.defaultPartitioning.Type == rawtopicwriter.PartitioningPartitionID {
 		return c.defaultPartitioning.PartitionID, true
 	}
+
 	return 0, false
 }
 
