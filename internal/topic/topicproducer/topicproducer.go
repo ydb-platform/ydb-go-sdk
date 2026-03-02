@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
-	topicclient "github.com/ydb-platform/ydb-go-sdk/v3/topic"
 )
 
 type Message struct {
@@ -28,7 +27,7 @@ type Producer struct {
 	shutdown   empty.Chan
 }
 
-func NewProducer(topicClient topicclient.Client, cfg ProducerConfig) *Producer {
+func NewProducer(topicDescriber TopicDescriber, cfg ProducerConfig) *Producer {
 	var (
 		ctx, cancel = context.WithCancel(context.Background())
 		shutdown    = make(empty.Chan)
@@ -38,7 +37,7 @@ func NewProducer(topicClient topicclient.Client, cfg ProducerConfig) *Producer {
 	p := &Producer{
 		ctx:        ctx,
 		cfg:        &cfg,
-		worker:     newWorker(ctx, cancel, shutdown, topicClient, background, &cfg),
+		worker:     newWorker(ctx, cancel, shutdown, topicDescriber, background, &cfg),
 		shutdown:   shutdown,
 		background: background,
 	}

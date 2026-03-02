@@ -1,8 +1,13 @@
 package topicproducer
 
 import (
+	"context"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
+
+type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDescription, error)
 
 type PartitionInfo struct {
 	ID        int64

@@ -102,13 +102,13 @@ func (c *boundPartitionChooser) RemovePartition(partitionID int64) {
 
 type hashPartitionChooser struct {
 	cfg        *ProducerConfig
-	partitions uint64
+	partitions []int64
 }
 
-func newHashPartitionChooser(cfg *ProducerConfig, partitionsCount uint64) *hashPartitionChooser {
+func newHashPartitionChooser(cfg *ProducerConfig, partitions []int64) *hashPartitionChooser {
 	return &hashPartitionChooser{
 		cfg:        cfg,
-		partitions: partitionsCount,
+		partitions: partitions,
 	}
 }
 
@@ -117,13 +117,15 @@ func (c *hashPartitionChooser) ChoosePartition(key string) (int64, error) {
 	hasher.Write([]byte(key))
 	low := hasher.Sum64()
 
-	return int64(low % c.partitions), nil
+	return c.partitions[low%uint64(len(c.partitions))], nil
 }
 
-func (c *hashPartitionChooser) AddNewPartition(_ int64, _, _ []byte) {
-	c.partitions++
+func (c *hashPartitionChooser) AddNewPartition(partitionID int64, _, _ []byte) {
+	c.partitions = append(c.partitions, partitionID)
 }
 
-func (c *hashPartitionChooser) RemovePartition(_ int64) {
-	c.partitions--
+func (c *hashPartitionChooser) RemovePartition(partitionID int64) {
+	c.partitions = slices.DeleteFunc(c.partitions, func(partition int64) bool {
+		return partition == partitionID
+	})
 }

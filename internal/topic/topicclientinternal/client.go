@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	internalproducer "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
@@ -21,6 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicproducer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -361,6 +363,42 @@ func (c *Client) StartTransactionalWriter(
 	txWriter := topicwriterinternal.NewTopicWriterTransaction(writer, internalTx, cfg.Tracer)
 
 	return topicwriter.NewTxWriterInternal(txWriter), nil
+}
+
+// CreateProducer creates a high-level topic producer.
+func (c *Client) CreateProducer(
+	topicPath string,
+	opts ...topicoptions.ProducerOption,
+) (*topicproducer.Producer, error) {
+	cfg := c.createProducerConfig(topicPath, opts)
+
+	internal := internalproducer.NewProducer(
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return c.Describe(ctx, path)
+		},
+		cfg,
+	)
+
+	return topicproducer.NewProducer(internal), nil
+}
+
+func (c *Client) createProducerConfig(
+	topicPath string,
+	opts []topicoptions.ProducerOption,
+) internalproducer.ProducerConfig {
+	writerCfg := c.createWriterConfig(topicPath, nil)
+
+	cfg := internalproducer.ProducerConfig{
+		WriterReconnectorConfig: writerCfg,
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+
+	return cfg
 }
 
 func (c *Client) createWriterConfig(

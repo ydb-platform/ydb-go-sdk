@@ -125,7 +125,7 @@ func TestPartitionChooser_Hash(t *testing.T) {
 		t.Parallel()
 
 		cfg := &ProducerConfig{}
-		chooser := newHashPartitionChooser(cfg, 4)
+		chooser := newHashPartitionChooser(cfg, []int64{0, 1, 2, 3})
 
 		partitionID, err := chooser.ChoosePartition("key1")
 		require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestPartitionChooser_Hash(t *testing.T) {
 				return "hashed-" + key
 			},
 		}
-		chooser := newHashPartitionChooser(cfg, 2)
+		chooser := newHashPartitionChooser(cfg, []int64{0, 1})
 
 		partitionID, err := chooser.ChoosePartition("key")
 		require.NoError(t, err)
@@ -156,7 +156,7 @@ func TestPartitionChooser_Hash(t *testing.T) {
 		t.Parallel()
 
 		cfg := &ProducerConfig{}
-		chooser := newHashPartitionChooser(cfg, 2)
+		chooser := newHashPartitionChooser(cfg, []int64{0, 1})
 
 		chooser.AddNewPartition(3, nil, nil)
 		partitionID, err := chooser.ChoosePartition("key")

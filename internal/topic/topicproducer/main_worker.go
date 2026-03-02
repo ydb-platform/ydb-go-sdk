@@ -6,14 +6,14 @@ import (
 	"fmt"
 
 	"github.com/spaolacci/murmur3"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	topicclient "github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"golang.org/x/sync/errgroup"
 )
@@ -38,8 +38,8 @@ type worker struct {
 	pendingMessagesIndex  map[int64]xlist.List[messagePtr]
 	messagesToResendIndex map[int64]xlist.List[messagePtr]
 
-	topicClient topicclient.Client
-	topicPath   string
+	topicDescriber TopicDescriber
+	topicPath      string
 
 	wakeupChan empty.Chan
 	shutdown   empty.Chan
@@ -55,17 +55,29 @@ func newWorker(
 	ctx context.Context,
 	stop context.CancelFunc,
 	shutdown empty.Chan,
-	topicClient topicclient.Client,
+	topicDescriber TopicDescriber,
 	background *background.Worker,
 	cfg *ProducerConfig,
 ) *worker {
+	if cfg.writersFactory == nil {
+		cfg.writersFactory = newBaseWritersFactory()
+	}
+
+	if cfg.SubSessionIdleTimeout == 0 {
+		cfg.SubSessionIdleTimeout = defaultWriterIdleTimeout
+	}
+
+	if cfg.MaxQueueLen == 0 {
+		cfg.MaxQueueLen = defaultInFlightMessagesBufferSize
+	}
+
 	w := &worker{
 		writers:               make(map[int64]*writerWrapper),
 		inFlightMessages:      xlist.New[Message](),
 		cfg:                   cfg,
 		wakeupChan:            make(empty.Chan, 1),
 		shutdown:              shutdown,
-		topicClient:           topicClient,
+		topicDescriber:        topicDescriber,
 		ctx:                   ctx,
 		stop:                  stop,
 		partitions:            make(map[int64]*PartitionInfo),
@@ -77,20 +89,8 @@ func newWorker(
 		background:            background,
 	}
 
-	if cfg.writersFactory == nil {
-		cfg.writersFactory = newBaseWritersFactory(topicClient)
-	}
-
 	if cfg.PartitioningKeyHasher == nil {
 		cfg.PartitioningKeyHasher = w.getDefaultKeyHasher()
-	}
-
-	if cfg.SubSessionIdleTimeout == 0 {
-		cfg.SubSessionIdleTimeout = defaultWriterIdleTimeout
-	}
-
-	if cfg.MaxQueueLen == 0 {
-		cfg.MaxQueueLen = defaultInFlightMessagesBufferSize
 	}
 
 	w.idleWritersSupervisor = newIdleWritersSupervisor(ctx, w, cfg.SubSessionIdleTimeout)
@@ -99,6 +99,10 @@ func newWorker(
 	})
 
 	return w
+}
+
+func isOperationErrorOverloaded(err error) bool {
+	return xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED)
 }
 
 func (w *worker) getDefaultKeyHasher() KeyHasher {
@@ -119,7 +123,7 @@ func (w *worker) init() (err error) {
 		}
 	}()
 
-	describeResult, err := w.topicClient.Describe(w.ctx, w.cfg.Topic())
+	describeResult, err := w.topicDescriber(w.ctx, w.cfg.Topic())
 	if err != nil {
 		return
 	}
@@ -152,7 +156,11 @@ func (w *worker) init() (err error) {
 			return
 		}
 	case PartitionChooserStrategyHash:
-		w.partitionChooser = newHashPartitionChooser(w.cfg, uint64(len(w.partitions)))
+		partitionIDs := make([]int64, 0, len(w.partitions))
+		for id := range w.partitions {
+			partitionIDs = append(partitionIDs, id)
+		}
+		w.partitionChooser = newHashPartitionChooser(w.cfg, partitionIDs)
 	}
 
 	return
@@ -161,6 +169,7 @@ func (w *worker) init() (err error) {
 func (w *worker) choosePartition(msg Message) (partitionID int64, err error) {
 	switch {
 	case msg.PartitionID != 0:
+		return msg.PartitionID, nil
 	case msg.Key != "":
 		partitionID, err = w.partitionChooser.ChoosePartition(msg.Key)
 		if err != nil {
@@ -306,7 +315,7 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 				})
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-				if ydb.IsOperationErrorOverloaded(args.Error) {
+				if isOperationErrorOverloaded(args.Error) {
 					w.onPartitionSplit(partitionID)
 					return topic.PublicRetryDecisionStop
 				}
@@ -498,7 +507,7 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 }
 
 func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
-	describeResult, err := w.topicClient.Describe(w.ctx, w.cfg.Topic())
+	describeResult, err := w.topicDescriber(w.ctx, w.cfg.Topic())
 	if err != nil {
 		return err
 	}
@@ -624,6 +633,11 @@ func (w *worker) flush(ctx context.Context) error {
 	waitCh := make(empty.Chan, 1)
 
 	w.mu.WithLock(func() {
+		if w.inFlightMessages.Len() == 0 {
+			waitCh <- empty.Struct{}
+			return
+		}
+
 		lastInFlightMessage := w.inFlightMessages.Back()
 		prevAckCallback := lastInFlightMessage.Value.OnAckCallback
 		lastInFlightMessage.Value.OnAckCallback = func() {

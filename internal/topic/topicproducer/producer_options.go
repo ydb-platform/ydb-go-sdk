@@ -46,12 +46,6 @@ func WithBasicWriterOptions(opts ...topicwriterinternal.PublicWriterOption) Publ
 	}
 }
 
-func withTestMode() PublicProducerOption {
-	return func(cfg *ProducerConfig) {
-		cfg.testMode = true
-	}
-}
-
 func withWritersFactory(writersFactory writersFactory) PublicProducerOption {
 	return func(cfg *ProducerConfig) {
 		cfg.writersFactory = writersFactory

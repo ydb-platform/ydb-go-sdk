@@ -14,7 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	topicclient "github.com/ydb-platform/ydb-go-sdk/v3/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 type stubWritersFactory struct {
@@ -70,13 +70,13 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 	}
 }
 
-func newTestProducer(t testing.TB, client topicclient.Client) *Producer {
+func newTestProducer(t testing.TB, describer TopicDescriber) *Producer {
 	t.Helper()
-	return NewProducer(client, ProducerConfig{})
+	return NewProducer(describer, ProducerConfig{})
 }
 
 // newTestProducerWithBasicWriter creates a producer that uses basicWriter as writer (no real gRPC).
-func newTestProducerWithBasicWriter(t testing.TB, client topicclient.Client) *Producer {
+func newTestProducerWithBasicWriter(t testing.TB, describer TopicDescriber) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil))(&cfg)
@@ -86,7 +86,7 @@ func newTestProducerWithBasicWriter(t testing.TB, client topicclient.Client) *Pr
 		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	)(&cfg)
-	return NewProducer(client, cfg)
+	return NewProducer(describer, cfg)
 }
 
 // newTestProducerWithAutopartitioningWriter creates a producer that uses the autopartitioning stub:
@@ -95,7 +95,7 @@ func newTestProducerWithBasicWriter(t testing.TB, client topicclient.Client) *Pr
 // with bounds [from, (from+to)/2) and [(from+to)/2, to).
 func newTestProducerWithAutopartitioningWriter(
 	t testing.TB,
-	client topicclient.Client,
+	describer TopicDescriber,
 	state *stubs.DescribeWithSplitsState,
 ) *Producer {
 	const producerIDPrefix = "test-producer"
@@ -109,7 +109,7 @@ func newTestProducerWithAutopartitioningWriter(
 		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	)(&cfg)
-	return NewProducer(client, cfg)
+	return NewProducer(describer, cfg)
 }
 
 func TestProducer_ErrAlreadyClosed(t *testing.T) {
@@ -117,7 +117,9 @@ func TestProducer_ErrAlreadyClosed(t *testing.T) {
 
 	ctx := xtest.Context(t)
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
-	producer := newTestProducer(t, stubClient)
+	producer := newTestProducer(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubClient.Describe(ctx, path)
+	})
 
 	err := producer.Close(ctx)
 	require.NoError(t, err)
@@ -131,7 +133,9 @@ func TestProducer_WaitInit_Success(t *testing.T) {
 
 	ctx := xtest.Context(t)
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
-	producer := newTestProducer(t, stubClient)
+	producer := newTestProducer(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubClient.Describe(ctx, path)
+	})
 
 	err := producer.WaitInit(ctx)
 	require.NoError(t, err)
@@ -145,7 +149,9 @@ func TestProducer_WaitInit_ContextCanceled(t *testing.T) {
 
 	ctx := xtest.Context(t)
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
-	producer := newTestProducer(t, stubClient)
+	producer := newTestProducer(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubClient.Describe(ctx, path)
+	})
 
 	ctxCancel, cancel := context.WithCancel(ctx)
 	cancel()
@@ -162,7 +168,9 @@ func TestProducer_DescribeError(t *testing.T) {
 	ctx := xtest.Context(t)
 	describeErr := errors.New("describe failed")
 	stubClient := stubs.NewStubTopicClientWithError(t, describeErr)
-	producer := newTestProducer(t, stubClient)
+	producer := newTestProducer(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubClient.Describe(ctx, path)
+	})
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -184,7 +192,9 @@ func TestProducer_Write_WithBasicWriter(t *testing.T) {
 	)
 
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
-	producer := newTestProducerWithBasicWriter(t, stubClient)
+	producer := newTestProducerWithBasicWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubClient.Describe(ctx, path)
+	})
 
 	err := producer.WaitInit(ctx)
 	require.NoError(t, err)
@@ -220,7 +230,9 @@ func TestProducer_Write_WithAutopartitioningWriter(t *testing.T) {
 	baseDesc := stubs.DefaultStubTopicDescription()
 	state := stubs.NewDescribeWithSplitsState(baseDesc, 6) // 6 is first free ID after partitions 1..5
 	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
-	producer := newTestProducerWithAutopartitioningWriter(t, stubClient, state)
+	producer := newTestProducerWithAutopartitioningWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubClient.Describe(ctx, path)
+	}, state)
 
 	err := producer.WaitInit(ctx)
 	require.NoError(t, err)

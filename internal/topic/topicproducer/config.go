@@ -20,5 +20,4 @@ type ProducerConfig struct {
 	CustomChoosePartitionFunc ChoosePartitionFunc
 
 	writersFactory writersFactory
-	testMode       bool
 }

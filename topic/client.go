@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicproducer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -62,4 +63,12 @@ type Client interface {
 		topicpath string,
 		opts ...topicoptions.WriterOption,
 	) (*topicwriter.TxWriter, error)
+
+	// CreateProducer creates high-level topic producer for the given topic.
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	CreateProducer(
+		topicPath string,
+		opts ...topicoptions.ProducerOption,
+	) (*topicproducer.Producer, error)
 }
