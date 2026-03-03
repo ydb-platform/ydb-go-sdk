@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicproducer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 func readMessages(ctx context.Context, count int, topicPath string, scope *scopeT) error {
@@ -59,6 +61,28 @@ func readMessages(ctx context.Context, count int, topicPath string, scope *scope
 	}
 
 	return nil
+}
+
+// CreateTopicWithAutoPartitioning creates a topic with auto partitioning.
+func createTopicWithAutoPartitioning(ctx context.Context, db *ydb.Driver, topicPath string) error {
+	return db.Topic().Create(
+		ctx,
+		topicPath,
+		topicoptions.CreateWithSupportedCodecs(topictypes.CodecRaw),
+		topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumerName}),
+		// MinActivePartitions(2), MaxActivePartitions(100)
+		topicoptions.CreateWithMinActivePartitions(2),
+		topicoptions.CreateWithMaxActivePartitions(100),
+		// AutoPartitioningSettings: Up=2, Down=1, Window=2s, Strategy=ScaleUp
+		topicoptions.CreateWithAutoPartitioningSettings(topictypes.AutoPartitioningSettings{
+			AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyScaleUp,
+			AutoPartitioningWriteSpeedStrategy: topictypes.AutoPartitioningWriteSpeedStrategy{
+				UpUtilizationPercent:   2,
+				DownUtilizationPercent: 1,
+				StabilizationWindow:    2 * time.Second,
+			},
+		}),
+	)
 }
 
 // TestTopicProducer_WaitInitAndClose verifies that internal topic producer
@@ -124,4 +148,112 @@ func TestTopicProducer_WriteAndFlush(t *testing.T) {
 	require.Equal(t, int64(1000), stats.MessagesWritten)
 	require.Equal(t, int64(1000), stats.LastWrittenSeqNo)
 	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
+}
+
+func TestTopicProducer_AutoPartitioning(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	db := scope.Driver()
+	topicClient := db.Topic()
+
+	topicPath := db.Name() + "/" + t.Name() + "--auto-part-topic"
+	_ = topicClient.Drop(ctx, topicPath)
+	require.NoError(t, createTopicWithAutoPartitioning(ctx, db, topicPath))
+
+	describe, err := topicClient.Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Len(t, describe.Partitions, 2)
+
+	producerSettings := []topicoptions.ProducerOption{
+		topicoptions.WithPartitionChooserStrategy(topicproducer.PartitionChooserStrategyBound),
+		topicoptions.WithSubSessionIdleTimeout(30 * time.Second),
+	}
+
+	producer1, err := topicClient.CreateProducer(
+		topicPath,
+		append(producerSettings,
+			topicoptions.WithProducerIDPrefix("autopartitioning_keyed_1"),
+		)...,
+	)
+	require.NoError(t, err)
+
+	producer2, err := topicClient.CreateProducer(
+		topicPath,
+		append(producerSettings,
+			topicoptions.WithProducerIDPrefix("autopartitioning_keyed_2"),
+		)...,
+	)
+	require.NoError(t, err)
+
+	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
+
+	keys := make([]string, 0, len(describe.Partitions))
+	for _, p := range describe.Partitions {
+		keys = append(keys, string(p.FromBound))
+	}
+
+	require.NotEmpty(t, keys)
+
+	writeMessage := func(p *topicproducer.Producer, payload []byte, seqNo int64) {
+		key := keys[seqNo%int64(len(keys))]
+		if key == "" {
+			key = "lalala"
+		}
+
+		msg := topicproducer.Message{
+			PublicMessage: topicwriterinternal.PublicMessage{
+				Data:  bytes.NewReader(payload),
+				SeqNo: seqNo,
+			},
+			Key: key,
+		}
+
+		require.NoError(t, p.Write(ctx, msg))
+	}
+
+	writeMessage(producer1, msgData, 1)
+	writeMessage(producer1, msgData, 2)
+	time.Sleep(5 * time.Second)
+
+	describe, err = topicClient.Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Len(t, describe.Partitions, 2)
+
+	writeMessage(producer1, msgData, 3)
+	writeMessage(producer1, msgData, 4)
+	writeMessage(producer1, msgData, 5)
+	writeMessage(producer1, msgData, 6)
+	writeMessage(producer1, msgData, 7)
+	writeMessage(producer2, msgData, 8)
+	writeMessage(producer1, msgData, 9)
+	writeMessage(producer1, msgData, 10)
+	writeMessage(producer2, msgData, 11)
+	writeMessage(producer1, msgData, 12)
+
+	require.NoError(t, producer1.Flush(ctx))
+	require.NoError(t, producer2.Flush(ctx))
+	time.Sleep(5 * time.Second)
+
+	describeResult, err := topicClient.Describe(ctx, topicPath)
+	require.NoError(t, err)
+	partitionsCount := len(describeResult.Partitions)
+	require.GreaterOrEqual(t, partitionsCount, 4, "partitions count: %d, expected at least 4", partitionsCount)
+
+	writeMessage(producer1, msgData, 13)
+	writeMessage(producer1, msgData, 14)
+	require.NoError(t, producer1.Flush(ctx))
+	require.NoError(t, producer2.Flush(ctx))
+
+	producer3, err := topicClient.CreateProducer(
+		topicPath,
+		append(producerSettings,
+			topicoptions.WithProducerIDPrefix("autopartitioning_keyed_3"),
+		)...,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, producer3.Close(ctx))
+	require.NoError(t, producer1.Close(ctx))
+	require.NoError(t, producer2.Close(ctx))
 }
