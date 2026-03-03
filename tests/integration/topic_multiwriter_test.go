@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -168,7 +169,7 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 		topicPath,
 		topicoptions.WithWriterSetAutoSeqNo(false),
 		topicoptions.WithMultiWriter(
-			topicoptions.WithPartitionChooserStrategy(topicwriter.PartitionChooserStrategyHash),
+			topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyHash),
 		),
 	)
 	require.NoError(t, err)
@@ -210,7 +211,7 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	}
 
 	topicMultiWriterSettings := []topicoptions.MultiWriterOption{
-		topicoptions.WithPartitionChooserStrategy(topicwriter.PartitionChooserStrategyBound),
+		topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyBound),
 		topicoptions.WithWriterIdleTimeout(30 * time.Second),
 	}
 
