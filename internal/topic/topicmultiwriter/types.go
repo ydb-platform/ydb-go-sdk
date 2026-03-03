@@ -1,4 +1,4 @@
-package topicproducer
+package topicmultiwriter
 
 import (
 	"context"

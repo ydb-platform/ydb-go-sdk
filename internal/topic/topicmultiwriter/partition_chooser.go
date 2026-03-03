@@ -1,4 +1,4 @@
-package topicproducer
+package topicmultiwriter
 
 import (
 	"fmt"
@@ -21,12 +21,12 @@ type PartitionChooser interface {
 }
 
 type boundPartitionChooser struct {
-	cfg        *ProducerConfig
+	cfg        *MultiWriterConfig
 	partitions []partitionShortInfo
 }
 
 func newBoundPartitionChooser(
-	cfg *ProducerConfig,
+	cfg *MultiWriterConfig,
 	partitions map[int64]*PartitionInfo,
 ) (*boundPartitionChooser, error) {
 	partitionShortInfos := make([]partitionShortInfo, 0, len(partitions))
@@ -104,11 +104,11 @@ func (c *boundPartitionChooser) RemovePartition(partitionID int64) {
 }
 
 type hashPartitionChooser struct {
-	cfg        *ProducerConfig
+	cfg        *MultiWriterConfig
 	partitions []int64
 }
 
-func newHashPartitionChooser(cfg *ProducerConfig, partitions []int64) *hashPartitionChooser {
+func newHashPartitionChooser(cfg *MultiWriterConfig, partitions []int64) *hashPartitionChooser {
 	return &hashPartitionChooser{
 		cfg:        cfg,
 		partitions: partitions,

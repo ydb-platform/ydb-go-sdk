@@ -13,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
-	internalproducer "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer"
+	internalmultiwriter "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -21,8 +21,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicproducer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -365,30 +365,30 @@ func (c *Client) StartTransactionalWriter(
 	return topicwriter.NewTxWriterInternal(txWriter), nil
 }
 
-// CreateProducer creates a high-level topic producer.
-func (c *Client) CreateProducer(
+// CreateMultiWriter creates a high-level topic multi writer.
+func (c *Client) CreateMultiWriter(
 	topicPath string,
-	opts ...topicoptions.ProducerOption,
-) (*topicproducer.Producer, error) {
-	cfg := c.createProducerConfig(topicPath, opts)
+	opts ...topicoptions.MultiWriterOption,
+) (*topicmultiwriter.MultiWriter, error) {
+	cfg := c.createMultiWriterConfig(topicPath, opts)
 
-	internal := internalproducer.NewProducer(
+	internal := internalmultiwriter.NewMultiWriter(
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return c.Describe(ctx, path)
 		},
 		cfg,
 	)
 
-	return topicproducer.NewProducer(internal), nil
+	return topicmultiwriter.NewMultiWriter(internal), nil
 }
 
-func (c *Client) createProducerConfig(
+func (c *Client) createMultiWriterConfig(
 	topicPath string,
-	opts []topicoptions.ProducerOption,
-) internalproducer.ProducerConfig {
+	opts []topicoptions.MultiWriterOption,
+) internalmultiwriter.MultiWriterConfig {
 	writerCfg := c.createWriterConfig(topicPath, nil)
 
-	cfg := internalproducer.ProducerConfig{
+	cfg := internalmultiwriter.MultiWriterConfig{
 		WriterReconnectorConfig: writerCfg,
 	}
 

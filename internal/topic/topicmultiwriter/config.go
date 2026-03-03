@@ -1,4 +1,4 @@
-package topicproducer
+package topicmultiwriter
 
 import (
 	"time"
@@ -9,9 +9,9 @@ import (
 
 type KeyHasher func(key string) string
 
-type ChoosePartitionFunc func(msg Message) (int64, error)
+type ChoosePartitionFunc func(msg topicwriterinternal.PublicMessage) (int64, error)
 
-type ProducerConfig struct {
+type MultiWriterConfig struct {
 	topicwriterinternal.WriterReconnectorConfig
 
 	SubSessionIdleTimeout     time.Duration

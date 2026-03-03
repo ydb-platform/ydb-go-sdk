@@ -13,10 +13,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicproducer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -95,19 +94,19 @@ func createProducerForAutoPartitioning(
 	ctx context.Context,
 	topicPath string,
 	topicClient topic.Client,
-	producerSettings []topicoptions.ProducerOption,
-) *topicproducer.Producer {
+	producerSettings []topicoptions.MultiWriterOption,
+) *topicmultiwriter.MultiWriter {
 	t.Helper()
 
-	producer, err := topicClient.CreateProducer(
+	multiWriter, err := topicClient.CreateMultiWriter(
 		topicPath,
 		append(producerSettings,
 			topicoptions.WithProducerIDPrefix(producerIDPrefix),
 		)...,
 	)
 	require.NoError(t, err)
-	require.NoError(t, producer.WaitInit(ctx))
-	return producer
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	return multiWriter
 }
 
 // TestTopicProducer_WaitInitAndClose verifies that internal topic producer
@@ -117,13 +116,13 @@ func TestTopicProducer_WaitInitAndClose(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	producer, err := topicClient.CreateProducer(scope.TopicPath())
+	multiWriter, err := topicClient.CreateMultiWriter(scope.TopicPath())
 	require.NoError(t, err)
 
-	err = producer.WaitInit(ctx)
+	err = multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
-	err = producer.Close(ctx)
+	err = multiWriter.Close(ctx)
 	require.NoError(t, err)
 }
 
@@ -134,10 +133,10 @@ func TestTopicProducer_CloseWithoutWaitInit(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	producer, err := topicClient.CreateProducer(scope.TopicPath())
+	multiWriter, err := topicClient.CreateMultiWriter(scope.TopicPath())
 	require.NoError(t, err)
 
-	err = producer.Close(ctx)
+	err = multiWriter.Close(ctx)
 	require.NoError(t, err)
 }
 
@@ -157,33 +156,31 @@ func TestTopicProducer_WriteAndFlush(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	producer, err := topicClient.CreateProducer(
+	multiWriter, err := topicClient.CreateMultiWriter(
 		topicPath,
 		topicoptions.WithBasicWriterOptions(
 			topicoptions.WithWriterSetAutoSeqNo(false),
 		),
-		topicoptions.WithPartitionChooserStrategy(topicproducer.PartitionChooserStrategyHash),
+		topicoptions.WithPartitionChooserStrategy(topicmultiwriter.PartitionChooserStrategyHash),
 	)
 	require.NoError(t, err)
 
-	err = producer.WaitInit(ctx)
+	err = multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
-	messages := make([]topicproducer.Message, 0, 1000)
+	messages := make([]topicmultiwriter.Message, 0, 1000)
 	for i := range 1000 {
-		messages = append(messages, topicproducer.Message{
-			PublicMessage: topicwriterinternal.PublicMessage{
-				Data:  bytes.NewReader([]byte("hello")),
-				SeqNo: int64(i + 1),
-			},
-			Key: fmt.Sprintf("partition-key-%d", i),
+		messages = append(messages, topicmultiwriter.Message{
+			Data:  bytes.NewReader([]byte("hello")),
+			SeqNo: int64(i + 1),
+			Key:   fmt.Sprintf("partition-key-%d", i),
 		})
 	}
 
-	require.NoError(t, producer.Write(ctx, messages...))
-	require.NoError(t, producer.Close(ctx))
+	require.NoError(t, multiWriter.Write(ctx, messages...))
+	require.NoError(t, multiWriter.Close(ctx))
 
-	stats := producer.GetWriteStats()
+	stats := multiWriter.GetWriteStats()
 	require.Equal(t, int64(1000), stats.MessagesWritten)
 	require.Equal(t, int64(1000), stats.LastWrittenSeqNo)
 	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
@@ -207,16 +204,16 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 		t.Skip("skipping test because autosplit does not work in this version of YDB")
 	}
 
-	producerSettings := []topicoptions.ProducerOption{
-		topicoptions.WithPartitionChooserStrategy(topicproducer.PartitionChooserStrategyBound),
+	topicMultiWriterSettings := []topicoptions.MultiWriterOption{
+		topicoptions.WithPartitionChooserStrategy(topicmultiwriter.PartitionChooserStrategyBound),
 		topicoptions.WithSubSessionIdleTimeout(30 * time.Second),
 		topicoptions.WithBasicWriterOptions(
 			topicoptions.WithWriterSetAutoSeqNo(false),
 		),
 	}
 
-	producer1 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, producerSettings)
-	producer2 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, producerSettings)
+	producer1 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	producer2 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
 
 	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
 	keys := make([]string, 0, len(describe.Partitions))
@@ -225,18 +222,16 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 	}
 	require.NotEmpty(t, keys)
 
-	writeMessage := func(p *topicproducer.Producer, payload []byte, seqNo int64) {
+	writeMessage := func(p *topicmultiwriter.MultiWriter, payload []byte, seqNo int64) {
 		key := keys[seqNo%int64(len(keys))]
 		if key == "" {
 			key = "lalala"
 		}
 
-		msg := topicproducer.Message{
-			PublicMessage: topicwriterinternal.PublicMessage{
-				Data:  bytes.NewReader(payload),
-				SeqNo: seqNo,
-			},
-			Key: key,
+		msg := topicmultiwriter.Message{
+			Data:  bytes.NewReader(payload),
+			SeqNo: seqNo,
+			Key:   key,
 		}
 
 		require.NoError(t, p.Write(ctx, msg))
@@ -275,7 +270,7 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 	require.NoError(t, producer1.Flush(ctx))
 	require.NoError(t, producer2.Flush(ctx))
 
-	producer3 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, producerSettings)
+	producer3 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, topicMultiWriterSettings)
 
 	require.NoError(t, producer3.Close(ctx))
 	require.NoError(t, producer1.Close(ctx))

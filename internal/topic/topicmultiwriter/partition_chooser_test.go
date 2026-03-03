@@ -1,4 +1,4 @@
-package topicproducer
+package topicmultiwriter
 
 import (
 	"testing"
@@ -12,7 +12,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 	t.Run("SinglePartition", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{}
+		cfg := &MultiWriterConfig{}
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("z")},
 		}
@@ -27,7 +27,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 	t.Run("MultiplePartitions", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{}
+		cfg := &MultiWriterConfig{}
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("m")},
 			2: {ID: 2, FromBound: []byte("m"), ToBound: []byte("z")},
@@ -47,7 +47,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 	t.Run("WithPartitioningKeyHasher", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{
+		cfg := &MultiWriterConfig{
 			PartitioningKeyHasher: func(key string) string {
 				return "hashed-" + key
 			},
@@ -66,7 +66,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 	t.Run("NoPartitions", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{}
+		cfg := &MultiWriterConfig{}
 		partitions := map[int64]*PartitionInfo{}
 		chooser, err := newBoundPartitionChooser(cfg, partitions)
 		require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 	t.Run("PartitionWithoutBounds", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{}
+		cfg := &MultiWriterConfig{}
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("z")},
 			2: {ID: 2, FromBound: []byte{}, ToBound: []byte{}}, // no bounds
@@ -92,7 +92,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 	t.Run("AddNewPartition", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{}
+		cfg := &MultiWriterConfig{}
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("m")},
 		}
@@ -109,7 +109,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 	t.Run("RemovePartition", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{}
+		cfg := &MultiWriterConfig{}
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("z")},
 		}
@@ -128,7 +128,7 @@ func TestPartitionChooser_Hash(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{}
+		cfg := &MultiWriterConfig{}
 		chooser := newHashPartitionChooser(cfg, []int64{0, 1, 2, 3})
 
 		partitionID, err := chooser.ChoosePartition("key1")
@@ -144,7 +144,7 @@ func TestPartitionChooser_Hash(t *testing.T) {
 	t.Run("WithPartitioningKeyHasher", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{
+		cfg := &MultiWriterConfig{
 			PartitioningKeyHasher: func(key string) string {
 				return "hashed-" + key
 			},
@@ -159,7 +159,7 @@ func TestPartitionChooser_Hash(t *testing.T) {
 	t.Run("AddRemovePartition", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &ProducerConfig{}
+		cfg := &MultiWriterConfig{}
 		chooser := newHashPartitionChooser(cfg, []int64{0, 1})
 
 		chooser.AddNewPartition(3, nil, nil)

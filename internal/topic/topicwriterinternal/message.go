@@ -21,6 +21,9 @@ type PublicMessage struct {
 	Data      io.Reader
 	Metadata  map[string][]byte
 
+	Key         string
+	PartitionID int64
+
 	tx tx.Transaction
 
 	// partitioning at level message available by protocol, but doesn't available by current server implementation

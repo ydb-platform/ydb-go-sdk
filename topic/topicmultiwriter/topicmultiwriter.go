@@ -1,17 +1,18 @@
-package topicproducer
+package topicmultiwriter
 
 import (
 	"context"
 
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicproducer"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
 // Message is a message to be written by Producer.
 // It extends internal topic writer message with key, partition and ack callback.
-type Message = internal.Message
+type Message = topicwriterinternal.PublicMessage
 
 // ProducerConfig defines configuration for Producer.
-type ProducerConfig = internal.ProducerConfig
+type ProducerConfig = internal.MultiWriterConfig
 
 // KeyHasher is a function that transforms a key before partition selection.
 type KeyHasher = internal.KeyHasher
@@ -50,39 +51,39 @@ var (
 
 // Producer represents a high-level topic producer.
 // It manages underlying writers, handles reconnections and buffering.
-type Producer struct {
-	inner *internal.Producer
+type MultiWriter struct {
+	inner *internal.MultiWriter
 }
 
-// NewProducer creates a new Producer instance.
+// NewMultiWriter creates a new MultiWriter instance.
 // It is a thin wrapper around internal topic producer implementation.
-func NewProducer(inner *internal.Producer) *Producer {
-	return &Producer{
+func NewMultiWriter(inner *internal.MultiWriter) *MultiWriter {
+	return &MultiWriter{
 		inner: inner,
 	}
 }
 
 // Write sends messages using the underlying producer.
-func (p *Producer) Write(ctx context.Context, messages ...Message) error {
+func (p *MultiWriter) Write(ctx context.Context, messages ...Message) error {
 	return p.inner.Write(ctx, messages...)
 }
 
 // Flush waits until all in-flight messages are acknowledged.
-func (p *Producer) Flush(ctx context.Context) error {
+func (p *MultiWriter) Flush(ctx context.Context) error {
 	return p.inner.Flush(ctx)
 }
 
 // WaitInit waits until producer initialization is completed or an error occurs.
-func (p *Producer) WaitInit(ctx context.Context) error {
+func (p *MultiWriter) WaitInit(ctx context.Context) error {
 	return p.inner.WaitInit(ctx)
 }
 
 // Close gracefully stops producer, flushing pending messages.
-func (p *Producer) Close(ctx context.Context) error {
+func (p *MultiWriter) Close(ctx context.Context) error {
 	return p.inner.Close(ctx)
 }
 
 // GetWriteStats returns statistics about the write operations.
-func (p *Producer) GetWriteStats() WriteStats {
+func (p *MultiWriter) GetWriteStats() WriteStats {
 	return p.inner.GetWriteStats()
 }

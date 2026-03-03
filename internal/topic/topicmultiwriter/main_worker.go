@@ -1,4 +1,4 @@
-package topicproducer
+package topicmultiwriter
 
 import (
 	"context"
@@ -20,7 +20,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-type messagePtr *xlist.Element[Message]
+type message struct {
+	topicwriterinternal.PublicMessage
+
+	onAckCallback func()
+	ackReceived   bool
+	sent          bool
+}
+
+type messagePtr *xlist.Element[message]
 
 type worker struct {
 	ctx  context.Context //nolint:containedctx
@@ -29,7 +37,7 @@ type worker struct {
 
 	writers               map[int64]*writerWrapper
 	idleWritersSupervisor *idleWritersSupervisor
-	cfg                   *ProducerConfig
+	cfg                   *MultiWriterConfig
 	mu                    xsync.Mutex
 	acksMu                xsync.Mutex
 	splittedPartitionsMu  xsync.Mutex
@@ -37,7 +45,7 @@ type worker struct {
 
 	partitionChooser PartitionChooser
 
-	inFlightMessages      xlist.List[Message]
+	inFlightMessages      xlist.List[message]
 	inFlightMessagesIndex map[int64]xlist.List[messagePtr]
 	pendingMessagesIndex  map[int64]xlist.List[messagePtr]
 	messagesToResendIndex map[int64]xlist.List[messagePtr]
@@ -68,7 +76,7 @@ func newWorker(
 	shutdown empty.Chan,
 	topicDescriber TopicDescriber,
 	background *background.Worker,
-	cfg *ProducerConfig,
+	cfg *MultiWriterConfig,
 ) *worker {
 	if cfg.writersFactory == nil {
 		if cfg.Transaction != nil {
@@ -88,7 +96,7 @@ func newWorker(
 
 	w := &worker{
 		writers:               make(map[int64]*writerWrapper),
-		inFlightMessages:      xlist.New[Message](),
+		inFlightMessages:      xlist.New[message](),
 		cfg:                   cfg,
 		wakeupChan:            make(empty.Chan, 1),
 		ackReceivedChan:       make(empty.Chan, 1),
@@ -255,7 +263,7 @@ func (w *worker) init() (err error) {
 	return nil
 }
 
-func (w *worker) choosePartition(msg Message) (partitionID int64, err error) {
+func (w *worker) choosePartition(msg message) (partitionID int64, err error) {
 	switch {
 	case msg.PartitionID != 0:
 		return msg.PartitionID, nil
@@ -274,7 +282,7 @@ func (w *worker) choosePartition(msg Message) (partitionID int64, err error) {
 			return
 		}
 	case w.cfg.CustomChoosePartitionFunc != nil:
-		partitionID, err = w.cfg.CustomChoosePartitionFunc(msg)
+		partitionID, err = w.cfg.CustomChoosePartitionFunc(msg.PublicMessage)
 		if err != nil {
 			return
 		}
@@ -353,7 +361,7 @@ func (w *worker) acquireMessage(ctx context.Context) error {
 	}
 }
 
-func (w *worker) pushMessage(ctx context.Context, msg Message) (err error) {
+func (w *worker) pushMessage(ctx context.Context, msg message) (err error) {
 	var autoSetSeqNo bool
 	w.mu.WithLock(func() {
 		autoSetSeqNo = w.cfg.AutoSetSeqNo
@@ -596,7 +604,7 @@ func (w *worker) getSplittedPartitionChildren(describeResult *topictypes.TopicDe
 	return nil
 }
 
-func (w *worker) rechoosePartition(msg *Message) (err error) {
+func (w *worker) rechoosePartition(msg *message) (err error) {
 	msg.PartitionID = 0
 	msg.PartitionID, err = w.choosePartition(*msg)
 
