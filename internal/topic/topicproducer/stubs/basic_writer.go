@@ -19,13 +19,19 @@ type basicWriter struct {
 	autoSetSeqNo          bool
 	currentSeqNo          int64
 	ackDelay              time.Duration
+	initDelay             time.Duration
 }
 
 func NewBasicWriter(
 	onAckReceivedCallback func(seqNo int64),
 	autoSetSeqNo bool,
 	ackDelay time.Duration,
+	initDelay time.Duration,
 ) *basicWriter {
+	if initDelay == 0 {
+		initDelay = time.Second
+	}
+
 	w := &basicWriter{
 		onAckReceivedCallback: onAckReceivedCallback,
 		currentSeqNo:          1,
@@ -33,6 +39,7 @@ func NewBasicWriter(
 		acksChan:              make(chan int64, 100),
 		autoSetSeqNo:          autoSetSeqNo,
 		ackDelay:              ackDelay,
+		initDelay:             initDelay,
 	}
 
 	go w.ackProcessor()
@@ -74,7 +81,7 @@ func (w *basicWriter) Write(ctx context.Context, messages []topicwriterinternal.
 }
 
 func (w *basicWriter) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
-	time.Sleep(time.Second)
+	time.Sleep(w.initDelay)
 
 	return topicwriterinternal.InitialInfo{
 		LastSeqNum: w.currentSeqNo,

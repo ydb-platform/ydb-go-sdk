@@ -30,7 +30,8 @@ type worker struct {
 	idleWritersSupervisor *idleWritersSupervisor
 	cfg                   *ProducerConfig
 	mu                    xsync.Mutex
-	messagesSemaphore     *xsync.SoftWeightedSemaphore
+	acksMu                xsync.Mutex
+	messagesSema          chan struct{}
 
 	partitionChooser PartitionChooser
 
@@ -41,8 +42,11 @@ type worker struct {
 
 	topicDescriber TopicDescriber
 
-	wakeupChan empty.Chan
-	shutdown   empty.Chan
+	wakeupChan      empty.Chan
+	ackReceivedChan empty.Chan
+	shutdown        empty.Chan
+
+	receivedAcks xlist.List[ack]
 
 	partitions map[int64]*PartitionInfo
 	initDone   chan struct{}
@@ -80,17 +84,19 @@ func newWorker(
 		inFlightMessages:      xlist.New[Message](),
 		cfg:                   cfg,
 		wakeupChan:            make(empty.Chan, 1),
+		ackReceivedChan:       make(empty.Chan, 1),
 		shutdown:              shutdown,
 		topicDescriber:        topicDescriber,
 		ctx:                   ctx,
 		stop:                  stop,
 		partitions:            make(map[int64]*PartitionInfo),
 		initDone:              make(chan struct{}),
-		messagesSemaphore:     xsync.NewSoftWeightedSemaphore(int64(cfg.MaxQueueLen) / 2),
+		messagesSema:          make(chan struct{}, int64(cfg.MaxQueueLen)/2),
 		inFlightMessagesIndex: make(map[int64]xlist.List[messagePtr]),
 		messagesToResendIndex: make(map[int64]xlist.List[messagePtr]),
 		pendingMessagesIndex:  make(map[int64]xlist.List[messagePtr]),
 		background:            background,
+		receivedAcks:          xlist.New[ack](),
 	}
 
 	if cfg.PartitioningKeyHasher == nil {
@@ -102,11 +108,39 @@ func newWorker(
 		w.idleWritersSupervisor.run()
 	})
 
+	background.Start("ack receiver", func(ctx context.Context) {
+		w.runAckReceiverLoop()
+	})
+
 	return w
 }
 
 func isOperationErrorOverloaded(err error) bool {
 	return xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED)
+}
+
+func (w *worker) runAckReceiverLoop() {
+	for {
+		select {
+		case <-w.ctx.Done():
+			return
+		case <-w.ackReceivedChan:
+		}
+
+		receivedAcks := make([]ack, 0, w.receivedAcks.Len())
+		w.acksMu.WithLock(func() {
+			for iter := w.receivedAcks.Front(); iter != nil; iter = iter.Next() {
+				receivedAcks = append(receivedAcks, iter.Value)
+			}
+			w.receivedAcks.Clear()
+		})
+
+		w.mu.WithLock(func() {
+			for _, ack := range receivedAcks {
+				w.onAckReceived(ack.partitionID, ack.seqNo)
+			}
+		})
+	}
 }
 
 func (w *worker) getDefaultKeyHasher() KeyHasher {
@@ -234,6 +268,17 @@ func (w *worker) addToMessagesToResendIndex(newElement messagePtr, toPartition i
 	}
 }
 
+func (w *worker) acquireMessage(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-w.ctx.Done():
+		return w.getResultErr()
+	case w.messagesSema <- struct{}{}:
+		return nil
+	}
+}
+
 func (w *worker) pushMessage(ctx context.Context, msg Message) (err error) {
 	var autoSetSeqNo bool
 	w.mu.WithLock(func() {
@@ -244,8 +289,8 @@ func (w *worker) pushMessage(ctx context.Context, msg Message) (err error) {
 		return ErrNoSeqNo
 	}
 
-	if err := w.messagesSemaphore.Acquire(ctx, 1); err != nil {
-		return fmt.Errorf("ydb: can not add message due to queue len overflow: %w", err)
+	if err := w.acquireMessage(ctx); err != nil {
+		return err
 	}
 
 	w.mu.WithLock(func() {
@@ -323,9 +368,17 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 			topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
 			topicwriterinternal.WithProducerID(w.getProducerID(partitionID)),
 			topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
-				w.mu.WithLock(func() {
-					w.onAckReceived(partitionID, seqNo)
+				w.acksMu.WithLock(func() {
+					w.receivedAcks.PushBack(ack{
+						partitionID: partitionID,
+						seqNo:       seqNo,
+					})
 				})
+
+				select {
+				case w.ackReceivedChan <- empty.Struct{}:
+				default:
+				}
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 				if isOperationErrorOverloaded(args.Error) {
@@ -398,8 +451,12 @@ func (w *worker) releaseInFlightMessages() {
 		}
 
 		w.inFlightMessages.Remove(front)
-		w.messagesSemaphore.Release(1)
+		w.releaseMessage()
 	}
+}
+
+func (w *worker) releaseMessage() {
+	<-w.messagesSema
 }
 
 func (w *worker) getSplittedPartitionAncestors(
@@ -497,6 +554,7 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 		iter.Value.Value.PartitionID = msg.PartitionID
 		inFlightMessagesToAdd = append(inFlightMessagesToAdd, iter.Value)
 		if iter.Value.Value.sent {
+			iter.Value.Value.sent = false
 			messagesToResendToAdd = append(messagesToResendToAdd, iter.Value)
 		} else {
 			pendingMessagesToAdd = append(pendingMessagesToAdd, iter.Value)
@@ -717,8 +775,16 @@ func (w *worker) step() error {
 					return fmt.Errorf("failed to write message: %w", err)
 				}
 
-				list.Remove(iter)
 				iter.Value.Value.sent = true
+			}
+
+			iter := list.Front()
+			for list.Len() > 0 && iter != nil {
+				next := iter.Next()
+				if iter.Value.Value.sent {
+					list.Remove(iter)
+				}
+				iter = next
 			}
 
 			if list.Len() == 0 {

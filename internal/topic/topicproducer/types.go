@@ -24,6 +24,11 @@ type partitionShortInfo struct {
 	ToBound   string
 }
 
+type ack struct {
+	partitionID int64
+	seqNo       int64
+}
+
 type PartitionChooserStrategy uint8
 
 const (
