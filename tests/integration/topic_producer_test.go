@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicproducer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -24,14 +25,6 @@ func readMessages(ctx context.Context, count int, topicPath string, scope *scope
 	reader, err := scope.Driver().Topic().StartReader(
 		consumerName,
 		topicoptions.ReadTopic(topicPath),
-		topicoptions.WithReaderGetPartitionStartOffset(
-			func(ctx context.Context, req topicoptions.GetPartitionStartOffsetRequest) (topicoptions.GetPartitionStartOffsetResponse, error) { //nolint:revive
-				var resp topicoptions.GetPartitionStartOffsetResponse
-				// Start reading from the beginning of each partition.
-				resp.StartFrom(0)
-				return resp, nil
-			},
-		),
 	)
 	if err != nil {
 		return err
@@ -99,6 +92,27 @@ func createTopicWithAutoPartitioning(ctx context.Context, db *ydb.Driver, topicP
 	)
 }
 
+func createProducerForAutoPartitioning(
+	t *testing.T,
+	producerIDPrefix string,
+	ctx context.Context,
+	topicPath string,
+	topicClient topic.Client,
+	producerSettings []topicoptions.ProducerOption,
+) *topicproducer.Producer {
+	t.Helper()
+
+	producer, err := topicClient.CreateProducer(
+		topicPath,
+		append(producerSettings,
+			topicoptions.WithProducerIDPrefix(producerIDPrefix),
+		)...,
+	)
+	require.NoError(t, err)
+	require.NoError(t, producer.WaitInit(ctx))
+	return producer
+}
+
 // TestTopicProducer_WaitInitAndClose verifies that internal topic producer
 // can be initialized and closed against a real YDB topic.
 func TestTopicProducer_WaitInitAndClose(t *testing.T) {
@@ -110,6 +124,20 @@ func TestTopicProducer_WaitInitAndClose(t *testing.T) {
 	require.NoError(t, err)
 
 	err = producer.WaitInit(ctx)
+	require.NoError(t, err)
+
+	err = producer.Close(ctx)
+	require.NoError(t, err)
+}
+
+// TestTopicProducer_WaitInitAndClose verifies that internal topic producer
+// can be initialized and closed against a real YDB topic.
+func TestTopicProducer_CloseWithoutWaitInit(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+	producer, err := topicClient.CreateProducer(scope.TopicPath())
 	require.NoError(t, err)
 
 	err = producer.Close(ctx)
@@ -190,31 +218,14 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 		),
 	}
 
-	producer1, err := topicClient.CreateProducer(
-		topicPath,
-		append(producerSettings,
-			topicoptions.WithProducerIDPrefix("autopartitioning_keyed_1"),
-		)...,
-	)
-	require.NoError(t, err)
-	require.NoError(t, producer1.WaitInit(ctx))
-
-	producer2, err := topicClient.CreateProducer(
-		topicPath,
-		append(producerSettings,
-			topicoptions.WithProducerIDPrefix("autopartitioning_keyed_2"),
-		)...,
-	)
-	require.NoError(t, err)
-	require.NoError(t, producer2.WaitInit(ctx))
+	producer1 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, producerSettings)
+	producer2 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, producerSettings)
 
 	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
-
 	keys := make([]string, 0, len(describe.Partitions))
 	for _, p := range describe.Partitions {
 		keys = append(keys, string(p.FromBound))
 	}
-
 	require.NotEmpty(t, keys)
 
 	writeMessage := func(p *topicproducer.Producer, payload []byte, seqNo int64) {
@@ -267,16 +278,11 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 	require.NoError(t, producer1.Flush(ctx))
 	require.NoError(t, producer2.Flush(ctx))
 
-	producer3, err := topicClient.CreateProducer(
-		topicPath,
-		append(producerSettings,
-			topicoptions.WithProducerIDPrefix("autopartitioning_keyed_3"),
-		)...,
-	)
-	require.NoError(t, err)
-	require.NoError(t, producer3.WaitInit(ctx))
+	producer3 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, producerSettings)
 
 	require.NoError(t, producer3.Close(ctx))
 	require.NoError(t, producer1.Close(ctx))
 	require.NoError(t, producer2.Close(ctx))
+
+	require.Equal(t, int64(14), producer1.GetWriteStats().MessagesWritten+producer2.GetWriteStats().MessagesWritten)
 }

@@ -47,6 +47,10 @@ func NewProducer(topicDescriber TopicDescriber, cfg ProducerConfig) *Producer {
 	p.background.Start("main worker", func(ctx context.Context) {
 		err := p.worker.init()
 		if err != nil {
+			if p.worker.ctx.Err() != nil {
+				return
+			}
+
 			p.worker.err = err
 			p.worker.stop()
 
@@ -87,14 +91,11 @@ func (p *Producer) Close(ctx context.Context) error {
 	}
 
 	p.worker.stop()
-	p.background.Close(ctx, nil)
-
-	select {
-	case <-p.shutdown:
-		return p.worker.getResultErr()
-	case <-ctx.Done():
-		return ctx.Err()
+	if err := p.background.Close(ctx, nil); err != nil {
+		return err
 	}
+
+	return p.worker.getResultErr()
 }
 
 func (p *Producer) Flush(ctx context.Context) error {
