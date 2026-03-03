@@ -320,10 +320,6 @@ func TestMultiWriter_Write_WithBasicWriter(t *testing.T) {
 
 	require.NoError(t, multiWriter.Write(ctx, messages...))
 	require.NoError(t, multiWriter.Close(ctx))
-
-	stats := multiWriter.GetWriteStats()
-	require.Equal(t, int64(1000), stats.MessagesWritten)
-	require.Equal(t, int64(1000), stats.LastWrittenSeqNo)
 }
 
 func TestMultiWriter_Write_WaitForAck(t *testing.T) {

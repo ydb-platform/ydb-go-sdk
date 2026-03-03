@@ -82,8 +82,3 @@ func (p *MultiWriter) WaitInit(ctx context.Context) error {
 func (p *MultiWriter) Close(ctx context.Context) error {
 	return p.inner.Close(ctx)
 }
-
-// GetWriteStats returns statistics about the write operations.
-func (p *MultiWriter) GetWriteStats() WriteStats {
-	return p.inner.GetWriteStats()
-}

@@ -95,7 +95,3 @@ func (p *MultiWriter) WaitInit(ctx context.Context) error {
 func (p *MultiWriter) getWritersCount() int {
 	return p.worker.getWritersCount()
 }
-
-func (p *MultiWriter) GetWriteStats() WriteStats {
-	return p.worker.getWriteStats()
-}

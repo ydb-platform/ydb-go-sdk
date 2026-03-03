@@ -65,9 +65,6 @@ type worker struct {
 
 	isAutoPartitioningEnabled bool
 	background                *background.Worker
-
-	lastWrittenSeqNo int64
-	writtenMessages  int64
 }
 
 func newWorker(
@@ -539,9 +536,6 @@ func (w *worker) releaseInFlightMessages() {
 
 		w.inFlightMessages.Remove(front)
 		w.releaseMessage()
-
-		w.lastWrittenSeqNo = max(w.lastWrittenSeqNo, front.Value.SeqNo)
-		w.writtenMessages++
 	}
 }
 
@@ -962,16 +956,6 @@ func (w *worker) run() {
 
 			return
 		}
-	}
-}
-
-func (w *worker) getWriteStats() WriteStats {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	return WriteStats{
-		MessagesWritten:  w.writtenMessages,
-		LastWrittenSeqNo: w.lastWrittenSeqNo,
 	}
 }
 
