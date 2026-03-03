@@ -121,7 +121,7 @@ func newTestMultiWriterWithBasicWriter(
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	}
 	options = append(options, opts...)
-	WithBasicWriterOptions(options...)(&cfg)
+	withBasicWriterOptions(options...)(&cfg)
 
 	return NewMultiWriter(describer, cfg)
 }
@@ -141,7 +141,7 @@ func newTestMultiWriterWithAutopartitioningWriter(
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state, 0))(&cfg)
 	WithProducerIDPrefix(producerIDPrefix)(&cfg)
-	WithBasicWriterOptions(
+	withBasicWriterOptions(
 		topicwriterinternal.WithTopic("test/topic"),
 		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
@@ -156,7 +156,7 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer Topic
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterIdleTimeout(1 * time.Second)(&cfg)
-	WithBasicWriterOptions(
+	withBasicWriterOptions(
 		topicwriterinternal.WithTopic("test/topic"),
 		topicwriterinternal.WithMaxQueueLen(100),
 		topicwriterinternal.WithAutosetCreatedTime(false),
@@ -181,7 +181,7 @@ func newTestMultiWriterWithAckDelay(
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	}
 	options = append(options, opts...)
-	WithBasicWriterOptions(options...)(&cfg)
+	withBasicWriterOptions(options...)(&cfg)
 
 	return NewMultiWriter(describer, cfg)
 }
@@ -202,7 +202,7 @@ func newTestMultiWriterWithCustomWritersFactory(
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	}
 	options = append(options, opts...)
-	WithBasicWriterOptions(options...)(&cfg)
+	withBasicWriterOptions(options...)(&cfg)
 
 	return NewMultiWriter(describer, cfg)
 }

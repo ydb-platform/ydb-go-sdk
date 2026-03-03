@@ -232,10 +232,9 @@ func WithWriterLogContext(ctx context.Context) WriterOption {
 // Experimental: the behavior may change in future minor versions.
 func WithMultiWriter(opts ...MultiWriterOption) WriterOption {
 	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
-		if len(opts) == 0 {
-			return
-		}
+		options := make([]MultiWriterOption, 0, len(opts))
+		options = append(options, opts...)
 		// Store options in the generic extension field; StartWriter will inspect it.
-		cfg.Extra = append([]MultiWriterOption(nil), opts...)
+		cfg.Extra = options
 	}
 }

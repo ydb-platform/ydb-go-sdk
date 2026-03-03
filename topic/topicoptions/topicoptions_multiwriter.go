@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
 // ProducerOption configures a topic producer.
@@ -32,12 +31,7 @@ func WithCustomChoosePartitionFunc(customChoosePartitionFunc topicmultiwriter.Ch
 	return topicmultiwriter.WithCustomChoosePartitionFunc(customChoosePartitionFunc)
 }
 
-// WithSubSessionIdleTimeout sets timeout after which idle sub-sessions are closed.
-func WithSubSessionIdleTimeout(timeout time.Duration) MultiWriterOption {
+// WithWriterIdleTimeout sets timeout after which idle writers are closed.
+func WithWriterIdleTimeout(timeout time.Duration) MultiWriterOption {
 	return topicmultiwriter.WithWriterIdleTimeout(timeout)
-}
-
-// WithBasicWriterOptions forwards basic writer options into underlying writer reconnectors.
-func WithBasicWriterOptions(opts ...topicwriterinternal.PublicWriterOption) MultiWriterOption {
-	return topicmultiwriter.WithBasicWriterOptions(opts...)
 }

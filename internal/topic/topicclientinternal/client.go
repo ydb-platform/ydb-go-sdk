@@ -21,7 +21,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -340,8 +339,8 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
 	if extra := cfg.Extra; extra != nil {
-		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && len(mwOpts) > 0 {
-			mwCfg := c.createMultiWriterConfig(topicPath, mwOpts)
+		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && mwOpts != nil {
+			mwCfg := c.createMultiWriterConfig(topicPath, cfg, mwOpts)
 
 			internal := internalmultiwriter.NewMultiWriter(
 				func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -378,8 +377,8 @@ func (c *Client) StartTransactionalWriter(
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
 	if extra := cfg.Extra; extra != nil {
-		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && len(mwOpts) > 0 {
-			mwCfg := c.createMultiWriterConfig(topicPath, mwOpts)
+		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && mwOpts != nil {
+			mwCfg := c.createMultiWriterConfig(topicPath, cfg, mwOpts)
 
 			multiWriterTx := internalmultiwriter.NewTopicMultiWriterTransaction(
 				internalmultiwriter.NewMultiWriter(
@@ -407,40 +406,22 @@ func (c *Client) StartTransactionalWriter(
 	return topicwriter.NewTxWriterInternal(txWriter), nil
 }
 
-// CreateMultiWriter creates a high-level topic multi writer.
-func (c *Client) CreateMultiWriter(
-	topicPath string,
-	opts ...topicoptions.MultiWriterOption,
-) (*topicmultiwriter.MultiWriter, error) {
-	cfg := c.createMultiWriterConfig(topicPath, opts)
-
-	internal := internalmultiwriter.NewMultiWriter(
-		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-			return c.Describe(ctx, path)
-		},
-		cfg,
-	)
-
-	return topicmultiwriter.NewMultiWriter(internal), nil
-}
-
 func (c *Client) createMultiWriterConfig(
 	topicPath string,
+	cfg topicwriterinternal.WriterReconnectorConfig,
 	opts []topicoptions.MultiWriterOption,
 ) internalmultiwriter.MultiWriterConfig {
-	writerCfg := c.createWriterConfig(topicPath, nil)
-
-	cfg := internalmultiwriter.MultiWriterConfig{
-		WriterReconnectorConfig: writerCfg,
+	mwCfg := internalmultiwriter.MultiWriterConfig{
+		WriterReconnectorConfig: cfg,
 	}
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt(&cfg)
+			opt(&mwCfg)
 		}
 	}
 
-	return cfg
+	return mwCfg
 }
 
 func (c *Client) createWriterConfig(

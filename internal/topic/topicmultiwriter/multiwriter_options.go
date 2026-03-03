@@ -38,16 +38,16 @@ func WithWriterIdleTimeout(timeout time.Duration) PublicMultiWriterOption {
 	}
 }
 
-func WithBasicWriterOptions(opts ...topicwriterinternal.PublicWriterOption) PublicMultiWriterOption {
+func withWritersFactory(writersFactory writersFactory) PublicMultiWriterOption {
+	return func(cfg *MultiWriterConfig) {
+		cfg.writersFactory = writersFactory
+	}
+}
+
+func withBasicWriterOptions(opts ...topicwriterinternal.PublicWriterOption) PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
 		for _, opt := range opts {
 			opt(&cfg.WriterReconnectorConfig)
 		}
-	}
-}
-
-func withWritersFactory(writersFactory writersFactory) PublicMultiWriterOption {
-	return func(cfg *MultiWriterConfig) {
-		cfg.writersFactory = writersFactory
 	}
 }

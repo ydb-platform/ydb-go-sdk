@@ -100,8 +100,11 @@ func createMultiWriterForAutoPartitioning(
 	t.Helper()
 
 	multiWriterSettings = append(multiWriterSettings, topicoptions.WithProducerIDPrefix(producerIDPrefix))
-
-	multiWriter, err := topicClient.StartWriter(topicPath, topicoptions.WithMultiWriter(multiWriterSettings...))
+	multiWriter, err := topicClient.StartWriter(
+		topicPath,
+		topicoptions.WithWriterSetAutoSeqNo(false),
+		topicoptions.WithMultiWriter(multiWriterSettings...),
+	)
 	require.NoError(t, err)
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	return multiWriter
@@ -119,6 +122,18 @@ func TestTopicMultiWriter_WaitInitAndClose(t *testing.T) {
 
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestTopicMultiWriter_WaitInitInfoUnimplemented(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter())
+	require.NoError(t, err)
+
+	_, err = multiWriter.WaitInitInfo(ctx)
+	require.ErrorIs(t, err, topicwriter.ErrUnimplemented)
 }
 
 // TestTopicMultiWriter_WaitInitAndClose verifies that internal topic multi writer
@@ -152,10 +167,8 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
+		topicoptions.WithWriterSetAutoSeqNo(false),
 		topicoptions.WithMultiWriter(
-			topicoptions.WithBasicWriterOptions(
-				topicoptions.WithWriterSetAutoSeqNo(false),
-			),
 			topicoptions.WithPartitionChooserStrategy(topicmultiwriter.PartitionChooserStrategyHash),
 		),
 	)
@@ -199,10 +212,7 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 
 	topicMultiWriterSettings := []topicoptions.MultiWriterOption{
 		topicoptions.WithPartitionChooserStrategy(topicmultiwriter.PartitionChooserStrategyBound),
-		topicoptions.WithSubSessionIdleTimeout(30 * time.Second),
-		topicoptions.WithBasicWriterOptions(
-			topicoptions.WithWriterSetAutoSeqNo(false),
-		),
+		topicoptions.WithWriterIdleTimeout(30 * time.Second),
 	}
 
 	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
