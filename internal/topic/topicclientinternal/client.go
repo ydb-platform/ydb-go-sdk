@@ -340,7 +340,7 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	// a multi-writer instead of a single-writer.
 	if extra := cfg.Extra; extra != nil {
 		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && mwOpts != nil {
-			mwCfg := c.createMultiWriterConfig(topicPath, cfg, mwOpts)
+			mwCfg := c.createMultiWriterConfig(cfg, mwOpts)
 
 			internal := internalmultiwriter.NewMultiWriter(
 				func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -378,7 +378,7 @@ func (c *Client) StartTransactionalWriter(
 	// a multi-writer instead of a single-writer.
 	if extra := cfg.Extra; extra != nil {
 		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && mwOpts != nil {
-			mwCfg := c.createMultiWriterConfig(topicPath, cfg, mwOpts)
+			mwCfg := c.createMultiWriterConfig(cfg, mwOpts)
 
 			multiWriterTx := internalmultiwriter.NewTopicMultiWriterTransaction(
 				internalmultiwriter.NewMultiWriter(
@@ -407,7 +407,6 @@ func (c *Client) StartTransactionalWriter(
 }
 
 func (c *Client) createMultiWriterConfig(
-	topicPath string,
 	cfg topicwriterinternal.WriterReconnectorConfig,
 	opts []topicoptions.MultiWriterOption,
 ) internalmultiwriter.MultiWriterConfig {
