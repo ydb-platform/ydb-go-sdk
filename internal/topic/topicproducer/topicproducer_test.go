@@ -18,9 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-var (
-	errTest = errors.New("test error")
-)
+var errTest = errors.New("test error")
 
 type stubWritersFactory struct {
 	stubWriterType   stubs.StubWriterType
@@ -92,7 +90,11 @@ func newTestProducer(t testing.TB, describer TopicDescriber) *Producer {
 }
 
 // newTestProducerWithBasicWriter creates a producer that uses basicWriter as writer (no real gRPC).
-func newTestProducerWithBasicWriter(t testing.TB, describer TopicDescriber, opts ...topicwriterinternal.PublicWriterOption) *Producer {
+func newTestProducerWithBasicWriter(
+	t testing.TB,
+	describer TopicDescriber,
+	opts ...topicwriterinternal.PublicWriterOption,
+) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
@@ -148,7 +150,12 @@ func newTestProducerWithSmallIdleSessionTimeout(t testing.TB, describer TopicDes
 	return NewProducer(describer, cfg)
 }
 
-func newTestProducerWithAckDelay(t testing.TB, describer TopicDescriber, ackDelay time.Duration, opts ...topicwriterinternal.PublicWriterOption) *Producer {
+func newTestProducerWithAckDelay(
+	t testing.TB,
+	describer TopicDescriber,
+	ackDelay time.Duration,
+	opts ...topicwriterinternal.PublicWriterOption,
+) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, ackDelay))(&cfg)
@@ -164,7 +171,12 @@ func newTestProducerWithAckDelay(t testing.TB, describer TopicDescriber, ackDela
 	return NewProducer(describer, cfg)
 }
 
-func newTestProducerWithCustomWritersFactory(t testing.TB, describer TopicDescriber, writersFactory writersFactory, opts ...topicwriterinternal.PublicWriterOption) *Producer {
+func newTestProducerWithCustomWritersFactory(
+	t testing.TB,
+	describer TopicDescriber,
+	writersFactory writersFactory,
+	opts ...topicwriterinternal.PublicWriterOption,
+) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
 	withWritersFactory(writersFactory)(&cfg)
