@@ -27,7 +27,6 @@ type stubWritersFactory struct {
 	seqNoMap         map[string]int64
 	mu               xsync.Mutex
 	ackDelay         time.Duration
-	initDelay        time.Duration
 }
 
 func newStubWritersFactory(
@@ -35,7 +34,6 @@ func newStubWritersFactory(
 	producerIDPrefix string,
 	describeSplits *stubs.DescribeWithSplitsState,
 	ackDelay time.Duration,
-	initDelay time.Duration,
 ) *stubWritersFactory {
 	return &stubWritersFactory{
 		stubWriterType:   stubWriterType,
@@ -43,14 +41,13 @@ func newStubWritersFactory(
 		describeSplits:   describeSplits,
 		seqNoMap:         make(map[string]int64),
 		ackDelay:         ackDelay,
-		initDelay:        initDelay,
 	}
 }
 
 func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	switch f.stubWriterType {
 	case stubs.StubWriterTypeBasic:
-		return stubs.NewBasicWriter(cfg.OnAckReceivedCallback, cfg.AutoSetSeqNo, f.ackDelay, f.initDelay), nil
+		return stubs.NewBasicWriter(cfg.OnAckReceivedCallback, cfg.AutoSetSeqNo, f.ackDelay), nil
 	case stubs.StubWriterTypeError:
 		return nil, errTest
 	case stubs.StubWriterTypeWithAutopartitioning:
@@ -99,9 +96,12 @@ func newTestProducerWithInitDelay(
 ) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0, initDelay))(&cfg)
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 
-	return NewProducer(describer, cfg)
+	return NewProducer(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		time.Sleep(initDelay)
+		return describer(ctx, path)
+	}, cfg)
 }
 
 // newTestProducerWithBasicWriter creates a producer that uses basicWriter as writer (no real gRPC).
@@ -112,7 +112,7 @@ func newTestProducerWithBasicWriter(
 ) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
 	options := []topicwriterinternal.PublicWriterOption{
@@ -139,7 +139,7 @@ func newTestProducerWithAutopartitioningWriter(
 
 	t.Helper()
 	cfg := ProducerConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state, 0, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state, 0))(&cfg)
 	WithProducerIDPrefix(producerIDPrefix)(&cfg)
 	WithBasicWriterOptions(
 		topicwriterinternal.WithTopic("test/topic"),
@@ -153,7 +153,7 @@ func newTestProducerWithAutopartitioningWriter(
 func newTestProducerWithSmallIdleSessionTimeout(t testing.TB, describer TopicDescriber) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithSubSessionIdleTimeout(1 * time.Second)(&cfg)
 	WithBasicWriterOptions(
@@ -173,7 +173,7 @@ func newTestProducerWithAckDelay(
 ) *Producer {
 	t.Helper()
 	cfg := ProducerConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, ackDelay, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, ackDelay))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
 	options := []topicwriterinternal.PublicWriterOption{
@@ -262,9 +262,9 @@ func TestProducer_CloseWithoutWaitInit(t *testing.T) {
 
 	ctx := xtest.Context(t)
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
-	producer := newTestProducerWithInitDelay(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+	producer := newTestProducerWithBasicWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		return stubClient.Describe(ctx, path)
-	}, time.Second*10)
+	})
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*2)
 	defer cancel()
@@ -371,7 +371,7 @@ func TestProducer_Write_WithErrorWritersFactory(t *testing.T) {
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
 		},
-		newStubWritersFactory(stubs.StubWriterTypeError, "test-producer", nil, 0, 0),
+		newStubWritersFactory(stubs.StubWriterTypeError, "test-producer", nil, 0),
 	)
 
 	err := producer.WaitInit(ctx)

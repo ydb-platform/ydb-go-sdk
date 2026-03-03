@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -48,8 +47,6 @@ func readMessages(ctx context.Context, count int, topicPath string, scope *scope
 
 			return err
 		}
-
-		fmt.Fprintf(os.Stderr, "read message: partitionID=%d, seqNo=%d\n", mess.PartitionID(), mess.SeqNo)
 
 		partitionID := mess.PartitionID()
 		seqNos, ok := partitionsSeqNoMap[partitionID]

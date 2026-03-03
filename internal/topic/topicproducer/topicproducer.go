@@ -47,12 +47,7 @@ func NewProducer(topicDescriber TopicDescriber, cfg ProducerConfig) *Producer {
 	p.background.Start("main worker", func(ctx context.Context) {
 		err := p.worker.init()
 		if err != nil {
-			if p.worker.ctx.Err() != nil {
-				return
-			}
-
-			p.worker.err = err
-			p.worker.stop()
+			p.worker.stopWithError(err)
 
 			return
 		}
@@ -107,7 +102,7 @@ func (p *Producer) WaitInit(ctx context.Context) error {
 }
 
 func (p *Producer) getWritersCount() int {
-	return len(p.worker.writers)
+	return p.worker.getWritersCount()
 }
 
 func (p *Producer) GetWriteStats() WriteStats {

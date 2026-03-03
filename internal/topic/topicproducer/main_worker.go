@@ -146,8 +146,9 @@ func (w *worker) runAckReceiver() {
 		case <-w.ackReceivedChan:
 		}
 
-		receivedAcks := make([]ack, 0, w.receivedAcks.Len())
+		var receivedAcks []ack
 		w.acksMu.WithLock(func() {
+			receivedAcks = make([]ack, 0, w.receivedAcks.Len())
 			for iter := w.receivedAcks.Front(); iter != nil; iter = iter.Next() {
 				receivedAcks = append(receivedAcks, iter.Value)
 			}
@@ -460,7 +461,14 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 					return topic.PublicRetryDecisionStop
 				}
 
-				return w.cfg.RetrySettings.CheckError(args)
+				var checkErrorResult topic.PublicCheckRetryResult
+				w.mu.WithLock(func() {
+					if w.cfg.RetrySettings.CheckError != nil {
+						checkErrorResult = w.cfg.RetrySettings.CheckError(args)
+					}
+				})
+
+				return checkErrorResult
 			}),
 			topicwriterinternal.WithMaxQueueLen(w.cfg.MaxQueueLen / 2),
 		}
@@ -807,12 +815,23 @@ func (w *worker) getResultErr() error {
 	return w.err
 }
 
+func (w *worker) stopWithError(err error) {
+	w.mu.WithLock(func() {
+		if w.ctx.Err() != nil {
+			return
+		}
+
+		w.err = err
+		w.stop()
+	})
+}
+
 func (w *worker) flush(ctx context.Context) error {
-	waitCh := make(empty.Chan, 1)
+	waitCh := make(empty.Chan)
 
 	w.mu.WithLock(func() {
 		if w.inFlightMessages.Len() == 0 {
-			waitCh <- empty.Struct{}
+			close(waitCh)
 
 			return
 		}
@@ -824,7 +843,7 @@ func (w *worker) flush(ctx context.Context) error {
 				prevAckCallback()
 			}
 
-			waitCh <- empty.Struct{}
+			close(waitCh)
 		}
 	})
 
@@ -946,4 +965,11 @@ func (w *worker) getWriteStats() WriteStats {
 		MessagesWritten:  w.writtenMessages,
 		LastWrittenSeqNo: w.lastWrittenSeqNo,
 	}
+}
+
+func (w *worker) getWritersCount() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return len(w.writers)
 }
