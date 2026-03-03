@@ -53,6 +53,7 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 	case stubs.StubWriterTypeWithAutopartitioning:
 		partitionID, _ := cfg.PartitionID()
 		producerID := cfg.ProducerID()
+
 		var onSplit func(int64)
 		if f.describeSplits != nil {
 			onSplit = f.describeSplits.RecordSplit
