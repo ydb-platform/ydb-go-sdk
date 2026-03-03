@@ -119,5 +119,9 @@ func TestTopicProducer_WriteAndFlush(t *testing.T) {
 
 	require.NoError(t, producer.Write(ctx, messages...))
 	require.NoError(t, producer.Close(ctx))
+
+	stats := producer.GetWriteStats()
+	require.Equal(t, int64(1000), stats.MessagesWritten)
+	require.Equal(t, int64(1000), stats.LastWrittenSeqNo)
 	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
 }

@@ -24,6 +24,11 @@ type ChoosePartitionFunc = internal.ChoosePartitionFunc
 // The default strategy is PartitionChooserStrategyBound.
 type PartitionChooserStrategy = internal.PartitionChooserStrategy
 
+// WriteStats is a struct that contains statistics about the write operations:
+// - MessagesWritten is the number of messages written to the topic.
+// - LastWrittenSeqNo is the last sequence number written to the topic.
+type WriteStats = internal.WriteStats
+
 const (
 	// PartitionChooserStrategyBound is a strategy for choosing a partition for a message based on the bounds of each partition.
 	// Key will be hashed using KeyHasher and after that the hash will be compared with the bounds of each partition.
@@ -75,4 +80,9 @@ func (p *Producer) WaitInit(ctx context.Context) error {
 // Close gracefully stops producer, flushing pending messages.
 func (p *Producer) Close(ctx context.Context) error {
 	return p.inner.Close(ctx)
+}
+
+// GetWriteStats returns statistics about the write operations.
+func (p *Producer) GetWriteStats() WriteStats {
+	return p.inner.GetWriteStats()
 }

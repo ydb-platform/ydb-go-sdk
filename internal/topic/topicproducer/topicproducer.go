@@ -108,3 +108,7 @@ func (p *Producer) WaitInit(ctx context.Context) error {
 func (p *Producer) getWritersCount() int {
 	return len(p.worker.writers)
 }
+
+func (p *Producer) GetWriteStats() WriteStats {
+	return p.worker.getWriteStats()
+}

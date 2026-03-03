@@ -46,3 +46,8 @@ type idleWriterInfo struct {
 	partitionID int64
 	deadline    time.Time
 }
+
+type WriteStats struct {
+	MessagesWritten  int64
+	LastWrittenSeqNo int64
+}
