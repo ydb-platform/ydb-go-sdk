@@ -18,7 +18,7 @@ var (
 	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	ErrQueueLimitExceed                      = topicwriterinternal.ErrPublicQueueIsFull
 	ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.ErrPublicMessagesPutToInternalQueueBeforeError
-	ErrUnimplemented                         = topicmultiwriter.ErrUnimplemented
+	ErrUnimplemented                         = errors.New("unimplemented")
 )
 
 // Writer represent write session to topic
@@ -129,6 +129,11 @@ func (w *TxWriter) WaitInit(ctx context.Context) (err error) {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (w *TxWriter) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
+	_, ok := w.inner.(*topicmultiwriter.MultiWriterWithTransaction)
+	if ok {
+		return PublicInitialInfo{}, ErrUnimplemented
+	}
+
 	privateInfo, err := w.inner.WaitInit(ctx)
 	if err != nil {
 		return PublicInitialInfo{}, err
