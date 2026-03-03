@@ -429,6 +429,13 @@ func (w *worker) getProducerID(partitionID int64) string {
 	return fmt.Sprintf("%s_%d", w.cfg.ProducerIDPrefix, partitionID)
 }
 
+func (w *worker) notifyOnPartitionSplit(partitionID int64) {
+	w.splittedPartitionsMu.WithLock(func() {
+		w.splittedPartitions.PushBack(partitionID)
+	})
+	w.wakeUpPartitionSplitter()
+}
+
 func (w *worker) createWriter(partitionID int64) (writer, error) {
 	withCustomCheckRetryErrorFunction := func(
 		callback topic.PublicCheckErrorRetryFunction,
@@ -455,10 +462,7 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 				if isOperationErrorOverloaded(args.Error) {
-					w.splittedPartitionsMu.WithLock(func() {
-						w.splittedPartitions.PushBack(partitionID)
-					})
-					w.wakeUpPartitionSplitter()
+					w.notifyOnPartitionSplit(partitionID)
 
 					return topic.PublicRetryDecisionStop
 				}
@@ -881,6 +885,12 @@ func (w *worker) iterateThroughMessagesIndex(
 
 			err = wr.Write(w.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage})
 			if err != nil {
+				if isOperationErrorOverloaded(err) {
+					w.notifyOnPartitionSplit(msg.PartitionID)
+
+					break
+				}
+
 				return fmt.Errorf("failed to write message: %w", err)
 			}
 
