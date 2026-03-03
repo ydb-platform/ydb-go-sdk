@@ -17,14 +17,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicproducer"
 )
 
-func readMessages(ctx context.Context, count int, scope *scopeT) error {
-	reader, err := scope.Driver().Topic().StartReader(consumerName, topicoptions.ReadTopic(scope.TopicPath()))
+func readMessages(ctx context.Context, count int, topicPath string, scope *scopeT) error {
+	reader, err := scope.Driver().Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
 	if err != nil {
 		return err
 	}
 
-	expectedSeqNo := int64(1)
-	for i := 0; i < count; i++ {
+	partitionsSeqNoMap := make(map[int64][]int64)
+
+	for i := range count {
 		readCtx, cancel := context.WithTimeout(ctx, time.Second)
 		defer cancel()
 
@@ -41,11 +42,20 @@ func readMessages(ctx context.Context, count int, scope *scopeT) error {
 			return err
 		}
 
-		if mess.SeqNo != expectedSeqNo {
-			return fmt.Errorf("expected seq no %d, got %d", expectedSeqNo, mess.SeqNo)
+		partitionID := mess.PartitionID()
+		seqNos, ok := partitionsSeqNoMap[partitionID]
+		if !ok {
+			partitionsSeqNoMap[partitionID] = []int64{mess.SeqNo}
+
+			continue
 		}
 
-		expectedSeqNo++
+		if len(seqNos) > 0 && seqNos[len(seqNos)-1] > mess.SeqNo {
+			return fmt.Errorf("seq no is not in order for partition %d", partitionID)
+		}
+
+		seqNos = append(seqNos, mess.SeqNo)
+		partitionsSeqNoMap[partitionID] = seqNos
 	}
 
 	return nil
@@ -73,11 +83,23 @@ func TestTopicProducer_WriteAndFlush(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
+
+	// Create topic with 10 partitions for this test.
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
 	producer, err := topicClient.CreateProducer(
-		scope.TopicPath(),
+		topicPath,
 		topicoptions.WithBasicWriterOptions(
 			topicoptions.WithWriterSetAutoSeqNo(false),
 		),
+		topicoptions.WithPartitionChooserStrategy(topicproducer.PartitionChooserStrategyHash),
 	)
 	require.NoError(t, err)
 
@@ -97,5 +119,5 @@ func TestTopicProducer_WriteAndFlush(t *testing.T) {
 
 	require.NoError(t, producer.Write(ctx, messages...))
 	require.NoError(t, producer.Close(ctx))
-	require.NoError(t, readMessages(ctx, 1000, scope))
+	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
 }

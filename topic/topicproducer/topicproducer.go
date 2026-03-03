@@ -19,6 +19,21 @@ type KeyHasher = internal.KeyHasher
 // ChoosePartitionFunc is a custom partition selection function.
 type ChoosePartitionFunc = internal.ChoosePartitionFunc
 
+// PartitionChooserStrategy is a strategy for choosing a partition for a message.
+// It is used to determine which partition a message should be written to.
+// The default strategy is PartitionChooserStrategyBound.
+type PartitionChooserStrategy = internal.PartitionChooserStrategy
+
+const (
+	// PartitionChooserStrategyBound is a strategy for choosing a partition for a message based on the bounds of each partition.
+	// Key will be hashed using KeyHasher and after that the hash will be compared with the bounds of each partition.
+	// The partition with the bounds that contain the hash will be chosen.
+	PartitionChooserStrategyBound PartitionChooserStrategy = iota
+	// PartitionChooserStrategyHash is a strategy for choosing a partition for a message based on the hash of the key.
+	// Key will be hashed using KeyHasher and the hash will be used to choose the partition.
+	PartitionChooserStrategyHash
+)
+
 var (
 	// ErrAlreadyClosed is returned when Producer is closed more than once.
 	ErrAlreadyClosed = internal.ErrAlreadyClosed
