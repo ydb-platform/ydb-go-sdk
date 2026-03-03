@@ -9,7 +9,13 @@ import (
 )
 
 type (
-	Message = topicwriterinternal.PublicMessage
+	Message                  = topicwriterinternal.PublicMessage
+	PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategy
+)
+
+const (
+	PartitionChooserStrategyHash  PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyHash
+	PartitionChooserStrategyBound PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyBound
 )
 
 var (

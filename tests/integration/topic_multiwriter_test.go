@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -169,7 +168,7 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 		topicPath,
 		topicoptions.WithWriterSetAutoSeqNo(false),
 		topicoptions.WithMultiWriter(
-			topicoptions.WithPartitionChooserStrategy(topicmultiwriter.PartitionChooserStrategyHash),
+			topicoptions.WithPartitionChooserStrategy(topicwriter.PartitionChooserStrategyHash),
 		),
 	)
 	require.NoError(t, err)
@@ -177,9 +176,9 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	err = multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
-	messages := make([]topicmultiwriter.Message, 0, 1000)
+	messages := make([]topicwriter.Message, 0, 1000)
 	for i := range 1000 {
-		messages = append(messages, topicmultiwriter.Message{
+		messages = append(messages, topicwriter.Message{
 			Data:  bytes.NewReader([]byte("hello")),
 			SeqNo: int64(i + 1),
 			Key:   fmt.Sprintf("partition-key-%d", i),
@@ -211,7 +210,7 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	}
 
 	topicMultiWriterSettings := []topicoptions.MultiWriterOption{
-		topicoptions.WithPartitionChooserStrategy(topicmultiwriter.PartitionChooserStrategyBound),
+		topicoptions.WithPartitionChooserStrategy(topicwriter.PartitionChooserStrategyBound),
 		topicoptions.WithWriterIdleTimeout(30 * time.Second),
 	}
 
@@ -231,7 +230,7 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 			key = "lalala"
 		}
 
-		msg := topicmultiwriter.Message{
+		msg := topicwriter.Message{
 			Data:  bytes.NewReader(payload),
 			SeqNo: seqNo,
 			Key:   key,
