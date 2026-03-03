@@ -33,9 +33,15 @@ type PublicInitialInfo struct {
 }
 
 // NewWriter create new writer from internal type. Used internally only.
-func NewWriter(writer innerWriter) *Writer {
+func NewWriter(writer *topicwriterinternal.WriterReconnector) *Writer {
 	return &Writer{
 		inner: writer,
+	}
+}
+
+func NewWriterWrapper(inner innerWriter) *Writer {
+	return &Writer{
+		inner: inner,
 	}
 }
 
@@ -99,8 +105,12 @@ type TxWriter struct {
 	inner innerTxWriter
 }
 
-func NewTxWriterInternal(w innerTxWriter) *TxWriter {
+func NewTxWriterInternal(w *topicwriterinternal.WriterWithTransaction) *TxWriter {
 	return &TxWriter{inner: w}
+}
+
+func NewTxWriterWrapper(inner innerTxWriter) *TxWriter {
+	return &TxWriter{inner: inner}
 }
 
 // Write messages to the transaction

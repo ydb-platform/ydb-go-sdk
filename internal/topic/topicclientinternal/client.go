@@ -350,7 +350,7 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 			)
 
 			// internal multi-writer already implements the necessary interface for topicwriter.Writer.
-			return topicwriter.NewWriter(internal), nil
+			return topicwriter.NewWriterWrapper(internal), nil
 		}
 	}
 
@@ -392,7 +392,7 @@ func (c *Client) StartTransactionalWriter(
 			)
 
 			// internal multi-writer already implements the necessary interface for topicwriter.Writer.
-			return topicwriter.NewTxWriterInternal(multiWriterTx), nil
+			return topicwriter.NewTxWriterWrapper(multiWriterTx), nil
 		}
 	}
 
