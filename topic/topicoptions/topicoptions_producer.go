@@ -34,7 +34,7 @@ func WithCustomChoosePartitionFunc(customChoosePartitionFunc topicmultiwriter.Ch
 
 // WithSubSessionIdleTimeout sets timeout after which idle sub-sessions are closed.
 func WithSubSessionIdleTimeout(timeout time.Duration) MultiWriterOption {
-	return topicmultiwriter.WithSubSessionIdleTimeout(timeout)
+	return topicmultiwriter.WithWriterIdleTimeout(timeout)
 }
 
 // WithBasicWriterOptions forwards basic writer options into underlying writer reconnectors.

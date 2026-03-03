@@ -65,7 +65,7 @@ func NewMultiWriter(inner *internal.MultiWriter) *MultiWriter {
 
 // Write sends messages using the underlying producer.
 func (p *MultiWriter) Write(ctx context.Context, messages ...Message) error {
-	return p.inner.Write(ctx, messages...)
+	return p.inner.Write(ctx, messages)
 }
 
 // Flush waits until all in-flight messages are acknowledged.
@@ -74,7 +74,7 @@ func (p *MultiWriter) Flush(ctx context.Context) error {
 }
 
 // WaitInit waits until producer initialization is completed or an error occurs.
-func (p *MultiWriter) WaitInit(ctx context.Context) error {
+func (p *MultiWriter) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
 	return p.inner.WaitInit(ctx)
 }
 

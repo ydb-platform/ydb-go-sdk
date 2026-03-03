@@ -76,15 +76,11 @@ func newWorker(
 	cfg *MultiWriterConfig,
 ) *worker {
 	if cfg.writersFactory == nil {
-		if cfg.Transaction != nil {
-			cfg.writersFactory = newTransactionalWritersFactory(cfg.Transaction)
-		} else {
-			cfg.writersFactory = newBaseWritersFactory()
-		}
+		cfg.writersFactory = newBaseWritersFactory()
 	}
 
-	if cfg.SubSessionIdleTimeout == 0 {
-		cfg.SubSessionIdleTimeout = defaultWriterIdleTimeout
+	if cfg.WriterIdleTimeout == 0 {
+		cfg.WriterIdleTimeout = defaultWriterIdleTimeout
 	}
 
 	if cfg.MaxQueueLen == 0 {
@@ -117,7 +113,7 @@ func newWorker(
 		cfg.PartitioningKeyHasher = w.getDefaultKeyHasher()
 	}
 
-	w.idleWritersSupervisor = newIdleWritersSupervisor(ctx, w, cfg.SubSessionIdleTimeout)
+	w.idleWritersSupervisor = newIdleWritersSupervisor(ctx, w, cfg.WriterIdleTimeout)
 	background.Start("idle writers supervisor", func(ctx context.Context) {
 		w.idleWritersSupervisor.run()
 	})
@@ -786,7 +782,7 @@ func (w *worker) getWriter(partitionID int64) (*writerWrapper, error) {
 		w.writers[partitionID] = wrapper
 
 		w.background.Start(fmt.Sprintf("wait init for partition %d", partitionID), func(ctx context.Context) {
-			_, err = partitionWriter.WaitInit(w.ctx)
+			_, err := partitionWriter.WaitInit(w.ctx)
 			w.mu.WithLock(func() {
 				if err != nil {
 					w.err = err

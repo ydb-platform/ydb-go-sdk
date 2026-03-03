@@ -2,7 +2,9 @@ package topicwriter
 
 import (
 	"context"
+	"errors"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
@@ -16,12 +18,13 @@ var (
 	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	ErrQueueLimitExceed                      = topicwriterinternal.ErrPublicQueueIsFull
 	ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.ErrPublicMessagesPutToInternalQueueBeforeError
+	ErrUnimplemented                         = topicmultiwriter.ErrUnimplemented
 )
 
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages
 type Writer struct {
-	inner *topicwriterinternal.WriterReconnector
+	inner innerWriter
 }
 
 // PublicInitialInfo is an information about writer after initialize
@@ -30,7 +33,7 @@ type PublicInitialInfo struct {
 }
 
 // NewWriter create new writer from internal type. Used internally only.
-func NewWriter(writer *topicwriterinternal.WriterReconnector) *Writer {
+func NewWriter(writer innerWriter) *Writer {
 	return &Writer{
 		inner: writer,
 	}
@@ -54,8 +57,7 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 // WaitInit waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
 func (w *Writer) WaitInit(ctx context.Context) (err error) {
-	_, err = w.inner.WaitInit(ctx)
-	if err != nil {
+	if _, err = w.inner.WaitInit(ctx); err != nil {
 		return err
 	}
 
@@ -67,6 +69,10 @@ func (w *Writer) WaitInit(ctx context.Context) (err error) {
 func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
 	privateInfo, err := w.inner.WaitInit(ctx)
 	if err != nil {
+		if errors.Is(err, topicmultiwriter.ErrUnimplemented) {
+			return PublicInitialInfo{}, ErrUnimplemented
+		}
+
 		return PublicInitialInfo{}, err
 	}
 	publicInfo := PublicInitialInfo{LastSeqNum: privateInfo.LastSeqNum}
@@ -89,10 +95,10 @@ func (w *Writer) Flush(ctx context.Context) error {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type TxWriter struct {
-	inner *topicwriterinternal.WriterWithTransaction
+	inner innerTxWriter
 }
 
-func NewTxWriterInternal(w *topicwriterinternal.WriterWithTransaction) *TxWriter {
+func NewTxWriterInternal(w innerTxWriter) *TxWriter {
 	return &TxWriter{inner: w}
 }
 
@@ -111,8 +117,7 @@ func (w *TxWriter) Write(ctx context.Context, messages ...Message) error {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (w *TxWriter) WaitInit(ctx context.Context) (err error) {
-	_, err = w.inner.WaitInit(ctx)
-	if err != nil {
+	if _, err = w.inner.WaitInit(ctx); err != nil {
 		return err
 	}
 

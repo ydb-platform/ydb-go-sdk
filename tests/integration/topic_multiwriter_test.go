@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
 func readMessages(ctx context.Context, count int, topicPath string, scope *scopeT) error {
@@ -94,16 +95,13 @@ func createMultiWriterForAutoPartitioning(
 	ctx context.Context,
 	topicPath string,
 	topicClient topic.Client,
-	producerSettings []topicoptions.MultiWriterOption,
-) *topicmultiwriter.MultiWriter {
+	multiWriterSettings []topicoptions.MultiWriterOption,
+) *topicwriter.Writer {
 	t.Helper()
 
-	multiWriter, err := topicClient.CreateMultiWriter(
-		topicPath,
-		append(producerSettings,
-			topicoptions.WithProducerIDPrefix(producerIDPrefix),
-		)...,
-	)
+	multiWriterSettings = append(multiWriterSettings, topicoptions.WithProducerIDPrefix(producerIDPrefix))
+
+	multiWriter, err := topicClient.StartWriter(topicPath, topicoptions.WithMultiWriter(multiWriterSettings...))
 	require.NoError(t, err)
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	return multiWriter
@@ -116,14 +114,11 @@ func TestTopicMultiWriter_WaitInitAndClose(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.CreateMultiWriter(scope.TopicPath())
+	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter())
 	require.NoError(t, err)
 
-	err = multiWriter.WaitInit(ctx)
-	require.NoError(t, err)
-
-	err = multiWriter.Close(ctx)
-	require.NoError(t, err)
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	require.NoError(t, multiWriter.Close(ctx))
 }
 
 // TestTopicMultiWriter_WaitInitAndClose verifies that internal topic multi writer
@@ -133,11 +128,10 @@ func TestTopicMultiWriter_CloseWithoutWaitInit(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.CreateMultiWriter(scope.TopicPath())
+	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter())
 	require.NoError(t, err)
 
-	err = multiWriter.Close(ctx)
-	require.NoError(t, err)
+	require.NoError(t, multiWriter.Close(ctx))
 }
 
 func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
@@ -156,12 +150,14 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	multiWriter, err := topicClient.CreateMultiWriter(
+	multiWriter, err := topicClient.StartWriter(
 		topicPath,
-		topicoptions.WithBasicWriterOptions(
-			topicoptions.WithWriterSetAutoSeqNo(false),
+		topicoptions.WithMultiWriter(
+			topicoptions.WithBasicWriterOptions(
+				topicoptions.WithWriterSetAutoSeqNo(false),
+			),
+			topicoptions.WithPartitionChooserStrategy(topicmultiwriter.PartitionChooserStrategyHash),
 		),
-		topicoptions.WithPartitionChooserStrategy(topicmultiwriter.PartitionChooserStrategyHash),
 	)
 	require.NoError(t, err)
 
@@ -219,7 +215,7 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	}
 	require.NotEmpty(t, keys)
 
-	writeMessage := func(m *topicmultiwriter.MultiWriter, payload []byte, seqNo int64) {
+	writeMessage := func(m *topicwriter.Writer, payload []byte, seqNo int64) {
 		key := keys[seqNo%int64(len(keys))]
 		if key == "" {
 			key = "lalala"

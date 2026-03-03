@@ -62,6 +62,11 @@ type WriterReconnectorConfig struct {
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 	OnAckReceivedCallback        func(seqNo int64)
 
+	// Extra is an optional extension point for higher-level features.
+	// It is not used by the low-level writer itself, but can be inspected by
+	// callers that construct writers (for example, to enable multi-writer mode).
+	Extra any
+
 	RetrySettings topic.RetrySettings
 
 	connectTimeout time.Duration

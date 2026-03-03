@@ -19,7 +19,7 @@ func ExampleMultiWriter_Write() {
 		log.Fatalf("failed ydb connection: %v", err)
 	}
 
-	multiWriter, err := db.Topic().CreateMultiWriter("topicName", topicoptions.WithProducerIDPrefix("test-producer"))
+	multiWriter, err := db.Topic().StartWriter("topicName", topicoptions.WithMultiWriter(topicoptions.WithProducerIDPrefix("test-producer")))
 	if err != nil {
 		log.Fatalf("failed to create topic producer: %v", err)
 	}

@@ -223,3 +223,19 @@ func WithWriterLogContext(ctx context.Context) WriterOption {
 		cfg.LogContext = ctx
 	}
 }
+
+// WithMultiWriter makes StartWriter construct a multi-writer instead of a single writer.
+// All options passed to WithMultiWriter are interpreted as MultiWriterOption and will be
+// applied when constructing the underlying multi-writer. Other WriterOption values passed
+// alongside WithMultiWriter are ignored by the multi-writer.
+//
+// Experimental: the behavior may change in future minor versions.
+func WithMultiWriter(opts ...MultiWriterOption) WriterOption {
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		if len(opts) == 0 {
+			return
+		}
+		// Store options in the generic extension field; StartWriter will inspect it.
+		cfg.Extra = append([]MultiWriterOption(nil), opts...)
+	}
+}

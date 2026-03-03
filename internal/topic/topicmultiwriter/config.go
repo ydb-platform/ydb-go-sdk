@@ -14,7 +14,7 @@ type ChoosePartitionFunc func(msg topicwriterinternal.PublicMessage) (int64, err
 type MultiWriterConfig struct {
 	topicwriterinternal.WriterReconnectorConfig
 
-	SubSessionIdleTimeout     time.Duration
+	WriterIdleTimeout         time.Duration
 	PartitioningKeyHasher     KeyHasher
 	PartitionChooserStrategy  PartitionChooserStrategy
 	ProducerIDPrefix          string

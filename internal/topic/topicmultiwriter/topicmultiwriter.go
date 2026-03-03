@@ -47,7 +47,7 @@ func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) *Multi
 	return p
 }
 
-func (p *MultiWriter) Write(ctx context.Context, messages ...topicwriterinternal.PublicMessage) error {
+func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
 	for _, msg := range messages {
 		if err := p.worker.pushMessage(ctx, message{
 			PublicMessage: msg,
@@ -88,8 +88,8 @@ func (p *MultiWriter) Flush(ctx context.Context) error {
 	return p.worker.flush(ctx)
 }
 
-func (p *MultiWriter) WaitInit(ctx context.Context) error {
-	return p.worker.waitInitDone(ctx)
+func (p *MultiWriter) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	return topicwriterinternal.InitialInfo{}, p.worker.waitInitDone(ctx)
 }
 
 func (p *MultiWriter) getWritersCount() int {

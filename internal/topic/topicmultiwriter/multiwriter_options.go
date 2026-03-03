@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
 type PublicMultiWriterOption func(cfg *MultiWriterConfig)
@@ -33,15 +32,9 @@ func WithCustomChoosePartitionFunc(customChoosePartitionFunc ChoosePartitionFunc
 	}
 }
 
-func WithSubSessionIdleTimeout(timeout time.Duration) PublicMultiWriterOption {
+func WithWriterIdleTimeout(timeout time.Duration) PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.SubSessionIdleTimeout = timeout
-	}
-}
-
-func WithTransaction(tx tx.Transaction) PublicMultiWriterOption {
-	return func(cfg *MultiWriterConfig) {
-		cfg.Transaction = tx
+		cfg.WriterIdleTimeout = timeout
 	}
 }
 

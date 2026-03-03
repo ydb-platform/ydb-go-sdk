@@ -336,6 +336,25 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	cfg := c.createWriterConfig(topicPath, append(opts, topicwriterinternal.WithMaxGrpcMessageBytes(
 		c.cfg.MaxGrpcMessageSize,
 	)))
+
+	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
+	// a multi-writer instead of a single-writer.
+	if extra := cfg.Extra; extra != nil {
+		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && len(mwOpts) > 0 {
+			mwCfg := c.createMultiWriterConfig(topicPath, mwOpts)
+
+			internal := internalmultiwriter.NewMultiWriter(
+				func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+					return c.Describe(ctx, path)
+				},
+				mwCfg,
+			)
+
+			// internal multi-writer already implements the necessary interface for topicwriter.Writer.
+			return topicwriter.NewWriter(internal), nil
+		}
+	}
+
 	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
 	if err != nil {
 		return nil, err
@@ -346,7 +365,7 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 
 func (c *Client) StartTransactionalWriter(
 	transaction tx.Identifier,
-	topicpath string,
+	topicPath string,
 	opts ...topicoptions.WriterOption,
 ) (*topicwriter.TxWriter, error) {
 	internalTx, ok := transaction.(tx.Transaction)
@@ -354,7 +373,30 @@ func (c *Client) StartTransactionalWriter(
 		return nil, xerrors.WithStackTrace(errUnsupportedTransactionType)
 	}
 
-	cfg := c.createWriterConfig(topicpath, opts)
+	cfg := c.createWriterConfig(topicPath, opts)
+
+	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
+	// a multi-writer instead of a single-writer.
+	if extra := cfg.Extra; extra != nil {
+		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && len(mwOpts) > 0 {
+			mwCfg := c.createMultiWriterConfig(topicPath, mwOpts)
+
+			multiWriterTx := internalmultiwriter.NewTopicMultiWriterTransaction(
+				internalmultiwriter.NewMultiWriter(
+					func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+						return c.Describe(ctx, path)
+					},
+					mwCfg,
+				),
+				internalTx,
+				c.cfg.Trace,
+			)
+
+			// internal multi-writer already implements the necessary interface for topicwriter.Writer.
+			return topicwriter.NewTxWriterInternal(multiWriterTx), nil
+		}
+	}
+
 	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
 	if err != nil {
 		return nil, err

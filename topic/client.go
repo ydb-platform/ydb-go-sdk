@@ -5,7 +5,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -63,12 +62,4 @@ type Client interface {
 		topicpath string,
 		opts ...topicoptions.WriterOption,
 	) (*topicwriter.TxWriter, error)
-
-	// CreateMultiWriter creates high-level topic multi writer for the given topic.
-	//
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	CreateMultiWriter(
-		topicPath string,
-		opts ...topicoptions.MultiWriterOption,
-	) (*topicmultiwriter.MultiWriter, error)
 }
