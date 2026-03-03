@@ -194,6 +194,7 @@ func (w *worker) runPartitionSplitter() {
 					w.err = err
 					w.stop()
 				})
+
 				return
 			}
 		}
@@ -272,12 +273,12 @@ func (w *worker) choosePartition(msg message) (partitionID int64, err error) {
 
 		partitionID, err = w.partitionChooser.ChoosePartition(msg.Key)
 		if err != nil {
-			return
+			return 0, err
 		}
 	case w.cfg.CustomChoosePartitionFunc != nil:
 		partitionID, err = w.cfg.CustomChoosePartitionFunc(msg.PublicMessage)
 		if err != nil {
-			return
+			return 0, err
 		}
 	default:
 		if w.partitionChooser == nil {
@@ -291,7 +292,7 @@ func (w *worker) choosePartition(msg message) (partitionID int64, err error) {
 
 		partitionID, err = w.partitionChooser.ChoosePartition(w.cfg.ProducerIDPrefix)
 		if err != nil {
-			return
+			return 0, err
 		}
 	}
 
@@ -855,67 +856,70 @@ func (w *worker) flush(ctx context.Context) error {
 	}
 }
 
+func (w *worker) iterateThroughMessagesIndex(
+	index map[int64]xlist.List[messagePtr],
+	stopFunc func(msg messagePtr) bool,
+) error {
+	var partitionsToRemove []int64
+
+	for partitionID, list := range index {
+		for iter := list.Front(); iter != nil; iter = iter.Next() {
+			msg := iter.Value.Value
+
+			if w.partitions[msg.PartitionID].Locked || stopFunc(iter.Value) {
+				break
+			}
+
+			wr, err := w.getWriter(msg.PartitionID)
+			if err != nil {
+				return fmt.Errorf("failed to get writer: %w", err)
+			}
+
+			if !wr.initDone {
+				break
+			}
+
+			err = wr.Write(w.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage})
+			if err != nil {
+				return fmt.Errorf("failed to write message: %w", err)
+			}
+
+			iter.Value.Value.sent = true
+		}
+
+		iter := list.Front()
+		for list.Len() > 0 && iter != nil {
+			next := iter.Next()
+			if iter.Value.Value.sent {
+				list.Remove(iter)
+			}
+			iter = next
+		}
+
+		if list.Len() == 0 {
+			partitionsToRemove = append(partitionsToRemove, partitionID)
+		}
+	}
+
+	for _, partitionID := range partitionsToRemove {
+		delete(index, partitionID)
+	}
+
+	return nil
+}
+
 func (w *worker) step() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	iterateThroughMessagesIndex := func(index map[int64]xlist.List[messagePtr], stopFunc func(msg messagePtr) bool) error {
-		var partitionsToRemove []int64
-
-		for partitionID, list := range index {
-			for iter := list.Front(); iter != nil; iter = iter.Next() {
-				msg := iter.Value.Value
-
-				if w.partitions[msg.PartitionID].Locked || stopFunc(iter.Value) {
-					break
-				}
-
-				wr, err := w.getWriter(msg.PartitionID)
-				if err != nil {
-					return fmt.Errorf("failed to get writer: %w", err)
-				}
-
-				if !wr.initDone {
-					break
-				}
-
-				err = wr.Write(w.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage})
-				if err != nil {
-					return fmt.Errorf("failed to write message: %w", err)
-				}
-
-				iter.Value.Value.sent = true
-			}
-
-			iter := list.Front()
-			for list.Len() > 0 && iter != nil {
-				next := iter.Next()
-				if iter.Value.Value.sent {
-					list.Remove(iter)
-				}
-				iter = next
-			}
-
-			if list.Len() == 0 {
-				partitionsToRemove = append(partitionsToRemove, partitionID)
-			}
-		}
-
-		for _, partitionID := range partitionsToRemove {
-			delete(index, partitionID)
-		}
-
-		return nil
-	}
-
-	if err := iterateThroughMessagesIndex(
+	if err := w.iterateThroughMessagesIndex(
 		w.messagesToResendIndex,
 		func(msg messagePtr) bool { return false },
 	); err != nil {
 		return err
 	}
 
-	return iterateThroughMessagesIndex(
+	return w.iterateThroughMessagesIndex(
 		w.pendingMessagesIndex,
 		func(msg messagePtr) bool {
 			_, ok := w.messagesToResendIndex[msg.Value.PartitionID]

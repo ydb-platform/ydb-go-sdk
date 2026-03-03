@@ -100,6 +100,7 @@ func newTestMultiWriterWithInitDelay(
 
 	return NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		time.Sleep(initDelay)
+
 		return describer(ctx, path)
 	}, cfg)
 }
@@ -244,9 +245,13 @@ func TestMultiWriter_WaitInit_ContextCanceled(t *testing.T) {
 
 	ctx := xtest.Context(t)
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
-	multiWriter := newTestMultiWriterWithInitDelay(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-		return stubClient.Describe(ctx, path)
-	}, time.Second*10)
+	multiWriter := newTestMultiWriterWithInitDelay(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		time.Second*10,
+	)
 
 	ctxCancel, cancel := context.WithCancel(ctx)
 	cancel()
@@ -262,9 +267,12 @@ func TestProducer_CloseWithoutWaitInit(t *testing.T) {
 
 	ctx := xtest.Context(t)
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
-	multiWriter := newTestMultiWriterWithBasicWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-		return stubClient.Describe(ctx, path)
-	})
+	multiWriter := newTestMultiWriterWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*2)
 	defer cancel()
@@ -279,9 +287,12 @@ func TestMultiWriter_DescribeError(t *testing.T) {
 	ctx := xtest.Context(t)
 	describeErr := errors.New("describe failed")
 	stubClient := stubs.NewStubTopicClientWithError(t, describeErr)
-	multiWriter := newTestMultiWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-		return stubClient.Describe(ctx, path)
-	})
+	multiWriter := newTestMultiWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
