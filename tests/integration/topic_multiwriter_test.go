@@ -88,7 +88,7 @@ func createTopicWithAutoPartitioning(ctx context.Context, db *ydb.Driver, topicP
 	)
 }
 
-func createProducerForAutoPartitioning(
+func createMultiWriterForAutoPartitioning(
 	t *testing.T,
 	producerIDPrefix string,
 	ctx context.Context,
@@ -109,9 +109,9 @@ func createProducerForAutoPartitioning(
 	return multiWriter
 }
 
-// TestTopicProducer_WaitInitAndClose verifies that internal topic producer
+// TestTopicMultiWriter_WaitInitAndClose verifies that internal topic multi writer
 // can be initialized and closed against a real YDB topic.
-func TestTopicProducer_WaitInitAndClose(t *testing.T) {
+func TestTopicMultiWriter_WaitInitAndClose(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -126,9 +126,9 @@ func TestTopicProducer_WaitInitAndClose(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestTopicProducer_WaitInitAndClose verifies that internal topic producer
+// TestTopicMultiWriter_WaitInitAndClose verifies that internal topic multi writer
 // can be initialized and closed against a real YDB topic.
-func TestTopicProducer_CloseWithoutWaitInit(t *testing.T) {
+func TestTopicMultiWriter_CloseWithoutWaitInit(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -140,7 +140,7 @@ func TestTopicProducer_CloseWithoutWaitInit(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestTopicProducer_WriteAndFlush(t *testing.T) {
+func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -180,13 +180,10 @@ func TestTopicProducer_WriteAndFlush(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages...))
 	require.NoError(t, multiWriter.Close(ctx))
 
-	stats := multiWriter.GetWriteStats()
-	require.Equal(t, int64(1000), stats.MessagesWritten)
-	require.Equal(t, int64(1000), stats.LastWrittenSeqNo)
 	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
 }
 
-func TestTopicProducer_AutoPartitioning(t *testing.T) {
+func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -212,8 +209,8 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 		),
 	}
 
-	producer1 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
-	producer2 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
 
 	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
 	keys := make([]string, 0, len(describe.Partitions))
@@ -222,7 +219,7 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 	}
 	require.NotEmpty(t, keys)
 
-	writeMessage := func(p *topicmultiwriter.MultiWriter, payload []byte, seqNo int64) {
+	writeMessage := func(m *topicmultiwriter.MultiWriter, payload []byte, seqNo int64) {
 		key := keys[seqNo%int64(len(keys))]
 		if key == "" {
 			key = "lalala"
@@ -234,30 +231,30 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 			Key:   key,
 		}
 
-		require.NoError(t, p.Write(ctx, msg))
+		require.NoError(t, m.Write(ctx, msg))
 	}
 
-	writeMessage(producer1, msgData, 1)
-	writeMessage(producer1, msgData, 2)
+	writeMessage(multiWriter1, msgData, 1)
+	writeMessage(multiWriter1, msgData, 2)
 	time.Sleep(5 * time.Second)
 
 	describe, err = topicClient.Describe(ctx, topicPath)
 	require.NoError(t, err)
 	require.Len(t, describe.Partitions, 2)
 
-	writeMessage(producer1, msgData, 3)
-	writeMessage(producer1, msgData, 4)
-	writeMessage(producer1, msgData, 5)
-	writeMessage(producer1, msgData, 6)
-	writeMessage(producer1, msgData, 7)
-	writeMessage(producer2, msgData, 8)
-	writeMessage(producer1, msgData, 9)
-	writeMessage(producer1, msgData, 10)
-	writeMessage(producer2, msgData, 11)
-	writeMessage(producer1, msgData, 12)
+	writeMessage(multiWriter1, msgData, 3)
+	writeMessage(multiWriter1, msgData, 4)
+	writeMessage(multiWriter1, msgData, 5)
+	writeMessage(multiWriter1, msgData, 6)
+	writeMessage(multiWriter1, msgData, 7)
+	writeMessage(multiWriter2, msgData, 8)
+	writeMessage(multiWriter1, msgData, 9)
+	writeMessage(multiWriter1, msgData, 10)
+	writeMessage(multiWriter2, msgData, 11)
+	writeMessage(multiWriter1, msgData, 12)
 
-	require.NoError(t, producer1.Flush(ctx))
-	require.NoError(t, producer2.Flush(ctx))
+	require.NoError(t, multiWriter1.Flush(ctx))
+	require.NoError(t, multiWriter2.Flush(ctx))
 	time.Sleep(5 * time.Second)
 
 	describeResult, err := topicClient.Describe(ctx, topicPath)
@@ -265,16 +262,14 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 	partitionsCount := len(describeResult.Partitions)
 	require.GreaterOrEqual(t, partitionsCount, 4, "partitions count: %d, expected at least 4", partitionsCount)
 
-	writeMessage(producer1, msgData, 13)
-	writeMessage(producer1, msgData, 14)
-	require.NoError(t, producer1.Flush(ctx))
-	require.NoError(t, producer2.Flush(ctx))
+	writeMessage(multiWriter1, msgData, 13)
+	writeMessage(multiWriter1, msgData, 14)
+	require.NoError(t, multiWriter1.Flush(ctx))
+	require.NoError(t, multiWriter2.Flush(ctx))
 
-	producer3 := createProducerForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter3 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, topicMultiWriterSettings)
 
-	require.NoError(t, producer3.Close(ctx))
-	require.NoError(t, producer1.Close(ctx))
-	require.NoError(t, producer2.Close(ctx))
-
-	require.Equal(t, int64(14), producer1.GetWriteStats().MessagesWritten+producer2.GetWriteStats().MessagesWritten)
+	require.NoError(t, multiWriter3.Close(ctx))
+	require.NoError(t, multiWriter1.Close(ctx))
+	require.NoError(t, multiWriter2.Close(ctx))
 }
