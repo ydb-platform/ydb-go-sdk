@@ -67,12 +67,13 @@ func (w *Writer) WaitInit(ctx context.Context) (err error) {
 // WaitInitInfo waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
 func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
+	_, ok := w.inner.(*topicmultiwriter.MultiWriter)
+	if ok {
+		return PublicInitialInfo{}, ErrUnimplemented
+	}
+
 	privateInfo, err := w.inner.WaitInit(ctx)
 	if err != nil {
-		if errors.Is(err, topicmultiwriter.ErrUnimplemented) {
-			return PublicInitialInfo{}, ErrUnimplemented
-		}
-
 		return PublicInitialInfo{}, err
 	}
 	publicInfo := PublicInitialInfo{LastSeqNum: privateInfo.LastSeqNum}
