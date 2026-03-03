@@ -103,7 +103,7 @@ func NewTxWriterInternal(w *topicwriterinternal.WriterWithTransaction) *TxWriter
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (w *TxWriter) Write(ctx context.Context, messages ...Message) error {
-	return w.inner.Write(ctx, messages...)
+	return w.inner.Write(ctx, messages)
 }
 
 // WaitInit waits until the reader is initialized

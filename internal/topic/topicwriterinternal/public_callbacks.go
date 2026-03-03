@@ -11,5 +11,3 @@ type PublicWithOnWriterConnectedInfo struct {
 }
 
 type PublicOnWriterInitResponseCallback func(info PublicWithOnWriterConnectedInfo) error
-
-type PublicOnAckReceivedCallback func(seqNo int64)

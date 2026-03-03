@@ -53,7 +53,7 @@ func (w *WriterWithTransaction) WaitInit(ctx context.Context) (info InitialInfo,
 	return w.streamWriter.WaitInit(ctx)
 }
 
-func (w *WriterWithTransaction) Write(ctx context.Context, messages ...PublicMessage) error {
+func (w *WriterWithTransaction) Write(ctx context.Context, messages []PublicMessage) error {
 	for i := range messages {
 		messages[i].tx = w.tx
 	}

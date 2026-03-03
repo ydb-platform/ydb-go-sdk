@@ -60,7 +60,11 @@ func newWorker(
 	cfg *ProducerConfig,
 ) *worker {
 	if cfg.writersFactory == nil {
-		cfg.writersFactory = newBaseWritersFactory()
+		if cfg.Transaction != nil {
+			cfg.writersFactory = newTransactionalWritersFactory(cfg.Transaction)
+		} else {
+			cfg.writersFactory = newBaseWritersFactory()
+		}
 	}
 
 	if cfg.SubSessionIdleTimeout == 0 {

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
 
 type PublicProducerOption func(cfg *ProducerConfig)
@@ -35,6 +36,12 @@ func WithCustomChoosePartitionFunc(customChoosePartitionFunc ChoosePartitionFunc
 func WithSubSessionIdleTimeout(timeout time.Duration) PublicProducerOption {
 	return func(cfg *ProducerConfig) {
 		cfg.SubSessionIdleTimeout = timeout
+	}
+}
+
+func WithTransaction(tx tx.Transaction) PublicProducerOption {
+	return func(cfg *ProducerConfig) {
+		cfg.Transaction = tx
 	}
 }
 
