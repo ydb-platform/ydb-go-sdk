@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/spaolacci/murmur3"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -31,6 +32,7 @@ type worker struct {
 	cfg                   *ProducerConfig
 	mu                    xsync.Mutex
 	acksMu                xsync.Mutex
+	splittedPartitionsMu  xsync.Mutex
 	messagesSema          chan struct{}
 
 	partitionChooser PartitionChooser
@@ -42,11 +44,13 @@ type worker struct {
 
 	topicDescriber TopicDescriber
 
-	wakeupChan      empty.Chan
-	ackReceivedChan empty.Chan
-	shutdown        empty.Chan
+	wakeupChan         empty.Chan
+	ackReceivedChan    empty.Chan
+	partitionSplitChan empty.Chan
+	shutdown           empty.Chan
 
-	receivedAcks xlist.List[ack]
+	receivedAcks       xlist.List[ack]
+	splittedPartitions xlist.List[int64]
 
 	partitions map[int64]*PartitionInfo
 	initDone   chan struct{}
@@ -88,6 +92,7 @@ func newWorker(
 		cfg:                   cfg,
 		wakeupChan:            make(empty.Chan, 1),
 		ackReceivedChan:       make(empty.Chan, 1),
+		partitionSplitChan:    make(empty.Chan, 1),
 		shutdown:              shutdown,
 		topicDescriber:        topicDescriber,
 		ctx:                   ctx,
@@ -100,6 +105,7 @@ func newWorker(
 		pendingMessagesIndex:  make(map[int64]xlist.List[messagePtr]),
 		background:            background,
 		receivedAcks:          xlist.New[ack](),
+		splittedPartitions:    xlist.New[int64](),
 	}
 
 	if cfg.PartitioningKeyHasher == nil {
@@ -112,7 +118,10 @@ func newWorker(
 	})
 
 	background.Start("ack receiver", func(ctx context.Context) {
-		w.runAckReceiverLoop()
+		w.runAckReceiver()
+	})
+	background.Start("partition splitter", func(ctx context.Context) {
+		w.runPartitionSplitter()
 	})
 
 	return w
@@ -122,7 +131,14 @@ func isOperationErrorOverloaded(err error) bool {
 	return xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED)
 }
 
-func (w *worker) runAckReceiverLoop() {
+func (w *worker) wakeUpAckReceiver() {
+	select {
+	case w.ackReceivedChan <- empty.Struct{}:
+	default:
+	}
+}
+
+func (w *worker) runAckReceiver() {
 	for {
 		select {
 		case <-w.ctx.Done():
@@ -143,6 +159,42 @@ func (w *worker) runAckReceiverLoop() {
 				w.onAckReceived(ack.partitionID, ack.seqNo)
 			}
 		})
+	}
+}
+
+func (w *worker) wakeUpPartitionSplitter() {
+	select {
+	case w.partitionSplitChan <- empty.Struct{}:
+	default:
+	}
+}
+
+func (w *worker) runPartitionSplitter() {
+	for {
+		select {
+		case <-w.ctx.Done():
+			return
+		case <-w.partitionSplitChan:
+		}
+
+		var splittedPartitions []int64
+		w.splittedPartitionsMu.WithLock(func() {
+			for iter := w.splittedPartitions.Front(); iter != nil; iter = iter.Next() {
+				splittedPartitions = append(splittedPartitions, iter.Value)
+			}
+			w.splittedPartitions.Clear()
+		})
+
+		for _, partitionID := range splittedPartitions {
+			err := w.onPartitionSplit(partitionID)
+			if err != nil {
+				w.mu.WithLock(func() {
+					w.err = err
+					w.stop()
+				})
+				return
+			}
+		}
 	}
 }
 
@@ -207,6 +259,15 @@ func (w *worker) choosePartition(msg Message) (partitionID int64, err error) {
 	case msg.PartitionID != 0:
 		return msg.PartitionID, nil
 	case msg.Key != "":
+		if w.partitionChooser == nil {
+			if w.err == nil {
+				w.err = fmt.Errorf("partition chooser is not set")
+				w.stop()
+			}
+
+			return 0, w.err
+		}
+
 		partitionID, err = w.partitionChooser.ChoosePartition(msg.Key)
 		if err != nil {
 			return
@@ -217,6 +278,15 @@ func (w *worker) choosePartition(msg Message) (partitionID int64, err error) {
 			return
 		}
 	default:
+		if w.partitionChooser == nil {
+			if w.err == nil {
+				w.err = fmt.Errorf("partition chooser is not set")
+				w.stop()
+			}
+
+			return 0, w.err
+		}
+
 		partitionID, err = w.partitionChooser.ChoosePartition(w.cfg.ProducerIDPrefix)
 		if err != nil {
 			return
@@ -378,19 +448,14 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 					})
 				})
 
-				select {
-				case w.ackReceivedChan <- empty.Struct{}:
-				default:
-				}
+				w.wakeUpAckReceiver()
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 				if isOperationErrorOverloaded(args.Error) {
-					if err := w.onPartitionSplit(partitionID); err != nil {
-						w.mu.WithLock(func() {
-							w.err = err
-							w.stop()
-						})
-					}
+					w.splittedPartitionsMu.WithLock(func() {
+						w.splittedPartitions.PushBack(partitionID)
+					})
+					w.wakeUpPartitionSplitter()
 
 					return topic.PublicRetryDecisionStop
 				}
@@ -608,6 +673,7 @@ func (w *worker) getMaxSeqNo(ancestors []int64) (maxSeqNo int64, err error) {
 			if err != nil {
 				return err
 			}
+			defer writer.Close(w.ctx)
 
 			initInfo, err := writer.WaitInit(w.ctx)
 			if err != nil {
@@ -630,9 +696,26 @@ func (w *worker) getMaxSeqNo(ancestors []int64) (maxSeqNo int64, err error) {
 }
 
 func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
-	describeResult, err := w.topicDescriber(w.ctx, w.cfg.Topic())
-	if err != nil {
-		return err
+	const (
+		maxRetries = 5
+		retryDelay = 100 * time.Millisecond
+	)
+
+	var (
+		err            error
+		describeResult topictypes.TopicDescription
+	)
+
+	for i := range maxRetries {
+		describeResult, err = w.topicDescriber(w.ctx, w.cfg.Topic())
+		if err == nil {
+			break
+		}
+
+		if err != nil && i == maxRetries-1 {
+			return err
+		}
+		time.Sleep(retryDelay)
 	}
 
 	w.mu.WithLock(func() {

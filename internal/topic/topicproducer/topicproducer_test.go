@@ -257,6 +257,22 @@ func TestProducer_WaitInit_ContextCanceled(t *testing.T) {
 	_ = producer.Close(ctx)
 }
 
+func TestProducer_CloseWithoutWaitInit(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	producer := newTestProducerWithInitDelay(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubClient.Describe(ctx, path)
+	}, time.Second*10)
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*2)
+	defer cancel()
+
+	err := producer.Close(ctxTimeout)
+	require.NoError(t, err)
+}
+
 func TestProducer_DescribeError(t *testing.T) {
 	t.Parallel()
 

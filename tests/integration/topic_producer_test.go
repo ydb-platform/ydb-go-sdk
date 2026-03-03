@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -20,7 +21,18 @@ import (
 )
 
 func readMessages(ctx context.Context, count int, topicPath string, scope *scopeT) error {
-	reader, err := scope.Driver().Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
+	reader, err := scope.Driver().Topic().StartReader(
+		consumerName,
+		topicoptions.ReadTopic(topicPath),
+		topicoptions.WithReaderGetPartitionStartOffset(
+			func(ctx context.Context, req topicoptions.GetPartitionStartOffsetRequest) (topicoptions.GetPartitionStartOffsetResponse, error) { //nolint:revive
+				var resp topicoptions.GetPartitionStartOffsetResponse
+				// Start reading from the beginning of each partition.
+				resp.StartFrom(0)
+				return resp, nil
+			},
+		),
+	)
 	if err != nil {
 		return err
 	}
@@ -28,14 +40,14 @@ func readMessages(ctx context.Context, count int, topicPath string, scope *scope
 	partitionsSeqNoMap := make(map[int64][]int64)
 
 	for i := range count {
-		readCtx, cancel := context.WithTimeout(ctx, time.Second)
+		readCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
 
 		mess, err := reader.ReadMessage(readCtx)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				if i != count-1 {
-					return errors.New("not all messages read")
+					return fmt.Errorf("not all messages read: %d, expected: %d", i, count)
 				}
 
 				return nil
@@ -43,6 +55,8 @@ func readMessages(ctx context.Context, count int, topicPath string, scope *scope
 
 			return err
 		}
+
+		fmt.Fprintf(os.Stderr, "read message: partitionID=%d, seqNo=%d\n", mess.PartitionID(), mess.SeqNo)
 
 		partitionID := mess.PartitionID()
 		seqNos, ok := partitionsSeqNoMap[partitionID]
@@ -164,10 +178,16 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 	describe, err := topicClient.Describe(ctx, topicPath)
 	require.NoError(t, err)
 	require.Len(t, describe.Partitions, 2)
+	if len(describe.Partitions[0].FromBound) == 0 && len(describe.Partitions[0].ToBound) == 0 {
+		t.Skip("skipping test because autosplit does not work in this version of YDB")
+	}
 
 	producerSettings := []topicoptions.ProducerOption{
 		topicoptions.WithPartitionChooserStrategy(topicproducer.PartitionChooserStrategyBound),
 		topicoptions.WithSubSessionIdleTimeout(30 * time.Second),
+		topicoptions.WithBasicWriterOptions(
+			topicoptions.WithWriterSetAutoSeqNo(false),
+		),
 	}
 
 	producer1, err := topicClient.CreateProducer(
@@ -177,6 +197,7 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 		)...,
 	)
 	require.NoError(t, err)
+	require.NoError(t, producer1.WaitInit(ctx))
 
 	producer2, err := topicClient.CreateProducer(
 		topicPath,
@@ -185,6 +206,7 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 		)...,
 	)
 	require.NoError(t, err)
+	require.NoError(t, producer2.WaitInit(ctx))
 
 	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
 
@@ -252,6 +274,7 @@ func TestTopicProducer_AutoPartitioning(t *testing.T) {
 		)...,
 	)
 	require.NoError(t, err)
+	require.NoError(t, producer3.WaitInit(ctx))
 
 	require.NoError(t, producer3.Close(ctx))
 	require.NoError(t, producer1.Close(ctx))
