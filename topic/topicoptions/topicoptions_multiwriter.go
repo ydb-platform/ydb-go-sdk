@@ -6,10 +6,20 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 )
 
-// ProducerOption configures a topic producer.
+// MultiWriterOption configures a topic multiwriter.
 //
-// It is a thin alias for internal producer options.
-type MultiWriterOption = topicmultiwriter.PublicMultiWriterOption
+// It is a thin alias for internal multiwriter options.
+type (
+	MultiWriterOption        = topicmultiwriter.PublicMultiWriterOption
+	KeyHasher                = topicmultiwriter.KeyHasher
+	ChoosePartitionFunc      = topicmultiwriter.ChoosePartitionFunc
+	PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategy
+)
+
+const (
+	PartitionChooserStrategyHash  PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyHash
+	PartitionChooserStrategyBound PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyBound
+)
 
 // WithProducerIDPrefix sets a prefix for producer IDs used by the internal producer.
 func WithProducerIDPrefix(prefix string) MultiWriterOption {
