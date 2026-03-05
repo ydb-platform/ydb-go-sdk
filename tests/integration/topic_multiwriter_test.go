@@ -176,6 +176,7 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 		topicoptions.WithWriterSetAutoSeqNo(false),
 		topicoptions.WithMultiWriter(
 			topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyHash),
+			topicoptions.WithProducerIDPrefix("test-producer"),
 		),
 	)
 	require.NoError(t, err)
