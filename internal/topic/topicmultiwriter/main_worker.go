@@ -61,8 +61,6 @@ type worker struct {
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
 
-	currentSeqNo int64
-
 	isAutoPartitioningEnabled bool
 	background                *background.Worker
 }
@@ -206,15 +204,12 @@ func (w *worker) init() (err error) {
 		return err
 	}
 
-	partitions := make([]int64, 0, len(describeResult.Partitions))
-
 	for _, partition := range describeResult.Partitions {
 		var parentID *int64
 		if len(partition.ParentPartitionIDs) > 0 {
 			parentID = &partition.ParentPartitionIDs[0]
 		}
 
-		partitions = append(partitions, partition.PartitionID)
 		w.partitions[partition.PartitionID] = &PartitionInfo{
 			ID:        partition.PartitionID,
 			ParentID:  parentID,
@@ -224,12 +219,6 @@ func (w *worker) init() (err error) {
 		}
 	}
 
-	maxSeqNo, err := w.getMaxSeqNo(partitions)
-	if err != nil {
-		return err
-	}
-
-	w.currentSeqNo = maxSeqNo
 	w.isAutoPartitioningEnabled = describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
 		topictypes.AutoPartitioningStrategyDisabled
 
@@ -355,16 +344,8 @@ func (w *worker) pushMessage(ctx context.Context, msg message) (err error) {
 		autoSetSeqNo = w.cfg.AutoSetSeqNo
 	})
 
-	switch {
-	case !autoSetSeqNo && msg.SeqNo == 0:
+	if !autoSetSeqNo && msg.SeqNo == 0 {
 		return ErrNoSeqNo
-	case autoSetSeqNo && msg.SeqNo != 0:
-		return topicwriterinternal.ErrNonZeroSeqNo
-	case autoSetSeqNo && msg.SeqNo == 0:
-		w.mu.WithLock(func() {
-			w.currentSeqNo++
-			msg.SeqNo = w.currentSeqNo
-		})
 	}
 
 	if err := w.acquireMessage(ctx); err != nil {
@@ -450,7 +431,6 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 		opts      = []topicwriterinternal.PublicWriterOption{
 			topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
 			topicwriterinternal.WithProducerID(w.getProducerID(partitionID)),
-			topicwriterinternal.WithAutoSetSeqNo(false),
 			topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
 				w.receivedAcks.PushBack(ack{
 					partitionID: partitionID,
@@ -605,7 +585,7 @@ func (w *worker) rechoosePartition(msg *message) (err error) {
 	return err
 }
 
-func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64, bufferedMessages []topicwriterinternal.PublicMessage) (err error) {
+func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error) {
 	inFlightIndexChain, ok := w.inFlightMessagesIndex[partitionID]
 	if !ok {
 		return nil
@@ -615,19 +595,13 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64, bufferedMes
 		inFlightMessagesToAdd []messagePtr
 		pendingMessagesToAdd  []messagePtr
 		messagesToResendToAdd []messagePtr
-
-		bufferedMessagesMap = make(map[int64]topicwriterinternal.PublicMessage)
 	)
-
-	for _, msg := range bufferedMessages {
-		bufferedMessagesMap[msg.SeqNo] = msg
-	}
 
 	for inFlightIndexChain.Len() > 0 {
 		iter := inFlightIndexChain.Front()
 
 		msg := iter.Value.Value
-		if msg.SeqNo < maxSeqNo && msg.SeqNo > 0 {
+		if msg.SeqNo < maxSeqNo {
 			if msg.ackReceived {
 				inFlightIndexChain.Remove(iter)
 
@@ -641,10 +615,6 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64, bufferedMes
 
 		if err := w.rechoosePartition(&msg); err != nil {
 			return err
-		}
-
-		if msg, ok := bufferedMessagesMap[msg.SeqNo]; ok {
-			iter.Value.Value.Data = msg.Data
 		}
 
 		iter.Value.Value.PartitionID = msg.PartitionID
@@ -679,7 +649,7 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64, bufferedMes
 	return nil
 }
 
-func (w *worker) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err error) {
+func (w *worker) getMaxSeqNo(ancestors []int64) (maxSeqNo int64, err error) {
 	var (
 		mu       xsync.Mutex
 		errGroup errgroup.Group
@@ -687,10 +657,10 @@ func (w *worker) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err error) {
 
 	errGroup.SetLimit(10)
 
-	for _, partition := range partitions {
+	for _, ancestor := range ancestors {
 		errGroup.Go(func() error {
 			writerCfg := w.cfg.WriterReconnectorConfig
-			topicwriterinternal.WithProducerID(w.getProducerID(partition))(&writerCfg)
+			topicwriterinternal.WithProducerID(w.getProducerID(ancestor))(&writerCfg)
 
 			writer, err := w.cfg.writersFactory.Create(writerCfg)
 			if err != nil {
@@ -762,19 +732,10 @@ func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
 	w.mu.WithLock(func() {
 		partition := w.partitions[partitionID]
 		partition.Locked = false
-
-		writer, err := w.getWriter(partitionID)
+		err = w.scheduleResendMessages(partitionID, maxSeqNo)
 		if err != nil {
-			w.stopWithError(err)
-
-			return
-		}
-
-		bufferedMessages := writer.GetMessagesInBuffer()
-
-		err = w.scheduleResendMessages(partitionID, maxSeqNo, bufferedMessages)
-		if err != nil {
-			w.stopWithError(err)
+			w.err = err
+			w.stop()
 
 			return
 		}
@@ -960,17 +921,12 @@ func (w *worker) step() error {
 	)
 }
 
-func (w *worker) waitInitDone(ctx context.Context) (int64, error) {
+func (w *worker) waitInitDone(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		return 0, ctx.Err()
+		return ctx.Err()
 	case <-w.initDone:
-		var currentSeqNo int64
-		w.mu.WithLock(func() {
-			currentSeqNo = w.currentSeqNo
-		})
-
-		return currentSeqNo, w.getResultErr()
+		return w.getResultErr()
 	}
 }
 

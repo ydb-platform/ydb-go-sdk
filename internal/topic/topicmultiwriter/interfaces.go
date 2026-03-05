@@ -10,7 +10,6 @@ type writer interface {
 	Close(ctx context.Context) error
 	WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error)
 	Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error
-	GetMessagesInBuffer() []topicwriterinternal.PublicMessage
 }
 
 type writersFactory interface {

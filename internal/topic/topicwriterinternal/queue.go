@@ -353,18 +353,6 @@ func (q *messageQueue) WaitLastWritten(ctx context.Context) error {
 	return q.Wait(ctx, MessageQueueAckWaiter{sequenseNumbers: []int{lastIndex}})
 }
 
-func (q *messageQueue) getNotSentMessagesWithLock() []messageWithDataContent {
-	q.m.Lock()
-	defer q.m.Unlock()
-
-	res := make([]messageWithDataContent, 0, len(q.messagesByOrder))
-	for i := q.lastSentIndex + 1; i <= q.lastWrittenIndex; i++ {
-		res = append(res, q.messagesByOrder[i])
-	}
-
-	return res
-}
-
 type MessageQueueAckWaiter struct {
 	sequenseNumbers []int
 }

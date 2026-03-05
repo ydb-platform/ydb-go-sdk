@@ -87,13 +87,7 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	t.Helper()
 
-	writer, err := NewMultiWriter(
-		describer,
-		MultiWriterConfig{
-			ProducerIDPrefix: "test-producer",
-			writersFactory:   newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0),
-		},
-	)
+	writer, err := NewMultiWriter(describer, MultiWriterConfig{ProducerIDPrefix: "test-producer"})
 	require.NoError(t, err)
 
 	return writer
@@ -416,7 +410,18 @@ func TestMultiWriter_Write_WithErrorWritersFactory(t *testing.T) {
 	)
 
 	_, err := multiWriter.WaitInit(ctx)
-	require.ErrorIs(t, err, errTest)
+	require.NoError(t, err)
+
+	err = multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:  bytes.NewReader([]byte("hello")),
+			SeqNo: 1,
+			Key:   "partition-key-1",
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorIs(t, multiWriter.Flush(ctx), errTest)
+	require.ErrorIs(t, multiWriter.Close(ctx), errTest)
 }
 
 func TestMultiWriter_Write_MaxQueueLenExceeded(t *testing.T) {

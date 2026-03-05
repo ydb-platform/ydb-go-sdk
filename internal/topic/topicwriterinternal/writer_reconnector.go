@@ -32,7 +32,7 @@ import (
 var (
 	errConnTimeout                                 = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector                       = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	ErrNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
+	errNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
 	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
 	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
@@ -206,7 +206,7 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 		// SetSeqNo
 		if w.cfg.AutoSetSeqNo {
 			if msg.SeqNo != 0 {
-				return xerrors.WithStackTrace(ErrNonZeroSeqNo)
+				return xerrors.WithStackTrace(errNonZeroSeqNo)
 			}
 			w.lastSeqNo++
 			msg.SeqNo = w.lastSeqNo
@@ -642,22 +642,6 @@ func (w *WriterReconnector) GetSessionID() (sessionID string) {
 	})
 
 	return sessionID
-}
-
-func (w *WriterReconnector) GetMessagesInBuffer() []PublicMessage {
-	messages := w.queue.getNotSentMessagesWithLock()
-
-	res := make([]PublicMessage, 0, len(messages))
-	for i := range messages {
-		newMessage := messages[i].PublicMessage
-		if messages[i].hasRawContent {
-			newMessage.Data = &messages[i].rawBuf
-		}
-
-		res = append(res, messages[i].PublicMessage)
-	}
-
-	return res
 }
 
 func allMessagesHasSameBufCodec(messages []messageWithDataContent) bool {

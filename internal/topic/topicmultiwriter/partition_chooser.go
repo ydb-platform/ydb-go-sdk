@@ -35,10 +35,6 @@ func newBoundPartitionChooser(
 			return nil, fmt.Errorf("%w: partition %d has no bounds", ErrNoBounds, partition.ID)
 		}
 
-		if len(partition.Children) > 0 {
-			continue
-		}
-
 		partitionShortInfos = append(partitionShortInfos, partitionShortInfo{
 			ID:        partition.ID,
 			FromBound: string(partition.FromBound),

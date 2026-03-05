@@ -94,14 +94,7 @@ func (p *MultiWriter) Flush(ctx context.Context) error {
 }
 
 func (p *MultiWriter) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
-	currentSeqNo, err := p.worker.waitInitDone(ctx)
-	if err != nil {
-		return topicwriterinternal.InitialInfo{}, err
-	}
-
-	return topicwriterinternal.InitialInfo{
-		LastSeqNum: currentSeqNo,
-	}, nil
+	return topicwriterinternal.InitialInfo{}, p.worker.waitInitDone(ctx)
 }
 
 func (p *MultiWriter) getWritersCount() int {
