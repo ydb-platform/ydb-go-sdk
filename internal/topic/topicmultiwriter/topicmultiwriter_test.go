@@ -336,19 +336,6 @@ func TestMultiWriter_ErrNoProducerIDPrefix(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidConfiguration)
 }
 
-func TestMultiWriter_ErrNoProducerID(t *testing.T) {
-	t.Parallel()
-
-	cfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
-	topicwriterinternal.WithProducerID("test-producer")(&cfg.WriterReconnectorConfig)
-
-	_, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-		return stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription()).Describe(ctx, path)
-	}, cfg)
-	require.ErrorIs(t, err, ErrInvalidConfiguration)
-}
-
 func TestMultiWriter_Write_WithBasicWriter(t *testing.T) {
 	t.Parallel()
 

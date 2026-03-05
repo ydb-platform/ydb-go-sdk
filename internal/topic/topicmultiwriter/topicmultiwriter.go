@@ -20,10 +20,6 @@ type MultiWriter struct {
 }
 
 func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) (*MultiWriter, error) {
-	if cfg.ProducerID() != "" {
-		return nil, fmt.Errorf("%w: producer id must be empty", ErrInvalidConfiguration)
-	}
-
 	if cfg.ProducerIDPrefix == "" {
 		return nil, fmt.Errorf("%w: producer id prefix is required", ErrInvalidConfiguration)
 	}
