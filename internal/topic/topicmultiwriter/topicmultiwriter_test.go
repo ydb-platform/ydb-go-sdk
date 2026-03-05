@@ -87,7 +87,7 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	t.Helper()
 
-	writer, err := NewMultiWriter(describer, MultiWriterConfig{})
+	writer, err := NewMultiWriter(describer, MultiWriterConfig{ProducerIDPrefix: "test-producer"})
 	require.NoError(t, err)
 
 	return writer
@@ -101,6 +101,7 @@ func newTestMultiWriterWithInitDelay(
 	t.Helper()
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
 
 	writer, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		time.Sleep(initDelay)
