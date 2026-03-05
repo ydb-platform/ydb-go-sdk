@@ -117,7 +117,9 @@ func TestTopicMultiWriter_WaitInitAndClose(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter())
+	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter(
+		topicoptions.WithProducerIDPrefix("test-producer"),
+	))
 	require.NoError(t, err)
 
 	require.NoError(t, multiWriter.WaitInit(ctx))
@@ -129,7 +131,9 @@ func TestTopicMultiWriter_WaitInitInfoUnimplemented(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter())
+	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter(
+		topicoptions.WithProducerIDPrefix("test-producer"),
+	))
 	require.NoError(t, err)
 
 	_, err = multiWriter.WaitInitInfo(ctx)
@@ -143,7 +147,9 @@ func TestTopicMultiWriter_CloseWithoutWaitInit(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter())
+	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter(
+		topicoptions.WithProducerIDPrefix("test-producer"),
+	))
 	require.NoError(t, err)
 
 	require.NoError(t, multiWriter.Close(ctx))
