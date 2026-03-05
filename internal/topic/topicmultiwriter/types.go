@@ -56,6 +56,7 @@ type WriteStats struct {
 
 type guardedList[T any] struct {
 	xlist.List[T]
+
 	mu xsync.Mutex
 }
 
