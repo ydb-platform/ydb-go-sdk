@@ -638,6 +638,7 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 
 	delete(w.inFlightMessagesIndex, partitionID)
 	delete(w.pendingMessagesIndex, partitionID)
+	w.releaseInFlightMessages()
 
 	if len(w.pendingMessagesIndex) > 0 || len(w.messagesToResendIndex) > 0 {
 		w.wakeup()
