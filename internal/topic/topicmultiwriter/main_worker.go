@@ -39,9 +39,7 @@ type worker struct {
 	idleWritersSupervisor *idleWritersSupervisor
 	cfg                   *MultiWriterConfig
 	mu                    xsync.Mutex
-	acksMu                xsync.Mutex
-	splittedPartitionsMu  xsync.Mutex
-	messagesSema          chan struct{}
+	messagesSema          empty.Chan
 
 	partitionChooser PartitionChooser
 
@@ -57,11 +55,11 @@ type worker struct {
 	partitionSplitChan empty.Chan
 	shutdown           empty.Chan
 
-	receivedAcks       xlist.List[ack]
-	splittedPartitions xlist.List[int64]
+	receivedAcks       *guardedList[ack]
+	splittedPartitions *guardedList[int64]
 
 	partitions map[int64]*PartitionInfo
-	initDone   chan struct{}
+	initDone   empty.Chan
 
 	isAutoPartitioningEnabled bool
 	background                *background.Worker
@@ -99,14 +97,14 @@ func newWorker(
 		ctx:                   ctx,
 		stop:                  stop,
 		partitions:            make(map[int64]*PartitionInfo),
-		initDone:              make(chan struct{}),
-		messagesSema:          make(chan struct{}, int64(cfg.MaxQueueLen)/2),
+		initDone:              make(empty.Chan),
+		messagesSema:          make(empty.Chan, int64(cfg.MaxQueueLen)/2),
 		inFlightMessagesIndex: make(map[int64]xlist.List[messagePtr]),
 		messagesToResendIndex: make(map[int64]xlist.List[messagePtr]),
 		pendingMessagesIndex:  make(map[int64]xlist.List[messagePtr]),
 		background:            background,
-		receivedAcks:          xlist.New[ack](),
-		splittedPartitions:    xlist.New[int64](),
+		receivedAcks:          newGuardedList[ack](),
+		splittedPartitions:    newGuardedList[int64](),
 	}
 
 	if cfg.PartitioningKeyHasher == nil {
@@ -147,15 +145,7 @@ func (w *worker) runAckReceiver() {
 		case <-w.ackReceivedChan:
 		}
 
-		var receivedAcks []ack
-		w.acksMu.WithLock(func() {
-			receivedAcks = make([]ack, 0, w.receivedAcks.Len())
-			for iter := w.receivedAcks.Front(); iter != nil; iter = iter.Next() {
-				receivedAcks = append(receivedAcks, iter.Value)
-			}
-			w.receivedAcks.Clear()
-		})
-
+		receivedAcks := w.receivedAcks.Consume()
 		w.mu.WithLock(func() {
 			for _, ack := range receivedAcks {
 				w.onAckReceived(ack.partitionID, ack.seqNo)
@@ -179,14 +169,7 @@ func (w *worker) runPartitionSplitter() {
 		case <-w.partitionSplitChan:
 		}
 
-		var splittedPartitions []int64
-		w.splittedPartitionsMu.WithLock(func() {
-			for iter := w.splittedPartitions.Front(); iter != nil; iter = iter.Next() {
-				splittedPartitions = append(splittedPartitions, iter.Value)
-			}
-			w.splittedPartitions.Clear()
-		})
-
+		splittedPartitions := w.splittedPartitions.Consume()
 		for _, partitionID := range splittedPartitions {
 			err := w.onPartitionSplit(partitionID)
 			if err != nil {
@@ -430,9 +413,7 @@ func (w *worker) getProducerID(partitionID int64) string {
 }
 
 func (w *worker) notifyOnPartitionSplit(partitionID int64) {
-	w.splittedPartitionsMu.WithLock(func() {
-		w.splittedPartitions.PushBack(partitionID)
-	})
+	w.splittedPartitions.PushBack(partitionID)
 	w.wakeUpPartitionSplitter()
 }
 
@@ -451,11 +432,9 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 			topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
 			topicwriterinternal.WithProducerID(w.getProducerID(partitionID)),
 			topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
-				w.acksMu.WithLock(func() {
-					w.receivedAcks.PushBack(ack{
-						partitionID: partitionID,
-						seqNo:       seqNo,
-					})
+				w.receivedAcks.PushBack(ack{
+					partitionID: partitionID,
+					seqNo:       seqNo,
 				})
 
 				w.wakeUpAckReceiver()

@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -50,4 +52,35 @@ type idleWriterInfo struct {
 type WriteStats struct {
 	MessagesWritten  int64
 	LastWrittenSeqNo int64
+}
+
+type guardedList[T any] struct {
+	xlist.List[T]
+	mu xsync.Mutex
+}
+
+func (l *guardedList[T]) PushBack(v T) *xlist.Element[T] {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.List.PushBack(v)
+}
+
+func (l *guardedList[T]) Consume() []T {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	result := make([]T, 0, l.Len())
+	for iter := l.Front(); iter != nil; iter = iter.Next() {
+		result = append(result, iter.Value)
+	}
+	l.Clear()
+
+	return result
+}
+
+func newGuardedList[T any]() *guardedList[T] {
+	return &guardedList[T]{
+		List: xlist.New[T](),
+	}
 }

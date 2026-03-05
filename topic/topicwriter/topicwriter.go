@@ -3,6 +3,7 @@ package topicwriter
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -19,12 +20,14 @@ var (
 	ErrQueueLimitExceed                      = topicwriterinternal.ErrPublicQueueIsFull
 	ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.ErrPublicMessagesPutToInternalQueueBeforeError
 	ErrUnimplemented                         = errors.New("unimplemented")
+	ErrInvalidConfiguration                  = errors.New("invalid configuration")
 )
 
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages
 type Writer struct {
-	inner innerWriter
+	inner              innerWriter
+	multiwriterEnabled bool
 }
 
 // PublicInitialInfo is an information about writer after initialize
@@ -40,8 +43,11 @@ func NewWriter(writer *topicwriterinternal.WriterReconnector) *Writer {
 }
 
 func NewWriterWrapper(inner innerWriter) *Writer {
+	_, ok := inner.(*topicmultiwriter.MultiWriter)
+
 	return &Writer{
-		inner: inner,
+		inner:              inner,
+		multiwriterEnabled: ok,
 	}
 }
 
@@ -57,6 +63,12 @@ func NewWriterWrapper(inner innerWriter) *Writer {
 // If err != nil you can check errors.Is(err, ErrMessagesPutToInternalQueueBeforeError) for check if the messages
 // put to buffer before error. It means that it is messages can be delivered to the server.
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
+	for i := range messages {
+		if !w.multiwriterEnabled && (messages[i].Key != "" || messages[i].PartitionID != 0) {
+			return fmt.Errorf("%w: key or partition id is not supported for non-multiwriter", ErrInvalidConfiguration)
+		}
+	}
+
 	return w.inner.Write(ctx, messages)
 }
 
@@ -73,8 +85,7 @@ func (w *Writer) WaitInit(ctx context.Context) (err error) {
 // WaitInitInfo waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
 func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
-	_, ok := w.inner.(*topicmultiwriter.MultiWriter)
-	if ok {
+	if w.multiwriterEnabled {
 		return PublicInitialInfo{}, ErrUnimplemented
 	}
 
@@ -120,6 +131,10 @@ func NewTxWriterWrapper(inner innerTxWriter) *TxWriter {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (w *TxWriter) Write(ctx context.Context, messages ...Message) error {
+	// for i := range messages {
+
+	// }
+
 	return w.inner.Write(ctx, messages)
 }
 
