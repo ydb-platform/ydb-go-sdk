@@ -224,7 +224,6 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 
 	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
 	multiWriter2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
-
 	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
 	keys := make([]string, 0, len(describe.Partitions))
 	for _, p := range describe.Partitions {
