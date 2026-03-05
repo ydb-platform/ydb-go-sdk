@@ -84,6 +84,10 @@ func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]
 	return m.getEncodedBytes(codec)
 }
 
+func (m *messageWithDataContent) GetRawBytes() ([]byte, error) {
+	return m.getRawBytes()
+}
+
 func (m *messageWithDataContent) cacheMetadata() {
 	if m.metadataCached {
 		return

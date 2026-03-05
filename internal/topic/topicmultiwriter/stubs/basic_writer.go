@@ -93,3 +93,7 @@ func (w *basicWriter) Close(ctx context.Context) error {
 
 	return nil
 }
+
+func (w *basicWriter) GetMessagesInBuffer() []topicwriterinternal.PublicMessage {
+	return nil
+}
