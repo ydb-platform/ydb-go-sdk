@@ -603,6 +603,8 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 		msg := iter.Value.Value
 		if msg.SeqNo < maxSeqNo {
 			if msg.ackReceived {
+				inFlightIndexChain.Remove(iter)
+
 				continue
 			}
 
