@@ -87,7 +87,10 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	t.Helper()
 
-	return NewMultiWriter(describer, MultiWriterConfig{})
+	writer, err := NewMultiWriter(describer, MultiWriterConfig{})
+	require.NoError(t, err)
+
+	return writer
 }
 
 func newTestMultiWriterWithInitDelay(
@@ -99,11 +102,14 @@ func newTestMultiWriterWithInitDelay(
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 
-	return NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+	writer, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		time.Sleep(initDelay)
 
 		return describer(ctx, path)
 	}, cfg)
+	require.NoError(t, err)
+
+	return writer
 }
 
 // newTestMultiWriterWithBasicWriter creates a multiwriter that uses basicWriter as writer (no real gRPC).
@@ -125,7 +131,10 @@ func newTestMultiWriterWithBasicWriter(
 	options = append(options, opts...)
 	withBasicWriterOptions(options...)(&cfg)
 
-	return NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, cfg)
+	require.NoError(t, err)
+
+	return writer
 }
 
 // newTestMultiWriterWithAutopartitioningWriter creates a multiwriter that uses the autopartitioning stub:
@@ -149,7 +158,10 @@ func newTestMultiWriterWithAutopartitioningWriter(
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	)(&cfg)
 
-	return NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, cfg)
+	require.NoError(t, err)
+
+	return writer
 }
 
 func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer TopicDescriber) *MultiWriter {
@@ -164,7 +176,10 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer Topic
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	)(&cfg)
 
-	return NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, cfg)
+	require.NoError(t, err)
+
+	return writer
 }
 
 func newTestMultiWriterWithAckDelay(
@@ -185,7 +200,10 @@ func newTestMultiWriterWithAckDelay(
 	options = append(options, opts...)
 	withBasicWriterOptions(options...)(&cfg)
 
-	return NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, cfg)
+	require.NoError(t, err)
+
+	return writer
 }
 
 func newTestMultiWriterWithCustomWritersFactory(
@@ -206,7 +224,10 @@ func newTestMultiWriterWithCustomWritersFactory(
 	options = append(options, opts...)
 	withBasicWriterOptions(options...)(&cfg)
 
-	return NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, cfg)
+	require.NoError(t, err)
+
+	return writer
 }
 
 func TestMultiWriter_ErrAlreadyClosed(t *testing.T) {
@@ -303,6 +324,28 @@ func TestMultiWriter_DescribeError(t *testing.T) {
 	// When init fails, WaitInit may return context.DeadlineExceeded (initDone is not closed on error)
 	// or the error may propagate depending on timing
 	require.True(t, errors.Is(err, describeErr) || errors.Is(err, context.DeadlineExceeded))
+}
+
+func TestMultiWriter_ErrNoProducerIDPrefix(t *testing.T) {
+	t.Parallel()
+
+	_, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription()).Describe(ctx, path)
+	}, MultiWriterConfig{})
+	require.ErrorIs(t, err, ErrInvalidConfiguration)
+}
+
+func TestMultiWriter_ErrNoProducerID(t *testing.T) {
+	t.Parallel()
+
+	cfg := MultiWriterConfig{}
+	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	topicwriterinternal.WithProducerID("test-producer")(&cfg.WriterReconnectorConfig)
+
+	_, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		return stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription()).Describe(ctx, path)
+	}, cfg)
+	require.ErrorIs(t, err, ErrInvalidConfiguration)
 }
 
 func TestMultiWriter_Write_WithBasicWriter(t *testing.T) {

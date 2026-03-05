@@ -20,7 +20,7 @@ var (
 	ErrQueueLimitExceed                      = topicwriterinternal.ErrPublicQueueIsFull
 	ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.ErrPublicMessagesPutToInternalQueueBeforeError
 	ErrUnimplemented                         = errors.New("unimplemented")
-	ErrInvalidConfiguration                  = errors.New("invalid configuration")
+	ErrInvalidConfiguration                  = topicmultiwriter.ErrInvalidConfiguration
 )
 
 // Writer represent write session to topic

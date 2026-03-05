@@ -342,12 +342,15 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && mwOpts != nil {
 			mwCfg := c.createMultiWriterConfig(cfg, mwOpts)
 
-			internal := internalmultiwriter.NewMultiWriter(
+			internal, err := internalmultiwriter.NewMultiWriter(
 				func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 					return c.Describe(ctx, path)
 				},
 				mwCfg,
 			)
+			if err != nil {
+				return nil, err
+			}
 
 			// internal multi-writer already implements the necessary interface for topicwriter.Writer.
 			return topicwriter.NewWriterWrapper(internal), nil
@@ -380,19 +383,24 @@ func (c *Client) StartTransactionalWriter(
 		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && mwOpts != nil {
 			mwCfg := c.createMultiWriterConfig(cfg, mwOpts)
 
-			multiWriterTx := internalmultiwriter.NewTopicMultiWriterTransaction(
-				internalmultiwriter.NewMultiWriter(
-					func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-						return c.Describe(ctx, path)
-					},
-					mwCfg,
-				),
+			multiwriter, err := internalmultiwriter.NewMultiWriter(
+				func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+					return c.Describe(ctx, path)
+				},
+				mwCfg,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			multiWriterWithTx := internalmultiwriter.NewTopicMultiWriterTransaction(
+				multiwriter,
 				internalTx,
 				c.cfg.Trace,
 			)
 
 			// internal multi-writer already implements the necessary interface for topicwriter.Writer.
-			return topicwriter.NewTxWriterWrapper(multiWriterTx), nil
+			return topicwriter.NewTxWriterWrapper(multiWriterWithTx), nil
 		}
 	}
 

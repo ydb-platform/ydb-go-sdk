@@ -2,6 +2,7 @@ package topicmultiwriter
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
@@ -18,7 +19,15 @@ type MultiWriter struct {
 	shutdown   empty.Chan
 }
 
-func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) *MultiWriter {
+func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) (*MultiWriter, error) {
+	if cfg.ProducerID() != "" {
+		return nil, fmt.Errorf("%w: producer id must be empty", ErrInvalidConfiguration)
+	}
+
+	if cfg.ProducerIDPrefix == "" {
+		return nil, fmt.Errorf("%w: producer id prefix is required", ErrInvalidConfiguration)
+	}
+
 	var (
 		ctx, cancel = context.WithCancel(context.Background())
 		shutdown    = make(empty.Chan)
@@ -44,7 +53,7 @@ func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) *Multi
 		p.worker.run()
 	})
 
-	return p
+	return p, nil
 }
 
 func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {

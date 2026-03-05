@@ -3,7 +3,8 @@ package topicmultiwriter
 import "errors"
 
 var (
-	ErrAlreadyClosed = errors.New("multiwriter already closed")
-	ErrNoSeqNo       = errors.New("seq no is required")
-	ErrNoBounds      = errors.New("partition has no bounds")
+	ErrAlreadyClosed        = errors.New("multiwriter already closed")
+	ErrNoSeqNo              = errors.New("seq no is required")
+	ErrNoBounds             = errors.New("partition has no bounds")
+	ErrInvalidConfiguration = errors.New("invalid configuration")
 )
