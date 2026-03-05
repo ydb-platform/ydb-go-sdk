@@ -21,7 +21,9 @@ type PublicMessage struct {
 	Data      io.Reader
 	Metadata  map[string][]byte
 
-	Key         string
+	// This parameter can be used ONLY for topic multiwriter.
+	Key string
+	// This parameter can be used ONLY for topic multiwriter.
 	PartitionID int64
 
 	tx tx.Transaction
