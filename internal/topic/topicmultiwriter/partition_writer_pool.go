@@ -168,9 +168,10 @@ func (p *partitionWriterPool) evict(partitionID int64) {
 }
 
 func (p *partitionWriterPool) close(ctx context.Context) error {
-	writersToClose := make([]writer, 0, len(p.writers))
+	var writersToClose []writer
 
 	p.mu.WithLock(func() {
+		writersToClose = make([]writer, 0, len(p.writers))
 		for _, writer := range p.writers {
 			writersToClose = append(writersToClose, writer)
 		}
