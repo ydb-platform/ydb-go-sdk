@@ -286,7 +286,7 @@ func TestMultiWriter_WaitInit_ContextCanceled(t *testing.T) {
 	_, err := multiWriter.WaitInit(ctxCancel)
 	require.ErrorIs(t, err, context.Canceled)
 
-	_ = multiWriter.Close(ctx)
+	_ = multiWriter.Close(ctxCancel)
 }
 
 func TestProducer_CloseWithoutWaitInit(t *testing.T) {

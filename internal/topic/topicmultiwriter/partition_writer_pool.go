@@ -107,7 +107,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	return wr, nil
 }
 
-func (p *partitionWriterPool) Get(partitionID int64, doNotCreate bool) (*writerWrapper, error) {
+func (p *partitionWriterPool) get(partitionID int64, doNotCreate bool) (*writerWrapper, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -152,7 +152,7 @@ func (p *partitionWriterPool) Get(partitionID int64, doNotCreate bool) (*writerW
 	return wrapper, nil
 }
 
-func (p *partitionWriterPool) Evict(partitionID int64) {
+func (p *partitionWriterPool) evict(partitionID int64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -166,7 +166,7 @@ func (p *partitionWriterPool) Evict(partitionID int64) {
 	p.idle.wakeup()
 }
 
-func (p *partitionWriterPool) CloseAll(ctx context.Context) error {
+func (p *partitionWriterPool) close(ctx context.Context) error {
 	writersToClose := make([]writer, 0, len(p.writers))
 
 	p.mu.WithLock(func() {

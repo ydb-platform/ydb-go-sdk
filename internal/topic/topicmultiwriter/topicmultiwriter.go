@@ -68,7 +68,7 @@ func (p *MultiWriter) Close(ctx context.Context) error {
 	}
 
 	defer func() {
-		_ = p.orchestrator.writerPool.CloseAll(ctx)
+		_ = p.orchestrator.writerPool.close(ctx)
 	}()
 
 	if err := p.orchestrator.flush(ctx); err != nil {

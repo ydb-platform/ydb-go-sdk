@@ -96,14 +96,14 @@ func TestPartitionWriterPool_GetCreatesWriterAndReturnsSameOnSecondGet(t *testin
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w1, err := pool.Get(1, false)
+	w1, err := pool.get(1, false)
 	require.NoError(t, err)
 	require.NotNil(t, w1)
 	require.Equal(t, 1, factory.createCalls)
 	require.Equal(t, []int64{1}, factory.partitionIDs)
 	require.Equal(t, []string{"test-prefix-1"}, factory.producerIDs)
 
-	w2, err := pool.Get(1, false)
+	w2, err := pool.get(1, false)
 	require.NoError(t, err)
 	require.Same(t, w1, w2)
 	require.Equal(t, 1, factory.createCalls)
@@ -116,14 +116,14 @@ func TestPartitionWriterPool_GetReturnsFromIdleAfterEvict(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w1, err := pool.Get(1, false)
+	w1, err := pool.get(1, false)
 	require.NoError(t, err)
 	require.NotNil(t, w1)
 	require.Equal(t, 1, factory.createCalls)
 
-	pool.Evict(1)
+	pool.evict(1)
 
-	w2, err := pool.Get(1, false)
+	w2, err := pool.get(1, false)
 	require.NoError(t, err)
 	require.Same(t, w1, w2)
 	require.Equal(t, 1, factory.createCalls)
@@ -136,13 +136,13 @@ func TestPartitionWriterPool_CloseAllClosesAllWriters(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	_, err := pool.Get(1, false)
+	_, err := pool.get(1, false)
 	require.NoError(t, err)
-	_, err = pool.Get(2, false)
+	_, err = pool.get(2, false)
 	require.NoError(t, err)
 	require.Len(t, factory.writers, 2)
 
-	err = pool.CloseAll(xtest.Context(t))
+	err = pool.close(xtest.Context(t))
 	require.NoError(t, err)
 
 	require.True(t, factory.writers[0].closed.Load())
@@ -156,7 +156,7 @@ func TestPartitionWriterPool_GetProducerIDFormat(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	_, err := pool.Get(5, false)
+	_, err := pool.get(5, false)
 	require.NoError(t, err)
 	require.Equal(t, []string{"test-prefix-5"}, factory.producerIDs)
 	require.Equal(t, []int64{5}, factory.partitionIDs)
@@ -171,7 +171,7 @@ func TestPartitionWriterPool_GetReturnsErrorWhenCreateFails(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w, err := pool.Get(1, false)
+	w, err := pool.get(1, false)
 	require.ErrorIs(t, err, errCreate)
 	require.Nil(t, w)
 	require.Equal(t, 1, factory.createCalls)

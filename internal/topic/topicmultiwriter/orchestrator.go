@@ -27,9 +27,7 @@ type orchestrator struct {
 	mu  *xsync.Mutex
 
 	partitionChooser PartitionChooser
-	buf              *inflightBuffer
-
-	topicDescriber TopicDescriber
+	topicDescriber   TopicDescriber
 
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
@@ -38,6 +36,7 @@ type orchestrator struct {
 
 	background *background.Worker
 
+	buf                    *inflightBuffer
 	writerPool             *partitionWriterPool
 	ackReceiver            *ackReceiver
 	partitionSplitReceiver *partitionSplitReceiver
@@ -273,7 +272,7 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	indexChain.Remove(message)
 	if indexChain.Len() == 0 {
 		delete(o.buf.inFlightMessagesIndex, partitionID)
-		o.writerPool.Evict(partitionID)
+		o.writerPool.evict(partitionID)
 	}
 
 	o.buf.sweep()
@@ -358,7 +357,7 @@ func (o *orchestrator) scheduleResendMessages(partitionID, maxSeqNo int64) (err 
 		bufferedMessagesMap = make(map[int64]topicwriterinternal.PublicMessage)
 	)
 
-	writer, err := o.writerPool.Get(partitionID, true)
+	writer, err := o.writerPool.get(partitionID, true)
 	if err != nil {
 		return err
 	}
@@ -443,7 +442,7 @@ func (o *orchestrator) initSeqNo() error {
 	})
 
 	for _, partitionID := range partitions {
-		o.writerPool.Evict(partitionID)
+		o.writerPool.evict(partitionID)
 	}
 
 	return nil
@@ -468,7 +467,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 					return err
 				}
 			} else {
-				writer, err = o.writerPool.Get(partition, false)
+				writer, err = o.writerPool.get(partition, false)
 				if err != nil {
 					return err
 				}
