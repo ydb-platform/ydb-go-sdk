@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/spaolacci/murmur3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xhash"
 )
 
 var (
@@ -120,11 +120,11 @@ func (c *hashPartitionChooser) ChoosePartition(msg message) (int64, error) {
 		return 0, fmt.Errorf("no partitions configured")
 	}
 
-	hasher := murmur3.New64()
-	hasher.Write([]byte(msg.Key))
-	low := hasher.Sum64()
+	// Same as Kafka Partitioner
+	// See: https://github.com/apache/kafka/blob/4.2/clients/src/main/java/org/apache/kafka/clients/producer/internals/BuiltInPartitioner.java#L330
+	hash := xhash.Murmur2Hash32([]byte(msg.Key), 0)
 
-	return c.partitions[low%uint64(len(c.partitions))], nil
+	return c.partitions[hash%uint32(len(c.partitions))], nil
 }
 
 func (c *hashPartitionChooser) AddNewPartition(partitionID int64, _, _ []byte) {

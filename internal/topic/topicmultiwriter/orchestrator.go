@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spaolacci/murmur3"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"golang.org/x/sync/errgroup"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xhash"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -133,7 +133,7 @@ func (o *orchestrator) getDefaultKeyHasher() KeyHasher {
 	return func(key string) string {
 		// Same as C++ TProducerSettings::DefaultPartitioningKeyHasher:
 		// MurmurHash64 with seed 0, result as 8 bytes in big-endian (network byte order)
-		lo := murmur3.Sum64([]byte(key))
+		lo := xhash.Murmur2Hash64A([]byte(key), 0)
 		out := make([]byte, 8)
 		binary.BigEndian.PutUint64(out, lo)
 

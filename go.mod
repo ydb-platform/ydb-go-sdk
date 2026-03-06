@@ -6,7 +6,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0
 	github.com/jonboulle/clockwork v0.5.0
-	github.com/spaolacci/murmur3 v1.1.0
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20251125145508-6d7ef87db5cb
 	go.uber.org/goleak v1.3.0
 	go.uber.org/zap v1.27.0
