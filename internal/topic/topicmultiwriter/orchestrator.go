@@ -488,7 +488,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 			}
 
 			if resultErr != nil {
-				return
+				return resultErr
 			}
 
 			initInfo, err := writer.WaitInit(o.ctx)
