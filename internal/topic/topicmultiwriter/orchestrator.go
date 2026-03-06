@@ -228,8 +228,10 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	case autoSetSeqNo && msg.SeqNo != 0:
 		return topicwriterinternal.ErrNonZeroSeqNo
 	case autoSetSeqNo && msg.SeqNo == 0:
-		o.currentSeqNo++
-		msg.SeqNo = o.currentSeqNo
+		o.mu.WithLock(func() {
+			o.currentSeqNo++
+			msg.SeqNo = o.currentSeqNo
+		})
 	}
 
 	if err := o.buf.acquireMessage(ctx); err != nil {
