@@ -121,7 +121,7 @@ func (c *hashPartitionChooser) ChoosePartition(msg message) (int64, error) {
 	}
 
 	// Same as Kafka Partitioner
-	// See: https://github.com/apache/kafka/blob/4.2/clients/src/main/java/org/apache/kafka/clients/producer/internals/BuiltInPartitioner.java#L330
+	// See: https://github.com/apache/kafka/blob/4.2/clients/src/main/java/org/apache/kafka/clients/producer/internals/BuiltInPartitioner.java#L330 //nolint:lll
 	hash := xhash.Murmur2Hash32([]byte(msg.Key), 0)
 
 	return c.partitions[hash%uint32(len(c.partitions))], nil
