@@ -461,15 +461,11 @@ func (o *orchestrator) initSeqNo() error {
 }
 
 func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err error) {
-	var (
-		mu       xsync.Mutex
-		errGroup errgroup.Group
-	)
-
+	var errGroup errgroup.Group
 	errGroup.SetLimit(10)
 
 	for _, partition := range partitions {
-		errGroup.Go(func() error {
+		errGroup.Go(func() (resultErr error) {
 			partitionInfo := o.partitions[partition]
 
 			var writer *writerWrapper
@@ -479,10 +475,18 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 					return err
 				}
 			} else {
-				writer, err = o.writerPool.get(partition, false)
-				if err != nil {
-					return err
-				}
+				o.mu.WithLock(func() {
+					writer, err = o.writerPool.get(partition, false)
+					if err != nil {
+						resultErr = err
+
+						return
+					}
+				})
+			}
+
+			if resultErr != nil {
+				return
 			}
 
 			initInfo, err := writer.WaitInit(o.ctx)
@@ -490,7 +494,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 				return err
 			}
 
-			mu.WithLock(func() {
+			o.mu.WithLock(func() {
 				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
 			})
 
