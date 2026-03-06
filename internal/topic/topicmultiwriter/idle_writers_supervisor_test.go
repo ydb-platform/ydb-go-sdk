@@ -27,6 +27,10 @@ func (w *testWriter) Write(_ context.Context, _ []topicwriterinternal.PublicMess
 	return nil
 }
 
+func (w *testWriter) GetBufferedMessages() []topicwriterinternal.PublicMessage {
+	return nil
+}
+
 func TestIdleWritersSupervisor_AddAndRemoveUpdatesIndex(t *testing.T) {
 	t.Parallel()
 

@@ -20,6 +20,10 @@ type PartitionInfo struct {
 	Locked    bool
 }
 
+func (p *PartitionInfo) Splitted() bool {
+	return len(p.Children) > 0
+}
+
 type partitionShortInfo struct {
 	ID        int64
 	FromBound string

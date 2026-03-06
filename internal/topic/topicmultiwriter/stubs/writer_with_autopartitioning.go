@@ -180,3 +180,7 @@ func (w *writerWithAutopartitioning) Close(ctx context.Context) error {
 
 	return nil
 }
+
+func (w *writerWithAutopartitioning) GetBufferedMessages() []topicwriterinternal.PublicMessage {
+	return nil
+}

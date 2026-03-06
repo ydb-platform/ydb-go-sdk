@@ -202,6 +202,23 @@ func (q *messageQueue) stopAddNewMessagesNeedLock(reason error) {
 	}
 }
 
+func (q *messageQueue) getBufferedMessages() []PublicMessage {
+	q.m.Lock()
+	defer q.m.Unlock()
+
+	res := make([]PublicMessage, 0, q.lastWrittenIndex-q.lastSentIndex)
+	for i := q.lastSentIndex + 1; i <= q.lastWrittenIndex; i++ {
+		msg := q.messagesByOrder[i]
+		if msg.hasRawContent {
+			msg.Data = &msg.rawBuf
+		}
+
+		res = append(res, msg.PublicMessage)
+	}
+
+	return res
+}
+
 func (q *messageQueue) Close(err error) error {
 	isFirstTimeClosed := false
 	q.m.Lock()

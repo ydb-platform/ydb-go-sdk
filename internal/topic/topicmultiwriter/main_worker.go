@@ -61,6 +61,8 @@ type worker struct {
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
 
+	currentSeqNo int64
+
 	isAutoPartitioningEnabled bool
 	background                *background.Worker
 }
@@ -204,12 +206,15 @@ func (w *worker) init() (err error) {
 		return err
 	}
 
+	partitions := make([]int64, 0, len(describeResult.Partitions))
+
 	for _, partition := range describeResult.Partitions {
 		var parentID *int64
 		if len(partition.ParentPartitionIDs) > 0 {
 			parentID = &partition.ParentPartitionIDs[0]
 		}
 
+		partitions = append(partitions, partition.PartitionID)
 		w.partitions[partition.PartitionID] = &PartitionInfo{
 			ID:        partition.PartitionID,
 			ParentID:  parentID,
@@ -217,6 +222,10 @@ func (w *worker) init() (err error) {
 			FromBound: partition.FromBound,
 			ToBound:   partition.ToBound,
 		}
+	}
+
+	if err := w.initSeqNo(); err != nil {
+		return err
 	}
 
 	w.isAutoPartitioningEnabled = describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
@@ -344,8 +353,14 @@ func (w *worker) pushMessage(ctx context.Context, msg message) (err error) {
 		autoSetSeqNo = w.cfg.AutoSetSeqNo
 	})
 
-	if !autoSetSeqNo && msg.SeqNo == 0 {
+	switch {
+	case !autoSetSeqNo && msg.SeqNo == 0:
 		return ErrNoSeqNo
+	case autoSetSeqNo && msg.SeqNo != 0:
+		return topicwriterinternal.ErrNonZeroSeqNo
+	case autoSetSeqNo && msg.SeqNo == 0:
+		w.currentSeqNo++
+		msg.SeqNo = w.currentSeqNo
 	}
 
 	if err := w.acquireMessage(ctx); err != nil {
@@ -431,6 +446,7 @@ func (w *worker) createWriter(partitionID int64) (writer, error) {
 		opts      = []topicwriterinternal.PublicWriterOption{
 			topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
 			topicwriterinternal.WithProducerID(w.getProducerID(partitionID)),
+			topicwriterinternal.WithAutoSetSeqNo(false),
 			topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
 				w.receivedAcks.PushBack(ack{
 					partitionID: partitionID,
@@ -595,7 +611,19 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 		inFlightMessagesToAdd []messagePtr
 		pendingMessagesToAdd  []messagePtr
 		messagesToResendToAdd []messagePtr
+
+		bufferedMessagesMap = make(map[int64]topicwriterinternal.PublicMessage)
 	)
+
+	writer, err := w.getWriter(partitionID)
+	if err != nil {
+		return err
+	}
+
+	bufferedMessages := writer.GetBufferedMessages()
+	for _, msg := range bufferedMessages {
+		bufferedMessagesMap[msg.PartitionID] = msg
+	}
 
 	for inFlightIndexChain.Len() > 0 {
 		iter := inFlightIndexChain.Front()
@@ -615,6 +643,11 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 
 		if err := w.rechoosePartition(&msg); err != nil {
 			return err
+		}
+
+		bufferedMessages, ok := bufferedMessagesMap[msg.PartitionID]
+		if ok {
+			iter.Value.Value.Data = bufferedMessages.Data
 		}
 
 		iter.Value.Value.PartitionID = msg.PartitionID
@@ -649,7 +682,27 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 	return nil
 }
 
-func (w *worker) getMaxSeqNo(ancestors []int64) (maxSeqNo int64, err error) {
+func (w *worker) initSeqNo() error {
+	partitions := make([]int64, 0, len(w.partitions))
+	for partitionID := range w.partitions {
+		partitions = append(partitions, partitionID)
+	}
+
+	maxSeqNo, err := w.getMaxSeqNo(partitions)
+	if err != nil {
+		return err
+	}
+
+	for _, partitionID := range partitions {
+		w.idleWritersSupervisor.add(partitionID)
+	}
+
+	w.currentSeqNo = maxSeqNo
+
+	return nil
+}
+
+func (w *worker) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err error) {
 	var (
 		mu       xsync.Mutex
 		errGroup errgroup.Group
@@ -657,16 +710,22 @@ func (w *worker) getMaxSeqNo(ancestors []int64) (maxSeqNo int64, err error) {
 
 	errGroup.SetLimit(10)
 
-	for _, ancestor := range ancestors {
+	for _, partition := range partitions {
 		errGroup.Go(func() error {
-			writerCfg := w.cfg.WriterReconnectorConfig
-			topicwriterinternal.WithProducerID(w.getProducerID(ancestor))(&writerCfg)
+			partitionInfo := w.partitions[partition]
 
-			writer, err := w.cfg.writersFactory.Create(writerCfg)
-			if err != nil {
-				return err
+			var writer *writerWrapper
+			if partitionInfo.Splitted() {
+				writer, err = w.createWriterToSplittedPartition(partition)
+				if err != nil {
+					return err
+				}
+			} else {
+				writer, err = w.getWriter(partition)
+				if err != nil {
+					return err
+				}
 			}
-			defer writer.Close(w.ctx)
 
 			initInfo, err := writer.WaitInit(w.ctx)
 			if err != nil {
@@ -686,6 +745,17 @@ func (w *worker) getMaxSeqNo(ancestors []int64) (maxSeqNo int64, err error) {
 	}
 
 	return maxSeqNo, nil
+}
+
+func (w *worker) createWriterToSplittedPartition(partitionID int64) (*writerWrapper, error) {
+	writerCfg := w.cfg.WriterReconnectorConfig
+	topicwriterinternal.WithProducerID(w.getProducerID(partitionID))(&writerCfg)
+
+	writer, err := w.cfg.writersFactory.Create(writerCfg)
+
+	return &writerWrapper{
+		writer: writer,
+	}, err
 }
 
 func (w *worker) onPartitionSplit(partitionID int64) (resultErr error) {
