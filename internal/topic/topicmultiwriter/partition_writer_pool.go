@@ -11,8 +11,9 @@ import (
 )
 
 type partitionWriterPool struct {
+	ctx context.Context //nolint:containedctx
+
 	cfg *MultiWriterConfig
-	ctx context.Context
 	bg  *background.Worker
 
 	mu      xsync.Mutex
@@ -26,8 +27,8 @@ type partitionWriterPool struct {
 }
 
 func newPartitionWriterPool(
-	cfg *MultiWriterConfig,
 	ctx context.Context,
+	cfg *MultiWriterConfig,
 	bg *background.Worker,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
@@ -129,7 +130,7 @@ func (p *partitionWriterPool) get(partitionID int64, doNotCreate bool) (*writerW
 	}
 
 	if doNotCreate {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	wrapper := &writerWrapper{
@@ -176,7 +177,9 @@ func (p *partitionWriterPool) close(ctx context.Context) error {
 	})
 
 	for _, writer := range writersToClose {
-		writer.Close(ctx)
+		if err := writer.Close(ctx); err != nil {
+			return err
+		}
 	}
 
 	return nil

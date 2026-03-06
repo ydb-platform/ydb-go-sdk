@@ -19,7 +19,12 @@ type inflightBuffer struct {
 	getError              func() error
 }
 
-func newInflightBuffer(ctx context.Context, mu *xsync.Mutex, cfg *MultiWriterConfig, getError func() error) *inflightBuffer {
+func newInflightBuffer(
+	ctx context.Context,
+	mu *xsync.Mutex,
+	cfg *MultiWriterConfig,
+	getError func() error,
+) *inflightBuffer {
 	return &inflightBuffer{
 		ctx:                   ctx,
 		mu:                    mu,
@@ -47,12 +52,10 @@ func (b *inflightBuffer) releaseMessage() {
 	<-b.messagesSema
 }
 
-func (b *inflightBuffer) pushNeedLock(msg message) error {
+func (b *inflightBuffer) pushNeedLock(msg message) {
 	newElement := b.inFlightMessages.PushBack(msg)
 	b.addToInFlightMessagesIndex(newElement, msg.PartitionID, false)
 	b.addToPendingMessagesIndex(newElement, msg.PartitionID, false)
-
-	return nil
 }
 
 // no concurrent safe

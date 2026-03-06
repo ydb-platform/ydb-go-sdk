@@ -77,8 +77,8 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 	cfg.writersFactory = factory
 
 	pool := newPartitionWriterPool(
-		cfg,
 		ctx,
+		cfg,
 		bg,
 		func(partitionID, seqNo int64) {},
 		func(partitionID int64) {},

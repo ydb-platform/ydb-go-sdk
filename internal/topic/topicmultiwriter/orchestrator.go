@@ -43,6 +43,7 @@ type orchestrator struct {
 	sender                 *sender
 }
 
+//nolint:funlen
 func newOrchestrator(
 	ctx context.Context,
 	stop context.CancelFunc,
@@ -62,10 +63,9 @@ func newOrchestrator(
 		cfg.MaxQueueLen = defaultInFlightMessagesBufferSize
 	}
 
-	mu := &xsync.Mutex{}
 	o := &orchestrator{
 		cfg:            cfg,
-		mu:             mu,
+		mu:             &xsync.Mutex{},
 		topicDescriber: topicDescriber,
 		ctx:            ctx,
 		stop:           stop,
@@ -74,7 +74,7 @@ func newOrchestrator(
 		background:     background,
 	}
 
-	o.buf = newInflightBuffer(ctx, mu, cfg, func() error { return o.getResultErr() })
+	o.buf = newInflightBuffer(ctx, o.mu, cfg, func() error { return o.getResultErr() })
 	o.ackReceiver = newAckReceiver(ctx, func(partitionID, seqNo int64) {
 		o.mu.WithLock(func() {
 			o.onAckReceivedNeedLock(partitionID, seqNo)
@@ -88,8 +88,8 @@ func newOrchestrator(
 		o.stopWithError,
 	)
 	o.writerPool = newPartitionWriterPool(
-		cfg,
 		ctx,
+		cfg,
 		background,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
@@ -149,15 +149,12 @@ func (o *orchestrator) init() (err error) {
 		return err
 	}
 
-	partitions := make([]int64, 0, len(describeResult.Partitions))
-
 	for _, partition := range describeResult.Partitions {
 		var parentID *int64
 		if len(partition.ParentPartitionIDs) > 0 {
 			parentID = &partition.ParentPartitionIDs[0]
 		}
 
-		partitions = append(partitions, partition.PartitionID)
 		o.partitions[partition.PartitionID] = &PartitionInfo{
 			ID:        partition.PartitionID,
 			ParentID:  parentID,
@@ -245,11 +242,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 			return
 		}
 
-		err = o.buf.pushNeedLock(msg)
-		if err != nil {
-			return
-		}
-
+		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
 	})
 
@@ -326,7 +319,10 @@ func (o *orchestrator) addNewPartitions(describeResult *topictypes.TopicDescript
 	}
 }
 
-func (o *orchestrator) getSplittedPartitionChildren(describeResult *topictypes.TopicDescription, partitionID int64) []int64 {
+func (o *orchestrator) getSplittedPartitionChildren(
+	describeResult *topictypes.TopicDescription,
+	partitionID int64,
+) []int64 {
 	for _, partition := range describeResult.Partitions {
 		if partition.PartitionID == partitionID {
 			return partition.ChildPartitionIDs
@@ -343,6 +339,31 @@ func (o *orchestrator) rechoosePartition(msg *message) (err error) {
 	return err
 }
 
+func (o *orchestrator) getWriterBufferedMessages(
+	partitionID int64,
+) (map[int64]topicwriterinternal.PublicMessage, error) {
+	writer, err := o.writerPool.get(partitionID, true)
+	if err != nil {
+		return nil, err
+	}
+
+	if writer == nil {
+		return nil, nil //nolint:nilnil
+	}
+
+	var (
+		bufferedMessagesMap = make(map[int64]topicwriterinternal.PublicMessage)
+		bufferedMessages    = writer.GetBufferedMessages()
+	)
+
+	for _, msg := range bufferedMessages {
+		bufferedMessagesMap[msg.PartitionID] = msg
+	}
+
+	return bufferedMessagesMap, nil
+}
+
+//nolint:funlen
 func (o *orchestrator) scheduleResendMessages(partitionID, maxSeqNo int64) (err error) {
 	inFlightIndexChain, ok := o.buf.inFlightMessagesIndex[partitionID]
 	if !ok {
@@ -353,20 +374,11 @@ func (o *orchestrator) scheduleResendMessages(partitionID, maxSeqNo int64) (err 
 		inFlightMessagesToAdd []messagePtr
 		pendingMessagesToAdd  []messagePtr
 		messagesToResendToAdd []messagePtr
-
-		bufferedMessagesMap = make(map[int64]topicwriterinternal.PublicMessage)
 	)
 
-	writer, err := o.writerPool.get(partitionID, true)
+	bufferedMessagesMap, err := o.getWriterBufferedMessages(partitionID)
 	if err != nil {
 		return err
-	}
-
-	if writer != nil {
-		bufferedMessages := writer.GetBufferedMessages()
-		for _, msg := range bufferedMessages {
-			bufferedMessagesMap[msg.PartitionID] = msg
-		}
 	}
 
 	for inFlightIndexChain.Len() > 0 {
