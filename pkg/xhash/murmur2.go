@@ -96,9 +96,11 @@ func Murmur2Hash32(data []byte, seed uint32) uint32 {
 	switch n - i {
 	case 3:
 		h ^= uint32(data[i+2]) << 16
+
 		fallthrough
 	case 2:
 		h ^= uint32(data[i+1]) << 8
+
 		fallthrough
 	case 1:
 		h ^= uint32(data[i])
