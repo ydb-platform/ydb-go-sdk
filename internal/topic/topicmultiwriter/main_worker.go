@@ -645,9 +645,9 @@ func (w *worker) scheduleResendMessages(partitionID, maxSeqNo int64) (err error)
 			return err
 		}
 
-		bufferedMessages, ok := bufferedMessagesMap[msg.PartitionID]
+		bufferedMessage, ok := bufferedMessagesMap[msg.PartitionID]
 		if ok {
-			iter.Value.Value.Data = bufferedMessages.Data
+			iter.Value.Value.Data = bufferedMessage.Data
 		}
 
 		iter.Value.Value.PartitionID = msg.PartitionID
