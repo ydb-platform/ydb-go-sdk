@@ -171,11 +171,11 @@ func TestPartitionChooser_Hash(t *testing.T) {
 		chooser.AddNewPartition(3, nil, nil)
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
-		require.True(t, partitionID >= 0 && partitionID < 3)
+		require.Contains(t, []int64{0, 1, 3}, partitionID)
 
 		chooser.RemovePartition(3)
 		partitionID, err = chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
-		require.True(t, partitionID >= 0 && partitionID < 2)
+		require.Contains(t, []int64{0, 1}, partitionID)
 	})
 }
