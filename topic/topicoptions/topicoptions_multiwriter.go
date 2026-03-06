@@ -12,13 +12,14 @@ import (
 type (
 	MultiWriterOption        = topicmultiwriter.PublicMultiWriterOption
 	KeyHasher                = topicmultiwriter.KeyHasher
-	ChoosePartitionFunc      = topicmultiwriter.ChoosePartitionFunc
 	PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategy
+	PartitionChooser         = topicmultiwriter.PartitionChooser
 )
 
 const (
-	PartitionChooserStrategyHash  PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyHash
-	PartitionChooserStrategyBound PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyBound
+	PartitionChooserStrategyHash   PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyHash
+	PartitionChooserStrategyBound  PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyBound
+	PartitionChooserStrategyCustom PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyCustom
 )
 
 // WithProducerIDPrefix sets a prefix for producer IDs used by the internal producer.
@@ -36,9 +37,9 @@ func WithPartitionChooserStrategy(strategy topicmultiwriter.PartitionChooserStra
 	return topicmultiwriter.WithPartitionChooserStrategy(strategy)
 }
 
-// WithCustomChoosePartitionFunc sets a custom partition selection function.
-func WithCustomChoosePartitionFunc(customChoosePartitionFunc topicmultiwriter.ChoosePartitionFunc) MultiWriterOption {
-	return topicmultiwriter.WithCustomChoosePartitionFunc(customChoosePartitionFunc)
+// WithCustomPartitionChooser sets a custom partition chooser.
+func WithCustomPartitionChooser(customPartitionChooser topicmultiwriter.PartitionChooser) MultiWriterOption {
+	return topicmultiwriter.WithCustomPartitionChooser(customPartitionChooser)
 }
 
 // WithWriterIdleTimeout sets timeout after which idle writers are closed.

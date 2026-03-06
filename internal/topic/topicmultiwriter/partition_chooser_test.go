@@ -4,7 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
+
+func messageWithKey(key string) message {
+	return message{PublicMessage: topicwriterinternal.PublicMessage{Key: key}}
+}
 
 func TestPartitionChooser_Bound(t *testing.T) {
 	t.Parallel()
@@ -19,7 +24,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		chooser, err := newBoundPartitionChooser(cfg, partitions)
 		require.NoError(t, err)
 
-		partitionID, err := chooser.ChoosePartition("key-a")
+		partitionID, err := chooser.ChoosePartition(messageWithKey("key-a"))
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
 	})
@@ -35,11 +40,11 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		chooser, err := newBoundPartitionChooser(cfg, partitions)
 		require.NoError(t, err)
 
-		partitionID, err := chooser.ChoosePartition("a")
+		partitionID, err := chooser.ChoosePartition(messageWithKey("a"))
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
 
-		partitionID, err = chooser.ChoosePartition("n")
+		partitionID, err = chooser.ChoosePartition(messageWithKey("n"))
 		require.NoError(t, err)
 		require.Equal(t, int64(2), partitionID)
 	})
@@ -58,7 +63,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		chooser, err := newBoundPartitionChooser(cfg, partitions)
 		require.NoError(t, err)
 
-		partitionID, err := chooser.ChoosePartition("key")
+		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
 	})
@@ -71,7 +76,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		chooser, err := newBoundPartitionChooser(cfg, partitions)
 		require.NoError(t, err)
 
-		_, err = chooser.ChoosePartition("key")
+		_, err = chooser.ChoosePartition(messageWithKey("key"))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no partitions configured")
 	})
@@ -101,7 +106,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 
 		chooser.AddNewPartition(2, []byte("m"), []byte("z"))
 
-		partitionID, err := chooser.ChoosePartition("n")
+		partitionID, err := chooser.ChoosePartition(messageWithKey("n"))
 		require.NoError(t, err)
 		require.Equal(t, int64(2), partitionID)
 	})
@@ -117,7 +122,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		require.NoError(t, err)
 
 		chooser.RemovePartition(1)
-		_, err = chooser.ChoosePartition("key")
+		_, err = chooser.ChoosePartition(messageWithKey("key"))
 		require.Error(t, err)
 	})
 }
@@ -131,12 +136,12 @@ func TestPartitionChooser_Hash(t *testing.T) {
 		cfg := &MultiWriterConfig{}
 		chooser := newHashPartitionChooser(cfg, []int64{0, 1, 2, 3})
 
-		partitionID, err := chooser.ChoosePartition("key1")
+		partitionID, err := chooser.ChoosePartition(messageWithKey("key1"))
 		require.NoError(t, err)
 		require.True(t, partitionID >= 0 && partitionID < 4)
 
 		// Same key should return same partition
-		partitionID2, err := chooser.ChoosePartition("key1")
+		partitionID2, err := chooser.ChoosePartition(messageWithKey("key1"))
 		require.NoError(t, err)
 		require.Equal(t, partitionID, partitionID2)
 	})
@@ -151,7 +156,7 @@ func TestPartitionChooser_Hash(t *testing.T) {
 		}
 		chooser := newHashPartitionChooser(cfg, []int64{0, 1})
 
-		partitionID, err := chooser.ChoosePartition("key")
+		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
 		require.True(t, partitionID >= 0 && partitionID < 2)
 	})
@@ -163,12 +168,12 @@ func TestPartitionChooser_Hash(t *testing.T) {
 		chooser := newHashPartitionChooser(cfg, []int64{0, 1})
 
 		chooser.AddNewPartition(3, nil, nil)
-		partitionID, err := chooser.ChoosePartition("key")
+		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
 		require.True(t, partitionID >= 0 && partitionID < 3)
 
 		chooser.RemovePartition(3)
-		partitionID, err = chooser.ChoosePartition("key")
+		partitionID, err = chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
 		require.True(t, partitionID >= 0 && partitionID < 2)
 	})

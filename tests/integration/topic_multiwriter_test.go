@@ -267,7 +267,7 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 
 	require.NoError(t, multiWriter1.Flush(ctx))
 	require.NoError(t, multiWriter2.Flush(ctx))
-	time.Sleep(5 * time.Second)
+	time.Sleep(7 * time.Second)
 
 	describeResult, err := topicClient.Describe(ctx, topicPath)
 	require.NoError(t, err)

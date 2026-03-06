@@ -15,7 +15,7 @@ var (
 )
 
 type PartitionChooser interface {
-	ChoosePartition(key string) (int64, error)
+	ChoosePartition(msg message) (int64, error)
 	AddNewPartition(partitionID int64, fromBound, toBound []byte)
 	RemovePartition(partitionID int64)
 }
@@ -52,14 +52,14 @@ func newBoundPartitionChooser(
 	}, nil
 }
 
-func (c *boundPartitionChooser) ChoosePartition(key string) (int64, error) {
+func (c *boundPartitionChooser) ChoosePartition(msg message) (int64, error) {
 	if len(c.partitions) == 0 {
 		return 0, fmt.Errorf("no partitions configured")
 	}
 
-	hashedKey := key
+	hashedKey := msg.Key
 	if c.cfg.PartitioningKeyHasher != nil {
-		hashedKey = c.cfg.PartitioningKeyHasher(key)
+		hashedKey = c.cfg.PartitioningKeyHasher(msg.Key)
 	}
 
 	// Find first partition whose lower bound is strictly greater than hashedKey.
@@ -115,9 +115,13 @@ func newHashPartitionChooser(cfg *MultiWriterConfig, partitions []int64) *hashPa
 	}
 }
 
-func (c *hashPartitionChooser) ChoosePartition(key string) (int64, error) {
+func (c *hashPartitionChooser) ChoosePartition(msg message) (int64, error) {
+	if len(c.partitions) == 0 {
+		return 0, fmt.Errorf("no partitions configured")
+	}
+
 	hasher := murmur3.New64()
-	hasher.Write([]byte(key))
+	hasher.Write([]byte(msg.Key))
 	low := hasher.Sum64()
 
 	return c.partitions[low%uint64(len(c.partitions))], nil

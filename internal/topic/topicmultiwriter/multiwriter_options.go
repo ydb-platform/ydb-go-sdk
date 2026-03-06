@@ -26,9 +26,9 @@ func WithPartitionChooserStrategy(strategy PartitionChooserStrategy) PublicMulti
 	}
 }
 
-func WithCustomChoosePartitionFunc(customChoosePartitionFunc ChoosePartitionFunc) PublicMultiWriterOption {
+func WithCustomPartitionChooser(customPartitionChooser PartitionChooser) PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.CustomChoosePartitionFunc = customChoosePartitionFunc
+		cfg.CustomPartitionChooser = customPartitionChooser
 	}
 }
 

@@ -144,7 +144,7 @@ func newTestMultiWriterWithBasicWriter(
 
 // newTestMultiWriterWithAutopartitioningWriter creates a multiwriter that uses the autopartitioning stub:
 // client must be from NewStubTopicClientWithSplits(t, state). After 100 messages the writer returns
-// OVERLOADED, main_worker calls onPartitionSplit and Describe; state adds two child partitions
+// OVERLOADED, orchestrator calls onPartitionSplit and Describe; state adds two child partitions
 // with bounds [from, (from+to)/2) and [(from+to)/2, to).
 func newTestMultiWriterWithAutopartitioningWriter(
 	t testing.TB,
@@ -429,7 +429,7 @@ func TestMultiWriter_Write_MaxQueueLenExceeded(t *testing.T) {
 			return stubClient.Describe(ctx, path)
 		},
 		time.Second*2,
-		topicwriterinternal.WithMaxQueueLen(10),
+		topicwriterinternal.WithMaxQueueLen(5),
 	)
 
 	_, err := multiWriter.WaitInit(ctx)
@@ -636,7 +636,7 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages))
 	require.NoError(t, multiWriter.Flush(ctx))
 
-	time.Sleep(4 * time.Second)
+	time.Sleep(2 * time.Second)
 	require.Equal(t, 0, multiWriter.getWritersCount())
 	messages = messages[:0]
 	for i := range 5 {

@@ -6,17 +6,15 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
 type MultiWriter struct {
-	ctx        context.Context //nolint:containedctx
-	cfg        *MultiWriterConfig
-	closed     atomic.Bool
-	worker     *worker
-	background *background.Worker
-	shutdown   empty.Chan
+	ctx          context.Context //nolint:containedctx
+	cfg          *MultiWriterConfig
+	closed       atomic.Bool
+	orchestrator *orchestrator
+	background   *background.Worker
 }
 
 func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) (*MultiWriter, error) {
@@ -26,27 +24,23 @@ func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) (*Mult
 
 	var (
 		ctx, cancel = context.WithCancel(context.Background())
-		shutdown    = make(empty.Chan)
 		background  = background.NewWorker(ctx, "topic multiwriter background")
 	)
 
 	p := &MultiWriter{
-		ctx:        ctx,
-		cfg:        &cfg,
-		worker:     newWorker(ctx, cancel, shutdown, topicDescriber, background, &cfg),
-		shutdown:   shutdown,
-		background: background,
+		ctx:          ctx,
+		cfg:          &cfg,
+		orchestrator: newOrchestrator(ctx, cancel, topicDescriber, background, &cfg),
+		background:   background,
 	}
 
-	p.background.Start("main worker", func(ctx context.Context) {
-		err := p.worker.init()
+	p.background.Start("init main worker", func(ctx context.Context) {
+		err := p.orchestrator.init()
 		if err != nil {
-			p.worker.stopWithError(err)
+			p.orchestrator.stopWithError(err)
 
 			return
 		}
-
-		p.worker.run()
 	})
 
 	return p, nil
@@ -54,7 +48,7 @@ func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) (*Mult
 
 func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
 	for _, msg := range messages {
-		if err := p.worker.pushMessage(ctx, message{
+		if err := p.orchestrator.pushMessage(ctx, message{
 			PublicMessage: msg,
 		}); err != nil {
 			return err
@@ -62,7 +56,7 @@ func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.
 	}
 
 	if p.cfg.WaitServerAck {
-		return p.worker.flush(ctx)
+		return p.orchestrator.flush(ctx)
 	}
 
 	return nil
@@ -74,29 +68,29 @@ func (p *MultiWriter) Close(ctx context.Context) error {
 	}
 
 	defer func() {
-		_ = p.worker.closeWriters(ctx)
+		_ = p.orchestrator.writerPool.CloseAll(ctx)
 	}()
 
-	if err := p.worker.flush(ctx); err != nil {
+	if err := p.orchestrator.flush(ctx); err != nil {
 		return err
 	}
 
-	p.worker.stop()
+	p.orchestrator.stop()
 	if err := p.background.Close(ctx, nil); err != nil {
 		return err
 	}
 
-	return p.worker.getResultErr()
+	return p.orchestrator.getResultErr()
 }
 
 func (p *MultiWriter) Flush(ctx context.Context) error {
-	return p.worker.flush(ctx)
+	return p.orchestrator.flush(ctx)
 }
 
 func (p *MultiWriter) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
-	return topicwriterinternal.InitialInfo{}, p.worker.waitInitDone(ctx)
+	return topicwriterinternal.InitialInfo{}, p.orchestrator.waitInitDone(ctx)
 }
 
 func (p *MultiWriter) getWritersCount() int {
-	return p.worker.getWritersCount()
+	return p.orchestrator.getWritersCount()
 }

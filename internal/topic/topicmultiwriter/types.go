@@ -2,8 +2,10 @@ package topicmultiwriter
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -30,6 +32,16 @@ type partitionShortInfo struct {
 	ToBound   string
 }
 
+type message struct {
+	topicwriterinternal.PublicMessage
+
+	onAckCallback func()
+	ackReceived   bool
+	sent          bool
+}
+
+type messagePtr *xlist.Element[message]
+
 type ack struct {
 	partitionID int64
 	seqNo       int64
@@ -40,12 +52,13 @@ type PartitionChooserStrategy uint8
 const (
 	PartitionChooserStrategyBound PartitionChooserStrategy = iota
 	PartitionChooserStrategyHash
+	PartitionChooserStrategyCustom
 )
 
 type writerWrapper struct {
 	writer
 
-	initDone bool
+	initDone atomic.Bool
 }
 
 type idleWriterInfo struct {
