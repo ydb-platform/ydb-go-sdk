@@ -478,12 +478,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 				}
 			} else {
 				o.mu.WithLock(func() {
-					writer, err = o.writerPool.get(partition, false)
-					if err != nil {
-						resultErr = err
-
-						return
-					}
+					writer, resultErr = o.writerPool.get(partition, false)
 				})
 			}
 
