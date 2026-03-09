@@ -467,17 +467,14 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	errGroup.SetLimit(10)
 
 	for _, partition := range partitions {
-		// for older versions of Go
-		partition := partition //nolint:copyloopvar
-
 		errGroup.Go(func() (resultErr error) {
 			partitionInfo := o.partitions[partition]
 
 			var writer *writerWrapper
 			if partitionInfo.Splitted() {
 				writer, resultErr = o.createWriterToSplittedPartition(partition)
-				if err != nil {
-					return err
+				if resultErr != nil {
+					return resultErr
 				}
 			} else {
 				o.mu.WithLock(func() {

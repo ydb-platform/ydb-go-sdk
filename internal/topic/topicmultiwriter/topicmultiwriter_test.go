@@ -128,12 +128,11 @@ func newTestMultiWriterWithBasicWriter(
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
-	options := []topicwriterinternal.PublicWriterOption{
-		topicwriterinternal.WithTopic("test/topic"),
-		topicwriterinternal.WithMaxQueueLen(100),
-		topicwriterinternal.WithAutosetCreatedTime(false),
-	}
+	options := make([]topicwriterinternal.PublicWriterOption, 0, len(opts)+3)
 	options = append(options, opts...)
+	options = append(options, topicwriterinternal.WithTopic("test/topic"))
+	options = append(options, topicwriterinternal.WithMaxQueueLen(100))
+	options = append(options, topicwriterinternal.WithAutosetCreatedTime(false))
 	withBasicWriterOptions(options...)(&cfg)
 
 	writer, err := NewMultiWriter(describer, cfg)
