@@ -100,6 +100,8 @@ func (m *idleWriterManager) run() {
 		timer := time.NewTimer(nextTimeout)
 		select {
 		case <-m.ctx.Done():
+			timer.Stop()
+
 			return
 		case <-m.wakeupChan:
 		case <-timer.C:
