@@ -26,8 +26,7 @@ var (
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages
 type Writer struct {
-	inner              innerWriter
-	multiwriterEnabled bool
+	inner innerWriter
 }
 
 // PublicInitialInfo is an information about writer after initialize
@@ -43,11 +42,8 @@ func NewWriter(writer *topicwriterinternal.WriterReconnector) *Writer {
 }
 
 func NewWriterWrapper(inner innerWriter) *Writer {
-	_, ok := inner.(*topicmultiwriter.MultiWriter)
-
 	return &Writer{
-		inner:              inner,
-		multiwriterEnabled: ok,
+		inner: inner,
 	}
 }
 
@@ -63,23 +59,15 @@ func NewWriterWrapper(inner innerWriter) *Writer {
 // If err != nil you can check errors.Is(err, ErrMessagesPutToInternalQueueBeforeError) for check if the messages
 // put to buffer before error. It means that it is messages can be delivered to the server.
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
-	for i := range messages {
-		if !w.multiwriterEnabled && (messages[i].Key != "" || messages[i].PartitionID != 0) {
-			return fmt.Errorf("%w: key or partition id is not supported for non-multiwriter", ErrInvalidConfiguration)
-		}
-	}
-
 	return w.inner.Write(ctx, messages)
 }
 
 // WaitInit waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
 func (w *Writer) WaitInit(ctx context.Context) (err error) {
-	if _, err = w.inner.WaitInit(ctx); err != nil {
-		return err
-	}
+	_, err = w.inner.WaitInit(ctx)
 
-	return nil
+	return err
 }
 
 // WaitInitInfo waits until the reader is initialized

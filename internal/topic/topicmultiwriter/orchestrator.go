@@ -420,13 +420,13 @@ func (o *orchestrator) scheduleResendMessages(partitionID, maxSeqNo int64) (err 
 	}
 
 	for i := len(inFlightMessagesToAdd) - 1; i >= 0; i-- {
-		o.buf.addToInFlightMessagesIndex(inFlightMessagesToAdd[i], inFlightMessagesToAdd[i].Value.PartitionID, true)
+		o.buf.getInflightMessagesIndex(inFlightMessagesToAdd[i].Value.PartitionID).PushFront(inFlightMessagesToAdd[i])
 	}
 	for i := len(pendingMessagesToAdd) - 1; i >= 0; i-- {
-		o.buf.addToPendingMessagesIndex(pendingMessagesToAdd[i], pendingMessagesToAdd[i].Value.PartitionID, true)
+		o.buf.getPendingMessagesIndex(pendingMessagesToAdd[i].Value.PartitionID).PushFront(pendingMessagesToAdd[i])
 	}
 	for i := len(messagesToResendToAdd) - 1; i >= 0; i-- {
-		o.buf.addToMessagesToResendIndex(messagesToResendToAdd[i], messagesToResendToAdd[i].Value.PartitionID, true)
+		o.buf.getMessagesToResendIndex(messagesToResendToAdd[i].Value.PartitionID).PushFront(messagesToResendToAdd[i])
 	}
 
 	delete(o.buf.inFlightMessagesIndex, partitionID)

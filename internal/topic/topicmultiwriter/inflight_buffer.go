@@ -54,53 +54,41 @@ func (b *inflightBuffer) releaseMessage() {
 
 func (b *inflightBuffer) pushNeedLock(msg message) {
 	newElement := b.inFlightMessages.PushBack(msg)
-	b.addToInFlightMessagesIndex(newElement, msg.PartitionID, false)
-	b.addToPendingMessagesIndex(newElement, msg.PartitionID, false)
+	b.getInflightMessagesIndex(msg.PartitionID).PushBack(newElement)
+	b.getPendingMessagesIndex(msg.PartitionID).PushBack(newElement)
 }
 
 // no concurrent safe
-func (b *inflightBuffer) addToInFlightMessagesIndex(newElement messagePtr, toPartition int64, toFront bool) {
-	list, ok := b.inFlightMessagesIndex[toPartition]
+func (b *inflightBuffer) getInflightMessagesIndex(partitionID int64) xlist.List[messagePtr] {
+	list, ok := b.inFlightMessagesIndex[partitionID]
 	if !ok {
 		list = xlist.New[messagePtr]()
-		b.inFlightMessagesIndex[toPartition] = list
+		b.inFlightMessagesIndex[partitionID] = list
 	}
 
-	if toFront {
-		list.PushFront(newElement)
-	} else {
-		list.PushBack(newElement)
-	}
+	return list
 }
 
 // no concurrent safe
-func (b *inflightBuffer) addToPendingMessagesIndex(newElement messagePtr, toPartition int64, toFront bool) {
-	list, ok := b.pendingMessagesIndex[toPartition]
+func (b *inflightBuffer) getPendingMessagesIndex(partitionID int64) xlist.List[messagePtr] {
+	list, ok := b.pendingMessagesIndex[partitionID]
 	if !ok {
 		list = xlist.New[messagePtr]()
-		b.pendingMessagesIndex[toPartition] = list
+		b.pendingMessagesIndex[partitionID] = list
 	}
 
-	if toFront {
-		list.PushFront(newElement)
-	} else {
-		list.PushBack(newElement)
-	}
+	return list
 }
 
 // no concurrent safe
-func (b *inflightBuffer) addToMessagesToResendIndex(newElement messagePtr, toPartition int64, toFront bool) {
-	list, ok := b.messagesToResendIndex[toPartition]
+func (b *inflightBuffer) getMessagesToResendIndex(partitionID int64) xlist.List[messagePtr] {
+	list, ok := b.messagesToResendIndex[partitionID]
 	if !ok {
 		list = xlist.New[messagePtr]()
-		b.messagesToResendIndex[toPartition] = list
+		b.messagesToResendIndex[partitionID] = list
 	}
 
-	if toFront {
-		list.PushFront(newElement)
-	} else {
-		list.PushBack(newElement)
-	}
+	return list
 }
 
 // no concurrent safe
