@@ -467,7 +467,8 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	errGroup.SetLimit(10)
 
 	for _, partition := range partitions {
-		partition := partition
+		// for older versions of Go
+		partition := partition //nolint:copyloopvar
 
 		errGroup.Go(func() (resultErr error) {
 			partitionInfo := o.partitions[partition]
