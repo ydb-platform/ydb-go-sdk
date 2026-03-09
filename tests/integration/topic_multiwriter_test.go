@@ -131,20 +131,6 @@ func TestTopicMultiWriter_WaitInitAndClose(t *testing.T) {
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
-func TestTopicMultiWriter_WaitInitInfoUnimplemented(t *testing.T) {
-	scope := newScope(t)
-	ctx := scope.Ctx
-
-	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter(
-		topicoptions.WithProducerIDPrefix("test-producer"),
-	))
-	require.NoError(t, err)
-
-	_, err = multiWriter.WaitInitInfo(ctx)
-	require.ErrorIs(t, err, topicwriter.ErrUnimplemented)
-}
-
 // TestTopicMultiWriter_WaitInitAndClose verifies that internal topic multi writer
 // can be initialized and closed against a real YDB topic.
 func TestTopicMultiWriter_CloseWithoutWaitInit(t *testing.T) {

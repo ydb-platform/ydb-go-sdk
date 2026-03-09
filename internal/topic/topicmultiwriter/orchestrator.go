@@ -474,7 +474,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 
 			var writer *writerWrapper
 			if partitionInfo.Splitted() {
-				writer, err = o.createWriterToSplittedPartition(partition)
+				writer, resultErr = o.createWriterToSplittedPartition(partition)
 				if err != nil {
 					return err
 				}
