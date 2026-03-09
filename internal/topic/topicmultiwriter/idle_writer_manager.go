@@ -97,12 +97,14 @@ func (m *idleWriterManager) run() {
 			}
 		})
 
+		timer := time.NewTimer(nextTimeout)
 		select {
 		case <-m.ctx.Done():
 			return
 		case <-m.wakeupChan:
-		case <-time.After(nextTimeout):
+		case <-timer.C:
 		}
+		timer.Stop()
 
 		m.mu.WithLock(func() {
 			element := m.idleWriters.Front()

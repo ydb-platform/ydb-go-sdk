@@ -467,6 +467,8 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	errGroup.SetLimit(10)
 
 	for _, partition := range partitions {
+		partition := partition
+
 		errGroup.Go(func() (resultErr error) {
 			partitionInfo := o.partitions[partition]
 
@@ -571,6 +573,8 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		for _, child := range partition.Children {
 			o.partitions[child].Locked = false
 		}
+
+		o.writerPool.evict(partitionID)
 	})
 
 	return nil

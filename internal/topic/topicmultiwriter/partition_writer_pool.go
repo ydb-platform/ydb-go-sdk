@@ -124,13 +124,13 @@ func (p *partitionWriterPool) get(partitionID int64, doNotCreate bool) (*writerW
 		return idleWriter, nil
 	}
 
+	if doNotCreate {
+		return nil, nil //nolint:nilnil
+	}
+
 	wr, err := p.createDirectWriter(partitionID)
 	if err != nil {
 		return nil, err
-	}
-
-	if doNotCreate {
-		return nil, nil //nolint:nilnil
 	}
 
 	wrapper := &writerWrapper{

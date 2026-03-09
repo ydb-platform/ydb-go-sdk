@@ -69,6 +69,8 @@ func readMessages(ctx context.Context, count int, topicPath string, scope *scope
 
 // CreateTopicWithAutoPartitioning creates a topic with auto partitioning.
 func createTopicWithAutoPartitioning(ctx context.Context, db *ydb.Driver, topicPath string) error {
+	const partitionWriteSpeed = 1 << 20
+
 	return db.Topic().Create(
 		ctx,
 		topicPath,
@@ -86,6 +88,8 @@ func createTopicWithAutoPartitioning(ctx context.Context, db *ydb.Driver, topicP
 				StabilizationWindow:    2 * time.Second,
 			},
 		}),
+		topicoptions.CreateWithPartitionWriteSpeedBytesPerSecond(partitionWriteSpeed),
+		topicoptions.CreateWithPartitionWriteBurstBytes(partitionWriteSpeed),
 	)
 }
 
@@ -96,7 +100,7 @@ func createMultiWriterForAutoPartitioning(
 	topicPath string,
 	topicClient topic.Client,
 	multiWriterSettings []topicoptions.MultiWriterOption,
-) *topicwriter.Writer {
+) (*topicwriter.Writer, int64) {
 	t.Helper()
 
 	multiWriterSettings = append(multiWriterSettings, topicoptions.WithProducerIDPrefix(producerIDPrefix))
@@ -106,8 +110,9 @@ func createMultiWriterForAutoPartitioning(
 		topicoptions.WithMultiWriter(multiWriterSettings...),
 	)
 	require.NoError(t, err)
-	require.NoError(t, multiWriter.WaitInit(ctx))
-	return multiWriter
+	lastSeqNo, err := multiWriter.WaitInitInfo(ctx)
+	require.NoError(t, err)
+	return multiWriter, lastSeqNo.LastSeqNum
 }
 
 // TestTopicMultiWriter_WaitInitAndClose verifies that internal topic multi writer
@@ -200,6 +205,8 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 }
 
 func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
+	const firstPartitionKey = "__first_partition__"
+
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -220,23 +227,37 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	topicMultiWriterSettings := []topicoptions.MultiWriterOption{
 		topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyBound),
 		topicoptions.WithWriterIdleTimeout(30 * time.Second),
+		topicoptions.WithPartitioningKeyHasher(func(key string) string {
+			if key == firstPartitionKey {
+				return ""
+			}
+
+			return key
+		}),
 	}
 
-	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
-	multiWriter2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter1, nextSeqNo1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter2, nextSeqNo2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
 	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
-	keys := make([]string, 0, len(describe.Partitions))
-	for _, p := range describe.Partitions {
-		keys = append(keys, string(p.FromBound))
-	}
-	require.NotEmpty(t, keys)
 
-	writeMessage := func(m *topicwriter.Writer, payload []byte, seqNo int64) {
-		key := keys[seqNo%int64(len(keys))]
-		if key == "" {
-			key = "lalala"
+	getKeys := func(partitions []topictypes.PartitionInfo) []string {
+		keys := make([]string, 0, len(partitions))
+		for _, p := range partitions {
+			if len(p.FromBound) == 0 {
+				keys = append(keys, firstPartitionKey)
+
+				continue
+			}
+
+			keys = append(keys, string(p.FromBound))
 		}
 
+		return keys
+	}
+
+	require.NotEmpty(t, getKeys(describe.Partitions))
+
+	writeMessage := func(m *topicwriter.Writer, payload []byte, seqNo int64, key string) {
 		msg := topicwriter.Message{
 			Data:  bytes.NewReader(payload),
 			SeqNo: seqNo,
@@ -246,40 +267,63 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		require.NoError(t, m.Write(ctx, msg))
 	}
 
-	writeMessage(multiWriter1, msgData, 1)
-	writeMessage(multiWriter1, msgData, 2)
-	time.Sleep(5 * time.Second)
+	nextSeqNo1++
+	nextSeqNo2++
 
-	describe, err = topicClient.Describe(ctx, topicPath)
-	require.NoError(t, err)
-	require.Len(t, describe.Partitions, 2)
+	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
+		for _, key := range getKeys(partitions) {
+			writeMessage(multiWriter1, msgData, nextSeqNo1, key)
+			nextSeqNo1++
+			writeMessage(multiWriter2, msgData, nextSeqNo2, key)
+			nextSeqNo2++
+		}
 
-	writeMessage(multiWriter1, msgData, 3)
-	writeMessage(multiWriter1, msgData, 4)
-	writeMessage(multiWriter1, msgData, 5)
-	writeMessage(multiWriter1, msgData, 6)
-	writeMessage(multiWriter1, msgData, 7)
-	writeMessage(multiWriter2, msgData, 8)
-	writeMessage(multiWriter1, msgData, 9)
-	writeMessage(multiWriter1, msgData, 10)
-	writeMessage(multiWriter2, msgData, 11)
-	writeMessage(multiWriter1, msgData, 12)
+		require.NoError(t, multiWriter1.Flush(ctx))
+		require.NoError(t, multiWriter2.Flush(ctx))
+	}
 
+	waitForPartitionsCountAtLeast := func(minCount int, timeout time.Duration) topictypes.TopicDescription {
+		deadline := time.Now().Add(timeout)
+		nextLoadAt := time.Now()
+		for {
+			describeResult, describeErr := topicClient.Describe(ctx, topicPath)
+			require.NoError(t, describeErr)
+			if len(describeResult.Partitions) >= minCount {
+				return describeResult
+			}
+
+			if time.Now().After(deadline) {
+				t.Fatalf("partitions count: %d, expected at least %d", len(describeResult.Partitions), minCount)
+			}
+
+			// Keep producing traffic while waiting so auto-partitioning has sustained load to react to.
+			if time.Now().After(nextLoadAt) {
+				writeLoadRound(describeResult.Partitions)
+				nextLoadAt = time.Now().Add(500 * time.Millisecond)
+			}
+
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+
+	writeLoadRound(describe.Partitions)
+	writeLoadRound(describe.Partitions)
+
+	describe = waitForPartitionsCountAtLeast(3, 20*time.Second)
+
+	writeLoadRound(describe.Partitions)
+	writeLoadRound(describe.Partitions)
+
+	describe = waitForPartitionsCountAtLeast(4, 20*time.Second)
+	require.GreaterOrEqual(t, len(describe.Partitions), 4, "partitions count: %d, expected at least 4", len(describe.Partitions))
+
+	writeMessage(multiWriter1, msgData, nextSeqNo1, getKeys(describe.Partitions)[0])
+	nextSeqNo1++
+	writeMessage(multiWriter1, msgData, nextSeqNo1, getKeys(describe.Partitions)[0])
 	require.NoError(t, multiWriter1.Flush(ctx))
 	require.NoError(t, multiWriter2.Flush(ctx))
-	time.Sleep(7 * time.Second)
 
-	describeResult, err := topicClient.Describe(ctx, topicPath)
-	require.NoError(t, err)
-	partitionsCount := len(describeResult.Partitions)
-	require.GreaterOrEqual(t, partitionsCount, 4, "partitions count: %d, expected at least 4", partitionsCount)
-
-	writeMessage(multiWriter1, msgData, 13)
-	writeMessage(multiWriter1, msgData, 14)
-	require.NoError(t, multiWriter1.Flush(ctx))
-	require.NoError(t, multiWriter2.Flush(ctx))
-
-	multiWriter3 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter3, _ := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, topicMultiWriterSettings)
 
 	require.NoError(t, multiWriter3.Close(ctx))
 	require.NoError(t, multiWriter1.Close(ctx))
