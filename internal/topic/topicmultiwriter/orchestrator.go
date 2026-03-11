@@ -511,10 +511,10 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 }
 
 func (o *orchestrator) createWriterToSplittedPartition(partitionID int64) (*writerWrapper, error) {
-	writerCfg := o.writerCfg
-	topicwriterinternal.WithProducerID(o.writerPool.getProducerID(partitionID))(writerCfg)
+	writerCfg := *o.writerCfg
+	topicwriterinternal.WithProducerID(o.writerPool.getProducerID(partitionID))(&writerCfg)
 
-	writer, err := o.multiWriterCfg.writersFactory.Create(*writerCfg)
+	writer, err := o.multiWriterCfg.writersFactory.Create(writerCfg)
 
 	return &writerWrapper{
 		writer: writer,
