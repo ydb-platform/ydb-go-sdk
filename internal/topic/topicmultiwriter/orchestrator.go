@@ -348,7 +348,7 @@ func (o *orchestrator) rechoosePartition(msg *message) (err error) {
 func (o *orchestrator) getWriterBufferedMessages(
 	partitionID int64,
 ) (map[int64]topicwriterinternal.PublicMessage, error) {
-	writer, err := o.writerPool.get(partitionID, true)
+	writer, err := o.writerPool.get(partitionID, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +482,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 				}
 			} else {
 				o.mu.WithLock(func() {
-					writer, resultErr = o.writerPool.get(partition, false)
+					writer, resultErr = o.writerPool.get(partition, true, false)
 				})
 			}
 

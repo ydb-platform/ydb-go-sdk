@@ -159,7 +159,15 @@ func newTestMultiWriterWithAutopartitioningWriter(
 
 	t.Helper()
 	cfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state, 0))(&cfg)
+	withWritersFactory(
+		newStubWritersFactory(
+			t,
+			stubs.StubWriterTypeWithAutopartitioning,
+			producerIDPrefix,
+			state,
+			0,
+		),
+	)(&cfg)
 	WithProducerIDPrefix(producerIDPrefix)(&cfg)
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)

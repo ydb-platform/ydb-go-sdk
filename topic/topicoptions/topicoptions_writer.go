@@ -31,7 +31,10 @@ type ResetableWriter = topicwriterinternal.PublicResetableWriter
 // If CreateEncoderFunc returns a writer implementing ResetableWriter, then the compression objects
 // will be reused for this codec. This will reduce the load on the GC.
 func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -45,7 +48,10 @@ func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOpt
 // callback func must be fast and deterministic: always result same result for same error - it can be called
 // few times for every error
 func WithWriterCheckRetryErrorFunction(callback CheckErrorRetryFunction) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -59,7 +65,10 @@ func WithWriterCheckRetryErrorFunction(callback CheckErrorRetryFunction) WriterO
 //
 // panic if num <= 0
 func WithWriterCompressorCount(num int) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -72,7 +81,10 @@ func WithWriterCompressorCount(num int) WriterOption {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithWriterMaxQueueLen(num int) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -84,7 +96,10 @@ func WithWriterMaxQueueLen(num int) WriterOption {
 // WithWriterMessageMaxBytesSize set max body size of one message in bytes.
 // Writer will return error in message will be more than the size.
 func WithWriterMessageMaxBytesSize(size int) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -105,7 +120,10 @@ func WithWriteSessionMeta(meta map[string]string) WriterOption {
 
 // WithWriterSessionMeta set writer's session metadata
 func WithWriterSessionMeta(meta map[string]string) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -126,7 +144,10 @@ func WithProducerID(producerID string) WriterOption {
 
 // WithWriterProducerID set producer for write session
 func WithWriterProducerID(producerID string) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -147,7 +168,10 @@ func WithPartitionID(partitionID int64) WriterOption {
 
 // WithWriterPartitionID set direct partition id on write session level
 func WithWriterPartitionID(partitionID int64) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -169,7 +193,10 @@ func WithSyncWrite(sync bool) WriterOption {
 // WithWriterWaitServerAck - when enabled every Write call wait ack from server for all messages from the call
 // disabled by default. Make writer much slower, use only if you really need it.
 func WithWriterWaitServerAck(wait bool) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -201,7 +228,10 @@ type (
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithOnWriterFirstConnected(f OnWriterInitResponseCallback) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -238,7 +268,10 @@ func WithWriterCodec(codec topictypes.Codec) WriterOption {
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCodecAutoSelect() WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -252,7 +285,10 @@ func WithCodecAutoSelect() WriterOption {
 // if option enabled - send a batch of messages for every allowed codec (for prevent delayed bad codec accident)
 // then from time to time measure all codecs and select codec with the smallest result messages size
 func WithWriterCodecAutoSelect() WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -265,7 +301,10 @@ func WithWriterCodecAutoSelect() WriterOption {
 // enabled by default
 // if enabled - Message.SeqNo field must be zero
 func WithWriterSetAutoSeqNo(val bool) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -278,7 +317,10 @@ func WithWriterSetAutoSeqNo(val bool) WriterOption {
 // enabled by default
 // if enabled - Message.CreatedAt field must be zero
 func WithWriterSetAutoCreatedAt(val bool) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -289,7 +331,10 @@ func WithWriterSetAutoCreatedAt(val bool) WriterOption {
 
 // WithWriterStartTimeout mean timeout for connect to writer stream and work some time without errors
 func WithWriterStartTimeout(timeout time.Duration) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -300,7 +345,10 @@ func WithWriterStartTimeout(timeout time.Duration) WriterOption {
 
 // WithWriterTrace set tracer for the writer
 func WithWriterTrace(t trace.Topic) WriterOption { //nolint:gocritic
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -311,7 +359,10 @@ func WithWriterTrace(t trace.Topic) WriterOption { //nolint:gocritic
 
 // WithWriterUpdateTokenInterval set time interval between send auth token to the server
 func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}
@@ -323,7 +374,10 @@ func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
 // WithWriterLogContext allows providing a context.Context instance which will be used
 // in log/topic events.
 func WithWriterLogContext(ctx context.Context) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}

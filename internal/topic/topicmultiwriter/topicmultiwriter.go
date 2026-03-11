@@ -18,7 +18,11 @@ type MultiWriter struct {
 	background   *background.Worker
 }
 
-func NewMultiWriter(topicDescriber TopicDescriber, writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *MultiWriterConfig) (*MultiWriter, error) {
+func NewMultiWriter(
+	topicDescriber TopicDescriber,
+	writerCfg *topicwriterinternal.WriterReconnectorConfig,
+	multiWriterCfg *MultiWriterConfig,
+) (*MultiWriter, error) {
 	if multiWriterCfg.ProducerIDPrefix == "" {
 		return nil, fmt.Errorf("%w: producer id prefix is required", ErrInvalidConfiguration)
 	}

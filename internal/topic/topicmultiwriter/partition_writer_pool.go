@@ -111,17 +111,37 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	return wr, nil
 }
 
-func (p *partitionWriterPool) get(partitionID int64, doNotCreate bool) (*writerWrapper, error) {
+func (p *partitionWriterPool) createNonDirectWriter(partitionID int64) (writer, error) {
+	writerCfg := *p.writerCfg
+	topicwriterinternal.WithProducerID(p.getProducerID(partitionID))(&writerCfg)
+	writer, err := p.cfg.writersFactory.Create(writerCfg)
+
+	return writer, err
+}
+
+func (p *partitionWriterPool) get(partitionID int64, direct bool, doNotCreate bool) (*writerWrapper, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	writer, ok := p.writers[partitionID]
+	existingWriter, ok := p.writers[partitionID]
 	if ok {
-		return writer, nil
+		if existingWriter.direct != direct {
+			p.forceEvict(partitionID)
+
+			return p.createNewWriter(partitionID, direct)
+		}
+
+		return existingWriter, nil
 	}
 
 	idleWriter, ok := p.idle.getWriterIfExists(partitionID)
 	if ok {
+		if idleWriter.direct != direct {
+			p.forceEvict(partitionID)
+
+			return p.createNewWriter(partitionID, direct)
+		}
+
 		p.writers[partitionID] = idleWriter
 
 		return idleWriter, nil
@@ -131,13 +151,30 @@ func (p *partitionWriterPool) get(partitionID int64, doNotCreate bool) (*writerW
 		return nil, nil //nolint:nilnil
 	}
 
-	wr, err := p.createDirectWriter(partitionID)
-	if err != nil {
-		return nil, err
+	return p.createNewWriter(partitionID, direct)
+}
+
+func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*writerWrapper, error) {
+	var (
+		wr  writer
+		err error
+	)
+
+	if direct {
+		wr, err = p.createDirectWriter(partitionID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		wr, err = p.createNonDirectWriter(partitionID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	wrapper := &writerWrapper{
 		writer: wr,
+		direct: direct,
 	}
 	p.writers[partitionID] = wrapper
 
@@ -168,6 +205,19 @@ func (p *partitionWriterPool) evict(partitionID int64) {
 	delete(p.writers, partitionID)
 	p.idle.addWriter(partitionID, writer)
 	p.idle.wakeup()
+}
+
+func (p *partitionWriterPool) forceEvict(partitionID int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	writer, ok := p.writers[partitionID]
+	if !ok {
+		return
+	}
+
+	delete(p.writers, partitionID)
+	_ = writer.Close(p.ctx)
 }
 
 func (p *partitionWriterPool) close(ctx context.Context) error {

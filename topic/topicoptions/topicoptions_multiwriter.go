@@ -24,7 +24,10 @@ const (
 
 // WithProducerIDPrefix sets a prefix for producer IDs used by the internal producer.
 func WithProducerIDPrefix(prefix string) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if multiWriterCfg == nil {
 			return
 		}
@@ -35,7 +38,10 @@ func WithProducerIDPrefix(prefix string) WriterOption {
 
 // WithPartitioningKeyHasher sets a custom key hasher used before partition selection.
 func WithPartitioningKeyHasher(hasher topicmultiwriter.KeyHasher) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if multiWriterCfg == nil {
 			return
 		}
@@ -46,7 +52,10 @@ func WithPartitioningKeyHasher(hasher topicmultiwriter.KeyHasher) WriterOption {
 
 // WithPartitionChooserStrategy sets partition chooser strategy for the producer.
 func WithPartitionChooserStrategy(strategy topicmultiwriter.PartitionChooserStrategy) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if multiWriterCfg == nil {
 			return
 		}
@@ -57,7 +66,10 @@ func WithPartitionChooserStrategy(strategy topicmultiwriter.PartitionChooserStra
 
 // WithCustomPartitionChooser sets a custom partition chooser.
 func WithCustomPartitionChooser(customPartitionChooser topicmultiwriter.PartitionChooser) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if multiWriterCfg == nil {
 			return
 		}
@@ -68,7 +80,10 @@ func WithCustomPartitionChooser(customPartitionChooser topicmultiwriter.Partitio
 
 // WithWriterIdleTimeout sets timeout after which idle writers are closed.
 func WithWriterIdleTimeout(timeout time.Duration) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if multiWriterCfg == nil {
 			return
 		}

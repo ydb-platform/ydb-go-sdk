@@ -332,9 +332,17 @@ func (c *Client) StartReader(
 
 // StartWriter create new topic writer wrapper
 func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
-	cfg := c.createWriterConfig(topicPath, append(opts, func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *internalmultiwriter.MultiWriterConfig) {
-		topicwriterinternal.WithMaxGrpcMessageBytes(c.cfg.MaxGrpcMessageSize)
-	}))
+	cfg := c.createWriterConfig(
+		topicPath, append(
+			opts,
+			func(
+				writerCfg *topicwriterinternal.WriterReconnectorConfig,
+				multiWriterCfg *internalmultiwriter.MultiWriterConfig,
+			) {
+				topicwriterinternal.WithMaxGrpcMessageBytes(c.cfg.MaxGrpcMessageSize)
+			},
+		),
+	)
 	mwCfg := c.createMultiWriterConfig(cfg, opts)
 
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct

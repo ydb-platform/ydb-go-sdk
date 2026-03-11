@@ -28,7 +28,11 @@ type partitionSplit struct {
 
 // NewDescribeWithSplitsState creates state with the given base description.
 // nextPartitionID is the first ID to use for new partitions (e.g. len(base.Partitions)+1).
-func NewDescribeWithSplitsState(t testing.TB, base topictypes.TopicDescription, nextPartitionID int64) *DescribeWithSplitsState {
+func NewDescribeWithSplitsState(
+	t testing.TB,
+	base topictypes.TopicDescription,
+	nextPartitionID int64,
+) *DescribeWithSplitsState {
 	t.Helper()
 
 	return &DescribeWithSplitsState{
