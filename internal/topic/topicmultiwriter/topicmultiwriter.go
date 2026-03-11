@@ -12,13 +12,14 @@ import (
 type MultiWriter struct {
 	ctx          context.Context //nolint:containedctx
 	cfg          *MultiWriterConfig
+	writerCfg    *topicwriterinternal.WriterReconnectorConfig
 	closed       atomic.Bool
 	orchestrator *orchestrator
 	background   *background.Worker
 }
 
-func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) (*MultiWriter, error) {
-	if cfg.ProducerIDPrefix == "" {
+func NewMultiWriter(topicDescriber TopicDescriber, writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *MultiWriterConfig) (*MultiWriter, error) {
+	if multiWriterCfg.ProducerIDPrefix == "" {
 		return nil, fmt.Errorf("%w: producer id prefix is required", ErrInvalidConfiguration)
 	}
 
@@ -29,8 +30,9 @@ func NewMultiWriter(topicDescriber TopicDescriber, cfg MultiWriterConfig) (*Mult
 
 	p := &MultiWriter{
 		ctx:          ctx,
-		cfg:          &cfg,
-		orchestrator: newOrchestrator(ctx, cancel, topicDescriber, background, &cfg),
+		cfg:          multiWriterCfg,
+		writerCfg:    writerCfg,
+		orchestrator: newOrchestrator(ctx, cancel, topicDescriber, background, writerCfg, multiWriterCfg),
 		background:   background,
 	}
 
@@ -55,7 +57,7 @@ func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.
 		}
 	}
 
-	if p.cfg.WaitServerAck {
+	if p.writerCfg.WaitServerAck {
 		return p.orchestrator.flush(ctx)
 	}
 

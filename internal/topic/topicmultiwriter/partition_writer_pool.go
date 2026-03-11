@@ -13,8 +13,9 @@ import (
 type partitionWriterPool struct {
 	ctx context.Context //nolint:containedctx
 
-	cfg *MultiWriterConfig
-	bg  *background.Worker
+	cfg       *MultiWriterConfig
+	writerCfg *topicwriterinternal.WriterReconnectorConfig
+	bg        *background.Worker
 
 	mu      xsync.Mutex
 	writers map[int64]*writerWrapper
@@ -29,6 +30,7 @@ type partitionWriterPool struct {
 func newPartitionWriterPool(
 	ctx context.Context,
 	cfg *MultiWriterConfig,
+	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	bg *background.Worker,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
@@ -37,6 +39,7 @@ func newPartitionWriterPool(
 ) *partitionWriterPool {
 	p := &partitionWriterPool{
 		cfg:                    cfg,
+		writerCfg:              writerCfg,
 		ctx:                    ctx,
 		bg:                     bg,
 		ackCallback:            ackCallback,
@@ -68,7 +71,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	}
 
 	var (
-		writerCfg = p.cfg.WriterReconnectorConfig
+		writerCfg = *p.writerCfg
 		opts      = []topicwriterinternal.PublicWriterOption{
 			topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
 			topicwriterinternal.WithProducerID(p.getProducerID(partitionID)),
@@ -85,14 +88,14 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 
 				var checkErrorResult topic.PublicCheckRetryResult
 				p.mu.WithLock(func() {
-					if p.cfg.RetrySettings.CheckError != nil {
-						checkErrorResult = p.cfg.RetrySettings.CheckError(args)
+					if p.writerCfg.RetrySettings.CheckError != nil {
+						checkErrorResult = p.writerCfg.RetrySettings.CheckError(args)
 					}
 				})
 
 				return checkErrorResult
 			}),
-			topicwriterinternal.WithMaxQueueLen(p.cfg.MaxQueueLen),
+			topicwriterinternal.WithMaxQueueLen(p.writerCfg.MaxQueueLen),
 		}
 	)
 

@@ -70,6 +70,7 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	bg := background.NewWorker(ctx, "pool-test")
 
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	cfg := &MultiWriterConfig{
 		ProducerIDPrefix:  "test-prefix",
 		WriterIdleTimeout: defaultWriterIdleTimeout,
@@ -79,6 +80,7 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 	pool := newPartitionWriterPool(
 		ctx,
 		cfg,
+		writerCfg,
 		bg,
 		func(partitionID, seqNo int64) {},
 		func(partitionID int64) {},

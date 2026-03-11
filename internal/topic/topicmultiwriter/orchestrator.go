@@ -23,8 +23,9 @@ type orchestrator struct {
 	err  error
 	stop context.CancelFunc
 
-	cfg *MultiWriterConfig
-	mu  *xsync.Mutex
+	multiWriterCfg *MultiWriterConfig
+	writerCfg      *topicwriterinternal.WriterReconnectorConfig
+	mu             *xsync.Mutex
 
 	partitionChooser PartitionChooser
 	topicDescriber   TopicDescriber
@@ -49,22 +50,24 @@ func newOrchestrator(
 	stop context.CancelFunc,
 	topicDescriber TopicDescriber,
 	background *background.Worker,
-	cfg *MultiWriterConfig,
+	writerCfg *topicwriterinternal.WriterReconnectorConfig,
+	multiWriterCfg *MultiWriterConfig,
 ) *orchestrator {
-	if cfg.writersFactory == nil {
-		cfg.writersFactory = newBaseWritersFactory()
+	if multiWriterCfg.writersFactory == nil {
+		multiWriterCfg.writersFactory = newBaseWritersFactory()
 	}
 
-	if cfg.WriterIdleTimeout == 0 {
-		cfg.WriterIdleTimeout = defaultWriterIdleTimeout
+	if multiWriterCfg.WriterIdleTimeout == 0 {
+		multiWriterCfg.WriterIdleTimeout = defaultWriterIdleTimeout
 	}
 
-	if cfg.MaxQueueLen == 0 {
-		cfg.MaxQueueLen = defaultInFlightMessagesBufferSize
+	if writerCfg.MaxQueueLen == 0 {
+		writerCfg.MaxQueueLen = defaultInFlightMessagesBufferSize
 	}
 
 	o := &orchestrator{
-		cfg:            cfg,
+		writerCfg:      writerCfg,
+		multiWriterCfg: multiWriterCfg,
 		mu:             &xsync.Mutex{},
 		topicDescriber: topicDescriber,
 		ctx:            ctx,
@@ -74,7 +77,7 @@ func newOrchestrator(
 		background:     background,
 	}
 
-	o.buf = newInflightBuffer(ctx, o.mu, cfg, func() error { return o.getResultErr() })
+	o.buf = newInflightBuffer(ctx, o.mu, writerCfg, func() error { return o.getResultErr() })
 	o.ackReceiver = newAckReceiver(ctx, func(partitionID, seqNo int64) {
 		o.mu.WithLock(func() {
 			o.onAckReceivedNeedLock(partitionID, seqNo)
@@ -89,7 +92,8 @@ func newOrchestrator(
 	)
 	o.writerPool = newPartitionWriterPool(
 		ctx,
-		cfg,
+		multiWriterCfg,
+		writerCfg,
 		background,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
@@ -108,8 +112,8 @@ func newOrchestrator(
 		o.stopWithError,
 	)
 
-	if cfg.PartitioningKeyHasher == nil {
-		cfg.PartitioningKeyHasher = o.getDefaultKeyHasher()
+	if multiWriterCfg.PartitioningKeyHasher == nil {
+		multiWriterCfg.PartitioningKeyHasher = o.getDefaultKeyHasher()
 	}
 
 	background.Start("ack receiver", func(ctx context.Context) {
@@ -144,7 +148,7 @@ func (o *orchestrator) getDefaultKeyHasher() KeyHasher {
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 
-	describeResult, err := o.topicDescriber(o.ctx, o.cfg.Topic())
+	describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
 	if err != nil {
 		return err
 	}
@@ -171,9 +175,9 @@ func (o *orchestrator) init() (err error) {
 	isAutoPartitioningEnabled := describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
 		topictypes.AutoPartitioningStrategyDisabled
 
-	switch o.cfg.PartitionChooserStrategy {
+	switch o.multiWriterCfg.PartitionChooserStrategy {
 	case PartitionChooserStrategyBound:
-		o.partitionChooser, err = newBoundPartitionChooser(o.cfg, o.partitions)
+		o.partitionChooser, err = newBoundPartitionChooser(o.multiWriterCfg, o.partitions)
 		if err != nil {
 			return err
 		}
@@ -187,13 +191,13 @@ func (o *orchestrator) init() (err error) {
 			partitionIDs = append(partitionIDs, id)
 		}
 
-		o.partitionChooser = newHashPartitionChooser(o.cfg, partitionIDs)
+		o.partitionChooser = newHashPartitionChooser(o.multiWriterCfg, partitionIDs)
 	case PartitionChooserStrategyCustom:
-		if o.cfg.CustomPartitionChooser == nil {
+		if o.multiWriterCfg.CustomPartitionChooser == nil {
 			return fmt.Errorf("%w: custom partition chooser is not set", ErrInvalidConfiguration)
 		}
 
-		o.partitionChooser = o.cfg.CustomPartitionChooser
+		o.partitionChooser = o.multiWriterCfg.CustomPartitionChooser
 	}
 
 	return nil
@@ -205,7 +209,7 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 	}
 
 	if msg.Key == "" {
-		msg.Key = o.cfg.ProducerIDPrefix
+		msg.Key = o.multiWriterCfg.ProducerIDPrefix
 	}
 
 	partitionID, err = o.partitionChooser.ChoosePartition(msg)
@@ -219,7 +223,7 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error) {
 	var autoSetSeqNo bool
 	o.mu.WithLock(func() {
-		autoSetSeqNo = o.cfg.AutoSetSeqNo
+		autoSetSeqNo = o.writerCfg.AutoSetSeqNo
 	})
 
 	switch {
@@ -507,10 +511,10 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 }
 
 func (o *orchestrator) createWriterToSplittedPartition(partitionID int64) (*writerWrapper, error) {
-	writerCfg := o.cfg.WriterReconnectorConfig
-	topicwriterinternal.WithProducerID(o.writerPool.getProducerID(partitionID))(&writerCfg)
+	writerCfg := o.writerCfg
+	topicwriterinternal.WithProducerID(o.writerPool.getProducerID(partitionID))(writerCfg)
 
-	writer, err := o.cfg.writersFactory.Create(writerCfg)
+	writer, err := o.multiWriterCfg.writersFactory.Create(*writerCfg)
 
 	return &writerWrapper{
 		writer: writer,
@@ -529,7 +533,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	)
 
 	for i := range maxRetries {
-		describeResult, err = o.topicDescriber(o.ctx, o.cfg.Topic())
+		describeResult, err = o.topicDescriber(o.ctx, o.writerCfg.Topic())
 		if err == nil {
 			break
 		}

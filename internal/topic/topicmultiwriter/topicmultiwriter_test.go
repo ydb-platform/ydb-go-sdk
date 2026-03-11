@@ -91,7 +91,7 @@ func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
-	writer, err := NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -111,7 +111,7 @@ func newTestMultiWriterWithInitDelay(
 		time.Sleep(initDelay)
 
 		return describer(ctx, path)
-	}, cfg)
+	}, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -128,14 +128,15 @@ func newTestMultiWriterWithBasicWriter(
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
-	options := make([]topicwriterinternal.PublicWriterOption, 0, len(opts)+3)
-	options = append(options, opts...)
-	options = append(options, topicwriterinternal.WithTopic("test/topic"))
-	options = append(options, topicwriterinternal.WithMaxQueueLen(100))
-	options = append(options, topicwriterinternal.WithAutosetCreatedTime(false))
-	withBasicWriterOptions(options...)(&cfg)
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+	for _, opt := range opts {
+		opt(writerCfg)
+	}
 
-	writer, err := NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -156,13 +157,12 @@ func newTestMultiWriterWithAutopartitioningWriter(
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state, 0))(&cfg)
 	WithProducerIDPrefix(producerIDPrefix)(&cfg)
-	withBasicWriterOptions(
-		topicwriterinternal.WithTopic("test/topic"),
-		topicwriterinternal.WithMaxQueueLen(100),
-		topicwriterinternal.WithAutosetCreatedTime(false),
-	)(&cfg)
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -174,13 +174,12 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer Topic
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterIdleTimeout(1 * time.Second)(&cfg)
-	withBasicWriterOptions(
-		topicwriterinternal.WithTopic("test/topic"),
-		topicwriterinternal.WithMaxQueueLen(100),
-		topicwriterinternal.WithAutosetCreatedTime(false),
-	)(&cfg)
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -197,14 +196,15 @@ func newTestMultiWriterWithAckDelay(
 	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, ackDelay))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
-	options := []topicwriterinternal.PublicWriterOption{
-		topicwriterinternal.WithTopic("test/topic"),
-		topicwriterinternal.WithAutosetCreatedTime(false),
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+	for _, opt := range opts {
+		opt(writerCfg)
 	}
-	options = append(options, opts...)
-	withBasicWriterOptions(options...)(&cfg)
 
-	writer, err := NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -226,9 +226,12 @@ func newTestMultiWriterWithCustomWritersFactory(
 		topicwriterinternal.WithAutosetCreatedTime(false),
 	}
 	options = append(options, opts...)
-	withBasicWriterOptions(options...)(&cfg)
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -335,7 +338,7 @@ func TestMultiWriter_ErrNoProducerIDPrefix(t *testing.T) {
 
 	_, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		return stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription()).Describe(ctx, path)
-	}, MultiWriterConfig{})
+	}, &topicwriterinternal.WriterReconnectorConfig{}, &MultiWriterConfig{})
 	require.ErrorIs(t, err, ErrInvalidConfiguration)
 }
 

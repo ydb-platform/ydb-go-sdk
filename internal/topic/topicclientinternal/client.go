@@ -332,29 +332,27 @@ func (c *Client) StartReader(
 
 // StartWriter create new topic writer wrapper
 func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
-	cfg := c.createWriterConfig(topicPath, append(opts, topicwriterinternal.WithMaxGrpcMessageBytes(
-		c.cfg.MaxGrpcMessageSize,
-	)))
+	cfg := c.createWriterConfig(topicPath, append(opts, func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *internalmultiwriter.MultiWriterConfig) {
+		topicwriterinternal.WithMaxGrpcMessageBytes(c.cfg.MaxGrpcMessageSize)
+	}))
+	mwCfg := c.createMultiWriterConfig(cfg, opts)
 
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
-	if extra := cfg.Extra; extra != nil {
-		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && mwOpts != nil {
-			mwCfg := c.createMultiWriterConfig(cfg, mwOpts)
-
-			internal, err := internalmultiwriter.NewMultiWriter(
-				func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-					return c.Describe(ctx, path)
-				},
-				mwCfg,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			// internal multi-writer already implements the necessary interface for topicwriter.Writer.
-			return topicwriter.NewWriterWrapper(internal), nil
+	if mwCfg != nil {
+		internal, err := internalmultiwriter.NewMultiWriter(
+			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+				return c.Describe(ctx, path)
+			},
+			&cfg,
+			mwCfg,
+		)
+		if err != nil {
+			return nil, err
 		}
+
+		// internal multi-writer already implements the necessary interface for topicwriter.Writer.
+		return topicwriter.NewWriterWrapper(internal), nil
 	}
 
 	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
@@ -376,32 +374,30 @@ func (c *Client) StartTransactionalWriter(
 	}
 
 	cfg := c.createWriterConfig(topicPath, opts)
+	mwCfg := c.createMultiWriterConfig(cfg, opts)
 
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
-	if extra := cfg.Extra; extra != nil {
-		if mwOpts, ok := extra.([]topicoptions.MultiWriterOption); ok && mwOpts != nil {
-			mwCfg := c.createMultiWriterConfig(cfg, mwOpts)
-
-			multiwriter, err := internalmultiwriter.NewMultiWriter(
-				func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-					return c.Describe(ctx, path)
-				},
-				mwCfg,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			multiWriterWithTx := internalmultiwriter.NewTopicMultiWriterTransaction(
-				multiwriter,
-				internalTx,
-				c.cfg.Trace,
-			)
-
-			// internal multi-writer already implements the necessary interface for topicwriter.Writer.
-			return topicwriter.NewTxWriterWrapper(multiWriterWithTx), nil
+	if mwCfg != nil {
+		multiwriter, err := internalmultiwriter.NewMultiWriter(
+			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+				return c.Describe(ctx, path)
+			},
+			&cfg,
+			mwCfg,
+		)
+		if err != nil {
+			return nil, err
 		}
+
+		multiWriterWithTx := internalmultiwriter.NewTopicMultiWriterTransaction(
+			multiwriter,
+			internalTx,
+			c.cfg.Trace,
+		)
+
+		// internal multi-writer already implements the necessary interface for topicwriter.Writer.
+		return topicwriter.NewTxWriterWrapper(multiWriterWithTx), nil
 	}
 
 	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
@@ -416,26 +412,28 @@ func (c *Client) StartTransactionalWriter(
 
 func (c *Client) createMultiWriterConfig(
 	cfg topicwriterinternal.WriterReconnectorConfig,
-	opts []topicoptions.MultiWriterOption,
-) internalmultiwriter.MultiWriterConfig {
-	mwCfg := internalmultiwriter.MultiWriterConfig{
-		WriterReconnectorConfig: cfg,
-	}
+	opts []topicoptions.WriterOption,
+) *internalmultiwriter.MultiWriterConfig {
+	mwCfg := internalmultiwriter.MultiWriterConfig{}
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt(&mwCfg)
+			opt(nil, &mwCfg)
 		}
 	}
 
-	return mwCfg
+	if !mwCfg.Initialized {
+		return nil
+	}
+
+	return &mwCfg
 }
 
 func (c *Client) createWriterConfig(
 	topicPath string,
 	opts []topicoptions.WriterOption,
 ) topicwriterinternal.WriterReconnectorConfig {
-	options := []topicoptions.WriterOption{
+	options := []topicwriterinternal.PublicWriterOption{
 		topicwriterinternal.WithRawClient(&c.rawClient),
 		topicwriterinternal.WithTopic(topicPath),
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
@@ -443,7 +441,11 @@ func (c *Client) createWriterConfig(
 		topicwriterinternal.WithCredentials(c.cred),
 	}
 
-	options = append(options, opts...)
+	for _, opt := range opts {
+		options = append(options, func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+			opt(cfg, nil)
+		})
+	}
 
 	return topicwriterinternal.NewWriterReconnectorConfig(options...)
 }

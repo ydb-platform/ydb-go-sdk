@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -22,7 +23,7 @@ type inflightBuffer struct {
 func newInflightBuffer(
 	ctx context.Context,
 	mu *xsync.Mutex,
-	cfg *MultiWriterConfig,
+	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	getError func() error,
 ) *inflightBuffer {
 	return &inflightBuffer{
@@ -32,7 +33,7 @@ func newInflightBuffer(
 		inFlightMessagesIndex: make(map[int64]xlist.List[messagePtr]),
 		pendingMessagesIndex:  make(map[int64]xlist.List[messagePtr]),
 		messagesToResendIndex: make(map[int64]xlist.List[messagePtr]),
-		messagesSema:          make(empty.Chan, cfg.MaxQueueLen),
+		messagesSema:          make(empty.Chan, writerCfg.MaxQueueLen),
 		getError:              getError,
 	}
 }

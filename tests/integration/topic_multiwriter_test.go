@@ -99,15 +99,15 @@ func createMultiWriterForAutoPartitioning(
 	ctx context.Context,
 	topicPath string,
 	topicClient topic.Client,
-	multiWriterSettings []topicoptions.MultiWriterOption,
+	writerOptions []topicoptions.WriterOption,
 ) (*topicwriter.Writer, int64) {
 	t.Helper()
 
-	multiWriterSettings = append(multiWriterSettings, topicoptions.WithProducerIDPrefix(producerIDPrefix))
+	writerOptions = append(writerOptions, topicoptions.WithWriterSetAutoSeqNo(false))
+	writerOptions = append(writerOptions, topicoptions.WithProducerIDPrefix(producerIDPrefix))
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
-		topicoptions.WithWriterSetAutoSeqNo(false),
-		topicoptions.WithMultiWriter(multiWriterSettings...),
+		writerOptions...,
 	)
 	require.NoError(t, err)
 	lastSeqNo, err := multiWriter.WaitInitInfo(ctx)
@@ -122,9 +122,7 @@ func TestTopicMultiWriter_WaitInitAndClose(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter(
-		topicoptions.WithProducerIDPrefix("test-producer"),
-	))
+	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithProducerIDPrefix("test-producer"))
 	require.NoError(t, err)
 
 	require.NoError(t, multiWriter.WaitInit(ctx))
@@ -138,9 +136,11 @@ func TestTopicMultiWriter_CloseWithoutWaitInit(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithMultiWriter(
+	multiWriter, err := topicClient.StartWriter(
+		scope.TopicPath(),
+		topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyHash),
 		topicoptions.WithProducerIDPrefix("test-producer"),
-	))
+	)
 	require.NoError(t, err)
 
 	require.NoError(t, multiWriter.Close(ctx))
@@ -165,10 +165,8 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
 		topicoptions.WithWriterSetAutoSeqNo(false),
-		topicoptions.WithMultiWriter(
-			topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyHash),
-			topicoptions.WithProducerIDPrefix("test-producer"),
-		),
+		topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyHash),
+		topicoptions.WithProducerIDPrefix("test-producer"),
 	)
 	require.NoError(t, err)
 
@@ -210,7 +208,7 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		t.Skip("skipping test because autosplit does not work in this version of YDB")
 	}
 
-	topicMultiWriterSettings := []topicoptions.MultiWriterOption{
+	topicMultiWriterSettings := []topicoptions.WriterOption{
 		topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyBound),
 		topicoptions.WithWriterIdleTimeout(30 * time.Second),
 		topicoptions.WithPartitioningKeyHasher(func(key string) string {

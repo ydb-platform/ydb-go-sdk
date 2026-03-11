@@ -4,13 +4,13 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
 // MultiWriterOption configures a topic multiwriter.
 //
 // It is a thin alias for internal multiwriter options.
 type (
-	MultiWriterOption        = topicmultiwriter.PublicMultiWriterOption
 	KeyHasher                = topicmultiwriter.KeyHasher
 	PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategy
 	PartitionChooser         = topicmultiwriter.PartitionChooser
@@ -23,26 +23,56 @@ const (
 )
 
 // WithProducerIDPrefix sets a prefix for producer IDs used by the internal producer.
-func WithProducerIDPrefix(prefix string) MultiWriterOption {
-	return topicmultiwriter.WithProducerIDPrefix(prefix)
+func WithProducerIDPrefix(prefix string) WriterOption {
+	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+		if multiWriterCfg == nil {
+			return
+		}
+
+		topicmultiwriter.WithProducerIDPrefix(prefix)(multiWriterCfg)
+	}
 }
 
 // WithPartitioningKeyHasher sets a custom key hasher used before partition selection.
-func WithPartitioningKeyHasher(hasher topicmultiwriter.KeyHasher) MultiWriterOption {
-	return topicmultiwriter.WithPartitioningKeyHasher(hasher)
+func WithPartitioningKeyHasher(hasher topicmultiwriter.KeyHasher) WriterOption {
+	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+		if multiWriterCfg == nil {
+			return
+		}
+
+		topicmultiwriter.WithPartitioningKeyHasher(hasher)(multiWriterCfg)
+	}
 }
 
 // WithPartitionChooserStrategy sets partition chooser strategy for the producer.
-func WithPartitionChooserStrategy(strategy topicmultiwriter.PartitionChooserStrategy) MultiWriterOption {
-	return topicmultiwriter.WithPartitionChooserStrategy(strategy)
+func WithPartitionChooserStrategy(strategy topicmultiwriter.PartitionChooserStrategy) WriterOption {
+	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+		if multiWriterCfg == nil {
+			return
+		}
+
+		topicmultiwriter.WithPartitionChooserStrategy(strategy)(multiWriterCfg)
+	}
 }
 
 // WithCustomPartitionChooser sets a custom partition chooser.
-func WithCustomPartitionChooser(customPartitionChooser topicmultiwriter.PartitionChooser) MultiWriterOption {
-	return topicmultiwriter.WithCustomPartitionChooser(customPartitionChooser)
+func WithCustomPartitionChooser(customPartitionChooser topicmultiwriter.PartitionChooser) WriterOption {
+	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+		if multiWriterCfg == nil {
+			return
+		}
+
+		topicmultiwriter.WithCustomPartitionChooser(customPartitionChooser)(multiWriterCfg)
+	}
 }
 
 // WithWriterIdleTimeout sets timeout after which idle writers are closed.
-func WithWriterIdleTimeout(timeout time.Duration) MultiWriterOption {
-	return topicmultiwriter.WithWriterIdleTimeout(timeout)
+func WithWriterIdleTimeout(timeout time.Duration) WriterOption {
+	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+		if multiWriterCfg == nil {
+			return
+		}
+
+		topicmultiwriter.WithWriterIdleTimeout(timeout)(multiWriterCfg)
+	}
 }
