@@ -21,6 +21,7 @@ import (
 var errTest = errors.New("test error")
 
 type stubWritersFactory struct {
+	t                testing.TB
 	stubWriterType   stubs.StubWriterType
 	producerIDPrefix string
 	describeSplits   *stubs.DescribeWithSplitsState
@@ -30,12 +31,14 @@ type stubWritersFactory struct {
 }
 
 func newStubWritersFactory(
+	t testing.TB,
 	stubWriterType stubs.StubWriterType,
 	producerIDPrefix string,
 	describeSplits *stubs.DescribeWithSplitsState,
 	ackDelay time.Duration,
 ) *stubWritersFactory {
 	return &stubWritersFactory{
+		t:                t,
 		stubWriterType:   stubWriterType,
 		producerIDPrefix: producerIDPrefix,
 		describeSplits:   describeSplits,
@@ -47,7 +50,7 @@ func newStubWritersFactory(
 func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	switch f.stubWriterType {
 	case stubs.StubWriterTypeBasic:
-		return stubs.NewBasicWriter(cfg.OnAckReceivedCallback, cfg.AutoSetSeqNo, f.ackDelay), nil
+		return stubs.NewBasicWriter(f.t, cfg.OnAckReceivedCallback, cfg.AutoSetSeqNo, f.ackDelay), nil
 	case stubs.StubWriterTypeError:
 		return nil, errTest
 	case stubs.StubWriterTypeWithAutopartitioning:
@@ -70,6 +73,7 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 		})
 
 		return stubs.NewWriterWithAutopartitioning(
+			f.t,
 			cfg.OnAckReceivedCallback,
 			cfg.RetrySettings,
 			cfg.AutoSetSeqNo,
@@ -88,7 +92,7 @@ func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	t.Helper()
 
 	cfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
 	writer, err := NewMultiWriter(describer, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
@@ -104,7 +108,7 @@ func newTestMultiWriterWithInitDelay(
 ) *MultiWriter {
 	t.Helper()
 	cfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
 	writer, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -125,7 +129,7 @@ func newTestMultiWriterWithBasicWriter(
 ) *MultiWriter {
 	t.Helper()
 	cfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
@@ -155,7 +159,7 @@ func newTestMultiWriterWithAutopartitioningWriter(
 
 	t.Helper()
 	cfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeWithAutopartitioning, producerIDPrefix, state, 0))(&cfg)
 	WithProducerIDPrefix(producerIDPrefix)(&cfg)
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
@@ -171,7 +175,7 @@ func newTestMultiWriterWithAutopartitioningWriter(
 func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer TopicDescriber) *MultiWriter {
 	t.Helper()
 	cfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterIdleTimeout(1 * time.Second)(&cfg)
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
@@ -193,7 +197,7 @@ func newTestMultiWriterWithAckDelay(
 ) *MultiWriter {
 	t.Helper()
 	cfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(stubs.StubWriterTypeBasic, "test-producer", nil, ackDelay))(&cfg)
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, ackDelay))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
@@ -241,7 +245,7 @@ func TestMultiWriter_ErrAlreadyClosed(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		return stubClient.Describe(ctx, path)
 	})
@@ -257,7 +261,7 @@ func TestMultiWriter_WaitInit_Success(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriter(t, func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		return stubClient.Describe(ctx, path)
 	})
@@ -273,7 +277,7 @@ func TestMultiWriter_WaitInit_ContextCanceled(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithInitDelay(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -295,7 +299,7 @@ func TestProducer_CloseWithoutWaitInit(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithBasicWriter(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -337,7 +341,7 @@ func TestMultiWriter_ErrNoProducerIDPrefix(t *testing.T) {
 	t.Parallel()
 
 	_, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-		return stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription()).Describe(ctx, path)
+		return stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t)).Describe(ctx, path)
 	}, &topicwriterinternal.WriterReconnectorConfig{}, &MultiWriterConfig{})
 	require.ErrorIs(t, err, ErrInvalidConfiguration)
 }
@@ -347,7 +351,7 @@ func TestMultiWriter_Write_WithBasicWriter(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithBasicWriter(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -376,7 +380,7 @@ func TestMultiWriter_Write_WaitForAck(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithBasicWriter(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -406,13 +410,13 @@ func TestMultiWriter_Write_WithErrorWritersFactory(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithCustomWritersFactory(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
 		},
-		newStubWritersFactory(stubs.StubWriterTypeError, "test-producer", nil, 0),
+		newStubWritersFactory(t, stubs.StubWriterTypeError, "test-producer", nil, 0),
 	)
 
 	_, err := multiWriter.WaitInit(ctx)
@@ -424,7 +428,7 @@ func TestMultiWriter_Write_MaxQueueLenExceeded(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithAckDelay(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -466,7 +470,7 @@ func TestMultiWriter_Write_CloseTimeout(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithAckDelay(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -497,7 +501,7 @@ func TestMultiWriter_Write_ErrNoSeqNo(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithBasicWriter(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -524,7 +528,7 @@ func TestMultiWriter_CloseOfClosed(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithBasicWriter(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -544,7 +548,7 @@ func TestMultiWriter_Write_Parallel(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription())
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
 	multiWriter := newTestMultiWriterWithBasicWriter(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
@@ -578,8 +582,8 @@ func TestMultiWriter_Write_WithAutopartitioningWriter(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
-	baseDesc := stubs.DefaultStubTopicDescription()
-	state := stubs.NewDescribeWithSplitsState(baseDesc, 6) // 6 is first free ID after partitions 1..5
+	baseDesc := stubs.DefaultStubTopicDescription(t)
+	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6) // 6 is first free ID after partitions 1..5
 	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
 	multiWriter := newTestMultiWriterWithAutopartitioningWriter(
 		t,
@@ -611,8 +615,8 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
-	baseDesc := stubs.DefaultStubTopicDescription()
-	state := stubs.NewDescribeWithSplitsState(baseDesc, 6) // 6 is first free ID after partitions 1..5
+	baseDesc := stubs.DefaultStubTopicDescription(t)
+	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6) // 6 is first free ID after partitions 1..5
 	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
 	multiWriter := newTestMultiWriterWithSmallIdleSessionTimeout(
 		t,

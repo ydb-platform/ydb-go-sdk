@@ -1,6 +1,10 @@
 package stubs
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+import (
+	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+)
 
 // Hash bounds for 5 partitions: MurmurHash64 (default hasher) returns 8 bytes in big-endian.
 // These bounds split the uint64 range [0, 2^64-1] into 5 equal segments so hashed keys
@@ -13,7 +17,9 @@ var (
 	bound5of5 = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff} // 2^64-1
 )
 
-func DefaultStubTopicDescription() topictypes.TopicDescription {
+func DefaultStubTopicDescription(t testing.TB) topictypes.TopicDescription {
+	t.Helper()
+
 	return topictypes.TopicDescription{
 		Path: "test/topic",
 		PartitionSettings: topictypes.PartitionSettings{

@@ -3,6 +3,7 @@ package stubs
 import (
 	"encoding/binary"
 	"sync"
+	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -11,6 +12,8 @@ import (
 // When a split is recorded, the next Describe returns the parent with ChildPartitionIDs set
 // and two new partitions with bounds [from, mid) and [mid, to) where mid = (from+to)/2.
 type DescribeWithSplitsState struct {
+	t testing.TB
+
 	mu     sync.Mutex
 	base   topictypes.TopicDescription
 	splits map[int64]partitionSplit // partitionID -> split info
@@ -25,8 +28,11 @@ type partitionSplit struct {
 
 // NewDescribeWithSplitsState creates state with the given base description.
 // nextPartitionID is the first ID to use for new partitions (e.g. len(base.Partitions)+1).
-func NewDescribeWithSplitsState(base topictypes.TopicDescription, nextPartitionID int64) *DescribeWithSplitsState {
+func NewDescribeWithSplitsState(t testing.TB, base topictypes.TopicDescription, nextPartitionID int64) *DescribeWithSplitsState {
+	t.Helper()
+
 	return &DescribeWithSplitsState{
+		t:      t,
 		base:   base,
 		splits: make(map[int64]partitionSplit),
 		nextID: nextPartitionID,
@@ -37,6 +43,8 @@ func NewDescribeWithSplitsState(base topictypes.TopicDescription, nextPartitionI
 // Bounds are computed as [from, (from+to)/2) and [(from+to)/2, to).
 // GetDescription will then return the parent with ChildPartitionIDs and the two new partitions.
 func (s *DescribeWithSplitsState) RecordSplit(partitionID int64) {
+	s.t.Helper()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -71,6 +79,8 @@ func (s *DescribeWithSplitsState) RecordSplit(partitionID int64) {
 // GetDescription returns the current topic description: base partitions with
 // ChildPartitionIDs set where splits occurred, plus all child partitions.
 func (s *DescribeWithSplitsState) GetDescription() topictypes.TopicDescription {
+	s.t.Helper()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -3,6 +3,7 @@ package stubs
 import (
 	"context"
 	"errors"
+	"testing"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -22,10 +23,13 @@ type basicWriter struct {
 }
 
 func NewBasicWriter(
+	t testing.TB,
 	onAckReceivedCallback func(seqNo int64),
 	autoSetSeqNo bool,
 	ackDelay time.Duration,
 ) *basicWriter {
+	t.Helper()
+
 	w := &basicWriter{
 		onAckReceivedCallback: onAckReceivedCallback,
 		currentSeqNo:          1,

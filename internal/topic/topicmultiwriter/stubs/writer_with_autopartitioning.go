@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -43,6 +44,7 @@ type writerWithAutopartitioning struct {
 // When OVERLOADED is returned, onSplit(partitionID) is called so the topic client stub
 // can add child partitions to the next Describe response (split bounds: [from, mid), [mid, to)).
 func NewWriterWithAutopartitioning(
+	t testing.TB,
 	onAckReceivedCallback func(seqNo int64),
 	retrySettings topic.RetrySettings,
 	autoSetSeqNo bool,
@@ -52,6 +54,8 @@ func NewWriterWithAutopartitioning(
 	maxSeqNo int64,
 	producerIDPrefix string,
 ) *writerWithAutopartitioning {
+	t.Helper()
+
 	mu := &sync.Mutex{}
 
 	w := &writerWithAutopartitioning{
