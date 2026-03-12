@@ -43,6 +43,22 @@ func NewDescribeWithSplitsState(
 	}
 }
 
+// IsBasePartition reports whether the given partition ID belongs to the base topic description.
+func (s *DescribeWithSplitsState) IsBasePartition(partitionID int64) bool {
+	s.t.Helper()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, p := range s.base.Partitions {
+		if p.PartitionID == partitionID {
+			return true
+		}
+	}
+
+	return false
+}
+
 // RecordSplit records that the given partition has split into two children.
 // Bounds are computed as [from, (from+to)/2) and [(from+to)/2, to).
 // GetDescription will then return the parent with ChildPartitionIDs and the two new partitions.

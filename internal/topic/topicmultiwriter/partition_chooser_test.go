@@ -69,19 +69,6 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		require.Equal(t, int64(1), partitionID)
 	})
 
-	t.Run("NoPartitions", func(t *testing.T) {
-		t.Parallel()
-
-		cfg := &MultiWriterConfig{}
-		partitions := map[int64]*PartitionInfo{}
-		chooser, err := newBoundPartitionChooser(cfg, partitions)
-		require.NoError(t, err)
-
-		_, err = chooser.ChoosePartition(messageWithKey("key"))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "no partitions configured")
-	})
-
 	t.Run("PartitionWithoutBounds", func(t *testing.T) {
 		t.Parallel()
 

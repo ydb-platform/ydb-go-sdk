@@ -111,13 +111,13 @@ func (w *writerWithAutopartitioning) processMessages() {
 		iter := w.messagesToProcess.Front()
 		w.messagesToProcess.Remove(iter)
 
-		if w.messagesWritten >= MessagesBeforeOverloaded {
+		if w.onSplit != nil && w.messagesWritten >= MessagesBeforeOverloaded {
+			// Only base partitions (with onSplit configured) simulate OVERLOADED and trigger split.
 			if w.retrySettings.CheckError != nil {
 				needOverloaded = true
+				w.splitted.Store(true)
+				w.onSplit(w.partitionID)
 			}
-
-			w.splitted.Store(true)
-			w.onSplit(w.partitionID)
 
 			break
 		}

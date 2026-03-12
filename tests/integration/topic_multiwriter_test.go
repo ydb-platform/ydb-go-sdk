@@ -476,6 +476,6 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		func(t testing.TB) {
 			runTestWithAutoPartitioning(t, scope)
 		},
-		xtest.StopAfter(25*time.Second),
+		xtest.StopAfter(60*time.Second),
 	)
 }

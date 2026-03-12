@@ -58,7 +58,7 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 		producerID := cfg.ProducerID()
 
 		var onSplit func(int64)
-		if f.describeSplits != nil {
+		if f.describeSplits != nil && f.describeSplits.IsBasePartition(partitionID) {
 			onSplit = f.describeSplits.RecordSplit
 		}
 		updateSeqNo := func(producerID string, seqNo int64) {
