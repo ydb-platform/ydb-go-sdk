@@ -379,7 +379,7 @@ func (o *orchestrator) getWriterBufferedMessages(
 	)
 
 	for _, msg := range bufferedMessages {
-		bufferedMessagesMap[msg.PartitionID] = msg
+		bufferedMessagesMap[msg.SeqNo] = msg
 	}
 
 	return bufferedMessagesMap, nil
@@ -422,7 +422,7 @@ func (o *orchestrator) scheduleResendMessages(
 			return err
 		}
 
-		bufferedMessage, ok := bufferedMessagesMap[msg.PartitionID]
+		bufferedMessage, ok := bufferedMessagesMap[msg.SeqNo]
 		if ok {
 			iter.Value.Value.Data = bufferedMessage.Data
 		}

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ func readMessagesAndAssertOrderedBySeqNo(
 	consumerName string,
 	expectedCount int,
 	timeout time.Duration,
+	expectedPayload []byte,
 ) error {
 	reader, err := client.StartReader(
 		consumerName,
@@ -58,6 +60,7 @@ func readMessagesAndAssertOrderedBySeqNo(
 		partitionID int64
 		producerID  string
 		seqNo       int64
+		payload     []byte
 	}
 
 	messages := make([]message, 0, expectedCount)
@@ -85,10 +88,17 @@ func readMessagesAndAssertOrderedBySeqNo(
 			return err
 		}
 
+		payload := make([]byte, msg.UncompressedSize)
+		_, err = msg.Read(payload)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+
 		messages = append(messages, message{
 			partitionID: msg.PartitionID(),
 			producerID:  msg.ProducerID,
 			seqNo:       msg.SeqNo,
+			payload:     payload,
 		})
 	}
 
@@ -107,6 +117,16 @@ func readMessagesAndAssertOrderedBySeqNo(
 			producerID:  m.producerID,
 		}
 		byPartitionAndProducer[key] = append(byPartitionAndProducer[key], m.seqNo)
+		if !bytes.Equal(expectedPayload, m.payload) {
+			return fmt.Errorf(
+				"partition %d, producerId %s: payload mismatch, expected %d bytes, got %d bytes, seqNo %d",
+				key.partitionID,
+				key.producerID,
+				len(expectedPayload),
+				len(m.payload),
+				m.seqNo,
+			)
+		}
 	}
 
 	for key, seqNos := range byPartitionAndProducer {
@@ -245,7 +265,7 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages...))
 	require.NoError(t, multiWriter.Close(ctx))
 
-	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second))
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second, []byte("hello")))
 }
 
 func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
@@ -284,7 +304,7 @@ func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages...))
 	require.NoError(t, multiWriter.Close(ctx))
 
-	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second))
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second, []byte("hello")))
 }
 
 func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
@@ -332,7 +352,7 @@ func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages...))
 	require.NoError(t, multiWriter.Close(ctx))
 
-	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second))
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second, []byte("hello")))
 }
 
 func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
@@ -464,6 +484,7 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 		consumerName,
 		messagesWritten1+messagesWritten2,
 		20*time.Second,
+		msgData,
 	))
 }
 

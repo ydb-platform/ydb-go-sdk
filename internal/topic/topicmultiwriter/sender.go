@@ -1,8 +1,10 @@
 package topicmultiwriter
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -75,7 +77,6 @@ func (s *sender) iterateThroughMessagesIndex(
 	for partitionID, list := range index {
 		for iter := list.Front(); iter != nil; iter = iter.Next() {
 			msg := iter.Value.Value
-
 			if (!ignorePartitionLock && s.partitions[msg.PartitionID].Locked) || stopFunc(iter.Value) {
 				break
 			}
@@ -89,8 +90,14 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			err = wr.Write(s.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage})
+			msgData, err := io.ReadAll(msg.Data)
 			if err != nil {
+				return fmt.Errorf("failed to read message data: %w", err)
+			}
+
+			msg.Data = bytes.NewReader(msgData)
+			if err = wr.Write(s.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage}); err != nil {
+				iter.Value.Value.Data = bytes.NewReader(msgData)
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
@@ -99,7 +106,6 @@ func (s *sender) iterateThroughMessagesIndex(
 
 				return fmt.Errorf("failed to write message: %w", err)
 			}
-
 			iter.Value.Value.sent = true
 		}
 

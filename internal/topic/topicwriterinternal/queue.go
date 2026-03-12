@@ -207,7 +207,7 @@ func (q *messageQueue) getBufferedMessages() []PublicMessage {
 	defer q.m.Unlock()
 
 	res := make([]PublicMessage, 0, q.lastWrittenIndex-q.lastSentIndex)
-	for i := q.lastSentIndex + 1; i <= q.lastWrittenIndex; i++ {
+	for i := range q.messagesByOrder {
 		msg := q.messagesByOrder[i]
 		if msg.hasRawContent {
 			msg.Data = &msg.rawBuf
