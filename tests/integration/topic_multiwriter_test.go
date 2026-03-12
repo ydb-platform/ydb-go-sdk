@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -53,12 +54,13 @@ func readMessagesAndAssertOrderedBySeqNo(
 		_ = reader.Close(context.Background())
 	}()
 
-	messages := make([]struct {
+	type message struct {
 		partitionID int64
 		producerID  string
 		seqNo       int64
-	}, 0, expectedCount)
+	}
 
+	messages := make([]message, 0, expectedCount)
 	deadline := time.Now().Add(timeout)
 
 	for len(messages) < expectedCount {
@@ -83,11 +85,7 @@ func readMessagesAndAssertOrderedBySeqNo(
 			return err
 		}
 
-		messages = append(messages, struct {
-			partitionID int64
-			producerID  string
-			seqNo       int64
-		}{
+		messages = append(messages, message{
 			partitionID: msg.PartitionID(),
 			producerID:  msg.ProducerID,
 			seqNo:       msg.SeqNo,
@@ -345,7 +343,7 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 	db := scope.Driver()
 	topicClient := db.Topic()
 
-	topicPath := db.Name() + "/" + t.Name() + "--auto-part-topic"
+	topicPath := db.Name() + "/" + t.Name() + "--auto-part-topic--" + uuid.NewString()
 	_ = topicClient.Drop(ctx, topicPath)
 	require.NoError(t, createTopicWithAutoPartitioning(ctx, db, topicPath))
 
@@ -476,6 +474,6 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		func(t testing.TB) {
 			runTestWithAutoPartitioning(t, scope)
 		},
-		xtest.StopAfter(60*time.Second),
+		xtest.StopAfter(30*time.Second),
 	)
 }
