@@ -657,10 +657,6 @@ func (w *WriterReconnector) GetSessionID() (sessionID string) {
 	return sessionID
 }
 
-func (w *WriterReconnector) GetBufferedMessages() []PublicMessage {
-	return w.queue.getBufferedMessages()
-}
-
 func allMessagesHasSameBufCodec(messages []messageWithDataContent) bool {
 	if len(messages) <= 1 {
 		return true

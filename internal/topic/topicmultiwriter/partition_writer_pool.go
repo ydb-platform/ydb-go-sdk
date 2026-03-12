@@ -120,24 +120,16 @@ func (p *partitionWriterPool) createNonDirectWriter(partitionID int64) (writer, 
 	return writer, err
 }
 
-func (p *partitionWriterPool) get(partitionID int64, direct bool, doNotCreate bool) (*writerWrapper, error) {
+func (p *partitionWriterPool) get(partitionID int64, direct bool) (*writerWrapper, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
-	finish := func() (*writerWrapper, error) {
-		if doNotCreate {
-			return nil, nil //nolint:nilnil
-		}
-
-		return p.createNewWriter(partitionID, direct)
-	}
 
 	existingWriter, ok := p.writers[partitionID]
 	if ok {
 		if existingWriter.direct != direct {
 			p.forceEvictNeedLock(partitionID)
 
-			return finish()
+			return p.createNewWriter(partitionID, direct)
 		}
 
 		return existingWriter, nil
@@ -148,7 +140,7 @@ func (p *partitionWriterPool) get(partitionID int64, direct bool, doNotCreate bo
 		if idleWriter.direct != direct {
 			_ = idleWriter.Close(p.ctx)
 
-			return finish()
+			return p.createNewWriter(partitionID, direct)
 		}
 
 		p.writers[partitionID] = idleWriter
@@ -156,7 +148,7 @@ func (p *partitionWriterPool) get(partitionID int64, direct bool, doNotCreate bo
 		return idleWriter, nil
 	}
 
-	return finish()
+	return p.createNewWriter(partitionID, direct)
 }
 
 func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*writerWrapper, error) {

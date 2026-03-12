@@ -1,7 +1,9 @@
 package topicmultiwriter
 
 import (
+	"bytes"
 	"context"
+	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -53,10 +55,21 @@ func (b *inflightBuffer) releaseMessage() {
 	<-b.messagesSema
 }
 
-func (b *inflightBuffer) pushNeedLock(msg message) {
+func (b *inflightBuffer) pushNeedLock(msg message) error {
+	dataBytes, err := io.ReadAll(msg.Data)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewReader(dataBytes)
+	msg.dataReader = buf
+	msg.Data = buf
+
 	newElement := b.inFlightMessages.PushBack(msg)
 	b.getInflightMessagesIndex(msg.PartitionID).PushBack(newElement)
 	b.getPendingMessagesIndex(msg.PartitionID).PushBack(newElement)
+
+	return nil
 }
 
 // no concurrent safe
