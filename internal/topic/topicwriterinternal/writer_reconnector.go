@@ -587,33 +587,13 @@ func (w *WriterReconnector) waitInit(ctx context.Context) (info InitialInfo, err
 }
 
 func (w *WriterReconnector) WaitInit(ctx context.Context) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
+	_, err := w.waitInit(ctx)
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-w.background.Done():
-		return w.background.CloseReason()
-	case <-w.initDoneCh:
-		return nil
-	}
+	return err
 }
 
 func (w *WriterReconnector) WaitInitInfo(ctx context.Context) (info InitialInfo, err error) {
-	if ctx.Err() != nil {
-		return InitialInfo{}, ctx.Err()
-	}
-
-	select {
-	case <-ctx.Done():
-		return InitialInfo{}, ctx.Err()
-	case <-w.background.Done():
-		return InitialInfo{}, w.background.CloseReason()
-	case <-w.initDoneCh:
-		return w.initInfo, nil
-	}
+	return w.waitInit(ctx)
 }
 
 func (w *WriterReconnector) onWriterInitCallbackHandler(writerStream *SingleStreamWriter) {
