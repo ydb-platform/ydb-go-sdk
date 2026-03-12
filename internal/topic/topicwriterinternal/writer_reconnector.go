@@ -39,6 +39,7 @@ var (
 	ErrPublicQueueIsFull                           = xerrors.Wrap(errors.New("ydb: queue is full"))                                                                                                                                                                                                                          // Deprecated.
 	ErrPublicMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
+	errWritingByKeyNotSupported                    = xerrors.Wrap(errors.New("ydb: writing by key is not supported for single writer, use WithWriterPartitionByKey or WithPartitionByPartitionID options"))                                                                                                                  //nolint:lll
 
 	// errProducerIDNotEqualMessageGroupID is temporary
 	// WithMessageGroupID is optional parameter because it allowed to be skipped by protocol.
@@ -61,6 +62,7 @@ type WriterReconnectorConfig struct {
 	AutoSetCreatedTime           bool
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 	OnAckReceivedCallback        func(seqNo int64)
+	MultiMode                    bool
 
 	RetrySettings topic.RetrySettings
 
@@ -229,6 +231,12 @@ func (w *WriterReconnector) start() {
 }
 
 func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) (resErr error) {
+	for i := range messages {
+		if !w.cfg.MultiMode && (messages[i].Key != "" || messages[i].PartitionID != 0) {
+			return xerrors.WithStackTrace(errWritingByKeyNotSupported)
+		}
+	}
+
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}

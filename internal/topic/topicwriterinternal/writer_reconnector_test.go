@@ -87,6 +87,20 @@ func TestWriterImpl_CheckMessages(t *testing.T) {
 	})
 }
 
+func TestWriterImpl_WriteWithKey(t *testing.T) {
+	t.Run("WriteWithKeyToSingleWriter", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig())
+		w.firstConnectionHandled.Store(true)
+
+		maxSize := 5
+		w.cfg.MaxMessageSize = maxSize
+
+		err := w.Write(ctx, []PublicMessage{{Data: bytes.NewReader(make([]byte, maxSize)), Key: "test"}})
+		require.ErrorIs(t, err, errWritingByKeyNotSupported)
+	})
+}
+
 func TestWriterImpl_Write(t *testing.T) {
 	t.Run("PushToQueue", func(t *testing.T) {
 		ctx := context.Background()

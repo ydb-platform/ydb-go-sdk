@@ -188,6 +188,93 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
 }
 
+func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+
+	// Create topic with 10 partitions for this test.
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	multiWriter, err := topicClient.StartWriter(
+		topicPath,
+		topicoptions.WithWriterPartitionByKey(),
+	)
+	require.NoError(t, err)
+
+	err = multiWriter.WaitInit(ctx)
+	require.NoError(t, err)
+
+	messages := make([]topicwriter.Message, 0, 1000)
+	for i := range 1000 {
+		messages = append(messages, topicwriter.Message{
+			Data: bytes.NewReader([]byte("hello")),
+			Key:  fmt.Sprintf("partition-key-%d", i),
+		})
+	}
+
+	require.NoError(t, multiWriter.Write(ctx, messages...))
+	require.NoError(t, multiWriter.Close(ctx))
+
+	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
+}
+
+func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+
+	// Create topic with 10 partitions for this test.
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	multiWriter, err := topicClient.StartWriter(
+		topicPath,
+		topicoptions.WithWriterPartitionByPartitionID(),
+	)
+	require.NoError(t, err)
+
+	err = multiWriter.WaitInit(ctx)
+	require.NoError(t, err)
+
+	describe, err := topicClient.Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Len(t, describe.Partitions, 10)
+
+	partitionIDs := make([]int64, 0, len(describe.Partitions))
+	for _, p := range describe.Partitions {
+		partitionIDs = append(partitionIDs, p.PartitionID)
+	}
+
+	messages := make([]topicwriter.Message, 0, 1000)
+	for i := range 1000 {
+		messages = append(messages, topicwriter.Message{
+			Data:        bytes.NewReader([]byte("hello")),
+			PartitionID: partitionIDs[i%len(partitionIDs)],
+		})
+	}
+
+	require.NoError(t, multiWriter.Write(ctx, messages...))
+	require.NoError(t, multiWriter.Close(ctx))
+
+	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
+}
+
 func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	const firstPartitionKey = "__first_partition__"
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/google/uuid"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
@@ -24,7 +26,7 @@ func NewMultiWriter(
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
 	if multiWriterCfg.ProducerIDPrefix == "" {
-		return nil, fmt.Errorf("%w: producer id prefix is required", ErrInvalidConfiguration)
+		multiWriterCfg.ProducerIDPrefix = uuid.NewString()
 	}
 
 	var (
@@ -54,6 +56,16 @@ func NewMultiWriter(
 
 func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
 	for _, msg := range messages {
+		if p.cfg.PartitionChooserStrategy == PartitionChooserStrategyByPartitionID && msg.Key != "" {
+			return fmt.Errorf("%w: key is not allowed when writing by partition id is chosen", ErrInvalidConfiguration)
+		}
+
+		if p.cfg.PartitionChooserStrategy != PartitionChooserStrategyByPartitionID &&
+			p.cfg.PartitionChooserStrategy != PartitionChooserStrategyCustom &&
+			msg.Key == "" {
+			return fmt.Errorf("%w: key is required", ErrInvalidConfiguration)
+		}
+
 		if err := p.orchestrator.pushMessage(ctx, message{
 			PublicMessage: msg,
 		}); err != nil {

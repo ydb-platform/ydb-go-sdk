@@ -99,6 +99,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 		}
 	)
 
+	writerCfg.MultiMode = true
 	for _, opt := range opts {
 		opt(&writerCfg)
 	}

@@ -3,7 +3,6 @@ package topicwriter
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -97,8 +96,7 @@ func (w *Writer) Flush(ctx context.Context) error {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type TxWriter struct {
-	inner              innerTxWriter
-	multiwriterEnabled bool
+	inner innerTxWriter
 }
 
 func NewTxWriterInternal(w *topicwriterinternal.WriterWithTransaction) *TxWriter {
@@ -106,9 +104,7 @@ func NewTxWriterInternal(w *topicwriterinternal.WriterWithTransaction) *TxWriter
 }
 
 func NewTxWriterWrapper(inner innerTxWriter) *TxWriter {
-	_, ok := inner.(*topicmultiwriter.MultiWriterWithTransaction)
-
-	return &TxWriter{inner: inner, multiwriterEnabled: ok}
+	return &TxWriter{inner: inner}
 }
 
 // Write messages to the transaction
@@ -118,12 +114,6 @@ func NewTxWriterWrapper(inner innerTxWriter) *TxWriter {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (w *TxWriter) Write(ctx context.Context, messages ...Message) error {
-	for i := range messages {
-		if !w.multiwriterEnabled && (messages[i].Key != "" || messages[i].PartitionID != 0) {
-			return fmt.Errorf("%w: key or partition id is not supported for non-multiwriter", ErrInvalidConfiguration)
-		}
-	}
-
 	return w.inner.Write(ctx, messages)
 }
 

@@ -3,6 +3,7 @@ package topicmultiwriter
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"time"
 
@@ -178,9 +179,16 @@ func (o *orchestrator) init() (err error) {
 	switch o.multiWriterCfg.PartitionChooserStrategy {
 	case PartitionChooserStrategyBound:
 		o.partitionChooser, err = newBoundPartitionChooser(o.multiWriterCfg, o.partitions)
-		if err != nil {
+
+		if err != nil && !errors.Is(err, ErrNoBounds) {
 			return err
 		}
+
+		if err == nil {
+			break
+		}
+
+		fallthrough // when partitions have no bounds, we use hash partition chooser by default
 	case PartitionChooserStrategyHash:
 		if isAutoPartitioningEnabled {
 			return ErrHashPartitionChooserNotSupported
@@ -190,7 +198,6 @@ func (o *orchestrator) init() (err error) {
 		for id := range o.partitions {
 			partitionIDs = append(partitionIDs, id)
 		}
-
 		o.partitionChooser = newHashPartitionChooser(o.multiWriterCfg, partitionIDs)
 	case PartitionChooserStrategyCustom:
 		if o.multiWriterCfg.CustomPartitionChooser == nil {
@@ -204,7 +211,8 @@ func (o *orchestrator) init() (err error) {
 }
 
 func (o *orchestrator) choosePartition(msg message) (partitionID int64, err error) {
-	if msg.PartitionID != 0 {
+	if msg.PartitionID != 0 ||
+		o.multiWriterCfg.PartitionChooserStrategy == PartitionChooserStrategyByPartitionID {
 		return msg.PartitionID, nil
 	}
 

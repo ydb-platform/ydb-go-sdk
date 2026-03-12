@@ -340,15 +340,6 @@ func TestMultiWriter_DescribeError(t *testing.T) {
 	require.True(t, errors.Is(err, describeErr) || errors.Is(err, context.DeadlineExceeded))
 }
 
-func TestMultiWriter_ErrNoProducerIDPrefix(t *testing.T) {
-	t.Parallel()
-
-	_, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-		return stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t)).Describe(ctx, path)
-	}, &topicwriterinternal.WriterReconnectorConfig{}, &MultiWriterConfig{})
-	require.ErrorIs(t, err, ErrInvalidConfiguration)
-}
-
 func TestMultiWriter_Write_WithBasicWriter(t *testing.T) {
 	t.Parallel()
 

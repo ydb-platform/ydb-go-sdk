@@ -8,6 +8,7 @@ import (
 )
 
 // MultiWriterOption configures a topic multiwriter.
+// THIS IS EXPERIMENTAL SDK PART
 //
 // It is a thin alias for internal multiwriter options.
 type (
@@ -89,5 +90,33 @@ func WithWriterIdleTimeout(timeout time.Duration) WriterOption {
 		}
 
 		topicmultiwriter.WithWriterIdleTimeout(timeout)(multiWriterCfg)
+	}
+}
+
+// WithWriterPartitionByKey sets partition chooser strategy to key-based.
+func WithWriterPartitionByKey() WriterOption {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
+		if multiWriterCfg == nil {
+			return
+		}
+
+		topicmultiwriter.WithWriterPartitionByKey()(multiWriterCfg)
+	}
+}
+
+// WithWriterPartitionByPartitionID sets partition chooser strategy to partition ID-based.
+func WithWriterPartitionByPartitionID() WriterOption {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
+		if multiWriterCfg == nil {
+			return
+		}
+
+		topicmultiwriter.WithWriterPartitionByPartitionID()(multiWriterCfg)
 	}
 }

@@ -54,6 +54,7 @@ const (
 	PartitionChooserStrategyBound PartitionChooserStrategy = iota
 	PartitionChooserStrategyHash
 	PartitionChooserStrategyCustom
+	PartitionChooserStrategyByPartitionID
 )
 
 type writerWrapper struct {

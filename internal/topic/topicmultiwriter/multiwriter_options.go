@@ -41,6 +41,19 @@ func WithWriterIdleTimeout(timeout time.Duration) PublicMultiWriterOption {
 	}
 }
 
+func WithWriterPartitionByKey() PublicMultiWriterOption {
+	return func(cfg *MultiWriterConfig) {
+		cfg.Initialized = true
+	}
+}
+
+func WithWriterPartitionByPartitionID() PublicMultiWriterOption {
+	return func(cfg *MultiWriterConfig) {
+		cfg.PartitionChooserStrategy = PartitionChooserStrategyByPartitionID
+		cfg.Initialized = true
+	}
+}
+
 func withWritersFactory(writersFactory writersFactory) PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
 		cfg.writersFactory = writersFactory

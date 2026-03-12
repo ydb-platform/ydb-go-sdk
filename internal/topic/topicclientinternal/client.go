@@ -348,6 +348,8 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
 	if mwCfg != nil {
+		cfg.MultiMode = true
+
 		internal, err := internalmultiwriter.NewMultiWriter(
 			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 				return c.Describe(ctx, path)
@@ -387,6 +389,8 @@ func (c *Client) StartTransactionalWriter(
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
 	if mwCfg != nil {
+		cfg.MultiMode = true
+
 		multiwriter, err := internalmultiwriter.NewMultiWriter(
 			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 				return c.Describe(ctx, path)
