@@ -26,7 +26,7 @@ func (w *poolTestWriter) Close(_ context.Context) error {
 	return nil
 }
 
-func (w *poolTestWriter) WaitInit(_ context.Context) (topicwriterinternal.InitialInfo, error) {
+func (w *poolTestWriter) WaitInitInfo(_ context.Context) (topicwriterinternal.InitialInfo, error) {
 	return topicwriterinternal.InitialInfo{}, nil
 }
 

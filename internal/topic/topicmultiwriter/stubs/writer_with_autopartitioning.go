@@ -164,7 +164,7 @@ func (w *writerWithAutopartitioning) Write(ctx context.Context, messages []topic
 	return nil
 }
 
-func (w *writerWithAutopartitioning) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+func (w *writerWithAutopartitioning) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
 	time.Sleep(time.Second)
 
 	return topicwriterinternal.InitialInfo{

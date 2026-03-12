@@ -64,15 +64,13 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 // WaitInit waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
 func (w *Writer) WaitInit(ctx context.Context) (err error) {
-	_, err = w.inner.WaitInit(ctx)
-
-	return err
+	return w.inner.WaitInit(ctx)
 }
 
 // WaitInitInfo waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
 func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
-	privateInfo, err := w.inner.WaitInit(ctx)
+	privateInfo, err := w.inner.WaitInitInfo(ctx)
 	if err != nil {
 		return PublicInitialInfo{}, err
 	}
@@ -122,11 +120,7 @@ func (w *TxWriter) Write(ctx context.Context, messages ...Message) error {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (w *TxWriter) WaitInit(ctx context.Context) (err error) {
-	if _, err = w.inner.WaitInit(ctx); err != nil {
-		return err
-	}
-
-	return nil
+	return w.inner.WaitInit(ctx)
 }
 
 // WaitInitInfo waits until the reader is initialized
@@ -139,7 +133,7 @@ func (w *TxWriter) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, er
 		return PublicInitialInfo{}, ErrUnimplemented
 	}
 
-	privateInfo, err := w.inner.WaitInit(ctx)
+	privateInfo, err := w.inner.WaitInitInfo(ctx)
 	if err != nil {
 		return PublicInitialInfo{}, err
 	}

@@ -77,7 +77,7 @@ func (w *basicWriter) Write(ctx context.Context, messages []topicwriterinternal.
 	return nil
 }
 
-func (w *basicWriter) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+func (w *basicWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
 	time.Sleep(time.Second)
 
 	return topicwriterinternal.InitialInfo{

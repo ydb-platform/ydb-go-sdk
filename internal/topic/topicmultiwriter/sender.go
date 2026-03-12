@@ -68,6 +68,7 @@ func (s *sender) wakeup() {
 func (s *sender) iterateThroughMessagesIndex(
 	index map[int64]xlist.List[messagePtr],
 	stopFunc func(msg messagePtr) bool,
+	ignorePartitionLock bool,
 ) error {
 	var partitionsToRemove []int64
 
@@ -75,7 +76,7 @@ func (s *sender) iterateThroughMessagesIndex(
 		for iter := list.Front(); iter != nil; iter = iter.Next() {
 			msg := iter.Value.Value
 
-			if s.partitions[msg.PartitionID].Locked || stopFunc(iter.Value) {
+			if (!ignorePartitionLock && s.partitions[msg.PartitionID].Locked) || stopFunc(iter.Value) {
 				break
 			}
 
@@ -130,6 +131,7 @@ func (s *sender) step() error {
 	if err := s.iterateThroughMessagesIndex(
 		s.buf.messagesToResendIndex,
 		func(msg messagePtr) bool { return false },
+		true,
 	); err != nil {
 		return err
 	}
@@ -141,5 +143,6 @@ func (s *sender) step() error {
 
 			return ok
 		},
+		false,
 	)
 }

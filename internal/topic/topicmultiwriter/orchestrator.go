@@ -271,7 +271,7 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 
 	message := indexChain.Front()
 	if message.Value.Value.SeqNo != 0 && message.Value.Value.SeqNo != seqNo {
-		panic("seqNo mismatch")
+		panic(fmt.Sprintf("seqNo mismatch, expected: %d, got: %d", message.Value.Value.SeqNo, seqNo))
 	}
 
 	message.Value.Value.ackReceived = true
@@ -282,8 +282,16 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 		o.writerPool.evict(partitionID)
 	}
 
+	partition := o.partitions[partitionID]
+	if partition.PendingResend > 0 {
+		partition.PendingResend--
+		if partition.PendingResend == 0 {
+			partition.Locked = false
+		}
+	}
+
 	o.buf.sweep()
-	if len(o.buf.pendingMessagesIndex) > 0 {
+	if len(o.buf.pendingMessagesIndex) > 0 || partition.PendingResend == 0 {
 		o.sender.wakeup()
 	}
 }
@@ -389,9 +397,9 @@ func (o *orchestrator) scheduleResendMessages(
 	}
 
 	var (
-		inFlightMessagesToAdd []messagePtr
-		pendingMessagesToAdd  []messagePtr
-		messagesToResendToAdd []messagePtr
+		inFlightMessagesToAdd    []messagePtr
+		messagesToResendToAdd    []messagePtr
+		pendingResendByPartition = make(map[int64]int)
 	)
 
 	for inFlightIndexChain.Len() > 0 {
@@ -421,23 +429,23 @@ func (o *orchestrator) scheduleResendMessages(
 
 		iter.Value.Value.PartitionID = msg.PartitionID
 		inFlightMessagesToAdd = append(inFlightMessagesToAdd, iter.Value)
-		if iter.Value.Value.sent {
-			iter.Value.Value.sent = false
-			messagesToResendToAdd = append(messagesToResendToAdd, iter.Value)
-		} else {
-			pendingMessagesToAdd = append(pendingMessagesToAdd, iter.Value)
-		}
+		iter.Value.Value.sent = false
+		messagesToResendToAdd = append(messagesToResendToAdd, iter.Value)
+		pendingResendByPartition[msg.PartitionID]++
 		inFlightIndexChain.Remove(iter)
 	}
 
 	for i := len(inFlightMessagesToAdd) - 1; i >= 0; i-- {
 		o.buf.getInflightMessagesIndex(inFlightMessagesToAdd[i].Value.PartitionID).PushFront(inFlightMessagesToAdd[i])
 	}
-	for i := len(pendingMessagesToAdd) - 1; i >= 0; i-- {
-		o.buf.getPendingMessagesIndex(pendingMessagesToAdd[i].Value.PartitionID).PushFront(pendingMessagesToAdd[i])
-	}
 	for i := len(messagesToResendToAdd) - 1; i >= 0; i-- {
 		o.buf.getMessagesToResendIndex(messagesToResendToAdd[i].Value.PartitionID).PushFront(messagesToResendToAdd[i])
+	}
+
+	for resendPartitionID, count := range pendingResendByPartition {
+		partition := o.partitions[resendPartitionID]
+		partition.PendingResend += count
+		partition.Locked = true
 	}
 
 	delete(o.buf.inFlightMessagesIndex, partitionID)
@@ -513,7 +521,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 				return resultErr
 			}
 
-			initInfo, err := writer.WaitInit(o.ctx)
+			initInfo, err := writer.WaitInitInfo(o.ctx)
 			if err != nil {
 				return err
 			}
@@ -534,25 +542,33 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	return maxSeqNo, nil
 }
 
-func (o *orchestrator) describeTopicWithRetries() (describeResult topictypes.TopicDescription, err error) {
+func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topictypes.TopicDescription, error) {
 	const (
 		maxRetries = 5
 		retryDelay = 100 * time.Millisecond
 	)
 
-	for i := range maxRetries {
-		describeResult, err = o.topicDescriber(o.ctx, o.writerCfg.Topic())
+	for range maxRetries {
+		describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
 		if err == nil {
-			break
+			var needRetry bool
+			for _, partition := range describeResult.Partitions {
+				if partition.PartitionID == splitPartitionID {
+					needRetry = len(partition.ChildPartitionIDs) == 0
+
+					break
+				}
+			}
+
+			if !needRetry {
+				return describeResult, nil
+			}
 		}
 
-		if i == maxRetries-1 {
-			return topictypes.TopicDescription{}, err
-		}
 		time.Sleep(retryDelay)
 	}
 
-	return describeResult, nil
+	return topictypes.TopicDescription{}, errors.New("failed to describe topic")
 }
 
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
@@ -561,7 +577,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage
 	)
 
-	describeResult, err := o.describeTopicWithRetries()
+	describeResult, err := o.describeTopicWithRetries(partitionID)
 	if err != nil {
 		return err
 	}
@@ -597,7 +613,6 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
-		partition.Locked = false
 		err = o.scheduleResendMessages(partitionID, maxSeqNo, bufferedMessagesMap)
 		if err != nil {
 			resultErr = err
@@ -605,6 +620,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			return
 		}
 
+		partition.Locked = false
 		for _, child := range partition.Children {
 			o.partitions[child].Locked = false
 		}

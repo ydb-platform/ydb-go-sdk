@@ -105,8 +105,15 @@ func (p *MultiWriter) Flush(ctx context.Context) error {
 	return p.orchestrator.flush(ctx)
 }
 
-func (p *MultiWriter) WaitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
-	return topicwriterinternal.InitialInfo{}, p.orchestrator.waitInitDone(ctx)
+func (p *MultiWriter) WaitInit(ctx context.Context) error {
+	return p.orchestrator.waitInitDone(ctx)
+}
+
+func (p *MultiWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	return topicwriterinternal.InitialInfo{}, fmt.Errorf(
+		"%w: do not use WaitInitInfo when writing to many partitions, use WaitInit instead",
+		ErrNotImplemented,
+	)
 }
 
 func (p *MultiWriter) getWritersCount() int {

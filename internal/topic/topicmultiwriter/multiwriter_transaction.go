@@ -63,8 +63,12 @@ func (w *MultiWriterWithTransaction) onTransactionCompleted(err error) {
 // WaitInit waits until initialization is completed or an error occurs.
 func (w *MultiWriterWithTransaction) WaitInit(
 	ctx context.Context,
-) (topicwriterinternal.InitialInfo, error) {
+) error {
 	return w.multiWriter.WaitInit(ctx)
+}
+
+func (w *MultiWriterWithTransaction) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	return w.multiWriter.WaitInitInfo(ctx)
 }
 
 // Write sends messages using the underlying multi-writer.

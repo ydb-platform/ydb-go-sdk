@@ -20,6 +20,7 @@ type PartitionInfo struct {
 	ParentID       *int64
 	Children       []int64
 	Locked         bool
+	PendingResend  int
 	CachedMaxSeqNo int64
 }
 

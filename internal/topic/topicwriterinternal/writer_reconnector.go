@@ -571,7 +571,37 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	}
 }
 
-func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err error) {
+func (w *WriterReconnector) waitInit(ctx context.Context) (info InitialInfo, err error) {
+	if ctx.Err() != nil {
+		return InitialInfo{}, ctx.Err()
+	}
+
+	select {
+	case <-ctx.Done():
+		return InitialInfo{}, ctx.Err()
+	case <-w.background.Done():
+		return InitialInfo{}, w.background.CloseReason()
+	case <-w.initDoneCh:
+		return w.initInfo, nil
+	}
+}
+
+func (w *WriterReconnector) WaitInit(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-w.background.Done():
+		return w.background.CloseReason()
+	case <-w.initDoneCh:
+		return nil
+	}
+}
+
+func (w *WriterReconnector) WaitInitInfo(ctx context.Context) (info InitialInfo, err error) {
 	if ctx.Err() != nil {
 		return InitialInfo{}, ctx.Err()
 	}

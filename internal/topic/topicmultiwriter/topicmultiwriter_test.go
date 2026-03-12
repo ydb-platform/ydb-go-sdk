@@ -238,6 +238,10 @@ func newTestMultiWriterWithCustomWritersFactory(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
+	for _, opt := range opts {
+		opt(writerCfg)
+	}
+
 	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
@@ -269,7 +273,7 @@ func TestMultiWriter_WaitInit_Success(t *testing.T) {
 		return stubClient.Describe(ctx, path)
 	})
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	err = multiWriter.Close(ctx)
@@ -292,7 +296,7 @@ func TestMultiWriter_WaitInit_ContextCanceled(t *testing.T) {
 	ctxCancel, cancel := context.WithCancel(ctx)
 	cancel()
 
-	_, err := multiWriter.WaitInit(ctxCancel)
+	err := multiWriter.WaitInit(ctxCancel)
 	require.ErrorIs(t, err, context.Canceled)
 
 	_ = multiWriter.Close(ctxCancel)
@@ -333,7 +337,7 @@ func TestMultiWriter_DescribeError(t *testing.T) {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	_, err := multiWriter.WaitInit(ctxTimeout)
+	err := multiWriter.WaitInit(ctxTimeout)
 	require.Error(t, err)
 	// When init fails, WaitInit may return context.DeadlineExceeded (initDone is not closed on error)
 	// or the error may propagate depending on timing
@@ -353,7 +357,7 @@ func TestMultiWriter_Write_WithBasicWriter(t *testing.T) {
 		},
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	messages := make([]topicwriterinternal.PublicMessage, 0, 1000)
@@ -383,7 +387,7 @@ func TestMultiWriter_Write_WaitForAck(t *testing.T) {
 		topicwriterinternal.WithWaitAckOnWrite(true),
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	messages := make([]topicwriterinternal.PublicMessage, 0, 1000)
@@ -413,7 +417,7 @@ func TestMultiWriter_Write_WithErrorWritersFactory(t *testing.T) {
 		newStubWritersFactory(t, stubs.StubWriterTypeError, "test-producer", nil, 0),
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.ErrorIs(t, err, errTest)
 }
 
@@ -432,7 +436,7 @@ func TestMultiWriter_Write_MaxQueueLenExceeded(t *testing.T) {
 		topicwriterinternal.WithMaxQueueLen(5),
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	messages := make([]topicwriterinternal.PublicMessage, 0, 5)
@@ -473,7 +477,7 @@ func TestMultiWriter_Write_CloseTimeout(t *testing.T) {
 		time.Second*2,
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
@@ -503,7 +507,7 @@ func TestMultiWriter_Write_ErrNoSeqNo(t *testing.T) {
 		},
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	err = multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
@@ -515,6 +519,23 @@ func TestMultiWriter_Write_ErrNoSeqNo(t *testing.T) {
 
 	require.ErrorIs(t, err, ErrNoSeqNo)
 	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestMultiWriter_WaitInitInfo_Unimplemented(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	_, err := multiWriter.WaitInitInfo(ctx)
+	require.ErrorIs(t, err, ErrNotImplemented)
 }
 
 func TestMultiWriter_CloseOfClosed(t *testing.T) {
@@ -530,7 +551,7 @@ func TestMultiWriter_CloseOfClosed(t *testing.T) {
 		},
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	require.NoError(t, multiWriter.Close(ctx))
@@ -551,7 +572,7 @@ func TestMultiWriter_Write_Parallel(t *testing.T) {
 		topicwriterinternal.WithAutoSetSeqNo(true),
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	var errgroup errgroup.Group
@@ -587,7 +608,7 @@ func TestMultiWriter_Write_WithAutopartitioningWriter(t *testing.T) {
 		state,
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	// Send enough messages so at least one partition hits MessagesBeforeOverloaded and returns OVERLOADED.
@@ -619,7 +640,7 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 		},
 	)
 
-	_, err := multiWriter.WaitInit(ctx)
+	err := multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
 	// Send enough messages so at least one partition hits MessagesBeforeOverloaded and returns OVERLOADED.

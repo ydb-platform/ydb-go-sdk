@@ -14,54 +14,116 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
-func readMessages(ctx context.Context, count int, topicPath string, scope *scopeT) error {
-	reader, err := scope.Driver().Topic().StartReader(
+type partitionProducerKey struct {
+	partitionID int64
+	producerID  string
+}
+
+// readMessagesAndAssertOrderedBySeqNo reads exactly expectedCount messages from the topic and asserts that
+// within each (partitionID, producerID) pair seqNo is strictly increasing.
+func readMessagesAndAssertOrderedBySeqNo(
+	ctx context.Context,
+	client topic.Client,
+	topicPath string,
+	consumerName string,
+	expectedCount int,
+	timeout time.Duration,
+) error {
+	reader, err := client.StartReader(
 		consumerName,
-		topicoptions.ReadTopic(topicPath),
+		topicoptions.ReadSelectors{
+			{
+				Path:     topicPath,
+				ReadFrom: time.Unix(0, 0).UTC(),
+			},
+		},
+		topicoptions.WithReaderSupportSplitMergePartitions(true),
 	)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = reader.Close(context.Background())
+	}()
 
-	partitionsSeqNoMap := make(map[int64][]int64)
+	messages := make([]struct {
+		partitionID int64
+		producerID  string
+		seqNo       int64
+	}, 0, expectedCount)
 
-	for i := range count {
+	deadline := time.Now().Add(timeout)
+
+	for len(messages) < expectedCount {
+		if time.Now().After(deadline) {
+			return fmt.Errorf(
+				"expected to read %d messages within %s, got %d",
+				expectedCount,
+				timeout,
+				len(messages),
+			)
+		}
+
 		readCtx, cancel := context.WithTimeout(ctx, time.Second*5)
-		defer cancel()
-
-		mess, err := reader.ReadMessage(readCtx)
+		msg, err := reader.ReadMessage(readCtx)
+		cancel()
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				if i != count-1 {
-					return fmt.Errorf("not all messages read: %d, expected: %d", i, count)
-				}
-
-				return nil
+				// Retry until overall timeout is reached.
+				continue
 			}
 
 			return err
 		}
 
-		partitionID := mess.PartitionID()
-		seqNos, ok := partitionsSeqNoMap[partitionID]
-		if !ok {
-			partitionsSeqNoMap[partitionID] = []int64{mess.SeqNo}
+		messages = append(messages, struct {
+			partitionID int64
+			producerID  string
+			seqNo       int64
+		}{
+			partitionID: msg.PartitionID(),
+			producerID:  msg.ProducerID,
+			seqNo:       msg.SeqNo,
+		})
+	}
 
-			continue
+	if len(messages) != expectedCount {
+		return fmt.Errorf(
+			"read message count mismatch: got %d, expected %d",
+			len(messages),
+			expectedCount,
+		)
+	}
+
+	byPartitionAndProducer := make(map[partitionProducerKey][]int64)
+	for _, m := range messages {
+		key := partitionProducerKey{
+			partitionID: m.partitionID,
+			producerID:  m.producerID,
 		}
+		byPartitionAndProducer[key] = append(byPartitionAndProducer[key], m.seqNo)
+	}
 
-		if len(seqNos) > 0 && seqNos[len(seqNos)-1] > mess.SeqNo {
-			return fmt.Errorf("seq no is not in order for partition %d", partitionID)
+	for key, seqNos := range byPartitionAndProducer {
+		for i := 1; i < len(seqNos); i++ {
+			if seqNos[i] <= seqNos[i-1] {
+				return fmt.Errorf(
+					"partition %d, producerId %s: expected seqNo strictly increasing, got %d then %d at index %d",
+					key.partitionID,
+					key.producerID,
+					seqNos[i-1],
+					seqNos[i],
+					i,
+				)
+			}
 		}
-
-		seqNos = append(seqNos, mess.SeqNo)
-		partitionsSeqNoMap[partitionID] = seqNos
 	}
 
 	return nil
@@ -94,25 +156,25 @@ func createTopicWithAutoPartitioning(ctx context.Context, db *ydb.Driver, topicP
 }
 
 func createMultiWriterForAutoPartitioning(
-	t *testing.T,
+	t testing.TB,
 	producerIDPrefix string,
 	ctx context.Context,
 	topicPath string,
 	topicClient topic.Client,
 	writerOptions []topicoptions.WriterOption,
-) (*topicwriter.Writer, int64) {
+) *topicwriter.Writer {
 	t.Helper()
 
-	writerOptions = append(writerOptions, topicoptions.WithWriterSetAutoSeqNo(false))
+	writerOptions = append(writerOptions, topicoptions.WithWriterSetAutoSeqNo(true))
 	writerOptions = append(writerOptions, topicoptions.WithProducerIDPrefix(producerIDPrefix))
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
 		writerOptions...,
 	)
 	require.NoError(t, err)
-	lastSeqNo, err := multiWriter.WaitInitInfo(ctx)
+	err = multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
-	return multiWriter, lastSeqNo.LastSeqNum
+	return multiWriter
 }
 
 // TestTopicMultiWriter_WaitInitAndClose verifies that internal topic multi writer
@@ -185,7 +247,7 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages...))
 	require.NoError(t, multiWriter.Close(ctx))
 
-	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second))
 }
 
 func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
@@ -224,7 +286,7 @@ func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages...))
 	require.NoError(t, multiWriter.Close(ctx))
 
-	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second))
 }
 
 func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
@@ -272,13 +334,12 @@ func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages...))
 	require.NoError(t, multiWriter.Close(ctx))
 
-	require.NoError(t, readMessages(ctx, 1000, topicPath, scope))
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second))
 }
 
-func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
+func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 	const firstPartitionKey = "__first_partition__"
 
-	scope := newScope(t)
 	ctx := scope.Ctx
 
 	db := scope.Driver()
@@ -307,9 +368,11 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		}),
 	}
 
-	multiWriter1, nextSeqNo1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
-	multiWriter2, nextSeqNo2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
 	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
+
+	var messagesWritten1, messagesWritten2 int
 
 	getKeys := func(partitions []topictypes.PartitionInfo) []string {
 		keys := make([]string, 0, len(partitions))
@@ -328,25 +391,21 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 
 	require.NotEmpty(t, getKeys(describe.Partitions))
 
-	writeMessage := func(m *topicwriter.Writer, payload []byte, seqNo int64, key string) {
+	writeMessage := func(m *topicwriter.Writer, payload []byte, key string) {
 		msg := topicwriter.Message{
-			Data:  bytes.NewReader(payload),
-			SeqNo: seqNo,
-			Key:   key,
+			Data: bytes.NewReader(payload),
+			Key:  key,
 		}
 
 		require.NoError(t, m.Write(ctx, msg))
 	}
 
-	nextSeqNo1++
-	nextSeqNo2++
-
 	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
 		for _, key := range getKeys(partitions) {
-			writeMessage(multiWriter1, msgData, nextSeqNo1, key)
-			nextSeqNo1++
-			writeMessage(multiWriter2, msgData, nextSeqNo2, key)
-			nextSeqNo2++
+			writeMessage(multiWriter1, msgData, key)
+			messagesWritten1++
+			writeMessage(multiWriter2, msgData, key)
+			messagesWritten2++
 		}
 
 		require.NoError(t, multiWriter1.Flush(ctx))
@@ -388,15 +447,35 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	describe = waitForPartitionsCountAtLeast(4, 20*time.Second)
 	require.GreaterOrEqual(t, len(describe.Partitions), 4, "partitions count: %d, expected at least 4", len(describe.Partitions))
 
-	writeMessage(multiWriter1, msgData, nextSeqNo1, getKeys(describe.Partitions)[0])
-	nextSeqNo1++
-	writeMessage(multiWriter1, msgData, nextSeqNo1, getKeys(describe.Partitions)[0])
+	writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
+	writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
+	messagesWritten1 += 2
 	require.NoError(t, multiWriter1.Flush(ctx))
 	require.NoError(t, multiWriter2.Flush(ctx))
 
-	multiWriter3, _ := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter3 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, topicMultiWriterSettings)
 
 	require.NoError(t, multiWriter3.Close(ctx))
 	require.NoError(t, multiWriter1.Close(ctx))
 	require.NoError(t, multiWriter2.Close(ctx))
+
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
+		ctx,
+		topicClient,
+		topicPath,
+		consumerName,
+		messagesWritten1+messagesWritten2,
+		20*time.Second,
+	))
+}
+
+func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
+	scope := newScope(t)
+	xtest.TestManyTimes(
+		t,
+		func(t testing.TB) {
+			runTestWithAutoPartitioning(t, scope)
+		},
+		xtest.StopAfter(25*time.Second),
+	)
 }

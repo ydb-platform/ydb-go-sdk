@@ -187,7 +187,7 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	}
 
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
-		_, err := wr.WaitInit(ctx)
+		_, err := wr.WaitInitInfo(ctx)
 		if err != nil {
 			p.onError(err)
 

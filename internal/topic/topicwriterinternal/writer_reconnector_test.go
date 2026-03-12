@@ -479,7 +479,7 @@ func TestWriterImpl_InitSession(t *testing.T) {
 	require.True(t, isClosed(w.firstInitResponseProcessedChan))
 }
 
-func TestWriterImpl_WaitInit(t *testing.T) {
+func TestWriterImpl_WaitInitInfo(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
 		expectedInitData := InitialInfo{
@@ -490,7 +490,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			LastSeqNumRequested: true,
 		})
 
-		initData, err := w.WaitInit(context.Background())
+		initData, err := w.WaitInitInfo(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, expectedInitData, initData)
 
@@ -498,7 +498,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		require.NoError(t, err)
 
 		// one more run is needed to check idempotency
-		anotherInitData, err := w.WaitInit(context.Background())
+		anotherInitData, err := w.WaitInitInfo(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, initData, anotherInitData)
 
@@ -515,7 +515,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			cancel()
 		}()
 
-		_, err := w.WaitInit(ctx)
+		err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, ctx.Err())
 	})
 
@@ -523,7 +523,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		_, err := w.WaitInit(ctx)
+		err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, ctx.Err())
 
 		w.onWriterChange(&SingleStreamWriter{})
@@ -539,7 +539,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			_ = w.close(ctx, testErr)
 		}()
 
-		_, err := w.WaitInit(ctx)
+		err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, testErr)
 
 		w.onWriterChange(&SingleStreamWriter{})
@@ -1058,7 +1058,7 @@ func TestWriterReconnector_WaitInit(t *testing.T) {
 					SupportedCodecs:       rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
 				})
 			}()
-			_, err := env.writer.WaitInit(env.ctx)
+			err := env.writer.WaitInit(env.ctx)
 			require.NoError(t, err)
 		})
 	})
@@ -1077,7 +1077,7 @@ func TestWriterReconnector_WaitInit(t *testing.T) {
 				time.Sleep(time.Millisecond)
 				_ = env.writer.close(env.ctx, testErr)
 			}()
-			_, err := env.writer.WaitInit(env.ctx)
+			err := env.writer.WaitInit(env.ctx)
 			require.ErrorIs(t, err, testErr)
 		})
 	})
@@ -1095,7 +1095,7 @@ func TestWriterReconnector_WaitInit(t *testing.T) {
 			ctx, cancel := context.WithTimeout(env.ctx, time.Millisecond)
 			defer cancel()
 
-			_, err := env.writer.WaitInit(ctx)
+			err := env.writer.WaitInit(ctx)
 			require.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 	})
