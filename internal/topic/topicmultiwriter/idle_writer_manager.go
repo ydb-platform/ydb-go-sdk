@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -90,7 +91,7 @@ func (m *idleWriterManager) wakeup() {
 
 func (m *idleWriterManager) run() {
 	for {
-		nextTimeout := infiniteTimeout
+		nextTimeout := value.InfiniteDuration
 		m.mu.WithLock(func() {
 			if m.idleWriters.Len() > 0 {
 				nextTimeout = time.Until(m.idleWriters.Front().Value.deadline)
