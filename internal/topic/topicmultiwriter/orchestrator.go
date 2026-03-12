@@ -370,7 +370,11 @@ func (o *orchestrator) getWriterBufferedMessages(
 }
 
 //nolint:funlen
-func (o *orchestrator) scheduleResendMessages(partitionID, maxSeqNo int64) (err error) {
+func (o *orchestrator) scheduleResendMessages(
+	partitionID,
+	maxSeqNo int64,
+	bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage,
+) (err error) {
 	inFlightIndexChain, ok := o.buf.inFlightMessagesIndex[partitionID]
 	if !ok {
 		return nil
@@ -381,11 +385,6 @@ func (o *orchestrator) scheduleResendMessages(partitionID, maxSeqNo int64) (err 
 		pendingMessagesToAdd  []messagePtr
 		messagesToResendToAdd []messagePtr
 	)
-
-	bufferedMessagesMap, err := o.getWriterBufferedMessages(partitionID)
-	if err != nil {
-		return err
-	}
 
 	for inFlightIndexChain.Len() > 0 {
 		iter := inFlightIndexChain.Front()
@@ -460,6 +459,13 @@ func (o *orchestrator) initSeqNo() error {
 	})
 
 	for _, partitionID := range partitions {
+		partitionInfo := o.partitions[partitionID]
+		if partitionInfo.Splitted() {
+			o.writerPool.forceEvict(partitionID)
+
+			continue
+		}
+
 		o.writerPool.evict(partitionID)
 	}
 
@@ -474,9 +480,18 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 		errGroup.Go(func() (resultErr error) {
 			partitionInfo := o.partitions[partition]
 
+			var seqNoAlreadyCached bool
+			o.mu.WithLock(func() {
+				seqNoAlreadyCached = partitionInfo.CachedMaxSeqNo != 0
+				maxSeqNo = max(maxSeqNo, partitionInfo.CachedMaxSeqNo)
+			})
+			if seqNoAlreadyCached {
+				return nil
+			}
+
 			var writer *writerWrapper
 			if partitionInfo.Splitted() {
-				writer, resultErr = o.createWriterToSplittedPartition(partition)
+				writer, resultErr = o.writerPool.get(partition, false, false)
 				if resultErr != nil {
 					return resultErr
 				}
@@ -497,6 +512,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 
 			o.mu.WithLock(func() {
 				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
+				partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
 			})
 
 			return nil
@@ -510,17 +526,6 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	return maxSeqNo, nil
 }
 
-func (o *orchestrator) createWriterToSplittedPartition(partitionID int64) (*writerWrapper, error) {
-	writerCfg := *o.writerCfg
-	topicwriterinternal.WithProducerID(o.writerPool.getProducerID(partitionID))(&writerCfg)
-
-	writer, err := o.multiWriterCfg.writersFactory.Create(writerCfg)
-
-	return &writerWrapper{
-		writer: writer,
-	}, err
-}
-
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	const (
 		maxRetries = 5
@@ -528,8 +533,10 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	)
 
 	var (
-		err            error
-		describeResult topictypes.TopicDescription
+		err                 error
+		describeResult      topictypes.TopicDescription
+		isAlreadySplitted   bool
+		bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage
 	)
 
 	for i := range maxRetries {
@@ -546,6 +553,12 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
+		if partition.Splitted() {
+			isAlreadySplitted = true
+
+			return
+		}
+
 		partition.Locked = true
 		partition.Children = o.getSplittedPartitionChildren(&describeResult, partitionID)
 		o.addNewPartitions(&describeResult, partitionID)
@@ -554,7 +567,17 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			o.partitionChooser.AddNewPartition(child, childPartition.FromBound, childPartition.ToBound)
 		}
 		o.partitionChooser.RemovePartition(partitionID)
+
+		bufferedMessagesMap, err = o.getWriterBufferedMessages(partitionID)
 	})
+
+	if err != nil {
+		return err
+	}
+
+	if isAlreadySplitted {
+		return nil
+	}
 
 	ancestors := o.getSplittedPartitionAncestors(&describeResult, partitionID)
 	maxSeqNo, err := o.getMaxSeqNo(ancestors)
@@ -565,7 +588,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
 		partition.Locked = false
-		err = o.scheduleResendMessages(partitionID, maxSeqNo)
+		err = o.scheduleResendMessages(partitionID, maxSeqNo, bufferedMessagesMap)
 		if err != nil {
 			resultErr = err
 
@@ -576,7 +599,9 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			o.partitions[child].Locked = false
 		}
 
-		o.writerPool.evict(partitionID)
+		for _, ancestor := range ancestors {
+			o.writerPool.evict(ancestor)
+		}
 	})
 
 	return nil

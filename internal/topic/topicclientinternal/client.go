@@ -343,7 +343,7 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 			},
 		),
 	)
-	mwCfg := c.createMultiWriterConfig(cfg, opts)
+	mwCfg := c.createMultiWriterConfig(opts)
 
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
@@ -382,7 +382,7 @@ func (c *Client) StartTransactionalWriter(
 	}
 
 	cfg := c.createWriterConfig(topicPath, opts)
-	mwCfg := c.createMultiWriterConfig(cfg, opts)
+	mwCfg := c.createMultiWriterConfig(opts)
 
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
@@ -418,10 +418,7 @@ func (c *Client) StartTransactionalWriter(
 	return topicwriter.NewTxWriterInternal(txWriter), nil
 }
 
-func (c *Client) createMultiWriterConfig(
-	cfg topicwriterinternal.WriterReconnectorConfig,
-	opts []topicoptions.WriterOption,
-) *internalmultiwriter.MultiWriterConfig {
+func (c *Client) createMultiWriterConfig(opts []topicoptions.WriterOption) *internalmultiwriter.MultiWriterConfig {
 	mwCfg := internalmultiwriter.MultiWriterConfig{}
 
 	for _, opt := range opts {

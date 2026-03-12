@@ -14,12 +14,13 @@ import (
 type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDescription, error)
 
 type PartitionInfo struct {
-	ID        int64
-	FromBound []byte
-	ToBound   []byte
-	ParentID  *int64
-	Children  []int64
-	Locked    bool
+	ID             int64
+	FromBound      []byte
+	ToBound        []byte
+	ParentID       *int64
+	Children       []int64
+	Locked         bool
+	CachedMaxSeqNo int64
 }
 
 func (p *PartitionInfo) Splitted() bool {

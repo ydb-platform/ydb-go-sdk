@@ -123,12 +123,20 @@ func (p *partitionWriterPool) get(partitionID int64, direct bool, doNotCreate bo
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	finish := func() (*writerWrapper, error) {
+		if doNotCreate {
+			return nil, nil //nolint:nilnil
+		}
+
+		return p.createNewWriter(partitionID, direct)
+	}
+
 	existingWriter, ok := p.writers[partitionID]
 	if ok {
 		if existingWriter.direct != direct {
-			p.forceEvict(partitionID)
+			p.forceEvictNeedLock(partitionID)
 
-			return p.createNewWriter(partitionID, direct)
+			return finish()
 		}
 
 		return existingWriter, nil
@@ -137,9 +145,9 @@ func (p *partitionWriterPool) get(partitionID int64, direct bool, doNotCreate bo
 	idleWriter, ok := p.idle.getWriterIfExists(partitionID)
 	if ok {
 		if idleWriter.direct != direct {
-			p.forceEvict(partitionID)
+			_ = idleWriter.Close(p.ctx)
 
-			return p.createNewWriter(partitionID, direct)
+			return finish()
 		}
 
 		p.writers[partitionID] = idleWriter
@@ -147,11 +155,7 @@ func (p *partitionWriterPool) get(partitionID int64, direct bool, doNotCreate bo
 		return idleWriter, nil
 	}
 
-	if doNotCreate {
-		return nil, nil //nolint:nilnil
-	}
-
-	return p.createNewWriter(partitionID, direct)
+	return finish()
 }
 
 func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*writerWrapper, error) {
@@ -177,6 +181,9 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 		direct: direct,
 	}
 	p.writers[partitionID] = wrapper
+	if !direct {
+		return wrapper, nil
+	}
 
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
 		_, err := wr.WaitInit(ctx)
@@ -203,6 +210,13 @@ func (p *partitionWriterPool) evict(partitionID int64) {
 	}
 
 	delete(p.writers, partitionID)
+
+	if !writer.direct {
+		_ = writer.Close(p.ctx)
+
+		return
+	}
+
 	p.idle.addWriter(partitionID, writer)
 	p.idle.wakeup()
 }
@@ -211,6 +225,10 @@ func (p *partitionWriterPool) forceEvict(partitionID int64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	p.forceEvictNeedLock(partitionID)
+}
+
+func (p *partitionWriterPool) forceEvictNeedLock(partitionID int64) {
 	writer, ok := p.writers[partitionID]
 	if !ok {
 		return
