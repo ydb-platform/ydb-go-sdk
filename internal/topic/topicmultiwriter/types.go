@@ -2,7 +2,6 @@ package topicmultiwriter
 
 import (
 	"context"
-	"io"
 	"sync/atomic"
 	"time"
 
@@ -41,7 +40,6 @@ type message struct {
 	onAckCallback func()
 	ackReceived   bool
 	sent          bool
-	dataReader    io.ReadSeeker
 }
 
 type messagePtr *xlist.Element[message]

@@ -1,6 +1,7 @@
 package topicmultiwriter
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -80,7 +81,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			wr, err := s.writerPool.get(msg.PartitionID, true)
+			wr, err := s.writerPool.get(msg.PartitionID, true, false)
 			if err != nil {
 				return fmt.Errorf("failed to get writer: %w", err)
 			}
@@ -89,9 +90,14 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			err = wr.Write(s.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage})
-			_, _ = msg.dataReader.Seek(0, io.SeekStart)
+			msgData, err := io.ReadAll(msg.Data)
 			if err != nil {
+				return fmt.Errorf("failed to read message data: %w", err)
+			}
+
+			msg.Data = bytes.NewReader(msgData)
+			if err = wr.Write(s.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage}); err != nil {
+				iter.Value.Value.Data = bytes.NewReader(msgData)
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
