@@ -481,12 +481,12 @@ func (o *orchestrator) initSeqNo() error {
 			break
 		}
 
-		if isOperationErrorOverloaded(err) {
+		if !isOperationErrorOverloaded(err) || i == maxRetries-1 {
 			return err
 		}
 
-		if i == maxRetries-1 {
-			return err
+		for _, partitionID := range partitions {
+			o.writerPool.forceEvict(partitionID)
 		}
 		time.Sleep(retryDelay)
 	}
