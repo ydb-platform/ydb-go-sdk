@@ -222,13 +222,6 @@ func (p *partitionWriterPool) evict(partitionID int64) {
 	p.idle.wakeup()
 }
 
-func (p *partitionWriterPool) forceEvict(partitionID int64) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.forceEvictNeedLock(partitionID)
-}
-
 func (p *partitionWriterPool) forceEvictNeedLock(partitionID int64) {
 	writer, ok := p.writers[partitionID]
 	if !ok {
