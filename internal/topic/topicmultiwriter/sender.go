@@ -1,10 +1,8 @@
 package topicmultiwriter
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -90,14 +88,14 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			msgData, err := io.ReadAll(msg.Data)
-			if err != nil {
-				return fmt.Errorf("failed to read message data: %w", err)
-			}
+			// msgData, err := io.ReadAll(msg.Data)
+			// if err != nil {
+			// 	return fmt.Errorf("failed to read message data: %w", err)
+			// }
 
-			msg.Data = bytes.NewReader(msgData)
+			// msg.Data = bytes.NewReader(msgData)
 			if err = wr.Write(s.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage}); err != nil {
-				iter.Value.Value.Data = bytes.NewReader(msgData)
+				// iter.Value.Value.Data = bytes.NewReader(msgData)
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 

@@ -257,16 +257,16 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		w.semaphore.Release(semaphoreWeight)
 	}()
 
+	if err := w.waitFirstInitResponse(ctx); err != nil {
+		return err
+	}
+
 	messagesSlice, err := w.createMessagesWithContent(messages)
 	if err != nil {
 		return err
 	}
 
 	if err = w.checkMessages(messagesSlice); err != nil {
-		return err
-	}
-
-	if err = w.waitFirstInitResponse(ctx); err != nil {
 		return err
 	}
 
