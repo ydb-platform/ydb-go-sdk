@@ -460,14 +460,35 @@ func (o *orchestrator) scheduleResendMessages(
 }
 
 func (o *orchestrator) initSeqNo() error {
+	const (
+		maxRetries = 5
+		retryDelay = 100 * time.Millisecond
+	)
+
 	partitions := make([]int64, 0, len(o.partitions))
 	for partitionID := range o.partitions {
 		partitions = append(partitions, partitionID)
 	}
 
-	maxSeqNo, err := o.getMaxSeqNo(partitions)
-	if err != nil {
-		return err
+	var (
+		maxSeqNo int64
+		err      error
+	)
+
+	for i := range maxRetries {
+		maxSeqNo, err = o.getMaxSeqNo(partitions)
+		if err == nil {
+			break
+		}
+
+		if isOperationErrorOverloaded(err) {
+			return err
+		}
+
+		if i == maxRetries-1 {
+			return err
+		}
+		time.Sleep(retryDelay)
 	}
 
 	o.mu.WithLock(func() {
@@ -475,13 +496,6 @@ func (o *orchestrator) initSeqNo() error {
 	})
 
 	for _, partitionID := range partitions {
-		partitionInfo := o.partitions[partitionID]
-		if partitionInfo.Splitted() {
-			o.writerPool.forceEvict(partitionID)
-
-			continue
-		}
-
 		o.writerPool.evict(partitionID)
 	}
 

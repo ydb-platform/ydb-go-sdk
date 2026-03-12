@@ -223,11 +223,12 @@ func (q *messageQueue) Close(err error) error {
 	isFirstTimeClosed := false
 	q.m.Lock()
 	defer func() {
+		seqNoToOrderIDLen := len(q.seqNoToOrderID)
 		q.m.Unlock()
 
 		// release all
 		if isFirstTimeClosed && q.OnAckReceived != nil {
-			q.OnAckReceived(len(q.seqNoToOrderID))
+			q.OnAckReceived(seqNoToOrderIDLen)
 		}
 	}()
 
