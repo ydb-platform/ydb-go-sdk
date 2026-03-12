@@ -233,11 +233,6 @@ func newTestMultiWriterWithCustomWritersFactory(
 	withWritersFactory(writersFactory)(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 
-	options := []topicwriterinternal.PublicWriterOption{
-		topicwriterinternal.WithTopic("test/topic"),
-		topicwriterinternal.WithAutosetCreatedTime(false),
-	}
-	options = append(options, opts...)
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)

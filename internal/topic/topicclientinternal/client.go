@@ -438,13 +438,15 @@ func (c *Client) createWriterConfig(
 	topicPath string,
 	opts []topicoptions.WriterOption,
 ) topicwriterinternal.WriterReconnectorConfig {
-	options := []topicwriterinternal.PublicWriterOption{
+	options := make([]topicwriterinternal.PublicWriterOption, 0, len(opts)+5)
+	options = append(
+		options,
 		topicwriterinternal.WithRawClient(&c.rawClient),
 		topicwriterinternal.WithTopic(topicPath),
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
 		topicwriterinternal.WithTrace(c.cfg.Trace),
 		topicwriterinternal.WithCredentials(c.cred),
-	}
+	)
 
 	for _, opt := range opts {
 		options = append(options, func(cfg *topicwriterinternal.WriterReconnectorConfig) {

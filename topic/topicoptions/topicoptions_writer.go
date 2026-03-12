@@ -252,7 +252,10 @@ func WithCodec(codec topictypes.Codec) WriterOption {
 
 // WithWriterCodec disable codec auto select and force set codec for the write session
 func WithWriterCodec(codec topictypes.Codec) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig, multiWriterCfg *topicmultiwriter.MultiWriterConfig) {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
 		if writerCfg == nil {
 			return
 		}

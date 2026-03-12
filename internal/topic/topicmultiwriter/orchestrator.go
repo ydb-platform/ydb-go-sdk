@@ -348,7 +348,7 @@ func (o *orchestrator) rechoosePartition(msg *message) (err error) {
 func (o *orchestrator) getWriterBufferedMessages(
 	partitionID int64,
 ) (map[int64]topicwriterinternal.PublicMessage, error) {
-	writer, err := o.writerPool.get(partitionID, true, false)
+	writer, err := o.writerPool.get(partitionID, true, true)
 	if err != nil {
 		return nil, err
 	}
@@ -526,17 +526,10 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	return maxSeqNo, nil
 }
 
-func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
+func (o *orchestrator) describeTopicWithRetries() (describeResult topictypes.TopicDescription, err error) {
 	const (
 		maxRetries = 5
 		retryDelay = 100 * time.Millisecond
-	)
-
-	var (
-		err                 error
-		describeResult      topictypes.TopicDescription
-		isAlreadySplitted   bool
-		bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage
 	)
 
 	for i := range maxRetries {
@@ -545,10 +538,24 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			break
 		}
 
-		if err != nil && i == maxRetries-1 {
-			return err
+		if i == maxRetries-1 {
+			return topictypes.TopicDescription{}, err
 		}
 		time.Sleep(retryDelay)
+	}
+
+	return describeResult, nil
+}
+
+func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
+	var (
+		isAlreadySplitted   bool
+		bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage
+	)
+
+	describeResult, err := o.describeTopicWithRetries()
+	if err != nil {
+		return err
 	}
 
 	o.mu.WithLock(func() {
@@ -567,16 +574,11 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			o.partitionChooser.AddNewPartition(child, childPartition.FromBound, childPartition.ToBound)
 		}
 		o.partitionChooser.RemovePartition(partitionID)
-
 		bufferedMessagesMap, err = o.getWriterBufferedMessages(partitionID)
 	})
 
-	if err != nil {
+	if err != nil || isAlreadySplitted {
 		return err
-	}
-
-	if isAlreadySplitted {
-		return nil
 	}
 
 	ancestors := o.getSplittedPartitionAncestors(&describeResult, partitionID)
