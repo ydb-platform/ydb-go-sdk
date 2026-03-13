@@ -1,3 +1,5 @@
+* Fixed a bug where sessions were not removed from the pool on context errors (`context.Canceled`, `context.DeadlineExceeded`), which caused `SESSION_BUSY` errors when the server-side query was still in progress
+
 ## v3.127.2
 * Added `table/types.{TypeTimestamp64,TypeDatetime64}` constants (primitive type IDs)
 * Topic reader: improved concurrency call errors
