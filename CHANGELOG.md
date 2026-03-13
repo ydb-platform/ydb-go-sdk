@@ -15,6 +15,14 @@
 * Fixed a bug where sessions were not removed from the pool on context errors (`context.Canceled`, `context.DeadlineExceeded`), which caused `SESSION_BUSY` errors when the server-side query was still in progress
 * Added CHANGELOG.md update requirements to AGENTS.md to ensure pull requests include user-facing change descriptions
 * Added `topicproducer` package with experimental API for writing messages to topics
+* New options for topicwriter:
+  - `WithProducerIDPrefix`
+  - `WithPartitioningKeyHasher`
+  - `WithPartitionChooserStrategy`
+  - `WithCustomPartitionChooser`
+  - `WithWriterIdleTimeout`
+  - `WithWriterPartitionByKey`
+  - `WithWriterPartitionByPartitionID`
 
 ## v3.127.2
 * Added `table/types.{TypeTimestamp64,TypeDatetime64}` constants (primitive type IDs)
