@@ -17,6 +17,8 @@ import (
 func TestMustDeleteTableOrQuerySession(t *testing.T) {
 	t.Run("True", func(t *testing.T) {
 		for _, err := range []error{
+			context.Canceled,
+			context.DeadlineExceeded,
 			Transport(
 				//nolint:staticcheck
 				// ignore SA1019
@@ -63,8 +65,6 @@ func TestMustDeleteTableOrQuerySession(t *testing.T) {
 	t.Run("False", func(t *testing.T) {
 		for _, err := range []error{
 			fmt.Errorf("unknown error"), // retryer given unknown error - we will not operationStatus and will close session
-			context.DeadlineExceeded,
-			context.Canceled,
 			Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
 			Transport(grpcStatus.Error(grpcCodes.OutOfRange, "")),
 			Operation(

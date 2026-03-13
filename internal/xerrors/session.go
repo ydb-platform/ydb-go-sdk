@@ -6,6 +6,13 @@ import (
 )
 
 func MustDeleteTableOrQuerySession(err error) bool {
+	// Context errors (context.Canceled, context.DeadlineExceeded) indicate that a
+	// query may still be running on the server side. The session must be invalidated
+	// to prevent SESSION_BUSY errors on subsequent requests.
+	if IsContextError(err) {
+		return true
+	}
+
 	if IsOperationError(err,
 		Ydb.StatusIds_BAD_SESSION,
 		Ydb.StatusIds_SESSION_BUSY,
