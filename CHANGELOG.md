@@ -1,3 +1,5 @@
+* Pessimized connection to YDB node when `OVERLOADED` operation error is returned on `CreateSession` request, preventing the client-side balancer from selecting the overloaded node for further session creation
+
 ## v3.127.6
 * Added `pkg/xslices.Subtract` helper for subtract elements from source slice with order preservation
 
