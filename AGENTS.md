@@ -21,3 +21,21 @@ curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install
 ```
 (The version `v2.4.0` is specified in [`.github/workflows/lint.yml`](.github/workflows/lint.yml#L10). This installation command is taken from the official documentation)
 
+## Changelog
+
+**Every pull request must include a changelog entry in [`CHANGELOG.md`](CHANGELOG.md).**
+
+Rules for adding a changelog entry:
+
+1. **Only include user-facing changes**: API changes (additions, renames, deletions, deprecations) or behavior changes. Internal refactoring or non-observable changes do not require an entry.
+2. **Use past tense verbs** (e.g., "Added", "Fixed", "Changed", "Removed", "Deprecated").
+3. **Insert the new line(s) at the very beginning of `CHANGELOG.md`**, before any existing entries.
+4. **Do not include a version number** — version numbers are assigned by the maintainer at release time (see [`.github/workflows/publish.yml`](.github/workflows/publish.yml)).
+
+Example entry format:
+```markdown
+* Added `query.WithLazyTx(bool)` option for `query.Client.DoTx` calls to enable/disable lazy transactions per operation
+```
+
+If the pull request contains no user-facing changes, add the label `no changelog` to the PR to skip the changelog check.
+
