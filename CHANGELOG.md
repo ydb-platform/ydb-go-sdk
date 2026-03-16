@@ -1,4 +1,4 @@
-* Stopped tracing `SessionDelete` in tableService spans adapter (no value for observability; avoid tying to request context)
+* Stopped tracing `SessionDelete` in `tableService` spans adapter (no value for observability)
 
 ## v3.127.3
 * Fixed a bug where sessions were not removed from the pool on context errors (`context.Canceled`, `context.DeadlineExceeded`), which caused `SESSION_BUSY` errors when the server-side query was still in progress
