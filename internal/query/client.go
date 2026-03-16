@@ -7,10 +7,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -651,50 +651,36 @@ func newWithQueryServiceClient(ctx context.Context,
 			}),
 			pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
 			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
-				s, err := createExplicitSession(conn.BanOnOverloaded(ctx), cfg, client, cc)
+				var (
+					createCtx    context.Context
+					cancelCreate context.CancelFunc
+				)
+				if d := cfg.SessionCreateTimeout(); d > 0 {
+					createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
+				} else {
+					createCtx, cancelCreate = xcontext.WithCancel(ctx)
+				}
+				defer cancelCreate()
+
+				if !cfg.DisableSessionBalancer() {
+					createCtx = meta.WithAllowFeatures(createCtx, meta.HintSessionBalancer)
+				}
+
+				s, err := createSession(conn.BanOnOverloaded(createCtx), client,
+					WithConn(cc),
+					WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+					WithTrace(cfg.Trace()),
+				)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
+
+				s.lazyTx = cfg.LazyTx()
 
 				return s, nil
 			}),
 		),
 	}
-}
-
-func createExplicitSession(
-	ctx context.Context,
-	cfg *config.Config,
-	client Ydb_Query_V1.QueryServiceClient,
-	cc grpc.ClientConnInterface,
-) (_ *Session, err error) {
-	var (
-		createCtx    context.Context
-		cancelCreate context.CancelFunc
-	)
-	if d := cfg.SessionCreateTimeout(); d > 0 {
-		createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
-	} else {
-		createCtx, cancelCreate = xcontext.WithCancel(ctx)
-	}
-	defer cancelCreate()
-
-	if !cfg.DisableSessionBalancer() {
-		createCtx = meta.WithAllowFeatures(createCtx, meta.HintSessionBalancer)
-	}
-
-	s, err := createSession(createCtx, client,
-		WithConn(cc),
-		WithDeleteTimeout(cfg.SessionDeleteTimeout()),
-		WithTrace(cfg.Trace()),
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	s.lazyTx = cfg.LazyTx()
-
-	return s, nil
 }
 
 func poolTrace(t *trace.Query) *pool.Trace {
