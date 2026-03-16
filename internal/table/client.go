@@ -8,10 +8,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -40,7 +40,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		config: config,
 		cc:     cc,
 		build: func(ctx context.Context) (s *Session, err error) {
-			return newSession(ctx, cc, config)
+			return newSession(conn.BanOnOverloaded(ctx), cc, config)
 		},
 		pool: pool.New[*Session, Session](ctx,
 			pool.WithLimit[*Session, Session](config.SizeLimit()),
@@ -58,12 +58,11 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			}),
 			pool.WithClock[*Session, Session](config.Clock()),
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-				s, err := createExplicitSession(conn.BanOnOverloaded(ctx), cc, config)
-				if err != nil {
-					return nil, err
+				if !config.DisableSessionBalancer() {
+					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
 				}
 
-				return s, nil
+				return newSession(conn.BanOnOverloaded(ctx), cc, config)
 			}),
 			pool.WithTrace[*Session, Session](&pool.Trace{
 				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
@@ -108,15 +107,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		),
 		done: make(chan struct{}),
 	}
-}
-
-// createExplicitSession creates a new session, optionally enabling session balancer hints.
-func createExplicitSession(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (*Session, error) {
-	if !cfg.DisableSessionBalancer() {
-		ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-	}
-
-	return newSession(ctx, cc, cfg)
 }
 
 // Client is a set of session instances that may be reused.
