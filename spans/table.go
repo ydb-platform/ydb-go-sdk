@@ -118,23 +118,8 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 
 		return nil
 	}
-	t.OnSessionDelete = func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
-		if adapter.Details()&trace.TableSessionLifeCycleEvents != 0 {
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-				kv.String("node_id", nodeID(safeID(info.Session))),
-				kv.String("session_id", safeID(info.Session)),
-			)
-
-			return func(info trace.TableSessionDeleteDoneInfo) {
-				finish(start, info.Error)
-			}
-		}
-
-		return nil
-	}
+	// SessionDelete is not traced: it has no value for observability and should not be tied to a request context.
+	t.OnSessionDelete = nil
 	t.OnSessionKeepAlive = func(info trace.TableKeepAliveStartInfo) func(trace.TableKeepAliveDoneInfo) {
 		if adapter.Details()&trace.TableSessionLifeCycleEvents != 0 {
 			start := childSpanWithReplaceCtx(
