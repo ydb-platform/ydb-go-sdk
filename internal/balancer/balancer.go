@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
@@ -395,12 +396,17 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 
 	if err = f(ctx, cc); err != nil {
 		if conn.UseWrapping(ctx) {
-			if credentials.IsAccessError(err) {
+			switch {
+			case credentials.IsAccessError(err):
 				err = credentials.AccessError("no access", err,
 					credentials.WithAddress(cc.Endpoint().String()),
 					credentials.WithNodeID(cc.Endpoint().NodeID()),
 					credentials.WithCredentials(b.driverConfig.Credentials()),
 				)
+			case xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED):
+				if conn.NeedBanOnOverloaded(ctx) {
+					_ = cc.SetState(ctx, conn.Banned)
+				}
 			}
 
 			return xerrors.WithStackTrace(err)

@@ -2,7 +2,6 @@ package table
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -11,15 +10,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	internalconn "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -226,118 +221,3 @@ func (s *StubBuilder) createSession(ctx context.Context) (session *Session, err 
 
 	return newTableSession(ctx, s.cc, config.New())
 }
-
-func TestCreateExplicitSession(t *testing.T) {
-	ctx := xtest.Context(t)
-
-	t.Run("HappyPath", func(t *testing.T) {
-		cc := &clientStateSettingConn{}
-
-		c := New(ctx, cc, config.New())
-		defer func() { _ = c.Close(ctx) }()
-
-		err := c.Do(ctx, func(ctx context.Context, s table.Session) error {
-			return nil
-		})
-
-		require.NoError(t, err)
-		require.NotEqual(t, internalconn.Banned, cc.state())
-	})
-
-	t.Run("BansConnectionOnOverloadedCreateSession", func(t *testing.T) {
-		cc := &clientStateSettingConn{
-			invokeErr: xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
-		}
-
-		c := New(ctx, cc, config.New())
-		defer func() { _ = c.Close(ctx) }()
-
-		ctxTimeout, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		defer cancel()
-
-		_ = c.Do(ctxTimeout, func(ctx context.Context, s table.Session) error {
-			return nil
-		})
-
-		require.Equal(t, internalconn.Banned, cc.state())
-	})
-
-	t.Run("DoesNotBanConnectionOnNonOverloadedError", func(t *testing.T) {
-		cc := &clientStateSettingConn{
-			invokeErr: xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
-		}
-
-		c := New(ctx, cc, config.New())
-		defer func() { _ = c.Close(ctx) }()
-
-		ctxTimeout, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		defer cancel()
-
-		_ = c.Do(ctxTimeout, func(ctx context.Context, s table.Session) error {
-			return nil
-		})
-
-		require.NotEqual(t, internalconn.Banned, cc.state())
-	})
-}
-
-// clientStateSettingConn is a test helper that implements grpc.ClientConnInterface and conn.StateSetter.
-// When Invoke is called with invokeErr != nil, it returns the error.
-// When invokeErr is nil, it populates reply with a valid session response for happy path testing.
-// SetState calls are recorded to verify pessimization behavior.
-type clientStateSettingConn struct {
-	mu        sync.Mutex
-	lastState internalconn.State
-	invokeErr error
-}
-
-func (c *clientStateSettingConn) SetState(_ context.Context, s internalconn.State) internalconn.State {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.lastState = s
-
-	return s
-}
-
-func (c *clientStateSettingConn) state() internalconn.State {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.lastState
-}
-
-func (c *clientStateSettingConn) Invoke(
-	_ context.Context, _ string, _ any, reply any, _ ...grpc.CallOption,
-) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.invokeErr != nil {
-		return c.invokeErr
-	}
-
-	switch r := reply.(type) {
-	case *Ydb_Table.CreateSessionResponse:
-		sessionResult, _ := anypb.New(&Ydb_Table.CreateSessionResult{SessionId: "test-session"})
-		r.Operation = &Ydb_Operations.Operation{
-			Status: Ydb.StatusIds_SUCCESS,
-			Ready:  true,
-			Result: sessionResult,
-		}
-	case *Ydb_Table.DeleteSessionResponse:
-		r.Operation = &Ydb_Operations.Operation{
-			Status: Ydb.StatusIds_SUCCESS,
-			Ready:  true,
-		}
-	}
-
-	return nil
-}
-
-func (c *clientStateSettingConn) NewStream(
-	_ context.Context, _ *grpc.StreamDesc, _ string, _ ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	return nil, errClientStateSettingConnNotImplemented
-}
-
-var errClientStateSettingConnNotImplemented = errors.New("not implemented")

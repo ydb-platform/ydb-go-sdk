@@ -47,15 +47,8 @@ type Conn interface {
 	Ping(ctx context.Context) error
 	IsState(states ...State) bool
 	GetState() State
-	StateSetter
-	Unban(ctx context.Context) State
-}
-
-// StateSetter is implemented by connections that support explicit state management.
-// It allows callers to directly set the connection state (e.g., to Banned) when
-// a specific error condition is detected, such as OVERLOADED on CreateSession.
-type StateSetter interface {
 	SetState(ctx context.Context, state State) State
+	Unban(ctx context.Context) State
 }
 
 type (

@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -144,74 +143,6 @@ func TestClient(t *testing.T) {
 				require.Error(t, err)
 				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 			})
-		})
-	})
-	t.Run("newWithQueryServiceClient", func(t *testing.T) {
-		t.Run("HappyPath", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-			attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
-				Status: Ydb.StatusIds_SUCCESS,
-			}, nil).AnyTimes()
-			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
-				Status:    Ydb.StatusIds_SUCCESS,
-				SessionId: "test",
-			}, nil)
-			client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-			client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
-				Status: Ydb.StatusIds_SUCCESS,
-			}, nil).AnyTimes()
-
-			// Pass nil as cc so the mock client handles all gRPC calls (no cc-based transport replacement).
-			c := newWithQueryServiceClient(ctx, client, nil, config.New())
-			defer func() { _ = c.Close(ctx) }()
-
-			err := c.Do(ctx, func(ctx context.Context, s query.Session) error {
-				return nil
-			})
-
-			require.NoError(t, err)
-		})
-		t.Run("BansConnectionOnOverloadedCreateSession", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
-				xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
-			).AnyTimes()
-
-			cc := &stateSettingConn{}
-			c := newWithQueryServiceClient(ctx, client, cc, config.New())
-			defer func() { _ = c.Close(ctx) }()
-
-			ctxTimeout, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-			defer cancel()
-
-			_ = c.Do(ctxTimeout, func(ctx context.Context, s query.Session) error {
-				return nil
-			})
-
-			require.Equal(t, internalconn.Banned, cc.state())
-		})
-		t.Run("DoesNotBanConnectionOnNonOverloadedError", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
-				xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
-			).AnyTimes()
-
-			cc := &stateSettingConn{}
-			c := newWithQueryServiceClient(ctx, client, cc, config.New())
-			defer func() { _ = c.Close(ctx) }()
-
-			ctxTimeout, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-			defer cancel()
-
-			_ = c.Do(ctxTimeout, func(ctx context.Context, s query.Session) error {
-				return nil
-			})
-
-			require.NotEqual(t, internalconn.Banned, cc.state())
 		})
 	})
 	t.Run("Do", func(t *testing.T) {

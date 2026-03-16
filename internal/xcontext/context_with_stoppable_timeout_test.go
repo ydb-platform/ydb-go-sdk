@@ -6,10 +6,10 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"testing/synctest"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )

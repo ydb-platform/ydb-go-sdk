@@ -58,14 +58,8 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			}),
 			pool.WithClock[*Session, Session](config.Clock()),
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-				s, err := createExplicitSession(ctx, cc, config)
+				s, err := createExplicitSession(conn.BanOnOverloaded(ctx), cc, config)
 				if err != nil {
-					if xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED) {
-						if ss, ok := cc.(conn.StateSetter); ok {
-							ss.SetState(ctx, conn.Banned)
-						}
-					}
-
 					return nil, err
 				}
 

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
@@ -652,14 +651,8 @@ func newWithQueryServiceClient(ctx context.Context,
 			}),
 			pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
 			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
-				s, err := createExplicitSession(ctx, cfg, client, cc)
+				s, err := createExplicitSession(conn.BanOnOverloaded(ctx), cfg, client, cc)
 				if err != nil {
-					if xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED) {
-						if ss, ok := cc.(conn.StateSetter); ok {
-							ss.SetState(ctx, conn.Banned)
-						}
-					}
-
 					return nil, xerrors.WithStackTrace(err)
 				}
 
