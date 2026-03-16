@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -58,6 +59,12 @@ func (m PositionalArgs) ToYdb(sql string, args ...any) (
 	}
 
 	if len(args) != position {
+		// If no positional '?' were found but all args are already bound parameters
+		// (e.g. passed through from NumericArgs), pass them through unchanged.
+		if position == 0 && allBoundParams(args) {
+			return buffer.String(), args, nil
+		}
+
 		return "", nil, xerrors.WithStackTrace(
 			fmt.Errorf("%w: (positional args %d, query args %d)", ErrInconsistentArgs, position, len(args)),
 		)
@@ -110,4 +117,17 @@ func positionalArgsStateFn(l *sqlLexer) stateFn {
 			return nil
 		}
 	}
+}
+
+// allBoundParams reports whether all args are already-bound *params.Parameter values.
+// This is used to detect args that were pre-processed by a prior binding (e.g. NumericArgs)
+// so that PositionalArgs can pass them through without raising an inconsistency error.
+func allBoundParams(args []any) bool {
+	for _, arg := range args {
+		if _, ok := arg.(*params.Parameter); !ok {
+			return false
+		}
+	}
+
+	return true
 }

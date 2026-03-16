@@ -161,6 +161,72 @@ SELECT $p0, $p1, $p2`,
 		{
 			b: testutil.QueryBind(
 				ydb.WithAutoDeclare(),
+				ydb.WithPositionalArgs(),
+				ydb.WithNumericArgs(),
+			),
+			sql: "SELECT ?, ?, ?",
+			args: []interface{}{
+				1,
+				"test",
+				[]string{
+					"test1",
+					"test2",
+					"test3",
+				},
+			},
+			yql: `-- bind declares
+DECLARE $p0 AS Int32;
+DECLARE $p1 AS Utf8;
+DECLARE $p2 AS List<Utf8>;
+
+-- origin query with positional args replacement
+SELECT $p0, $p1, $p2`,
+			params: table.NewQueryParameters(
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.TextValue("test")),
+				table.ValueParam("$p2", types.ListValue(
+					types.TextValue("test1"),
+					types.TextValue("test2"),
+					types.TextValue("test3"),
+				)),
+			),
+		},
+		{
+			b: testutil.QueryBind(
+				ydb.WithAutoDeclare(),
+				ydb.WithPositionalArgs(),
+				ydb.WithNumericArgs(),
+			),
+			sql: "SELECT $1, $2, $3",
+			args: []interface{}{
+				1,
+				"test",
+				[]string{
+					"test1",
+					"test2",
+					"test3",
+				},
+			},
+			yql: `-- bind declares
+DECLARE $p0 AS Int32;
+DECLARE $p1 AS Utf8;
+DECLARE $p2 AS List<Utf8>;
+
+-- origin query with numeric args replacement
+SELECT $p0, $p1, $p2`,
+			params: table.NewQueryParameters(
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.TextValue("test")),
+				table.ValueParam("$p2", types.ListValue(
+					types.TextValue("test1"),
+					types.TextValue("test2"),
+					types.TextValue("test3"),
+				)),
+			),
+		},
+		{
+			b: testutil.QueryBind(
+				ydb.WithAutoDeclare(),
 				ydb.WithNumericArgs(),
 			),
 			sql: "SELECT $1, $2, $3, $1, $2",
