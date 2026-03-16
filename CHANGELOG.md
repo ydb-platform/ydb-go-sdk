@@ -1,5 +1,6 @@
+* Stopped tracing `SessionDelete` in tableService spans adapter (no value for observability; avoid tying to request context)
+
 ## v3.127.3
-* Stopped tracing `SessionDelete` in table spans adapter (no value for observability; avoid tying to request context)
 * Fixed a bug where sessions were not removed from the pool on context errors (`context.Canceled`, `context.DeadlineExceeded`), which caused `SESSION_BUSY` errors when the server-side query was still in progress
 * Added CHANGELOG.md update requirements to AGENTS.md to ensure pull requests include user-facing change descriptions
 
