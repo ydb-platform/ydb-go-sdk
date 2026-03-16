@@ -660,7 +660,7 @@ func newWithQueryServiceClient(ctx context.Context,
 						}
 					}
 
-					return nil, err
+					return nil, xerrors.WithStackTrace(err)
 				}
 
 				return s, nil
