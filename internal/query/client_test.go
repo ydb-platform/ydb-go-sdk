@@ -5,7 +5,9 @@ import (
 	"errors"
 	"io"
 	"math/rand"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -19,6 +21,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	internalconn "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
@@ -141,6 +144,48 @@ func TestClient(t *testing.T) {
 				require.Error(t, err)
 				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 			})
+		})
+	})
+	t.Run("newWithQueryServiceClient", func(t *testing.T) {
+		t.Run("BansConnectionOnOverloadedCreateSession", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
+				xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+			).AnyTimes()
+
+			cc := &stateSettingConn{}
+			c := newWithQueryServiceClient(ctx, client, cc, config.New())
+			defer func() { _ = c.Close(ctx) }()
+
+			ctxTimeout, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+			defer cancel()
+
+			_ = c.Do(ctxTimeout, func(ctx context.Context, s query.Session) error {
+				return nil
+			})
+
+			require.Equal(t, internalconn.Banned, cc.state())
+		})
+		t.Run("DoesNotBanConnectionOnNonOverloadedError", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
+				xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+			).AnyTimes()
+
+			cc := &stateSettingConn{}
+			c := newWithQueryServiceClient(ctx, client, cc, config.New())
+			defer func() { _ = c.Close(ctx) }()
+
+			ctxTimeout, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+			defer cancel()
+
+			_ = c.Do(ctxTimeout, func(ctx context.Context, s query.Session) error {
+				return nil
+			})
+
+			require.NotEqual(t, internalconn.Banned, cc.state())
 		})
 	})
 	t.Run("Do", func(t *testing.T) {
@@ -1884,6 +1929,42 @@ func testPool(
 		pool.WithCreateItemFunc(createSession),
 	)
 }
+
+// stateSettingConn is a test helper that implements grpc.ClientConnInterface and conn.StateSetter.
+// It records SetState calls so tests can verify pessimization behavior.
+type stateSettingConn struct {
+	mu        sync.Mutex
+	lastState internalconn.State
+}
+
+func (c *stateSettingConn) SetState(_ context.Context, s internalconn.State) internalconn.State {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastState = s
+
+	return s
+}
+
+func (c *stateSettingConn) state() internalconn.State {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.lastState
+}
+
+func (c *stateSettingConn) Invoke(
+	_ context.Context, _ string, _ any, _ any, _ ...grpc.CallOption,
+) error {
+	return nil
+}
+
+func (c *stateSettingConn) NewStream(
+	_ context.Context, _ *grpc.StreamDesc, _ string, _ ...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	return nil, errNotImplemented
+}
+
+var errNotImplemented = errors.New("not implemented")
 
 func TestQueryScript(t *testing.T) {
 	ctx := xtest.Context(t)

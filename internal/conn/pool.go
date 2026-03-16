@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
@@ -108,7 +107,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		// grpcCodes.Internal,
 		// grpcCodes.DataLoss,
 		// grpcCodes.Unauthenticated,
-	) && !xerrors.IsOperationError(cause, Ydb.StatusIds_OVERLOADED) {
+	) {
 		return
 	}
 

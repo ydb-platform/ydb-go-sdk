@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
@@ -390,8 +389,6 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 				b.pool.Allow(ctx, cc)
 			}
 		} else if conn.IsBadConn(err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-			b.pool.Ban(ctx, cc, err)
-		} else if conn.IsPessimizeOnOverloaded(ctx) && xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED) {
 			b.pool.Ban(ctx, cc, err)
 		}
 	}()

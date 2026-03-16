@@ -34,22 +34,3 @@ func TestUseWrapping(t *testing.T) {
 		require.False(t, UseWrapping(ctx))
 	})
 }
-
-func TestWithPessimizeOnOverloaded(t *testing.T) {
-	t.Run("DefaultContextNotPessimize", func(t *testing.T) {
-		ctx := context.Background()
-		require.False(t, IsPessimizeOnOverloaded(ctx))
-	})
-
-	t.Run("MarkedContextPessimize", func(t *testing.T) {
-		ctx := WithPessimizeOnOverloaded(context.Background())
-		require.True(t, IsPessimizeOnOverloaded(ctx))
-	})
-
-	t.Run("NestedMarkedContextPessimize", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = WithPessimizeOnOverloaded(ctx)
-		ctx = context.WithValue(ctx, "key", "value") //nolint:revive,staticcheck
-		require.True(t, IsPessimizeOnOverloaded(ctx))
-	})
-}

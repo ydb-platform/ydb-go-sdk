@@ -58,12 +58,22 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			}),
 			pool.WithClock[*Session, Session](config.Clock()),
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-				ctx = conn.WithPessimizeOnOverloaded(ctx)
 				if !config.DisableSessionBalancer() {
 					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
 				}
 
-				return newSession(ctx, cc, config)
+				s, err := newSession(ctx, cc, config)
+				if err != nil {
+					if xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED) {
+						if ss, ok := cc.(conn.StateSetter); ok {
+							ss.SetState(ctx, conn.Banned)
+						}
+					}
+
+					return nil, err
+				}
+
+				return s, nil
 			}),
 			pool.WithTrace[*Session, Session](&pool.Trace{
 				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {

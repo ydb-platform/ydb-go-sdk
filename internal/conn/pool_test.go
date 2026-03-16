@@ -7,7 +7,6 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -201,32 +200,6 @@ func TestPool_Ban(t *testing.T) {
 
 		// Should still be Online
 		require.Equal(t, Online, conn.GetState())
-	})
-
-	t.Run("BanOnOverloadedOperationError", func(t *testing.T) {
-		ctx := context.Background()
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		pool := NewPool(ctx, config)
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
-
-		// Ban with OVERLOADED operation error (should ban)
-		err := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
-		pool.Ban(ctx, conn, err)
-
-		// Should be Banned
-		require.Equal(t, Banned, conn.GetState())
 	})
 }
 
