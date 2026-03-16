@@ -58,11 +58,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			}),
 			pool.WithClock[*Session, Session](config.Clock()),
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-				if !config.DisableSessionBalancer() {
-					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-				}
-
-				s, err := newSession(ctx, cc, config)
+				s, err := createExplicitSession(ctx, cc, config)
 				if err != nil {
 					if xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED) {
 						if ss, ok := cc.(conn.StateSetter); ok {
@@ -118,6 +114,15 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		),
 		done: make(chan struct{}),
 	}
+}
+
+// createExplicitSession creates a new session, optionally enabling session balancer hints.
+func createExplicitSession(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (*Session, error) {
+	if !cfg.DisableSessionBalancer() {
+		ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
+	}
+
+	return newSession(ctx, cc, cfg)
 }
 
 // Client is a set of session instances that may be reused.

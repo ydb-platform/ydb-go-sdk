@@ -652,7 +652,18 @@ func newWithQueryServiceClient(ctx context.Context,
 			}),
 			pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
 			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
-				return createExplicitSession(ctx, cfg, client, cc)
+				s, err := createExplicitSession(ctx, cfg, client, cc)
+				if err != nil {
+					if xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED) {
+						if ss, ok := cc.(conn.StateSetter); ok {
+							ss.SetState(ctx, conn.Banned)
+						}
+					}
+
+					return nil, err
+				}
+
+				return s, nil
 			}),
 		),
 	}
@@ -685,12 +696,6 @@ func createExplicitSession(
 		WithTrace(cfg.Trace()),
 	)
 	if err != nil {
-		if xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED) {
-			if ss, ok := cc.(conn.StateSetter); ok {
-				ss.SetState(createCtx, conn.Banned)
-			}
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
