@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -146,6 +147,37 @@ func (o *orchestrator) getDefaultKeyHasher() KeyHasher {
 	}
 }
 
+func (o *orchestrator) checkNeedAssignBounds() bool {
+	for _, partition := range o.partitions {
+		if len(partition.FromBound) == 0 || len(partition.ToBound) == 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (o *orchestrator) assignBoundsToPartitions() {
+	keyRanges := BuildKeyRangesSplitMerge(len(o.partitions))
+
+	ids := make([]int, 0, len(o.partitions))
+	for id := range o.partitions {
+		ids = append(ids, int(id))
+	}
+
+	sort.Ints(ids)
+
+	idsOrder := make(map[int64]int)
+	for i, id := range ids {
+		idsOrder[int64(id)] = i
+	}
+
+	for id, partition := range o.partitions {
+		partition.FromBound = keyRanges[idsOrder[id]].From
+		partition.ToBound = keyRanges[idsOrder[id]].To
+	}
+}
+
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 
@@ -178,17 +210,11 @@ func (o *orchestrator) init() (err error) {
 
 	switch o.multiWriterCfg.PartitionChooserStrategy {
 	case PartitionChooserStrategyBound:
-		o.partitionChooser, err = newBoundPartitionChooser(o.multiWriterCfg, o.partitions)
-
-		if err != nil && !errors.Is(err, ErrNoBounds) {
-			return err
+		if o.checkNeedAssignBounds() {
+			o.assignBoundsToPartitions()
 		}
 
-		if err == nil {
-			break
-		}
-
-		fallthrough // when partitions have no bounds, we use hash partition chooser by default
+		o.partitionChooser = newBoundPartitionChooser(o.multiWriterCfg, o.partitions)
 	case PartitionChooserStrategyHash:
 		if isAutoPartitioningEnabled {
 			return ErrHashPartitionChooserNotSupported

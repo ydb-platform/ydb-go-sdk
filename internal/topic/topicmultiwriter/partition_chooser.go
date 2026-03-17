@@ -28,20 +28,15 @@ type boundPartitionChooser struct {
 func newBoundPartitionChooser(
 	cfg *MultiWriterConfig,
 	partitions map[int64]*PartitionInfo,
-) (*boundPartitionChooser, error) {
-	var hasZeroBound bool
+) *boundPartitionChooser {
 	partitionShortInfos := make([]partitionShortInfo, 0, len(partitions))
 	for _, partition := range partitions {
 		if len(partitions) > 1 && len(partition.FromBound) == 0 && len(partition.ToBound) == 0 {
-			return nil, fmt.Errorf("%w: partition %d has no bounds", ErrNoBounds, partition.ID)
+			panic("ydb: unexpected partition bounds state: partition has no bounds")
 		}
 
 		if partition.Splitted() {
 			continue
-		}
-
-		if len(partition.FromBound) == 0 {
-			hasZeroBound = true
 		}
 
 		partitionShortInfos = append(partitionShortInfos, partitionShortInfo{
@@ -51,10 +46,6 @@ func newBoundPartitionChooser(
 		})
 	}
 
-	if !hasZeroBound {
-		panic("bad partitions!")
-	}
-
 	sort.Slice(partitionShortInfos, func(i, j int) bool {
 		return strings.Compare(partitionShortInfos[i].FromBound, partitionShortInfos[j].FromBound) < 0
 	})
@@ -62,7 +53,7 @@ func newBoundPartitionChooser(
 	return &boundPartitionChooser{
 		cfg:        cfg,
 		partitions: partitionShortInfos,
-	}, nil
+	}
 }
 
 func (c *boundPartitionChooser) ChoosePartition(msg message) (int64, error) {

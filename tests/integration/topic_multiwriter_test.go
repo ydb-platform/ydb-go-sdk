@@ -307,6 +307,48 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	)
 }
 
+func TestTopicMultiWriter_SelfAssignBounds(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+
+	// Create topic with 10 partitions for this test.
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	multiWriter, err := topicClient.StartWriter(
+		topicPath,
+		topicoptions.WithWriterSetAutoSeqNo(false),
+		topicoptions.WithProducerIDPrefix("test-producer"),
+	)
+	require.NoError(t, err)
+
+	err = multiWriter.WaitInit(ctx)
+	require.NoError(t, err)
+
+	writeAndReadMessages(
+		t,
+		ctx,
+		topicClient,
+		topicPath,
+		multiWriter,
+		func(i int) topicwriter.Message {
+			return topicwriter.Message{
+				Data:  bytes.NewReader([]byte(defaultMessageString)),
+				SeqNo: int64(i + 1),
+				Key:   fmt.Sprintf("partition-key-%d", i),
+			}
+		},
+	)
+}
+
 func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx

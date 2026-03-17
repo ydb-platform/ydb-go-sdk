@@ -22,8 +22,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("z")},
 		}
-		chooser, err := newBoundPartitionChooser(cfg, partitions)
-		require.NoError(t, err)
+		chooser := newBoundPartitionChooser(cfg, partitions)
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key-a"))
 		require.NoError(t, err)
@@ -38,9 +37,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("m")},
 			2: {ID: 2, FromBound: []byte("m"), ToBound: []byte("z")},
 		}
-		chooser, err := newBoundPartitionChooser(cfg, partitions)
-		require.NoError(t, err)
-
+		chooser := newBoundPartitionChooser(cfg, partitions)
 		partitionID, err := chooser.ChoosePartition(messageWithKey("a"))
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
@@ -61,25 +58,11 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("zzzz")},
 		}
-		chooser, err := newBoundPartitionChooser(cfg, partitions)
-		require.NoError(t, err)
+		chooser := newBoundPartitionChooser(cfg, partitions)
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
-	})
-
-	t.Run("PartitionWithoutBounds", func(t *testing.T) {
-		t.Parallel()
-
-		cfg := &MultiWriterConfig{}
-		partitions := map[int64]*PartitionInfo{
-			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("z")},
-			2: {ID: 2, FromBound: []byte{}, ToBound: []byte{}}, // no bounds
-		}
-		_, err := newBoundPartitionChooser(cfg, partitions)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "has no bounds")
 	})
 
 	t.Run("AddNewPartition", func(t *testing.T) {
@@ -89,9 +72,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("m")},
 		}
-		chooser, err := newBoundPartitionChooser(cfg, partitions)
-		require.NoError(t, err)
-
+		chooser := newBoundPartitionChooser(cfg, partitions)
 		chooser.AddNewPartition(2, []byte("m"), []byte("z"))
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("n"))
@@ -106,11 +87,9 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("z")},
 		}
-		chooser, err := newBoundPartitionChooser(cfg, partitions)
-		require.NoError(t, err)
-
+		chooser := newBoundPartitionChooser(cfg, partitions)
 		chooser.RemovePartition(1)
-		_, err = chooser.ChoosePartition(messageWithKey("key"))
+		_, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.Error(t, err)
 	})
 }
