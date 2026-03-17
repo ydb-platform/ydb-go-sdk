@@ -26,7 +26,6 @@ func TestMurmur2Hash64A_StringAndBytes_Consistency(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			for _, seed := range seeds {
 				hFromBytes := Murmur2Hash64A([]byte(tt.s), seed)
@@ -61,7 +60,6 @@ func TestMurmur2Hash32_StringAndBytes_Consistency(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			for _, seed := range seeds {
 				hFromBytes := Murmur2Hash32([]byte(tt.s), seed)
@@ -129,4 +127,3 @@ func TestMurmur2Hash_ChangesWithInput(t *testing.T) {
 		t.Fatalf("Murmur2Hash32 produced equal hashes for different inputs: %v and %v", h32_1, h32_2)
 	}
 }
-
