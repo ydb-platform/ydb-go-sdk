@@ -7,6 +7,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -196,6 +197,59 @@ func TestPool_Ban(t *testing.T) {
 
 		// Try to ban with Internal error (should not ban)
 		err := xerrors.Transport(grpcStatus.Error(grpcCodes.Internal, "test"))
+		pool.Ban(ctx, conn, err)
+
+		// Should still be Online
+		require.Equal(t, Online, conn.GetState())
+	})
+
+	t.Run("BanOnOperationErrorWhenContextRequests", func(t *testing.T) {
+		ctx := context.Background()
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		pool := NewPool(ctx, config)
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		e := endpoint.New("test-endpoint:2135")
+		conn := pool.Get(e)
+		require.NotNil(t, conn)
+
+		conn.SetState(ctx, Online)
+		require.Equal(t, Online, conn.GetState())
+
+		// Tag the context to ban on OVERLOADED operation errors
+		banCtx := BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED)
+		err := xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)))
+		pool.Ban(banCtx, conn, err)
+
+		// Should be Banned
+		require.Equal(t, Banned, conn.GetState())
+	})
+
+	t.Run("DontBanOnOperationErrorWithoutContextRequest", func(t *testing.T) {
+		ctx := context.Background()
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		pool := NewPool(ctx, config)
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		e := endpoint.New("test-endpoint:2135")
+		conn := pool.Get(e)
+		require.NotNil(t, conn)
+
+		conn.SetState(ctx, Online)
+		require.Equal(t, Online, conn.GetState())
+
+		// Plain context (no BanOnOperationError) — operation error must not ban
+		err := xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)))
 		pool.Ban(ctx, conn, err)
 
 		// Should still be Online

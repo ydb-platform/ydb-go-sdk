@@ -89,7 +89,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	if !xerrors.IsTransportError(cause,
+	isTransportBan := xerrors.IsTransportError(cause,
 		grpcCodes.ResourceExhausted,
 		grpcCodes.Unavailable,
 		// grpcCodes.OK,
@@ -107,15 +107,21 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		// grpcCodes.Internal,
 		// grpcCodes.DataLoss,
 		// grpcCodes.Unauthenticated,
-	) {
-		return
+	)
+
+	if !isTransportBan {
+		// Also ban when the context explicitly opts in to banning on matched operation errors.
+		operationErrorCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType)
+		if len(operationErrorCodes) == 0 || !xerrors.IsOperationError(cause, operationErrorCodes...) {
+			return
+		}
 	}
 
 	e := cc.Endpoint().Copy()
 
-	cc, ok := p.conns.Get(e.Key())
-	if !ok {
-		return
+	// Try to find canonical conn from pool; fall back to the provided cc (e.g. in tests with mocks).
+	if poolCC, ok := p.conns.Get(e.Key()); ok {
+		cc = poolCC
 	}
 
 	trace.DriverOnConnBan(

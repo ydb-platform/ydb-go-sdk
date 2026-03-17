@@ -12,6 +12,7 @@ import (
 
 type Conn struct {
 	PingErr       error
+	InvokeErr     error
 	AddrField     string
 	LocationField string
 	NodeIDField   uint32
@@ -26,7 +27,7 @@ func (c *Conn) Invoke(
 	reply interface{},
 	opts ...grpc.CallOption,
 ) error {
-	panic("not implemented in mock")
+	return c.InvokeErr
 }
 
 func (c *Conn) NewStream(ctx context.Context,

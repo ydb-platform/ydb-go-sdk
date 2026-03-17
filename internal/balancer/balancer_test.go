@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/test/bufconn"
@@ -19,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 func TestBalancer_discoveryConn(t *testing.T) {
@@ -157,14 +159,39 @@ func TestNew(t *testing.T) {
 	})
 }
 
-// TestPessimizationOnOverloaded verifies that a connection pessimized via SetState (as done
-// by createExplicitSession on OVERLOADED) is correctly excluded from balancer routing,
-// and that when all connections are pessimized the balancer still returns a connection.
+// TestPessimizationOnOverloaded verifies that calling Invoke with a context tagged via
+// conn.BanOnOperationError causes the balancer to ban the connection that returns OVERLOADED,
+// and that when all connections are pessimized the balancer still returns a connection
+// (falling back to banned connections).
 func TestPessimizationOnOverloaded(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("PessimizedConnectionExcludedFromBalancing", func(t *testing.T) {
+	overloadedErr := xerrors.WithStackTrace(xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+	))
+
+	t.Run("HappyPath", func(t *testing.T) {
 		cc1 := &mock.Conn{AddrField: "node1:2135", NodeIDField: 1, State: conn.Online}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		state := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(state)
+
+		err := b.Invoke(ctx, "/test.Service/Method", nil, nil)
+		require.NoError(t, err)
+		require.NotEqual(t, conn.Banned, cc1.GetState(), "connection must not be banned on success")
+	})
+
+	t.Run("PessimizedConnectionExcludedFromBalancing", func(t *testing.T) {
+		cc1 := &mock.Conn{AddrField: "node1:2135", NodeIDField: 1, State: conn.Online, InvokeErr: overloadedErr}
 		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: conn.Online}
 
 		cfg := config.New()
@@ -179,21 +206,57 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		state := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
 		b.connectionsState.Store(state)
 
-		// Simulate what createExplicitSession does on OVERLOADED: directly ban cc1.
-		cc1.SetState(ctx, conn.Banned)
+		// Call Invoke targeting cc1 with OVERLOADED tagged in context — wrapCall must ban cc1.
+		invokeCtx := conn.BanOnOperationError(
+			endpoint.WithNodeID(ctx, cc1.NodeIDField),
+			Ydb.StatusIds_OVERLOADED,
+		)
+		err := b.Invoke(invokeCtx, "/test.Service/Method", nil, nil)
+		require.Error(t, err)
+		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
 
-		// cc1 must not be selected by the balancer anymore.
+		// cc1 must be Banned now.
+		require.Equal(t, conn.Banned, cc1.GetState(), "cc1 must be banned after OVERLOADED response")
+
+		// nextConn must only return cc2 now.
 		for i := 0; i < 100; i++ {
-			c, err := b.nextConn(ctx)
-			require.NoError(t, err)
+			c, nextErr := b.nextConn(ctx)
+			require.NoError(t, nextErr)
 			require.Equal(t, cc2.AddrField, c.Endpoint().Address(),
 				"banned cc1 must not be selected by the balancer")
 		}
 	})
 
+	t.Run("DoesNotBanConnectionOnOtherOperationErrors", func(t *testing.T) {
+		notFoundErr := xerrors.WithStackTrace(xerrors.Operation(
+			xerrors.WithStatusCode(Ydb.StatusIds_NOT_FOUND),
+		))
+
+		cc1 := &mock.Conn{AddrField: "node1:2135", NodeIDField: 1, State: conn.Online, InvokeErr: notFoundErr}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		state := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(state)
+
+		// Context only bans on OVERLOADED — a NOT_FOUND error must not ban.
+		invokeCtx := conn.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED)
+		err := b.Invoke(invokeCtx, "/test.Service/Method", nil, nil)
+		require.Error(t, err)
+		require.NotEqual(t, conn.Banned, cc1.GetState(),
+			"connection must not be banned for non-OVERLOADED operation error")
+	})
+
 	t.Run("AllConnectionsPessimizedFallback", func(t *testing.T) {
-		cc1 := &mock.Conn{AddrField: "node1:2135", NodeIDField: 1, State: conn.Online}
-		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: conn.Online}
+		cc1 := &mock.Conn{AddrField: "node1:2135", NodeIDField: 1, State: conn.Online, InvokeErr: overloadedErr}
+		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: conn.Online, InvokeErr: overloadedErr}
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
@@ -207,12 +270,19 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		state := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
 		b.connectionsState.Store(state)
 
-		// Sequentially pessimize all connections (simulating repeated OVERLOADED responses).
-		cc1.SetState(ctx, conn.Banned)
-		cc2.SetState(ctx, conn.Banned)
+		// Sequentially pessimize cc1 then cc2 via the normal Invoke+BanOnOperationError flow.
+		cc1Ctx := conn.BanOnOperationError(endpoint.WithNodeID(ctx, cc1.NodeIDField), Ydb.StatusIds_OVERLOADED)
+		err := b.Invoke(cc1Ctx, "/test.Service/Method", nil, nil)
+		require.Error(t, err)
+		require.Equal(t, conn.Banned, cc1.GetState())
+
+		cc2Ctx := conn.BanOnOperationError(endpoint.WithNodeID(ctx, cc2.NodeIDField), Ydb.StatusIds_OVERLOADED)
+		err = b.Invoke(cc2Ctx, "/test.Service/Method", nil, nil)
+		require.Error(t, err)
+		require.Equal(t, conn.Banned, cc2.GetState())
 
 		// When all connections are banned, the balancer must still return a connection
-		// (falling back to the banned connections pool so callers can retry or report the error).
+		// (falling back to the banned connections pool so callers can retry).
 		c, err := b.nextConn(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, c)
