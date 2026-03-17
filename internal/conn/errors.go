@@ -49,8 +49,9 @@ func BanOnOperationError(ctx context.Context, codes ...Ydb.StatusIds_StatusCode)
 	allCodes := make(operationErrorCodesType, 0, len(existingCodes)+len(codes))
 	allCodes = append(allCodes, existingCodes...)
 	allCodes = append(allCodes, codes...)
+	allCodes = xslices.Uniq(allCodes)
 
-	return context.WithValue(ctx, ctxBanOnOperationError{}, xslices.Uniq(allCodes))
+	return context.WithValue(ctx, ctxBanOnOperationError{}, allCodes)
 }
 
 func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bool {
