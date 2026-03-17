@@ -28,6 +28,44 @@ type partitionProducerKey struct {
 	producerID  string
 }
 
+const (
+	defaultMessageCount  = 1000
+	defaultReadTimeout   = 20 * time.Second
+	defaultMessageString = "hello"
+)
+
+func writeAndReadMessages(
+	t testing.TB,
+	ctx context.Context,
+	topicClient topic.Client,
+	topicPath string,
+	multiWriter *topicwriter.Writer,
+	makeMessage func(i int) topicwriter.Message,
+) {
+	t.Helper()
+
+	messages := make([]topicwriter.Message, 0, defaultMessageCount)
+	for i := 0; i < defaultMessageCount; i++ {
+		messages = append(messages, makeMessage(i))
+	}
+
+	require.NoError(t, multiWriter.Write(ctx, messages...))
+	require.NoError(t, multiWriter.Close(ctx))
+
+	require.NoError(
+		t,
+		readMessagesAndAssertOrderedBySeqNo(
+			ctx,
+			topicClient,
+			topicPath,
+			consumerName,
+			defaultMessageCount,
+			defaultReadTimeout,
+			[]byte(defaultMessageString),
+		),
+	)
+}
+
 // readMessagesAndAssertOrderedBySeqNo reads exactly expectedCount messages from the topic and asserts that
 // within each (partitionID, producerID) pair seqNo is strictly increasing.
 func readMessagesAndAssertOrderedBySeqNo(
@@ -253,19 +291,20 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	err = multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
-	messages := make([]topicwriter.Message, 0, 1000)
-	for i := range 1000 {
-		messages = append(messages, topicwriter.Message{
-			Data:  bytes.NewReader([]byte("hello")),
-			SeqNo: int64(i + 1),
-			Key:   fmt.Sprintf("partition-key-%d", i),
-		})
-	}
-
-	require.NoError(t, multiWriter.Write(ctx, messages...))
-	require.NoError(t, multiWriter.Close(ctx))
-
-	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second, []byte("hello")))
+	writeAndReadMessages(
+		t,
+		ctx,
+		topicClient,
+		topicPath,
+		multiWriter,
+		func(i int) topicwriter.Message {
+			return topicwriter.Message{
+				Data:  bytes.NewReader([]byte(defaultMessageString)),
+				SeqNo: int64(i + 1),
+				Key:   fmt.Sprintf("partition-key-%d", i),
+			}
+		},
+	)
 }
 
 func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
@@ -293,18 +332,19 @@ func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 	err = multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
-	messages := make([]topicwriter.Message, 0, 1000)
-	for i := range 1000 {
-		messages = append(messages, topicwriter.Message{
-			Data: bytes.NewReader([]byte("hello")),
-			Key:  fmt.Sprintf("partition-key-%d", i),
-		})
-	}
-
-	require.NoError(t, multiWriter.Write(ctx, messages...))
-	require.NoError(t, multiWriter.Close(ctx))
-
-	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second, []byte("hello")))
+	writeAndReadMessages(
+		t,
+		ctx,
+		topicClient,
+		topicPath,
+		multiWriter,
+		func(i int) topicwriter.Message {
+			return topicwriter.Message{
+				Data: bytes.NewReader([]byte(defaultMessageString)),
+				Key:  fmt.Sprintf("partition-key-%d", i),
+			}
+		},
+	)
 }
 
 func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
@@ -341,18 +381,19 @@ func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
 		partitionIDs = append(partitionIDs, p.PartitionID)
 	}
 
-	messages := make([]topicwriter.Message, 0, 1000)
-	for i := range 1000 {
-		messages = append(messages, topicwriter.Message{
-			Data:        bytes.NewReader([]byte("hello")),
-			PartitionID: partitionIDs[i%len(partitionIDs)],
-		})
-	}
-
-	require.NoError(t, multiWriter.Write(ctx, messages...))
-	require.NoError(t, multiWriter.Close(ctx))
-
-	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(ctx, topicClient, topicPath, consumerName, 1000, 20*time.Second, []byte("hello")))
+	writeAndReadMessages(
+		t,
+		ctx,
+		topicClient,
+		topicPath,
+		multiWriter,
+		func(i int) topicwriter.Message {
+			return topicwriter.Message{
+				Data:        bytes.NewReader([]byte(defaultMessageString)),
+				PartitionID: partitionIDs[i%len(partitionIDs)],
+			}
+		},
+	)
 }
 
 func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
