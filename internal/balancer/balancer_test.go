@@ -216,14 +216,13 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
 
 		// cc1 must be Banned now.
-		require.Equal(t, conn.Banned, cc1.GetState(), "cc1 must be banned after OVERLOADED response")
+		require.Equal(t, conn.Banned, cc1.GetState())
 
 		// nextConn must only return cc2 now.
 		for i := 0; i < 100; i++ {
 			c, nextErr := b.nextConn(ctx)
 			require.NoError(t, nextErr)
-			require.Equal(t, cc2.AddrField, c.Endpoint().Address(),
-				"banned cc1 must not be selected by the balancer")
+			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
 		}
 	})
 
@@ -250,8 +249,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		invokeCtx := conn.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED)
 		err := b.Invoke(invokeCtx, "/test.Service/Method", nil, nil)
 		require.Error(t, err)
-		require.NotEqual(t, conn.Banned, cc1.GetState(),
-			"connection must not be banned for non-OVERLOADED operation error")
+		require.NotEqual(t, conn.Banned, cc1.GetState())
 	})
 
 	t.Run("AllConnectionsPessimizedFallback", func(t *testing.T) {
@@ -286,7 +284,6 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		c, err := b.nextConn(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, c)
-		require.Equal(t, conn.Banned, c.GetState(),
-			"balancer should return a banned connection when no live connections remain")
+		require.Equal(t, conn.Banned, c.GetState())
 	})
 }

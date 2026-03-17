@@ -8,9 +8,6 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	"google.golang.org/grpc"
-	grpcCodes "google.golang.org/grpc/codes"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -19,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"google.golang.org/grpc"
 )
 
 type Pool struct {
@@ -89,45 +87,10 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	isTransportBan := xerrors.IsTransportError(cause,
-		grpcCodes.ResourceExhausted,
-		grpcCodes.Unavailable,
-		// grpcCodes.OK,
-		// grpcCodes.Canceled,
-		// grpcCodes.Unknown,
-		// grpcCodes.InvalidArgument,
-		// grpcCodes.DeadlineExceeded,
-		// grpcCodes.NotFound,
-		// grpcCodes.AlreadyExists,
-		// grpcCodes.PermissionDenied,
-		// grpcCodes.FailedPrecondition,
-		// grpcCodes.Aborted,
-		// grpcCodes.OutOfRange,
-		// grpcCodes.Unimplemented,
-		// grpcCodes.Internal,
-		// grpcCodes.DataLoss,
-		// grpcCodes.Unauthenticated,
-	)
-
-	if !isTransportBan {
-		// Also ban when the context explicitly opts in to banning on matched operation errors.
-		operationErrorCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType)
-		if len(operationErrorCodes) == 0 || !xerrors.IsOperationError(cause, operationErrorCodes...) {
-			return
-		}
-	}
-
-	e := cc.Endpoint().Copy()
-
-	// Try to find canonical conn from pool; fall back to the provided cc (e.g. in tests with mocks).
-	if poolCC, ok := p.conns.Get(e.Key()); ok {
-		cc = poolCC
-	}
-
 	trace.DriverOnConnBan(
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
-		e, cc.GetState(), cause,
+		cc.Endpoint().Copy(), cc.GetState(), cause,
 	)(cc.SetState(ctx, Banned))
 }
 
