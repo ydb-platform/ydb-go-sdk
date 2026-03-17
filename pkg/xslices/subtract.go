@@ -6,7 +6,7 @@ func Subtract[T comparable](source []T, toSubtract []T) []T {
 	}
 
 	var (
-		excludeSet = make(map[T]struct{}, len(source)+len(toSubtract))
+		excludeSet = make(map[T]struct{}, len(toSubtract))
 		difference = make([]T, 0, len(source))
 	)
 
