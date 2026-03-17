@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -666,7 +665,7 @@ func newWithQueryServiceClient(ctx context.Context,
 					createCtx = meta.WithAllowFeatures(createCtx, meta.HintSessionBalancer)
 				}
 
-				s, err := createSession(conn.BanOnError(createCtx), client,
+				s, err := createSession(createCtx, client,
 					WithConn(cc),
 					WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 					WithTrace(cfg.Trace()),

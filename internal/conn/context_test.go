@@ -7,9 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 func TestWithoutWrapping(t *testing.T) {

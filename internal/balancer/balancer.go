@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
@@ -403,10 +402,8 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 					credentials.WithNodeID(cc.Endpoint().NodeID()),
 					credentials.WithCredentials(b.driverConfig.Credentials()),
 				)
-			case xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED):
-				if conn.NeedBanOnOverloaded(ctx) {
-					_ = cc.SetState(ctx, conn.Banned)
-				}
+			case conn.CheckErrForBan(ctx, err):
+				_ = cc.SetState(ctx, conn.Banned)
 			}
 
 			return xerrors.WithStackTrace(err)
