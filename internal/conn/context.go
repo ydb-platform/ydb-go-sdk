@@ -1,8 +1,6 @@
 package conn
 
-import (
-	"context"
-)
+import "context"
 
 type ctxNoWrappingKey struct{}
 
