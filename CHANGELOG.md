@@ -1,3 +1,4 @@
+## v3.127.4
 * Stopped tracing `SessionDelete` in `tableService` spans adapter (no value for observability)
 
 ## v3.127.3
