@@ -7,10 +7,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
-// MultiWriterOption configures a topic multiwriter.
-// THIS IS EXPERIMENTAL SDK PART
-//
-// It is a thin alias for internal multiwriter options.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+
 type (
 	KeyHasher        = topicmultiwriter.KeyHasher
 	PartitionChooser = topicmultiwriter.PartitionChooser
