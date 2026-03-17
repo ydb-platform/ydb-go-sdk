@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -259,8 +260,8 @@ func TestPool_ConnParker(t *testing.T) {
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
 
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
+		conn.SetState(ctx, state.Online)
+		require.Equal(t, state.Online, conn.GetState())
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -299,8 +300,8 @@ func TestPool_ConnParker(t *testing.T) {
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
 
-		conn.SetState(ctx, Banned)
-		require.Equal(t, Banned, conn.GetState())
+		conn.SetState(ctx, state.Banned)
+		require.Equal(t, state.Banned, conn.GetState())
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -339,8 +340,8 @@ func TestPool_ConnParker(t *testing.T) {
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
 
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
+		conn.SetState(ctx, state.Online)
+		require.Equal(t, state.Online, conn.GetState())
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -355,7 +356,7 @@ func TestPool_ConnParker(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Connection should still be Online (not idle enough to park)
-		require.Equal(t, Online, conn.GetState())
+		require.Equal(t, state.Online, conn.GetState())
 	})
 
 	t.Run("DoesNotParkCreatedConnections", func(t *testing.T) {
@@ -378,7 +379,7 @@ func TestPool_ConnParker(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
-		require.Equal(t, Created, conn.GetState())
+		require.Equal(t, state.Created, conn.GetState())
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -393,7 +394,7 @@ func TestPool_ConnParker(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Connection should still be Created (not parked since not Online/Banned)
-		require.Equal(t, Created, conn.GetState())
+		require.Equal(t, state.Created, conn.GetState())
 	})
 
 	t.Run("StopsWhenPoolIsClosed", func(t *testing.T) {
@@ -452,7 +453,7 @@ func TestPool_ConnParker(t *testing.T) {
 		// Create connection to track parking attempts
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
-		conn.SetState(ctx, Online)
+		conn.SetState(ctx, state.Online)
 
 		// Start the parker
 		ttl := 10 * time.Second

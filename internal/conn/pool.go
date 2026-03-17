@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -62,7 +63,6 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 
 	cc = newConn(endpoint, p,
 		withOnClose(p.remove),
-		withOnTransportError(p.Ban),
 	)
 
 	p.conns.Set(endpoint.Key(), cc)
@@ -92,7 +92,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
 		cc.Endpoint().Copy(), cc.GetState(), cause,
-	)(cc.SetState(ctx, Banned))
+	)(cc.SetState(ctx, state.Banned))
 }
 
 func (p *Pool) Allow(ctx context.Context, cc Conn) {
@@ -176,7 +176,7 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 			p.conns.Range(func(_ endpoint.Key, c *conn) bool {
 				if time.Since(c.LastUsage()) > ttl {
 					switch c.GetState() {
-					case Online, Banned:
+					case state.Online, state.Banned:
 						_ = c.park(ctx)
 					default:
 						// nop

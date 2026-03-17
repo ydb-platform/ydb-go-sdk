@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
@@ -32,23 +33,16 @@ var (
 
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
-
-	// errUnavailableConnection specified error when connection are closed early
-	errUnavailableConnection = xerrors.Wrap(fmt.Errorf("connection unavailable"))
 )
 
 type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-
 	LastUsage() time.Time
-
-	Ping(ctx context.Context) error
-	IsState(states ...State) bool
-	GetState() State
-	SetState(ctx context.Context, state State) State
-	Unban(ctx context.Context) State
+	GetState() state.State
+	SetState(ctx context.Context, state state.State) state.State
+	Unban(ctx context.Context) state.State
 }
 
 type (
@@ -64,17 +58,16 @@ type (
 		GetState() connectivity.State
 	}
 	conn struct {
-		mtx               sync.RWMutex
-		config            connConfig // ro access
-		grpcConn          grpcClientConnInterface
-		done              chan struct{}
-		endpoint          endpoint.Endpoint // ro access
-		closed            bool
-		state             atomic.Uint32
-		childStreams      *xcontext.CancelsGuard
-		lastUsage         xsync.LastUsage
-		onClose           []func(*conn)
-		onTransportErrors []func(ctx context.Context, cc Conn, cause error)
+		mtx          sync.RWMutex
+		config       connConfig // ro access
+		grpcConn     grpcClientConnInterface
+		done         chan struct{}
+		endpoint     endpoint.Endpoint // ro access
+		closed       bool
+		state        atomic.Uint32
+		childStreams *xcontext.CancelsGuard
+		lastUsage    xsync.LastUsage
+		onClose      []func(*conn)
 	}
 )
 
@@ -82,34 +75,11 @@ func (c *conn) Address() string {
 	return c.endpoint.Address()
 }
 
-func (c *conn) Ping(ctx context.Context) error {
-	cc, err := c.realConn(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	if !isAvailable(cc) {
-		return xerrors.WithStackTrace(errUnavailableConnection)
-	}
-
-	return nil
-}
-
 func (c *conn) LastUsage() time.Time {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
 
 	return c.lastUsage.Get()
-}
-
-func (c *conn) IsState(states ...State) bool {
-	state := State(c.state.Load())
-	for _, s := range states {
-		if s == state {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (c *conn) NodeID() uint32 {
@@ -157,12 +127,12 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	return nil
 }
 
-func (c *conn) SetState(ctx context.Context, s State) State {
+func (c *conn) SetState(ctx context.Context, s state.State) state.State {
 	return c.setState(ctx, s)
 }
 
-func (c *conn) setState(ctx context.Context, s State) State {
-	if state := State(c.state.Swap(uint32(s))); state != s {
+func (c *conn) setState(ctx context.Context, s state.State) state.State {
+	if state := state.State(c.state.Swap(uint32(s))); state != s {
 		trace.DriverOnConnStateChange(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).setState"),
@@ -173,15 +143,15 @@ func (c *conn) setState(ctx context.Context, s State) State {
 	return s
 }
 
-func (c *conn) Unban(ctx context.Context) State {
-	var newState State
+func (c *conn) Unban(ctx context.Context) state.State {
+	var newState state.State
 	c.mtx.RLock()
 	cc := c.grpcConn
 	c.mtx.RUnlock()
 	if isAvailable(cc) {
-		newState = Online
+		newState = state.Online
 	} else {
-		newState = Offline
+		newState = state.Offline
 	}
 
 	c.setState(ctx, newState)
@@ -189,8 +159,8 @@ func (c *conn) Unban(ctx context.Context) State {
 	return newState
 }
 
-func (c *conn) GetState() (s State) {
-	return State(c.state.Load())
+func (c *conn) GetState() (s state.State) {
+	return state.State(c.state.Load())
 }
 
 func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err error) {
@@ -242,10 +212,6 @@ func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error)
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		defer func() {
-			c.onTransportError(ctx, err)
-		}()
-
 		return nil, xerrors.WithStackTrace(
 			xerrors.Retryable(
 				xerrors.Transport(err),
@@ -257,15 +223,9 @@ func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error)
 	}
 
 	c.grpcConn = cc
-	c.setState(ctx, Online)
+	c.setState(ctx, state.Online)
 
 	return c.grpcConn, nil
-}
-
-func (c *conn) onTransportError(ctx context.Context, cause error) {
-	for _, onTransportError := range c.onTransportErrors {
-		onTransportError(ctx, c, cause)
-	}
 }
 
 func isAvailable(raw grpcClientConnInterface) bool {
@@ -280,7 +240,7 @@ func (c *conn) close(ctx context.Context) (err error) {
 
 	defer func() {
 		c.grpcConn = nil
-		c.setState(ctx, Offline)
+		c.setState(ctx, state.Offline)
 	}()
 
 	err = c.grpcConn.Close()
@@ -314,7 +274,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	defer func() {
 		c.closed = true
 
-		c.setState(ctx, Destroyed)
+		c.setState(ctx, state.Destroyed)
 
 		for _, onClose := range c.onClose {
 			onClose(c)
@@ -334,8 +294,6 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		xerrors.WithNodeID(c.NodeID()),
 	))
 }
-
-var onTransportErrorStub = func(ctx context.Context, err error) {}
 
 func replyWrapper(reply any) (opID string, issues []trace.Issue) {
 	switch t := reply.(type) {
@@ -359,7 +317,6 @@ func invoke(
 	method string,
 	req, reply any,
 	cc grpc.ClientConnInterface,
-	onTransportError func(context.Context, error),
 	address string,
 	nodeID uint32,
 	opts ...grpc.CallOption,
@@ -377,10 +334,6 @@ func invoke(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	if onTransportError == nil {
-		onTransportError = onTransportErrorStub
-	}
-
 	err = cc.Invoke(ctx, method, req, reply, opts...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
@@ -390,8 +343,6 @@ func invoke(
 			(status.Code(err) == codes.Canceled || status.Code(err) == codes.DeadlineExceeded) {
 			return opID, issues, xerrors.WithStackTrace(ctxErr)
 		}
-
-		defer onTransportError(ctx, err)
 
 		if !useWrapping {
 			return opID, issues, err
@@ -488,7 +439,6 @@ func (c *conn) Invoke(
 		req,
 		res,
 		cc,
-		c.onTransportError,
 		c.Address(),
 		c.NodeID(),
 		append(opts, grpc.Trailer(&md))...,
@@ -554,10 +504,6 @@ func (c *conn) NewStream(
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		defer func() {
-			c.onTransportError(ctx, err)
-		}()
-
 		if !useWrapping {
 			return nil, err
 		}
@@ -590,14 +536,6 @@ func withOnClose(onClose func(*conn)) option {
 	}
 }
 
-func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, cause error)) option {
-	return func(c *conn) {
-		if onTransportError != nil {
-			c.onTransportErrors = append(c.onTransportErrors, onTransportError)
-		}
-	}
-}
-
 func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 	c := &conn{
 		endpoint:     e,
@@ -611,7 +549,7 @@ func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 			},
 		},
 	}
-	c.state.Store(uint32(Created))
+	c.state.Store(uint32(state.Created))
 	for _, opt := range opts {
 		if opt != nil {
 			opt(c)

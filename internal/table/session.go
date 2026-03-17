@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
@@ -278,7 +279,7 @@ func newTableSession(
 	ctx context.Context, cc grpc.ClientConnInterface, config *config.Config,
 ) (*Session, error) {
 	response, err := Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(
-		conn.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED),
+		balancer.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED),
 		&Ydb_Table.CreateSessionRequest{
 			OperationParams: operation.Params(
 				ctx,

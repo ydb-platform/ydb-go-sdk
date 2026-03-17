@@ -6,35 +6,21 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
+//go:generate mockgen -destination grpc_client_conn_interface_mock.go --typed -package mock -write_package_comment=false google.golang.org/grpc ClientConnInterface
+//go:generate mockgen -destination grpc_client_stream_mock.go --typed -package mock -write_package_comment=false google.golang.org/grpc ClientStream
+
 type Conn struct {
-	PingErr       error
-	InvokeErr     error
+	grpc.ClientConnInterface
+
 	AddrField     string
 	LocationField string
 	NodeIDField   uint32
-	State         conn.State
+	State         state.State
 	LocalDCField  bool
-}
-
-func (c *Conn) Invoke(
-	ctx context.Context,
-	method string,
-	args interface{},
-	reply interface{},
-	opts ...grpc.CallOption,
-) error {
-	return c.InvokeErr
-}
-
-func (c *Conn) NewStream(ctx context.Context,
-	desc *grpc.StreamDesc, method string,
-	opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	panic("not implemented in mock")
 }
 
 func (c *Conn) Endpoint() endpoint.Endpoint {
@@ -50,32 +36,20 @@ func (c *Conn) LastUsage() time.Time {
 	panic("not implemented in mock")
 }
 
-func (c *Conn) Park(ctx context.Context) (err error) {
-	panic("not implemented in mock")
-}
-
-func (c *Conn) Ping(ctx context.Context) error {
-	return c.PingErr
-}
-
-func (c *Conn) IsState(states ...conn.State) bool {
-	panic("not implemented in mock")
-}
-
-func (c *Conn) GetState() conn.State {
+func (c *Conn) GetState() state.State {
 	return c.State
 }
 
-func (c *Conn) SetState(ctx context.Context, state conn.State) conn.State {
+func (c *Conn) SetState(ctx context.Context, state state.State) state.State {
 	c.State = state
 
 	return c.State
 }
 
-func (c *Conn) Unban(ctx context.Context) conn.State {
-	c.SetState(ctx, conn.Online)
+func (c *Conn) Unban(ctx context.Context) state.State {
+	c.SetState(ctx, state.Online)
 
-	return conn.Online
+	return state.Online
 }
 
 type Endpoint struct {

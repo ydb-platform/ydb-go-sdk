@@ -5,6 +5,7 @@ import (
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
@@ -169,9 +170,9 @@ func sortPreferConnections(
 
 func isOkConnection(c conn.Conn, bannedIsOk bool) bool {
 	switch c.GetState() {
-	case conn.Online, conn.Created, conn.Offline:
+	case state.Online, state.Created, state.Offline:
 		return true
-	case conn.Banned:
+	case state.Banned:
 		return bannedIsOk
 	default:
 		return false
