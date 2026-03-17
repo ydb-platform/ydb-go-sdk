@@ -3,10 +3,10 @@ package conn
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
 var (
