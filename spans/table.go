@@ -120,16 +120,19 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 	}
 	t.OnSessionDelete = func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
 		if adapter.Details()&trace.TableSessionLifeCycleEvents != 0 {
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
+			ctx := *info.Context
+			call := info.Call.String()
+			fields := []KeyValue{
 				kv.String("node_id", nodeID(safeID(info.Session))),
 				kv.String("session_id", safeID(info.Session)),
-			)
+			}
 
 			return func(info trace.TableSessionDeleteDoneInfo) {
-				finish(start, info.Error)
+				if info.Error == nil {
+					logToParentSpan(adapter, ctx, call, fields...)
+				} else {
+					logToParentSpanError(adapter, ctx, info.Error, fields...)
+				}
 			}
 		}
 
