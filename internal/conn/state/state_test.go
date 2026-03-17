@@ -1,52 +1,50 @@
-package conn
+package state
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	state2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 )
 
 func TestState_String(t *testing.T) {
 	tests := []struct {
 		name     string
-		state    state2.State
+		state    State
 		expected string
 	}{
 		{
 			name:     "Created",
-			state:    state2.Created,
+			state:    Created,
 			expected: "created",
 		},
 		{
 			name:     "Online",
-			state:    state2.Online,
+			state:    Online,
 			expected: "online",
 		},
 		{
 			name:     "Banned",
-			state:    state2.Banned,
+			state:    Banned,
 			expected: "banned",
 		},
 		{
 			name:     "Offline",
-			state:    state2.Offline,
+			state:    Offline,
 			expected: "offline",
 		},
 		{
 			name:     "Destroyed",
-			state:    state2.Destroyed,
+			state:    Destroyed,
 			expected: "destroyed",
 		},
 		{
 			name:     "Unknown",
-			state:    state2.Unknown,
+			state:    Unknown,
 			expected: "unknown",
 		},
 		{
 			name:     "Invalid value",
-			state:    state2.State(99),
+			state:    State(99),
 			expected: "unknown",
 		},
 	}
@@ -61,37 +59,37 @@ func TestState_String(t *testing.T) {
 func TestState_Code(t *testing.T) {
 	tests := []struct {
 		name     string
-		state    state2.State
+		state    State
 		expected int
 	}{
 		{
 			name:     "Unknown",
-			state:    state2.Unknown,
+			state:    Unknown,
 			expected: 0,
 		},
 		{
 			name:     "Created",
-			state:    state2.Created,
+			state:    Created,
 			expected: 1,
 		},
 		{
 			name:     "Online",
-			state:    state2.Online,
+			state:    Online,
 			expected: 2,
 		},
 		{
 			name:     "Banned",
-			state:    state2.Banned,
+			state:    Banned,
 			expected: 3,
 		},
 		{
 			name:     "Offline",
-			state:    state2.Offline,
+			state:    Offline,
 			expected: 4,
 		},
 		{
 			name:     "Destroyed",
-			state:    state2.Destroyed,
+			state:    Destroyed,
 			expected: 5,
 		},
 	}
@@ -106,42 +104,42 @@ func TestState_Code(t *testing.T) {
 func TestState_IsValid(t *testing.T) {
 	tests := []struct {
 		name     string
-		state    state2.State
+		state    State
 		expected bool
 	}{
 		{
 			name:     "Online is valid",
-			state:    state2.Online,
+			state:    Online,
 			expected: true,
 		},
 		{
 			name:     "Offline is valid",
-			state:    state2.Offline,
+			state:    Offline,
 			expected: true,
 		},
 		{
 			name:     "Banned is valid",
-			state:    state2.Banned,
+			state:    Banned,
 			expected: true,
 		},
 		{
 			name:     "Unknown is not valid",
-			state:    state2.Unknown,
+			state:    Unknown,
 			expected: false,
 		},
 		{
 			name:     "Created is not valid",
-			state:    state2.Created,
+			state:    Created,
 			expected: false,
 		},
 		{
 			name:     "Destroyed is not valid",
-			state:    state2.Destroyed,
+			state:    Destroyed,
 			expected: false,
 		},
 		{
 			name:     "Invalid value is not valid",
-			state:    state2.State(99),
+			state:    State(99),
 			expected: false,
 		},
 	}
