@@ -1,10 +1,6 @@
 package xslices
 
-import (
-	"cmp"
-)
-
-func Subtract[T cmp.Ordered](source []T, toSubtract []T) []T {
+func Subtract[T comparable](source []T, toSubtract []T) []T {
 	if len(toSubtract) == 0 {
 		return source
 	}
