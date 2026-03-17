@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -36,6 +37,18 @@ var (
 	}
 	badCodes = xslices.Subtract(xslices.Keys(allCodes), goodCodes)
 )
+
+type (
+	ctxBanOnOperationError  struct{}
+	operationErrorCodesType []Ydb.StatusIds_StatusCode
+)
+
+func BanOnOperationError(ctx context.Context, codes ...Ydb.StatusIds_StatusCode) context.Context {
+	existingCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType)
+	existingCodes = append(existingCodes, codes...)
+
+	return context.WithValue(ctx, ctxBanOnOperationError{}, existingCodes)
+}
 
 func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bool {
 	if xerrors.IsTransportError(err, xslices.Subtract(badCodes, ignoreCodes)...) {
