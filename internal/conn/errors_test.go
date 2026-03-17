@@ -1,7 +1,6 @@
 package conn
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -12,9 +11,12 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestIsBadConn(t *testing.T) {
+	ctx := xtest.Context(t)
+
 	for i, tt := range []struct {
 		err           error
 		goodConnCodes []grpcCodes.Code
@@ -105,15 +107,13 @@ func TestIsBadConn(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d. %v", i, tt.err), func(t *testing.T) {
-			require.Equal(t, tt.badConn, IsBadConn(t.Context(), tt.err, tt.goodConnCodes...))
-			require.Equal(t, tt.badConn, IsBadConn(t.Context(), xerrors.WithStackTrace(tt.err), tt.goodConnCodes...))
-			require.Equal(t, tt.badConn, IsBadConn(t.Context(), xerrors.Retryable(tt.err), tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(ctx, tt.err, tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(ctx, xerrors.WithStackTrace(tt.err), tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(ctx, xerrors.Retryable(tt.err), tt.goodConnCodes...))
 		})
 	}
 
-	t.Run("ContextBased_BanOnOperationErrorAndTransportError", func(t *testing.T) {
-		ctx := context.Background()
-
+	t.Run("ContextBased_BanOnOperationError", func(t *testing.T) {
 		// Ban on operation error ABORTED only
 		ctx = BanOnOperationError(ctx, Ydb.StatusIds_ABORTED)
 		require.False(t, IsBadConn(ctx, nil))
