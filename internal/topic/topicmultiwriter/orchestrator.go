@@ -211,6 +211,16 @@ func (o *orchestrator) init() (err error) {
 }
 
 func (o *orchestrator) choosePartition(msg message) (partitionID int64, err error) {
+	if o.multiWriterCfg.PartitionChooserStrategy == PartitionChooserStrategyByPartitionID && msg.Key != "" {
+		return 0, fmt.Errorf("%w: key is not allowed when writing by partition id is chosen", ErrInvalidConfiguration)
+	}
+
+	if o.multiWriterCfg.PartitionChooserStrategy != PartitionChooserStrategyByPartitionID &&
+		o.multiWriterCfg.PartitionChooserStrategy != PartitionChooserStrategyCustom &&
+		msg.Key == "" {
+		return 0, fmt.Errorf("%w: key is required", ErrInvalidConfiguration)
+	}
+
 	if msg.PartitionID != 0 ||
 		o.multiWriterCfg.PartitionChooserStrategy == PartitionChooserStrategyByPartitionID {
 		return msg.PartitionID, nil
@@ -260,7 +270,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		o.sender.wakeup()
 	})
 
-	return nil
+	return err
 }
 
 func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {

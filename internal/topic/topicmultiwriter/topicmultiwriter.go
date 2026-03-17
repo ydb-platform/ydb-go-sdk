@@ -56,16 +56,6 @@ func NewMultiWriter(
 
 func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
 	for _, msg := range messages {
-		if p.cfg.PartitionChooserStrategy == PartitionChooserStrategyByPartitionID && msg.Key != "" {
-			return fmt.Errorf("%w: key is not allowed when writing by partition id is chosen", ErrInvalidConfiguration)
-		}
-
-		if p.cfg.PartitionChooserStrategy != PartitionChooserStrategyByPartitionID &&
-			p.cfg.PartitionChooserStrategy != PartitionChooserStrategyCustom &&
-			msg.Key == "" {
-			return fmt.Errorf("%w: key is required", ErrInvalidConfiguration)
-		}
-
 		if err := p.orchestrator.pushMessage(ctx, message{
 			PublicMessage: msg,
 		}); err != nil {
