@@ -18,6 +18,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
 func TestBalancer_discoveryConn(t *testing.T) {
@@ -153,5 +154,69 @@ func TestNew(t *testing.T) {
 		_, err := New(ctx, config.New(), nil)
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Regexp(t, "^context canceled at", err.Error())
+	})
+}
+
+// TestPessimizationOnOverloaded verifies that a connection pessimized via SetState (as done
+// by createExplicitSession on OVERLOADED) is correctly excluded from balancer routing,
+// and that when all connections are pessimized the balancer still returns a connection.
+func TestPessimizationOnOverloaded(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("PessimizedConnectionExcludedFromBalancing", func(t *testing.T) {
+		cc1 := &mock.Conn{AddrField: "node1:2135", NodeIDField: 1, State: conn.Online}
+		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: conn.Online}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		state := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(state)
+
+		// Simulate what createExplicitSession does on OVERLOADED: directly ban cc1.
+		cc1.SetState(ctx, conn.Banned)
+
+		// cc1 must not be selected by the balancer anymore.
+		for i := 0; i < 100; i++ {
+			c, err := b.nextConn(ctx)
+			require.NoError(t, err)
+			require.Equal(t, cc2.AddrField, c.Endpoint().Address(),
+				"banned cc1 must not be selected by the balancer")
+		}
+	})
+
+	t.Run("AllConnectionsPessimizedFallback", func(t *testing.T) {
+		cc1 := &mock.Conn{AddrField: "node1:2135", NodeIDField: 1, State: conn.Online}
+		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: conn.Online}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		state := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(state)
+
+		// Sequentially pessimize all connections (simulating repeated OVERLOADED responses).
+		cc1.SetState(ctx, conn.Banned)
+		cc2.SetState(ctx, conn.Banned)
+
+		// When all connections are banned, the balancer must still return a connection
+		// (falling back to the banned connections pool so callers can retry or report the error).
+		c, err := b.nextConn(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.Equal(t, conn.Banned, c.GetState(),
+			"balancer should return a banned connection when no live connections remain")
 	})
 }
