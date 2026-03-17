@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -16,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"google.golang.org/grpc"
 )
 
 type Pool struct {

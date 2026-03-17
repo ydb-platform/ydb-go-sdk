@@ -7,9 +7,10 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"google.golang.org/grpc"
 )
 
 // mockConfig implements the Config interface for testing
