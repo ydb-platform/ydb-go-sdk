@@ -6,16 +6,16 @@ func Subtract[T comparable](source []T, toSubtract []T) []T {
 	}
 
 	var (
-		counts     = make(map[T]struct{}, len(source)+len(toSubtract))
+		excludeSet = make(map[T]struct{}, len(source)+len(toSubtract))
 		difference = make([]T, 0, len(source))
 	)
 
 	for _, v := range toSubtract {
-		counts[v] = struct{}{}
+		excludeSet[v] = struct{}{}
 	}
 
 	for _, v := range source {
-		if _, exists := counts[v]; exists {
+		if _, exists := excludeSet[v]; exists {
 			continue
 		}
 		difference = append(difference, v)
