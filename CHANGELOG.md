@@ -1,3 +1,10 @@
+## v3.127.6
+* Added `pkg/xslices.Subtract` helper for subtract elements from source slice with order preservation
+
+## v3.127.5
+* Fixed a bug in `ydb.WithNumericArgs` where the `-- origin query with numeric args replacement` comment was incorrectly prepended even when no `$N` placeholders were replaced in the query
+* Fixed a bug where combining `ydb.WithPositionalArgs` and `ydb.WithNumericArgs` caused `ErrInconsistentArgs` when the query contained no `?` placeholders — `PositionalArgs` now passes args through unchanged when it has nothing to bind, regardless of registration order
+
 ## v3.127.4
 * Stopped tracing `SessionDelete` in `tableService` spans adapter (no value for observability)
 
