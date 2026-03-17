@@ -1,4 +1,4 @@
-* Added `pkg/xslices.Subtract` helper for subtract elements from source slice with order preservance
+* Added `pkg/xslices.Subtract` helper for subtract elements from source slice with order preservation
 
 ## v3.127.5
 * Fixed a bug in `ydb.WithNumericArgs` where the `-- origin query with numeric args replacement` comment was incorrectly prepended even when no `$N` placeholders were replaced in the query
