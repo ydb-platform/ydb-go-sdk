@@ -236,6 +236,29 @@ SELECT $p0, $p1`,
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
+		{
+			// No '?' in query but args are present — PositionalArgs has nothing to bind,
+			// so it passes args through unchanged for other binders (e.g. NumericArgs).
+			sql: "SELECT $1, $2",
+			args: []any{
+				100,
+				200,
+			},
+			yql: "SELECT $1, $2",
+			params: []any{
+				100,
+				200,
+			},
+		},
+		{
+			// Fewer '?' than args — some args have no matching placeholder.
+			sql: "SELECT ?",
+			args: []any{
+				100,
+				200,
+			},
+			err: ErrInconsistentArgs,
+		},
 	} {
 		t.Run("", func(t *testing.T) {
 			yql, params, err := b.ToYdb(tt.sql, tt.args...)
