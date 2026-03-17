@@ -218,7 +218,7 @@ func TestTopicMultiWriter_CloseWithoutWaitInit(t *testing.T) {
 	topicClient := scope.Driver().Topic()
 	multiWriter, err := topicClient.StartWriter(
 		scope.TopicPath(),
-		topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyHash),
+		topicoptions.WithHashPartitionChooser(),
 		topicoptions.WithProducerIDPrefix("test-producer"),
 	)
 	require.NoError(t, err)
@@ -245,7 +245,7 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
 		topicoptions.WithWriterSetAutoSeqNo(false),
-		topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyHash),
+		topicoptions.WithHashPartitionChooser(),
 		topicoptions.WithProducerIDPrefix("test-producer"),
 	)
 	require.NoError(t, err)
@@ -375,7 +375,7 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 	}
 
 	topicMultiWriterSettings := []topicoptions.WriterOption{
-		topicoptions.WithPartitionChooserStrategy(topicoptions.PartitionChooserStrategyBound),
+		topicoptions.WithBoundPartitionChooser(),
 		topicoptions.WithWriterIdleTimeout(30 * time.Second),
 		topicoptions.WithPartitioningKeyHasher(func(key string) string {
 			if key == firstPartitionKey {

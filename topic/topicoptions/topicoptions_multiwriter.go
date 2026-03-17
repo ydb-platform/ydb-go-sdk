@@ -12,15 +12,8 @@ import (
 //
 // It is a thin alias for internal multiwriter options.
 type (
-	KeyHasher                = topicmultiwriter.KeyHasher
-	PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategy
-	PartitionChooser         = topicmultiwriter.PartitionChooser
-)
-
-const (
-	PartitionChooserStrategyHash   PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyHash
-	PartitionChooserStrategyBound  PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyBound
-	PartitionChooserStrategyCustom PartitionChooserStrategy = topicmultiwriter.PartitionChooserStrategyCustom
+	KeyHasher        = topicmultiwriter.KeyHasher
+	PartitionChooser = topicmultiwriter.PartitionChooser
 )
 
 // WithProducerIDPrefix sets a prefix for producer IDs used by the internal producer.
@@ -52,7 +45,7 @@ func WithPartitioningKeyHasher(hasher topicmultiwriter.KeyHasher) WriterOption {
 }
 
 // WithPartitionChooserStrategy sets partition chooser strategy for the producer.
-func WithPartitionChooserStrategy(strategy topicmultiwriter.PartitionChooserStrategy) WriterOption {
+func WithHashPartitionChooser() WriterOption {
 	return func(
 		writerCfg *topicwriterinternal.WriterReconnectorConfig,
 		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
@@ -61,7 +54,21 @@ func WithPartitionChooserStrategy(strategy topicmultiwriter.PartitionChooserStra
 			return
 		}
 
-		topicmultiwriter.WithPartitionChooserStrategy(strategy)(multiWriterCfg)
+		topicmultiwriter.WithHashPartitionChooser()(multiWriterCfg)
+	}
+}
+
+// WithBoundPartitionChooser sets partition chooser strategy to bound-based.
+func WithBoundPartitionChooser() WriterOption {
+	return func(
+		writerCfg *topicwriterinternal.WriterReconnectorConfig,
+		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
+	) {
+		if multiWriterCfg == nil {
+			return
+		}
+
+		topicmultiwriter.WithBoundPartitionChooser()(multiWriterCfg)
 	}
 }
 
