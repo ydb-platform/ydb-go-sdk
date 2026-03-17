@@ -118,14 +118,22 @@ func TestIsBadConn(t *testing.T) {
 		ctx = BanOnOperationError(ctx, Ydb.StatusIds_ABORTED)
 		require.False(t, IsBadConn(ctx, nil))
 		require.False(t, IsBadConn(ctx, errors.New("test")))
-		require.False(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)))))
-		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED)))))
+		require.False(t, IsBadConn(ctx, xerrors.WithStackTrace(
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
+		))
+		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED))),
+		))
 
 		// Add OVERLOADED to operation error codes
 		ctx = BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED)
 		require.False(t, IsBadConn(ctx, nil))
 		require.False(t, IsBadConn(ctx, errors.New("test")))
-		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)))))
-		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED)))))
+		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
+		))
+		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED))),
+		))
 	})
 }
