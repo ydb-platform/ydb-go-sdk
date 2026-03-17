@@ -1,40 +1,52 @@
 package conn
 
 import (
+	"context"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-func IsBadConn(err error, goodConnCodes ...grpcCodes.Code) bool {
-	if !xerrors.IsTransportError(err) {
-		return false
+var (
+	allCodes = map[grpcCodes.Code]struct{}{
+		grpcCodes.OK:                 {},
+		grpcCodes.Canceled:           {},
+		grpcCodes.Unknown:            {},
+		grpcCodes.InvalidArgument:    {},
+		grpcCodes.DeadlineExceeded:   {},
+		grpcCodes.NotFound:           {},
+		grpcCodes.AlreadyExists:      {},
+		grpcCodes.PermissionDenied:   {},
+		grpcCodes.ResourceExhausted:  {},
+		grpcCodes.FailedPrecondition: {},
+		grpcCodes.Aborted:            {},
+		grpcCodes.OutOfRange:         {},
+		grpcCodes.Unimplemented:      {},
+		grpcCodes.Internal:           {},
+		grpcCodes.Unavailable:        {},
+		grpcCodes.DataLoss:           {},
+		grpcCodes.Unauthenticated:    {},
+	}
+	goodCodes = []grpcCodes.Code{
+		grpcCodes.ResourceExhausted,
+		grpcCodes.OutOfRange,
+		grpcCodes.OK,
+	}
+	badCodes = xslices.Subtract(xslices.Keys(allCodes), goodCodes)
+)
+
+func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bool {
+	if xerrors.IsTransportError(err, xslices.Subtract(badCodes, ignoreCodes)...) {
+		return true
 	}
 
-	if xerrors.IsTransportError(err,
-		append(
-			goodConnCodes,
-			grpcCodes.ResourceExhausted,
-			grpcCodes.OutOfRange,
-			grpcCodes.OK,
-			// grpcCodes.Canceled,
-			// grpcCodes.Unknown,
-			// grpcCodes.InvalidArgument,
-			// grpcCodes.DeadlineExceeded,
-			// grpcCodes.NotFound,
-			// grpcCodes.AlreadyExists,
-			// grpcCodes.PermissionDenied,
-			// grpcCodes.FailedPrecondition,
-			// grpcCodes.Aborted,
-			// grpcCodes.OutOfRange,
-			// grpcCodes.Unimplemented,
-			// grpcCodes.Internal,
-			// grpcCodes.DataLoss,
-			// grpcCodes.Unauthenticated,
-		)...,
-	) {
-		return false
+	operationErrorCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType)
+
+	if len(operationErrorCodes) > 0 && xerrors.IsOperationError(err, operationErrorCodes...) {
+		return true
 	}
 
-	return true
+	return false
 }

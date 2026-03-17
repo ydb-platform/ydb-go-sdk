@@ -1,10 +1,13 @@
 package conn
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
@@ -102,9 +105,27 @@ func TestIsBadConn(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d. %v", i, tt.err), func(t *testing.T) {
-			require.Equal(t, tt.badConn, IsBadConn(tt.err, tt.goodConnCodes...))
-			require.Equal(t, tt.badConn, IsBadConn(xerrors.WithStackTrace(tt.err), tt.goodConnCodes...))
-			require.Equal(t, tt.badConn, IsBadConn(xerrors.Retryable(tt.err), tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(t.Context(), tt.err, tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(t.Context(), xerrors.WithStackTrace(tt.err), tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(t.Context(), xerrors.Retryable(tt.err), tt.goodConnCodes...))
 		})
 	}
+
+	t.Run("ContextBased_BanOnOperationErrorAndTransportError", func(t *testing.T) {
+		ctx := context.Background()
+
+		// Ban on operation error ABORTED only
+		ctx = BanOnOperationError(ctx, Ydb.StatusIds_ABORTED)
+		require.False(t, IsBadConn(ctx, nil))
+		require.False(t, IsBadConn(ctx, errors.New("test")))
+		require.False(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)))))
+		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED)))))
+
+		// Add OVERLOADED to operation error codes
+		ctx = BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED)
+		require.False(t, IsBadConn(ctx, nil))
+		require.False(t, IsBadConn(ctx, errors.New("test")))
+		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)))))
+		require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED)))))
+	})
 }
