@@ -277,7 +277,8 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 func newTableSession(
 	ctx context.Context, cc grpc.ClientConnInterface, config *config.Config,
 ) (*Session, error) {
-	response, err := Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(ctx,
+	response, err := Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(
+		conn.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED),
 		&Ydb_Table.CreateSessionRequest{
 			OperationParams: operation.Params(
 				ctx,

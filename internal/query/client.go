@@ -666,7 +666,7 @@ func newWithQueryServiceClient(ctx context.Context,
 					createCtx = meta.WithAllowFeatures(createCtx, meta.HintSessionBalancer)
 				}
 
-				s, err := createSession(conn.BanOnOverloaded(createCtx), client,
+				s, err := createSession(conn.BanOnError(createCtx), client,
 					WithConn(cc),
 					WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 					WithTrace(cfg.Trace()),

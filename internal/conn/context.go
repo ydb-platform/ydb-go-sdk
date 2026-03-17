@@ -1,15 +1,20 @@
 package conn
 
-import "context"
+import (
+	"context"
 
-type (
-	ctxNoWrappingKey   struct{}
-	ctxBanOnOverloaded struct{}
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	grpcCodes "google.golang.org/grpc/codes"
 )
 
-func BanOnOverloaded(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxBanOnOverloaded{}, true)
-}
+type (
+	ctxNoWrappingKey        struct{}
+	ctxBanOnOperationError  struct{}
+	ctxBanOnTransportError  struct{}
+	operationErrorCodesType []Ydb.StatusIds_StatusCode
+	transportErrorCodesType []grpcCodes.Code
+)
 
 func WithoutWrapping(ctx context.Context) context.Context {
 	return context.WithValue(ctx, ctxNoWrappingKey{}, true)
@@ -21,8 +26,36 @@ func UseWrapping(ctx context.Context) bool {
 	return !ok || !b
 }
 
-func NeedBanOnOverloaded(ctx context.Context) bool {
-	b, ok := ctx.Value(ctxNoWrappingKey{}).(bool)
+func BanOnOperationError(ctx context.Context, codes ...Ydb.StatusIds_StatusCode) context.Context {
+	existingCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType)
+	existingCodes = append(existingCodes, codes...)
 
-	return !ok || !b
+	return context.WithValue(ctx, ctxBanOnOperationError{}, existingCodes)
+}
+
+func BanOnTransportError(ctx context.Context, codes ...grpcCodes.Code) context.Context {
+	existingCodes, _ := ctx.Value(ctxBanOnTransportError{}).(transportErrorCodesType)
+	existingCodes = append(existingCodes, codes...)
+
+	return context.WithValue(ctx, ctxBanOnTransportError{}, existingCodes)
+}
+
+func CheckErrForBan(ctx context.Context, err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if operationErrorCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType); xerrors.IsOperationError(
+		err, operationErrorCodes...,
+	) {
+		return true
+	}
+
+	if transportErrorCodes, _ := ctx.Value(ctxBanOnTransportError{}).(transportErrorCodesType); xerrors.IsTransportError(
+		err, transportErrorCodes...,
+	) {
+		return true
+	}
+
+	return false
 }

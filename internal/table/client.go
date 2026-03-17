@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -40,7 +39,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		config: config,
 		cc:     cc,
 		build: func(ctx context.Context) (s *Session, err error) {
-			return newSession(conn.BanOnOverloaded(ctx), cc, config)
+			return newSession(ctx, cc, config)
 		},
 		pool: pool.New[*Session, Session](ctx,
 			pool.WithLimit[*Session, Session](config.SizeLimit()),
@@ -62,7 +61,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
 				}
 
-				return newSession(conn.BanOnOverloaded(ctx), cc, config)
+				return newSession(ctx, cc, config)
 			}),
 			pool.WithTrace[*Session, Session](&pool.Trace{
 				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
