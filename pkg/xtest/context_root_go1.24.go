@@ -8,5 +8,5 @@ import (
 )
 
 func contextRoot(t testing.TB) context.Context {
-	return t.Context()
+	return context.Background()
 }
