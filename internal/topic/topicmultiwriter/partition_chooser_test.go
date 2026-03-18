@@ -90,7 +90,7 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		for _, partition := range partitions {
 			require.NoError(t, chooser.AddNewPartition(partition.ID, partition.FromBound, partition.ToBound))
 		}
-		chooser.AddNewPartition(2, []byte("m"), []byte("z"))
+		_ = chooser.AddNewPartition(2, []byte("m"), []byte("z"))
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("n"))
 		require.NoError(t, err)
@@ -123,8 +123,8 @@ func TestPartitionChooser_Hash(t *testing.T) {
 
 		chooser := newHashPartitionChooser()
 
-		for i := 0; i < 4; i++ {
-			chooser.AddNewPartition(int64(i), nil, nil)
+		for i := range 4 {
+			_ = chooser.AddNewPartition(int64(i), nil, nil)
 		}
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key1"))
@@ -141,8 +141,8 @@ func TestPartitionChooser_Hash(t *testing.T) {
 		t.Parallel()
 
 		chooser := newHashPartitionChooser()
-		chooser.AddNewPartition(0, nil, nil)
-		chooser.AddNewPartition(1, nil, nil)
+		_ = chooser.AddNewPartition(0, nil, nil)
+		_ = chooser.AddNewPartition(1, nil, nil)
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
@@ -153,9 +153,9 @@ func TestPartitionChooser_Hash(t *testing.T) {
 		t.Parallel()
 
 		chooser := newHashPartitionChooser()
-		chooser.AddNewPartition(0, nil, nil)
-		chooser.AddNewPartition(1, nil, nil)
-		chooser.AddNewPartition(3, nil, nil)
+		_ = chooser.AddNewPartition(0, nil, nil)
+		_ = chooser.AddNewPartition(1, nil, nil)
+		_ = chooser.AddNewPartition(3, nil, nil)
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)

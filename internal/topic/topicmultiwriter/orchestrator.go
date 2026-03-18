@@ -157,7 +157,11 @@ func (o *orchestrator) initHashPartitionChooser() error {
 		return o.partitions[partitionIDs[i]].ID < o.partitions[partitionIDs[j]].ID
 	})
 	for _, partitionID := range partitionIDs {
-		if err := o.partitionChooser.AddNewPartition(partitionID, o.partitions[partitionID].FromBound, o.partitions[partitionID].ToBound); err != nil {
+		if err := o.partitionChooser.AddNewPartition(
+			partitionID,
+			o.partitions[partitionID].FromBound,
+			o.partitions[partitionID].ToBound,
+		); err != nil {
 			return err
 		}
 	}
@@ -182,7 +186,11 @@ func (o *orchestrator) initBoundPartitionChooser() error {
 		return partitionShortInfos[i].FromBound < partitionShortInfos[j].FromBound
 	})
 	for _, partitionShortInfo := range partitionShortInfos {
-		if err := o.partitionChooser.AddNewPartition(partitionShortInfo.ID, []byte(partitionShortInfo.FromBound), []byte(partitionShortInfo.ToBound)); err != nil {
+		if err := o.partitionChooser.AddNewPartition(
+			partitionShortInfo.ID,
+			[]byte(partitionShortInfo.FromBound),
+			[]byte(partitionShortInfo.ToBound),
+		); err != nil {
 			return err
 		}
 	}
@@ -223,7 +231,7 @@ func (o *orchestrator) init() (err error) {
 	}
 
 	var (
-		isAutoPartitioningEnabled = describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
+		isAutoPartitioningEnabled = describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy != //nolint:lll
 			topictypes.AutoPartitioningStrategyDisabled
 		_, isHashPartitionChooser             = o.partitionChooser.(*hashPartitionChooser)
 		boundChooser, isBoundPartitionChooser = o.partitionChooser.(*boundPartitionChooser)
@@ -231,7 +239,7 @@ func (o *orchestrator) init() (err error) {
 
 	switch {
 	case isHashPartitionChooser && isAutoPartitioningEnabled:
-		return fmt.Errorf("%w: hash partition chooser is not supported when auto partitioning is enabled", ErrInvalidConfiguration)
+		return fmt.Errorf("%w: hash partition chooser is not supported when auto partitioning is enabled", ErrInvalidConfiguration) //nolint:lll
 	case isHashPartitionChooser:
 		return o.initHashPartitionChooser()
 	case isBoundPartitionChooser:
@@ -364,7 +372,11 @@ func (o *orchestrator) getSplittedPartitionAncestors(
 	return ancestors
 }
 
-func (o *orchestrator) addNewPartitions(describeResult *topictypes.TopicDescription, splittedPartitionID int64) {
+func (o *orchestrator) addNewPartitions(
+	parentPartition *PartitionInfo,
+	describeResult *topictypes.TopicDescription,
+	splittedPartitionID int64,
+) error {
 	for _, partition := range describeResult.Partitions {
 		if len(partition.ParentPartitionIDs) > 0 && partition.ParentPartitionIDs[0] == splittedPartitionID {
 			o.partitions[partition.PartitionID] = &PartitionInfo{
@@ -377,6 +389,19 @@ func (o *orchestrator) addNewPartitions(describeResult *topictypes.TopicDescript
 			}
 		}
 	}
+
+	for _, child := range parentPartition.Children {
+		childPartition := o.partitions[child]
+		if err := o.partitionChooser.AddNewPartition(
+			child,
+			childPartition.FromBound,
+			childPartition.ToBound,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (o *orchestrator) getSplittedPartitionChildren(
@@ -644,10 +669,8 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 
 		partition.Locked = true
 		partition.Children = o.getSplittedPartitionChildren(&describeResult, partitionID)
-		o.addNewPartitions(&describeResult, partitionID)
-		for _, child := range partition.Children {
-			childPartition := o.partitions[child]
-			o.partitionChooser.AddNewPartition(child, childPartition.FromBound, childPartition.ToBound)
+		if resultErr = o.addNewPartitions(partition, &describeResult, partitionID); resultErr != nil {
+			return
 		}
 		o.partitionChooser.RemovePartition(partitionID)
 		bufferedMessagesMap, err = o.getWriterBufferedMessages(partitionID)
@@ -662,7 +685,6 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	if err != nil {
 		return err
 	}
-
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
 		err = o.scheduleResendMessages(partitionID, maxSeqNo, bufferedMessagesMap)
