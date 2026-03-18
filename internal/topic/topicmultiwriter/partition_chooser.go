@@ -16,7 +16,7 @@ var (
 
 type PartitionChooser interface {
 	ChoosePartition(msg message) (int64, error)
-	AddNewPartition(partitionID int64, fromBound, toBound []byte)
+	AddNewPartition(partitionID int64, fromBound, toBound []byte) error
 	RemovePartition(partitionID int64)
 }
 
@@ -25,35 +25,8 @@ type boundPartitionChooser struct {
 	partitions []partitionShortInfo
 }
 
-func newBoundPartitionChooser(
-	cfg *MultiWriterConfig,
-	partitions map[int64]*PartitionInfo,
-) *boundPartitionChooser {
-	partitionShortInfos := make([]partitionShortInfo, 0, len(partitions))
-	for _, partition := range partitions {
-		if len(partitions) > 1 && len(partition.FromBound) == 0 && len(partition.ToBound) == 0 {
-			panic("ydb: unexpected partition bounds state: partition has no bounds")
-		}
-
-		if partition.Splitted() {
-			continue
-		}
-
-		partitionShortInfos = append(partitionShortInfos, partitionShortInfo{
-			ID:        partition.ID,
-			FromBound: string(partition.FromBound),
-			ToBound:   string(partition.ToBound),
-		})
-	}
-
-	sort.Slice(partitionShortInfos, func(i, j int) bool {
-		return strings.Compare(partitionShortInfos[i].FromBound, partitionShortInfos[j].FromBound) < 0
-	})
-
-	return &boundPartitionChooser{
-		cfg:        cfg,
-		partitions: partitionShortInfos,
-	}
+func newBoundPartitionChooser() *boundPartitionChooser {
+	return &boundPartitionChooser{}
 }
 
 func (c *boundPartitionChooser) ChoosePartition(msg message) (int64, error) {
@@ -89,7 +62,11 @@ func (c *boundPartitionChooser) ChoosePartition(msg message) (int64, error) {
 	}
 }
 
-func (c *boundPartitionChooser) AddNewPartition(partitionID int64, fromBound, toBound []byte) {
+func (c *boundPartitionChooser) AddNewPartition(partitionID int64, fromBound, toBound []byte) error {
+	if len(c.partitions) > 1 && len(fromBound) == 0 && len(toBound) == 0 {
+		return ErrNoBounds
+	}
+
 	c.partitions = append(c.partitions, partitionShortInfo{
 		ID:        partitionID,
 		FromBound: string(fromBound),
@@ -99,6 +76,8 @@ func (c *boundPartitionChooser) AddNewPartition(partitionID int64, fromBound, to
 	sort.Slice(c.partitions, func(i, j int) bool {
 		return strings.Compare(c.partitions[i].FromBound, c.partitions[j].FromBound) < 0
 	})
+
+	return nil
 }
 
 func (c *boundPartitionChooser) RemovePartition(partitionID int64) {
@@ -108,15 +87,11 @@ func (c *boundPartitionChooser) RemovePartition(partitionID int64) {
 }
 
 type hashPartitionChooser struct {
-	cfg        *MultiWriterConfig
 	partitions []int64
 }
 
-func newHashPartitionChooser(cfg *MultiWriterConfig, partitions []int64) *hashPartitionChooser {
-	return &hashPartitionChooser{
-		cfg:        cfg,
-		partitions: partitions,
-	}
+func newHashPartitionChooser() *hashPartitionChooser {
+	return &hashPartitionChooser{}
 }
 
 func (c *hashPartitionChooser) ChoosePartition(msg message) (int64, error) {
@@ -132,12 +107,31 @@ func (c *hashPartitionChooser) ChoosePartition(msg message) (int64, error) {
 	return c.partitions[hash%uint32(len(c.partitions))], nil
 }
 
-func (c *hashPartitionChooser) AddNewPartition(partitionID int64, _, _ []byte) {
+func (c *hashPartitionChooser) AddNewPartition(partitionID int64, _, _ []byte) error {
 	c.partitions = append(c.partitions, partitionID)
+
+	return nil
 }
 
 func (c *hashPartitionChooser) RemovePartition(partitionID int64) {
 	c.partitions = slices.DeleteFunc(c.partitions, func(partition int64) bool {
 		return partition == partitionID
 	})
+}
+
+type byPartitionIDPartitionChooser struct{}
+
+func newByPartitionIDPartitionChooser() *byPartitionIDPartitionChooser {
+	return &byPartitionIDPartitionChooser{}
+}
+
+func (c *byPartitionIDPartitionChooser) ChoosePartition(msg message) (int64, error) {
+	return msg.PartitionID, nil
+}
+
+func (c *byPartitionIDPartitionChooser) AddNewPartition(partitionID int64, _, _ []byte) error {
+	return nil
+}
+
+func (c *byPartitionIDPartitionChooser) RemovePartition(partitionID int64) {
 }

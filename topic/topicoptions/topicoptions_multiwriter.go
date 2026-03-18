@@ -43,7 +43,7 @@ func WithPartitioningKeyHasher(hasher topicmultiwriter.KeyHasher) WriterOption {
 }
 
 // WithPartitionChooserStrategy sets partition chooser strategy for the producer.
-func WithHashPartitionChooser() WriterOption {
+func WithKafkaHashPartitionChooser() WriterOption {
 	return func(
 		writerCfg *topicwriterinternal.WriterReconnectorConfig,
 		multiWriterCfg *topicmultiwriter.MultiWriterConfig,

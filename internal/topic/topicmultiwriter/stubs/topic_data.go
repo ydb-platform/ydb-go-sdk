@@ -34,6 +34,7 @@ func DefaultStubTopicDescription(t testing.TB) topictypes.TopicDescription {
 				ToBound:            bound1of5,
 				ChildPartitionIDs:  []int64{},
 				ParentPartitionIDs: []int64{},
+				Active:             true,
 			},
 			{
 				PartitionID:        2,
@@ -41,6 +42,7 @@ func DefaultStubTopicDescription(t testing.TB) topictypes.TopicDescription {
 				ToBound:            bound2of5,
 				ChildPartitionIDs:  []int64{},
 				ParentPartitionIDs: []int64{},
+				Active:             true,
 			},
 			{
 				PartitionID:        3,
@@ -48,6 +50,7 @@ func DefaultStubTopicDescription(t testing.TB) topictypes.TopicDescription {
 				ToBound:            bound3of5,
 				ChildPartitionIDs:  []int64{},
 				ParentPartitionIDs: []int64{},
+				Active:             true,
 			},
 			{
 				PartitionID:        4,
@@ -55,6 +58,7 @@ func DefaultStubTopicDescription(t testing.TB) topictypes.TopicDescription {
 				ToBound:            bound4of5,
 				ChildPartitionIDs:  []int64{},
 				ParentPartitionIDs: []int64{},
+				Active:             true,
 			},
 			{
 				PartitionID:        5,
@@ -62,6 +66,7 @@ func DefaultStubTopicDescription(t testing.TB) topictypes.TopicDescription {
 				ToBound:            bound5of5,
 				ChildPartitionIDs:  []int64{},
 				ParentPartitionIDs: []int64{},
+				Active:             true,
 			},
 		},
 	}

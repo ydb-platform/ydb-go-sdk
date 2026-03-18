@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -67,15 +68,16 @@ func newOrchestrator(
 	}
 
 	o := &orchestrator{
-		writerCfg:      writerCfg,
-		multiWriterCfg: multiWriterCfg,
-		mu:             &xsync.Mutex{},
-		topicDescriber: topicDescriber,
-		ctx:            ctx,
-		stop:           stop,
-		partitions:     make(map[int64]*PartitionInfo),
-		initDone:       make(empty.Chan),
-		background:     background,
+		writerCfg:        writerCfg,
+		multiWriterCfg:   multiWriterCfg,
+		mu:               &xsync.Mutex{},
+		topicDescriber:   topicDescriber,
+		ctx:              ctx,
+		stop:             stop,
+		partitions:       make(map[int64]*PartitionInfo),
+		initDone:         make(empty.Chan),
+		background:       background,
+		partitionChooser: multiWriterCfg.PartitionChooser,
 	}
 
 	o.buf = newInflightBuffer(ctx, o.mu, writerCfg, func() error { return o.getResultErr() })
@@ -146,14 +148,46 @@ func (o *orchestrator) getDefaultKeyHasher() KeyHasher {
 	}
 }
 
-func (o *orchestrator) checkHasBounds() bool {
-	for _, partition := range o.partitions {
-		if len(partition.FromBound) == 0 || len(partition.ToBound) == 0 {
-			return true
+func (o *orchestrator) initHashPartitionChooser() error {
+	partitionIDs := make([]int64, 0, len(o.partitions))
+	for id := range o.partitions {
+		partitionIDs = append(partitionIDs, id)
+	}
+	sort.Slice(partitionIDs, func(i, j int) bool {
+		return o.partitions[partitionIDs[i]].ID < o.partitions[partitionIDs[j]].ID
+	})
+	for _, partitionID := range partitionIDs {
+		if err := o.partitionChooser.AddNewPartition(partitionID, o.partitions[partitionID].FromBound, o.partitions[partitionID].ToBound); err != nil {
+			return err
 		}
 	}
 
-	return false
+	return nil
+}
+
+func (o *orchestrator) initBoundPartitionChooser() error {
+	partitionShortInfos := make([]partitionShortInfo, 0, len(o.partitions))
+	for _, partition := range o.partitions {
+		if partition.Splitted() || !partition.Active {
+			continue
+		}
+
+		partitionShortInfos = append(partitionShortInfos, partitionShortInfo{
+			ID:        partition.ID,
+			FromBound: string(partition.FromBound),
+			ToBound:   string(partition.ToBound),
+		})
+	}
+	sort.Slice(partitionShortInfos, func(i, j int) bool {
+		return partitionShortInfos[i].FromBound < partitionShortInfos[j].FromBound
+	})
+	for _, partitionShortInfo := range partitionShortInfos {
+		if err := o.partitionChooser.AddNewPartition(partitionShortInfo.ID, []byte(partitionShortInfo.FromBound), []byte(partitionShortInfo.ToBound)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (o *orchestrator) init() (err error) {
@@ -172,6 +206,7 @@ func (o *orchestrator) init() (err error) {
 
 		o.partitions[partition.PartitionID] = &PartitionInfo{
 			ID:        partition.PartitionID,
+			Active:    partition.Active,
 			ParentID:  parentID,
 			Children:  partition.ChildPartitionIDs,
 			FromBound: partition.FromBound,
@@ -183,53 +218,42 @@ func (o *orchestrator) init() (err error) {
 		return err
 	}
 
-	isAutoPartitioningEnabled := describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
-		topictypes.AutoPartitioningStrategyDisabled
+	if o.partitionChooser == nil {
+		o.partitionChooser = newBoundPartitionChooser()
+	}
 
-	switch o.multiWriterCfg.PartitionChooserStrategy {
-	case PartitionChooserStrategyBound:
-		if !o.checkHasBounds() {
-			return ErrNoBounds
+	var (
+		isAutoPartitioningEnabled = describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy !=
+			topictypes.AutoPartitioningStrategyDisabled
+		_, isHashPartitionChooser             = o.partitionChooser.(*hashPartitionChooser)
+		boundChooser, isBoundPartitionChooser = o.partitionChooser.(*boundPartitionChooser)
+	)
+
+	switch {
+	case isHashPartitionChooser && isAutoPartitioningEnabled:
+		return fmt.Errorf("%w: hash partition chooser is not supported when auto partitioning is enabled", ErrInvalidConfiguration)
+	case isHashPartitionChooser:
+		return o.initHashPartitionChooser()
+	case isBoundPartitionChooser:
+		boundChooser.cfg = o.multiWriterCfg
+
+		return o.initBoundPartitionChooser()
+	}
+
+	for _, partition := range o.partitions {
+		if partition.Splitted() || !partition.Active {
+			continue
 		}
 
-		o.partitionChooser = newBoundPartitionChooser(o.multiWriterCfg, o.partitions)
-	case PartitionChooserStrategyHash:
-		if isAutoPartitioningEnabled {
-			return ErrHashPartitionChooserNotSupported
+		if err := o.partitionChooser.AddNewPartition(partition.ID, partition.FromBound, partition.ToBound); err != nil {
+			return err
 		}
-
-		partitionIDs := make([]int64, 0, len(o.partitions))
-		for id := range o.partitions {
-			partitionIDs = append(partitionIDs, id)
-		}
-		o.partitionChooser = newHashPartitionChooser(o.multiWriterCfg, partitionIDs)
-	case PartitionChooserStrategyCustom:
-		if o.multiWriterCfg.CustomPartitionChooser == nil {
-			return fmt.Errorf("%w: custom partition chooser is not set", ErrInvalidConfiguration)
-		}
-
-		o.partitionChooser = o.multiWriterCfg.CustomPartitionChooser
 	}
 
 	return nil
 }
 
 func (o *orchestrator) choosePartition(msg message) (partitionID int64, err error) {
-	if o.multiWriterCfg.PartitionChooserStrategy == PartitionChooserStrategyByPartitionID && msg.Key != "" {
-		return 0, fmt.Errorf("%w: key is not allowed when writing by partition id is chosen", ErrInvalidConfiguration)
-	}
-
-	if o.multiWriterCfg.PartitionChooserStrategy != PartitionChooserStrategyByPartitionID &&
-		o.multiWriterCfg.PartitionChooserStrategy != PartitionChooserStrategyCustom &&
-		msg.Key == "" {
-		return 0, fmt.Errorf("%w: key is required", ErrInvalidConfiguration)
-	}
-
-	if msg.PartitionID != 0 ||
-		o.multiWriterCfg.PartitionChooserStrategy == PartitionChooserStrategyByPartitionID {
-		return msg.PartitionID, nil
-	}
-
 	if msg.Key == "" {
 		msg.Key = o.multiWriterCfg.ProducerIDPrefix
 	}

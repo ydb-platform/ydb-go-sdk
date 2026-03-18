@@ -22,7 +22,11 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("z")},
 		}
-		chooser := newBoundPartitionChooser(cfg, partitions)
+		chooser := newBoundPartitionChooser()
+		chooser.cfg = cfg
+		for _, partition := range partitions {
+			require.NoError(t, chooser.AddNewPartition(partition.ID, partition.FromBound, partition.ToBound))
+		}
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key-a"))
 		require.NoError(t, err)
@@ -37,7 +41,12 @@ func TestPartitionChooser_Bound(t *testing.T) {
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("m")},
 			2: {ID: 2, FromBound: []byte("m"), ToBound: []byte("z")},
 		}
-		chooser := newBoundPartitionChooser(cfg, partitions)
+		chooser := newBoundPartitionChooser()
+		chooser.cfg = cfg
+		for _, partition := range partitions {
+			require.NoError(t, chooser.AddNewPartition(partition.ID, partition.FromBound, partition.ToBound))
+		}
+
 		partitionID, err := chooser.ChoosePartition(messageWithKey("a"))
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
@@ -56,9 +65,13 @@ func TestPartitionChooser_Bound(t *testing.T) {
 			},
 		}
 		partitions := map[int64]*PartitionInfo{
-			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("zzzz")},
+			1: {ID: 1, Active: true, FromBound: []byte{}, ToBound: []byte("zzzz")},
 		}
-		chooser := newBoundPartitionChooser(cfg, partitions)
+		chooser := newBoundPartitionChooser()
+		chooser.cfg = cfg
+		for _, partition := range partitions {
+			require.NoError(t, chooser.AddNewPartition(partition.ID, partition.FromBound, partition.ToBound))
+		}
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
@@ -70,9 +83,13 @@ func TestPartitionChooser_Bound(t *testing.T) {
 
 		cfg := &MultiWriterConfig{}
 		partitions := map[int64]*PartitionInfo{
-			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("m")},
+			1: {ID: 1, Active: true, FromBound: []byte{}, ToBound: []byte("m")},
 		}
-		chooser := newBoundPartitionChooser(cfg, partitions)
+		chooser := newBoundPartitionChooser()
+		chooser.cfg = cfg
+		for _, partition := range partitions {
+			require.NoError(t, chooser.AddNewPartition(partition.ID, partition.FromBound, partition.ToBound))
+		}
 		chooser.AddNewPartition(2, []byte("m"), []byte("z"))
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("n"))
@@ -87,7 +104,11 @@ func TestPartitionChooser_Bound(t *testing.T) {
 		partitions := map[int64]*PartitionInfo{
 			1: {ID: 1, FromBound: []byte{}, ToBound: []byte("z")},
 		}
-		chooser := newBoundPartitionChooser(cfg, partitions)
+		chooser := newBoundPartitionChooser()
+		chooser.cfg = cfg
+		for _, partition := range partitions {
+			require.NoError(t, chooser.AddNewPartition(partition.ID, partition.FromBound, partition.ToBound))
+		}
 		chooser.RemovePartition(1)
 		_, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.Error(t, err)
@@ -100,8 +121,11 @@ func TestPartitionChooser_Hash(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &MultiWriterConfig{}
-		chooser := newHashPartitionChooser(cfg, []int64{0, 1, 2, 3})
+		chooser := newHashPartitionChooser()
+
+		for i := 0; i < 4; i++ {
+			chooser.AddNewPartition(int64(i), nil, nil)
+		}
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key1"))
 		require.NoError(t, err)
@@ -116,12 +140,9 @@ func TestPartitionChooser_Hash(t *testing.T) {
 	t.Run("WithPartitioningKeyHasher", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &MultiWriterConfig{
-			PartitioningKeyHasher: func(key string) string {
-				return "hashed-" + key
-			},
-		}
-		chooser := newHashPartitionChooser(cfg, []int64{0, 1})
+		chooser := newHashPartitionChooser()
+		chooser.AddNewPartition(0, nil, nil)
+		chooser.AddNewPartition(1, nil, nil)
 
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
@@ -131,10 +152,11 @@ func TestPartitionChooser_Hash(t *testing.T) {
 	t.Run("AddRemovePartition", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := &MultiWriterConfig{}
-		chooser := newHashPartitionChooser(cfg, []int64{0, 1})
-
+		chooser := newHashPartitionChooser()
+		chooser.AddNewPartition(0, nil, nil)
+		chooser.AddNewPartition(1, nil, nil)
 		chooser.AddNewPartition(3, nil, nil)
+
 		partitionID, err := chooser.ChoosePartition(messageWithKey("key"))
 		require.NoError(t, err)
 		require.Contains(t, []int64{0, 1, 3}, partitionID)

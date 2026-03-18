@@ -22,6 +22,7 @@ type PartitionInfo struct {
 	Locked         bool
 	PendingResend  int
 	CachedMaxSeqNo int64
+	Active         bool
 }
 
 func (p *PartitionInfo) Splitted() bool {
@@ -48,15 +49,6 @@ type ack struct {
 	partitionID int64
 	seqNo       int64
 }
-
-type PartitionChooserStrategy uint8
-
-const (
-	PartitionChooserStrategyBound PartitionChooserStrategy = iota
-	PartitionChooserStrategyHash
-	PartitionChooserStrategyCustom
-	PartitionChooserStrategyByPartitionID
-)
 
 type writerWrapper struct {
 	writer

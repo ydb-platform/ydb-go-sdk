@@ -45,7 +45,7 @@ func writeAndReadMessages(
 	t.Helper()
 
 	messages := make([]topicwriter.Message, 0, defaultMessageCount)
-	for i := 0; i < defaultMessageCount; i++ {
+	for i := range defaultMessageCount {
 		messages = append(messages, makeMessage(i))
 	}
 
@@ -256,7 +256,7 @@ func TestTopicMultiWriter_CloseWithoutWaitInit(t *testing.T) {
 	topicClient := scope.Driver().Topic()
 	multiWriter, err := topicClient.StartWriter(
 		scope.TopicPath(),
-		topicoptions.WithHashPartitionChooser(),
+		topicoptions.WithKafkaHashPartitionChooser(),
 		topicoptions.WithProducerIDPrefix("test-producer"),
 	)
 	require.NoError(t, err)
@@ -283,7 +283,7 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
 		topicoptions.WithWriterSetAutoSeqNo(false),
-		topicoptions.WithHashPartitionChooser(),
+		topicoptions.WithKafkaHashPartitionChooser(),
 		topicoptions.WithProducerIDPrefix("test-producer"),
 	)
 	require.NoError(t, err)
@@ -326,7 +326,7 @@ func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
 		topicoptions.WithWriterPartitionByKey(),
-		topicoptions.WithHashPartitionChooser(),
+		topicoptions.WithKafkaHashPartitionChooser(),
 	)
 	require.NoError(t, err)
 

@@ -22,22 +22,21 @@ func WithPartitioningKeyHasher(hasher KeyHasher) PublicMultiWriterOption {
 
 func WithCustomPartitionChooser(customPartitionChooser PartitionChooser) PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.CustomPartitionChooser = customPartitionChooser
-		cfg.PartitionChooserStrategy = PartitionChooserStrategyCustom
+		cfg.PartitionChooser = customPartitionChooser
 		cfg.Initialized = true
 	}
 }
 
 func WithHashPartitionChooser() PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.PartitionChooserStrategy = PartitionChooserStrategyHash
+		cfg.PartitionChooser = newHashPartitionChooser()
 		cfg.Initialized = true
 	}
 }
 
 func WithBoundPartitionChooser() PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.PartitionChooserStrategy = PartitionChooserStrategyBound
+		cfg.PartitionChooser = newBoundPartitionChooser()
 		cfg.Initialized = true
 	}
 }
@@ -57,7 +56,7 @@ func WithWriterPartitionByKey() PublicMultiWriterOption {
 
 func WithWriterPartitionByPartitionID() PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.PartitionChooserStrategy = PartitionChooserStrategyByPartitionID
+		cfg.PartitionChooser = newByPartitionIDPartitionChooser()
 		cfg.Initialized = true
 	}
 }

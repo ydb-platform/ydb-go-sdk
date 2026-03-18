@@ -128,6 +128,7 @@ func (s *DescribeWithSplitsState) GetDescription() topictypes.TopicDescription {
 				ParentPartitionIDs: []int64{parentID},
 				FromBound:          split.from1,
 				ToBound:            split.to1,
+				Active:             true,
 			},
 			topictypes.PartitionInfo{
 				PartitionID:        split.child2,
@@ -135,6 +136,7 @@ func (s *DescribeWithSplitsState) GetDescription() topictypes.TopicDescription {
 				ParentPartitionIDs: []int64{parentID},
 				FromBound:          split.from2,
 				ToBound:            split.to2,
+				Active:             true,
 			},
 		)
 	}
