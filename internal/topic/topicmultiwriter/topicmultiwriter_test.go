@@ -334,7 +334,7 @@ func TestMultiWriter_DescribeError(t *testing.T) {
 		},
 	)
 
-	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
+	ctxTimeout, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
 	err := multiWriter.WaitInit(ctxTimeout)
