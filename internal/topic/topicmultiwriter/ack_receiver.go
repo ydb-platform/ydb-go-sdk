@@ -7,28 +7,25 @@ import (
 )
 
 type ackReceiver struct {
-	ctx          context.Context //nolint:containedctx
 	receivedAcks *guardedList[ack]
 	wakeupChan   empty.Chan
 	ackCallback  func(partitionID, seqNo int64)
 }
 
 func newAckReceiver(
-	ctx context.Context,
 	ackCallback func(partitionID, seqNo int64),
 ) *ackReceiver {
 	return &ackReceiver{
-		ctx:          ctx,
 		ackCallback:  ackCallback,
 		receivedAcks: newGuardedList[ack](),
 		wakeupChan:   make(empty.Chan, 1),
 	}
 }
 
-func (a *ackReceiver) run() {
+func (a *ackReceiver) run(ctx context.Context) {
 	for {
 		select {
-		case <-a.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-a.wakeupChan:
 		}

@@ -104,7 +104,7 @@ func WithWriterMessageMaxBytesSize(size int) WriterOption {
 			return
 		}
 
-		topicwriterinternal.WithMaxGrpcMessageBytes(size)(writerCfg)
+		writerCfg.MaxMessageSize = size
 	}
 }
 

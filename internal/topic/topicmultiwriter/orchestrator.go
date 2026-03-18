@@ -81,13 +81,12 @@ func newOrchestrator(
 	}
 
 	o.buf = newInflightBuffer(ctx, o.mu, writerCfg, func() error { return o.getResultErr() })
-	o.ackReceiver = newAckReceiver(ctx, func(partitionID, seqNo int64) {
+	o.ackReceiver = newAckReceiver(func(partitionID, seqNo int64) {
 		o.mu.WithLock(func() {
 			o.onAckReceivedNeedLock(partitionID, seqNo)
 		})
 	})
 	o.partitionSplitReceiver = newPartitionSplitReceiver(
-		ctx,
 		func(partitionID int64) error {
 			return o.onPartitionSplit(partitionID)
 		},
@@ -120,10 +119,10 @@ func newOrchestrator(
 	}
 
 	background.Start("ack receiver", func(ctx context.Context) {
-		o.ackReceiver.run()
+		o.ackReceiver.run(o.ctx)
 	})
 	background.Start("partition splitter", func(ctx context.Context) {
-		o.partitionSplitReceiver.run()
+		o.partitionSplitReceiver.run(ctx)
 	})
 	background.Start("sender", func(ctx context.Context) {
 		o.sender.run()

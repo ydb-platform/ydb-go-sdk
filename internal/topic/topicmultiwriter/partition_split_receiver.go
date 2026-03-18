@@ -7,7 +7,6 @@ import (
 )
 
 type partitionSplitReceiver struct {
-	ctx                    context.Context //nolint:containedctx
 	partitionSplitCallback func(partitionID int64) error
 	onError                func(err error)
 	wakeupChan             empty.Chan
@@ -15,12 +14,10 @@ type partitionSplitReceiver struct {
 }
 
 func newPartitionSplitReceiver(
-	ctx context.Context,
 	partitionSplitCallback func(partitionID int64) error,
 	onError func(err error),
 ) *partitionSplitReceiver {
 	return &partitionSplitReceiver{
-		ctx:                    ctx,
 		partitionSplitCallback: partitionSplitCallback,
 		wakeupChan:             make(empty.Chan, 1),
 		partitionSplits:        newGuardedList[int64](),
@@ -28,10 +25,10 @@ func newPartitionSplitReceiver(
 	}
 }
 
-func (p *partitionSplitReceiver) run() {
+func (p *partitionSplitReceiver) run(ctx context.Context) {
 	for {
 		select {
-		case <-p.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-p.wakeupChan:
 		}
