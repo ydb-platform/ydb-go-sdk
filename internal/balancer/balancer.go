@@ -2,7 +2,9 @@ package balancer
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync/atomic"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -33,6 +36,32 @@ var (
 	ErrNoEndpoints    = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
 	errBalancerClosed = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
 )
+
+// streamWrapper wraps grpc.ClientStream and triggers pool.Ban on RecvMsg/SendMsg/CloseSend
+// errors that qualify as bad connection (same logic as wrapCall defer).
+type streamWrapper struct {
+	grpc.ClientStream
+
+	onErr func(error)
+}
+
+func (s *streamWrapper) SendMsg(m interface{}) error {
+	err := s.ClientStream.SendMsg(m)
+	if err != nil && !errors.Is(err, io.EOF) {
+		s.onErr(err)
+	}
+
+	return err
+}
+
+func (s *streamWrapper) RecvMsg(m interface{}) error {
+	err := s.ClientStream.RecvMsg(m)
+	if err != nil && !errors.Is(err, io.EOF) {
+		s.onErr(err)
+	}
+
+	return err
+}
 
 type Balancer struct {
 	driverConfig      *config.Config
@@ -364,17 +393,27 @@ func (b *Balancer) NewStream(
 		return nil, xerrors.WithStackTrace(errBalancerClosed)
 	}
 
-	var client grpc.ClientStream
-	err = b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
-		client, err = cc.NewStream(ctx, desc, method, opts...)
+	var stream grpc.ClientStream
+	if err := b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
+		inner, innerErr := cc.NewStream(ctx, desc, method, opts...)
+		if innerErr != nil {
+			return innerErr
+		}
+		stream = &streamWrapper{
+			ClientStream: inner,
+			onErr: func(err error) {
+				if IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
+					b.pool.Ban(ctx, cc, err)
+				}
+			},
+		}
 
-		return err
-	})
-	if err == nil {
-		return client, nil
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
-	return nil, err
+	return stream, nil
 }
 
 func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc conn.Conn) error) (err error) {
@@ -385,10 +424,10 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 
 	defer func() {
 		if err == nil {
-			if !b.driverConfig.DisableOptimisticUnban() && cc.GetState() == conn.Banned {
+			if !b.driverConfig.DisableOptimisticUnban() && cc.GetState() == state.Banned {
 				b.pool.Allow(ctx, cc)
 			}
-		} else if conn.IsBadConn(err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
+		} else if IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
 			b.pool.Ban(ctx, cc, err)
 		}
 	}()

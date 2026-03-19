@@ -19,12 +19,12 @@ import (
 	"google.golang.org/grpc/stats"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
-
-//go:generate mockgen -destination grpc_client_conn_interface_mock_test.go --typed -package conn -write_package_comment=false google.golang.org/grpc ClientConnInterface
 
 var _ grpc.ClientConnInterface = (*connMock)(nil)
 
@@ -33,7 +33,7 @@ type connMock struct {
 }
 
 func (c connMock) Invoke(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
-	_, _, err := invoke(ctx, method, args, reply, c.cc, nil, "", 0, opts...)
+	_, _, err := invoke(ctx, method, args, reply, c.cc, "", 0, opts...)
 
 	return err
 }
@@ -49,7 +49,7 @@ func TestConn(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctx := xtest.Context(t)
 			ctrl := gomock.NewController(t)
-			cc := NewMockClientConnInterface(ctrl)
+			cc := mock.NewMockClientConnInterface(ctrl)
 			cc.EXPECT().Invoke(
 				gomock.Any(),
 				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
@@ -78,7 +78,7 @@ func TestConn(t *testing.T) {
 		t.Run("TransportError", func(t *testing.T) {
 			ctx := xtest.Context(t)
 			ctrl := gomock.NewController(t)
-			cc := NewMockClientConnInterface(ctrl)
+			cc := mock.NewMockClientConnInterface(ctrl)
 			expectedErr := grpcStatus.Error(grpcCodes.Unavailable, "")
 			cc.EXPECT().Invoke(
 				gomock.Any(),
@@ -99,7 +99,7 @@ func TestConn(t *testing.T) {
 			cancel()
 
 			ctrl := gomock.NewController(t)
-			cc := NewMockClientConnInterface(ctrl)
+			cc := mock.NewMockClientConnInterface(ctrl)
 			cc.EXPECT().Invoke(
 				gomock.Any(),
 				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
@@ -120,7 +120,7 @@ func TestConn(t *testing.T) {
 			ctx := xtest.Context(t)
 			ctrl := gomock.NewController(t)
 			t.Run("discovery.WhoAmI", func(t *testing.T) {
-				cc := NewMockClientConnInterface(ctrl)
+				cc := mock.NewMockClientConnInterface(ctrl)
 				cc.EXPECT().Invoke(
 					gomock.Any(),
 					Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
@@ -148,7 +148,7 @@ func TestConn(t *testing.T) {
 				require.Nil(t, response)
 			})
 			t.Run("query.BeginTransaction", func(t *testing.T) {
-				cc := NewMockClientConnInterface(ctrl)
+				cc := mock.NewMockClientConnInterface(ctrl)
 				cc.EXPECT().Invoke(
 					gomock.Any(),
 					Ydb_Query_V1.QueryService_BeginTransaction_FullMethodName,
@@ -271,21 +271,7 @@ func TestConn_StateManagement(t *testing.T) {
 		}
 		e := endpoint.New("test-endpoint:2135")
 		c := newConn(e, config)
-		require.Equal(t, Created, c.GetState())
-	})
-
-	t.Run("IsStateChecksMultipleStates", func(t *testing.T) {
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		e := endpoint.New("test-endpoint:2135")
-		c := newConn(e, config)
-		c.setState(context.Background(), Online)
-		require.True(t, c.IsState(Online))
-		require.True(t, c.IsState(Online, Offline))
-		require.False(t, c.IsState(Offline))
-		require.False(t, c.IsState(Banned, Destroyed))
+		require.Equal(t, state.Created, c.GetState())
 	})
 
 	t.Run("EndpointMethodsWork", func(t *testing.T) {
@@ -408,46 +394,6 @@ func TestConn_OnClose(t *testing.T) {
 	})
 }
 
-func TestConn_OnTransportError(t *testing.T) {
-	t.Run("OnTransportErrorCalledOnError", func(t *testing.T) {
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		e := endpoint.New("test-endpoint:2135")
-
-		var capturedConn Conn
-		var capturedErr error
-
-		onTransportError := func(ctx context.Context, cc Conn, cause error) {
-			capturedConn = cc
-			capturedErr = cause
-		}
-
-		c := newConn(e, config, withOnTransportError(onTransportError))
-
-		testErr := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
-		c.onTransportError(context.Background(), testErr)
-
-		require.Equal(t, c, capturedConn)
-		require.Equal(t, testErr, capturedErr)
-	})
-
-	t.Run("OnTransportErrorWithNilCallback", func(t *testing.T) {
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		e := endpoint.New("test-endpoint:2135")
-
-		c := newConn(e, config, withOnTransportError(nil))
-
-		// Should not panic
-		testErr := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
-		c.onTransportError(context.Background(), testErr)
-	})
-}
-
 func TestIsAvailable(t *testing.T) {
 	t.Run("NilConnIsNotAvailable", func(t *testing.T) {
 		require.False(t, isAvailable(nil))
@@ -466,7 +412,7 @@ func TestConn_Park(t *testing.T) {
 		// Close the connection first
 		err := c.Close(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, Destroyed, c.GetState())
+		require.Equal(t, state.Destroyed, c.GetState())
 
 		// Parking a closed connection should succeed without error
 		err = c.park(context.Background())
@@ -514,7 +460,7 @@ func TestConn_Park(t *testing.T) {
 		c := newConn(e, config)
 
 		// Set to Online but don't actually dial
-		c.setState(context.Background(), Online)
+		c.setState(context.Background(), state.Online)
 		require.Nil(t, c.grpcConn)
 
 		// Park should succeed without error (grpcConn is nil so it's a no-op)
@@ -522,6 +468,6 @@ func TestConn_Park(t *testing.T) {
 		require.NoError(t, err)
 
 		// State should remain Online since grpcConn was nil
-		require.Equal(t, Online, c.GetState())
+		require.Equal(t, state.Online, c.GetState())
 	})
 }

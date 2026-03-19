@@ -16,16 +16,15 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-//go:generate mockgen -destination grpc_client_stream_mock_test.go --typed -package conn -write_package_comment=false google.golang.org/grpc ClientStream
-
 func TestGrpcClientStream_Header(t *testing.T) {
 	t.Run("ReturnsHeaderFromUnderlyingStream", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		expectedMD := metadata.MD{"key": []string{"value"}}
 		mockStream.EXPECT().Header().Return(expectedMD, nil)
@@ -49,7 +48,7 @@ func TestGrpcClientStream_Header(t *testing.T) {
 
 	t.Run("ReturnsErrorFromUnderlyingStream", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		expectedErr := fmt.Errorf("header error")
 		mockStream.EXPECT().Header().Return(metadata.MD{}, expectedErr)
@@ -75,7 +74,7 @@ func TestGrpcClientStream_Header(t *testing.T) {
 func TestGrpcClientStream_Trailer(t *testing.T) {
 	t.Run("ReturnsTrailerFromUnderlyingStream", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		expectedMD := metadata.MD{"trailer-key": []string{"trailer-value"}}
 		mockStream.EXPECT().Trailer().Return(expectedMD)
@@ -100,7 +99,7 @@ func TestGrpcClientStream_Trailer(t *testing.T) {
 func TestGrpcClientStream_Context(t *testing.T) {
 	t.Run("ReturnsContextFromUnderlyingStream", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		expectedCtx := context.WithValue(context.Background(), "key", "value") //nolint:revive,staticcheck
 		mockStream.EXPECT().Context().Return(expectedCtx)
@@ -125,7 +124,7 @@ func TestGrpcClientStream_Context(t *testing.T) {
 func TestGrpcClientStream_CloseSend(t *testing.T) {
 	t.Run("SuccessfulClose", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		mockStream.EXPECT().CloseSend().Return(nil)
 
@@ -150,7 +149,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 
 	t.Run("ContextError", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		mockStream.EXPECT().CloseSend().Return(context.Canceled)
 
@@ -176,7 +175,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 
 	t.Run("TransportErrorWithWrapping", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		mockStream.EXPECT().CloseSend().Return(fmt.Errorf("transport error"))
 
@@ -202,7 +201,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 
 	t.Run("ErrorWithoutWrapping", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		expectedErr := fmt.Errorf("raw error")
 		mockStream.EXPECT().CloseSend().Return(expectedErr)
@@ -230,7 +229,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 func TestGrpcClientStream_SendMsg(t *testing.T) {
 	t.Run("SuccessfulSend", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryRequest{}
 		mockStream.EXPECT().SendMsg(msg).Return(nil)
@@ -256,7 +255,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 
 	t.Run("ContextError", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryRequest{}
 		mockStream.EXPECT().SendMsg(msg).Return(context.DeadlineExceeded)
@@ -283,7 +282,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 
 	t.Run("TransportErrorRetryable", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryRequest{}
 		mockStream.EXPECT().SendMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
@@ -312,7 +311,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 
 	t.Run("TransportErrorNonRetryable", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryRequest{}
 		mockStream.EXPECT().SendMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
@@ -344,7 +343,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 
 	t.Run("ErrorWithoutWrapping", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryRequest{}
 		expectedErr := fmt.Errorf("raw error")
@@ -374,7 +373,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 func TestGrpcClientStream_RecvMsg(t *testing.T) {
 	t.Run("SuccessfulReceive", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m interface{}) error {
@@ -405,7 +404,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 	t.Run("EOFError", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).Return(io.EOF)
@@ -432,7 +431,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 	t.Run("ContextError", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).Return(context.Canceled)
@@ -460,7 +459,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 	t.Run("TransportErrorRetryable", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
@@ -490,7 +489,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 	t.Run("TransportErrorNonRetryable", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
@@ -523,7 +522,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 	t.Run("ErrorWithoutWrapping", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		expectedErr := fmt.Errorf("raw error")
@@ -552,7 +551,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 	t.Run("OperationError", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m interface{}) error {
@@ -585,7 +584,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 	t.Run("OperationErrorWithoutWrapping", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m interface{}) error {
@@ -618,7 +617,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 func TestGrpcClientStream_Finish(t *testing.T) {
 	t.Run("CallsCancelOnFinish", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		config := &mockConfig{
 			dialTimeout:   5 * time.Second,
@@ -648,7 +647,7 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 
 	t.Run("FinishWithError", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockStream := NewMockClientStream(ctrl)
+		mockStream := mock.NewMockClientStream(ctrl)
 
 		config := &mockConfig{
 			dialTimeout:   5 * time.Second,

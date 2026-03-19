@@ -1,17 +1,22 @@
-package conn
+package balancer
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestIsBadConn(t *testing.T) {
+	ctx := xtest.Context(t)
+
 	for i, tt := range []struct {
 		err           error
 		goodConnCodes []grpcCodes.Code
@@ -102,9 +107,34 @@ func TestIsBadConn(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d. %v", i, tt.err), func(t *testing.T) {
-			require.Equal(t, tt.badConn, IsBadConn(tt.err, tt.goodConnCodes...))
-			require.Equal(t, tt.badConn, IsBadConn(xerrors.WithStackTrace(tt.err), tt.goodConnCodes...))
-			require.Equal(t, tt.badConn, IsBadConn(xerrors.Retryable(tt.err), tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(ctx, tt.err, tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(ctx, xerrors.WithStackTrace(tt.err), tt.goodConnCodes...))
+			require.Equal(t, tt.badConn, IsBadConn(ctx, xerrors.Retryable(tt.err), tt.goodConnCodes...))
 		})
 	}
+}
+
+func TestBanOnOperationError(t *testing.T) {
+	ctx := xtest.Context(t)
+	// Ban on operation error ABORTED only
+	ctx = BanOnOperationError(ctx, Ydb.StatusIds_ABORTED)
+	require.False(t, IsBadConn(ctx, nil))
+	require.False(t, IsBadConn(ctx, errors.New("test")))
+	require.False(t, IsBadConn(ctx, xerrors.WithStackTrace(
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
+	))
+	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED))),
+	))
+
+	// Add OVERLOADED to operation error codes
+	ctx = BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED)
+	require.False(t, IsBadConn(ctx, nil))
+	require.False(t, IsBadConn(ctx, errors.New("test")))
+	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
+	))
+	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED))),
+	))
 }

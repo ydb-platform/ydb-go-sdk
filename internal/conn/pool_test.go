@@ -8,11 +8,9 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	grpcCodes "google.golang.org/grpc/codes"
-	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -90,144 +88,6 @@ func TestPool_Get(t *testing.T) {
 
 		// Should return different connections
 		require.NotEqual(t, conn1, conn2)
-	})
-}
-
-func TestPool_Ban(t *testing.T) {
-	t.Run("BanConnection", func(t *testing.T) {
-		ctx := context.Background()
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		pool := NewPool(ctx, config)
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		// Initially should be Created
-		require.Equal(t, Created, conn.GetState())
-
-		// Set to Online first
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
-
-		// Ban the connection with Unavailable error
-		err := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test"))
-		pool.Ban(ctx, conn, err)
-
-		// Should be Banned
-		require.Equal(t, Banned, conn.GetState())
-	})
-
-	t.Run("DontBanOnNonTransportError", func(t *testing.T) {
-		ctx := context.Background()
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		pool := NewPool(ctx, config)
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
-
-		// Try to ban with operation error (should not ban)
-		err := xerrors.Operation()
-		pool.Ban(ctx, conn, err)
-
-		// Should still be Online
-		require.Equal(t, Online, conn.GetState())
-	})
-
-	t.Run("BanOnResourceExhaustedError", func(t *testing.T) {
-		ctx := context.Background()
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		pool := NewPool(ctx, config)
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
-
-		// Ban with ResourceExhausted error (should ban)
-		err := xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "test"))
-		pool.Ban(ctx, conn, err)
-
-		// Should be Banned
-		require.Equal(t, Banned, conn.GetState())
-	})
-
-	t.Run("DontBanOnOtherTransportErrors", func(t *testing.T) {
-		ctx := context.Background()
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		pool := NewPool(ctx, config)
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
-
-		// Try to ban with Internal error (should not ban)
-		err := xerrors.Transport(grpcStatus.Error(grpcCodes.Internal, "test"))
-		pool.Ban(ctx, conn, err)
-
-		// Should still be Online
-		require.Equal(t, Online, conn.GetState())
-	})
-}
-
-func TestPool_Allow(t *testing.T) {
-	t.Run("AllowBannedConnection", func(t *testing.T) {
-		ctx := context.Background()
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		pool := NewPool(ctx, config)
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		// Set to Banned
-		conn.SetState(ctx, Banned)
-		require.Equal(t, Banned, conn.GetState())
-
-		// Allow the connection
-		pool.Allow(ctx, conn)
-
-		// Should be Offline (since grpcConn is nil)
-		require.Equal(t, Offline, conn.GetState())
 	})
 }
 
@@ -400,8 +260,8 @@ func TestPool_ConnParker(t *testing.T) {
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
 
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
+		conn.SetState(ctx, state.Online)
+		require.Equal(t, state.Online, conn.GetState())
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -440,8 +300,8 @@ func TestPool_ConnParker(t *testing.T) {
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
 
-		conn.SetState(ctx, Banned)
-		require.Equal(t, Banned, conn.GetState())
+		conn.SetState(ctx, state.Banned)
+		require.Equal(t, state.Banned, conn.GetState())
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -480,8 +340,8 @@ func TestPool_ConnParker(t *testing.T) {
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
 
-		conn.SetState(ctx, Online)
-		require.Equal(t, Online, conn.GetState())
+		conn.SetState(ctx, state.Online)
+		require.Equal(t, state.Online, conn.GetState())
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -496,7 +356,7 @@ func TestPool_ConnParker(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Connection should still be Online (not idle enough to park)
-		require.Equal(t, Online, conn.GetState())
+		require.Equal(t, state.Online, conn.GetState())
 	})
 
 	t.Run("DoesNotParkCreatedConnections", func(t *testing.T) {
@@ -519,7 +379,7 @@ func TestPool_ConnParker(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
 		require.NotNil(t, conn)
-		require.Equal(t, Created, conn.GetState())
+		require.Equal(t, state.Created, conn.GetState())
 
 		// Start the parker in background
 		ttl := 10 * time.Second
@@ -534,7 +394,7 @@ func TestPool_ConnParker(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Connection should still be Created (not parked since not Online/Banned)
-		require.Equal(t, Created, conn.GetState())
+		require.Equal(t, state.Created, conn.GetState())
 	})
 
 	t.Run("StopsWhenPoolIsClosed", func(t *testing.T) {
@@ -593,7 +453,7 @@ func TestPool_ConnParker(t *testing.T) {
 		// Create connection to track parking attempts
 		e := endpoint.New("test-endpoint:2135")
 		conn := pool.Get(e)
-		conn.SetState(ctx, Online)
+		conn.SetState(ctx, state.Online)
 
 		// Start the parker
 		ttl := 10 * time.Second
