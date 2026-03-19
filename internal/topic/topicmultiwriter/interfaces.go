@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicpartitions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -20,7 +19,7 @@ type writersFactory interface {
 }
 
 type partitionChooser interface {
-	ChoosePartition(msg topicpartitions.Message) (int64, error)
+	ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error)
 	AddNewPartitions(partitions ...topictypes.PartitionInfo) error
 	RemovePartition(partitionID int64)
 }

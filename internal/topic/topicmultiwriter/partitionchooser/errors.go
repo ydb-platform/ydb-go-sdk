@@ -2,6 +2,4 @@ package partitionchooser
 
 import "errors"
 
-var (
-	ErrNoBounds = errors.New("no bounds configured")
-)
+var ErrNoBounds = errors.New("no bounds configured")

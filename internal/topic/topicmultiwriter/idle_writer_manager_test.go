@@ -11,7 +11,7 @@ import (
 func TestIdleWriterManager_AddAndGetRemovesWriter(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	manager := newIdleWriterManager(ctx, time.Minute)
@@ -36,7 +36,7 @@ func TestIdleWriterManager_AddAndGetRemovesWriter(t *testing.T) {
 func TestIdleWriterManager_RemovesIdleWriterAfterTimeout(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	const idleTimeout = 10 * time.Millisecond

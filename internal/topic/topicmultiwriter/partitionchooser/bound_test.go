@@ -11,7 +11,7 @@ import (
 )
 
 func messageWithKey(key string) topicpartitions.Message {
-	return topicpartitions.Message(topicwriterinternal.PublicMessage{Key: key})
+	return topicwriterinternal.PublicMessage{Key: key}
 }
 
 func TestBoundPartitionChooser(t *testing.T) {
@@ -35,7 +35,9 @@ func TestBoundPartitionChooser(t *testing.T) {
 	t.Run("MultiplePartitions", func(t *testing.T) {
 		t.Parallel()
 
-		chooser := NewBoundPartitionChooser()
+		chooser := NewBoundPartitionChooser(
+			WithKeyHasher(func(k string) string { return k }),
+		)
 		partitions := []topictypes.PartitionInfo{
 			{PartitionID: 1, FromBound: []byte{}, ToBound: []byte("m")},
 			{PartitionID: 2, FromBound: []byte("m"), ToBound: []byte("z")},
@@ -75,7 +77,9 @@ func TestBoundPartitionChooser(t *testing.T) {
 	t.Run("AddNewPartition", func(t *testing.T) {
 		t.Parallel()
 
-		chooser := NewBoundPartitionChooser()
+		chooser := NewBoundPartitionChooser(
+			WithKeyHasher(func(k string) string { return k }),
+		)
 		partitions := []topictypes.PartitionInfo{
 			{PartitionID: 1, Active: true, FromBound: []byte{}, ToBound: []byte("m")},
 		}
@@ -113,4 +117,3 @@ func TestBoundPartitionChooser(t *testing.T) {
 		require.Error(t, err)
 	})
 }
-

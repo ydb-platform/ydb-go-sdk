@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicpartitions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -28,7 +27,7 @@ func TestHashPartitionChooser(t *testing.T) {
 
 		require.NoError(t, chooser.AddNewPartitions(partitionsToAdd...))
 
-		msg := topicpartitions.Message(topicwriterinternal.PublicMessage{Key: "key1"})
+		msg := topicwriterinternal.PublicMessage{Key: "key1"}
 
 		partitionID, err := chooser.ChoosePartition(msg)
 		require.NoError(t, err)
@@ -60,7 +59,7 @@ func TestHashPartitionChooser(t *testing.T) {
 
 		require.NoError(t, chooser.AddNewPartitions(partitionsToAdd...))
 
-		msg := topicpartitions.Message(topicwriterinternal.PublicMessage{Key: "key"})
+		msg := topicwriterinternal.PublicMessage{Key: "key"}
 
 		partitionID, err := chooser.ChoosePartition(msg)
 		require.NoError(t, err)
@@ -72,4 +71,3 @@ func TestHashPartitionChooser(t *testing.T) {
 		require.Contains(t, []int64{0, 1}, partitionID)
 	})
 }
-

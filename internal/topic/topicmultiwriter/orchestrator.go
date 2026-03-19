@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicpartitions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -171,11 +170,7 @@ func (o *orchestrator) init() (err error) {
 		partitionsToAdd = append(partitionsToAdd, partition.PartitionInfo)
 	}
 
-	if err := o.partitionChooser.AddNewPartitions(partitionsToAdd...); err != nil {
-		return err
-	}
-
-	return nil
+	return o.partitionChooser.AddNewPartitions(partitionsToAdd...)
 }
 
 func (o *orchestrator) choosePartition(msg message) (partitionID int64, err error) {
@@ -183,7 +178,7 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 		msg.Key = o.multiWriterCfg.ProducerIDPrefix
 	}
 
-	partitionID, err = o.partitionChooser.ChoosePartition(topicpartitions.Message(msg.PublicMessage))
+	partitionID, err = o.partitionChooser.ChoosePartition(msg.PublicMessage)
 	if err != nil {
 		return 0, fmt.Errorf("choose partition: %w", err)
 	}
@@ -311,11 +306,8 @@ func (o *orchestrator) addNewPartitions(
 	}
 
 	parentPartition.ChildPartitionIDs = childPartitions
-	if err := o.partitionChooser.AddNewPartitions(partitionsToAdd...); err != nil {
-		return err
-	}
 
-	return nil
+	return o.partitionChooser.AddNewPartitions(partitionsToAdd...)
 }
 
 func (o *orchestrator) rechoosePartition(msg *message) (err error) {

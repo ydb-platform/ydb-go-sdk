@@ -25,12 +25,6 @@ func (p *PartitionInfo) Splitted() bool {
 	return len(p.ChildPartitionIDs) > 0
 }
 
-type partitionShortInfo struct {
-	ID        int64
-	FromBound string
-	ToBound   string
-}
-
 type message struct {
 	topicwriterinternal.PublicMessage
 

@@ -5,7 +5,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-type Message topicwriterinternal.PublicMessage
+type Message = topicwriterinternal.PublicMessage
 
 type PartitionChooser interface {
 	ChoosePartition(msg Message) (int64, error)
