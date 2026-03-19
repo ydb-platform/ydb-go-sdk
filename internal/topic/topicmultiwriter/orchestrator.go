@@ -161,7 +161,7 @@ func (o *orchestrator) init() (err error) {
 		return fmt.Errorf("%w: hash partition chooser is not supported when auto partitioning is enabled", ErrInvalidConfiguration) //nolint:lll
 	}
 
-	var partitionsToAdd []topictypes.PartitionInfo
+	partitionsToAdd := make([]topictypes.PartitionInfo, 0, len(o.partitions))
 	for _, partition := range o.partitions {
 		if partition.Splitted() || !partition.Active {
 			continue
