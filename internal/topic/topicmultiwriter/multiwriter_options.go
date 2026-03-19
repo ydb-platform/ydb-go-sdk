@@ -2,6 +2,8 @@ package topicmultiwriter
 
 import (
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 )
 
 type PublicMultiWriterOption func(cfg *MultiWriterConfig)
@@ -13,14 +15,7 @@ func WithProducerIDPrefix(prefix string) PublicMultiWriterOption {
 	}
 }
 
-func WithPartitioningKeyHasher(hasher KeyHasher) PublicMultiWriterOption {
-	return func(cfg *MultiWriterConfig) {
-		cfg.PartitioningKeyHasher = hasher
-		cfg.Initialized = true
-	}
-}
-
-func WithCustomPartitionChooser(customPartitionChooser PartitionChooser) PublicMultiWriterOption {
+func WithCustomPartitionChooser(customPartitionChooser partitionChooser) PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
 		cfg.PartitionChooser = customPartitionChooser
 		cfg.Initialized = true
@@ -29,14 +24,14 @@ func WithCustomPartitionChooser(customPartitionChooser PartitionChooser) PublicM
 
 func WithHashPartitionChooser() PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.PartitionChooser = newHashPartitionChooser()
+		cfg.PartitionChooser = partitionchooser.NewHashPartitionChooser()
 		cfg.Initialized = true
 	}
 }
 
-func WithBoundPartitionChooser() PublicMultiWriterOption {
+func WithBoundPartitionChooser(options ...partitionchooser.BoundPartitionChooserOption) PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.PartitionChooser = newBoundPartitionChooser()
+		cfg.PartitionChooser = partitionchooser.NewBoundPartitionChooser(options...)
 		cfg.Initialized = true
 	}
 }
@@ -56,7 +51,7 @@ func WithWriterPartitionByKey() PublicMultiWriterOption {
 
 func WithWriterPartitionByPartitionID() PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
-		cfg.PartitionChooser = newByPartitionIDPartitionChooser()
+		cfg.PartitionChooser = partitionchooser.NewByPartitionIDPartitionChooser()
 		cfg.Initialized = true
 	}
 }

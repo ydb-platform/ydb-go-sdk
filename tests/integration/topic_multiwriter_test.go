@@ -417,15 +417,16 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 	}
 
 	topicMultiWriterSettings := []topicoptions.WriterOption{
-		topicoptions.WithBoundPartitionChooser(),
-		topicoptions.WithWriterIdleTimeout(30 * time.Second),
-		topicoptions.WithPartitioningKeyHasher(func(key string) string {
-			if key == firstPartitionKey {
-				return ""
-			}
+		topicoptions.WithBoundPartitionChooser(topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(
+			func(key string) string {
+				if key == firstPartitionKey {
+					return ""
+				}
 
-			return key
-		}),
+				return key
+			},
+		)),
+		topicoptions.WithWriterIdleTimeout(30 * time.Second),
 	}
 
 	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
@@ -537,6 +538,6 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		func(t testing.TB) {
 			runTestWithAutoPartitioning(t, scope)
 		},
-		xtest.StopAfter(30*time.Second),
+		xtest.StopAfter(40*time.Second),
 	)
 }

@@ -14,19 +14,15 @@ import (
 type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDescription, error)
 
 type PartitionInfo struct {
-	ID             int64
-	FromBound      []byte
-	ToBound        []byte
-	ParentID       *int64
-	Children       []int64
+	topictypes.PartitionInfo
+
 	Locked         bool
 	PendingResend  int
 	CachedMaxSeqNo int64
-	Active         bool
 }
 
 func (p *PartitionInfo) Splitted() bool {
-	return len(p.Children) > 0
+	return len(p.ChildPartitionIDs) > 0
 }
 
 type partitionShortInfo struct {

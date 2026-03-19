@@ -2,10 +2,8 @@ package topicmultiwriter
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -13,10 +11,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xhash"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicpartitions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -29,7 +28,7 @@ type orchestrator struct {
 	writerCfg      *topicwriterinternal.WriterReconnectorConfig
 	mu             *xsync.Mutex
 
-	partitionChooser PartitionChooser
+	partitionChooser partitionChooser
 	topicDescriber   TopicDescriber
 
 	partitions map[int64]*PartitionInfo
@@ -114,10 +113,6 @@ func newOrchestrator(
 		o.stopWithError,
 	)
 
-	if multiWriterCfg.PartitioningKeyHasher == nil {
-		multiWriterCfg.PartitioningKeyHasher = o.getDefaultKeyHasher()
-	}
-
 	background.Start("ack receiver", func(ctx context.Context) {
 		o.ackReceiver.run(o.ctx)
 	})
@@ -135,68 +130,6 @@ func isOperationErrorOverloaded(err error) bool {
 	return xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED)
 }
 
-func (o *orchestrator) getDefaultKeyHasher() KeyHasher {
-	return func(key string) string {
-		// Same as C++ TProducerSettings::DefaultPartitioningKeyHasher:
-		// MurmurHash64 with seed 0, result as 8 bytes in big-endian (network byte order)
-		lo := xhash.Murmur2Hash64A([]byte(key), 0)
-		out := make([]byte, 8)
-		binary.BigEndian.PutUint64(out, lo)
-
-		return string(out)
-	}
-}
-
-func (o *orchestrator) initHashPartitionChooser() error {
-	partitionIDs := make([]int64, 0, len(o.partitions))
-	for id := range o.partitions {
-		partitionIDs = append(partitionIDs, id)
-	}
-	sort.Slice(partitionIDs, func(i, j int) bool {
-		return o.partitions[partitionIDs[i]].ID < o.partitions[partitionIDs[j]].ID
-	})
-	for _, partitionID := range partitionIDs {
-		if err := o.partitionChooser.AddNewPartition(
-			partitionID,
-			o.partitions[partitionID].FromBound,
-			o.partitions[partitionID].ToBound,
-		); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (o *orchestrator) initBoundPartitionChooser() error {
-	partitionShortInfos := make([]partitionShortInfo, 0, len(o.partitions))
-	for _, partition := range o.partitions {
-		if partition.Splitted() || !partition.Active {
-			continue
-		}
-
-		partitionShortInfos = append(partitionShortInfos, partitionShortInfo{
-			ID:        partition.ID,
-			FromBound: string(partition.FromBound),
-			ToBound:   string(partition.ToBound),
-		})
-	}
-	sort.Slice(partitionShortInfos, func(i, j int) bool {
-		return partitionShortInfos[i].FromBound < partitionShortInfos[j].FromBound
-	})
-	for _, partitionShortInfo := range partitionShortInfos {
-		if err := o.partitionChooser.AddNewPartition(
-			partitionShortInfo.ID,
-			[]byte(partitionShortInfo.FromBound),
-			[]byte(partitionShortInfo.ToBound),
-		); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 
@@ -206,18 +139,8 @@ func (o *orchestrator) init() (err error) {
 	}
 
 	for _, partition := range describeResult.Partitions {
-		var parentID *int64
-		if len(partition.ParentPartitionIDs) > 0 {
-			parentID = &partition.ParentPartitionIDs[0]
-		}
-
 		o.partitions[partition.PartitionID] = &PartitionInfo{
-			ID:        partition.PartitionID,
-			Active:    partition.Active,
-			ParentID:  parentID,
-			Children:  partition.ChildPartitionIDs,
-			FromBound: partition.FromBound,
-			ToBound:   partition.ToBound,
+			PartitionInfo: partition,
 		}
 	}
 
@@ -226,35 +149,30 @@ func (o *orchestrator) init() (err error) {
 	}
 
 	if o.partitionChooser == nil {
-		o.partitionChooser = newBoundPartitionChooser()
+		o.partitionChooser = partitionchooser.NewBoundPartitionChooser()
 	}
 
 	var (
 		isAutoPartitioningEnabled = describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy != //nolint:lll
 			topictypes.AutoPartitioningStrategyDisabled
-		_, isHashPartitionChooser             = o.partitionChooser.(*hashPartitionChooser)
-		boundChooser, isBoundPartitionChooser = o.partitionChooser.(*boundPartitionChooser)
+		_, isHashPartitionChooser = o.partitionChooser.(*partitionchooser.HashPartitionChooser)
 	)
 
-	switch {
-	case isHashPartitionChooser && isAutoPartitioningEnabled:
+	if isHashPartitionChooser && isAutoPartitioningEnabled {
 		return fmt.Errorf("%w: hash partition chooser is not supported when auto partitioning is enabled", ErrInvalidConfiguration) //nolint:lll
-	case isHashPartitionChooser:
-		return o.initHashPartitionChooser()
-	case isBoundPartitionChooser:
-		boundChooser.cfg = o.multiWriterCfg
-
-		return o.initBoundPartitionChooser()
 	}
 
+	var partitionsToAdd []topictypes.PartitionInfo
 	for _, partition := range o.partitions {
 		if partition.Splitted() || !partition.Active {
 			continue
 		}
 
-		if err := o.partitionChooser.AddNewPartition(partition.ID, partition.FromBound, partition.ToBound); err != nil {
-			return err
-		}
+		partitionsToAdd = append(partitionsToAdd, partition.PartitionInfo)
+	}
+
+	if err := o.partitionChooser.AddNewPartitions(partitionsToAdd...); err != nil {
+		return err
 	}
 
 	return nil
@@ -265,7 +183,7 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 		msg.Key = o.multiWriterCfg.ProducerIDPrefix
 	}
 
-	partitionID, err = o.partitionChooser.ChoosePartition(msg)
+	partitionID, err = o.partitionChooser.ChoosePartition(topicpartitions.Message(msg.PublicMessage))
 	if err != nil {
 		return 0, fmt.Errorf("choose partition: %w", err)
 	}
@@ -376,41 +294,25 @@ func (o *orchestrator) addNewPartitions(
 	describeResult *topictypes.TopicDescription,
 	splittedPartitionID int64,
 ) error {
+	var (
+		childPartitions = make([]int64, 0, 2)
+		partitionsToAdd = make([]topictypes.PartitionInfo, 0, 2)
+	)
+
 	for _, partition := range describeResult.Partitions {
 		if len(partition.ParentPartitionIDs) > 0 && partition.ParentPartitionIDs[0] == splittedPartitionID {
+			childPartitions = append(childPartitions, partition.PartitionID)
+			partitionsToAdd = append(partitionsToAdd, partition)
 			o.partitions[partition.PartitionID] = &PartitionInfo{
-				ID:        partition.PartitionID,
-				ParentID:  &splittedPartitionID,
-				Children:  partition.ChildPartitionIDs,
-				FromBound: partition.FromBound,
-				ToBound:   partition.ToBound,
-				Locked:    true,
+				PartitionInfo: partition,
+				Locked:        true,
 			}
 		}
 	}
 
-	for _, child := range parentPartition.Children {
-		childPartition := o.partitions[child]
-		if err := o.partitionChooser.AddNewPartition(
-			child,
-			childPartition.FromBound,
-			childPartition.ToBound,
-		); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (o *orchestrator) getSplittedPartitionChildren(
-	describeResult *topictypes.TopicDescription,
-	partitionID int64,
-) []int64 {
-	for _, partition := range describeResult.Partitions {
-		if partition.PartitionID == partitionID {
-			return partition.ChildPartitionIDs
-		}
+	parentPartition.ChildPartitionIDs = childPartitions
+	if err := o.partitionChooser.AddNewPartitions(partitionsToAdd...); err != nil {
+		return err
 	}
 
 	return nil
@@ -667,7 +569,6 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		}
 
 		partition.Locked = true
-		partition.Children = o.getSplittedPartitionChildren(&describeResult, partitionID)
 		if resultErr = o.addNewPartitions(partition, &describeResult, partitionID); resultErr != nil {
 			return
 		}
@@ -694,7 +595,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		}
 
 		partition.Locked = false
-		for _, child := range partition.Children {
+		for _, child := range partition.ChildPartitionIDs {
 			o.partitions[child].Locked = false
 		}
 

@@ -4,14 +4,17 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicpartitions"
 )
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 
 type (
-	KeyHasher        = topicmultiwriter.KeyHasher
-	PartitionChooser = topicmultiwriter.PartitionChooser
+	KeyHasher = partitionchooser.KeyHasher
+
+	BoundPartitionChooserOption = partitionchooser.BoundPartitionChooserOption
 )
 
 // WithProducerIDPrefix sets a prefix for producer IDs used by the internal producer.
@@ -25,20 +28,6 @@ func WithProducerIDPrefix(prefix string) WriterOption {
 		}
 
 		topicmultiwriter.WithProducerIDPrefix(prefix)(multiWriterCfg)
-	}
-}
-
-// WithPartitioningKeyHasher sets a custom key hasher used before partition selection.
-func WithPartitioningKeyHasher(hasher topicmultiwriter.KeyHasher) WriterOption {
-	return func(
-		writerCfg *topicwriterinternal.WriterReconnectorConfig,
-		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
-	) {
-		if multiWriterCfg == nil {
-			return
-		}
-
-		topicmultiwriter.WithPartitioningKeyHasher(hasher)(multiWriterCfg)
 	}
 }
 
@@ -56,8 +45,13 @@ func WithKafkaHashPartitionChooser() WriterOption {
 	}
 }
 
+// WithBoundPartitionChooserPartitioningKeyHasher sets a custom key hasher used before partition selection by key.
+func WithBoundPartitionChooserPartitioningKeyHasher(hasher KeyHasher) BoundPartitionChooserOption {
+	return partitionchooser.WithKeyHasher(hasher)
+}
+
 // WithBoundPartitionChooser sets partition chooser strategy to bound-based.
-func WithBoundPartitionChooser() WriterOption {
+func WithBoundPartitionChooser(options ...BoundPartitionChooserOption) WriterOption {
 	return func(
 		writerCfg *topicwriterinternal.WriterReconnectorConfig,
 		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
@@ -66,12 +60,12 @@ func WithBoundPartitionChooser() WriterOption {
 			return
 		}
 
-		topicmultiwriter.WithBoundPartitionChooser()(multiWriterCfg)
+		topicmultiwriter.WithBoundPartitionChooser(options...)(multiWriterCfg)
 	}
 }
 
 // WithCustomPartitionChooser sets a custom partition chooser.
-func WithCustomPartitionChooser(customPartitionChooser topicmultiwriter.PartitionChooser) WriterOption {
+func WithCustomPartitionChooser(customPartitionChooser topicpartitions.PartitionChooser) WriterOption {
 	return func(
 		writerCfg *topicwriterinternal.WriterReconnectorConfig,
 		multiWriterCfg *topicmultiwriter.MultiWriterConfig,
