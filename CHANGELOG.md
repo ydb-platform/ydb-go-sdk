@@ -1,3 +1,4 @@
+## v3.127.7
 * Added pessimization of connection to YDB node when `OVERLOADED` operation error is returned on `CreateSession` request for exclude next `CreateSession` calls on overloaded nodes
 
 ## v3.127.6
