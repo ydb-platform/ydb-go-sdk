@@ -134,6 +134,8 @@ func (o *orchestrator) init() (err error) {
 
 	describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
 	if err != nil {
+		o.stopWithError(err)
+
 		return err
 	}
 
@@ -144,6 +146,8 @@ func (o *orchestrator) init() (err error) {
 	}
 
 	if err := o.initSeqNo(); err != nil {
+		o.stopWithError(err)
+
 		return err
 	}
 
@@ -158,7 +162,10 @@ func (o *orchestrator) init() (err error) {
 	)
 
 	if isHashPartitionChooser && isAutoPartitioningEnabled {
-		return fmt.Errorf("%w: hash partition chooser is not supported when auto partitioning is enabled", ErrInvalidConfiguration) //nolint:lll
+		err := fmt.Errorf("%w: hash partition chooser is not supported when auto partitioning is enabled", ErrInvalidConfiguration) //nolint:lll
+		o.stopWithError(err)
+
+		return err
 	}
 
 	partitionsToAdd := make([]topictypes.PartitionInfo, 0, len(o.partitions))
@@ -170,7 +177,13 @@ func (o *orchestrator) init() (err error) {
 		partitionsToAdd = append(partitionsToAdd, partition.PartitionInfo)
 	}
 
-	return o.partitionChooser.AddNewPartitions(partitionsToAdd...)
+	if err := o.partitionChooser.AddNewPartitions(partitionsToAdd...); err != nil {
+		o.stopWithError(err)
+
+		return err
+	}
+
+	return nil
 }
 
 func (o *orchestrator) choosePartition(msg message) (partitionID int64, err error) {
