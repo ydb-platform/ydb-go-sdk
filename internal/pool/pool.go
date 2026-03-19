@@ -272,7 +272,20 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 				if newItem == nil {
 					return
 				}
+				// Caller gave up (e.g. context canceled). Do not put the item back
+				// into the pool to avoid exceeding the limit: the slot was already
+				// released (createInProgress--) when the caller returned.
+				// Use ctx (caller's context), not createCtx: createCtx is WithoutCancel(ctx)
+				// so it is not canceled when the caller cancels.
+				if ctx.Err() != nil {
+					p.closeItem(createCtx, newItem,
+						closeItemWithLock(),
+						closeItemNotifyStats(),
+						closeItemWithDeleteFromPool(),
+					)
 
+					return
+				}
 				_ = p.putItem(createCtx, newItem)
 			}
 		}()

@@ -1601,8 +1601,101 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NotNil(t, item3)
 
 			finalStats2 := p.Stats()
-			require.Equal(t, finalStats2.Index, 3,
+			require.Equal(t, 3, finalStats2.Index,
 				"Pool should not exceed limit")
 		})
+	})
+}
+
+// TestPoolContextCanceledAfterSlotReservationReproduce reproduces the race from
+// https://github.com/ydb-platform/ydb-go-sdk/issues/2051: when context is
+// canceled after reserving a slot for preferred node but before creation
+// completes, the creation goroutine may still complete after blockCreation is
+// released. Without the fix, that goroutine would putItem the new connection
+// into the pool, and a concurrent mustGetItem could also create one, exceeding
+// the pool limit.
+func TestPoolContextCanceledAfterSlotReservationReproduce(t *testing.T) {
+	const limit = 3
+
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		blockCreation := atomic.Bool{}
+		createdSignal := make(chan struct{})
+		itemIDCounter := atomic.Int32{}
+		enableChannel := false
+		blockCreation.Store(false)
+
+		rootCtx := context.Background()
+		p := New(rootCtx,
+			WithLimit[*testItem](limit),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				if enableChannel {
+					select {
+					case createdSignal <- struct{}{}:
+					default:
+					}
+				}
+				for {
+					select {
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					default:
+					}
+					if !blockCreation.Load() {
+						break
+					}
+				}
+				id := itemIDCounter.Add(1)
+				nodeID, has := endpoint.ContextNodeID(ctx)
+				if !has {
+					nodeID = uint32(id)
+				}
+
+				return &testItem{
+					v: id,
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+			WithTrace[*testItem, testItem](defaultTrace),
+		)
+		// Pre-fill to capacity
+		item0 := mustGetItem(t, p)
+		item1 := mustGetItem(t, p)
+		item2 := mustGetItem(t, p)
+		mustPutItem(t, p, item2)
+
+		blockCreation.Store(true)
+		getCtx := endpoint.WithNodeID(context.Background(), 99)
+		getCtx, cancel := context.WithCancel(getCtx)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		var getErr error
+		enableChannel = true
+		go func() {
+			defer wg.Done()
+			_, getErr = p.getItem(getCtx)
+		}()
+
+		<-createdSignal
+		enableChannel = false
+		cancel()
+		wg.Wait()
+		blockCreation.Store(false)
+
+		require.Error(t, getErr)
+		require.ErrorIs(t, getErr, context.Canceled)
+
+		item3 := mustGetItem(t, p)
+		require.NotNil(t, item3)
+
+		stats := p.Stats()
+		require.Equal(t, limit, stats.Index, "pool must not exceed limit after cancel")
+
+		mustPutItem(t, p, item3)
+		mustPutItem(t, p, item0)
+		mustPutItem(t, p, item1)
+		mustClose(t, p)
 	})
 }

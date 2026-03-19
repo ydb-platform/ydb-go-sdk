@@ -1,3 +1,4 @@
+* Fixed pool exceeding limit when context was canceled after reserving a slot for preferred node but before item creation completed: the creation goroutine could still add the new item after the caller returned, causing a subsequent get to create one more and exceed the limit (fixes #2051)
 * Added pessimization of connection to YDB node when `OVERLOADED` operation error is returned on `CreateSession` request for exclude next `CreateSession` calls on overloaded nodes
 
 ## v3.127.6
