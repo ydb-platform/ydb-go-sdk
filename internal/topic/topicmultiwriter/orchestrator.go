@@ -155,19 +155,6 @@ func (o *orchestrator) init() (err error) {
 		o.partitionChooser = partitionchooser.NewBoundPartitionChooser()
 	}
 
-	var (
-		isAutoPartitioningEnabled = describeResult.PartitionSettings.AutoPartitioningSettings.AutoPartitioningStrategy != //nolint:lll
-			topictypes.AutoPartitioningStrategyDisabled
-		_, isHashPartitionChooser = o.partitionChooser.(*partitionchooser.HashPartitionChooser)
-	)
-
-	if isHashPartitionChooser && isAutoPartitioningEnabled {
-		err := fmt.Errorf("%w: hash partition chooser is not supported when auto partitioning is enabled", ErrInvalidConfiguration) //nolint:lll
-		o.stopWithError(err)
-
-		return err
-	}
-
 	partitionsToAdd := make([]topictypes.PartitionInfo, 0, len(o.partitions))
 	for _, partition := range o.partitions {
 		if partition.Splitted() || !partition.Active {

@@ -32,6 +32,10 @@ func (c *HashPartitionChooser) ChoosePartition(msg topicpartitions.Message) (int
 
 func (c *HashPartitionChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
 	for _, partition := range partitions {
+		if len(partition.FromBound) > 0 || len(partition.ToBound) > 0 {
+			return fmt.Errorf("%w: boundaries are not supported for hash partition chooser", ErrUnsupported)
+		}
+
 		c.partitions = append(c.partitions, partition.PartitionID)
 	}
 
