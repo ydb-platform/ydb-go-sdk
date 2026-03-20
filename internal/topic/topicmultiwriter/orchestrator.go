@@ -173,6 +173,10 @@ func (o *orchestrator) init() (err error) {
 	return nil
 }
 
+func (o *orchestrator) getPartition(partitionID int64) *PartitionInfo {
+	return o.partitions[partitionID]
+}
+
 func (o *orchestrator) choosePartition(msg message) (partitionID int64, err error) {
 	if msg.Key == "" {
 		msg.Key = o.multiWriterCfg.ProducerIDPrefix
@@ -655,9 +659,4 @@ func (o *orchestrator) waitInitDone(ctx context.Context) error {
 	case <-o.initDone:
 		return o.getResultErr()
 	}
-}
-
-// for test purposes
-func (o *orchestrator) getWritersCount() int {
-	return o.writerPool.getWritersCount()
 }

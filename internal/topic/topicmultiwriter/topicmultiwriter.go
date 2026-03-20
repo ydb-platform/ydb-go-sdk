@@ -105,7 +105,3 @@ func (p *MultiWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.Ini
 		ErrNotImplemented,
 	)
 }
-
-func (p *MultiWriter) getWritersCount() int {
-	return p.orchestrator.getWritersCount()
-}

@@ -9,8 +9,7 @@ import (
 )
 
 type (
-	Message          = topicwriterinternal.PublicMessage
-	PartitionChooser = topicmultiwriter.PartitionChooser
+	Message = topicwriterinternal.PublicMessage
 )
 
 var (

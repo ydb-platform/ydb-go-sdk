@@ -217,11 +217,27 @@ func createMultiWriterForAutoPartitioning(
 	ctx context.Context,
 	topicPath string,
 	topicClient topic.Client,
-	multiWriterOptions []topicoptions.MultiWriterOption,
+	firstPartitionKey string,
 ) *topicwriter.Writer {
 	t.Helper()
 
-	multiWriterOptions = append(multiWriterOptions, topicoptions.WithProducerIDPrefix(producerIDPrefix))
+	multiWriterOptions := []topicoptions.MultiWriterOption{
+		topicoptions.WithWriterPartitionByKey(
+			topicoptions.BoundPartitionChooser(
+				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(
+					func(key string) string {
+						if key == firstPartitionKey {
+							return ""
+						}
+
+						return key
+					},
+				),
+			),
+		),
+		topicoptions.WithWriterIdleTimeout(30 * time.Second),
+		topicoptions.WithProducerIDPrefix(producerIDPrefix),
+	}
 
 	writerOptions := []topicoptions.WriterOption{
 		topicoptions.WithWriterSetAutoSeqNo(true),
@@ -432,25 +448,8 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 		t.Skip("skipping test because autosplit does not work in this version of YDB")
 	}
 
-	topicMultiWriterSettings := []topicoptions.MultiWriterOption{
-		topicoptions.WithWriterPartitionByKey(
-			topicoptions.BoundPartitionChooser(
-				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(
-					func(key string) string {
-						if key == firstPartitionKey {
-							return ""
-						}
-
-						return key
-					},
-				),
-			),
-		),
-		topicoptions.WithWriterIdleTimeout(30 * time.Second),
-	}
-
-	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, topicMultiWriterSettings)
-	multiWriter2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, firstPartitionKey)
+	multiWriter2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, firstPartitionKey)
 	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
 
 	var messagesWritten1, messagesWritten2 int
@@ -534,7 +533,7 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 	require.NoError(t, multiWriter1.Flush(ctx))
 	require.NoError(t, multiWriter2.Flush(ctx))
 
-	multiWriter3 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, topicMultiWriterSettings)
+	multiWriter3 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, firstPartitionKey)
 
 	require.NoError(t, multiWriter3.Close(ctx))
 	require.NoError(t, multiWriter1.Close(ctx))
@@ -609,6 +608,11 @@ func TestTopicMultiWriter_WithCustomPartitioning(t *testing.T) {
 	)
 }
 
+func TestTopicMultiWriter_AutoPartitioning_Once(t *testing.T) {
+	scope := newScope(t)
+	runTestWithAutoPartitioning(t, scope)
+}
+
 func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	scope := newScope(t)
 	xtest.TestManyTimes(
@@ -616,6 +620,6 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		func(t testing.TB) {
 			runTestWithAutoPartitioning(t, scope)
 		},
-		xtest.StopAfter(40*time.Second),
+		xtest.StopAfter(60*time.Second),
 	)
 }

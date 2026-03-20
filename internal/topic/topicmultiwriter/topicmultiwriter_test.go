@@ -21,6 +21,15 @@ import (
 
 var errTest = errors.New("test error")
 
+func (p *MultiWriter) getWritersCount() int {
+	return p.orchestrator.getWritersCount()
+}
+
+// for test purposes
+func (o *orchestrator) getWritersCount() int {
+	return o.writerPool.getWritersCount()
+}
+
 type stubWritersFactory struct {
 	t                testing.TB
 	stubWriterType   stubs.StubWriterType

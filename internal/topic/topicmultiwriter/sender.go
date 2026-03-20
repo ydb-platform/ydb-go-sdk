@@ -75,7 +75,13 @@ func (s *sender) iterateThroughMessagesIndex(
 	for partitionID, list := range index {
 		for iter := list.Front(); iter != nil; iter = iter.Next() {
 			msg := iter.Value.Value
-			if (!ignorePartitionLock && s.partitions[msg.PartitionID].Locked) || stopFunc(iter.Value) {
+
+			partition := s.partitions[msg.PartitionID]
+			if partition == nil {
+				return fmt.Errorf("partition not found: %d", msg.PartitionID)
+			}
+
+			if (!ignorePartitionLock && partition.Locked) || stopFunc(iter.Value) {
 				break
 			}
 

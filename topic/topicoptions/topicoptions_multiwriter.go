@@ -5,7 +5,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
@@ -44,18 +43,18 @@ func WithWriterPartitionByPartitionID() MultiWriterOption {
 }
 
 // WithWriterPartitionByKey sets partition chooser strategy to key-based.
-func WithWriterPartitionByKey(partitionChooser topicwriter.PartitionChooser) MultiWriterOption {
+func WithWriterPartitionByKey(partitionChooser topicmultiwriter.PartitionChooser) MultiWriterOption {
 	return func(cfg *topicmultiwriter.MultiWriterConfig) {
 		topicmultiwriter.WithWriterPartitionByKey(partitionChooser)(cfg)
 	}
 }
 
 // KafkaHashPartitionChooser returns Kafka-based partition chooser strategy.
-func KafkaHashPartitionChooser() topicwriter.PartitionChooser {
+func KafkaHashPartitionChooser() topicmultiwriter.PartitionChooser {
 	return topicmultiwriter.KafkaHashPartitionChooser()
 }
 
 // BoundPartitionChooser returns bound-based partition chooser strategy.
-func BoundPartitionChooser(options ...partitionchooser.BoundPartitionChooserOption) topicwriter.PartitionChooser {
+func BoundPartitionChooser(options ...partitionchooser.BoundPartitionChooserOption) topicmultiwriter.PartitionChooser {
 	return topicmultiwriter.BoundPartitionChooser(options...)
 }
