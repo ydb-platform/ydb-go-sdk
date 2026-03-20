@@ -18,7 +18,7 @@ type writersFactory interface {
 	Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error)
 }
 
-type partitionChooser interface {
+type PartitionChooser interface {
 	ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error)
 	AddNewPartitions(partitions ...topictypes.PartitionInfo) error
 	RemovePartition(partitionID int64)

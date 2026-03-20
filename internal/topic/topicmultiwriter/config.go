@@ -7,7 +7,7 @@ import (
 type MultiWriterConfig struct {
 	WriterIdleTimeout time.Duration
 	ProducerIDPrefix  string
-	PartitionChooser  partitionChooser
+	PartitionChooser  PartitionChooser
 
 	writersFactory writersFactory
 }

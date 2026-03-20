@@ -150,8 +150,8 @@ type (
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithOnWriterFirstConnected(f OnWriterInitResponseCallback) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		writerCfg.OnWriterInitResponseCallback = f
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.OnWriterInitResponseCallback = f
 	}
 }
 

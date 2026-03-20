@@ -16,7 +16,7 @@ func WithProducerIDPrefix(prefix string) PublicMultiWriterOption {
 	}
 }
 
-func WithCustomPartitionChooser(customPartitionChooser partitionChooser) PublicPartitionChooserOption {
+func WithCustomPartitionChooser(customPartitionChooser PartitionChooser) PublicPartitionChooserOption {
 	return func(cfg *MultiWriterConfig) {
 		cfg.PartitionChooser = customPartitionChooser
 	}
@@ -34,15 +34,15 @@ func WithWriterPartitionByPartitionID() PublicMultiWriterOption {
 	}
 }
 
-func KafkaHashPartitionChooser() partitionChooser {
+func KafkaHashPartitionChooser() PartitionChooser {
 	return partitionchooser.NewHashPartitionChooser()
 }
 
-func BoundPartitionChooser(options ...partitionchooser.BoundPartitionChooserOption) partitionChooser {
+func BoundPartitionChooser(options ...partitionchooser.BoundPartitionChooserOption) PartitionChooser {
 	return partitionchooser.NewBoundPartitionChooser(options...)
 }
 
-func WithWriterPartitionByKey(partitionChooser partitionChooser) PublicPartitionChooserOption {
+func WithWriterPartitionByKey(partitionChooser PartitionChooser) PublicPartitionChooserOption {
 	return func(cfg *MultiWriterConfig) {
 		cfg.PartitionChooser = partitionChooser
 	}

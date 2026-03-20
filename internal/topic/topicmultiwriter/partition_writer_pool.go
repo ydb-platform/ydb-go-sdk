@@ -114,6 +114,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 
 func (p *partitionWriterPool) createNonDirectWriter(partitionID int64) (writer, error) {
 	writerCfg := *p.writerCfg
+	writerCfg.MultiMode = true
 	topicwriterinternal.WithProducerID(p.getProducerID(partitionID))(&writerCfg)
 	writer, err := p.cfg.writersFactory.Create(writerCfg)
 

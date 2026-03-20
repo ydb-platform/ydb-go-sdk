@@ -27,7 +27,7 @@ type orchestrator struct {
 	writerCfg      *topicwriterinternal.WriterReconnectorConfig
 	mu             *xsync.Mutex
 
-	partitionChooser partitionChooser
+	partitionChooser PartitionChooser
 	topicDescriber   TopicDescriber
 
 	partitions map[int64]*PartitionInfo
