@@ -64,7 +64,8 @@ type WriterReconnectorConfig struct {
 	OnAckReceivedCallback        func(seqNo int64)
 	MultiMode                    bool
 
-	RetrySettings topic.RetrySettings
+	MultiWriterConfig any
+	RetrySettings     topic.RetrySettings
 
 	connectTimeout time.Duration
 }

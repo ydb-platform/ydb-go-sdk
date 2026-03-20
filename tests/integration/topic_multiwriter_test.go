@@ -217,12 +217,17 @@ func createMultiWriterForAutoPartitioning(
 	ctx context.Context,
 	topicPath string,
 	topicClient topic.Client,
-	writerOptions []topicoptions.WriterOption,
+	multiWriterOptions []topicoptions.MultiWriterOption,
 ) *topicwriter.Writer {
 	t.Helper()
 
-	writerOptions = append(writerOptions, topicoptions.WithWriterSetAutoSeqNo(true))
-	writerOptions = append(writerOptions, topicoptions.WithProducerIDPrefix(producerIDPrefix))
+	writerOptions := []topicoptions.WriterOption{
+		topicoptions.WithWriterSetAutoSeqNo(true),
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithProducerIDPrefix(producerIDPrefix),
+		),
+	}
+
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
 		writerOptions...,
@@ -240,7 +245,9 @@ func TestTopicMultiWriter_WaitInitAndClose(t *testing.T) {
 	ctx := scope.Ctx
 
 	topicClient := scope.Driver().Topic()
-	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithProducerIDPrefix("test-producer"))
+	multiWriter, err := topicClient.StartWriter(scope.TopicPath(), topicoptions.WithWriteToManyPartitions(
+		topicoptions.WithProducerIDPrefix("test-producer"),
+	))
 	require.NoError(t, err)
 
 	require.NoError(t, multiWriter.WaitInit(ctx))
@@ -256,8 +263,10 @@ func TestTopicMultiWriter_CloseWithoutWaitInit(t *testing.T) {
 	topicClient := scope.Driver().Topic()
 	multiWriter, err := topicClient.StartWriter(
 		scope.TopicPath(),
-		topicoptions.WithKafkaHashPartitionChooser(),
-		topicoptions.WithProducerIDPrefix("test-producer"),
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+			topicoptions.WithProducerIDPrefix("test-producer"),
+		),
 	)
 	require.NoError(t, err)
 
@@ -283,8 +292,10 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
 		topicoptions.WithWriterSetAutoSeqNo(false),
-		topicoptions.WithKafkaHashPartitionChooser(),
-		topicoptions.WithProducerIDPrefix("test-producer"),
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+			topicoptions.WithProducerIDPrefix("test-producer"),
+		),
 	)
 	require.NoError(t, err)
 
@@ -325,8 +336,9 @@ func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
-		topicoptions.WithWriterPartitionByKey(),
-		topicoptions.WithKafkaHashPartitionChooser(),
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+		),
 	)
 	require.NoError(t, err)
 
@@ -366,7 +378,9 @@ func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
 
 	multiWriter, err := topicClient.StartWriter(
 		topicPath,
-		topicoptions.WithWriterPartitionByPartitionID(),
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByPartitionID(),
+		),
 	)
 	require.NoError(t, err)
 
@@ -416,16 +430,20 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 		t.Skip("skipping test because autosplit does not work in this version of YDB")
 	}
 
-	topicMultiWriterSettings := []topicoptions.WriterOption{
-		topicoptions.WithBoundPartitionChooser(topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(
-			func(key string) string {
-				if key == firstPartitionKey {
-					return ""
-				}
+	topicMultiWriterSettings := []topicoptions.MultiWriterOption{
+		topicoptions.WithWriterPartitionByKey(
+			topicoptions.BoundPartitionChooser(
+				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(
+					func(key string) string {
+						if key == firstPartitionKey {
+							return ""
+						}
 
-				return key
-			},
-		)),
+						return key
+					},
+				),
+			),
+		),
 		topicoptions.WithWriterIdleTimeout(30 * time.Second),
 	}
 

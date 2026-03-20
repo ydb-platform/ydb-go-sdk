@@ -5,8 +5,6 @@ import (
 )
 
 type MultiWriterConfig struct {
-	Initialized bool
-
 	WriterIdleTimeout time.Duration
 	ProducerIDPrefix  string
 	PartitionChooser  partitionChooser

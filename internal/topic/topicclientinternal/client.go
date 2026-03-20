@@ -335,19 +335,17 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	cfg := c.createWriterConfig(
 		topicPath, append(
 			opts,
-			func(
-				writerCfg *topicwriterinternal.WriterReconnectorConfig,
-				multiWriterCfg *internalmultiwriter.MultiWriterConfig,
-			) {
+			func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
 				topicwriterinternal.WithMaxGrpcMessageBytes(c.cfg.MaxGrpcMessageSize)
 			},
 		),
 	)
-	mwCfg := c.createMultiWriterConfig(opts)
+
+	mwCfg, ok := cfg.MultiWriterConfig.(*internalmultiwriter.MultiWriterConfig)
 
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
-	if mwCfg != nil {
+	if ok && mwCfg != nil {
 		cfg.MultiMode = true
 
 		internal, err := internalmultiwriter.NewMultiWriter(
@@ -384,11 +382,12 @@ func (c *Client) StartTransactionalWriter(
 	}
 
 	cfg := c.createWriterConfig(topicPath, opts)
-	mwCfg := c.createMultiWriterConfig(opts)
+
+	mwCfg, ok := cfg.MultiWriterConfig.(*internalmultiwriter.MultiWriterConfig)
 
 	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
 	// a multi-writer instead of a single-writer.
-	if mwCfg != nil {
+	if ok && mwCfg != nil {
 		cfg.MultiMode = true
 
 		multiwriter, err := internalmultiwriter.NewMultiWriter(
@@ -422,22 +421,6 @@ func (c *Client) StartTransactionalWriter(
 	return topicwriter.NewTxWriterInternal(txWriter), nil
 }
 
-func (c *Client) createMultiWriterConfig(opts []topicoptions.WriterOption) *internalmultiwriter.MultiWriterConfig {
-	mwCfg := internalmultiwriter.MultiWriterConfig{}
-
-	for _, opt := range opts {
-		if opt != nil {
-			opt(nil, &mwCfg)
-		}
-	}
-
-	if !mwCfg.Initialized {
-		return nil
-	}
-
-	return &mwCfg
-}
-
 func (c *Client) createWriterConfig(
 	topicPath string,
 	opts []topicoptions.WriterOption,
@@ -452,11 +435,7 @@ func (c *Client) createWriterConfig(
 		topicwriterinternal.WithCredentials(c.cred),
 	)
 
-	for _, opt := range opts {
-		options = append(options, func(cfg *topicwriterinternal.WriterReconnectorConfig) {
-			opt(cfg, nil)
-		})
-	}
+	options = append(options, opts...)
 
 	return topicwriterinternal.NewWriterReconnectorConfig(options...)
 }
