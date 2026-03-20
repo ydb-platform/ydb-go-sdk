@@ -38,8 +38,8 @@ func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOpt
 // callback func must be fast and deterministic: always result same result for same error - it can be called
 // few times for every error
 func WithWriterCheckRetryErrorFunction(callback CheckErrorRetryFunction) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		writerCfg.RetrySettings.CheckError = callback
+	return func(сfg *topicwriterinternal.WriterReconnectorConfig) {
+		сfg.RetrySettings.CheckError = callback
 	}
 }
 
@@ -61,8 +61,8 @@ func WithWriterMaxQueueLen(num int) WriterOption {
 // WithWriterMessageMaxBytesSize set max body size of one message in bytes.
 // Writer will return error in message will be more than the size.
 func WithWriterMessageMaxBytesSize(size int) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		writerCfg.MaxMessageSize = size
+	return func(сfg *topicwriterinternal.WriterReconnectorConfig) {
+		сfg.MaxMessageSize = size
 	}
 }
 
@@ -192,9 +192,7 @@ func WithWriterCodecAutoSelect() WriterOption {
 // enabled by default
 // if enabled - Message.SeqNo field must be zero
 func WithWriterSetAutoSeqNo(val bool) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithAutoSetSeqNo(val)(writerCfg)
-	}
+	return topicwriterinternal.WithAutoSetSeqNo(val)
 }
 
 // WithWriterSetAutoCreatedAt set messages CreatedAt by SDK
