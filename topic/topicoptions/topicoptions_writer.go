@@ -30,9 +30,7 @@ type ResetableWriter = topicwriterinternal.PublicResetableWriter
 // If CreateEncoderFunc returns a writer implementing ResetableWriter, then the compression objects
 // will be reused for this codec. This will reduce the load on the GC.
 func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithAddEncoder(rawtopiccommon.Codec(codec), f)(writerCfg)
-	}
+	return topicwriterinternal.WithAddEncoder(rawtopiccommon.Codec(codec), f)
 }
 
 // WithWriterCheckRetryErrorFunction can override default error retry policy
@@ -50,18 +48,14 @@ func WithWriterCheckRetryErrorFunction(callback CheckErrorRetryFunction) WriterO
 //
 // panic if num <= 0
 func WithWriterCompressorCount(num int) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithCompressorCount(num)(writerCfg)
-	}
+	return topicwriterinternal.WithCompressorCount(num)
 }
 
 // WithWriterMaxQueueLen set max len of queue for wait ack
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithWriterMaxQueueLen(num int) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithMaxQueueLen(num)(writerCfg)
-	}
+	return topicwriterinternal.WithMaxQueueLen(num)
 }
 
 // WithWriterMessageMaxBytesSize set max body size of one message in bytes.
@@ -84,9 +78,7 @@ func WithWriteSessionMeta(meta map[string]string) WriterOption {
 
 // WithWriterSessionMeta set writer's session metadata
 func WithWriterSessionMeta(meta map[string]string) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithSessionMeta(meta)(writerCfg)
-	}
+	return topicwriterinternal.WithSessionMeta(meta)
 }
 
 // WithProducerID
@@ -101,9 +93,7 @@ func WithProducerID(producerID string) WriterOption {
 
 // WithWriterProducerID set producer for write session
 func WithWriterProducerID(producerID string) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithProducerID(producerID)(writerCfg)
-	}
+	return topicwriterinternal.WithProducerID(producerID)
 }
 
 // WithPartitionID
@@ -118,9 +108,7 @@ func WithPartitionID(partitionID int64) WriterOption {
 
 // WithWriterPartitionID set direct partition id on write session level
 func WithWriterPartitionID(partitionID int64) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID))(writerCfg)
-	}
+	return topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID))
 }
 
 // WithSyncWrite
@@ -136,9 +124,7 @@ func WithSyncWrite(sync bool) WriterOption {
 // WithWriterWaitServerAck - when enabled every Write call wait ack from server for all messages from the call
 // disabled by default. Make writer much slower, use only if you really need it.
 func WithWriterWaitServerAck(wait bool) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithWaitAckOnWrite(wait)(writerCfg)
-	}
+	return topicwriterinternal.WithWaitAckOnWrite(wait)
 }
 
 type (
@@ -181,9 +167,7 @@ func WithCodec(codec topictypes.Codec) WriterOption {
 
 // WithWriterCodec disable codec auto select and force set codec for the write session
 func WithWriterCodec(codec topictypes.Codec) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithCodec(rawtopiccommon.Codec(codec))(writerCfg)
-	}
+	return topicwriterinternal.WithCodec(rawtopiccommon.Codec(codec))
 }
 
 // WithCodecAutoSelect
@@ -193,9 +177,7 @@ func WithWriterCodec(codec topictypes.Codec) WriterOption {
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCodecAutoSelect() WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithAutoCodec()(writerCfg)
-	}
+	return topicwriterinternal.WithAutoCodec()
 }
 
 // WithWriterCodecAutoSelect - auto select best codec for messages stream
@@ -203,9 +185,7 @@ func WithCodecAutoSelect() WriterOption {
 // if option enabled - send a batch of messages for every allowed codec (for prevent delayed bad codec accident)
 // then from time to time measure all codecs and select codec with the smallest result messages size
 func WithWriterCodecAutoSelect() WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithAutoCodec()(writerCfg)
-	}
+	return topicwriterinternal.WithAutoCodec()
 }
 
 // WithWriterSetAutoSeqNo set messages SeqNo by SDK
@@ -221,30 +201,22 @@ func WithWriterSetAutoSeqNo(val bool) WriterOption {
 // enabled by default
 // if enabled - Message.CreatedAt field must be zero
 func WithWriterSetAutoCreatedAt(val bool) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithAutosetCreatedTime(val)(writerCfg)
-	}
+	return topicwriterinternal.WithAutosetCreatedTime(val)
 }
 
 // WithWriterStartTimeout mean timeout for connect to writer stream and work some time without errors
 func WithWriterStartTimeout(timeout time.Duration) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithStartTimeout(timeout)(writerCfg)
-	}
+	return topicwriterinternal.WithStartTimeout(timeout)
 }
 
 // WithWriterTrace set tracer for the writer
 func WithWriterTrace(t trace.Topic) WriterOption { //nolint:gocritic
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithTrace(&t)(writerCfg)
-	}
+	return topicwriterinternal.WithTrace(&t)
 }
 
 // WithWriterUpdateTokenInterval set time interval between send auth token to the server
 func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		topicwriterinternal.WithTokenUpdateInterval(interval)(writerCfg)
-	}
+	return topicwriterinternal.WithTokenUpdateInterval(interval)
 }
 
 // WithWriterLogContext allows providing a context.Context instance which will be used

@@ -221,10 +221,12 @@ func createMultiWriterForAutoPartitioning(
 ) *topicwriter.Writer {
 	t.Helper()
 
+	multiWriterOptions = append(multiWriterOptions, topicoptions.WithProducerIDPrefix(producerIDPrefix))
+
 	writerOptions := []topicoptions.WriterOption{
 		topicoptions.WithWriterSetAutoSeqNo(true),
 		topicoptions.WithWriteToManyPartitions(
-			topicoptions.WithProducerIDPrefix(producerIDPrefix),
+			multiWriterOptions...,
 		),
 	}
 
