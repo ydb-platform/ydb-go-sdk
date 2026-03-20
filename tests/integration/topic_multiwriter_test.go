@@ -549,6 +549,64 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 	))
 }
 
+type customPartitionChooser struct{}
+
+// ChoosePartition implements [topicmultiwriter.PartitionChooser].
+func (c *customPartitionChooser) ChoosePartition(msg topicwriter.Message) (int64, error) {
+	return 1, nil
+}
+
+// AddNewPartitions implements [topicmultiwriter.PartitionChooser].
+func (c *customPartitionChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
+	return nil
+}
+
+// RemovePartition implements [topicmultiwriter.PartitionChooser].
+func (c *customPartitionChooser) RemovePartition(partitionID int64) {
+
+}
+
+func TestTopicMultiWriter_WithCustomPartitioning(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+
+	// Create topic with 10 partitions for this test.
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	multiWriter, err := topicClient.StartWriter(
+		topicPath,
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByKey(&customPartitionChooser{}),
+		),
+	)
+	require.NoError(t, err)
+
+	err = multiWriter.WaitInit(ctx)
+	require.NoError(t, err)
+
+	writeAndReadMessages(
+		t,
+		ctx,
+		topicClient,
+		topicPath,
+		multiWriter,
+		func(i int) topicwriter.Message {
+			return topicwriter.Message{
+				Data: bytes.NewReader([]byte(defaultMessageString)),
+			}
+		},
+	)
+}
+
 func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	scope := newScope(t)
 	xtest.TestManyTimes(

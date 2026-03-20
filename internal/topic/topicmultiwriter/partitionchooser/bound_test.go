@@ -6,11 +6,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicpartitions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-func messageWithKey(key string) topicpartitions.Message {
+func messageWithKey(key string) topicwriterinternal.PublicMessage {
 	return topicwriterinternal.PublicMessage{Key: key}
 }
 

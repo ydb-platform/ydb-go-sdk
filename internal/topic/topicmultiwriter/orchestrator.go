@@ -152,7 +152,7 @@ func (o *orchestrator) init() (err error) {
 	}
 
 	if o.partitionChooser == nil {
-		o.partitionChooser = partitionchooser.NewBoundPartitionChooser()
+		o.partitionChooser = partitionchooser.NewByPartitionIDPartitionChooser()
 	}
 
 	partitionsToAdd := make([]topictypes.PartitionInfo, 0, len(o.partitions))

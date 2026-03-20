@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -94,6 +95,7 @@ func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
 	writer, err := NewMultiWriter(describer, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
@@ -110,6 +112,7 @@ func newTestMultiWriterWithInitDelay(
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
 	writer, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		time.Sleep(initDelay)
@@ -131,6 +134,7 @@ func newTestMultiWriterWithBasicWriter(
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
@@ -169,6 +173,7 @@ func newTestMultiWriterWithAutopartitioningWriter(
 		),
 	)(&cfg)
 	WithProducerIDPrefix(producerIDPrefix)(&cfg)
+	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
@@ -186,6 +191,8 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer Topic
 	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterIdleTimeout(1 * time.Second)(&cfg)
+	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
+
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
@@ -207,11 +214,13 @@ func newTestMultiWriterWithAckDelay(
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, ackDelay))(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+
 	for _, opt := range opts {
 		opt(writerCfg)
 	}
@@ -232,6 +241,7 @@ func newTestMultiWriterWithCustomWritersFactory(
 	cfg := MultiWriterConfig{}
 	withWritersFactory(writersFactory)(&cfg)
 	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)

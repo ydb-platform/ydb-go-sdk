@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xhash"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicpartitions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -56,7 +56,7 @@ func NewBoundPartitionChooser(options ...BoundPartitionChooserOption) *BoundPart
 	return chooser
 }
 
-func (c *BoundPartitionChooser) ChoosePartition(msg topicpartitions.Message) (int64, error) {
+func (c *BoundPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error) {
 	if len(c.partitions) == 0 {
 		return 0, fmt.Errorf("no partitions configured")
 	}
