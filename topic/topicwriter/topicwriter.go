@@ -6,11 +6,18 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 type (
 	Message = topicwriterinternal.PublicMessage
 )
+
+type PartitionChooser interface {
+	ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error)
+	AddNewPartitions(partitions ...topictypes.PartitionInfo) error
+	RemovePartition(partitionID int64)
+}
 
 var (
 	// Deprecated: the error will not be returned. Topic writer allow overflow queue for single call.
