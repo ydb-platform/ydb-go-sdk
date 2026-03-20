@@ -38,8 +38,8 @@ func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOpt
 // callback func must be fast and deterministic: always result same result for same error - it can be called
 // few times for every error
 func WithWriterCheckRetryErrorFunction(callback CheckErrorRetryFunction) WriterOption {
-	return func(сfg *topicwriterinternal.WriterReconnectorConfig) {
-		сfg.RetrySettings.CheckError = callback
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.RetrySettings.CheckError = callback
 	}
 }
 
