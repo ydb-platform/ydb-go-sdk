@@ -208,7 +208,7 @@ func TestParamsFromMap(t *testing.T) {
 	t.Run("DefaultTimeTypes", func(t *testing.T) {
 		params := ydb.ParamsFromMap(map[string]any{
 			"a": time.Unix(123, 456),
-			"b": time.Duration(123) * time.Microsecond,
+			"b": 123 * time.Microsecond,
 		})
 		pp, err := params.ToYDB()
 		require.NoError(t, err)
@@ -245,7 +245,7 @@ func TestParamsFromMap(t *testing.T) {
 	t.Run("BindWideTimeTypes", func(t *testing.T) {
 		params := ydb.ParamsFromMap(map[string]any{
 			"a": time.Date(1900, 1, 1, 0, 0, 0, 123456, time.UTC),
-			"b": time.Duration(123) * time.Nanosecond,
+			"b": 123 * time.Microsecond,
 		}, ydb.WithWideTimeTypes(true))
 		pp, err := params.ToYDB()
 		require.NoError(t, err)

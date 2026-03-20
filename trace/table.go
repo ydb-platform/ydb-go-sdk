@@ -394,9 +394,10 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolGetDoneInfo struct {
-		Session  sessionInfo
-		Attempts int
-		Error    error
+		Session      sessionInfo
+		Attempts     int
+		NodeHintInfo *NodeHintInfo
+		Error        error
 	}
 	// Deprecated
 	// Will be removed after March 2025.

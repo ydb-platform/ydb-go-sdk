@@ -70,6 +70,15 @@ func WithResponsePartLimitSizeBytes(size int64) ExecuteOption {
 	return options.WithResponsePartLimitSizeBytes(size)
 }
 
+// WithConcurrentResultSets enables concurrent computation of result sets. It is useful when a single query executes
+// multiple independent SELECT statements.
+//
+// WARNING: This option must be used only in Query() method. Using it with other methods results in undefined behavior
+// or an error.
+func WithConcurrentResultSets(isEnabled bool) ExecuteOption {
+	return options.WithConcurrentResultSets(isEnabled)
+}
+
 func WithCallOptions(opts ...grpc.CallOption) ExecuteOption {
 	return options.WithCallOptions(opts...)
 }

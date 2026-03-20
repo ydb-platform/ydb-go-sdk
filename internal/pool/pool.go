@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type (
@@ -58,7 +59,7 @@ type (
 	Pool[PT ItemConstraint[T], T any] struct {
 		config Config[PT, T]
 
-		createItemFunc func(ctx context.Context) (PT, error)
+		createItemFunc func(ctx context.Context, withReservedSpace bool) (PT, error)
 
 		mu               xsync.RWMutex
 		createInProgress int // KIKIMR-9163: in-create-process counter
@@ -201,9 +202,12 @@ func New[PT ItemConstraint[T], T any](
 // makeAsyncCreateItemFunc wraps the createItem function with timeout handling
 func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	p *Pool[PT, T],
-) func(ctx context.Context) (PT, error) {
-	return func(ctx context.Context) (PT, error) {
+) func(ctx context.Context, withReservedSpace bool) (PT, error) {
+	return func(ctx context.Context, withReservedSpace bool) (PT, error) {
 		if !xsync.WithLock(&p.mu, func() bool {
+			if withReservedSpace {
+				return true
+			}
 			if len(p.index)+p.createInProgress < p.config.limit {
 				p.createInProgress++
 
@@ -769,6 +773,25 @@ func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[
 	return false
 }
 
+func getNodeHintInfo[PT ItemConstraint[T], T any](
+	item PT,
+	preferredNodeID uint32,
+	hasPreferredNodeID bool,
+	finalErr error,
+) *trace.NodeHintInfo {
+	if !hasPreferredNodeID || finalErr != nil {
+		return nil
+	}
+	res := &trace.NodeHintInfo{
+		PreferredNodeID: preferredNodeID,
+	}
+	if item != nil {
+		res.SessionNodeID = item.NodeID()
+	}
+
+	return res
+}
+
 func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { //nolint:funlen
 	var (
 		start   = p.config.clock.Now()
@@ -776,18 +799,18 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		lastErr error
 	)
 
+	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
+
 	if onGet := p.config.trace.OnGet; onGet != nil {
 		onDone := onGet(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).getItem"),
 		)
 		if onDone != nil {
 			defer func() {
-				onDone(item, attempt, finalErr)
+				onDone(item, attempt, getNodeHintInfo(item, preferredNodeID, hasPreferredNodeID, finalErr), finalErr)
 			}()
 		}
 	}
-
-	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
 	for ; attempt < maxAttempts; attempt++ {
 		select {
@@ -795,7 +818,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			return nil, xerrors.WithStackTrace(errClosedPool)
 		default:
 		}
-
+		reservedSpace := false
 		if item := xsync.WithLock(&p.mu, func() PT { //nolint:nestif
 			if hasPreferredNodeID {
 				item := p.removeIdleByNodeID(preferredNodeID)
@@ -809,7 +832,23 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 				}
 			}
 
-			return p.removeFirstIdle()
+			idle := p.removeFirstIdle()
+			if hasPreferredNodeID {
+				if idle != nil {
+					// reserve slot in session pool
+					p.createInProgress++
+					reservedSpace = true
+					// close most idle item to make space for new one with preferred node id
+					p.closeItem(ctx, idle,
+						closeItemNotifyStats(),
+						closeItemWithDeleteFromPool(),
+					)
+
+					return nil
+				}
+			}
+
+			return idle
 		}); item != nil {
 			if item.IsAlive() {
 				info := xsync.WithLock(&p.mu, func() itemInfo[PT, T] {
@@ -843,7 +882,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 			)
 		}
 
-		item, err := p.createItemFunc(ctx)
+		item, err := p.createItemFunc(ctx, reservedSpace)
 		if item != nil {
 			return item, nil
 		}

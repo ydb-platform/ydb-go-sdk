@@ -31,6 +31,7 @@ import (
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	internalScripting "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -290,7 +291,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 		if parser := dsnParsers[parserIdx]; parser != nil {
 			optsFromParser, err := parser(dsn)
 			if err != nil {
-				return nil, xerrors.WithStackTrace(fmt.Errorf("data source name '%s' wrong: %w", dsn, err))
+				return nil, xerrors.WithStackTrace(fmt.Errorf("data source name '%s' wrong: %w", secret.DSN(dsn), err))
 			}
 			opts = append(opts, optsFromParser...)
 		}

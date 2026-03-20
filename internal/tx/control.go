@@ -3,6 +3,7 @@ package tx
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 )
 
 type (
@@ -51,6 +52,49 @@ func (ctrl *Control) ToYdbTableTransactionControl() *Ydb_Table.TransactionContro
 
 func (ctrl *Control) Selector() Selector {
 	return ctrl.selector
+}
+
+// Equal compares two Control objects by comparing their protobuf representations
+func (ctrl *Control) Equal(other *Control) bool {
+	if ctrl == nil && other == nil {
+		return true
+	}
+	if ctrl == nil || other == nil {
+		return false
+	}
+
+	return proto.Equal(
+		ctrl.ToYdbQueryTransactionControl(),
+		other.ToYdbQueryTransactionControl(),
+	)
+}
+
+// IsBeginTxWithoutCommit checks if the control has BeginTx selector but no CommitTx flag set
+// This only returns true for READ-WRITE transactions without commit.
+// Read-only transactions don't need CommitTx.
+func (ctrl *Control) IsBeginTxWithoutCommit() bool {
+	if ctrl == nil {
+		return false
+	}
+	opts, ok := ctrl.selector.(beginTxOptions)
+	if !ok || ctrl.commit {
+		return false
+	}
+
+	// Check if this is a read-write transaction mode
+	// Read-only modes don't require CommitTx
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		// Check if it's a read-write mode
+		switch opt.(type) {
+		case serializableReadWriteTxSettingsOption, snapshotReadWriteTxSettingsOption:
+			return true
+		}
+	}
+
+	return false
 }
 
 var (

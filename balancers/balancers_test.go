@@ -7,6 +7,7 @@ import (
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
@@ -14,8 +15,8 @@ import (
 func TestPreferLocalDC(t *testing.T) {
 	conns := []conn.Conn{
 		&mock.Conn{AddrField: "1", LocationField: "1"},
-		&mock.Conn{AddrField: "2", State: conn.Online, LocationField: "2"},
-		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "2"},
+		&mock.Conn{AddrField: "2", State: state.Online, LocationField: "2"},
+		&mock.Conn{AddrField: "3", State: state.Online, LocationField: "2"},
 	}
 	rr := PreferNearestDC(RandomChoice())
 	require.False(t, rr.AllowFallback)
@@ -25,8 +26,8 @@ func TestPreferLocalDC(t *testing.T) {
 func TestPreferLocalDCWithFallBack(t *testing.T) {
 	conns := []conn.Conn{
 		&mock.Conn{AddrField: "1", LocationField: "1"},
-		&mock.Conn{AddrField: "2", State: conn.Online, LocationField: "2"},
-		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "2"},
+		&mock.Conn{AddrField: "2", State: state.Online, LocationField: "2"},
+		&mock.Conn{AddrField: "3", State: state.Online, LocationField: "2"},
 	}
 	rr := PreferNearestDCWithFallBack(RandomChoice())
 	require.True(t, rr.AllowFallback)
@@ -35,9 +36,9 @@ func TestPreferLocalDCWithFallBack(t *testing.T) {
 
 func TestPreferLocations(t *testing.T) {
 	conns := []conn.Conn{
-		&mock.Conn{AddrField: "1", LocationField: "zero", State: conn.Online},
-		&mock.Conn{AddrField: "2", State: conn.Online, LocationField: "one"},
-		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "two"},
+		&mock.Conn{AddrField: "1", LocationField: "zero", State: state.Online},
+		&mock.Conn{AddrField: "2", State: state.Online, LocationField: "one"},
+		&mock.Conn{AddrField: "3", State: state.Online, LocationField: "two"},
 	}
 
 	rr := PreferLocations(RandomChoice(), "zero", "two")
@@ -47,9 +48,9 @@ func TestPreferLocations(t *testing.T) {
 
 func TestPreferLocationsWithFallback(t *testing.T) {
 	conns := []conn.Conn{
-		&mock.Conn{AddrField: "1", LocationField: "zero", State: conn.Online},
-		&mock.Conn{AddrField: "2", State: conn.Online, LocationField: "one"},
-		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "two"},
+		&mock.Conn{AddrField: "1", LocationField: "zero", State: state.Online},
+		&mock.Conn{AddrField: "2", State: state.Online, LocationField: "one"},
+		&mock.Conn{AddrField: "3", State: state.Online, LocationField: "two"},
 	}
 
 	rr := PreferLocationsWithFallback(RandomChoice(), "zero", "two")

@@ -319,7 +319,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			method: "Interval64",
-			args:   []any{p(time.Duration(123456789))},
+			args:   []any{p(123456789 * time.Microsecond)},
 			expected: expected{
 				Type: &Ydb.Type{
 					Type: &Ydb.Type_OptionalType{

@@ -58,6 +58,13 @@ func (m PositionalArgs) ToYdb(sql string, args ...any) (
 	}
 
 	if len(args) != position {
+		// If no positional '?' were found, this binder has nothing to do with these
+		// args — they may be intended for another binder (e.g. NumericArgs).
+		// Pass them through unchanged.
+		if position == 0 {
+			return buffer.String(), args, nil
+		}
+
 		return "", nil, xerrors.WithStackTrace(
 			fmt.Errorf("%w: (positional args %d, query args %d)", ErrInconsistentArgs, position, len(args)),
 		)

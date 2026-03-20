@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -35,6 +36,12 @@ func (s *grpcClientStream) Trailer() metadata.MD {
 
 func (s *grpcClientStream) Context() context.Context {
 	return s.stream.Context()
+}
+
+// Endpoint returns the endpoint of the connection used by this stream.
+// It implements the optional interface used by topic writer for session logging.
+func (s *grpcClientStream) Endpoint() endpoint.Endpoint {
+	return s.parentConn.Endpoint()
 }
 
 func (s *grpcClientStream) CloseSend() (err error) {
@@ -92,10 +99,6 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 			return xerrors.WithStackTrace(err)
 		}
 
-		defer func() {
-			s.parentConn.onTransportError(ctx, err)
-		}()
-
 		if !s.wrapping {
 			return err
 		}
@@ -124,7 +127,7 @@ func (s *grpcClientStream) finish(err error) {
 	s.streamCancel()
 }
 
-func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
+func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
@@ -150,10 +153,6 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
 		if xerrors.IsContextError(err) {
 			return xerrors.WithStackTrace(err)
 		}
-
-		defer func() {
-			s.parentConn.onTransportError(ctx, err)
-		}()
 
 		if !s.wrapping {
 			return err

@@ -42,6 +42,8 @@ func (m NumericArgs) ToYdb(sql string, args ...any) (yql string, newArgs []any, 
 		}
 	}
 
+	replaced := false
+
 	for _, p := range l.parts {
 		switch p := p.(type) {
 		case string:
@@ -61,11 +63,12 @@ func (m NumericArgs) ToYdb(sql string, args ...any) (yql string, newArgs []any, 
 				panic(fmt.Sprintf("unsupported type conversion from %T to table.ParameterOption", val))
 			}
 			buffer.WriteString(val.Name())
+			replaced = true
 		}
 	}
 
 	yql = buffer.String()
-	if len(newArgs) > 0 {
+	if replaced {
 		yql = "-- origin query with numeric args replacement\n" + yql
 	}
 

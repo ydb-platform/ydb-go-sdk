@@ -555,6 +555,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		}
 
 		initRequest := testCreateInitRequest(w)
+		strm.EXPECT().Endpoint().Return(nil).AnyTimes()
 		strm.EXPECT().Send(&initRequest)
 		strm.EXPECT().Recv().Return(nil, testErr)
 		strm.EXPECT().CloseSend()
@@ -581,6 +582,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		isFirstConnection := true
 		newStream := func(name string) *MockRawTopicWriterStream {
 			strm := NewMockRawTopicWriterStream(mc)
+			strm.EXPECT().Endpoint().Return(nil).AnyTimes()
 			initReq := testCreateInitRequest(w)
 			if isFirstConnection {
 				isFirstConnection = false
@@ -1194,6 +1196,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 
 	res.writer = newWriterReconnectorStopped(NewWriterReconnectorConfig(writerOptions...))
 
+	res.stream.EXPECT().Endpoint().Return(nil).AnyTimes()
 	res.stream.EXPECT().Recv().DoAndReturn(res.receiveMessageHandler).AnyTimes()
 
 	req := testCreateInitRequest(res.writer)

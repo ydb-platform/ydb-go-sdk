@@ -83,23 +83,23 @@ func TestInterval64ToDuration(t *testing.T) {
 			expected: 0,
 		},
 		{
-			name:     "one nanosecond",
+			name:     "one microsecond",
 			input:    1,
-			expected: time.Nanosecond,
+			expected: time.Microsecond,
 		},
 		{
 			name:     "one second",
-			input:    int64(time.Second / time.Nanosecond),
+			input:    int64(time.Second / time.Microsecond),
 			expected: time.Second,
 		},
 		{
 			name:     "one hour",
-			input:    int64(time.Hour / time.Nanosecond),
+			input:    int64(time.Hour / time.Microsecond),
 			expected: time.Hour,
 		},
 		{
 			name:     "negative value",
-			input:    -1000000,
+			input:    -1000,
 			expected: -time.Millisecond,
 		},
 	} {

@@ -45,7 +45,7 @@ func main() {
 	}()
 
 	// pool size similar to query variant
-	s, err := NewStorage(ctx, cfg, cfg.ReadRPS+cfg.WriteRPS, "no_session")
+	s, err := NewStorage(ctx, cfg, cfg.ReadRPS+cfg.WriteRPS, label)
 	if err != nil {
 		panic(fmt.Errorf("create storage failed: %w", err))
 	}
@@ -104,7 +104,7 @@ func main() {
 	case config.CleanupMode:
 		err = s.DropTable(ctx)
 		if err != nil {
-			panic(fmt.Errorf("create table failed: %w", err))
+			panic(fmt.Errorf("drop table failed: %w", err))
 		}
 
 		log.Println("cleanup table ok")

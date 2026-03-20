@@ -556,3 +556,142 @@ func TestTransactionOnBeforeCommitWithError(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, expectedErr)
 }
+
+func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
+	t.Run("MatchingTxControlWithLazyTx", func(t *testing.T) {
+		e := fixenv.New(t)
+		// Create a transaction without setting its ID (lazy transaction)
+		tx := &Transaction{
+			LazyID: func() (id baseTx.LazyID) {
+				// Don't set the ID, keep it as LazyTxID
+				return id
+			}(),
+			s:          SessionOverGrpcMock(e),
+			txSettings: query.TxSettings(query.WithSerializableReadWrite()),
+		}
+
+		// Try to execute with the same TxControl
+		txControl := baseTx.SerializableReadWriteTxControl()
+		settings, err := tx.executeSettings(options.WithTxControl(txControl))
+
+		// Should not return an error since TxControl matches
+		require.NoError(t, err)
+		// Verify that the returned settings use BeginTx selector (not TxID) for lazy transactions
+		actualControl := settings.TxControl().ToYdbQueryTransactionControl()
+		require.NotNil(t, actualControl)
+		require.NotNil(t, actualControl.GetBeginTx(), "Expected BeginTx selector for lazy transaction")
+		require.Empty(t, actualControl.GetTxId(), "Expected no TxID for lazy transaction")
+	})
+
+	t.Run("DifferentTxControlWithLazyTx", func(t *testing.T) {
+		e := fixenv.New(t)
+		// Create a transaction without setting its ID (lazy transaction)
+		tx := &Transaction{
+			LazyID: func() (id baseTx.LazyID) {
+				// Don't set the ID, keep it as LazyTxID
+				return id
+			}(),
+			s:          SessionOverGrpcMock(e),
+			txSettings: query.TxSettings(query.WithSerializableReadWrite()),
+		}
+
+		// Try to execute with a different TxControl (SnapshotReadOnly)
+		txControl := baseTx.SnapshotReadOnlyTxControl()
+		_, err := tx.executeSettings(options.WithTxControl(txControl))
+
+		// Should return an error since TxControl doesn't match
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
+	})
+
+	t.Run("MatchingTxControlWithCommitDiffers", func(t *testing.T) {
+		e := fixenv.New(t)
+		// Create a transaction without setting its ID (lazy transaction)
+		tx := &Transaction{
+			LazyID: func() (id baseTx.LazyID) {
+				// Don't set the ID, keep it as LazyTxID
+				return id
+			}(),
+			s:          SessionOverGrpcMock(e),
+			txSettings: query.TxSettings(query.WithSerializableReadWrite()),
+		}
+
+		// Try to execute with the same TxControl but with commit flag
+		txControl := baseTx.SerializableReadWriteTxControl(baseTx.CommitTx())
+		_, err := tx.executeSettings(options.WithTxControl(txControl))
+
+		// Should return an error since commit flag differs
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
+	})
+
+	t.Run("WithMatchingTxID", func(t *testing.T) {
+		e := fixenv.New(t)
+		// Create a transaction with txSettings set to SerializableReadWrite
+		tx := &Transaction{
+			LazyID: func() (id baseTx.LazyID) {
+				id.SetTxID(fmt.Sprintf("test-transaction-id-%v", e.T().Name()))
+
+				return id
+			}(),
+			s:          SessionOverGrpcMock(e),
+			txSettings: query.TxSettings(query.WithSerializableReadWrite()),
+		}
+
+		// Try to execute with a TxControl that matches the txSettings used to begin the transaction
+		txControl := baseTx.SerializableReadWriteTxControl()
+		settings, err := tx.executeSettings(options.WithTxControl(txControl))
+
+		// Should not return an error since TxControl matches the original txSettings
+		require.NoError(t, err)
+		// Verify that the returned settings use TxID selector (not BeginTx) for started transactions
+		actualControl := settings.TxControl().ToYdbQueryTransactionControl()
+		require.NotNil(t, actualControl)
+		require.Equal(t, tx.ID(), actualControl.GetTxId(), "Expected TxID selector to match transaction ID")
+		require.Nil(t, actualControl.GetBeginTx(), "Expected no BeginTx selector for started transaction")
+	})
+
+	t.Run("WithDifferentTxID", func(t *testing.T) {
+		e := fixenv.New(t)
+		// Create a transaction with txSettings set to SerializableReadWrite
+		tx := &Transaction{
+			LazyID: func() (id baseTx.LazyID) {
+				id.SetTxID(fmt.Sprintf("test-transaction-id-%v", e.T().Name()))
+
+				return id
+			}(),
+			s:          SessionOverGrpcMock(e),
+			txSettings: query.TxSettings(query.WithSerializableReadWrite()),
+		}
+
+		// Try to execute with a TxControl that uses a different transaction mode
+		txControl := baseTx.SnapshotReadOnlyTxControl()
+		_, err := tx.executeSettings(options.WithTxControl(txControl))
+
+		// Should return an error since TxControl doesn't match
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
+	})
+
+	t.Run("WithBeginTxOnStartedTx", func(t *testing.T) {
+		e := fixenv.New(t)
+		// Create a transaction with txSettings set to SnapshotReadOnly
+		tx := &Transaction{
+			LazyID: func() (id baseTx.LazyID) {
+				id.SetTxID(fmt.Sprintf("test-transaction-id-%v", e.T().Name()))
+
+				return id
+			}(),
+			s:          SessionOverGrpcMock(e),
+			txSettings: query.TxSettings(query.WithSnapshotReadOnly()),
+		}
+
+		// Try to execute with a TxControl that tries to begin a different transaction type
+		txControl := baseTx.SerializableReadWriteTxControl()
+		_, err := tx.executeSettings(options.WithTxControl(txControl))
+
+		// Should return an error since the transaction settings don't match
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
+	})
+}

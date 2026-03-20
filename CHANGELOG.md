@@ -1,10 +1,98 @@
 * Changed default for `database/sql` driver from TABLE service to QUERY service
 
+## v3.127.7
+* Added pessimization of connection to YDB node when `OVERLOADED` operation error is returned on `CreateSession` request for exclude next `CreateSession` calls on overloaded nodes
+
+## v3.127.6
+* Added `pkg/xslices.Subtract` helper for subtract elements from source slice with order preservation
+
+## v3.127.5
+* Fixed a bug in `ydb.WithNumericArgs` where the `-- origin query with numeric args replacement` comment was incorrectly prepended even when no `$N` placeholders were replaced in the query
+* Fixed a bug where combining `ydb.WithPositionalArgs` and `ydb.WithNumericArgs` caused `ErrInconsistentArgs` when the query contained no `?` placeholders — `PositionalArgs` now passes args through unchanged when it has nothing to bind, regardless of registration order
+
+## v3.127.4
+* Stopped tracing `SessionDelete` in `tableService` spans adapter (no value for observability)
+
+## v3.127.3
+* Fixed a bug where sessions were not removed from the pool on context errors (`context.Canceled`, `context.DeadlineExceeded`), which caused `SESSION_BUSY` errors when the server-side query was still in progress
+* Added CHANGELOG.md update requirements to AGENTS.md to ensure pull requests include user-facing change descriptions
+
+## v3.127.2
+* Added `table/types.{TypeTimestamp64,TypeDatetime64}` constants (primitive type IDs)
+* Topic reader: improved concurrency call errors
+
+## v3.127.1
+* Added `endpoint` (`node_id`, `address`, `location`) to topic writer init stream logs
+
+## v3.127.0
+* Changed behaviour of `table.Client` and `query.Client` internal session pool. When `ydb.WithPreferredNodeID` is set and there is no idle session on preferred node, the pool closes most idle session to create a new one on the preferred node
+* Fixed a bug when sometimes in cases of context cancellation returner error was not `errors.Is(err, context.Canceled)`
+
+## v3.126.5
+* Invoke `OnWriterReceiveResult` trace callback when topic writer receives ack from server (enables client-side logging for sync write diagnostics)
+* Added `ydb.WithCommitTxContext(ctx)` to request commit along with query execution in database/sql transactions
+
+## v3.126.4
+* Fixed a bug where the `internal/value.Any()` method was prematurely converting `*decimalValue` to `decimal.Decimal`, preventing users from implementing custom scanners that need to work with the underlying YDB value type.
+
+## v3.126.3
+* Allowed `TxControl` in `database/sql` transaction execution when TxControl equals TxControl on BeginTx
+
+## v3.126.2
+* Added support for custom types derived from primitive types in `database/sql` driver
+
+## v3.126.1
+* Added check `CommitTx` flag in `query.TxControl` on `db.Query().{Exec,Query,QueryResultSet,QueryRow}` calls before execution
+
+## v3.126.0
+* Added `query.WithLazyTx(bool)` option for `query.Client.DoTx` calls to enable/disable lazy transactions per operation
+* Added `retry.WithLazyTx(bool)` option for `retry.DoTx` calls to enable/disable lazy transactions for database/sql
+
+## v3.125.4
+* Added support for `GlobalUniqueIndex` type in `table/options.IndexDescription`
+
+## v3.125.3
+* Added optimized helper methods for efficient `[]byte` → `string` conversions in `JSON` and `JSONDocument` types.
+
+## v3.125.2
+* Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
+
+## v3.125.1
+* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to 
+`ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to 
+distinguish between hits and misses
+* Bumped `golang.org/x/net` from 0.35.0 to 0.38.0
+
+## v3.125.0
+* Added `WithConcurrentResultSets` option for `db.Query().Query()`
+* Added `DefaultValue` field to `table/options.Column` struct
+
+## v3.124.1
+* Fixed bug with incorrect conversion of `time.Duration` to `Interval64`, which was previously using nanoseconds instead of microseconds
+
+## v3.124.0
+* Fixed UUID scanning with `database/sql` when using types implementing `sql.Scanner` interface (like `uuid.UUID`)
+
+## v3.123.1
+* Fixed `pool.getItem()` panics, if unable to give session for preferred node ID
+
+## v3.123.0
+* Moved `internal/decimal` package to `pkg/decimal` for public usage
+
+## v3.122.0
+* Added `trace.NodeHintInfo` field for OnPoolGet trace callback which stores info for node hint misses
+* Added `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics for node hint misses
+
+## v3.121.1
+* Added support for `Timestamp64` type in `value.Any` converter
+* Masked the sensitive credential data in the connection string (DSN, data source name) from error messages for security reasons
+* Fixed issue with topic offsets update in transactions
+
 ## v3.121.0
 * Changed internal pprof label to pyroscope supported format
 * Added `query.ImplicitTxControl()` transaction control (the same as `query.NoTx()` and `query.EmptyTxControl()`). See more about implicit transactions on [ydb.tech](https://ydb.tech/docs/en/concepts/transactions?version=v25.2#implicit)
 * Added `SnapshotReadWrite` isolation mode support to `database/sql` driver using `sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: false}`
-* Move `internal/ratelimiter/options` to `ratelimiter/options` for public usage
+* Moved `internal/ratelimiter/options` to `ratelimiter/options` for public usage
 
 ## v3.120.0
 * Added support of `SnapshotReadWrite` isolation mode into query and table clients

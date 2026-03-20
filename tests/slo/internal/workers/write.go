@@ -11,7 +11,7 @@ import (
 	"slo/internal/metrics"
 )
 
-func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter, gen *generator.Generator) {
+func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter, gen generator.Generator) {
 	defer wg.Done()
 	for {
 		select {
@@ -33,9 +33,10 @@ func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limite
 	}
 }
 
-func (w *Workers) write(ctx context.Context, gen *generator.Generator) (finalErr error) {
+func (w *Workers) write(ctx context.Context, gen generator.Generator) (finalErr error) {
 	m := w.m.Start(metrics.OperationTypeWrite)
 	var attempts int
+	missed := false
 	if w.s != nil {
 		row, err := gen.Generate()
 		if err != nil {
@@ -44,7 +45,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (finalErr
 			return err
 		}
 
-		attempts, finalErr = w.s.Write(ctx, row)
+		attempts, missed, finalErr = w.s.Write(ctx, row)
 	} else {
 		rows := make([]generator.Row, 0, w.cfg.BatchSize)
 		for range w.cfg.BatchSize {
@@ -59,7 +60,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (finalErr
 
 		attempts, finalErr = w.sb.WriteBatch(ctx, rows)
 	}
-	m.Finish(finalErr, attempts)
+	m.Finish(finalErr, attempts, missed)
 
 	return finalErr
 }

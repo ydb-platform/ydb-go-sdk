@@ -42,10 +42,12 @@ type (
 		statsCallback          func(queryStats stats.QueryStats)
 		callOptions            []grpc.CallOption
 		txControl              *tx.Control
+		userProvidedTxControl  bool // track if user explicitly provided TxControl
 		retryOptions           []retry.Option
 		issueCallback          func(issues []*Ydb_Issue.IssueMessage)
 		responsePartLimitBytes int64
 		label                  string
+		concurrentResultSets   bool
 	}
 
 	// Execute is an interface for execute method options
@@ -64,7 +66,8 @@ type (
 	parametersOption  struct {
 		params params.Parameters
 	}
-	txControlOption tx.Control
+	TxControlOption tx.Control
+	txControlOption = TxControlOption
 	syntaxOption    = Syntax
 	statsModeOption struct {
 		mode     StatsMode
@@ -75,6 +78,7 @@ type (
 	issuesOption           struct {
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
+	concurrentResultSets bool
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -99,6 +103,7 @@ func (t txCommitOption) applyExecuteOption(s *executeSettings) {
 
 func (txControl *txControlOption) applyExecuteOption(s *executeSettings) {
 	s.txControl = (*tx.Control)(txControl)
+	s.userProvidedTxControl = true
 }
 
 func (txControl *txControlOption) thisOptionIsNotForExecuteOnTx() {}
@@ -130,6 +135,10 @@ func (mode ExecMode) applyExecuteOption(s *executeSettings) {
 
 func (opts issuesOption) applyExecuteOption(s *executeSettings) {
 	s.issueCallback = opts.callback
+}
+
+func (opt concurrentResultSets) applyExecuteOption(s *executeSettings) {
+	s.concurrentResultSets = bool(opt)
 }
 
 const (
@@ -205,6 +214,14 @@ func (s *executeSettings) Label() string {
 	return s.label
 }
 
+func (s *executeSettings) ConcurrentResultSets() bool {
+	return s.concurrentResultSets
+}
+
+func (s *executeSettings) UserProvidedTxControl() bool {
+	return s.userProvidedTxControl
+}
+
 func WithParameters(params params.Parameters) parametersOption {
 	return parametersOption{
 		params: params,
@@ -235,6 +252,10 @@ func WithExecMode(mode ExecMode) execModeOption {
 
 func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 	return responsePartLimitBytes(size)
+}
+
+func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
+	return concurrentResultSets(isEnabled)
 }
 
 func (size responsePartLimitBytes) applyExecuteOption(s *executeSettings) {

@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	ttypes "github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestFieldName(t *testing.T) {
@@ -934,9 +934,9 @@ func TestScannerDecimal(t *testing.T) {
 		},
 	))
 	var row struct {
-		A ttypes.Decimal
+		A types.Decimal
 	}
-	expected := ttypes.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(10200000000), 22, 9), Precision: 22, Scale: 9}
+	expected := types.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(10200000000), 22), Precision: 22, Scale: 9}
 	err := scanner.ScanStruct(&row)
 	require.NoError(t, err)
 	require.Equal(t, expected, row.A)
@@ -964,9 +964,9 @@ func TestScannerDecimalNegative(t *testing.T) {
 		},
 	))
 	var row struct {
-		A ttypes.Decimal
+		A types.Decimal
 	}
-	expected := ttypes.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(-2005000000), 22, 9), Precision: 22, Scale: 9}
+	expected := types.Decimal{Bytes: decimal.BigIntToByte(big.NewInt(-2005000000), 22), Precision: 22, Scale: 9}
 	err := scanner.ScanStruct(&row)
 	require.NoError(t, err)
 	require.Equal(t, expected, row.A)
@@ -995,7 +995,7 @@ func TestScannerDecimalBigDecimal(t *testing.T) {
 		},
 	))
 	var row struct {
-		A ttypes.Decimal
+		A types.Decimal
 	}
 	expectedVal := decimal.Decimal{
 		Bytes:     [16]byte{0, 19, 66, 97, 114, 199, 77, 130, 43, 135, 143, 232, 0, 0, 0, 0},

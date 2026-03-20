@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -35,9 +36,6 @@ func (retryOptions doRetryOptionsOption) ApplyDoOption(opts *doOptions) {
 }
 
 // WithDoRetryOptions specified retry options
-// Deprecated: use explicit options instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
 	return opts
 }
@@ -119,6 +117,7 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 type doTxOptions struct {
 	txOptions    *sql.TxOptions
 	retryOptions []Option
+	lazyTx       *bool
 }
 
 // doTxOption defines option for redefine default Retry behavior
@@ -135,9 +134,6 @@ func (doTxRetryOptions doTxRetryOptionsOption) ApplyDoTxOption(o *doTxOptions) {
 }
 
 // WithDoTxRetryOptions specified retry options
-// Deprecated: use explicit options instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDoTxRetryOptions(opts ...Option) doTxRetryOptionsOption {
 	return opts
 }
@@ -157,6 +153,27 @@ func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 	return txOptionsOption{
 		txOptions: txOptions,
 	}
+}
+
+var _ doTxOption = lazyTxOption{}
+
+type lazyTxOption struct {
+	lazyTx bool
+}
+
+func (opt lazyTxOption) ApplyDoTxOption(o *doTxOptions) {
+	o.lazyTx = &opt.lazyTx
+}
+
+// WithLazyTx enables or disables lazy transactions for DoTx call.
+// When enabled, the Begin call will be a no-op and the first execute will create
+// an interactive transaction.
+//
+// Note: This option works only with query service (ydb.WithQueryService(true) connector option).
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithLazyTx(lazyTx bool) lazyTxOption {
+	return lazyTxOption{lazyTx: lazyTx}
 }
 
 // DoTx is a retryer of database/sql transactions with fallbacks on errors
@@ -207,6 +224,9 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 		if opt != nil {
 			opt.ApplyDoTxOption(&options)
 		}
+	}
+	if options.lazyTx != nil {
+		ctx = tx.WithLazyTx(ctx, *options.lazyTx)
 	}
 	v, err := RetryWithResult(ctx, func(ctx context.Context) (_ T, finalErr error) {
 		attempts++

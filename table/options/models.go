@@ -13,17 +13,23 @@ import (
 )
 
 type Column struct {
-	Name   string
-	Type   types.Type
-	Family string
+	Name         string
+	Type         types.Type // if column is nullable, its type will be [internal/types.Optional]
+	Family       string
+	DefaultValue *value.DefaultValue
 }
 
 func (c Column) toYDB() *Ydb_Table.ColumnMeta {
-	return &Ydb_Table.ColumnMeta{
+	meta := &Ydb_Table.ColumnMeta{
 		Name:   c.Name,
 		Type:   types.TypeToYDB(c.Type),
 		Family: c.Family,
 	}
+	if c.DefaultValue != nil {
+		c.DefaultValue.ToYDB(meta)
+	}
+
+	return meta
 }
 
 func NewTableColumn(name string, typ types.Type, family string) Column {
@@ -281,6 +287,7 @@ type (
 const (
 	IndexTypeGlobal = IndexType(iota)
 	IndexTypeGlobalAsync
+	IndexTypeGlobalUnique
 )
 
 func (t IndexType) ApplyIndexOption(d *indexDesc) {
@@ -293,6 +300,10 @@ func (t IndexType) ApplyIndexOption(d *indexDesc) {
 		d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
 			GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
 		}
+	case IndexTypeGlobalUnique:
+		d.Type = &Ydb_Table.TableIndex_GlobalUniqueIndex{
+			GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
+		}
 	}
 }
 
@@ -302,6 +313,10 @@ func GlobalIndex() IndexType {
 
 func GlobalAsyncIndex() IndexType {
 	return IndexTypeGlobalAsync
+}
+
+func GlobalUniqueIndex() IndexType {
+	return IndexTypeGlobalUnique
 }
 
 type PartitioningMode byte

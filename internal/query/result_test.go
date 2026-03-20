@@ -1030,7 +1030,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		require.NoError(t, err)
 
 		row, err := exactlyOneRowFromResult(ctx, r)
-		require.ErrorIs(t, err, errMoreThanOneRow)
+		require.ErrorIs(t, err, ErrMoreThanOneRow)
 		require.Nil(t, row)
 	})
 	t.Run("MoreThanOneRowErrorOnNextRow", func(t *testing.T) {
@@ -1172,7 +1172,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 		require.NoError(t, err)
 
 		row, err := exactlyOneResultSetFromResult(ctx, r)
-		require.ErrorIs(t, err, errMoreThanOneResultSet)
+		require.ErrorIs(t, err, ErrMoreThanOneResultSet)
 		require.Nil(t, row)
 	})
 	t.Run("MoreThanOneResultSetErrorOnNextResultSet", func(t *testing.T) {
@@ -1400,7 +1400,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 		require.NoError(t, err)
 
 		rs, err := exactlyOneResultSetFromResult(ctx, r)
-		require.ErrorIs(t, err, errMoreThanOneResultSet)
+		require.ErrorIs(t, err, ErrMoreThanOneResultSet)
 		require.Nil(t, rs)
 	})
 	t.Run("MoreThanOneResultSetErrorOnNextResultSet", func(t *testing.T) {

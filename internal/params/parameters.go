@@ -366,8 +366,24 @@ func (p *Parameter) JSON(v string) Builder {
 	}
 }
 
+func (p *Parameter) JSONFromBytes(v []byte) Builder {
+	p.value = value.JSONValueFromBytes(v)
+
+	return Builder{
+		params: append(p.parent.params, p),
+	}
+}
+
 func (p *Parameter) JSONDocument(v string) Builder {
 	p.value = value.JSONDocumentValue(v)
+
+	return Builder{
+		params: append(p.parent.params, p),
+	}
+}
+
+func (p *Parameter) JSONDocumentFromBytes(v []byte) Builder {
+	p.value = value.JSONDocumentValueFromBytes(v)
 
 	return Builder{
 		params: append(p.parent.params, p),

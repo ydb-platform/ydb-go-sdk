@@ -19,6 +19,7 @@ func TestDatabaseSqlPositionalArgs(t *testing.T) {
 		ydb.WithTablePathPrefix(scope.Folder()),
 		ydb.WithAutoDeclare(),
 		ydb.WithPositionalArgs(),
+		ydb.WithWideTimeTypes(true),
 	)
 	dt := time.Date(2023, 3, 1, 16, 34, 18, 0, time.UTC)
 
