@@ -563,9 +563,7 @@ func (c *customPartitionChooser) AddNewPartitions(partitions ...topictypes.Parti
 }
 
 // RemovePartition implements [topicmultiwriter.PartitionChooser].
-func (c *customPartitionChooser) RemovePartition(partitionID int64) {
-
-}
+func (c *customPartitionChooser) RemovePartition(partitionID int64) {}
 
 func TestTopicMultiWriter_WithCustomPartitioning(t *testing.T) {
 	scope := newScope(t)
