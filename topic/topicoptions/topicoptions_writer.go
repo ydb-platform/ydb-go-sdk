@@ -61,8 +61,8 @@ func WithWriterMaxQueueLen(num int) WriterOption {
 // WithWriterMessageMaxBytesSize set max body size of one message in bytes.
 // Writer will return error in message will be more than the size.
 func WithWriterMessageMaxBytesSize(size int) WriterOption {
-	return func(сfg *topicwriterinternal.WriterReconnectorConfig) {
-		сfg.MaxMessageSize = size
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.MaxMessageSize = size
 	}
 }
 
