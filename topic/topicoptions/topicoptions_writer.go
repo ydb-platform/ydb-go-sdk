@@ -220,8 +220,8 @@ func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
 // WithWriterLogContext allows providing a context.Context instance which will be used
 // in log/topic events.
 func WithWriterLogContext(ctx context.Context) WriterOption {
-	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
-		writerCfg.LogContext = ctx
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.LogContext = ctx
 	}
 }
 
