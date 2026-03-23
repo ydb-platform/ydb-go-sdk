@@ -1,3 +1,5 @@
+* Fixed a bug where the pool could exceed its item limit when a context was canceled after reserving a slot for preferred-node session creation but before the background goroutine completed
+
 ## v3.128.1
 * Fixed `go_query_mode` / `query_mode` DSN parameters for table-backed modes (`data`, `scan`, `scheme`, `scripting`) to select the TABLE processor so the default query mode applies
 * Fixed a bug where the topic writer was not able to resend messages when the partition was split

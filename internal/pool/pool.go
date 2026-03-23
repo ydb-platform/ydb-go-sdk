@@ -273,6 +273,24 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 					return
 				}
 
+				// The outer function already decremented createInProgress.
+				// If another creation took the freed slot while the goroutine
+				// was still running, adding this item would exceed the pool
+				// limit. In that case, discard the item instead of returning
+				// it to the pool.
+				overflow := xsync.WithLock(&p.mu, func() bool {
+					return len(p.index)+p.createInProgress > p.config.limit
+				})
+				if overflow {
+					p.closeItem(createCtx, newItem,
+						closeItemWithLock(),
+						closeItemNotifyStats(),
+						closeItemWithDeleteFromPool(),
+					)
+
+					return
+				}
+
 				_ = p.putItem(createCtx, newItem)
 			}
 		}()
