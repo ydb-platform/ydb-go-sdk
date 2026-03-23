@@ -1,3 +1,5 @@
+* Fixed a bug where the topic writer was not able to resend messages when the partition was split
+
 ## v3.128.0
 * New options for topicwriter:
   - `WithProducerIDPrefix`
