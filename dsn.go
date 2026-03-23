@@ -81,7 +81,10 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 		case unknownQueryMode:
 			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		default:
-			opts = append(opts, withConnectorOptions(xsql.WithDefaultQueryMode(modeToMode(mode))))
+			opts = append(opts, withConnectorOptions(
+				xsql.WithQueryService(false),
+				xsql.WithDefaultQueryMode(modeToMode(mode))),
+			)
 		}
 	} else if queryMode := info.Params.Get("query_mode"); queryMode != "" {
 		switch mode := queryModeFromString(queryMode); mode {
@@ -90,7 +93,10 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 		case unknownQueryMode:
 			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		default:
-			opts = append(opts, withConnectorOptions(xsql.WithDefaultQueryMode(modeToMode(mode))))
+			opts = append(opts, withConnectorOptions(
+				xsql.WithQueryService(false),
+				xsql.WithDefaultQueryMode(modeToMode(mode)),
+			))
 		}
 	}
 	if fakeTx := info.Params.Get("go_fake_tx"); fakeTx != "" {
