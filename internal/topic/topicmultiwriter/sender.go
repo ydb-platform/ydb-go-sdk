@@ -65,6 +65,7 @@ func (s *sender) wakeup() {
 	}
 }
 
+//nolint:funlen
 func (s *sender) iterateThroughMessagesIndex(
 	index map[int64]xlist.List[messagePtr],
 	stopFunc func(msg messagePtr) bool,
@@ -91,6 +92,12 @@ func (s *sender) iterateThroughMessagesIndex(
 			}
 
 			if !wr.initDone.Load() {
+				break
+			}
+
+			if wr.err != nil && isOperationErrorOverloaded(wr.err) {
+				s.partitionSplitReceiver.push(partitionID)
+
 				break
 			}
 

@@ -45,6 +45,7 @@ type writerWrapper struct {
 
 	initDone atomic.Bool
 	direct   bool
+	err      error
 }
 
 type idleWriterInfo struct {
