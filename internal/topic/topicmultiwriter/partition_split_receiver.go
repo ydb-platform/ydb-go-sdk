@@ -37,6 +37,8 @@ func (p *partitionSplitReceiver) run(ctx context.Context) {
 		for _, partitionID := range partitionSplits {
 			if err := p.partitionSplitCallback(partitionID); err != nil {
 				p.onError(err)
+
+				return
 			}
 		}
 	}
