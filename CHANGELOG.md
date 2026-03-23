@@ -1,3 +1,4 @@
+## v3.128.0
 * New options for topicwriter:
   - `WithProducerIDPrefix`
   - `WithPartitioningKeyHasher`
