@@ -83,8 +83,8 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 		default:
 			opts = append(opts, withConnectorOptions(
 				xsql.WithQueryService(false),
-				xsql.WithDefaultQueryMode(modeToMode(mode))),
-			)
+				xsql.WithDefaultQueryMode(modeToMode(mode)),
+			))
 		}
 	} else if queryMode := info.Params.Get("query_mode"); queryMode != "" {
 		switch mode := queryModeFromString(queryMode); mode {
