@@ -279,7 +279,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 				// limit. In that case, discard the item instead of returning
 				// it to the pool.
 				overflow := xsync.WithLock(&p.mu, func() bool {
-					return len(p.index)+p.createInProgress > p.config.limit
+					return len(p.index) + p.createInProgress > p.config.limit
 				})
 				if overflow {
 					p.closeItem(createCtx, newItem,
