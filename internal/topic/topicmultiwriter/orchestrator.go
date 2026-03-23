@@ -362,7 +362,7 @@ func (o *orchestrator) scheduleResendMessages(
 		iter := inFlightIndexChain.Front()
 
 		msg := iter.Value.Value
-		if msg.SeqNo < maxSeqNo {
+		if msg.SeqNo <= maxSeqNo {
 			if msg.ackReceived {
 				inFlightIndexChain.Remove(iter)
 
