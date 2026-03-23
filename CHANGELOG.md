@@ -1,4 +1,4 @@
-* Fixed `go_query_mode` / `query_mode` DSN parameters and `ydb.WithDefaultQueryMode` for table-backed modes (`data`, `scan`, `scheme`, `scripting`) to select the TABLE processor so the default query mode applies
+* Fixed `go_query_mode` / `query_mode` DSN parameters for table-backed modes (`data`, `scan`, `scheme`, `scripting`) to select the TABLE processor so the default query mode applies
 
 ## v3.128.0
 * New options for topicwriter:
