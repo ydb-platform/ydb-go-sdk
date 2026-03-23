@@ -1,3 +1,12 @@
+* New options for topicwriter:
+  - `WithProducerIDPrefix`
+  - `WithPartitioningKeyHasher`
+  - `WithPartitionChooserStrategy`
+  - `WithCustomPartitionChooser`
+  - `WithWriterIdleTimeout`
+  - `WithWriterPartitionByKey`
+  - `WithWriterPartitionByPartitionID`
+
 ## v3.127.7
 * Added pessimization of connection to YDB node when `OVERLOADED` operation error is returned on `CreateSession` request for exclude next `CreateSession` calls on overloaded nodes
 

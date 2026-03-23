@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -221,5 +222,18 @@ func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
 func WithWriterLogContext(ctx context.Context) WriterOption {
 	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
 		cfg.LogContext = ctx
+	}
+}
+
+// WithWriteToManyPartitions sets configuration for writing to multiple partitions.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithWriteToManyPartitions(opts ...MultiWriterOption) WriterOption {
+	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
+		multiWriterCfg := &topicmultiwriter.MultiWriterConfig{}
+		for _, opt := range opts {
+			opt(multiWriterCfg)
+		}
+		writerCfg.MultiWriterConfig = multiWriterCfg
 	}
 }

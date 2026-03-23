@@ -32,13 +32,14 @@ import (
 var (
 	errConnTimeout                                 = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector                       = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	errNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
+	ErrNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
 	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
 	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
 	ErrPublicQueueIsFull                           = xerrors.Wrap(errors.New("ydb: queue is full"))                                                                                                                                                                                                                          // Deprecated.
 	ErrPublicMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
+	errWritingByKeyNotSupported                    = xerrors.Wrap(errors.New("ydb: writing by key is not supported for single writer, use WithWriterPartitionByKey or WithPartitionByPartitionID options"))                                                                                                                  //nolint:lll
 
 	// errProducerIDNotEqualMessageGroupID is temporary
 	// WithMessageGroupID is optional parameter because it allowed to be skipped by protocol.
@@ -60,7 +61,11 @@ type WriterReconnectorConfig struct {
 	AutoSetSeqNo                 bool
 	AutoSetCreatedTime           bool
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
-	RetrySettings                topic.RetrySettings
+	OnAckReceivedCallback        func(seqNo int64)
+	MultiMode                    bool
+
+	MultiWriterConfig any
+	RetrySettings     topic.RetrySettings
 
 	connectTimeout time.Duration
 }
@@ -177,6 +182,7 @@ func newWriterReconnectorStopped(
 	}
 
 	res.queue.OnAckReceived = res.onAckReceived
+	res.queue.AckCallback = res.cfg.OnAckReceivedCallback
 
 	for codec, creator := range cfg.AdditionalEncoders {
 		res.encodersMap.AddEncoder(codec, creator)
@@ -198,7 +204,7 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 		// SetSeqNo
 		if w.cfg.AutoSetSeqNo {
 			if msg.SeqNo != 0 {
-				return xerrors.WithStackTrace(errNonZeroSeqNo)
+				return xerrors.WithStackTrace(ErrNonZeroSeqNo)
 			}
 			w.lastSeqNo++
 			msg.SeqNo = w.lastSeqNo
@@ -226,6 +232,12 @@ func (w *WriterReconnector) start() {
 }
 
 func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) (resErr error) {
+	for i := range messages {
+		if !w.cfg.MultiMode && (messages[i].Key != "" || messages[i].PartitionID != 0) {
+			return xerrors.WithStackTrace(errWritingByKeyNotSupported)
+		}
+	}
+
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
@@ -246,16 +258,16 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		w.semaphore.Release(semaphoreWeight)
 	}()
 
+	if err := w.waitFirstInitResponse(ctx); err != nil {
+		return err
+	}
+
 	messagesSlice, err := w.createMessagesWithContent(messages)
 	if err != nil {
 		return err
 	}
 
 	if err = w.checkMessages(messagesSlice); err != nil {
-		return err
-	}
-
-	if err = w.waitFirstInitResponse(ctx); err != nil {
 		return err
 	}
 
@@ -560,7 +572,7 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	}
 }
 
-func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err error) {
+func (w *WriterReconnector) waitInit(ctx context.Context) (info InitialInfo, err error) {
 	if ctx.Err() != nil {
 		return InitialInfo{}, ctx.Err()
 	}
@@ -573,6 +585,16 @@ func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err
 	case <-w.initDoneCh:
 		return w.initInfo, nil
 	}
+}
+
+func (w *WriterReconnector) WaitInit(ctx context.Context) error {
+	_, err := w.waitInit(ctx)
+
+	return err
+}
+
+func (w *WriterReconnector) WaitInitInfo(ctx context.Context) (info InitialInfo, err error) {
+	return w.waitInit(ctx)
 }
 
 func (w *WriterReconnector) onWriterInitCallbackHandler(writerStream *SingleStreamWriter) {
@@ -634,6 +656,10 @@ func (w *WriterReconnector) GetSessionID() (sessionID string) {
 	})
 
 	return sessionID
+}
+
+func (w *WriterReconnector) GetBufferedMessages() []PublicMessage {
+	return w.queue.getBufferedMessages()
 }
 
 func allMessagesHasSameBufCodec(messages []messageWithDataContent) bool {
