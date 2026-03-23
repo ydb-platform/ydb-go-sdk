@@ -164,8 +164,14 @@ func WithReaderBufferSizeBytes(size int) ReaderOption {
 // CreateDecoderFunc interface for fabric of message decoders
 type CreateDecoderFunc = topicreadercommon.PublicCreateDecoderFunc
 
+// ResettableReader is able to reset a nested reader between uses.
+type ResettableReader = topicreadercommon.PublicResettableReader
+
 // WithAddDecoder add decoder for a codec.
 // It allows to set decoders fabric for custom codec and replace internal decoders.
+//
+// If CreateDecoderFunc returns a reader implementing ResettableReader, then the decompression objects
+// will be reused for this codec. This will reduce the load on the GC.
 func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.Decoders.AddDecoder(rawtopiccommon.Codec(codec), decoderCreate)

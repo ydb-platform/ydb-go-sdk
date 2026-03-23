@@ -12,22 +12,22 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-type PublicResetableReader interface {
+type PublicResettableReader interface {
 	io.Reader
-	Reset(io.Reader) error
+	Reset(rd io.Reader) error
 }
 
 type decoderPool struct {
 	pool sync.Pool
 }
 
-func (p *decoderPool) Get() PublicResetableReader {
-	dec, _ := p.pool.Get().(PublicResetableReader)
+func (p *decoderPool) Get() PublicResettableReader {
+	dec, _ := p.pool.Get().(PublicResettableReader)
 
 	return dec
 }
 
-func (p *decoderPool) Put(rd PublicResetableReader) {
+func (p *decoderPool) Put(rd PublicResettableReader) {
 	p.pool.Put(rd)
 }
 
@@ -76,7 +76,7 @@ func (d *MultiDecoder) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.R
 		return nil, err
 	}
 
-	if resetableDec, ok := dec.(PublicResetableReader); ok {
+	if resetableDec, ok := dec.(PublicResettableReader); ok {
 		d.dp[codec].Put(resetableDec)
 	}
 
@@ -90,6 +90,7 @@ func (d *MultiDecoder) createDecodeReader(codec rawtopiccommon.Codec, source io.
 			if err := rd.Reset(source); err != nil {
 				return nil, err
 			}
+
 			return rd, nil
 		}
 	}

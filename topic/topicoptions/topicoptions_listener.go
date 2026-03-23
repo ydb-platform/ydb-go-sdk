@@ -14,6 +14,9 @@ type ListenerOption func(cfg *topiclistenerinternal.StreamListenerConfig)
 // WithListenerAddDecoder add decoder for a codec.
 // It allows to set decoders fabric for custom codec and replace internal decoders.
 //
+// If CreateDecoderFunc returns a reader implementing ResettableReader, then the decompression objects
+// will be reused for this codec. This will reduce the load on the GC.
+//
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithListenerAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) ListenerOption {
 	return func(cfg *topiclistenerinternal.StreamListenerConfig) {
