@@ -1,3 +1,4 @@
+## v3.128.2
 * Downgraded direct dependency `google.golang.org/grpc` to v1.78.0
 
 ## v3.128.1
