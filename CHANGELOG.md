@@ -1,3 +1,5 @@
+* Fixed panic and `unsupported type` error when passing a nil pointer to a `json.Marshaler`-implementing type as a `database/sql` query parameter (`toType` now handles `json.Marshaler` and returns `types.JSON`, matching the existing `toValue` behaviour)
+
 ## v3.128.2
 * Downgraded direct dependency `google.golang.org/grpc` to v1.78.0
 
