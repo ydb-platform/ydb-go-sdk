@@ -3,6 +3,7 @@ package scanner
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -778,5 +779,108 @@ func TestScanToJsonUnmarshaller(t *testing.T) {
 				t.Fatalf("test: %s; error: %s", test.name, err)
 			}
 		}
+	}
+}
+
+// jsonSQLScanner is a struct with a private json.RawMessage field that
+// implements sql.Scanner and json.Marshaler without inheriting driver.Valuer.
+// This mirrors the user-side pattern described in the fix for json.RawMessage binding.
+type jsonSQLScanner struct {
+	raw json.RawMessage
+}
+
+var _ json.Marshaler = jsonSQLScanner{}
+var _ json.Unmarshaler = (*jsonSQLScanner)(nil)
+
+func (j jsonSQLScanner) MarshalJSON() ([]byte, error) { return j.raw, nil }
+func (j *jsonSQLScanner) UnmarshalJSON(data []byte) error {
+	j.raw = data
+	return nil
+}
+func (j *jsonSQLScanner) Scan(src any) error {
+	switch v := src.(type) {
+	case nil:
+		j.raw = nil
+	case []byte:
+		j.raw = v
+	case string:
+		j.raw = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan %T into jsonSQLScanner", src)
+	}
+	return nil
+}
+
+// TestScanToSQLScannerJSON verifies that a type implementing sql.Scanner
+// correctly receives []byte when scanning JSON and JSONDocument columns.
+func TestScanToSQLScannerJSON(t *testing.T) {
+	s := initScanner()
+	for _, test := range []struct {
+		name    string
+		count   int
+		columns []*column
+	}{
+		{
+			name:  "<required JSON, required JSONDocument> to sql.Scanner",
+			count: 5,
+			columns: []*column{
+				{name: "json", typeID: Ydb.Type_JSON},
+				{name: "jsondocument", typeID: Ydb.Type_JSON_DOCUMENT},
+			},
+		},
+		{
+			name:  "<optional JSON, required JSONDocument> to sql.Scanner",
+			count: 5,
+			columns: []*column{
+				{name: "json", typeID: Ydb.Type_JSON, optional: true},
+				{name: "jsondocument", typeID: Ydb.Type_JSON_DOCUMENT},
+			},
+		},
+		{
+			name:  "<required JSON, optional JSONDocument> to sql.Scanner",
+			count: 5,
+			columns: []*column{
+				{name: "json", typeID: Ydb.Type_JSON},
+				{name: "jsondocument", typeID: Ydb.Type_JSON_DOCUMENT, optional: true},
+			},
+		},
+		{
+			name:  "<optional JSON, optional JSONDocument> to sql.Scanner",
+			count: 5,
+			columns: []*column{
+				{name: "json", typeID: Ydb.Type_JSON, optional: true},
+				{name: "jsondocument", typeID: Ydb.Type_JSON_DOCUMENT, optional: true},
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			set, _ := getResultSet(test.count, test.columns)
+			s.reset(set)
+			for s.NextRow() {
+				dst1 := new(jsonSQLScanner)
+				dst2 := new(jsonSQLScanner)
+				values := make([]indexed.RequiredOrOptional, len(test.columns))
+				for i, col := range test.columns {
+					var dst *jsonSQLScanner
+					if i == 0 {
+						dst = dst1
+					} else {
+						dst = dst2
+					}
+					if col.optional {
+						values[i] = indexed.Optional(dst)
+					} else {
+						values[i] = indexed.Required(dst)
+					}
+				}
+				require.NoError(t, s.Scan(values...))
+				// Scan must have populated the raw bytes for each column.
+				require.NotNil(t, dst1.raw, "json column: raw bytes must be set after Scan")
+				require.NotNil(t, dst2.raw, "jsondocument column: raw bytes must be set after Scan")
+				// The scanned bytes must be valid JSON (the test data is a numeric string).
+				require.True(t, json.Valid(dst1.raw), "json column: scanned value must be valid JSON, got %q", dst1.raw)
+				require.True(t, json.Valid(dst2.raw), "jsondocument column: scanned value must be valid JSON, got %q", dst2.raw)
+			}
+		})
 	}
 }
