@@ -792,11 +792,13 @@ type jsonSQLScanner struct {
 func (j jsonSQLScanner) MarshalJSON() ([]byte, error) {
 	return j.raw, nil
 }
+
 func (j *jsonSQLScanner) UnmarshalJSON(data []byte) error {
 	j.raw = data
 
 	return nil
 }
+
 func (j *jsonSQLScanner) Scan(src any) error {
 	switch v := src.(type) {
 	case nil:
