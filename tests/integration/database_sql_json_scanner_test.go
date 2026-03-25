@@ -26,9 +26,11 @@ type jsonRawScanner struct {
 	raw json.RawMessage
 }
 
-var _ json.Marshaler = jsonRawScanner{}
-var _ json.Unmarshaler = (*jsonRawScanner)(nil)
-var _ sql.Scanner = (*jsonRawScanner)(nil)
+var (
+	_ json.Marshaler   = jsonRawScanner{}
+	_ json.Unmarshaler = (*jsonRawScanner)(nil)
+	_ sql.Scanner      = (*jsonRawScanner)(nil)
+)
 
 func (j jsonRawScanner) MarshalJSON() ([]byte, error) {
 	return j.raw, nil
