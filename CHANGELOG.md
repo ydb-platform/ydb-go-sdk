@@ -1,4 +1,3 @@
-## v3.128.3
 * Supported pool of decoders, which implement ResettableReader interface
 
 ## v3.128.2
