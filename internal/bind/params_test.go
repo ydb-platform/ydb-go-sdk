@@ -51,16 +51,13 @@ type testJSONMarshaler struct {
 	raw json.RawMessage
 }
 
-var _ json.Marshaler = testJSONMarshaler{}
-var _ json.Unmarshaler = (*testJSONMarshaler)(nil)
-var _ sql.Scanner = (*testJSONMarshaler)(nil)
-
 func (j testJSONMarshaler) MarshalJSON() ([]byte, error) {
 	return j.raw, nil
 }
 
 func (j *testJSONMarshaler) UnmarshalJSON(data []byte) error {
 	j.raw = data
+
 	return nil
 }
 
@@ -75,6 +72,7 @@ func (j *testJSONMarshaler) Scan(src any) error {
 	default:
 		return fmt.Errorf("cannot scan %T into testJSONMarshaler", src)
 	}
+
 	return nil
 }
 

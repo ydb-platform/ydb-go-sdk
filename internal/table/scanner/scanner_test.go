@@ -789,12 +789,12 @@ type jsonSQLScanner struct {
 	raw json.RawMessage
 }
 
-var _ json.Marshaler = jsonSQLScanner{}
-var _ json.Unmarshaler = (*jsonSQLScanner)(nil)
-
-func (j jsonSQLScanner) MarshalJSON() ([]byte, error) { return j.raw, nil }
+func (j jsonSQLScanner) MarshalJSON() ([]byte, error) {
+	return j.raw, nil
+}
 func (j *jsonSQLScanner) UnmarshalJSON(data []byte) error {
 	j.raw = data
+
 	return nil
 }
 func (j *jsonSQLScanner) Scan(src any) error {
@@ -808,6 +808,7 @@ func (j *jsonSQLScanner) Scan(src any) error {
 	default:
 		return fmt.Errorf("cannot scan %T into jsonSQLScanner", src)
 	}
+
 	return nil
 }
 
