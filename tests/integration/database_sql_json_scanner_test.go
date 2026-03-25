@@ -67,14 +67,18 @@ func (j jsonRawScanner) Bytes() []byte {
 func TestDatabaseSqlJSONScanner(t *testing.T) {
 	var (
 		scope = newScope(t)
-		db    = scope.SQLDriverWithFolder(
+		// ddlDB is used only for scheme (DDL) queries. WithQueryService is not
+		// used here because the query service handles SchemeQueryMode differently.
+		ddlDB = scope.SQLDriverWithFolder()
+		// db is used for all DML / SELECT queries with autodeclare.
+		db = scope.SQLDriverWithFolder(
 			ydb.WithQueryService(true),
 			ydb.WithAutoDeclare(),
 		)
 	)
 
 	// Create the test table.
-	require.NoError(t, retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) error {
+	require.NoError(t, retry.Do(scope.Ctx, ddlDB, func(ctx context.Context, cc *sql.Conn) error {
 		_, err := cc.ExecContext(
 			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 			`CREATE TABLE IF NOT EXISTS json_scanner_test (
@@ -88,7 +92,7 @@ func TestDatabaseSqlJSONScanner(t *testing.T) {
 	}, retry.WithIdempotent(true)))
 
 	t.Cleanup(func() {
-		_ = retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) error {
+		_ = retry.Do(scope.Ctx, ddlDB, func(ctx context.Context, cc *sql.Conn) error {
 			_, err := cc.ExecContext(
 				ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 				`DROP TABLE IF EXISTS json_scanner_test`,
@@ -133,8 +137,9 @@ func TestDatabaseSqlJSONScanner(t *testing.T) {
 		// Read back both rows and scan the JSON column into a jsonRawScanner
 		// via its sql.Scanner implementation.
 		rows, err := db.QueryContext(scope.Ctx,
-			`SELECT id, data FROM json_scanner_test WHERE id IN ($p1, $p2) ORDER BY id`,
-			uint64(1), uint64(2),
+			`SELECT id, data FROM json_scanner_test WHERE id = $id1 OR id = $id2 ORDER BY id`,
+			sql.Named("id1", uint64(1)),
+			sql.Named("id2", uint64(2)),
 		)
 		require.NoError(t, err)
 		defer func() { _ = rows.Close() }()
