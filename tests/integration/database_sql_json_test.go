@@ -372,7 +372,7 @@ func TestDatabaseSqlJson(t *testing.T) {
 				var act string
 				require.NoError(t, row.Scan(&act))
 				require.NoError(t, row.Err())
-				require.Equal(t, `Json?`, act)
+				require.Equal(t, `Optional<Json>`, act)
 			})
 			t.Run("get json value", func(t *testing.T) {
 				// AS_TABLE round-trips Optional<Json> through YDB without a persistent table.
@@ -398,7 +398,7 @@ func TestDatabaseSqlJson(t *testing.T) {
 				var act string
 				require.NoError(t, row.Scan(&act))
 				require.NoError(t, row.Err())
-				require.Equal(t, `Json?`, act)
+				require.Equal(t, `Optional<Json>`, act)
 			})
 			t.Run("get json value", func(t *testing.T) {
 				var nilPtr *jsonRawScanner
