@@ -76,8 +76,8 @@ func (d *MultiDecoder) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.R
 		return nil, err
 	}
 
-	if resetableDec, ok := dec.(PublicResettableReader); ok {
-		d.dp[codec].Put(resetableDec)
+	if resettableDec, ok := dec.(PublicResettableReader); ok {
+		d.dp[codec].Put(resettableDec)
 	}
 
 	return buf, nil
