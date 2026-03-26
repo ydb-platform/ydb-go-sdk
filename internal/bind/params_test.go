@@ -59,7 +59,7 @@ func TestToValue(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			src:  nil,
-			dst:  value.VoidValue(),
+			dst:  value.NullValue(types.Null{}),
 			err:  nil,
 		},
 		{

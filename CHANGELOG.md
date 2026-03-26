@@ -1,3 +1,5 @@
+* Fixed `nil` value passed as a `database/sql` argument now produces `NullType` instead of `Void`, allowing it to be used with optional YDB columns
+
 ## v3.128.2
 * Downgraded direct dependency `google.golang.org/grpc` to v1.78.0
 
