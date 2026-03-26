@@ -204,28 +204,31 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	p *Pool[PT, T],
 ) func(ctx context.Context, withReservedSpace bool) (PT, error) {
 	return func(ctx context.Context, withReservedSpace bool) (PT, error) {
-		if !xsync.WithLock(&p.mu, func() bool {
-			if withReservedSpace {
-				// createInProgress was already incremented by getItem when it
-				// reserved a slot for a preferred-node-ID request.
-				return true
-			}
-			if len(p.index)+p.createInProgress < p.config.limit {
-				p.createInProgress++
+		// When withReservedSpace=true, createInProgress was already incremented by
+		// getItem; this function must not touch it. The caller (getItem) is responsible
+		// for decrementing createInProgress after this function returns.
+		if !withReservedSpace {
+			if !xsync.WithLock(&p.mu, func() bool {
+				if len(p.index)+p.createInProgress < p.config.limit {
+					p.createInProgress++
 
-				return true
+					return true
+				}
+
+				return false
+			}) {
+				return nil, xerrors.WithStackTrace(errPoolIsOverflow)
 			}
 
-			return false
-		}) {
-			return nil, xerrors.WithStackTrace(errPoolIsOverflow)
+			// Release the reserved slot on any exit from this function, including
+			// early returns due to context cancellation or pool closure. This covers
+			// all code paths without tracking individual exits.
+			defer func() {
+				p.mu.WithLock(func() {
+					p.createInProgress--
+				})
+			}()
 		}
-		// createInProgress is now reserved (either by getItem for withReservedSpace=true,
-		// or by the block above for withReservedSpace=false). The goroutine below is the
-		// sole owner of the reserved slot: it decrements createInProgress atomically with
-		// either adding the item to the index (on success) or on creation failure, before
-		// the select. This ensures the counter is correct before any caller or waiter
-		// observes the result.
 
 		var (
 			ch = make(chan struct {
@@ -249,14 +252,8 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 			}
 
 			newItem, err := p.config.createItemFunc(createCtx)
-
-			// Release the reserved slot atomically with tracking the item.
-			// Decrementing here (before the select below) ensures that by the time
-			// the outer function receives the result and returns to its caller,
-			// createInProgress is already accurate. This prevents false "pool full"
-			// errors for concurrent getItem calls.
-			p.mu.WithLock(func() {
-				if newItem != nil {
+			if newItem != nil {
+				p.mu.WithLock(func() {
 					var (
 						useCounter uint64
 						now        = p.config.clock.Now()
@@ -266,9 +263,8 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 						lastUsage:  now,
 						useCounter: &useCounter,
 					}
-				}
-				p.createInProgress--
-			})
+				})
+			}
 
 			select {
 			case ch <- struct {
@@ -302,8 +298,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 					return result.item, nil
 				}
 			default:
-				// Goroutine is still running; it will decrement createInProgress and
-				// call putItem when it finishes.
+				// Goroutine is still running; it will call putItem when it finishes.
 			}
 
 			return nil, xerrors.WithStackTrace(ctx.Err())
@@ -894,6 +889,16 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		}
 
 		item, err := p.createItemFunc(ctx, reservedSpace)
+		if reservedSpace {
+			// The slot was reserved by this getItem call (createInProgress was
+			// incremented here). Release it now that createItemFunc has returned,
+			// whether it succeeded or not. The background goroutine (if still running)
+			// will call putItem when it finishes; putItem's overflow guard protects
+			// against exceeding the limit in the rare concurrent-getItem race.
+			p.mu.WithLock(func() {
+				p.createInProgress--
+			})
+		}
 		if item != nil {
 			return item, nil
 		}

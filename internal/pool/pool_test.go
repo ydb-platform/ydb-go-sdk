@@ -1704,8 +1704,13 @@ func TestPoolContextCanceledAfterSlotReservationReproduce(t *testing.T) {
 		require.Error(t, getErr)
 		require.ErrorIs(t, getErr, context.Canceled)
 
-		// Allow any in-flight goroutines to complete.
-		runtime.Gosched()
+		// Wait for the background goroutine to complete and push its item to idle.
+		// The goroutine adds to p.index before calling putItem, so there is a brief
+		// window where len(p.index) may temporarily exceed the limit. We wait until
+		// the goroutine has settled (Idle > 0) before proceeding.
+		for p.Stats().Idle == 0 {
+			runtime.Gosched()
+		}
 
 		item3 := mustGetItem(t, p)
 		require.NotNil(t, item3)
