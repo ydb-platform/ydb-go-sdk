@@ -11,7 +11,7 @@ import (
 
 type StreamListenerConfig struct {
 	BufferSize             int
-	Decoders               topicreadercommon.DecoderMap
+	Decoders               *topicreadercommon.MultiDecoder
 	Selectors              []*topicreadercommon.PublicReadSelector
 	Consumer               string
 	ConnectWithoutConsumer bool
@@ -22,7 +22,7 @@ type StreamListenerConfig struct {
 func NewStreamListenerConfig() StreamListenerConfig {
 	return StreamListenerConfig{
 		BufferSize: topicreadercommon.DefaultBufferSize,
-		Decoders:   topicreadercommon.NewDecoderMap(),
+		Decoders:   topicreadercommon.NewMultiDecoder(),
 		Selectors:  nil,
 		Consumer:   "",
 		readerID:   topicreadercommon.NextReaderID(),

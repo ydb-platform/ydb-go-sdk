@@ -59,7 +59,7 @@ func NewBatch(session *PartitionSession, messages []*PublicMessage) (*PublicBatc
 }
 
 func NewBatchFromStream(
-	decoders DecoderMap,
+	decoders *MultiDecoder,
 	session *PartitionSession,
 	sb rawtopicreader.Batch, //nolint:gocritic
 ) (*PublicBatch, error) {
