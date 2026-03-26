@@ -3,6 +3,8 @@ package bind
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -41,6 +43,37 @@ type (
 
 func (v testValuer) Value() (driver.Value, error) {
 	return v.value, nil
+}
+
+// testJSONMarshaler is a struct with a private json.RawMessage field that
+// implements json.Marshaler and json.Unmarshaler without inheriting driver.Valuer.
+type testJSONMarshaler struct {
+	raw json.RawMessage
+}
+
+func (j testJSONMarshaler) MarshalJSON() ([]byte, error) {
+	return j.raw, nil
+}
+
+func (j *testJSONMarshaler) UnmarshalJSON(data []byte) error {
+	j.raw = data
+
+	return nil
+}
+
+func (j *testJSONMarshaler) Scan(src any) error {
+	switch v := src.(type) {
+	case nil:
+		j.raw = nil
+	case []byte:
+		j.raw = v
+	case string:
+		j.raw = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan %T into testJSONMarshaler", src)
+	}
+
+	return nil
 }
 
 func TestToValue(t *testing.T) {
@@ -983,6 +1016,27 @@ func TestToValue(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			src:  func() *testBytes { return nil }(),
 			dst:  value.NullValue(types.Bytes),
+			err:  nil,
+		},
+		// json.Marshaler: value — routes to case json.Marshaler in toValue
+		{
+			name: xtest.CurrentFileLine(),
+			src:  testJSONMarshaler{raw: json.RawMessage(`{"a":1,"b":"hello"}`)},
+			dst:  value.JSONValue(`{"a":1,"b":"hello"}`),
+			err:  nil,
+		},
+		// json.Marshaler: pointer — dereferenced, then routes to case json.Marshaler
+		{
+			name: xtest.CurrentFileLine(),
+			src:  &testJSONMarshaler{raw: json.RawMessage(`{"a":1,"b":"hello"}`)},
+			dst:  value.OptionalValue(value.JSONValue(`{"a":1,"b":"hello"}`)),
+			err:  nil,
+		},
+		// json.Marshaler: nil pointer — toType must return types.JSON via case json.Marshaler
+		{
+			name: xtest.CurrentFileLine(),
+			src:  (*testJSONMarshaler)(nil),
+			dst:  value.NullValue(types.JSON),
 			err:  nil,
 		},
 	} {
