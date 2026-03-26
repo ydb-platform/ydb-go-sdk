@@ -1,3 +1,5 @@
+* Supported pool of decoders, which implement ResettableReader interface
+
 ## v3.128.2
 * Downgraded direct dependency `google.golang.org/grpc` to v1.78.0
 
