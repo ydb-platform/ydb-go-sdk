@@ -201,6 +201,8 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen,gocyclo
 		return types.Timestamp, nil
 	case time.Duration:
 		return types.Interval, nil
+	case json.Marshaler:
+		return types.JSON, nil
 	default:
 		rv := reflect.ValueOf(x)
 		if converted := tryConvertToBaseType(rv); converted != nil {
