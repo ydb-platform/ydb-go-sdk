@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -218,10 +219,20 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 		}) {
 			return nil, xerrors.WithStackTrace(errPoolIsOverflow)
 		}
+		// goroutineOwnsDecrement tracks whether the outer function or the
+		// background goroutine is responsible for decrementing createInProgress.
+		// It is set to true when the caller's context is canceled while the
+		// goroutine is still running, so that the slot reservation stays valid
+		// until the goroutine finishes and prevents a concurrent getItem from
+		// seeing apparent free capacity and creating an extra item.
+		var goroutineOwnsDecrement atomic.Bool
+
 		defer func() {
-			p.mu.WithLock(func() {
-				p.createInProgress--
-			})
+			if !goroutineOwnsDecrement.Load() {
+				p.mu.WithLock(func() {
+					p.createInProgress--
+				})
+			}
 		}()
 
 		var (
@@ -269,6 +280,15 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 				err:  xerrors.WithStackTrace(err),
 			}:
 			case <-done:
+				// When the caller's context was canceled while this goroutine was
+				// still running, the outer function transferred the createInProgress
+				// decrement to us. Perform it now, before putItem, so that the slot
+				// is released atomically with the item being returned to the pool.
+				if goroutineOwnsDecrement.Load() {
+					p.mu.WithLock(func() {
+						p.createInProgress--
+					})
+				}
 				if newItem == nil {
 					return
 				}
@@ -293,6 +313,10 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 					return result.item, nil
 				}
 			default:
+				// Goroutine is still running. Transfer slot ownership so that
+				// createInProgress is not decremented until the goroutine finishes,
+				// preventing a concurrent getItem from seeing free capacity.
+				goroutineOwnsDecrement.Store(true)
 			}
 
 			return nil, xerrors.WithStackTrace(ctx.Err())
@@ -1049,7 +1073,7 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 			return xerrors.WithStackTrace(errItemIsNotAlive)
 		}
 
-		if len(p.index)+p.createInProgress > p.config.limit {
+		if len(p.index) > p.config.limit {
 			p.closeItem(ctx, item,
 				closeItemNotifyStats(),
 				closeItemWithDeleteFromPool(),

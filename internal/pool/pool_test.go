@@ -1588,19 +1588,22 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.ErrorIs(t, getErr, context.Canceled,
 				"getItem should fail with context canceled: got %v", getErr)
 
-			// Check that createInProgress was cleaned up
+			// With the root-cause fix the slot is held (createInProgress stays 1)
+			// until the background goroutine finishes, so we do NOT assert 0 here.
+			// Instead we verify the key invariant: the pool must not exceed limit.
 			finalStats := p.Stats()
-			t.Logf("Stats after cancel: Index=%d, Idle=%d, CreateInProgress=%d",
+			t.Logf("Stats after cancel (goroutine may still be running): Index=%d, Idle=%d, CreateInProgress=%d",
 				finalStats.Index, finalStats.Idle, finalStats.CreateInProgress)
 
-			require.Equal(t, 0, finalStats.CreateInProgress,
-				"createInProgress should be cleaned up after context cancellation")
-
-			// Verify pool can still operate at full capacity
+			// Verify pool can still operate at full capacity; mustGetItem blocks
+			// until the background goroutine completes and puts its item into idle.
 			item3 := mustGetItem(t, p)
 			require.NotNil(t, item3)
 
+			// Goroutine must have finished by now (we got its item via mustGetItem).
 			finalStats2 := p.Stats()
+			require.Equal(t, 0, finalStats2.CreateInProgress,
+				"createInProgress should be cleaned up after goroutine finishes")
 			require.Equal(t, 3, finalStats2.Index,
 				"Pool should not exceed limit")
 		})
