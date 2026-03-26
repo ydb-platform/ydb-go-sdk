@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -207,6 +206,8 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	return func(ctx context.Context, withReservedSpace bool) (PT, error) {
 		if !xsync.WithLock(&p.mu, func() bool {
 			if withReservedSpace {
+				// createInProgress was already incremented by getItem when it
+				// reserved a slot for a preferred-node-ID request.
 				return true
 			}
 			if len(p.index)+p.createInProgress < p.config.limit {
@@ -219,21 +220,12 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 		}) {
 			return nil, xerrors.WithStackTrace(errPoolIsOverflow)
 		}
-		// goroutineOwnsDecrement tracks whether the outer function or the
-		// background goroutine is responsible for decrementing createInProgress.
-		// It is set to true when the caller's context is canceled while the
-		// goroutine is still running, so that the slot reservation stays valid
-		// until the goroutine finishes and prevents a concurrent getItem from
-		// seeing apparent free capacity and creating an extra item.
-		var goroutineOwnsDecrement atomic.Bool
-
-		defer func() {
-			if !goroutineOwnsDecrement.Load() {
-				p.mu.WithLock(func() {
-					p.createInProgress--
-				})
-			}
-		}()
+		// createInProgress is now reserved (either by getItem for withReservedSpace=true,
+		// or by the block above for withReservedSpace=false). The goroutine below is the
+		// sole owner of the reserved slot: it decrements createInProgress atomically with
+		// either adding the item to the index (on success) or on creation failure, before
+		// the select. This ensures the counter is correct before any caller or waiter
+		// observes the result.
 
 		var (
 			ch = make(chan struct {
@@ -257,8 +249,14 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 			}
 
 			newItem, err := p.config.createItemFunc(createCtx)
-			if newItem != nil {
-				p.mu.WithLock(func() {
+
+			// Release the reserved slot atomically with tracking the item.
+			// Decrementing here (before the select below) ensures that by the time
+			// the outer function receives the result and returns to its caller,
+			// createInProgress is already accurate. This prevents false "pool full"
+			// errors for concurrent getItem calls.
+			p.mu.WithLock(func() {
+				if newItem != nil {
 					var (
 						useCounter uint64
 						now        = p.config.clock.Now()
@@ -268,8 +266,9 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 						lastUsage:  now,
 						useCounter: &useCounter,
 					}
-				})
-			}
+				}
+				p.createInProgress--
+			})
 
 			select {
 			case ch <- struct {
@@ -280,20 +279,11 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 				err:  xerrors.WithStackTrace(err),
 			}:
 			case <-done:
-				// When the caller's context was canceled while this goroutine was
-				// still running, the outer function transferred the createInProgress
-				// decrement to us. Perform it now, before putItem, so that the slot
-				// is released atomically with the item being returned to the pool.
-				if goroutineOwnsDecrement.Load() {
-					p.mu.WithLock(func() {
-						p.createInProgress--
-					})
+				// Outer function has returned (caller context canceled or pool closed).
+				// Return the item to the pool if it was successfully created.
+				if newItem != nil {
+					_ = p.putItem(createCtx, newItem)
 				}
-				if newItem == nil {
-					return
-				}
-
-				_ = p.putItem(createCtx, newItem)
 			}
 		}()
 
@@ -301,22 +291,19 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 		case <-p.done:
 			return nil, xerrors.WithStackTrace(errClosedPool)
 		case <-ctx.Done():
-			// Try non-blocking read from ch to check if goroutine has already completed
+			// Try non-blocking read from ch to check if goroutine has already completed.
 			select {
 			case result, has := <-ch:
 				if has {
 					if result.err != nil {
-						// Goroutine completed with an error, join it with context error
 						return nil, xerrors.WithStackTrace(xerrors.Join(result.err, ctx.Err()))
 					}
-					// Goroutine completed successfully, return the item
+
 					return result.item, nil
 				}
 			default:
-				// Goroutine is still running. Transfer slot ownership so that
-				// createInProgress is not decremented until the goroutine finishes,
-				// preventing a concurrent getItem from seeing free capacity.
-				goroutineOwnsDecrement.Store(true)
+				// Goroutine is still running; it will decrement createInProgress and
+				// call putItem when it finishes.
 			}
 
 			return nil, xerrors.WithStackTrace(ctx.Err())
