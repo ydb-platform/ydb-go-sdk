@@ -1,4 +1,5 @@
 * Fixed a bug where the pool could exceed its item limit when a context was canceled after slot reservation but before item creation completed
+* Supported pool of decoders, which implement ResettableReader interface
 
 ## v3.128.2
 * Downgraded direct dependency `google.golang.org/grpc` to v1.78.0
