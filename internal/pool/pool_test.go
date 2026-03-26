@@ -1601,8 +1601,117 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NotNil(t, item3)
 
 			finalStats2 := p.Stats()
-			require.Equal(t, finalStats2.Index, 3,
+			require.Equal(t, 3, finalStats2.Index,
 				"Pool should not exceed limit")
 		})
+	})
+}
+
+// TestPoolContextCanceledAfterSlotReservationReproduce reproduces the race from
+// https://github.com/ydb-platform/ydb-go-sdk/issues/2051.
+//
+// When context is canceled after reserving a creation slot (createInProgress++)
+// for a preferred node, the background goroutine may still complete the item
+// creation after the caller's slot is released. Without the overflow guard in
+// putItem, that goroutine would add the new item to the pool, and a concurrent
+// getItem could also create one more, exceeding the configured limit.
+func TestPoolContextCanceledAfterSlotReservationReproduce(t *testing.T) {
+	const limit = 3
+
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		blockCreation := atomic.Bool{}
+		createdSignal := make(chan struct{}, 1)
+		itemIDCounter := atomic.Int32{}
+		enableChannel := atomic.Bool{}
+
+		rootCtx := xtest.Context(t)
+		p := New[*testItem, testItem](rootCtx,
+			WithLimit[*testItem, testItem](limit),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				if enableChannel.Load() {
+					select {
+					case createdSignal <- struct{}{}:
+					default:
+					}
+				}
+				for {
+					select {
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					default:
+					}
+					if !blockCreation.Load() {
+						break
+					}
+				}
+				id := itemIDCounter.Add(1)
+				nodeID, has := endpoint.ContextNodeID(ctx)
+				if !has {
+					nodeID = uint32(id)
+				}
+
+				return &testItem{
+					v: id,
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+			WithTrace[*testItem, testItem](defaultTrace),
+		)
+		defer mustClose(t, p)
+
+		// Pre-fill to capacity.
+		item0 := mustGetItem(t, p)
+		item1 := mustGetItem(t, p)
+		item2 := mustGetItem(t, p)
+
+		// Return one item to idle so the preferred-node path can remove it and
+		// increment createInProgress.
+		mustPutItem(t, p, item2)
+
+		// Block item creation so the background goroutine stays running after
+		// the caller's context is canceled.
+		blockCreation.Store(true)
+
+		getCtx := endpoint.WithNodeID(context.Background(), 99)
+		getCtx, cancel := context.WithCancel(getCtx)
+
+		var (
+			wg     sync.WaitGroup
+			getErr error
+		)
+
+		enableChannel.Store(true)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, getErr = p.getItem(getCtx)
+		}()
+
+		// Wait until the creation function has been entered (slot reserved).
+		<-createdSignal
+		enableChannel.Store(false)
+
+		// Cancel the caller's context, then let the background goroutine finish.
+		cancel()
+		wg.Wait()
+		blockCreation.Store(false)
+
+		require.Error(t, getErr)
+		require.ErrorIs(t, getErr, context.Canceled)
+
+		// Allow any in-flight goroutines to complete.
+		runtime.Gosched()
+
+		item3 := mustGetItem(t, p)
+		require.NotNil(t, item3)
+
+		stats := p.Stats()
+		require.Equal(t, limit, stats.Index, "pool must not exceed limit after cancel")
+
+		mustPutItem(t, p, item3)
+		mustPutItem(t, p, item0)
+		mustPutItem(t, p, item1)
 	})
 }
