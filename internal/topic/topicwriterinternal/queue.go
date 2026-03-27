@@ -220,24 +220,14 @@ func (q *messageQueue) getBufferedMessages() []PublicMessage {
 }
 
 func (q *messageQueue) Close(err error) error {
-	isFirstTimeClosed := false
 	q.m.Lock()
-	defer func() {
-		seqNoToOrderIDLen := len(q.seqNoToOrderID)
-		q.m.Unlock()
-
-		// release all
-		if isFirstTimeClosed && q.OnAckReceived != nil {
-			q.OnAckReceived(seqNoToOrderIDLen)
-		}
-	}()
+	defer q.m.Unlock()
 
 	q.stopAddNewMessagesNeedLock(err)
 
 	if q.closed {
 		return xerrors.WithStackTrace(errCloseClosedMessageQueue)
 	}
-	isFirstTimeClosed = true
 
 	q.closed = true
 	q.closedErr = err
