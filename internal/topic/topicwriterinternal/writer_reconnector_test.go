@@ -21,13 +21,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var testCommonEncoders = NewMultiEncoder()
+var testCommonEncoders = topicwritercommon.NewMultiEncoder()
 
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
@@ -121,7 +122,7 @@ func TestWriterImpl_Write(t *testing.T) {
 			mess := expectedMap[k]
 			_, err = mess.GetEncodedBytes(rawtopiccommon.CodecRaw)
 			require.NoError(t, err)
-			mess.metadataCached = true
+			mess.MetadataCached = true
 			expectedMap[k] = mess
 		}
 
@@ -196,6 +197,27 @@ func TestWriterImpl_Write(t *testing.T) {
 	})
 }
 
+func TestWriterImpl_WriteInternal(t *testing.T) {
+	t.Run("PreserveCreatedAt", func(t *testing.T) {
+		ctx := context.Background()
+		w := newTestWriterStopped()
+		w.firstConnectionHandled.Store(true)
+
+		messageTime := time.Date(2022, 9, 7, 11, 34, 0, 0, time.UTC)
+		msg := topicwritercommon.NewMessageDataWithContent(PublicMessage{
+			SeqNo:     1,
+			CreatedAt: messageTime,
+			Data:      bytes.NewReader([]byte("123")),
+		}, testCommonEncoders)
+		require.NoError(t, msg.CacheMessageData(rawtopiccommon.CodecRaw))
+
+		err := w.WriteInternal(ctx, []topicwritercommon.MessageWithDataContent{msg})
+		require.NoError(t, err)
+		require.Len(t, w.queue.messagesByOrder, 1)
+		require.Equal(t, messageTime, w.queue.messagesByOrder[1].CreatedAt)
+	})
+}
+
 func TestWriterImpl_WriteCodecs(t *testing.T) {
 	t.Run("ForceRaw", func(t *testing.T) {
 		var err error
@@ -267,11 +289,11 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			messReceived <- writeReq.Codec
 
 			return nil
-		}).Times(codecMeasureIntervalBatches * 2)
+		}).Times(topicwritercommon.CodecMeasureIntervalBatches * 2)
 
 		codecs := make(map[rawtopiccommon.Codec]empty.Struct)
 
-		for i := 0; i < codecMeasureIntervalBatches; i++ {
+		for i := 0; i < topicwritercommon.CodecMeasureIntervalBatches; i++ {
 			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentShort),
 			}}))
@@ -280,7 +302,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			codecs[codec] = empty.Struct{}
 		}
 
-		for i := 0; i < codecMeasureIntervalBatches; i++ {
+		for i := 0; i < topicwritercommon.CodecMeasureIntervalBatches; i++ {
 			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentLong),
 			}}))
@@ -824,7 +846,7 @@ func TestAllMessagesHasSameBufCodec(t *testing.T) {
 	t.Run("DifferCodecs", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			messages := newTestMessagesWithContent(1, 2, 3)
-			messages[i].bufCodec = rawtopiccommon.CodecGzip
+			messages[i].BufCodec = rawtopiccommon.CodecGzip
 			require.False(t, allMessagesHasSameBufCodec(messages))
 		}
 	})
@@ -920,7 +942,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 			var messages []messageWithDataContent
 			for index, codec := range test {
 				mess := newTestMessageWithDataContent(index)
-				mess.bufCodec = codec
+				mess.BufCodec = codec
 				messages = append(messages, mess)
 			}
 
@@ -932,7 +954,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 				require.Len(t, group, cap(group))
 				for _, mess := range group {
 					expectedNum++
-					require.Equal(t, test[int(expectedNum)], mess.bufCodec)
+					require.Equal(t, test[int(expectedNum)], mess.BufCodec)
 					mess.SeqNo = expectedNum
 				}
 			}
@@ -945,7 +967,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 func TestCalculateAllowedCodecs(t *testing.T) {
 	customCodecSupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst)
 	customCodecUnsupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst + 1)
-	encoders := NewMultiEncoder()
+	encoders := topicwritercommon.NewMultiEncoder()
 	encoders.AddEncoder(customCodecSupported, func(writer io.Writer) (io.WriteCloser, error) {
 		return nil, errors.New("test")
 	})

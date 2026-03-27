@@ -11,11 +11,14 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type orchestrator struct {
@@ -187,6 +190,13 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 }
 
 func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error) {
+	acquired := false
+	defer func() {
+		if err != nil && acquired {
+			o.buf.releaseMessage()
+		}
+	}()
+
 	var autoSetSeqNo bool
 	o.mu.WithLock(func() {
 		autoSetSeqNo = o.writerCfg.AutoSetSeqNo
@@ -207,6 +217,31 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err := o.buf.acquireMessage(ctx); err != nil {
 		return err
 	}
+	acquired = true
+
+	tracer := o.writerCfg.Tracer
+	if tracer == nil {
+		tracer = &trace.Topic{}
+	}
+	logCtx := o.writerCfg.LogContext
+	onCompressDone := trace.TopicOnWriterCompressMessages(
+		tracer,
+		&logCtx,
+		o.multiWriterCfg.ProducerIDPrefix,
+		"",
+		rawtopiccommon.CodecRaw.ToInt32(),
+		msg.SeqNo,
+		1,
+		trace.TopicWriterCompressMessagesReasonCompressDataOnWriteReadData,
+	)
+	// Materialize raw payload before the message is exposed to writer reconnector.
+	// This keeps multiwriter-owned messages resendable even if a downstream writer
+	// reads the original reader and fails before enqueueing to its own buffer.
+	err = msg.CacheMessageData(rawtopiccommon.CodecRaw)
+	onCompressDone(err)
+	if err != nil {
+		return err
+	}
 
 	o.mu.WithLock(func() {
 		msg.PartitionID, err = o.choosePartition(msg)
@@ -216,6 +251,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
+		acquired = false
 	})
 
 	return err
@@ -319,7 +355,7 @@ func (o *orchestrator) rechoosePartition(msg *message) (err error) {
 
 func (o *orchestrator) getWriterBufferedMessages(
 	partitionID int64,
-) (map[int64]topicwriterinternal.PublicMessage, error) {
+) (map[int64]topicwritercommon.MessageWithDataContent, error) {
 	writer, err := o.writerPool.get(partitionID, true, true)
 	if err != nil {
 		return nil, err
@@ -330,7 +366,7 @@ func (o *orchestrator) getWriterBufferedMessages(
 	}
 
 	var (
-		bufferedMessagesMap = make(map[int64]topicwriterinternal.PublicMessage)
+		bufferedMessagesMap = make(map[int64]topicwritercommon.MessageWithDataContent)
 		bufferedMessages    = writer.GetBufferedMessages()
 	)
 
@@ -345,7 +381,7 @@ func (o *orchestrator) getWriterBufferedMessages(
 func (o *orchestrator) scheduleResendMessages(
 	partitionID,
 	maxSeqNo int64,
-	bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage,
+	bufferedMessagesMap map[int64]topicwritercommon.MessageWithDataContent,
 ) (err error) {
 	inFlightIndexChain, ok := o.buf.inFlightMessagesIndex[partitionID]
 	if !ok {
@@ -380,7 +416,7 @@ func (o *orchestrator) scheduleResendMessages(
 
 		bufferedMessage, ok := bufferedMessagesMap[msg.SeqNo]
 		if ok {
-			iter.Value.Value.Data = bufferedMessage.Data
+			iter.Value.Value.MessageWithDataContent = bufferedMessage
 		}
 
 		iter.Value.Value.PartitionID = msg.PartitionID
@@ -544,7 +580,7 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	var (
 		isAlreadySplitted   bool
-		bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage
+		bufferedMessagesMap map[int64]topicwritercommon.MessageWithDataContent
 	)
 
 	describeResult, err := o.describeTopicWithRetries(partitionID)

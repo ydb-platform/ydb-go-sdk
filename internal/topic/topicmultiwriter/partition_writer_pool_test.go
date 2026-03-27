@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
@@ -30,11 +31,11 @@ func (w *poolTestWriter) WaitInitInfo(_ context.Context) (topicwriterinternal.In
 	return topicwriterinternal.InitialInfo{}, nil
 }
 
-func (w *poolTestWriter) Write(_ context.Context, _ []topicwriterinternal.PublicMessage) error {
+func (w *poolTestWriter) WriteInternal(_ context.Context, _ []topicwritercommon.MessageWithDataContent) error {
 	return nil
 }
 
-func (w *poolTestWriter) GetBufferedMessages() []topicwriterinternal.PublicMessage {
+func (w *poolTestWriter) GetBufferedMessages() []topicwritercommon.MessageWithDataContent {
 	return nil
 }
 

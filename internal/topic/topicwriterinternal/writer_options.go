@@ -10,15 +10,16 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type PublicWriterOption func(cfg *WriterReconnectorConfig)
 
-func WithAddEncoder(codec rawtopiccommon.Codec, encoderFunc PublicCreateEncoderFunc) PublicWriterOption {
+func WithAddEncoder(codec rawtopiccommon.Codec, encoderFunc topicwritercommon.PublicCreateEncoderFunc) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		if cfg.AdditionalEncoders == nil {
-			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]PublicCreateEncoderFunc{}
+			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc{}
 		}
 		cfg.AdditionalEncoders[codec] = encoderFunc
 	}

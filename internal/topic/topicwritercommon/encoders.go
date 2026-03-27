@@ -1,4 +1,4 @@
-package topicwriterinternal
+package topicwritercommon
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	codecMeasureIntervalBatches = 100
+	CodecMeasureIntervalBatches = 100
 	codecUnknown                = rawtopiccommon.CodecUNSPECIFIED
 )
 
@@ -183,7 +183,7 @@ func NewEncoderSelector(
 	res := EncoderSelector{
 		m:                      m,
 		parallelCompressors:    parallelCompressors,
-		measureIntervalBatches: codecMeasureIntervalBatches,
+		measureIntervalBatches: CodecMeasureIntervalBatches,
 		tracer:                 tracer,
 		writerReconnectorID:    writerReconnectorID,
 		sessionID:              sessionID,
@@ -194,7 +194,7 @@ func NewEncoderSelector(
 	return res
 }
 
-func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
+func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (rawtopiccommon.Codec, error) {
 	codec, err := s.selectCodec(messages)
 	if err == nil {
 		logCtx := s.logContext
@@ -225,7 +225,7 @@ func (s *EncoderSelector) ResetAllowedCodecs(allowedCodecs rawtopiccommon.Suppor
 	s.batchCounter = 0
 }
 
-func (s *EncoderSelector) selectCodec(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
+func (s *EncoderSelector) selectCodec(messages []MessageWithDataContent) (rawtopiccommon.Codec, error) {
 	if len(s.allowedCodecs) == 0 {
 		return codecUnknown, errNoAllowedCodecs
 	}
@@ -257,7 +257,7 @@ func (s *EncoderSelector) selectCodec(messages []messageWithDataContent) (rawtop
 	return s.lastSelectedCodec, nil
 }
 
-func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
+func (s *EncoderSelector) measureCodecs(messages []MessageWithDataContent) (rawtopiccommon.Codec, error) {
 	if len(s.allowedCodecs) == 0 {
 		return codecUnknown, errNoAllowedCodecs
 	}
@@ -307,7 +307,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 	return s.allowedCodecs[minSizeIndex], nil
 }
 
-func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec, workerCount int) error {
+func CacheMessages(messages []MessageWithDataContent, codec rawtopiccommon.Codec, workerCount int) error {
 	if len(messages) < workerCount {
 		workerCount = len(messages)
 	}
@@ -321,7 +321,7 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 		}
 	}
 
-	tasks := make(chan *messageWithDataContent, len(messages))
+	tasks := make(chan *MessageWithDataContent, len(messages))
 
 	for i := range messages {
 		tasks <- &messages[i]
@@ -363,4 +363,8 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 	wg.Wait()
 
 	return resErr
+}
+
+func cacheMessages(messages []MessageWithDataContent, codec rawtopiccommon.Codec, workerCount int) error {
+	return CacheMessages(messages, codec, workerCount)
 }

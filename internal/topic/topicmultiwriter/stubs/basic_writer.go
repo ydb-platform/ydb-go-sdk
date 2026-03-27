@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -53,7 +54,7 @@ func (w *basicWriter) ackProcessor() {
 	}
 }
 
-func (w *basicWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
+func (w *basicWriter) WriteInternal(ctx context.Context, messages []topicwritercommon.MessageWithDataContent) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -98,6 +99,6 @@ func (w *basicWriter) Close(ctx context.Context) error {
 	return nil
 }
 
-func (w *basicWriter) GetBufferedMessages() []topicwriterinternal.PublicMessage {
+func (w *basicWriter) GetBufferedMessages() []topicwritercommon.MessageWithDataContent {
 	return nil
 }
