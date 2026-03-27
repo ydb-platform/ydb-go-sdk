@@ -315,7 +315,9 @@ func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) err
 	return nil
 }
 
-func (w *WriterReconnector) createMessagesWithContentNeedLock(messages []PublicMessage) ([]messageWithDataContent, error) {
+func (w *WriterReconnector) createMessagesWithContentNeedLock(
+	messages []PublicMessage,
+) ([]messageWithDataContent, error) {
 	res := make([]messageWithDataContent, 0, len(messages))
 	for i := range messages {
 		mess := newMessageDataWithContent(messages[i], w.encodersMap)
