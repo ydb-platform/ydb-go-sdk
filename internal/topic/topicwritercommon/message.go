@@ -106,6 +106,22 @@ func (m *MessageWithDataContent) CacheMessageData(codec rawtopiccommon.Codec) er
 	return err
 }
 
+func FillCreatedAt(messages []MessageWithDataContent, now time.Time, preserveAssigned bool) error {
+	for i := range messages {
+		if messages[i].CreatedAt.IsZero() {
+			messages[i].CreatedAt = now
+
+			continue
+		}
+
+		if !preserveAssigned {
+			return xerrors.WithStackTrace(ErrNonZeroCreatedAt)
+		}
+	}
+
+	return nil
+}
+
 func (m *MessageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([]byte, error) {
 	if !m.HasRawContent {
 		return nil, xerrors.WithStackTrace(errNoRawContent)

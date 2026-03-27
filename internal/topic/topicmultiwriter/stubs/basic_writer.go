@@ -98,7 +98,3 @@ func (w *basicWriter) Close(ctx context.Context) error {
 
 	return nil
 }
-
-func (w *basicWriter) GetBufferedMessages() []topicwritercommon.MessageWithDataContent {
-	return nil
-}

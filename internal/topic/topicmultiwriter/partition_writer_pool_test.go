@@ -35,10 +35,6 @@ func (w *poolTestWriter) WriteInternal(_ context.Context, _ []topicwritercommon.
 	return nil
 }
 
-func (w *poolTestWriter) GetBufferedMessages() []topicwritercommon.MessageWithDataContent {
-	return nil
-}
-
 // poolMockFactory records Create calls and returns configurable writers or error.
 type poolMockFactory struct {
 	createCalls  int

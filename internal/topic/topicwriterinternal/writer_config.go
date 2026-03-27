@@ -45,3 +45,7 @@ func (c *WritersCommonConfig) PartitionID() (int64, bool) {
 func (c *WritersCommonConfig) ProducerID() string {
 	return c.producerID
 }
+
+func (c *WritersCommonConfig) Now() time.Time {
+	return c.clock.Now()
+}

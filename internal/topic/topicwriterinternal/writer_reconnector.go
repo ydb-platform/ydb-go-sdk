@@ -33,8 +33,7 @@ import (
 var (
 	errConnTimeout                                 = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector                       = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	ErrNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
-	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
+	ErrNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode")) //nolint:lll
 	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
 	ErrPublicQueueIsFull                           = xerrors.Wrap(errors.New("ydb: queue is full"))                                                                                                                                                                                                                          // Deprecated.
@@ -197,8 +196,6 @@ func newWriterReconnectorStopped(
 }
 
 func (w *WriterReconnector) fillFields(messages []messageWithDataContent, preserveAssignedFields bool) error {
-	var now time.Time
-
 	for i := range messages {
 		msg := &messages[i]
 
@@ -213,19 +210,11 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent, preser
 				msg.SeqNo = w.lastSeqNo
 			}
 		}
+	}
 
-		// Set created time
-		if w.cfg.AutoSetCreatedTime {
-			if msg.CreatedAt.IsZero() {
-				if now.IsZero() {
-					now = w.cfg.clock.Now()
-				}
-				msg.CreatedAt = now
-			} else {
-				if !preserveAssignedFields {
-					return xerrors.WithStackTrace(errNonZeroCreatedAt)
-				}
-			}
+	if w.cfg.AutoSetCreatedTime {
+		if err := topicwritercommon.FillCreatedAt(messages, w.cfg.Now(), preserveAssignedFields); err != nil {
+			return err
 		}
 	}
 
@@ -700,10 +689,6 @@ func (w *WriterReconnector) GetSessionID() (sessionID string) {
 	})
 
 	return sessionID
-}
-
-func (w *WriterReconnector) GetBufferedMessages() []topicwritercommon.MessageWithDataContent {
-	return w.queue.getBufferedMessages()
 }
 
 func allMessagesHasSameBufCodec(messages []messageWithDataContent) bool {

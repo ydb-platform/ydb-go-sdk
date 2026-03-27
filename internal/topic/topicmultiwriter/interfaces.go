@@ -12,7 +12,6 @@ type writer interface {
 	Close(ctx context.Context) error
 	WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error)
 	WriteInternal(ctx context.Context, messages []topicwritercommon.MessageWithDataContent) error
-	GetBufferedMessages() []topicwritercommon.MessageWithDataContent
 }
 
 type writersFactory interface {

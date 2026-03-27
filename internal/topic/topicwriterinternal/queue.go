@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -201,23 +200,6 @@ func (q *messageQueue) stopAddNewMessagesNeedLock(reason error) {
 	if q.stopReceiveMessagesReason == nil {
 		q.stopReceiveMessagesReason = reason
 	}
-}
-
-func (q *messageQueue) getBufferedMessages() []topicwritercommon.MessageWithDataContent {
-	q.m.Lock()
-	defer q.m.Unlock()
-
-	res := make([]topicwritercommon.MessageWithDataContent, 0, q.lastWrittenIndex-q.lastSentIndex)
-	for i := range q.messagesByOrder {
-		msg := q.messagesByOrder[i]
-		if msg.HasRawContent {
-			msg.Data = &msg.RawBuf
-		}
-
-		res = append(res, msg)
-	}
-
-	return res
 }
 
 func (q *messageQueue) Close(err error) error {

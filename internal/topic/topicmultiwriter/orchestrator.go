@@ -219,6 +219,16 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	}
 	acquired = true
 
+	if o.writerCfg.AutoSetCreatedTime {
+		if err := topicwritercommon.FillCreatedAt(
+			[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
+			o.writerCfg.Now(),
+			false,
+		); err != nil {
+			return err
+		}
+	}
+
 	tracer := o.writerCfg.Tracer
 	if tracer == nil {
 		tracer = &trace.Topic{}
@@ -353,35 +363,10 @@ func (o *orchestrator) rechoosePartition(msg *message) (err error) {
 	return err
 }
 
-func (o *orchestrator) getWriterBufferedMessages(
-	partitionID int64,
-) (map[int64]topicwritercommon.MessageWithDataContent, error) {
-	writer, err := o.writerPool.get(partitionID, true, true)
-	if err != nil {
-		return nil, err
-	}
-
-	if writer == nil {
-		return nil, nil //nolint:nilnil
-	}
-
-	var (
-		bufferedMessagesMap = make(map[int64]topicwritercommon.MessageWithDataContent)
-		bufferedMessages    = writer.GetBufferedMessages()
-	)
-
-	for _, msg := range bufferedMessages {
-		bufferedMessagesMap[msg.SeqNo] = msg
-	}
-
-	return bufferedMessagesMap, nil
-}
-
 //nolint:funlen
 func (o *orchestrator) scheduleResendMessages(
 	partitionID,
 	maxSeqNo int64,
-	bufferedMessagesMap map[int64]topicwritercommon.MessageWithDataContent,
 ) (err error) {
 	inFlightIndexChain, ok := o.buf.inFlightMessagesIndex[partitionID]
 	if !ok {
@@ -412,11 +397,6 @@ func (o *orchestrator) scheduleResendMessages(
 
 		if err := o.rechoosePartition(&msg); err != nil {
 			return err
-		}
-
-		bufferedMessage, ok := bufferedMessagesMap[msg.SeqNo]
-		if ok {
-			iter.Value.Value.MessageWithDataContent = bufferedMessage
 		}
 
 		iter.Value.Value.PartitionID = msg.PartitionID
@@ -578,10 +558,7 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 }
 
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
-	var (
-		isAlreadySplitted   bool
-		bufferedMessagesMap map[int64]topicwritercommon.MessageWithDataContent
-	)
+	var isAlreadySplitted bool
 
 	describeResult, err := o.describeTopicWithRetries(partitionID)
 	if err != nil {
@@ -601,7 +578,6 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			return
 		}
 		o.partitionChooser.RemovePartition(partitionID)
-		bufferedMessagesMap, err = o.getWriterBufferedMessages(partitionID)
 	})
 
 	if err != nil || isAlreadySplitted {
@@ -615,7 +591,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	}
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
-		err = o.scheduleResendMessages(partitionID, maxSeqNo, bufferedMessagesMap)
+		err = o.scheduleResendMessages(partitionID, maxSeqNo)
 		if err != nil {
 			resultErr = err
 
