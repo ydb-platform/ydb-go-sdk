@@ -229,6 +229,25 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		}
 	}
 
+	if err := o.saveMessageContent(&msg); err != nil {
+		return err
+	}
+
+	o.mu.WithLock(func() {
+		msg.PartitionID, err = o.choosePartition(msg)
+		if err != nil {
+			return
+		}
+
+		o.buf.pushNeedLock(msg)
+		o.sender.wakeup()
+		acquired = false
+	})
+
+	return err
+}
+
+func (o *orchestrator) saveMessageContent(msg *message) error {
 	tracer := o.writerCfg.Tracer
 	if tracer == nil {
 		tracer = &trace.Topic{}
@@ -247,24 +266,13 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	// Materialize raw payload before the message is exposed to writer reconnector.
 	// This keeps multiwriter-owned messages resendable even if a downstream writer
 	// reads the original reader and fails before enqueueing to its own buffer.
-	err = msg.CacheMessageData(rawtopiccommon.CodecRaw)
+	err := msg.CacheMessageData(rawtopiccommon.CodecRaw)
 	onCompressDone(err)
 	if err != nil {
 		return err
 	}
 
-	o.mu.WithLock(func() {
-		msg.PartitionID, err = o.choosePartition(msg)
-		if err != nil {
-			return
-		}
-
-		o.buf.pushNeedLock(msg)
-		o.sender.wakeup()
-		acquired = false
-	})
-
-	return err
+	return nil
 }
 
 func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {

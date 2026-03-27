@@ -149,7 +149,10 @@ func (w *writerWithAutopartitioning) processMessages() {
 	}
 }
 
-func (w *writerWithAutopartitioning) WriteInternal(ctx context.Context, messages []topicwritercommon.MessageWithDataContent) error {
+func (w *writerWithAutopartitioning) WriteInternal(
+	ctx context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

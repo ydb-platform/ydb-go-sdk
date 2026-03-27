@@ -16,7 +16,10 @@ import (
 
 type PublicWriterOption func(cfg *WriterReconnectorConfig)
 
-func WithAddEncoder(codec rawtopiccommon.Codec, encoderFunc topicwritercommon.PublicCreateEncoderFunc) PublicWriterOption {
+func WithAddEncoder(
+	codec rawtopiccommon.Codec,
+	encoderFunc topicwritercommon.PublicCreateEncoderFunc,
+) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		if cfg.AdditionalEncoders == nil {
 			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc{}

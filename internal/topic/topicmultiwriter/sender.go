@@ -101,7 +101,10 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			if err = wr.WriteInternal(s.ctx, []topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent}); err != nil {
+			if err = wr.WriteInternal(
+				s.ctx,
+				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
+			); err != nil {
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
