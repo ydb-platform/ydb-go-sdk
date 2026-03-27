@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -47,6 +49,12 @@ func WithApplicationNameOption(applicationName string) Option {
 	}
 }
 
+func WithBuildInfo(frameworkName string, version string) Option {
+	return func(m *Meta) {
+		m.buildInfo = xslices.Uniq(append(m.buildInfo, frameworkName+"/"+version))
+	}
+}
+
 func WithRequestTypeOption(requestType string) Option {
 	return func(m *Meta) {
 		m.requestsType = requestType
@@ -77,6 +85,7 @@ type Meta struct {
 	trace           *trace.Driver
 	credentials     credentials.Credentials
 	database        string
+	buildInfo       []string
 	requestsType    string
 	applicationName string
 	capabilities    []string
@@ -95,7 +104,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 
 	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, version.FullVersion)
+		md.Set(HeaderVersion, strings.Join(append([]string{version.FullVersion}, m.buildInfo...), ";"))
 	}
 
 	if m.requestsType != "" {
@@ -136,6 +145,14 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md.Set(HeaderTicket, token)
 
 	return md, nil
+}
+
+func (m *Meta) Apply(opts ...Option) *Meta {
+	for _, opt := range opts {
+		opt(m)
+	}
+
+	return m
 }
 
 func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
