@@ -149,7 +149,9 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 
 func (m *Meta) Apply(opts ...Option) *Meta {
 	for _, opt := range opts {
-		opt(m)
+		if opt != nil {
+			opt(m)
+		}
 	}
 
 	return m
