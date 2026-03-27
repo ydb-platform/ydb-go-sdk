@@ -14,6 +14,101 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+func TestWithBuildInfo(t *testing.T) {
+	t.Run("SingleEntry", func(t *testing.T) {
+		m := internal.New(
+			"database",
+			nil,
+			&trace.Driver{},
+			internal.WithBuildInfo("database/sql", "1.2.3"),
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{
+			version.FullVersion + ";database/sql/1.2.3",
+		}, md.Get(internal.HeaderVersion))
+	})
+
+	t.Run("Deduplication", func(t *testing.T) {
+		m := internal.New(
+			"database",
+			nil,
+			&trace.Driver{},
+			internal.WithBuildInfo("database/sql", "1.2.3"),
+			internal.WithBuildInfo("database/sql", "1.2.3"),
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{
+			version.FullVersion + ";database/sql/1.2.3",
+		}, md.Get(internal.HeaderVersion))
+	})
+
+	t.Run("MultipleEntries", func(t *testing.T) {
+		m := internal.New(
+			"database",
+			nil,
+			&trace.Driver{},
+			internal.WithBuildInfo("database/sql", "1.0.0"),
+			internal.WithBuildInfo("my-framework", "2.0.0"),
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+
+		headerValues := md.Get(internal.HeaderVersion)
+		require.Len(t, headerValues, 1)
+		require.Contains(t, headerValues[0], version.FullVersion)
+		require.Contains(t, headerValues[0], "database/sql/1.0.0")
+		require.Contains(t, headerValues[0], "my-framework/2.0.0")
+	})
+
+	t.Run("ApplyDeduplication", func(t *testing.T) {
+		m := internal.New(
+			"database",
+			nil,
+			&trace.Driver{},
+			internal.WithBuildInfo("database/sql", "1.2.3"),
+		)
+		m.Apply(internal.WithBuildInfo("database/sql", "1.2.3"))
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{
+			version.FullVersion + ";database/sql/1.2.3",
+		}, md.Get(internal.HeaderVersion))
+	})
+
+	t.Run("EmptyBuildInfo", func(t *testing.T) {
+		m := internal.New(
+			"database",
+			nil,
+			&trace.Driver{},
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{version.FullVersion}, md.Get(internal.HeaderVersion))
+	})
+}
+
 func TestMetaRequiredHeaders(t *testing.T) {
 	m := internal.New(
 		"database",
