@@ -1,3 +1,5 @@
+* Refactor topic writer internal API to use `topicwritercommon.MessageWithDataContent` instead of `topicwriterinternal.PublicMessage`
+
 ## v3.128.3
 * Fixed panic and `unsupported type` error when passing a nil pointer to a `json.Marshaler`-implementing type as a `database/sql` query parameter (`toType` now handles `json.Marshaler` and returns `types.JSON`, matching the existing `toValue` behaviour)
 * Supported pool of decoders, which implement ResettableReader interface
