@@ -283,7 +283,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 func (w *WriterReconnector) addMessageToInternalQueueWithLock(
 	messages []PublicMessage,
 	semaphoreWeight *int64,
-	createMessagesFunc func([]PublicMessage) ([]messageWithDataContent, error),
+	createMessagesFunc createMessagesFunc,
 ) (MessageQueueAckWaiter, error) {
 	var (
 		waiter MessageQueueAckWaiter
