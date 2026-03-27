@@ -34,8 +34,8 @@ func (w *poolTestWriter) Write(_ context.Context, _ []topicwriterinternal.Public
 	return nil
 }
 
-func (w *poolTestWriter) GetBufferedMessages() []topicwriterinternal.PublicMessage {
-	return nil
+func (w *poolTestWriter) GetBufferedMessages() ([]topicwriterinternal.PublicMessage, error) {
+	return nil, nil
 }
 
 // poolMockFactory records Create calls and returns configurable writers or error.

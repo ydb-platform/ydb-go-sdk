@@ -1,12 +1,14 @@
 package topicwriterinternal
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -28,6 +30,8 @@ const (
 
 	minPositiveIndexWhichOrderLessThenNegative = maxInt / 2
 )
+
+type createMessagesFunc func([]PublicMessage) ([]messageWithDataContent, error)
 
 type messageQueue struct {
 	OnAckReceived func(count int)
@@ -59,25 +63,46 @@ func newMessageQueue() messageQueue {
 	}
 }
 
-func (q *messageQueue) AddMessages(messages []messageWithDataContent) error {
-	_, err := q.addMessages(messages, false)
+func (q *messageQueue) AddMessages(
+	messages []PublicMessage,
+	createMessagesFunc createMessagesFunc,
+) error {
+	_, err := q.addMessages(messages, false, createMessagesFunc)
 
 	return err
 }
 
-func (q *messageQueue) AddMessagesWithWaiter(messages []messageWithDataContent) (
+func (q *messageQueue) AddMessagesWithWaiter(
+	messages []PublicMessage,
+	createMessagesFunc createMessagesFunc,
+) (
 	waiter MessageQueueAckWaiter,
 	err error,
 ) {
-	return q.addMessages(messages, true)
+	return q.addMessages(messages, true, createMessagesFunc)
 }
 
-func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter bool) (
+func (q *messageQueue) addMessages(
+	pubMessages []PublicMessage,
+	needWaiter bool,
+	createMessagesFunc createMessagesFunc,
+) (
 	waiter MessageQueueAckWaiter,
 	err error,
 ) {
 	q.m.Lock()
 	defer q.m.Unlock()
+
+	if q.stopReceiveMessagesReason != nil {
+		return waiter, xerrors.WithStackTrace(
+			fmt.Errorf("ydb: add message to closed message queue: %w", q.stopReceiveMessagesReason),
+		)
+	}
+
+	messages, err := createMessagesFunc(pubMessages)
+	if err != nil {
+		return waiter, err
+	}
 
 	if err := q.checkNewMessagesBeforeAddNeedLock(messages); err != nil {
 		return waiter, err
@@ -89,12 +114,6 @@ func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter
 		if needWaiter {
 			waiter.AddWaitIndex(messageIndex)
 		}
-	}
-
-	if q.stopReceiveMessagesReason != nil {
-		return waiter, xerrors.WithStackTrace(
-			fmt.Errorf("ydb: add message to closed message queue: %w", q.stopReceiveMessagesReason),
-		)
 	}
 
 	q.notifyNewMessages()
@@ -202,32 +221,44 @@ func (q *messageQueue) stopAddNewMessagesNeedLock(reason error) {
 	}
 }
 
-func (q *messageQueue) getBufferedMessages() []PublicMessage {
+func (q *messageQueue) getBufferedMessages() ([]PublicMessage, error) {
 	q.m.Lock()
 	defer q.m.Unlock()
 
 	res := make([]PublicMessage, 0, q.lastWrittenIndex-q.lastSentIndex)
 	for i := range q.messagesByOrder {
 		msg := q.messagesByOrder[i]
-		if msg.hasRawContent {
-			msg.Data = &msg.rawBuf
+		msgBytes, err := msg.GetEncodedBytes(rawtopiccommon.CodecRaw)
+		if err != nil {
+			return nil, err
 		}
 
+		msg.Data = bytes.NewReader(msgBytes)
 		res = append(res, msg.PublicMessage)
 	}
 
-	return res
+	return res, nil
 }
 
 func (q *messageQueue) Close(err error) error {
+	isFirstTimeClosed := false
 	q.m.Lock()
-	defer q.m.Unlock()
+	defer func() {
+		seqNoToOrderIDLen := len(q.seqNoToOrderID)
+		q.m.Unlock()
+
+		// release all
+		if isFirstTimeClosed && q.OnAckReceived != nil {
+			q.OnAckReceived(seqNoToOrderIDLen)
+		}
+	}()
 
 	q.stopAddNewMessagesNeedLock(err)
 
 	if q.closed {
 		return xerrors.WithStackTrace(errCloseClosedMessageQueue)
 	}
+	isFirstTimeClosed = true
 
 	q.closed = true
 	q.closedErr = err

@@ -329,10 +329,11 @@ func (o *orchestrator) getWriterBufferedMessages(
 		return nil, nil //nolint:nilnil
 	}
 
-	var (
-		bufferedMessagesMap = make(map[int64]topicwriterinternal.PublicMessage)
-		bufferedMessages    = writer.GetBufferedMessages()
-	)
+	bufferedMessagesMap := make(map[int64]topicwriterinternal.PublicMessage)
+	bufferedMessages, err := writer.GetBufferedMessages()
+	if err != nil {
+		return nil, err
+	}
 
 	for _, msg := range bufferedMessages {
 		bufferedMessagesMap[msg.SeqNo] = msg

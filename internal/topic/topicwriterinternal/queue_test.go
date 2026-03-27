@@ -20,7 +20,7 @@ import (
 func TestMessageQueue_AddMessages(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 3, 5), createMessagesWithContentForTest))
 
 		require.Equal(t, 3, q.lastWrittenIndex)
 
@@ -39,12 +39,12 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 	t.Run("Closed", func(t *testing.T) {
 		q := newMessageQueue()
 		_ = q.Close(errors.New("err"))
-		require.Error(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
+		require.Error(t, q.AddMessages(newTestMessages(1, 3, 5), createMessagesWithContentForTest))
 	})
 	t.Run("OverflowIndex", func(t *testing.T) {
 		q := newMessageQueue()
 		q.lastWrittenIndex = maxInt - 1
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 3, 5), createMessagesWithContentForTest))
 		require.Len(t, q.messagesByOrder, 3)
 		q.messagesByOrder[maxInt] = newTestMessageWithDataContent(1)
 		q.messagesByOrder[minInt] = newTestMessageWithDataContent(3)
@@ -53,7 +53,7 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 	})
 	t.Run("BadOrder", func(t *testing.T) {
 		q := newMessageQueue()
-		require.Error(t, q.AddMessages(newTestMessagesWithContent(2, 1)))
+		require.Error(t, q.AddMessages(newTestMessages(2, 1), createMessagesWithContentForTest))
 	})
 }
 
@@ -90,8 +90,8 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 	ctx := context.Background()
 	t.Run("Simple", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(3, 4)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 2), createMessagesWithContentForTest))
+		require.NoError(t, q.AddMessages(newTestMessages(3, 4), createMessagesWithContentForTest))
 
 		messages, err := q.GetMessagesForSend(ctx)
 		require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		}()
 
 		waitGetMessageStarted(&q)
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 3)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 3), createMessagesWithContentForTest))
 
 		<-gotMessages
 		require.NoError(t, err)
@@ -130,12 +130,12 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 			sendRand := rand.New(rand.NewSource(0))
 			for i := 0; i < iterations; i++ {
 				count := sendRand.Intn(10) + 1
-				var m []messageWithDataContent
+				var m []PublicMessage
 				for k := 0; k < count; k++ {
 					number := int(atomic.AddInt64(&lastSentSeqNo, 1))
-					m = append(m, newTestMessageWithDataContent(number))
+					m = append(m, PublicMessage{SeqNo: int64(number)})
 				}
-				require.NoError(t, q.AddMessages(m))
+				require.NoError(t, q.AddMessages(m, createMessagesWithContentForTest))
 			}
 			close(sendFinished)
 		}()
@@ -199,7 +199,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		cancel()
 
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 2), createMessagesWithContentForTest))
 
 		_, err := q.GetMessagesForSend(closedCtx)
 		require.ErrorIs(t, err, context.Canceled)
@@ -238,7 +238,7 @@ func TestMessageQueue_ResetSentProgress(t *testing.T) {
 
 	t.Run("Simple", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 3)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 3), createMessagesWithContentForTest))
 		res1, err := q.GetMessagesForSend(ctx)
 		require.NoError(t, err)
 
@@ -255,7 +255,7 @@ func TestMessageQueue_ResetSentProgress(t *testing.T) {
 		q.lastWrittenIndex = maxInt - 1
 		q.lastSentIndex = q.lastWrittenIndex
 
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 3)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 3), createMessagesWithContentForTest))
 		res1, err := q.GetMessagesForSend(ctx)
 		require.NoError(t, err)
 
@@ -407,10 +407,30 @@ func TestQueuePanicOnOverflow(t *testing.T) {
 	})
 }
 
+func TestRegressionIssue1038_ReceiveAckAfterCloseQueue(t *testing.T) {
+	counter := 0
+
+	q := newMessageQueue()
+	q.OnAckReceived = func(count int) {
+		counter -= count
+	}
+	require.NoError(t, q.AddMessages(newTestMessages(1), createMessagesWithContentForTest))
+	counter++
+
+	require.NoError(t, q.Close(errors.New("test err")))
+	require.ErrorIs(t, q.AcksReceived([]rawtopicwriter.WriteAck{
+		{
+			SeqNo:              1,
+			MessageWriteStatus: rawtopicwriter.MessageWriteStatus{},
+		},
+	}), errAckOnClosedMessageQueue)
+	require.Zero(t, counter)
+}
+
 func TestQueue_Ack(t *testing.T) {
 	t.Run("First", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 5)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 5), createMessagesWithContentForTest))
 
 		require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{
 			{
@@ -425,7 +445,7 @@ func TestQueue_Ack(t *testing.T) {
 	})
 	t.Run("Unexisted", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1)))
+		require.NoError(t, q.AddMessages(newTestMessages(1), createMessagesWithContentForTest))
 
 		// remove first with the seqno
 		require.Error(t, q.AcksReceived([]rawtopicwriter.WriteAck{
@@ -449,7 +469,7 @@ func TestQueue_Ack(t *testing.T) {
 			receivedCount = count
 		}
 
-		err := q.AddMessages(newTestMessagesWithContent(1, 2, 3))
+		err := q.AddMessages(newTestMessages(1, 2, 3), createMessagesWithContentForTest)
 		require.NoError(t, err)
 
 		err = q.AcksReceived([]rawtopicwriter.WriteAck{
@@ -493,4 +513,13 @@ func getSeqNumbers(messages []messageWithDataContent) []int64 {
 	}
 
 	return res
+}
+
+func createMessagesWithContentForTest(messages []PublicMessage) ([]messageWithDataContent, error) {
+	res := make([]messageWithDataContent, 0, len(messages))
+	for i := range messages {
+		res = append(res, newMessageDataWithContent(messages[i], testCommonEncoders))
+	}
+
+	return res, nil
 }

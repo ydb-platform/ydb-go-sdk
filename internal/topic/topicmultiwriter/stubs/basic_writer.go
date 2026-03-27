@@ -98,6 +98,6 @@ func (w *basicWriter) Close(ctx context.Context) error {
 	return nil
 }
 
-func (w *basicWriter) GetBufferedMessages() []topicwriterinternal.PublicMessage {
-	return nil
+func (w *basicWriter) GetBufferedMessages() ([]topicwriterinternal.PublicMessage, error) {
+	return nil, nil
 }

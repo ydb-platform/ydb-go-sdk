@@ -262,19 +262,11 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		return err
 	}
 
-	messagesSlice, err := w.createMessagesWithContent(messages)
+	waiter, err := w.addMessageToInternalQueueWithLock(messages, &semaphoreWeight, w.createMessagesWithContentNeedLock)
 	if err != nil {
 		return err
 	}
 
-	if err = w.checkMessages(messagesSlice); err != nil {
-		return err
-	}
-
-	waiter, err := w.addMessageToInternalQueueWithLock(messagesSlice, &semaphoreWeight)
-	if err != nil {
-		return err
-	}
 	defer func() {
 		if resErr != nil {
 			resErr = xerrors.Join(resErr, ErrPublicMessagesPutToInternalQueueBeforeError)
@@ -289,24 +281,19 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 }
 
 func (w *WriterReconnector) addMessageToInternalQueueWithLock(
-	messagesSlice []messageWithDataContent,
+	messages []PublicMessage,
 	semaphoreWeight *int64,
+	createMessagesFunc func([]PublicMessage) ([]messageWithDataContent, error),
 ) (MessageQueueAckWaiter, error) {
 	var (
 		waiter MessageQueueAckWaiter
 		err    error
 	)
 	w.m.WithLock(func() {
-		// need set numbers and add to queue atomically
-		err = w.fillFields(messagesSlice)
-		if err != nil {
-			return
-		}
-
 		if w.cfg.WaitServerAck {
-			waiter, err = w.queue.AddMessagesWithWaiter(messagesSlice)
+			waiter, err = w.queue.AddMessagesWithWaiter(messages, createMessagesFunc)
 		} else {
-			err = w.queue.AddMessages(messagesSlice)
+			err = w.queue.AddMessages(messages, createMessagesFunc)
 		}
 		if err == nil {
 			// move semaphore weight to queue
@@ -328,23 +315,19 @@ func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) err
 	return nil
 }
 
-func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) ([]messageWithDataContent, error) {
+func (w *WriterReconnector) createMessagesWithContentNeedLock(messages []PublicMessage) ([]messageWithDataContent, error) {
 	res := make([]messageWithDataContent, 0, len(messages))
 	for i := range messages {
 		mess := newMessageDataWithContent(messages[i], w.encodersMap)
 		res = append(res, mess)
 	}
 
-	var sessionID string
-	w.m.WithRLock(func() {
-		sessionID = w.sessionID
-	})
 	logCtx := w.cfg.LogContext
 	onCompressDone := trace.TopicOnWriterCompressMessages(
 		w.cfg.Tracer,
 		&logCtx,
 		w.writerInstanceID,
-		sessionID,
+		w.sessionID,
 		w.cfg.forceCodec.ToInt32(),
 		messages[0].SeqNo,
 		len(messages),
@@ -358,6 +341,16 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	err := cacheMessages(res, targetCodec, w.cfg.compressorCount)
 	onCompressDone(err)
 
+	if err != nil {
+		return nil, err
+	}
+
+	if err := w.checkMessages(res); err != nil {
+		return nil, err
+	}
+
+	// need set numbers and add to queue atomically
+	err = w.fillFields(res)
 	if err != nil {
 		return nil, err
 	}
@@ -658,7 +651,7 @@ func (w *WriterReconnector) GetSessionID() (sessionID string) {
 	return sessionID
 }
 
-func (w *WriterReconnector) GetBufferedMessages() []PublicMessage {
+func (w *WriterReconnector) GetBufferedMessages() ([]PublicMessage, error) {
 	return w.queue.getBufferedMessages()
 }
 
