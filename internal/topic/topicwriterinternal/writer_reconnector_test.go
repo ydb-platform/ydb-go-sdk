@@ -53,7 +53,7 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 
 		const messCount = 1000
 		wg.Add(messCount)
-		for i := 0; i < messCount; i++ {
+		for i := range messCount {
 			go fWrite(i)
 		}
 		wg.Wait()
@@ -293,7 +293,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 
 		codecs := make(map[rawtopiccommon.Codec]empty.Struct)
 
-		for i := 0; i < topicwritercommon.CodecMeasureIntervalBatches; i++ {
+		for range topicwritercommon.CodecMeasureIntervalBatches {
 			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentShort),
 			}}))
@@ -302,7 +302,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			codecs[codec] = empty.Struct{}
 		}
 
-		for i := 0; i < topicwritercommon.CodecMeasureIntervalBatches; i++ {
+		for range topicwritercommon.CodecMeasureIntervalBatches {
 			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentLong),
 			}}))
@@ -844,7 +844,7 @@ func TestAllMessagesHasSameBufCodec(t *testing.T) {
 		require.True(t, allMessagesHasSameBufCodec(newTestMessagesWithContent(1, 2, 3)))
 	})
 	t.Run("DifferCodecs", func(t *testing.T) {
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			messages := newTestMessagesWithContent(1, 2, 3)
 			messages[i].BufCodec = rawtopiccommon.CodecGzip
 			require.False(t, allMessagesHasSameBufCodec(messages))
@@ -1192,7 +1192,7 @@ type testEnv struct {
 	sendFromServerChannel chan sendFromServerResponse
 	stopReadEvents        empty.Chan
 	partitionID           int64
-	connectCount          int64
+	connectCount          atomic.Int64
 }
 
 type testEnvOptions struct {
@@ -1221,7 +1221,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 			RawTopicWriterStream,
 			error,
 		) {
-			connectNum := atomic.AddInt64(&res.connectCount, 1)
+			connectNum := res.connectCount.Add(1)
 			if connectNum > 1 {
 				t.Fatalf("test: default env support most one connection")
 			}

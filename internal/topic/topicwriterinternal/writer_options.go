@@ -1,6 +1,7 @@
 package topicwriterinternal
 
 import (
+	"maps"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -149,9 +150,7 @@ func WithSessionMeta(meta map[string]string) PublicWriterOption {
 			cfg.writerMeta = nil
 		} else {
 			cfg.writerMeta = make(map[string]string, len(meta))
-			for k, v := range meta {
-				cfg.writerMeta[k] = v
-			}
+			maps.Copy(cfg.writerMeta, meta)
 		}
 	}
 }

@@ -86,7 +86,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			wr, err := s.writerPool.get(msg.PartitionID, true, false)
+			wr, err := s.writerPool.get(msg.PartitionID, true)
 			if err != nil {
 				return fmt.Errorf("failed to get writer: %w", err)
 			}

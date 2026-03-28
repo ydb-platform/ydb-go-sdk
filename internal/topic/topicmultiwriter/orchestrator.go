@@ -501,13 +501,13 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 
 			var writer *writerWrapper
 			if partitionInfo.Splitted() {
-				writer, resultErr = o.writerPool.get(partition, false, false)
+				writer, resultErr = o.writerPool.get(partition, false)
 				if resultErr != nil {
 					return resultErr
 				}
 			} else {
 				o.mu.WithLock(func() {
-					writer, resultErr = o.writerPool.get(partition, true, false)
+					writer, resultErr = o.writerPool.get(partition, true)
 				})
 			}
 
