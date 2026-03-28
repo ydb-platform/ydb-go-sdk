@@ -189,7 +189,7 @@ func WithApplicationName(applicationName string) Option {
 	}
 }
 
-// WithBuildInfo added framework name with version to all api requests
+// WithBuildInfo adds framework name with version to all API requests.
 func WithBuildInfo(frameworkName string, version string) Option {
 	return func(c *Config) {
 		c.metaOptions = append(c.metaOptions, meta.WithBuildInfo(frameworkName, version))

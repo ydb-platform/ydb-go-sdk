@@ -49,9 +49,13 @@ func WithApplicationNameOption(applicationName string) Option {
 	}
 }
 
-func WithBuildInfo(frameworkName string, version string) Option {
+func WithBuildInfo(frameworkName string, ver string) Option {
 	return func(m *Meta) {
-		m.buildInfo = xslices.Uniq(append(m.buildInfo, frameworkName+"/"+version))
+		m.buildInfo = xslices.Uniq(append(m.buildInfo, frameworkName+"/"+ver))
+		parts := make([]string, 0, 1+len(m.buildInfo))
+		parts = append(parts, version.FullVersion)
+		parts = append(parts, m.buildInfo...)
+		m.versionHeader = strings.Join(parts, ";")
 	}
 }
 
@@ -86,6 +90,7 @@ type Meta struct {
 	credentials     credentials.Credentials
 	database        string
 	buildInfo       []string
+	versionHeader   string
 	requestsType    string
 	applicationName string
 	capabilities    []string
@@ -104,7 +109,11 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 
 	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, strings.Join(append([]string{version.FullVersion}, m.buildInfo...), ";"))
+		if m.versionHeader != "" {
+			md.Set(HeaderVersion, m.versionHeader)
+		} else {
+			md.Set(HeaderVersion, version.FullVersion)
+		}
 	}
 
 	if m.requestsType != "" {
