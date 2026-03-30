@@ -150,11 +150,11 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	return md, nil
 }
 
-// AppendBuildInfo adds build information for the given framework.
-// Note: duplicates are ignored – if called multiple times with the same
-// framework name, only the value from the first call is kept. This is due
-// to xsync.Map.Set being implemented via LoadOrStore and not overwriting
-// existing values.
+// AppendBuildInfo adds or updates build information for the given framework
+// in the x-ydb-sdk-build-info header. If called multiple times with the same
+// framework name, the value from the last call overwrites any previously
+// stored version. This happens because the function rebuilds a map of
+// frameworks and assigns frameworks[framework] = version inside buildInfo.Change.
 func (m *Meta) AppendBuildInfo(framework string, version string) {
 	m.buildInfo.Change(func(old string) (new string) {
 		parts := strings.Split(old, ";")
