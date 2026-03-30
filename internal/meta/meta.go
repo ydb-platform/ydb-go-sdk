@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
@@ -16,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -93,7 +93,7 @@ type Meta struct {
 	capabilities    []string
 }
 
-func versionHeader(buildInfo xsync.Map[string, string]) string {
+func versionHeader(buildInfo *xsync.Map[string, string]) string {
 	l := buildInfo.Len()
 	if l == 0 {
 		return version.FullVersion
@@ -104,6 +104,7 @@ func versionHeader(buildInfo xsync.Map[string, string]) string {
 
 	buildInfo.Range(func(framework string, version string) bool {
 		frameworks = append(frameworks, framework+"/"+version)
+
 		return true
 	})
 
@@ -113,7 +114,7 @@ func versionHeader(buildInfo xsync.Map[string, string]) string {
 }
 
 func (m *Meta) versionHeader() string {
-	return versionHeader(m.buildInfo)
+	return versionHeader(&m.buildInfo)
 }
 
 func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
