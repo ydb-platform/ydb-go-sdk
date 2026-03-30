@@ -189,7 +189,7 @@ func WithApplicationName(applicationName string) Option {
 	}
 }
 
-// WithBuildInfo adds framework name with version to all API requests.
+// WithBuildInfo adds framework name with its version to x-ydb-build-info header for all API requests.
 func WithBuildInfo(frameworkName string, version string) Option {
 	return func(c *Config) {
 		c.metaOptions = append(c.metaOptions, meta.WithBuildInfo(frameworkName, version))

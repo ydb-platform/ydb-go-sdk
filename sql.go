@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
@@ -275,7 +274,7 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	parent.config.Meta().Apply(meta.WithBuildInfo("database/sql", version.Version))
+	parent.config.Meta().AppendBuildInfo("database/sql", version.Version)
 
 	return c, nil
 }

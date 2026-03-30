@@ -159,6 +159,15 @@ func WithOauth2TokenExchangeCredentialsFile(
 	})
 }
 
+// WithBuildInfo adds framework name with its version to x-ydb-build-info header for all API requests.
+func WithBuildInfo(frameworkName string, version string) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.options = append(d.options, config.WithBuildInfo(frameworkName, version))
+
+		return nil
+	}
+}
+
 // WithApplicationName add provided application name to all api requests
 func WithApplicationName(applicationName string) Option {
 	return func(ctx context.Context, d *Driver) error {
