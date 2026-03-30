@@ -1,5 +1,5 @@
-* Added `ydb.WithBuildInfo`, `config.WithBuildInfo` options for append frameworks into `x-ydb-build-info` header for all API requests
-* Automatically added (if used) `database/sql` framework to `x-ydb-build-info` header
+* Added `ydb.WithBuildInfo`, `config.WithBuildInfo` options to append frameworks to `x-ydb-sdk-build-info` header for all API requests
+* Automatically added (if used) `database/sql` framework to `x-ydb-sdk-build-info` header
 
 ## v3.128.3
 * Fixed panic and `unsupported type` error when passing a nil pointer to a `json.Marshaler`-implementing type as a `database/sql` query parameter (`toType` now handles `json.Marshaler` and returns `types.JSON`, matching the existing `toValue` behaviour)
