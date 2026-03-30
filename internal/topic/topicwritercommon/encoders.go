@@ -208,7 +208,7 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 			len(messages),
 			trace.TopicWriterCompressMessagesReasonCompressData,
 		)
-		err = cacheMessages(messages, codec, s.parallelCompressors)
+		err = CacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
 	}
 
@@ -280,7 +280,7 @@ func (s *EncoderSelector) measureCodecs(messages []MessageWithDataContent) (rawt
 			len(messages),
 			trace.TopicWriterCompressMessagesReasonCodecsMeasure,
 		)
-		err := cacheMessages(messages, codec, s.parallelCompressors)
+		err := CacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
 		if err != nil {
 			return codecUnknown, err
@@ -363,8 +363,4 @@ func CacheMessages(messages []MessageWithDataContent, codec rawtopiccommon.Codec
 	wg.Wait()
 
 	return resErr
-}
-
-func cacheMessages(messages []MessageWithDataContent, codec rawtopiccommon.Codec, workerCount int) error {
-	return CacheMessages(messages, codec, workerCount)
 }

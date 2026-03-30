@@ -174,19 +174,19 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 
 func TestCompressMessages(t *testing.T) {
 	t.Run("NoMessages", func(t *testing.T) {
-		require.NoError(t, cacheMessages(nil, rawtopiccommon.CodecRaw, 1))
+		require.NoError(t, CacheMessages(nil, rawtopiccommon.CodecRaw, 1))
 	})
 
 	t.Run("RawOk", func(t *testing.T) {
 		messages := newTestMessagesWithContent(1)
-		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecRaw, 1))
+		require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 	})
 	t.Run("RawError", func(t *testing.T) {
 		mess := NewMessageDataWithContent(PublicMessage{}, testCommonEncoders)
 		_, err := mess.GetEncodedBytes(rawtopiccommon.CodecGzip)
 		require.NoError(t, err)
 		messages := []MessageWithDataContent{mess}
-		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecRaw, 1))
+		require.Error(t, CacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 	})
 
 	const messageCount = 10
@@ -197,7 +197,7 @@ func TestCompressMessages(t *testing.T) {
 			messages = append(messages, mess)
 		}
 
-		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecGzip, 1))
+		require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecGzip, 1))
 		for i := range messageCount {
 			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].BufCodec)
 		}
@@ -211,7 +211,7 @@ func TestCompressMessages(t *testing.T) {
 			messages = append(messages, mess)
 		}
 
-		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
+		require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 		for i := range messageCount {
 			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].BufCodec)
 		}
@@ -225,7 +225,7 @@ func TestCompressMessages(t *testing.T) {
 		}
 		messages[0].DataWasRead = true
 
-		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
+		require.Error(t, CacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 	})
 }
 
