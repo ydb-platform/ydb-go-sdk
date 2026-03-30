@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -32,6 +32,7 @@ func New(
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
+		buildInfo:   xsync.NewValue(version.FullVersion),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -51,9 +52,9 @@ func WithApplicationNameOption(applicationName string) Option {
 }
 
 // WithBuildInfo adds framework name with its version to x-ydb-sdk-build-info header for all API requests.
-func WithBuildInfo(frameworkName string, ver string) Option {
+func WithBuildInfo(frameworkName string, version string) Option {
 	return func(m *Meta) {
-		m.buildInfo.Set(frameworkName, ver)
+		m.AppendBuildInfo(frameworkName, version)
 	}
 }
 
@@ -87,34 +88,10 @@ type Meta struct {
 	trace           *trace.Driver
 	credentials     credentials.Credentials
 	database        string
-	buildInfo       xsync.Map[string, string]
+	buildInfo       *xsync.Value[string]
 	requestsType    string
 	applicationName string
 	capabilities    []string
-}
-
-func versionHeader(buildInfo *xsync.Map[string, string]) string {
-	l := buildInfo.Len()
-	if l == 0 {
-		return version.FullVersion
-	}
-
-	frameworks := make([]string, 0, l+1)
-	frameworks = append(frameworks, version.FullVersion)
-
-	buildInfo.Range(func(framework string, version string) bool {
-		frameworks = append(frameworks, framework+"/"+version)
-
-		return true
-	})
-
-	sort.Strings(frameworks[1:])
-
-	return strings.Join(frameworks, ";")
-}
-
-func (m *Meta) versionHeader() string {
-	return versionHeader(&m.buildInfo)
 }
 
 func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
@@ -130,7 +107,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 
 	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, m.versionHeader())
+		md.Set(HeaderVersion, m.buildInfo.Get())
 	}
 
 	if m.requestsType != "" {
@@ -179,7 +156,24 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 // to xsync.Map.Set being implemented via LoadOrStore and not overwriting
 // existing values.
 func (m *Meta) AppendBuildInfo(framework string, version string) {
-	m.buildInfo.Set(framework, version)
+	m.buildInfo.Change(func(old string) (new string) {
+		parts := strings.Split(old, ";")
+		frameworks := make(map[string]string, len(parts)+1)
+		for _, part := range parts[1:] {
+			subparts := strings.Split(part, "/")
+			framework, version := strings.Join(subparts[:len(subparts)-1], "/"), subparts[len(subparts)-1]
+			frameworks[framework] = version
+		}
+
+		frameworks[framework] = version
+
+		return parts[0] + ";" + strings.Join(xslices.Transform(
+			xslices.Uniq(xslices.Keys(frameworks)),
+			func(framework string) string {
+				return framework + "/" + frameworks[framework]
+			},
+		), ";")
+	})
 }
 
 func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
