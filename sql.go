@@ -274,6 +274,8 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
+	// database/sql integration version intentionally matches the YDB SDK version,
+	// not the Go standard library's database/sql version.
 	parent.config.Meta().AppendBuildInfo("database/sql", version.Version)
 
 	return c, nil
