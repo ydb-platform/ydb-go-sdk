@@ -173,6 +173,11 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	return md, nil
 }
 
+// AppendBuildInfo adds build information for the given framework.
+// Note: duplicates are ignored – if called multiple times with the same
+// framework name, only the value from the first call is kept. This is due
+// to xsync.Map.Set being implemented via LoadOrStore and not overwriting
+// existing values.
 func (m *Meta) AppendBuildInfo(framework string, version string) {
 	m.buildInfo.Set(framework, version)
 }
