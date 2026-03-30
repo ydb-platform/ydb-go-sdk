@@ -93,7 +93,7 @@ func TestMetaContext(t *testing.T) {
 
 		headerValues := md.Get(HeaderVersion)
 		require.Len(t, headerValues, 1)
-		require.Contains(t, headerValues[0], version.FullVersion+";database/sql/1.0.0;my-framework/2.0.0")
+		require.Equal(t, []string{version.FullVersion + ";database/sql/1.0.0;my-framework/2.0.0"}, headerValues)
 	})
 
 	t.Run("BuildInfoAppendBuildInfo", func(t *testing.T) {
