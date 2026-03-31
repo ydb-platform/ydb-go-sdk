@@ -1,4 +1,4 @@
-* Added `ydb.WithBuildInfo`, `config.WithBuildInfo` options to append frameworks to `x-ydb-sdk-build-info` header for all API requests
+* Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
 * Automatically added (if used) `database/sql` framework to `x-ydb-sdk-build-info` header
 
 ## v3.128.3
