@@ -190,6 +190,8 @@ func WithApplicationName(applicationName string) Option {
 }
 
 // WithBuildInfo adds provided framework name with its version to all API requests
+// via the x-ydb-sdk-build-info header. The frameworkName and frameworkVersion
+// must not contain semicolons (";"). Invalid values are silently ignored.
 func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 	if err := meta.ValidateBuildInfo(frameworkName, frameworkVersion); err != nil {
 		return nil // wrong frameworkName or frameworkVersion will not apply

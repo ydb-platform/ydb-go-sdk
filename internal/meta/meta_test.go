@@ -76,6 +76,43 @@ func TestMetaContext(t *testing.T) {
 		require.True(t, has)
 		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.2.4"}, md.Get(HeaderVersion))
 	})
+
+	t.Run("BuildInfoMultipleDistinctFrameworks", func(t *testing.T) {
+		m := New(
+			"database",
+			nil,
+			&trace.Driver{},
+			WithBuildInfo("database/sql", "1.0.0"),
+			WithBuildInfo("my-framework", "2.0.0"),
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		// Keys are sorted alphabetically: "database/sql" < "my-framework"
+		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.0.0;my-framework/2.0.0"}, md.Get(HeaderVersion))
+	})
+
+	t.Run("SDKVersionCannotBeOverwritten", func(t *testing.T) {
+		m := New(
+			"database",
+			nil,
+			&trace.Driver{},
+		)
+
+		// Attempting to overwrite the SDK version via ValidateBuildInfo returns an error
+		require.Error(t, ValidateBuildInfo("ydb-go-sdk", "evil-version"))
+
+		// The header must still contain only the base SDK version
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{buildInfoFirstPart}, md.Get(HeaderVersion))
+	})
 }
 
 func TestValidateBuildInfo(t *testing.T) {
