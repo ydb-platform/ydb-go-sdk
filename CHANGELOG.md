@@ -1,3 +1,4 @@
+## v3.128.4
 * Fixed panic when topic writer is closed unexpectedly
 
 ## v3.128.3
