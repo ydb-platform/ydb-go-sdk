@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -86,7 +86,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			wr, err := s.writerPool.get(msg.PartitionID, true, false)
+			wr, err := s.writerPool.get(msg.PartitionID, true)
 			if err != nil {
 				return fmt.Errorf("failed to get writer: %w", err)
 			}
@@ -101,7 +101,10 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			if err = wr.Write(s.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage}); err != nil {
+			if err = wr.WriteInternal(
+				s.ctx,
+				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
+			); err != nil {
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
