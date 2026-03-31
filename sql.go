@@ -267,7 +267,7 @@ type SQLConnector interface {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	defer meta.WithBuildInfo(
+	meta.WithBuildInfo(
 		"database/sql",
 		version.Version,
 	)(parent.config.Meta())
