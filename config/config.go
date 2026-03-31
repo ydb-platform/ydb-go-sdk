@@ -191,6 +191,10 @@ func WithApplicationName(applicationName string) Option {
 
 // WithBuildInfo adds provided framework name with its version to all api requests
 func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
+	if err := meta.ValidateBuildInfo(frameworkName, frameworkVersion); err != nil {
+		return nil // wrong frameworkName or frameworkVersion will not apply
+	}
+
 	return func(c *Config) {
 		c.metaOptions = append(c.metaOptions, meta.WithBuildInfo(frameworkName, frameworkVersion))
 	}
