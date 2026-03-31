@@ -166,7 +166,7 @@ func WithBuildInfo(frameworkName string, version string) Option {
 		if strings.Contains(frameworkName, ";") {
 			return xerrors.WithStackTrace(fmt.Errorf("wrong framework name %q", frameworkName))
 		}
-		
+
 		if strings.Contains(version, ";") {
 			return xerrors.WithStackTrace(fmt.Errorf("wrong version %q", version))
 		}
