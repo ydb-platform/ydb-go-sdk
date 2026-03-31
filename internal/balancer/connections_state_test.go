@@ -468,8 +468,7 @@ func TestConnection(t *testing.T) {
 
 func TestDiscoveryReuseIpAndHostName(t *testing.T) {
 	ctx := context.Background()
-	cfg, err := config.New()
-	require.NoError(t, err)
+	cfg := config.New()
 	e := mock.Endpoint{AddrField: "::1:123", NodeIDField: 1, OverrideHostField: "dyn-node-1.svc.cluster.local"}
 	r := &Balancer{
 		driverConfig:   cfg,

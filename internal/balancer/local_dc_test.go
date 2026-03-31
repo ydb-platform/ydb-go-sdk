@@ -131,10 +131,9 @@ func TestDetectLocalDC(t *testing.T) {
 
 func TestLocalDCDiscovery(t *testing.T) {
 	ctx := context.Background()
-	cfg, err := config.New(
+	cfg := config.New(
 		config.WithBalancer(balancers.PreferNearestDC(balancers.Default())),
 	)
-	require.NoError(t, err)
 	r := &Balancer{
 		driverConfig:   cfg,
 		balancerConfig: *cfg.Balancer(),
@@ -151,7 +150,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 		},
 	}
 
-	err = r.clusterDiscoveryAttempt(ctx, nil)
+	err := r.clusterDiscoveryAttempt(ctx, nil)
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {

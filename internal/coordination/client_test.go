@@ -139,10 +139,10 @@ func TestOperationParams(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			ctx:  context.Background(),
-			config: xtest.Must(config.New(
+			config: config.New(
 				config.WithOperationCancelAfter(time.Second),
 				config.WithOperationTimeout(time.Second),
-			)),
+			),
 			mode: operation.ModeSync,
 			operationParams: &Ydb_Operations.OperationParams{
 				OperationMode:    Ydb_Operations.OperationParams_SYNC,
@@ -153,7 +153,7 @@ func TestOperationParams(t *testing.T) {
 		{
 			name:   xtest.CurrentFileLine(),
 			ctx:    operation.WithCancelAfter(operation.WithTimeout(context.Background(), time.Second), time.Second),
-			config: xtest.Must(config.New()),
+			config: config.New(),
 			mode:   operation.ModeSync,
 			operationParams: &Ydb_Operations.OperationParams{
 				OperationMode:    Ydb_Operations.OperationParams_SYNC,

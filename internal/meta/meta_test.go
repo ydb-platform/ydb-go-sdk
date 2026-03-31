@@ -40,7 +40,7 @@ func TestMetaContext(t *testing.T) {
 		require.NotEmpty(t, md.Get(HeaderClientPid)[0])
 		require.Equal(t, []string{"test app"}, md.Get(HeaderApplicationName))
 		require.Equal(t, []string{"traceID"}, md.Get(HeaderTraceID))
-		require.Equal(t, []string{version.FullVersion}, md.Get(HeaderVersion))
+		require.Equal(t, []string{buildInfoFirstPart}, md.Get(HeaderVersion))
 		require.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
 	})
 
@@ -57,7 +57,7 @@ func TestMetaContext(t *testing.T) {
 
 		md, has := metadata.FromOutgoingContext(ctx)
 		require.True(t, has)
-		require.Equal(t, []string{version.FullVersion + ";database/sql/1.2.3"}, md.Get(HeaderVersion))
+		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.2.3"}, md.Get(HeaderVersion))
 	})
 
 	t.Run("BuildInfoDeduplication", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestMetaContext(t *testing.T) {
 
 		md, has := metadata.FromOutgoingContext(ctx)
 		require.True(t, has)
-		require.Equal(t, []string{version.FullVersion + ";database/sql/1.2.4"}, md.Get(HeaderVersion))
+		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.2.4"}, md.Get(HeaderVersion))
 	})
 }
 

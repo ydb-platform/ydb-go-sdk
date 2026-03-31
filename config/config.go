@@ -332,7 +332,7 @@ func WithDisableOptimisticUnban() Option {
 	}
 }
 
-func New(opts ...Option) (*Config, error) {
+func New(opts ...Option) *Config {
 	c := defaultConfig()
 
 	for _, opt := range opts {
@@ -343,7 +343,7 @@ func New(opts ...Option) (*Config, error) {
 
 	c.meta = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
 
-	return c, nil
+	return c
 }
 
 // With makes copy of current Config with specified options

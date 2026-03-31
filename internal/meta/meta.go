@@ -65,6 +65,7 @@ func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 			for frameworkName, frameworkVersion := range frameworks {
 				buildInfo.frameworks[frameworkName] = frameworkVersion
 			}
+			buildInfo.frameworks[frameworkName] = frameworkVersion
 		} else {
 			buildInfo.frameworks = map[string]string{
 				frameworkName: frameworkVersion,

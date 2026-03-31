@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestParse(t *testing.T) {
@@ -218,7 +217,7 @@ func TestParse(t *testing.T) {
 				act.QueryOpts = nil
 				require.Equal(t, exp.Bindings(), act.Bindings())
 				require.Equal(t, exp, act)
-				compareConfigs(t, xtest.Must(config.New(tt.opts...)), d.config)
+				compareConfigs(t, config.New(tt.opts...), d.config)
 			}
 		})
 	}

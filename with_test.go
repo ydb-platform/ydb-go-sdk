@@ -19,7 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestWithCertificatesCached(t *testing.T) {
@@ -133,7 +132,7 @@ func TestWithCertificatesCached(t *testing.T) {
 			db, err := driverFromOptions(ctx,
 				append(
 					test.options,
-					withConnPool(conn.NewPool(context.Background(), xtest.Must(config.New()))), //nolint:contextcheck
+					withConnPool(conn.NewPool(context.Background(), config.New())), //nolint:contextcheck
 				)...,
 			)
 			require.NoError(t, err)

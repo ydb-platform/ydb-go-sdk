@@ -428,10 +428,7 @@ func driverFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err erro
 			}
 		}
 	}
-	d.config, err = config.New(d.options...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
+	d.config = config.New(d.options...)
 
 	return d, nil
 }
