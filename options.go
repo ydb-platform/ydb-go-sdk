@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -162,6 +163,14 @@ func WithOauth2TokenExchangeCredentialsFile(
 // WithBuildInfo adds framework name with its version to x-ydb-sdk-build-info header for all API requests.
 func WithBuildInfo(frameworkName string, version string) Option {
 	return func(ctx context.Context, d *Driver) error {
+		if strings.Contains(frameworkName, ";") {
+			return xerrors.WithStackTrace(fmt.Errorf("wrong framework name %q", frameworkName))
+		}
+		
+		if strings.Contains(version, ";") {
+			return xerrors.WithStackTrace(fmt.Errorf("wrong version %q", version))
+		}
+
 		d.options = append(d.options, config.WithBuildInfo(frameworkName, version))
 
 		return nil
