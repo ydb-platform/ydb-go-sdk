@@ -1,3 +1,6 @@
+* Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
+* Automatically added (if used) `database/sql` framework to `x-ydb-sdk-build-info` header
+
 ## v3.128.4
 * Fixed panic when topic writer is closed unexpectedly
 
