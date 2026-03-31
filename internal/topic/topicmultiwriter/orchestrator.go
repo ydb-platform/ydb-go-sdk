@@ -11,11 +11,14 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type orchestrator struct {
@@ -187,6 +190,13 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 }
 
 func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error) {
+	acquired := false
+	defer func() {
+		if err != nil && acquired {
+			o.buf.releaseMessage()
+		}
+	}()
+
 	var autoSetSeqNo bool
 	o.mu.WithLock(func() {
 		autoSetSeqNo = o.writerCfg.AutoSetSeqNo
@@ -207,6 +217,21 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err := o.buf.acquireMessage(ctx); err != nil {
 		return err
 	}
+	acquired = true
+
+	if o.writerCfg.AutoSetCreatedTime {
+		if err := topicwritercommon.FillCreatedAt(
+			[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
+			o.writerCfg.Now(),
+			false,
+		); err != nil {
+			return err
+		}
+	}
+
+	if err := o.saveMessageContent(&msg); err != nil {
+		return err
+	}
 
 	o.mu.WithLock(func() {
 		msg.PartitionID, err = o.choosePartition(msg)
@@ -216,9 +241,38 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
+		acquired = false
 	})
 
 	return err
+}
+
+func (o *orchestrator) saveMessageContent(msg *message) error {
+	tracer := o.writerCfg.Tracer
+	if tracer == nil {
+		tracer = &trace.Topic{}
+	}
+	logCtx := o.writerCfg.LogContext
+	onCompressDone := trace.TopicOnWriterCompressMessages(
+		tracer,
+		&logCtx,
+		o.multiWriterCfg.ProducerIDPrefix,
+		"",
+		rawtopiccommon.CodecRaw.ToInt32(),
+		msg.SeqNo,
+		1,
+		trace.TopicWriterCompressMessagesReasonCompressDataOnWriteReadData,
+	)
+	// Materialize raw payload before the message is exposed to writer reconnector.
+	// This keeps multiwriter-owned messages resendable even if a downstream writer
+	// reads the original reader and fails before enqueueing to its own buffer.
+	err := msg.CacheMessageData(rawtopiccommon.CodecRaw)
+	onCompressDone(err)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
@@ -317,35 +371,10 @@ func (o *orchestrator) rechoosePartition(msg *message) (err error) {
 	return err
 }
 
-func (o *orchestrator) getWriterBufferedMessages(
-	partitionID int64,
-) (map[int64]topicwriterinternal.PublicMessage, error) {
-	writer, err := o.writerPool.get(partitionID, true, true)
-	if err != nil {
-		return nil, err
-	}
-
-	if writer == nil {
-		return nil, nil //nolint:nilnil
-	}
-
-	var (
-		bufferedMessagesMap = make(map[int64]topicwriterinternal.PublicMessage)
-		bufferedMessages    = writer.GetBufferedMessages()
-	)
-
-	for _, msg := range bufferedMessages {
-		bufferedMessagesMap[msg.SeqNo] = msg
-	}
-
-	return bufferedMessagesMap, nil
-}
-
 //nolint:funlen
 func (o *orchestrator) scheduleResendMessages(
 	partitionID,
 	maxSeqNo int64,
-	bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage,
 ) (err error) {
 	inFlightIndexChain, ok := o.buf.inFlightMessagesIndex[partitionID]
 	if !ok {
@@ -376,11 +405,6 @@ func (o *orchestrator) scheduleResendMessages(
 
 		if err := o.rechoosePartition(&msg); err != nil {
 			return err
-		}
-
-		bufferedMessage, ok := bufferedMessagesMap[msg.SeqNo]
-		if ok {
-			iter.Value.Value.Data = bufferedMessage.Data
 		}
 
 		iter.Value.Value.PartitionID = msg.PartitionID
@@ -477,13 +501,13 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 
 			var writer *writerWrapper
 			if partitionInfo.Splitted() {
-				writer, resultErr = o.writerPool.get(partition, false, false)
+				writer, resultErr = o.writerPool.get(partition, false)
 				if resultErr != nil {
 					return resultErr
 				}
 			} else {
 				o.mu.WithLock(func() {
-					writer, resultErr = o.writerPool.get(partition, true, false)
+					writer, resultErr = o.writerPool.get(partition, true)
 				})
 			}
 
@@ -542,10 +566,7 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 }
 
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
-	var (
-		isAlreadySplitted   bool
-		bufferedMessagesMap map[int64]topicwriterinternal.PublicMessage
-	)
+	var isAlreadySplitted bool
 
 	describeResult, err := o.describeTopicWithRetries(partitionID)
 	if err != nil {
@@ -565,7 +586,6 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			return
 		}
 		o.partitionChooser.RemovePartition(partitionID)
-		bufferedMessagesMap, err = o.getWriterBufferedMessages(partitionID)
 	})
 
 	if err != nil || isAlreadySplitted {
@@ -579,7 +599,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	}
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
-		err = o.scheduleResendMessages(partitionID, maxSeqNo, bufferedMessagesMap)
+		err = o.scheduleResendMessages(partitionID, maxSeqNo)
 		if err != nil {
 			resultErr = err
 

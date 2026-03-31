@@ -1,4 +1,4 @@
-package topicwriterinternal
+package topicwritercommon
 
 import (
 	"bytes"
@@ -15,6 +15,23 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+var testCommonEncoders = NewMultiEncoder()
+
+func newTestMessageWithDataContent(num int) MessageWithDataContent {
+	res := NewMessageDataWithContent(PublicMessage{SeqNo: int64(num)}, testCommonEncoders)
+
+	return res
+}
+
+func newTestMessagesWithContent(numbers ...int) []MessageWithDataContent {
+	messages := make([]MessageWithDataContent, 0, len(numbers))
+	for _, num := range numbers {
+		messages = append(messages, newTestMessageWithDataContent(num))
+	}
+
+	return messages
+}
 
 func TestEncoderSelector_CodecMeasure(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
@@ -53,16 +70,16 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 				&trace.Topic{}, "", "",
 			)
 
-			var messages []messageWithDataContent
-			for i := 0; i < smallCount; i++ {
+			var messages []MessageWithDataContent
+			for range smallCount {
 				data := make([]byte, smallSize)
-				message := newMessageDataWithContent(PublicMessage{Data: bytes.NewReader(data)}, testCommonEncoders)
+				message := NewMessageDataWithContent(PublicMessage{Data: bytes.NewReader(data)}, testCommonEncoders)
 				messages = append(messages, message)
 			}
 
-			for i := 0; i < largeCount; i++ {
+			for range largeCount {
 				data := make([]byte, largeSize)
-				message := newMessageDataWithContent(PublicMessage{Data: bytes.NewReader(data)}, testCommonEncoders)
+				message := NewMessageDataWithContent(PublicMessage{Data: bytes.NewReader(data)}, testCommonEncoders)
 				messages = append(messages, message)
 			}
 
@@ -72,7 +89,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 
 			// reverse
 			{
-				reverseMessages := make([]messageWithDataContent, len(messages))
+				reverseMessages := make([]MessageWithDataContent, len(messages))
 				for index := range messages {
 					reverseMessages[index] = messages[len(messages)-index-1]
 				}
@@ -157,58 +174,58 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 
 func TestCompressMessages(t *testing.T) {
 	t.Run("NoMessages", func(t *testing.T) {
-		require.NoError(t, cacheMessages(nil, rawtopiccommon.CodecRaw, 1))
+		require.NoError(t, CacheMessages(nil, rawtopiccommon.CodecRaw, 1))
 	})
 
 	t.Run("RawOk", func(t *testing.T) {
 		messages := newTestMessagesWithContent(1)
-		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecRaw, 1))
+		require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 	})
 	t.Run("RawError", func(t *testing.T) {
-		mess := newMessageDataWithContent(PublicMessage{}, testCommonEncoders)
+		mess := NewMessageDataWithContent(PublicMessage{}, testCommonEncoders)
 		_, err := mess.GetEncodedBytes(rawtopiccommon.CodecGzip)
 		require.NoError(t, err)
-		messages := []messageWithDataContent{mess}
-		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecRaw, 1))
+		messages := []MessageWithDataContent{mess}
+		require.Error(t, CacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 	})
 
 	const messageCount = 10
 	t.Run("GzipOneThread", func(t *testing.T) {
-		var messages []messageWithDataContent
-		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
+		messages := make([]MessageWithDataContent, 0, messageCount)
+		for range messageCount {
+			mess := NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
 
-		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecGzip, 1))
-		for i := 0; i < messageCount; i++ {
-			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].bufCodec)
+		require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecGzip, 1))
+		for i := range messageCount {
+			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].BufCodec)
 		}
 	})
 
 	const parallelCount = 10
 	t.Run("GzipOk", func(t *testing.T) {
-		var messages []messageWithDataContent
-		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
+		messages := make([]MessageWithDataContent, 0, messageCount)
+		for range messageCount {
+			mess := NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
 
-		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
-		for i := 0; i < messageCount; i++ {
-			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].bufCodec)
+		require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
+		for i := range messageCount {
+			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].BufCodec)
 		}
 	})
 
 	t.Run("GzipErr", func(t *testing.T) {
-		var messages []messageWithDataContent
-		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
+		messages := make([]MessageWithDataContent, 0, messageCount)
+		for range messageCount {
+			mess := NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
-		messages[0].dataWasRead = true
+		messages[0].DataWasRead = true
 
-		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
+		require.Error(t, CacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 	})
 }
 
@@ -227,8 +244,8 @@ func TestMultiEncoder(t *testing.T) {
 		testMultiEncoder := NewMultiEncoder()
 
 		buf := &bytes.Buffer{}
-		for i := 0; i < 50; i++ {
-			testMsg := []byte(fmt.Sprintf("test_data_%d", i))
+		for i := range 50 {
+			testMsg := fmt.Appendf(nil, "test_data_%d", i)
 
 			buf.Reset()
 			_, err := testMultiEncoder.Encode(rawtopiccommon.CodecGzip, buf, bytes.NewReader(testMsg))
@@ -286,8 +303,8 @@ func TestMultiEncoder(t *testing.T) {
 		testMultiEncoder := NewMultiEncoder()
 
 		buf := &bytes.Buffer{}
-		for i := 0; i < 50; i++ {
-			testMsg := []byte(fmt.Sprintf("test_data_%d", i))
+		for i := range 50 {
+			testMsg := fmt.Appendf(nil, "test_data_%d", i)
 
 			buf.Reset()
 			_, err := testMultiEncoder.EncodeBytes(rawtopiccommon.CodecGzip, buf, testMsg)
