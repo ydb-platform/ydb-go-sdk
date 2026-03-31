@@ -149,8 +149,7 @@ func TestParseConnectionStringEmptyDatabase(t *testing.T) {
 	}
 	c, err := config.New(config.WithDatabase("mydb"))
 	require.NoError(t, err)
-	c, err = c.With(info.Options...)
-	require.NoError(t, err)
+	c = c.With(info.Options...)
 	require.False(t, c.Secure())
 	require.Equal(t, "ydb-ru.yandex.net:2135", c.Endpoint())
 	require.Equal(t, "mydb", c.Database())

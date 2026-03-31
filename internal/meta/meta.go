@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"google.golang.org/grpc/metadata"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -26,85 +26,78 @@ func New(
 	credentials credentials.Credentials,
 	trace *trace.Driver,
 	opts ...Option,
-) (*Meta, error) {
+) *Meta {
 	m := &Meta{
 		pid:         strconv.Itoa(pid),
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
-		buildInfo: xsync.NewValue(&buildInfo{
-			buildInfoHeader: buildInfoFirstPart,
-		}),
 	}
+
+	m.buildInfo.Store(&buildInfo{
+		frameworks:      make(map[string]string),
+		buildInfoHeader: buildInfoFirstPart,
+	})
+
 	for _, opt := range opts {
 		if opt != nil {
-			if err := opt(m); err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
+			opt(m)
 		}
 	}
 
-	return m, nil
+	return m
 }
 
-type Option func(m *Meta) error
+type Option func(m *Meta)
 
 func WithApplicationNameOption(applicationName string) Option {
-	return func(m *Meta) error {
+	return func(m *Meta) {
 		m.applicationName = applicationName
-
-		return nil
 	}
 }
 
-func WithBuildInfo(frameworkName string, version string) Option {
-	return func(m *Meta) error {
-		if err := validateBuildInfo(frameworkName, version); err != nil {
-			return xerrors.WithStackTrace(err)
+func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
+	return func(m *Meta) {
+		var buildInfo buildInfo
+
+		if frameworks := m.buildInfo.Load().frameworks; len(frameworks) > 0 {
+			buildInfo.frameworks = make(map[string]string, len(frameworks)+1)
+			for frameworkName, frameworkVersion := range frameworks {
+				buildInfo.frameworks[frameworkName] = frameworkVersion
+			}
+		} else {
+			buildInfo.frameworks = map[string]string{
+				frameworkName: frameworkVersion,
+			}
 		}
 
-		m.buildInfo.Change(func(info *buildInfo) *buildInfo {
-			frameworks := make(map[string]string, len(info.frameworks)+1)
-			for frameworkName, frameworkVersion := range info.frameworks {
-				frameworks[frameworkName] = frameworkVersion
-			}
-			frameworks[frameworkName] = version
+		buildInfo.buildInfoHeader = buildInfoFirstPart + ";" + strings.Join(
+			xslices.Transform(
+				xslices.Keys(buildInfo.frameworks),
+				func(frameworkName string) string {
+					return frameworkName + "/" + buildInfo.frameworks[frameworkName]
+				},
+			), ";",
+		)
 
-			return &buildInfo{
-				frameworks: frameworks,
-				buildInfoHeader: buildInfoFirstPart + ";" + strings.Join(
-					xslices.Transform(
-						xslices.Keys(frameworks),
-						func(frameworkName string) string {
-							return frameworkName + "/" + frameworks[frameworkName]
-						},
-					), ";",
-				),
-			}
-		})
-
-		return nil
+		m.buildInfo.Store(&buildInfo)
 	}
 }
 
 func WithRequestTypeOption(requestType string) Option {
-	return func(m *Meta) error {
+	return func(m *Meta) {
 		m.requestsType = requestType
-
-		return nil
 	}
 }
 
 func AllowOption(feature string) Option {
-	return func(m *Meta) error {
+	return func(m *Meta) {
 		m.capabilities = append(m.capabilities, feature)
-
-		return nil
 	}
 }
 
 func ForbidOption(feature string) Option {
-	return func(m *Meta) error {
+	return func(m *Meta) {
 		n := 0
 		for _, capability := range m.capabilities {
 			if capability != feature {
@@ -113,8 +106,6 @@ func ForbidOption(feature string) Option {
 			}
 		}
 		m.capabilities = m.capabilities[:n]
-
-		return nil
 	}
 }
 
@@ -128,7 +119,7 @@ type (
 		trace           *trace.Driver
 		credentials     credentials.Credentials
 		database        string
-		buildInfo       *xsync.Value[*buildInfo]
+		buildInfo       atomic.Pointer[buildInfo]
 		requestsType    string
 		applicationName string
 		capabilities    []string
@@ -150,7 +141,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 
 	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, m.buildInfo.Get().buildInfoHeader)
+		md.Set(HeaderVersion, m.buildInfo.Load().buildInfoHeader)
 	}
 
 	if m.requestsType != "" {
@@ -193,7 +184,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	return md, nil
 }
 
-func validateBuildInfo(frameworkName string, frameworkVersion string) error {
+func ValidateBuildInfo(frameworkName string, frameworkVersion string) error {
 	if frameworkName == version.Package {
 		return xerrors.WithStackTrace(errReservedPackageName)
 	}

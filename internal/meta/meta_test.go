@@ -15,20 +15,19 @@ import (
 
 func TestMetaContext(t *testing.T) {
 	t.Run("RequiredHeaders", func(t *testing.T) {
-		m, err := New(
+		m := New(
 			"database",
 			credentials.NewAccessTokenCredentials("token"),
 			&trace.Driver{},
 			WithRequestTypeOption("requestType"),
 			WithApplicationNameOption("test app"),
 		)
-		require.NoError(t, err)
 
 		ctx := context.Background()
 		ctx = WithTraceID(ctx, "traceID")
 		ctx = metadata.AppendToOutgoingContext(ctx, "some-user-header", "some-user-value")
 
-		ctx, err = m.Context(ctx)
+		ctx, err := m.Context(ctx)
 		require.NoError(t, err)
 
 		md, has := metadata.FromOutgoingContext(ctx)
@@ -46,13 +45,12 @@ func TestMetaContext(t *testing.T) {
 	})
 
 	t.Run("BuildInfoSingleEntry", func(t *testing.T) {
-		m, err := New(
+		m := New(
 			"database",
 			nil,
 			&trace.Driver{},
 			WithBuildInfo("database/sql", "1.2.3"),
 		)
-		require.NoError(t, err)
 
 		ctx, err := m.Context(context.Background())
 		require.NoError(t, err)
@@ -63,14 +61,13 @@ func TestMetaContext(t *testing.T) {
 	})
 
 	t.Run("BuildInfoDeduplication", func(t *testing.T) {
-		m, err := New(
+		m := New(
 			"database",
 			nil,
 			&trace.Driver{},
 			WithBuildInfo("database/sql", "1.2.3"),
 			WithBuildInfo("database/sql", "1.2.4"),
 		)
-		require.NoError(t, err)
 
 		ctx, err := m.Context(context.Background())
 		require.NoError(t, err)
@@ -110,9 +107,9 @@ func TestValidateBuildInfo(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			if tt.err {
-				require.Error(t, validateBuildInfo(tt.framework, tt.version))
+				require.Error(t, ValidateBuildInfo(tt.framework, tt.version))
 			} else {
-				require.NoError(t, validateBuildInfo(tt.framework, tt.version))
+				require.NoError(t, ValidateBuildInfo(tt.framework, tt.version))
 			}
 		})
 	}

@@ -12,7 +12,6 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -329,7 +328,7 @@ func WithDisableOptimisticUnban() Option {
 	}
 }
 
-func New(opts ...Option) (_ *Config, err error) {
+func New(opts ...Option) (*Config, error) {
 	c := defaultConfig()
 
 	for _, opt := range opts {
@@ -338,30 +337,24 @@ func New(opts ...Option) (_ *Config, err error) {
 		}
 	}
 
-	c.meta, err = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
+	c.meta = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
 
 	return c, nil
 }
 
 // With makes copy of current Config with specified options
-func (c *Config) With(opts ...Option) (_ *Config, err error) {
+func (c *Config) With(opts ...Option) *Config {
 	for _, opt := range opts {
 		if opt != nil {
 			opt(c)
 		}
 	}
-	c.meta, err = meta.New(
+	c.meta = meta.New(
 		c.database,
 		c.credentials,
 		c.trace,
 		c.metaOptions...,
 	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
 
-	return c, nil
+	return c
 }

@@ -6,8 +6,8 @@ import (
 	"database/sql/driver"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
@@ -261,24 +261,12 @@ type SQLConnector interface {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	c, err := ConnectorContext(context.Background(), parent, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return c, nil
-}
-
-func ConnectorContext(ctx context.Context, parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	driver, err := parent.With(ctx, With(config.WithBuildInfo(
+	defer meta.WithBuildInfo(
 		"database/sql",
 		version.Version,
-	)))
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
+	)(parent.config.Meta())
 
-	c, err := xsql.Open(driver, parent.metaBalancer, parent.query.Must().Config(),
+	c, err := xsql.Open(parent, parent.metaBalancer, parent.query.Must().Config(),
 		append(
 			append(
 				parent.databaseSQLOptions,

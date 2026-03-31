@@ -437,7 +437,7 @@ func driverFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err erro
 }
 
 //nolint:cyclop, nonamedreturns, funlen
-func (d *Driver) connect(ctx context.Context) (err error) {
+func (d *Driver) connect(ctx context.Context) error {
 	if d.config.Endpoint() == "" {
 		return xerrors.WithStackTrace(errors.New("configuration: empty dial address")) //nolint:err113
 	}
@@ -451,16 +451,13 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	}
 
 	if d.userInfo != nil {
-		d.config, err = d.config.With(config.WithCredentials(
+		d.config = d.config.With(config.WithCredentials(
 			credentials.NewStaticCredentials(
 				d.userInfo.User, d.userInfo.Password,
 				d.config.Endpoint(),
 				credentials.WithGrpcDialOptions(d.config.GrpcDialOptions()...),
 			),
 		))
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
 	}
 
 	if d.pool == nil {
