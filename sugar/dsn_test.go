@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestDSN(t *testing.T) {
@@ -46,7 +47,7 @@ func TestDSN(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, exp.Params, act.Params)
 			require.Equal(t, exp.UserInfo, act.UserInfo)
-			lhs, rhs := config.New(act.Options...), config.New(exp.Options...)
+			lhs, rhs := xtest.Must(config.New(act.Options...)), xtest.Must(config.New(exp.Options...))
 			require.Equal(t, lhs.Endpoint(), rhs.Endpoint())
 			require.Equal(t, lhs.Database(), rhs.Database())
 			require.Equal(t, lhs.Secure(), rhs.Secure())

@@ -12,6 +12,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -189,10 +190,10 @@ func WithApplicationName(applicationName string) Option {
 	}
 }
 
-// WithBuildInfo adds framework name with its version to x-ydb-sdk-build-info header for all API requests.
-func WithBuildInfo(frameworkName string, version string) Option {
+// WithBuildInfo adds provided framework name with its version to all api requests
+func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 	return func(c *Config) {
-		c.metaOptions = append(c.metaOptions, meta.WithBuildInfo(frameworkName, version))
+		c.metaOptions = append(c.metaOptions, meta.WithBuildInfo(frameworkName, frameworkVersion))
 	}
 }
 
@@ -328,7 +329,7 @@ func WithDisableOptimisticUnban() Option {
 	}
 }
 
-func New(opts ...Option) *Config {
+func New(opts ...Option) (_ *Config, err error) {
 	c := defaultConfig()
 
 	for _, opt := range opts {
@@ -337,24 +338,30 @@ func New(opts ...Option) *Config {
 		}
 	}
 
-	c.meta = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
+	c.meta, err = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
-	return c
+	return c, nil
 }
 
 // With makes copy of current Config with specified options
-func (c *Config) With(opts ...Option) *Config {
+func (c *Config) With(opts ...Option) (_ *Config, err error) {
 	for _, opt := range opts {
 		if opt != nil {
 			opt(c)
 		}
 	}
-	c.meta = meta.New(
+	c.meta, err = meta.New(
 		c.database,
 		c.credentials,
 		c.trace,
 		c.metaOptions...,
 	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
-	return c
+	return c, nil
 }

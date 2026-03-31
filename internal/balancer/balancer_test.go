@@ -51,39 +51,43 @@ func TestBalancer_discoveryConn(t *testing.T) {
 
 	var dialAttempt atomic.Uint32
 
-	balancer := &Balancer{
-		address: "ydbmock:///mock",
-		driverConfig: config.New(
-			config.WithEndpoint("mock"),
-			config.WithGrpcOptions(
-				grpc.WithResolvers(&mockResolverBuilder{}),
+	cfg, err := config.New(
+		config.WithEndpoint("mock"),
+		config.WithGrpcOptions(
+			grpc.WithResolvers(&mockResolverBuilder{}),
 
-				grpc.WithContextDialer(
-					// The first dialing is never ended, while the subsequent ones work fine.
-					func(ctx context.Context, s string) (net.Conn, error) {
-						if dialAttempt.Add(1) == 1 {
-							<-ctx.Done() // dial will never complete successfully
+			grpc.WithContextDialer(
+				// The first dialing is never ended, while the subsequent ones work fine.
+				func(ctx context.Context, s string) (net.Conn, error) {
+					if dialAttempt.Add(1) == 1 {
+						<-ctx.Done() // dial will never complete successfully
 
-							return nil, fmt.Errorf("fake error for endpoint: %s: %w", s, ctx.Err())
-						}
+						return nil, fmt.Errorf("fake error for endpoint: %s: %w", s, ctx.Err())
+					}
 
-						return fakeListener.DialContext(ctx)
-					}),
+					return fakeListener.DialContext(ctx)
+				}),
 
-				// If you want to reproduce the issue, uncomment the line:
-				// grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy": "pick_first"}`),
-			),
+			// If you want to reproduce the issue, uncomment the line:
+			// grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy": "pick_first"}`),
 		),
+	)
+	require.NoError(t, err)
+
+	balancer := &Balancer{
+		address:      "ydbmock:///mock",
+		driverConfig: cfg,
 	}
 
-	_, err := balancer.discoveryConn(ctx)
+	_, err = balancer.discoveryConn(ctx)
 	require.NoError(t, err)
 }
 
 func TestApplyDiscoveredEndpoints(t *testing.T) {
 	ctx := context.Background()
 
-	cfg := config.New()
+	cfg, err := config.New()
+	require.NoError(t, err)
 	pool := conn.NewPool(ctx, cfg)
 	defer func() { _ = pool.Release(ctx) }()
 
@@ -155,7 +159,10 @@ func TestNew(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err := New(ctx, config.New(), nil)
+		c, err := config.New()
+		require.NoError(t, err)
+
+		_, err = New(ctx, c, nil)
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Regexp(t, "^context canceled at", err.Error())
 	})
@@ -189,7 +196,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			AddrField:           "node1:2135", NodeIDField: 1, State: state.Online,
 		}
 
-		cfg := config.New()
+		cfg, err := config.New()
+		require.NoError(t, err)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { _ = pool.Release(ctx) }()
 
@@ -201,7 +209,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
 		b.connectionsState.Store(s)
 
-		err := b.Invoke(ctx, "/test.Service/Method", nil, nil)
+		err = b.Invoke(ctx, "/test.Service/Method", nil, nil)
 		require.NoError(t, err)
 		require.NotEqual(t, state.Banned, cc1.GetState())
 	})
@@ -231,7 +239,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			State:               state.Online,
 		}
 
-		cfg := config.New()
+		cfg, err := config.New()
+		require.NoError(t, err)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { _ = pool.Release(ctx) }()
 
@@ -248,7 +257,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			endpoint.WithNodeID(ctx, cc1.NodeIDField),
 			Ydb.StatusIds_OVERLOADED,
 		)
-		err := b.Invoke(invokeCtx, "/test.Service/Method", nil, nil)
+		err = b.Invoke(invokeCtx, "/test.Service/Method", nil, nil)
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
 
@@ -282,7 +291,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			AddrField:           "node1:2135", NodeIDField: 1, State: state.Online,
 		}
 
-		cfg := config.New()
+		cfg, err := config.New()
+		require.NoError(t, err)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { _ = pool.Release(ctx) }()
 
@@ -296,7 +306,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		// Context only bans on OVERLOADED — a NOT_FOUND error must not ban.
 		invokeCtx := BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED)
-		err := b.Invoke(invokeCtx, "/test.Service/Method", nil, nil)
+		err = b.Invoke(invokeCtx, "/test.Service/Method", nil, nil)
 		require.Error(t, err)
 		require.NotEqual(t, state.Banned, cc1.GetState())
 	})
@@ -322,7 +332,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			AddrField:           "node2:2135", NodeIDField: 2, State: state.Online,
 		}
 
-		cfg := config.New()
+		cfg, err := config.New()
+		require.NoError(t, err)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { _ = pool.Release(ctx) }()
 
@@ -336,7 +347,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		// Sequentially pessimize cc1 then cc2 via the normal Invoke+BanOnOperationError flow.
 		cc1Ctx := BanOnOperationError(endpoint.WithNodeID(ctx, cc1.NodeIDField), Ydb.StatusIds_OVERLOADED)
-		err := b.Invoke(cc1Ctx, "/test.Service/Method", nil, nil)
+		err = b.Invoke(cc1Ctx, "/test.Service/Method", nil, nil)
 		require.Error(t, err)
 		require.Equal(t, state.Banned, cc1.GetState())
 
@@ -375,7 +386,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		}
 		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: state.Online}
 
-		cfg := config.New()
+		cfg, err := config.New()
+		require.NoError(t, err)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { _ = pool.Release(ctx) }()
 
@@ -429,7 +441,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		}
 		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: state.Online}
 
-		cfg := config.New()
+		cfg, err := config.New()
+		require.NoError(t, err)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { _ = pool.Release(ctx) }()
 

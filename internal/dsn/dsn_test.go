@@ -126,7 +126,8 @@ func TestParseConnectionString(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Received unexpected error:\n%+v", err)
 			}
-			c := config.New(info.Options...)
+			c, err := config.New(info.Options...)
+			require.NoError(t, err)
 			require.Equal(t, test.secure, c.Secure())
 			require.Equal(t, test.endpoint, c.Endpoint())
 			require.Equal(t, test.database, c.Database())
@@ -146,8 +147,10 @@ func TestParseConnectionStringEmptyDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Received unexpected error:\n%+v", err)
 	}
-	c := config.New(config.WithDatabase("mydb"))
-	c = c.With(info.Options...)
+	c, err := config.New(config.WithDatabase("mydb"))
+	require.NoError(t, err)
+	c, err = c.With(info.Options...)
+	require.NoError(t, err)
 	require.False(t, c.Secure())
 	require.Equal(t, "ydb-ru.yandex.net:2135", c.Endpoint())
 	require.Equal(t, "mydb", c.Database())

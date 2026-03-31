@@ -2,6 +2,7 @@ package meta
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,19 +15,20 @@ import (
 
 func TestMetaContext(t *testing.T) {
 	t.Run("RequiredHeaders", func(t *testing.T) {
-		m := New(
+		m, err := New(
 			"database",
 			credentials.NewAccessTokenCredentials("token"),
 			&trace.Driver{},
 			WithRequestTypeOption("requestType"),
 			WithApplicationNameOption("test app"),
 		)
+		require.NoError(t, err)
 
 		ctx := context.Background()
 		ctx = WithTraceID(ctx, "traceID")
 		ctx = metadata.AppendToOutgoingContext(ctx, "some-user-header", "some-user-value")
 
-		ctx, err := m.Context(ctx)
+		ctx, err = m.Context(ctx)
 		require.NoError(t, err)
 
 		md, has := metadata.FromOutgoingContext(ctx)
@@ -44,12 +46,13 @@ func TestMetaContext(t *testing.T) {
 	})
 
 	t.Run("BuildInfoSingleEntry", func(t *testing.T) {
-		m := New(
+		m, err := New(
 			"database",
 			nil,
 			&trace.Driver{},
 			WithBuildInfo("database/sql", "1.2.3"),
 		)
+		require.NoError(t, err)
 
 		ctx, err := m.Context(context.Background())
 		require.NoError(t, err)
@@ -60,50 +63,14 @@ func TestMetaContext(t *testing.T) {
 	})
 
 	t.Run("BuildInfoDeduplication", func(t *testing.T) {
-		m := New(
+		m, err := New(
 			"database",
 			nil,
 			&trace.Driver{},
 			WithBuildInfo("database/sql", "1.2.3"),
-			WithBuildInfo("database/sql", "1.2.3"),
+			WithBuildInfo("database/sql", "1.2.4"),
 		)
-
-		ctx, err := m.Context(context.Background())
 		require.NoError(t, err)
-
-		md, has := metadata.FromOutgoingContext(ctx)
-		require.True(t, has)
-		require.Equal(t, []string{version.FullVersion + ";database/sql/1.2.3"}, md.Get(HeaderVersion))
-	})
-
-	t.Run("BuildInfoMultipleEntries", func(t *testing.T) {
-		m := New(
-			"database",
-			nil,
-			&trace.Driver{},
-			WithBuildInfo("my-framework", "2.0.0"),
-			WithBuildInfo("database/sql", "1.0.0"),
-		)
-
-		ctx, err := m.Context(context.Background())
-		require.NoError(t, err)
-
-		md, has := metadata.FromOutgoingContext(ctx)
-		require.True(t, has)
-
-		headerValues := md.Get(HeaderVersion)
-		require.Len(t, headerValues, 1)
-		require.Equal(t, []string{version.FullVersion + ";database/sql/1.0.0;my-framework/2.0.0"}, headerValues)
-	})
-
-	t.Run("BuildInfoAppendBuildInfo", func(t *testing.T) {
-		m := New(
-			"database",
-			nil,
-			&trace.Driver{},
-			WithBuildInfo("database/sql", "1.2.3"),
-		)
-		m.AppendBuildInfo("database/sql", "1.2.4")
 
 		ctx, err := m.Context(context.Background())
 		require.NoError(t, err)
@@ -112,4 +79,41 @@ func TestMetaContext(t *testing.T) {
 		require.True(t, has)
 		require.Equal(t, []string{version.FullVersion + ";database/sql/1.2.4"}, md.Get(HeaderVersion))
 	})
+}
+
+func TestValidateBuildInfo(t *testing.T) {
+	for i, tt := range []struct {
+		framework string
+		version   string
+		err       bool
+	}{
+		{
+			framework: "test",
+			version:   "0.0.0",
+			err:       false,
+		},
+		{
+			framework: "test;",
+			version:   "0.0.0",
+			err:       true,
+		},
+		{
+			framework: "test",
+			version:   "0;0;0",
+			err:       true,
+		},
+		{
+			framework: version.Package,
+			version:   version.Version,
+			err:       true,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			if tt.err {
+				require.Error(t, validateBuildInfo(tt.framework, tt.version))
+			} else {
+				require.NoError(t, validateBuildInfo(tt.framework, tt.version))
+			}
+		})
+	}
 }

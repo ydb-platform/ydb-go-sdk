@@ -18,50 +18,50 @@ func TestDriver_String(t *testing.T) {
 	}{
 		{
 			name: xtest.CurrentFileLine(),
-			d: &Driver{config: config.New(
+			d: &Driver{config: xtest.Must(config.New(
 				config.WithEndpoint("localhost"),
 				config.WithDatabase("local"),
 				config.WithSecure(false),
-			)},
+			))},
 			s: `Driver{Endpoint:"localhost",Database:"local",Secure:false,Credentials:Anonymous{From:"github.com/ydb-platform/ydb-go-sdk/v3/config.defaultConfig(defaults.go:108)"}}`, //nolint:lll
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			d: &Driver{config: config.New(
+			d: &Driver{config: xtest.Must(config.New(
 				config.WithEndpoint("localhost"),
 				config.WithDatabase("local"),
 				config.WithSecure(true),
-			)},
+			))},
 			s: `Driver{Endpoint:"localhost",Database:"local",Secure:true,Credentials:Anonymous{From:"github.com/ydb-platform/ydb-go-sdk/v3/config.defaultConfig(defaults.go:108)"}}`, //nolint:lll
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			d: &Driver{config: config.New(
+			d: &Driver{config: xtest.Must(config.New(
 				config.WithEndpoint("localhost"),
 				config.WithDatabase("local"),
 				config.WithSecure(false),
 				config.WithCredentials(credentials.NewAnonymousCredentials(credentials.WithSourceInfo(t.Name()))),
-			)},
+			))},
 			s: `Driver{Endpoint:"localhost",Database:"local",Secure:false,Credentials:Anonymous{From:"TestDriver_String"}}`, //nolint:lll
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			d: &Driver{config: config.New(
+			d: &Driver{config: xtest.Must(config.New(
 				config.WithEndpoint("localhost"),
 				config.WithDatabase("local"),
 				config.WithSecure(true),
 				config.WithCredentials(credentials.NewStaticCredentials("user", "password", "")),
-			)},
+			))},
 			s: `Driver{Endpoint:"localhost",Database:"local",Secure:true,Credentials:Static{User:"user",Password:"p******d",Token:"****(CRC-32c: 00000000)",From:"github.com/ydb-platform/ydb-go-sdk/v3/credentials.NewStaticCredentials(credentials.go:35)"}}`, //nolint:lll
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			d: &Driver{config: config.New(
+			d: &Driver{config: xtest.Must(config.New(
 				config.WithEndpoint("localhost"),
 				config.WithDatabase("local"),
 				config.WithSecure(true),
 				config.WithCredentials(credentials.NewAccessTokenCredentials("AUTH_TOKEN")),
-			)},
+			))},
 			s: `Driver{Endpoint:"localhost",Database:"local",Secure:true,Credentials:AccessToken{Token:"****(CRC-32c: 9F26E847)",From:"github.com/ydb-platform/ydb-go-sdk/v3/credentials.NewAccessTokenCredentials(credentials.go:20)"}}`, //nolint:lll
 		},
 	} {

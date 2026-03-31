@@ -26,52 +26,85 @@ func New(
 	credentials credentials.Credentials,
 	trace *trace.Driver,
 	opts ...Option,
-) *Meta {
+) (*Meta, error) {
 	m := &Meta{
 		pid:         strconv.Itoa(pid),
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
-		buildInfo:   xsync.NewValue(version.FullVersion),
+		buildInfo: xsync.NewValue(&buildInfo{
+			buildInfoHeader: buildInfoFirstPart,
+		}),
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt(m)
+			if err := opt(m); err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
 		}
 	}
 
-	return m
+	return m, nil
 }
 
-type Option func(m *Meta)
+type Option func(m *Meta) error
 
 func WithApplicationNameOption(applicationName string) Option {
-	return func(m *Meta) {
+	return func(m *Meta) error {
 		m.applicationName = applicationName
+
+		return nil
 	}
 }
 
-// WithBuildInfo adds framework name with its version to x-ydb-sdk-build-info header for all API requests.
 func WithBuildInfo(frameworkName string, version string) Option {
-	return func(m *Meta) {
-		m.AppendBuildInfo(frameworkName, version)
+	return func(m *Meta) error {
+		if err := validateBuildInfo(frameworkName, version); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		m.buildInfo.Change(func(info *buildInfo) *buildInfo {
+			frameworks := make(map[string]string, len(info.frameworks)+1)
+			for frameworkName, frameworkVersion := range info.frameworks {
+				frameworks[frameworkName] = frameworkVersion
+			}
+			frameworks[frameworkName] = version
+
+			return &buildInfo{
+				frameworks: frameworks,
+				buildInfoHeader: buildInfoFirstPart + ";" + strings.Join(
+					xslices.Transform(
+						xslices.Keys(frameworks),
+						func(frameworkName string) string {
+							return frameworkName + "/" + frameworks[frameworkName]
+						},
+					), ";",
+				),
+			}
+		})
+
+		return nil
 	}
 }
 
 func WithRequestTypeOption(requestType string) Option {
-	return func(m *Meta) {
+	return func(m *Meta) error {
 		m.requestsType = requestType
+
+		return nil
 	}
 }
 
 func AllowOption(feature string) Option {
-	return func(m *Meta) {
+	return func(m *Meta) error {
 		m.capabilities = append(m.capabilities, feature)
+
+		return nil
 	}
 }
 
 func ForbidOption(feature string) Option {
-	return func(m *Meta) {
+	return func(m *Meta) error {
 		n := 0
 		for _, capability := range m.capabilities {
 			if capability != feature {
@@ -80,19 +113,29 @@ func ForbidOption(feature string) Option {
 			}
 		}
 		m.capabilities = m.capabilities[:n]
+
+		return nil
 	}
 }
 
-type Meta struct {
-	pid             string
-	trace           *trace.Driver
-	credentials     credentials.Credentials
-	database        string
-	buildInfo       *xsync.Value[string]
-	requestsType    string
-	applicationName string
-	capabilities    []string
-}
+type (
+	buildInfo struct {
+		frameworks      map[string]string // frameworkName -> version
+		buildInfoHeader string
+	}
+	Meta struct {
+		pid             string
+		trace           *trace.Driver
+		credentials     credentials.Credentials
+		database        string
+		buildInfo       *xsync.Value[*buildInfo]
+		requestsType    string
+		applicationName string
+		capabilities    []string
+	}
+)
+
+const buildInfoFirstPart = version.FullVersion
 
 func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
@@ -107,7 +150,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 
 	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, m.buildInfo.Get())
+		md.Set(HeaderVersion, m.buildInfo.Get().buildInfoHeader)
 	}
 
 	if m.requestsType != "" {
@@ -150,30 +193,20 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	return md, nil
 }
 
-// AppendBuildInfo adds or updates build information for the given framework
-// in the x-ydb-sdk-build-info header. If called multiple times with the same
-// framework name, the value from the last call overwrites any previously
-// stored version. This happens because the function rebuilds a map of
-// frameworks and assigns frameworks[framework] = version inside buildInfo.Change.
-func (m *Meta) AppendBuildInfo(framework string, version string) {
-	m.buildInfo.Change(func(old string) (new string) {
-		parts := strings.Split(old, ";")
-		frameworks := make(map[string]string, len(parts)+1)
-		for _, part := range parts[1:] {
-			subparts := strings.Split(part, "/")
-			framework, version := strings.Join(subparts[:len(subparts)-1], "/"), subparts[len(subparts)-1]
-			frameworks[framework] = version
-		}
+func validateBuildInfo(frameworkName string, frameworkVersion string) error {
+	if frameworkName == version.Package {
+		return xerrors.WithStackTrace(errReservedPackageName)
+	}
 
-		frameworks[framework] = version
+	if strings.ContainsAny(frameworkName, ";") {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %q", errWrongFrameworkName, frameworkName))
+	}
 
-		return parts[0] + ";" + strings.Join(xslices.Transform(
-			xslices.Uniq(xslices.Keys(frameworks)),
-			func(framework string) string {
-				return framework + "/" + frameworks[framework]
-			},
-		), ";")
-	})
+	if strings.ContainsAny(frameworkVersion, ";") {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %q", errWrongFrameworkVersion, frameworkVersion))
+	}
+
+	return nil
 }
 
 func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {

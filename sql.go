@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -260,7 +261,24 @@ type SQLConnector interface {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
-	c, err := xsql.Open(parent, parent.metaBalancer, parent.query.Must().Config(),
+	c, err := ConnectorContext(context.Background(), parent, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return c, nil
+}
+
+func ConnectorContext(ctx context.Context, parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
+	driver, err := parent.With(ctx, With(config.WithBuildInfo(
+		"database/sql",
+		version.Version,
+	)))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	c, err := xsql.Open(driver, parent.metaBalancer, parent.query.Must().Config(),
 		append(
 			append(
 				parent.databaseSQLOptions,
@@ -273,10 +291,6 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-
-	// database/sql integration version intentionally matches the YDB SDK version,
-	// not the Go standard library's database/sql version.
-	parent.config.Meta().AppendBuildInfo("database/sql", version.Version)
 
 	return c, nil
 }
