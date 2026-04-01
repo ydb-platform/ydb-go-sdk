@@ -6,6 +6,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
 
 // WithOperationTimeout returns a copy of parent context in which YDB operation timeout
@@ -24,4 +26,22 @@ func WithOperationCancelAfter(ctx context.Context, operationCancelAfter time.Dur
 // WithPreferredNodeID allows to set preferred node to get session from
 func WithPreferredNodeID(ctx context.Context, nodeID uint32) context.Context {
 	return endpoint.WithNodeID(ctx, nodeID)
+}
+
+// WithStatsModeBasic sets basic stats collection mode for database/sql queries.
+// The callback will be called with query execution statistics after query execution.
+func WithStatsModeBasic(ctx context.Context, callback func(stats.QueryStats)) context.Context {
+	return common.WithStatsMode(ctx, common.StatsModeBasic, callback)
+}
+
+// WithStatsModeFull sets full stats collection mode for database/sql queries.
+// The callback will be called with query execution statistics after query execution.
+func WithStatsModeFull(ctx context.Context, callback func(stats.QueryStats)) context.Context {
+	return common.WithStatsMode(ctx, common.StatsModeFull, callback)
+}
+
+// WithStatsModeProfile sets profile stats collection mode for database/sql queries.
+// The callback will be called with query execution statistics after query execution.
+func WithStatsModeProfile(ctx context.Context, callback func(stats.QueryStats)) context.Context {
+	return common.WithStatsMode(ctx, common.StatsModeProfile, callback)
 }

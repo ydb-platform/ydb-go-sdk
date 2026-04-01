@@ -1,3 +1,5 @@
+* Added `ydb.WithStatsModeBasic`, `ydb.WithStatsModeFull`, `ydb.WithStatsModeProfile` context options for collecting query statistics via `database/sql`
+
 ## v3.128.4
 * Fixed panic when topic writer is closed unexpectedly
 

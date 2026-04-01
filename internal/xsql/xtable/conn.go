@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	Ydb_Table "github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -139,15 +141,40 @@ func (c *Conn) isReady() bool {
 	return c.session.Status() == table.SessionReady
 }
 
+func toTableCollectStatsMode(mode common.StatsMode) Ydb_Table.QueryStatsCollection_Mode {
+	switch mode {
+	case common.StatsModeBasic:
+		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
+	case common.StatsModeFull:
+		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_FULL
+	case common.StatsModeProfile:
+		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_PROFILE
+	default:
+		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+	}
+}
+
 func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
+	dataOpts := c.dataOpts
+	sm := common.StatsModeFromContext(ctx)
+	if sm != nil {
+		dataOpts = append(c.dataOpts, options.WithCollectStatsMode(toTableCollectStatsMode(sm.Mode)))
+	}
+
 	_, res, err := c.session.Execute(ctx,
 		tx.ControlFromContext(ctx, c.defaultTxControl),
-		sql, params, c.dataOpts...,
+		sql, params, dataOpts...,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 	defer res.Close()
+
+	if sm != nil {
+		if s := res.Stats(); s != nil {
+			sm.Callback(s)
+		}
+	}
 
 	if err := res.NextResultSetErr(ctx); err != nil && !xerrors.Is(err, nil, io.EOF) {
 		return nil, xerrors.WithStackTrace(err)
@@ -189,13 +216,26 @@ func (c *Conn) executeScriptingQuery(ctx context.Context, sql string, params *pa
 func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Params) (
 	driver.RowsNextResultSet, error,
 ) {
+	dataOpts := c.dataOpts
+	sm := common.StatsModeFromContext(ctx)
+	if sm != nil {
+		dataOpts = append(c.dataOpts, options.WithCollectStatsMode(toTableCollectStatsMode(sm.Mode)))
+	}
+
 	_, res, err := c.session.Execute(ctx,
 		tx.ControlFromContext(ctx, c.defaultTxControl),
-		sql, params, c.dataOpts...,
+		sql, params, dataOpts...,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
+	if sm != nil {
+		if s := res.Stats(); s != nil {
+			sm.Callback(s)
+		}
+	}
+
 	if err = res.Err(); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
