@@ -1,4 +1,32 @@
-* Changed default for `database/sql` driver from TABLE service to QUERY service
+* Changed default for `database/sql` driver from `TABLE` service to `QUERY` service
+
+## v3.129.0
+* Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
+* Automatically added (if used) `database/sql` framework to `x-ydb-sdk-build-info` header
+
+## v3.128.4
+* Fixed panic when topic writer is closed unexpectedly
+
+## v3.128.3
+* Fixed panic and `unsupported type` error when passing a nil pointer to a `json.Marshaler`-implementing type as a `database/sql` query parameter (`toType` now handles `json.Marshaler` and returns `types.JSON`, matching the existing `toValue` behaviour)
+* Supported pool of decoders, which implement ResettableReader interface
+
+## v3.128.2
+* Downgraded direct dependency `google.golang.org/grpc` to v1.78.0
+
+## v3.128.1
+* Fixed `go_query_mode` / `query_mode` DSN parameters for table-backed modes (`data`, `scan`, `scheme`, `scripting`) to select the TABLE processor so the default query mode applies
+* Fixed a bug where the topic writer was not able to resend messages when the partition was split
+
+## v3.128.0
+* New options for topicwriter:
+  - `WithProducerIDPrefix`
+  - `WithPartitioningKeyHasher`
+  - `WithPartitionChooserStrategy`
+  - `WithCustomPartitionChooser`
+  - `WithWriterIdleTimeout`
+  - `WithWriterPartitionByKey`
+  - `WithWriterPartitionByPartitionID`
 
 ## v3.127.7
 * Added pessimization of connection to YDB node when `OVERLOADED` operation error is returned on `CreateSession` request for exclude next `CreateSession` calls on overloaded nodes

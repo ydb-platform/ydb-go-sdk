@@ -49,13 +49,17 @@ func (w *WriterWithTransaction) onBeforeCommitTransaction(ctx context.Context) (
 	return w.Close(ctx)
 }
 
-func (w *WriterWithTransaction) WaitInit(ctx context.Context) (info InitialInfo, err error) {
+func (w *WriterWithTransaction) WaitInit(ctx context.Context) error {
 	return w.streamWriter.WaitInit(ctx)
 }
 
-func (w *WriterWithTransaction) Write(ctx context.Context, messages ...PublicMessage) error {
+func (w *WriterWithTransaction) WaitInitInfo(ctx context.Context) (InitialInfo, error) {
+	return w.streamWriter.WaitInitInfo(ctx)
+}
+
+func (w *WriterWithTransaction) Write(ctx context.Context, messages []PublicMessage) error {
 	for i := range messages {
-		messages[i].tx = w.tx
+		messages[i].Tx = w.tx
 	}
 
 	return w.streamWriter.Write(ctx, messages)

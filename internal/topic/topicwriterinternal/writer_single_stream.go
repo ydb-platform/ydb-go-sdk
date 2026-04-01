@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,7 +25,7 @@ type SingleStreamWriterConfig struct {
 
 	stream                RawTopicWriterStream
 	queue                 *messageQueue
-	encodersMap           *MultiEncoder
+	encodersMap           *topicwritercommon.MultiEncoder
 	getLastSeqNum         bool
 	reconnectorInstanceID string
 	endpoint              trace.EndpointInfo
@@ -34,7 +35,7 @@ func newSingleStreamWriterConfig(
 	common WritersCommonConfig, //nolint:gocritic
 	stream RawTopicWriterStream,
 	queue *messageQueue,
-	encodersMap *MultiEncoder,
+	encodersMap *topicwritercommon.MultiEncoder,
 	getLastSeqNum bool,
 	reconnectorID string,
 	endpoint trace.EndpointInfo,
@@ -52,7 +53,7 @@ func newSingleStreamWriterConfig(
 
 type SingleStreamWriter struct {
 	cfg                 SingleStreamWriterConfig
-	Encoder             EncoderSelector
+	Encoder             topicwritercommon.EncoderSelector
 	background          background.Worker
 	CodecsFromServer    rawtopiccommon.SupportedCodecs
 	allowedCodecs       rawtopiccommon.SupportedCodecs
@@ -161,7 +162,7 @@ func (w *SingleStreamWriter) initStream() (err error) {
 		return xerrors.WithStackTrace(errNoAllowedCodecs)
 	}
 
-	w.Encoder = NewEncoderSelector(
+	w.Encoder = topicwritercommon.NewEncoderSelector(
 		w.cfg.LogContext,
 		w.cfg.encodersMap,
 		w.allowedCodecs,
