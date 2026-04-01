@@ -1,6 +1,20 @@
 // Command topicmultiwriter runs a load generator against a YDB topic using the
 // multi-partition writer (topicmultiwriter). Each writer uses its own goroutine
 // and a distinct producer ID prefix.
+//
+// Run template (from the examples module directory, github.com/ydb-platform/ydb-go-sdk/examples):
+//
+//	go run ./topic/topicmultiwriter/ \
+//	  -ydb 'grpc://localhost:2136/local' \
+//	  -topic 'database_path/topic_name' \
+//	  -min-bytes 64 \
+//	  -max-bytes 4096 \
+//	  -duration 5m \
+//	  -writers 8
+//
+// With authentication from the environment (see ydb-go-sdk-auth-environ), add:
+//
+//	-use-env-credentials
 package main
 
 import (
@@ -218,6 +232,11 @@ func parseFlags() config {
 		out := fs.Output()
 		_, _ = fmt.Fprintf(out, "Load generator for YDB topic multi-writer (multiple partitions).\n\n")
 		_, _ = fmt.Fprintf(out, "Usage:\n  %s [options]\n\n", os.Args[0])
+		_, _ = fmt.Fprintf(out, "Example (from the examples module root):\n")
+		_, _ = fmt.Fprintf(out, "  go run ./topic/topicmultiwriter/ \\\n")
+		_, _ = fmt.Fprintf(out, "    -ydb 'grpc://localhost:2136/local' \\\n")
+		_, _ = fmt.Fprintf(out, "    -topic 'database_path/topic_name' \\\n")
+		_, _ = fmt.Fprintf(out, "    -min-bytes 64 -max-bytes 4096 -duration 5m -writers 8\n\n")
 		_, _ = fmt.Fprintf(out, "Options:\n")
 		fs.PrintDefaults()
 	}
