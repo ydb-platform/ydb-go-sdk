@@ -177,6 +177,9 @@ func (o *orchestrator) init() (err error) {
 }
 
 func (o *orchestrator) choosePartition(msg message) (partitionID int64, err error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
 	if msg.Key == "" {
 		msg.Key = o.multiWriterCfg.ProducerIDPrefix
 	}
@@ -189,7 +192,6 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 	return partitionID, nil
 }
 
-//nolint:funlen
 func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error) {
 	acquired := false
 	defer func() {
@@ -234,9 +236,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		msg.Metadata = make(map[string][]byte)
 	}
 
-	o.mu.WithLock(func() {
-		msg.PartitionID, err = o.choosePartition(msg)
-	})
+	msg.PartitionID, err = o.choosePartition(msg)
 	if err != nil {
 		return err
 	}

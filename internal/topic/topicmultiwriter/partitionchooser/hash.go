@@ -3,7 +3,6 @@ package partitionchooser
 import (
 	"fmt"
 	"slices"
-	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xhash"
@@ -40,9 +39,7 @@ func (c *HashPartitionChooser) AddNewPartitions(partitions ...topictypes.Partiti
 		c.partitions = append(c.partitions, partition.PartitionID)
 	}
 
-	sort.Slice(c.partitions, func(i, j int) bool {
-		return c.partitions[i] < c.partitions[j]
-	})
+	slices.Sort(c.partitions)
 
 	return nil
 }
