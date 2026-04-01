@@ -6,10 +6,12 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	queryOptions "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 var _ common.Tx = (*transaction)(nil)
@@ -32,9 +34,23 @@ func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Para
 	if m != DataQueryMode {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("%q: %w", m.String(), ErrWrongQueryMode))
 	}
-	_, err := tx.tx.Execute(ctx, sql, params, tx.conn.dataOpts...)
+
+	dataOpts := tx.conn.dataOpts
+	if userMode, _, ok := common.StatsModeFromContext(ctx); ok && userMode != queryOptions.StatsModeNone {
+		// The table service data query API only supports Basic stats collection.
+		// Basic is used regardless of whether Basic, Full, or Profile was requested.
+		dataOpts = append(dataOpts, options.WithCollectStatsModeBasic())
+	}
+
+	res, err := tx.tx.Execute(ctx, sql, params, dataOpts...)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	if _, userCallback, ok := common.StatsModeFromContext(ctx); ok && userCallback != nil {
+		if s := res.Stats(); s != nil {
+			userCallback(s)
+		}
 	}
 
 	return resultNoRows{}, nil

@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -112,6 +113,51 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 // table.TransactionControl and query.TransactionControl are the type aliases to internal tx.Control
 func WithTxControl(ctx context.Context, txControl *tx.Control) context.Context {
 	return tx.WithTxControl(ctx, txControl)
+}
+
+// QueryStats is a type alias for query execution statistics collected via WithStatsMode* functions.
+type QueryStats = query.Stats
+
+// WithStatsModeBasic sets basic query stats collection mode on the context.
+// The callback will be called with the collected statistics after query execution.
+//
+// Usage:
+//
+//	var s ydb.QueryStats
+//	ctx = ydb.WithStatsModeBasic(ctx, func(stats ydb.QueryStats) {
+//	    s = stats
+//	})
+//	rows, err := db.QueryContext(ctx, "SELECT 1")
+func WithStatsModeBasic(ctx context.Context, callback func(QueryStats)) context.Context {
+	return xsql.WithStatsMode(ctx, query.StatsModeBasic, callback)
+}
+
+// WithStatsModeFull sets full query stats collection mode on the context.
+// The callback will be called with the collected statistics after query execution.
+//
+// Usage:
+//
+//	var s ydb.QueryStats
+//	ctx = ydb.WithStatsModeFull(ctx, func(stats ydb.QueryStats) {
+//	    s = stats
+//	})
+//	rows, err := db.QueryContext(ctx, "SELECT 1")
+func WithStatsModeFull(ctx context.Context, callback func(QueryStats)) context.Context {
+	return xsql.WithStatsMode(ctx, query.StatsModeFull, callback)
+}
+
+// WithStatsModeProfile sets profile query stats collection mode on the context.
+// The callback will be called with the collected statistics after query execution.
+//
+// Usage:
+//
+//	var s ydb.QueryStats
+//	ctx = ydb.WithStatsModeProfile(ctx, func(stats ydb.QueryStats) {
+//	    s = stats
+//	})
+//	rows, err := db.QueryContext(ctx, "SELECT 1")
+func WithStatsModeProfile(ctx context.Context, callback func(QueryStats)) context.Context {
+	return xsql.WithStatsMode(ctx, query.StatsModeProfile, callback)
 }
 
 // WithCommitTxContext modifies context to request commit along with the query execution.

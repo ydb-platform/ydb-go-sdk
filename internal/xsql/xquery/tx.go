@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
@@ -35,7 +36,16 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 	}
 
 	r := &resultWithStats{}
-	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
+	if userMode, userCallback, ok := common.StatsModeFromContext(ctx); ok {
+		opts = append(opts, options.WithStatsMode(userMode, func(qs stats.QueryStats) {
+			r.onQueryStats(qs)
+			if userCallback != nil {
+				userCallback(qs)
+			}
+		}))
+	} else {
+		opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
+	}
 
 	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {

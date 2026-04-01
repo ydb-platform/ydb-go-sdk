@@ -1,6 +1,7 @@
 ## v3.129.0
 * Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
 * Automatically added (if used) `database/sql` framework to `x-ydb-sdk-build-info` header
+* Added `ydb.WithStatsModeBasic`, `ydb.WithStatsModeFull`, and `ydb.WithStatsModeProfile` context option functions to enable query statistics collection via `database/sql` interface; added `ydb.QueryStats` type alias for query execution statistics
 
 ## v3.128.4
 * Fixed panic when topic writer is closed unexpectedly

@@ -57,7 +57,16 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	}
 
 	r := &resultWithStats{}
-	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
+	if userMode, userCallback, ok := common.StatsModeFromContext(ctx); ok {
+		opts = append(opts, options.WithStatsMode(userMode, func(qs stats.QueryStats) {
+			r.onQueryStats(qs)
+			if userCallback != nil {
+				userCallback(qs)
+			}
+		}))
+	} else {
+		opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
+	}
 
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {

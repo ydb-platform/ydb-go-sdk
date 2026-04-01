@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	queryOptions "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -140,9 +141,16 @@ func (c *Conn) isReady() bool {
 }
 
 func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
+	dataOpts := c.dataOpts
+	if userMode, _, ok := common.StatsModeFromContext(ctx); ok && userMode != queryOptions.StatsModeNone {
+		// The table service data query API only supports Basic stats collection.
+		// Basic is used regardless of whether Basic, Full, or Profile was requested.
+		dataOpts = append(dataOpts, options.WithCollectStatsModeBasic())
+	}
+
 	_, res, err := c.session.Execute(ctx,
 		tx.ControlFromContext(ctx, c.defaultTxControl),
-		sql, params, c.dataOpts...,
+		sql, params, dataOpts...,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -154,6 +162,12 @@ func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.
 	}
 	if err := res.Err(); err != nil {
 		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if _, userCallback, ok := common.StatsModeFromContext(ctx); ok && userCallback != nil {
+		if s := res.Stats(); s != nil {
+			userCallback(s)
+		}
 	}
 
 	return resultNoRows{}, nil
