@@ -1,3 +1,4 @@
+* Fixed YSON scanning in `TableService` to support both underlying `TextValue` and `BytesValue` wire representations
 * Fixed inverted success/error handling in the `ExampleWriter_Write` doc example for `topicwriter`, which printed `OK` on failure and aborted on success
 
 ## v3.139.6
