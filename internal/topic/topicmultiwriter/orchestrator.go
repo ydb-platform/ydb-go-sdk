@@ -233,7 +233,9 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		msg.Metadata = make(map[string][]byte)
 	}
 
-	msg.PartitionID, err = o.choosePartition(msg)
+	o.mu.WithLock(func() {
+		msg.PartitionID, err = o.choosePartition(msg)
+	})
 	if err != nil {
 		return err
 	}
