@@ -578,15 +578,33 @@ func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
 	)
 }
 
-func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
+// autoPartitioningIntegrationVariant selects topic path fragment, per-message payload, and producer ID stem
+// (writers use stem_1, stem_2, stem_3) for the shared auto-partitioning integration scenario.
+// messagesPerLogicalWrite allows representing one "logical" write by several physical messages
+// with the same key, e.g. to keep total written bytes equal across payload sizes.
+type autoPartitioningIntegrationVariant struct {
+	topicPathMarker         string
+	payload                 []byte
+	producerStem            string
+	messagesPerLogicalWrite int
+	readTimeout             time.Duration
+}
+
+func runTestWithAutoPartitioningVariant(t testing.TB, scope *scopeT, variant autoPartitioningIntegrationVariant) {
 	const firstPartitionKey = "__first_partition__"
+	if variant.messagesPerLogicalWrite <= 0 {
+		variant.messagesPerLogicalWrite = 1
+	}
+	if variant.readTimeout <= 0 {
+		variant.readTimeout = 20 * time.Second
+	}
 
 	ctx := scope.Ctx
 
 	db := scope.Driver()
 	topicClient := db.Topic()
 
-	topicPath := db.Name() + "/" + t.Name() + "--auto-part-topic--" + uuid.NewString()
+	topicPath := db.Name() + "/" + t.Name() + variant.topicPathMarker + uuid.NewString()
 	_ = topicClient.Drop(ctx, topicPath)
 	require.NoError(t, createTopicWithAutoPartitioning(ctx, db, topicPath))
 
@@ -597,9 +615,13 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 		t.Skip("skipping test because autosplit does not work in this version of YDB")
 	}
 
-	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, firstPartitionKey)
-	multiWriter2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, firstPartitionKey)
-	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
+	producerID := func(i int) string {
+		return fmt.Sprintf("%s_%d", variant.producerStem, i)
+	}
+
+	multiWriter1 := createMultiWriterForAutoPartitioning(t, producerID(1), ctx, topicPath, topicClient, firstPartitionKey)
+	multiWriter2 := createMultiWriterForAutoPartitioning(t, producerID(2), ctx, topicPath, topicClient, firstPartitionKey)
+	msgData := variant.payload
 
 	var messagesWritten1, messagesWritten2 int
 
@@ -620,21 +642,24 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 
 	require.NotEmpty(t, getKeys(describe.Partitions))
 
-	writeMessage := func(m *topicwriter.Writer, payload []byte, key string) {
-		msg := topicwriter.Message{
-			Data: bytes.NewReader(payload),
-			Key:  key,
+	writeMessage := func(m *topicwriter.Writer, payload []byte, key string) int {
+		messages := make([]topicwriter.Message, 0, variant.messagesPerLogicalWrite)
+		for range variant.messagesPerLogicalWrite {
+			messages = append(messages, topicwriter.Message{
+				Data: bytes.NewReader(payload),
+				Key:  key,
+			})
 		}
 
-		require.NoError(t, m.Write(ctx, msg))
+		require.NoError(t, m.Write(ctx, messages...))
+
+		return len(messages)
 	}
 
 	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
 		for _, key := range getKeys(partitions) {
-			writeMessage(multiWriter1, msgData, key)
-			messagesWritten1++
-			writeMessage(multiWriter2, msgData, key)
-			messagesWritten2++
+			messagesWritten1 += writeMessage(multiWriter1, msgData, key)
+			messagesWritten2 += writeMessage(multiWriter2, msgData, key)
 		}
 
 		require.NoError(t, multiWriter1.Flush(ctx))
@@ -676,13 +701,12 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 	describe = waitForPartitionsCountAtLeast(4, 20*time.Second)
 	require.GreaterOrEqual(t, len(describe.Partitions), 4, "partitions count: %d, expected at least 4", len(describe.Partitions))
 
-	writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
-	writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
-	messagesWritten1 += 2
+	messagesWritten1 += writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
+	messagesWritten1 += writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
 	require.NoError(t, multiWriter1.Flush(ctx))
 	require.NoError(t, multiWriter2.Flush(ctx))
 
-	multiWriter3 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, firstPartitionKey)
+	multiWriter3 := createMultiWriterForAutoPartitioning(t, producerID(3), ctx, topicPath, topicClient, firstPartitionKey)
 
 	require.NoError(t, multiWriter3.Close(ctx))
 	require.NoError(t, multiWriter1.Close(ctx))
@@ -694,9 +718,19 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 		topicPath,
 		consumerName,
 		messagesWritten1+messagesWritten2,
-		20*time.Second,
+		variant.readTimeout,
 		msgData,
 	))
+}
+
+func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
+	runTestWithAutoPartitioningVariant(t, scope, autoPartitioningIntegrationVariant{
+		topicPathMarker:         "--auto-part-topic--",
+		payload:                 bytes.Repeat([]byte{'a'}, 1<<20), // 1 MiB
+		producerStem:            "autopartitioning_keyed",
+		messagesPerLogicalWrite: 1,
+		readTimeout:             20 * time.Second,
+	})
 }
 
 type customPartitionChooser struct{}
@@ -764,4 +798,20 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		},
 		xtest.StopAfter(60*time.Second),
 	)
+}
+
+func TestTopicMultiWriter_AutoPartitioning_SmallMessages(t *testing.T) {
+	const (
+		smallMessageSize      = 64
+		logicalWriteSizeBytes = 1 << 20
+	)
+
+	scope := newScope(t)
+	runTestWithAutoPartitioningVariant(t, scope, autoPartitioningIntegrationVariant{
+		topicPathMarker:         "--auto-part-topic-small--",
+		payload:                 bytes.Repeat([]byte{'s'}, smallMessageSize),
+		producerStem:            "autopartitioning_small",
+		messagesPerLogicalWrite: logicalWriteSizeBytes / smallMessageSize,
+		readTimeout:             2 * time.Minute,
+	})
 }
