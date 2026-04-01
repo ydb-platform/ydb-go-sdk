@@ -185,6 +185,80 @@ func readMessagesAndAssertOrderedBySeqNo(
 	return nil
 }
 
+// readPartitionByPayload reads from the topic until each distinct payload in wantPayloads has been
+// observed at least once, and returns the partition ID of the first message with that payload.
+func readPartitionByPayload(
+	ctx context.Context,
+	client topic.Client,
+	topicPath string,
+	wantPayloads [][]byte,
+	timeout time.Duration,
+) (map[string]int64, error) {
+	reader, err := client.StartReader(
+		consumerName,
+		topicoptions.ReadSelectors{
+			{
+				Path:     topicPath,
+				ReadFrom: time.Unix(0, 0).UTC(),
+			},
+		},
+		topicoptions.WithReaderSupportSplitMergePartitions(true),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = reader.Close(context.Background())
+	}()
+
+	wantSet := make(map[string]struct{}, len(wantPayloads))
+	for _, p := range wantPayloads {
+		wantSet[string(p)] = struct{}{}
+	}
+
+	found := make(map[string]int64, len(wantSet))
+	deadline := time.Now().Add(timeout)
+
+	for len(found) < len(wantSet) {
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf(
+				"readPartitionByPayload: timeout after %s, found %d/%d payloads",
+				timeout,
+				len(found),
+				len(wantSet),
+			)
+		}
+
+		readCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		msg, err := reader.ReadMessage(readCtx)
+		cancel()
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		payload := make([]byte, msg.UncompressedSize)
+		_, err = msg.Read(payload)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+
+		ps := string(payload)
+		if _, want := wantSet[ps]; !want {
+			continue
+		}
+
+		if _, ok := found[ps]; !ok {
+			found[ps] = msg.PartitionID()
+		}
+	}
+
+	return found, nil
+}
+
 // CreateTopicWithAutoPartitioning creates a topic with auto partitioning.
 func createTopicWithAutoPartitioning(ctx context.Context, db *ydb.Driver, topicPath string) error {
 	const partitionWriteSpeed = 1 << 20
@@ -333,6 +407,81 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 				Key:   fmt.Sprintf("partition-key-%d", i),
 			}
 		},
+	)
+}
+
+// TestTopicMultiWriter_KafkaHashPartitionStableAcrossWriterRestart checks that with Kafka-style hash
+// partitioning, the same message key maps to the same partition after closing the writer and
+// starting a new one (simulating application restart).
+func TestTopicMultiWriter_KafkaHashPartitionStableAcrossWriterRestart(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	const (
+		producerPrefix = "kafka-hash-restart-producer"
+		stableKey      = "stable-partitioning-key-restart-42"
+	)
+	payloadFirst := []byte("payload-kafka-hash-first-session")
+	payloadSecond := []byte("payload-kafka-hash-second-session")
+
+	multiWriterOpts := []topicoptions.MultiWriterOption{
+		topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+		topicoptions.WithProducerIDPrefix(producerPrefix),
+	}
+
+	startWriter := func() *topicwriter.Writer {
+		w, wErr := topicClient.StartWriter(
+			topicPath,
+			topicoptions.WithWriterSetAutoSeqNo(true),
+			topicoptions.WithWriteToManyPartitions(multiWriterOpts...),
+		)
+		require.NoError(t, wErr)
+		require.NoError(t, w.WaitInit(ctx))
+
+		return w
+	}
+
+	w1 := startWriter()
+	require.NoError(t, w1.Write(ctx, topicwriter.Message{
+		Data: bytes.NewReader(payloadFirst),
+		Key:  stableKey,
+	}))
+	require.NoError(t, w1.Flush(ctx))
+	require.NoError(t, w1.Close(ctx))
+
+	w2 := startWriter()
+	require.NoError(t, w2.Write(ctx, topicwriter.Message{
+		Data: bytes.NewReader(payloadSecond),
+		Key:  stableKey,
+	}))
+	require.NoError(t, w2.Flush(ctx))
+	require.NoError(t, w2.Close(ctx))
+
+	partitionsByPayload, err := readPartitionByPayload(
+		ctx,
+		topicClient,
+		topicPath,
+		[][]byte{payloadFirst, payloadSecond},
+		defaultReadTimeout,
+	)
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		partitionsByPayload[string(payloadFirst)],
+		partitionsByPayload[string(payloadSecond)],
+		"same key must map to the same partition after writer restart (Kafka hash strategy)",
 	)
 }
 
