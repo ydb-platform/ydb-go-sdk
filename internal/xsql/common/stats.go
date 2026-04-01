@@ -9,7 +9,7 @@ import (
 type StatsMode uint8
 
 const (
-	StatsModeBasic   StatsMode = iota + 1
+	StatsModeBasic StatsMode = iota + 1
 	StatsModeFull
 	StatsModeProfile
 )

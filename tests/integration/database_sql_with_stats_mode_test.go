@@ -105,7 +105,6 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 					require.NoError(t, rows.Err())
 
 					require.True(t, callbackCalled.Load(), "stats callback must be called for Query with StatsModeFull")
-
 				})
 			})
 
