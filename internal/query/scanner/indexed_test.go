@@ -77,6 +77,64 @@ func TestIndexed(t *testing.T) {
 			},
 		},
 		{
+			name: "Ydb.Type_YSON_TextValue",
+			s: Indexed(NewData(
+				[]*Ydb.Column{
+					{
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_YSON,
+							},
+						},
+					},
+				},
+				[]*Ydb.Value{
+					{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "<a=1>[3;%false]",
+						},
+					},
+				},
+			)),
+			dst: [][]interface{}{
+				{func(v string) *string { return &v }("")},
+				{func(v []byte) *[]byte { return &v }([]byte(""))},
+			},
+			exp: [][]interface{}{
+				{func(v string) *string { return &v }("<a=1>[3;%false]")},
+				{func(v []byte) *[]byte { return &v }([]byte("<a=1>[3;%false]"))},
+			},
+		},
+		{
+			name: "Ydb.Type_YSON_BytesValue",
+			s: Indexed(NewData(
+				[]*Ydb.Column{
+					{
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_YSON,
+							},
+						},
+					},
+				},
+				[]*Ydb.Value{
+					{
+						Value: &Ydb.Value_BytesValue{
+							BytesValue: []byte("<a=1>[3;%false]"),
+						},
+					},
+				},
+			)),
+			dst: [][]interface{}{
+				{func(v string) *string { return &v }("")},
+				{func(v []byte) *[]byte { return &v }([]byte(""))},
+			},
+			exp: [][]interface{}{
+				{func(v string) *string { return &v }("<a=1>[3;%false]")},
+				{func(v []byte) *[]byte { return &v }([]byte("<a=1>[3;%false]"))},
+			},
+		},
+		{
 			name: "Ydb.Type_UINT64",
 			s: Indexed(NewData(
 				[]*Ydb.Column{

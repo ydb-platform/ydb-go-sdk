@@ -460,10 +460,18 @@ func (s *valueScanner) any() interface{} {
 		return src
 	case internalTypes.Text, internalTypes.DyNumber:
 		return s.text()
-	case
-		internalTypes.YSON,
-		internalTypes.JSON,
-		internalTypes.JSONDocument:
+	case internalTypes.YSON:
+		switch x := s.stack.currentValue().(type) {
+		case *Ydb.Value_TextValue:
+			return xstring.ToBytes(x.TextValue)
+		case *Ydb.Value_BytesValue:
+			return x.BytesValue
+		default:
+			_ = s.errorf(0, "valueScanner.any(): incorrect YSON underlying type %T (expected TextValue or BytesValue)", x)
+
+			return nil
+		}
+	case internalTypes.JSON, internalTypes.JSONDocument:
 		return xstring.ToBytes(s.text())
 	default:
 		_ = s.errorf(0, "unknown primitive type '%+v'", p)
@@ -794,8 +802,17 @@ func (s *valueScanner) setString(dst *string) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		_ = s.errorf(0, "ydb: failed scan uuid: %w", value.ErrIssue1501BadUUID)
-	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
+	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = s.text()
+	case Ydb.Type_YSON:
+		switch x := s.stack.currentValue().(type) {
+		case *Ydb.Value_TextValue:
+			*dst = x.TextValue
+		case *Ydb.Value_BytesValue:
+			*dst = xstring.FromBytes(x.BytesValue)
+		default:
+			_ = s.errorf(0, "scan row failed: incorrect YSON underlying type %T (expected TextValue or BytesValue)", x)
+		}
 	case Ydb.Type_STRING:
 		*dst = xstring.FromBytes(s.bytes())
 	default:
@@ -807,8 +824,17 @@ func (s *valueScanner) setByte(dst *[]byte) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		_ = s.errorf(0, "ydb: failed to scan uuid: %w", value.ErrIssue1501BadUUID)
-	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
+	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = xstring.ToBytes(s.text())
+	case Ydb.Type_YSON:
+		switch x := s.stack.currentValue().(type) {
+		case *Ydb.Value_TextValue:
+			*dst = xstring.ToBytes(x.TextValue)
+		case *Ydb.Value_BytesValue:
+			*dst = x.BytesValue
+		default:
+			_ = s.errorf(0, "scan row failed: incorrect YSON underlying type %T (expected TextValue or BytesValue)", x)
+		}
 	case Ydb.Type_STRING:
 		*dst = s.bytes()
 	default:
