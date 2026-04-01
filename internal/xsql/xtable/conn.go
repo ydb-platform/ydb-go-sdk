@@ -171,7 +171,7 @@ func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.
 	defer res.Close()
 
 	if sm != nil {
-		if s := res.Stats(); s != nil {
+		if s := res.Stats(); s != nil && sm.Callback != nil {
 			sm.Callback(s)
 		}
 	}
