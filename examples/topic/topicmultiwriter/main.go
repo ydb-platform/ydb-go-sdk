@@ -186,6 +186,8 @@ func runWriter(
 
 		if err := writer.Write(ctx, msg); err != nil {
 			writeErrors.Add(1)
+			log.Printf("writer %d Write: %v", writerID, err)
+
 			return fmt.Errorf("writer %d Write: %w", writerID, err)
 		}
 		messagesWritten.Add(1)
