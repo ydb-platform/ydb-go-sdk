@@ -1,3 +1,5 @@
+* Fixed flaky `TestReadersWritersStress` integration test: added nil guards for `writer.Close`/`reader.Close` calls when `StartWriter`/`StartReader` fails, and increased WaitGroup timeouts from 1s to 1 minute to accommodate slow CI environments
+
 ## v3.129.0
 * Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
 * Automatically added (if used) `database/sql` framework to `x-ydb-sdk-build-info` header
