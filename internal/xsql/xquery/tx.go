@@ -31,6 +31,10 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 		opts = append(opts, options.WithTxControl(txControl))
 	}
 
+	if issuesHandler := IssuesHandlerFromContext(ctx); issuesHandler != nil {
+		opts = append(opts, options.WithIssuesHandler(issuesHandler.Callback))
+	}
+
 	if tx.CommitTxFromContext(ctx) {
 		opts = append(opts, options.WithCommit())
 	}
@@ -54,6 +58,10 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 
 	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
 		opts = append(opts, options.WithTxControl(txControl))
+	}
+
+	if issuesHandler := IssuesHandlerFromContext(ctx); issuesHandler != nil {
+		opts = append(opts, options.WithIssuesHandler(issuesHandler.Callback))
 	}
 
 	if tx.CommitTxFromContext(ctx) {
