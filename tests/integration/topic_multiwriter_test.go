@@ -755,11 +755,6 @@ func TestTopicMultiWriter_WithCustomPartitioning(t *testing.T) {
 	)
 }
 
-func TestTopicMultiWriter_AutoPartitioning_Once(t *testing.T) {
-	scope := newScope(t)
-	runTestWithAutoPartitioning(t, scope)
-}
-
 func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	scope := newScope(t)
 	xtest.TestManyTimes(
