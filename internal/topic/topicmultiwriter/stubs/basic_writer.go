@@ -6,11 +6,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
+
+// BasicWriterOption configures stub basicWriter behavior.
+type BasicWriterOption func(*basicWriter)
+
+// WithRequireChoosePartitionKeyMetadata makes WriteInternal fail the test if any message
+// lacks non-empty metadata entry choose_partition_key (as set by BoundPartitionChooser).
+func WithRequireChoosePartitionKeyMetadata(tb testing.TB) BasicWriterOption {
+	return func(w *basicWriter) {
+		w.tb = tb
+		w.requireChoosePartitionKey = true
+	}
+}
 
 type basicWriter struct {
 	closed                bool
@@ -21,6 +36,9 @@ type basicWriter struct {
 	autoSetSeqNo          bool
 	currentSeqNo          int64
 	ackDelay              time.Duration
+
+	tb                        testing.TB
+	requireChoosePartitionKey bool
 }
 
 func NewBasicWriter(
@@ -28,6 +46,7 @@ func NewBasicWriter(
 	onAckReceivedCallback func(seqNo int64),
 	autoSetSeqNo bool,
 	ackDelay time.Duration,
+	opts ...BasicWriterOption,
 ) *basicWriter {
 	t.Helper()
 
@@ -38,6 +57,10 @@ func NewBasicWriter(
 		acksChan:              make(chan int64, 100),
 		autoSetSeqNo:          autoSetSeqNo,
 		ackDelay:              ackDelay,
+	}
+
+	for _, opt := range opts {
+		opt(w)
 	}
 
 	go w.ackProcessor()
@@ -66,6 +89,15 @@ func (w *basicWriter) WriteInternal(ctx context.Context, messages []topicwriterc
 		for i := range messages {
 			messages[i].SeqNo = w.currentSeqNo
 			w.currentSeqNo++
+		}
+	}
+
+	if w.requireChoosePartitionKey {
+		for i := range messages {
+			require.NotNil(w.tb, messages[i].Metadata, "message %d: metadata must be set", i)
+			v, ok := messages[i].Metadata[partitionchooser.PartitionKeyMetadataKey]
+			require.True(w.tb, ok && len(v) > 0,
+				"message %d: metadata %q must be non-empty", i, partitionchooser.PartitionKeyMetadataKey)
 		}
 	}
 

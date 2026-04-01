@@ -1,5 +1,9 @@
 * Added `ydb.WithStatsModeBasic`, `ydb.WithStatsModeFull`, `ydb.WithStatsModeProfile` context options for collecting query statistics via `database/sql`
 
+## v3.130.0
+* Changed default for `database/sql` driver from `TABLE` service to `QUERY` service
+* Added `__ydb_partition_key` metadata key to messages for topic writer to store the key used to choose the partition
+
 ## v3.129.0
 * Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
 * Automatically added (if used) `database/sql` framework to `x-ydb-sdk-build-info` header
