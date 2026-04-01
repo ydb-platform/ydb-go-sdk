@@ -95,9 +95,9 @@ func (w *basicWriter) WriteInternal(ctx context.Context, messages []topicwriterc
 	if w.requireChoosePartitionKey {
 		for i := range messages {
 			require.NotNil(w.tb, messages[i].Metadata, "message %d: metadata must be set", i)
-			v, ok := messages[i].Metadata[partitionchooser.ChoosePartitionKeyMetadataKey]
+			v, ok := messages[i].Metadata[partitionchooser.PartitioningKeyMetadataKey]
 			require.True(w.tb, ok && len(v) > 0,
-				"message %d: metadata %q must be non-empty", i, partitionchooser.ChoosePartitionKeyMetadataKey)
+				"message %d: metadata %q must be non-empty", i, partitionchooser.PartitioningKeyMetadataKey)
 		}
 	}
 
