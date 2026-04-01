@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
@@ -35,7 +36,7 @@ func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Para
 	}
 
 	dataOpts := tx.conn.dataOpts
-	sm := common.StatsModeFromContext(ctx)
+	sm := stats.ModeCallbackFromContext(ctx)
 	if sm != nil {
 		dataOpts = append(tx.conn.dataOpts, options.WithCollectStatsMode(toTableCollectStatsMode(sm.Mode)))
 	}
@@ -63,7 +64,7 @@ func (tx *transaction) Query(ctx context.Context, sql string, params *params.Par
 	}
 
 	dataOpts := tx.conn.dataOpts
-	sm := common.StatsModeFromContext(ctx)
+	sm := stats.ModeCallbackFromContext(ctx)
 	if sm != nil {
 		dataOpts = append(tx.conn.dataOpts, options.WithCollectStatsMode(toTableCollectStatsMode(sm.Mode)))
 	}

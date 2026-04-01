@@ -12,6 +12,7 @@ import (
 	Ydb_Table "github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -141,13 +142,13 @@ func (c *Conn) isReady() bool {
 	return c.session.Status() == table.SessionReady
 }
 
-func toTableCollectStatsMode(mode common.StatsMode) Ydb_Table.QueryStatsCollection_Mode {
+func toTableCollectStatsMode(mode stats.Mode) Ydb_Table.QueryStatsCollection_Mode {
 	switch mode {
-	case common.StatsModeBasic:
+	case stats.ModeBasic:
 		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
-	case common.StatsModeFull:
+	case stats.ModeFull:
 		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_FULL
-	case common.StatsModeProfile:
+	case stats.ModeProfile:
 		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_PROFILE
 	default:
 		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
@@ -156,7 +157,7 @@ func toTableCollectStatsMode(mode common.StatsMode) Ydb_Table.QueryStatsCollecti
 
 func (c *Conn) executeDataQuery(ctx context.Context, sql string, params *params.Params) (driver.Result, error) {
 	dataOpts := c.dataOpts
-	sm := common.StatsModeFromContext(ctx)
+	sm := stats.ModeCallbackFromContext(ctx)
 	if sm != nil {
 		dataOpts = append(c.dataOpts, options.WithCollectStatsMode(toTableCollectStatsMode(sm.Mode)))
 	}
@@ -217,7 +218,7 @@ func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Par
 	driver.RowsNextResultSet, error,
 ) {
 	dataOpts := c.dataOpts
-	sm := common.StatsModeFromContext(ctx)
+	sm := stats.ModeCallbackFromContext(ctx)
 	if sm != nil {
 		dataOpts = append(c.dataOpts, options.WithCollectStatsMode(toTableCollectStatsMode(sm.Mode)))
 	}

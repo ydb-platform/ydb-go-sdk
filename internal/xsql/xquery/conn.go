@@ -31,13 +31,13 @@ func (c *Conn) NodeID() uint32 {
 	return c.session.NodeID()
 }
 
-func toQueryStatsMode(mode common.StatsMode) options.StatsMode {
+func toQueryStatsMode(mode stats.Mode) options.StatsMode {
 	switch mode {
-	case common.StatsModeBasic:
+	case stats.ModeBasic:
 		return options.StatsModeBasic
-	case common.StatsModeFull:
+	case stats.ModeFull:
 		return options.StatsModeFull
-	case common.StatsModeProfile:
+	case stats.ModeProfile:
 		return options.StatsModeProfile
 	default:
 		return options.StatsModeNone
@@ -72,7 +72,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	r := &resultWithStats{}
 	statsMode := options.StatsModeBasic
 	onStats := r.onQueryStats
-	if sm := common.StatsModeFromContext(ctx); sm != nil {
+	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
 		statsMode = toQueryStatsMode(sm.Mode)
 		onStats = func(qs stats.QueryStats) {
 			r.onQueryStats(qs)
@@ -107,7 +107,7 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 		opts = append(opts, options.WithTxControl(txControl))
 	}
 
-	if sm := common.StatsModeFromContext(ctx); sm != nil {
+	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
 		opts = append(opts, options.WithStatsMode(toQueryStatsMode(sm.Mode), sm.Callback))
 	}
 

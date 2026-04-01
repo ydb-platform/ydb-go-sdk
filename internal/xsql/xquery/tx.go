@@ -38,7 +38,7 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 	r := &resultWithStats{}
 	statsMode := options.StatsModeBasic
 	onStats := r.onQueryStats
-	if sm := common.StatsModeFromContext(ctx); sm != nil {
+	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
 		statsMode = toQueryStatsMode(sm.Mode)
 		onStats = func(qs stats.QueryStats) {
 			r.onQueryStats(qs)
@@ -68,7 +68,7 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 		opts = append(opts, options.WithCommit())
 	}
 
-	if sm := common.StatsModeFromContext(ctx); sm != nil {
+	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
 		opts = append(opts, options.WithStatsMode(toQueryStatsMode(sm.Mode), sm.Callback))
 	}
 

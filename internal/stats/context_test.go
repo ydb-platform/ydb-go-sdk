@@ -1,4 +1,4 @@
-package common
+package stats_test
 
 import (
 	"context"
@@ -11,31 +11,31 @@ import (
 
 func TestStatsModeContext(t *testing.T) {
 	t.Run("nil by default", func(t *testing.T) {
-		sm := StatsModeFromContext(context.Background())
+		sm := stats.ModeCallbackFromContext(context.Background())
 		require.Nil(t, sm)
 	})
 
 	t.Run("round-trip", func(t *testing.T) {
 		called := false
-		ctx := WithStatsMode(context.Background(), StatsModeBasic, func(qs stats.QueryStats) {
+		ctx := stats.WithModeCallback(context.Background(), stats.ModeBasic, func(qs stats.QueryStats) {
 			called = true
 		})
-		sm := StatsModeFromContext(ctx)
+		sm := stats.ModeCallbackFromContext(ctx)
 		require.NotNil(t, sm)
-		require.Equal(t, StatsModeBasic, sm.Mode)
+		require.Equal(t, stats.ModeBasic, sm.Mode)
 		sm.Callback(nil)
 		require.True(t, called)
 	})
 
 	t.Run("all modes", func(t *testing.T) {
-		modes := []StatsMode{
-			StatsModeBasic,
-			StatsModeFull,
-			StatsModeProfile,
+		modes := []stats.Mode{
+			stats.ModeBasic,
+			stats.ModeFull,
+			stats.ModeProfile,
 		}
 		for _, mode := range modes {
-			ctx := WithStatsMode(context.Background(), mode, func(qs stats.QueryStats) {})
-			sm := StatsModeFromContext(ctx)
+			ctx := stats.WithModeCallback(context.Background(), mode, func(qs stats.QueryStats) {})
+			sm := stats.ModeCallbackFromContext(ctx)
 			require.NotNil(t, sm)
 			require.Equal(t, mode, sm.Mode)
 		}
