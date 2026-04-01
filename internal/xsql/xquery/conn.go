@@ -31,19 +31,6 @@ func (c *Conn) NodeID() uint32 {
 	return c.session.NodeID()
 }
 
-func toQueryStatsMode(mode stats.Mode) options.StatsMode {
-	switch mode {
-	case stats.ModeBasic:
-		return options.StatsModeBasic
-	case stats.ModeFull:
-		return options.StatsModeFull
-	case stats.ModeProfile:
-		return options.StatsModeProfile
-	default:
-		return options.StatsModeNone
-	}
-}
-
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	driver.Result, error,
 ) {
@@ -70,16 +57,8 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	}
 
 	r := &resultWithStats{}
-	statsMode := options.StatsModeBasic
-	onStats := r.onQueryStats
-	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
-		statsMode = toQueryStatsMode(sm.Mode)
-		onStats = func(qs stats.QueryStats) {
-			r.onQueryStats(qs)
-			sm.Callback(qs)
-		}
-	}
-	opts = append(opts, options.WithStatsMode(statsMode, onStats))
+	sm := stats.ModeCallbackFromContextOverried(ctx, stats.ModeBasic, r.onQueryStats)
+	opts = append(opts, options.WithStatsMode(options.QueryStatsMode(sm.Mode), sm.Callback))
 
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
@@ -108,7 +87,7 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	}
 
 	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
-		opts = append(opts, options.WithStatsMode(toQueryStatsMode(sm.Mode), sm.Callback))
+		opts = append(opts, options.WithStatsMode(options.QueryStatsMode(sm.Mode), sm.Callback))
 	}
 
 	res, err := c.session.Query(ctx, sql, opts...)
