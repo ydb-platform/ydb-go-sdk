@@ -98,6 +98,22 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 	}
 }
 
+type choosePartitionKeyCheckWritersFactory struct {
+	t testing.TB
+}
+
+func (f *choosePartitionKeyCheckWritersFactory) Create(
+	cfg topicwriterinternal.WriterReconnectorConfig,
+) (writer, error) {
+	return stubs.NewBasicWriter(
+		f.t,
+		cfg.OnAckReceivedCallback,
+		cfg.AutoSetSeqNo,
+		0,
+		stubs.WithRequireChoosePartitionKeyMetadata(f.t),
+	), nil
+}
+
 func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	t.Helper()
 
@@ -387,6 +403,33 @@ func TestMultiWriter_Write_WithBasicWriter(t *testing.T) {
 			Key:   fmt.Sprintf("partition-key-%d", i+1),
 		})
 	}
+
+	require.NoError(t, multiWriter.Write(ctx, messages))
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestMultiWriter_Write_SetsChoosePartitionKeyMetadata(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithCustomWritersFactory(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		&choosePartitionKeyCheckWritersFactory{t: t},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+
+	messages := []topicwriterinternal.PublicMessage{{
+		Data:     bytes.NewReader([]byte("hello")),
+		SeqNo:    1,
+		Key:      "partition-key",
+		Metadata: map[string][]byte{},
+	}}
 
 	require.NoError(t, multiWriter.Write(ctx, messages))
 	require.NoError(t, multiWriter.Close(ctx))

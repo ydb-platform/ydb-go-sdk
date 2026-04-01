@@ -141,9 +141,20 @@ func (s *sender) step() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	checkPartitionLocked := func(partitionID int64) bool {
+		partition, ok := s.partitions[partitionID]
+		if !ok {
+			return true
+		}
+
+		return partition.Locked
+	}
+
 	if err := s.iterateThroughMessagesIndex(
 		s.buf.messagesToResendIndex,
-		func(msg messagePtr) bool { return false },
+		func(msg messagePtr) bool {
+			return checkPartitionLocked(msg.Value.PartitionID)
+		},
 		true,
 	); err != nil {
 		return err
@@ -152,6 +163,10 @@ func (s *sender) step() error {
 	return s.iterateThroughMessagesIndex(
 		s.buf.pendingMessagesIndex,
 		func(msg messagePtr) bool {
+			if checkPartitionLocked(msg.Value.PartitionID) {
+				return true
+			}
+
 			_, ok := s.buf.messagesToResendIndex[msg.Value.PartitionID]
 
 			return ok

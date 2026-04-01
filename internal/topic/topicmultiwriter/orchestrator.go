@@ -229,16 +229,20 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		}
 	}
 
-	if err := o.saveMessageContent(&msg); err != nil {
-		return err
+	if msg.Metadata == nil {
+		msg.Metadata = make(map[string][]byte)
 	}
-
 	o.mu.WithLock(func() {
 		msg.PartitionID, err = o.choosePartition(msg)
 		if err != nil {
 			return
 		}
+	})
 
+	if err := o.saveMessageContent(&msg); err != nil {
+		return err
+	}
+	o.mu.WithLock(func() {
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
 		acquired = false
@@ -393,7 +397,7 @@ func (o *orchestrator) scheduleResendMessages(
 		msg := iter.Value.Value
 		if msg.SeqNo <= maxSeqNo {
 			if msg.ackReceived {
-				inFlightIndexChain.Remove(iter)
+				o.buf.sweep()
 
 				continue
 			}
@@ -430,6 +434,7 @@ func (o *orchestrator) scheduleResendMessages(
 
 	delete(o.buf.inFlightMessagesIndex, partitionID)
 	delete(o.buf.pendingMessagesIndex, partitionID)
+	delete(o.buf.messagesToResendIndex, partitionID)
 	o.buf.sweep()
 
 	if len(o.buf.pendingMessagesIndex) > 0 || len(o.buf.messagesToResendIndex) > 0 {
