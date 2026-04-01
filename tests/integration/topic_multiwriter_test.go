@@ -802,16 +802,22 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 
 func TestTopicMultiWriter_AutoPartitioning_SmallMessages(t *testing.T) {
 	const (
-		smallMessageSize      = 64
+		smallMessageSize      = 256
 		logicalWriteSizeBytes = 1 << 20
 	)
 
 	scope := newScope(t)
-	runTestWithAutoPartitioningVariant(t, scope, autoPartitioningIntegrationVariant{
-		topicPathMarker:         "--auto-part-topic-small--",
-		payload:                 bytes.Repeat([]byte{'s'}, smallMessageSize),
-		producerStem:            "autopartitioning_small",
-		messagesPerLogicalWrite: logicalWriteSizeBytes / smallMessageSize,
-		readTimeout:             2 * time.Minute,
-	})
+	xtest.TestManyTimes(
+		t,
+		func(t testing.TB) {
+			runTestWithAutoPartitioningVariant(t, scope, autoPartitioningIntegrationVariant{
+				topicPathMarker:         "--auto-part-topic-small--",
+				payload:                 bytes.Repeat([]byte{'s'}, smallMessageSize),
+				producerStem:            "autopartitioning_small",
+				messagesPerLogicalWrite: logicalWriteSizeBytes / smallMessageSize,
+				readTimeout:             2 * time.Minute,
+			})
+		},
+		xtest.StopAfter(60*time.Second),
+	)
 }
