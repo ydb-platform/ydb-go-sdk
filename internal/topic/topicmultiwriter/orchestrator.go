@@ -248,7 +248,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		acquired = false
 	})
 
-	return nil
+	return err
 }
 
 func (o *orchestrator) saveMessageContent(msg *message) error {
@@ -397,7 +397,7 @@ func (o *orchestrator) scheduleResendMessages(
 		msg := iter.Value.Value
 		if msg.SeqNo <= maxSeqNo {
 			if msg.ackReceived {
-				inFlightIndexChain.Remove(iter)
+				o.buf.sweep()
 
 				continue
 			}
@@ -434,6 +434,7 @@ func (o *orchestrator) scheduleResendMessages(
 
 	delete(o.buf.inFlightMessagesIndex, partitionID)
 	delete(o.buf.pendingMessagesIndex, partitionID)
+	delete(o.buf.messagesToResendIndex, partitionID)
 	o.buf.sweep()
 
 	if len(o.buf.pendingMessagesIndex) > 0 || len(o.buf.messagesToResendIndex) > 0 {
