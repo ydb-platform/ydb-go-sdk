@@ -6,8 +6,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 // WithOperationTimeout returns a copy of parent context in which YDB operation timeout

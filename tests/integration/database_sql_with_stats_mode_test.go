@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 func TestDatabaseSqlWithStatsMode(t *testing.T) {
@@ -53,7 +53,6 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 
 					rows, err := db.QueryContext(ctx, "SELECT id, val FROM `"+tableName+"`")
 					require.NoError(t, err)
-					defer rows.Close()
 
 					for rows.Next() {
 						var id int64
@@ -61,6 +60,7 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 						require.NoError(t, rows.Scan(&id, &val))
 					}
 					require.NoError(t, rows.Err())
+					require.NoError(t, rows.Close())
 
 					require.True(t, callbackCalled.Load(), "stats callback must be called for Query with StatsModeBasic")
 				})
@@ -95,7 +95,6 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 
 					rows, err := db.QueryContext(ctx, "SELECT id, val FROM `"+tableName+"`")
 					require.NoError(t, err)
-					defer rows.Close()
 
 					for rows.Next() {
 						var id int64
@@ -103,6 +102,7 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 						require.NoError(t, rows.Scan(&id, &val))
 					}
 					require.NoError(t, rows.Err())
+					require.NoError(t, rows.Close())
 
 					require.True(t, callbackCalled.Load(), "stats callback must be called for Query with StatsModeFull")
 				})
@@ -137,7 +137,6 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 
 					rows, err := db.QueryContext(ctx, "SELECT id, val FROM `"+tableName+"`")
 					require.NoError(t, err)
-					defer rows.Close()
 
 					for rows.Next() {
 						var id int64
@@ -145,6 +144,7 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 						require.NoError(t, rows.Scan(&id, &val))
 					}
 					require.NoError(t, rows.Err())
+					require.NoError(t, rows.Close())
 
 					require.True(t, callbackCalled.Load(), "stats callback must be called for Query with StatsModeProfile")
 				})
@@ -169,7 +169,6 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 					callbackCalled.Store(false)
 					rows, err := tx.QueryContext(ctx, "SELECT id, val FROM `"+tableName+"`")
 					require.NoError(t, err)
-					defer rows.Close()
 
 					for rows.Next() {
 						var id int64
@@ -177,6 +176,7 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 						require.NoError(t, rows.Scan(&id, &val))
 					}
 					require.NoError(t, rows.Err())
+					require.NoError(t, rows.Close())
 
 					require.True(t, callbackCalled.Load(),
 						"stats callback must be called for tx Query with StatsModeFull")
