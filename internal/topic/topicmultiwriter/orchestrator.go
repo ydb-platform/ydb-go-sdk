@@ -229,22 +229,26 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		}
 	}
 
+	if msg.Metadata == nil {
+		msg.Metadata = make(map[string][]byte)
+	}
+
+	msg.PartitionID, err = o.choosePartition(msg)
+	if err != nil {
+		return err
+	}
+
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
 
 	o.mu.WithLock(func() {
-		msg.PartitionID, err = o.choosePartition(msg)
-		if err != nil {
-			return
-		}
-
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
 		acquired = false
 	})
 
-	return err
+	return nil
 }
 
 func (o *orchestrator) saveMessageContent(msg *message) error {

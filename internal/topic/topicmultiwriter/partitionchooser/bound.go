@@ -66,6 +66,10 @@ func (c *BoundPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMe
 		hashedKey = c.keyHasher(msg.Key)
 	}
 
+	if msg.Metadata != nil {
+		msg.Metadata[ChoosePartitionKeyMetadataKey] = []byte(hashedKey)
+	}
+
 	// Find first partition whose lower bound is strictly greater than hashedKey.
 	// Then take the previous one as the partition for this key.
 	idx := sort.Search(len(c.partitions), func(i int) bool {
