@@ -177,9 +177,6 @@ func (o *orchestrator) init() (err error) {
 }
 
 func (o *orchestrator) choosePartition(msg message) (partitionID int64, err error) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-
 	if msg.Key == "" {
 		msg.Key = o.multiWriterCfg.ProducerIDPrefix
 	}
@@ -235,16 +232,16 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if msg.Metadata == nil {
 		msg.Metadata = make(map[string][]byte)
 	}
-
-	msg.PartitionID, err = o.choosePartition(msg)
-	if err != nil {
-		return err
-	}
+	o.mu.WithLock(func() {
+		msg.PartitionID, err = o.choosePartition(msg)
+		if err != nil {
+			return
+		}
+	})
 
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
-
 	o.mu.WithLock(func() {
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
