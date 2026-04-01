@@ -1421,7 +1421,7 @@ func TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch(t *testing.T
 
 func TestTopicMultiWriter_AutoPartitioning_SmallMessages(t *testing.T) {
 	const (
-		smallMessageSize      = 4096 // 4KB
+		smallMessageSize      = 65536 // 64KB
 		logicalWriteSizeBytes = 1 << 20
 	)
 

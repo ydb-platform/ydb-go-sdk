@@ -184,6 +184,10 @@ func runWriter(
 		}
 		seq++
 
+		if seq == int64(cfg.keysNumber) {
+			seq = 0
+		}
+
 		if err := writer.Write(ctx, msg); err != nil {
 			writeErrors.Add(1)
 			log.Printf("writer %d Write: %v", writerID, err)
@@ -205,6 +209,7 @@ type config struct {
 	maxMsgBytes       int
 	duration          time.Duration
 	writers           int
+	keysNumber        int
 }
 
 func (c *config) validate() error {
@@ -251,6 +256,7 @@ func parseFlags() config {
 	fs.IntVar(&c.maxMsgBytes, "max-bytes", 4096, "Maximum message payload size in bytes")
 	fs.DurationVar(&c.duration, "duration", time.Minute, "How long each writer runs")
 	fs.IntVar(&c.writers, "writers", 4, "Number of concurrent writers (goroutines)")
+	fs.IntVar(&c.keysNumber, "keys-number", 10000, "Number of keys")
 
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		fs.Usage()
