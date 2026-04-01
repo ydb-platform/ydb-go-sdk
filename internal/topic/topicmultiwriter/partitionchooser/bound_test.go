@@ -28,7 +28,7 @@ func TestBoundPartitionChooser(t *testing.T) {
 
 		msg := messageWithKey("key-a")
 		partitionID, err := chooser.ChoosePartition(msg)
-		require.Equal(t, []byte(defaultKeyHasher("key-a")), msg.Metadata[PartitioningKeyMetadataKey])
+		require.Equal(t, []byte(defaultKeyHasher("key-a")), msg.Metadata[YdbPartitionKeyMetadataKey])
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
 	})

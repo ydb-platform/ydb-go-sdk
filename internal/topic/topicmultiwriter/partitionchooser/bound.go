@@ -67,7 +67,7 @@ func (c *BoundPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMe
 	}
 
 	if msg.Metadata != nil {
-		msg.Metadata[PartitioningKeyMetadataKey] = []byte(hashedKey)
+		msg.Metadata[YdbPartitionKeyMetadataKey] = []byte(hashedKey)
 	}
 
 	// Find first partition whose lower bound is strictly greater than hashedKey.
