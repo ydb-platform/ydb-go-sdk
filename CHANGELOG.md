@@ -1,4 +1,4 @@
-* Added `choose_partition_key` metadata key to messages for topic writer to store the key used to choose the partition
+* Added `__ydb_partition_key` metadata key to messages for topic writer to store the key used to choose the partition
 
 ## v3.129.0
 * Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
