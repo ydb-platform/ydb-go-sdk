@@ -408,6 +408,11 @@ func newAutoPartitioningScenario(
 	topicPath := db.Name() + "/" + t.Name() + topicPathMarker + uuid.NewString()
 	_ = topicClient.Drop(ctx, topicPath)
 	require.NoError(t, createTopicWithAutoPartitioning(ctx, db, topicPath))
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = topicClient.Drop(cleanupCtx, topicPath)
+	})
 
 	describe, err := topicClient.Describe(ctx, topicPath)
 	require.NoError(t, err)
@@ -894,6 +899,11 @@ func runTestWithAutoPartitioningVariant(t testing.TB, scope *scopeT, variant aut
 	topicPath := db.Name() + "/" + t.Name() + variant.topicPathMarker + uuid.NewString()
 	_ = topicClient.Drop(ctx, topicPath)
 	require.NoError(t, createTopicWithAutoPartitioning(ctx, db, topicPath))
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = topicClient.Drop(cleanupCtx, topicPath)
+	})
 
 	describe, err := topicClient.Describe(ctx, topicPath)
 	require.NoError(t, err)
@@ -1083,7 +1093,7 @@ func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 		func(t testing.TB) {
 			runTestWithAutoPartitioning(t, scope)
 		},
-		xtest.StopAfter(60*time.Second),
+		xtest.StopAfter(15*time.Second),
 	)
 }
 
@@ -1437,6 +1447,6 @@ func TestTopicMultiWriter_AutoPartitioning_SmallMessages(t *testing.T) {
 				readTimeout:             3 * time.Minute,
 			})
 		},
-		xtest.StopAfter(60*time.Second),
+		xtest.StopAfter(15*time.Second),
 	)
 }
