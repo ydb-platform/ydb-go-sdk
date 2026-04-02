@@ -8,17 +8,22 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
+const (
+	operationErrorCategory   = "operation"
+	operationTimeoutCategory = "timeout"
+)
+
 func classifyError(err error) (category, name string) {
 	if err == nil {
 		return "", ""
 	}
 
 	if ydb.IsOperationErrorTransactionLocksInvalidated(err) {
-		return "operation", "ydb/aborted/tli"
+		return operationErrorCategory, "ydb/aborted/tli"
 	}
 
 	if opErr := ydb.OperationError(err); opErr != nil {
-		return "operation", normalizeErrorName(opErr.Name())
+		return operationErrorCategory, normalizeErrorName(opErr.Name())
 	}
 
 	if trErr := ydb.TransportError(err); trErr != nil {
@@ -27,9 +32,9 @@ func classifyError(err error) (category, name string) {
 
 	switch {
 	case context.DeadlineExceeded != nil && strings.Contains(err.Error(), context.DeadlineExceeded.Error()):
-		return "timeout", "context/deadline_exceeded"
+		return operationTimeoutCategory, "context/deadline_exceeded"
 	case context.Canceled != nil && strings.Contains(err.Error(), context.Canceled.Error()):
-		return "timeout", "context/canceled"
+		return operationTimeoutCategory, "context/canceled"
 	}
 
 	return "other", "unknown/" + truncate(normalizeMessage(err.Error()), 64)
