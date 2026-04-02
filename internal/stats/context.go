@@ -12,9 +12,14 @@ type ModeCallback struct {
 	Callback func(QueryStats)
 }
 
-// WithModeCallback returns a new context with the specified statistics mode and callback function.
-// The callback will be invoked when query statistics become available.
+// WithModeCallback returns a new context with the specified statistics mode and callback.
+// The callback is invoked when query statistics become available.
+// If callback is nil, the original context is returned.
 func WithModeCallback(ctx context.Context, mode Mode, callback func(QueryStats)) context.Context {
+	if callback == nil {
+		return ctx
+	}
+
 	return context.WithValue(ctx, ctxModeCallbackKey{}, &ModeCallback{
 		Mode:     mode,
 		Callback: callback,

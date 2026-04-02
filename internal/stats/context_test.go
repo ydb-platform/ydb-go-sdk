@@ -41,6 +41,12 @@ func TestStatsModeContext(t *testing.T) {
 			require.Equal(t, mode, sm.Mode)
 		}
 	})
+
+	t.Run("callback is nil", func(t *testing.T) {
+		ctx := stats.WithModeCallback(context.Background(), stats.ModeBasic, nil)
+		sm := stats.ModeCallbackFromContext(ctx)
+		require.Nil(t, sm)
+	})
 }
 
 func TestStatsModeContextWithDefault(t *testing.T) {
