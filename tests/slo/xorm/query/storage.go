@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"path"
 	"strconv"
 	"time"
 
@@ -16,8 +15,9 @@ import (
 	"xorm.io/xorm/core"
 	"xorm.io/xorm/log"
 
-	"slo/internal/config"
+	"slo/internal/framework"
 	"slo/internal/generator"
+	"slo/internal/kv"
 )
 
 type mapper struct {
@@ -26,95 +26,90 @@ type mapper struct {
 }
 
 func newMapper(tableName, objectName string) *mapper {
-	return &mapper{
-		tableName:  tableName,
-		objectName: objectName,
-	}
+	return &mapper{tableName: tableName, objectName: objectName}
 }
 
-func (m mapper) Obj2Table(_ string) string {
-	return m.tableName
+func (m mapper) Obj2Table(_ string) string { return m.tableName }
+func (m mapper) Table2Obj(_ string) string { return m.objectName }
+
+type db struct {
+	xe           *xorm.Engine
+	sqlDB        *sql.DB
+	driver       *ydb.Driver
+	connector    ydb.SQLConnector
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 }
 
-func (m mapper) Table2Obj(_ string) string {
-	return m.objectName
-}
+func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workload, error) {
+	params := kv.ParseParams(fw, "xorm-query", nil)
 
-type Storage struct {
-	cc  *ydb.Driver
-	c   ydb.SQLConnector
-	db  *sql.DB
-	x   *xorm.Engine
-	cfg *config.Config
-}
+	connectCtx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
+	defer cancel()
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Storage, err error) {
-	s := &Storage{
-		cfg: cfg,
-	}
-
-	dsn := s.cfg.Endpoint + s.cfg.DB
-
-	s.cc, err = ydb.Open(
-		ctx,
-		dsn,
+	driver, err := ydb.Open(connectCtx,
+		fw.Config.Endpoint+fw.Config.Database,
+		ydb.WithRetryBudget(params.RetryBudget),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Open error: %w", err)
 	}
 
-	s.c, err = ydb.Connector(s.cc,
+	connector, err := ydb.Connector(driver,
+		ydb.WithFakeTx(ydb.ScriptingQueryMode),
 		ydb.WithAutoDeclare(),
 		ydb.WithNumericArgs(),
-		ydb.WithTablePathPrefix(path.Join(s.cc.Name(), label)),
-		ydb.WithFakeTx(ydb.ScriptingQueryMode),
+		ydb.WithTablePathPrefix(fw.Config.Label),
 		ydb.WithDefaultQueryMode(ydb.ScriptingQueryMode),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Connector error: %w", err)
 	}
 
-	s.db = sql.OpenDB(s.c)
+	sqlDB := sql.OpenDB(connector)
 
-	s.x, err = xorm.NewEngineWithDB("ydb", dsn, core.FromDB(s.db))
+	xe, err := xorm.NewEngineWithDB("ydb", fw.Config.Endpoint+fw.Config.Database, core.FromDB(sqlDB))
 	if err != nil {
 		return nil, err
 	}
 
-	s.x.SetMaxOpenConns(poolSize)
-	s.x.SetMaxIdleConns(poolSize)
-	s.x.SetConnMaxIdleTime(time.Second)
-
-	s.x.SetTableMapper(newMapper(cfg.Table, cfg.Table))
-
-	s.x.SetLogLevel(log.LOG_DEBUG)
-
-	tableParams := map[string]string{
+	xe.SetMaxOpenConns(params.PoolSize())
+	xe.SetMaxIdleConns(params.PoolSize())
+	xe.SetConnMaxIdleTime(time.Second)
+	xe.SetTableMapper(newMapper(fw.Config.Ref, fw.Config.Ref))
+	xe.SetLogLevel(log.LOG_DEBUG)
+	xe.Dialect().SetParams(map[string]string{
 		"AUTO_PARTITIONING_BY_SIZE":              "ENABLED",
 		"AUTO_PARTITIONING_BY_LOAD":              "ENABLED",
-		"AUTO_PARTITIONING_PARTITION_SIZE_MB":    strconv.FormatUint(s.cfg.PartitionSize, 10),
-		"AUTO_PARTITIONING_MIN_PARTITIONS_COUNT": strconv.FormatUint(s.cfg.MinPartitionsCount, 10),
-		"AUTO_PARTITIONING_MAX_PARTITIONS_COUNT": strconv.FormatUint(s.cfg.MaxPartitionsCount, 10),
-		"UNIFORM_PARTITIONS":                     strconv.FormatUint(s.cfg.MinPartitionsCount, 10),
-	}
-	s.x.Dialect().SetParams(tableParams)
+		"AUTO_PARTITIONING_PARTITION_SIZE_MB":    strconv.FormatUint(uint64(params.PartitionSize), 10),
+		"AUTO_PARTITIONING_MIN_PARTITIONS_COUNT": strconv.FormatUint(uint64(params.MinPartitionCount), 10),
+		"AUTO_PARTITIONING_MAX_PARTITIONS_COUNT": strconv.FormatUint(uint64(params.MaxPartitionCount), 10),
+		"UNIFORM_PARTITIONS":                     strconv.FormatUint(uint64(params.MinPartitionCount), 10),
+	})
 
-	return s, nil
+	return kv.New(fw, params, &db{
+		xe:           xe,
+		sqlDB:        sqlDB,
+		driver:       driver,
+		connector:    connector,
+		readTimeout:  params.ReadTimeout,
+		writeTimeout: params.WriteTimeout,
+	}), nil
 }
 
-func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.Row, attempts int, err error) {
-	if err = ctx.Err(); err != nil {
-		return generator.Row{}, attempts, err
+func (d *db) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, _ error) {
+	if err := ctx.Err(); err != nil {
+		return generator.Row{}, 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.readTimeout)
 	defer cancel()
 
-	row.ID = id
+	row := generator.Row{ID: entryID}
 
-	err = retry.Do(ctx, s.x.DB().DB,
-		func(ctx context.Context, _ *sql.Conn) (err error) {
-			has, err := s.x.Context(ctx).Where("hash = Digest::NumericHash(?)", id).Get(&row)
+	err := retry.Do(ctx, d.xe.DB().DB,
+		func(ctx context.Context, _ *sql.Conn) error {
+			has, err := d.xe.Context(ctx).Where("hash = Digest::NumericHash(?)", entryID).Get(&row)
 			if err != nil {
 				return fmt.Errorf("get entry error: %w", err)
 			}
@@ -139,21 +134,21 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 	return row, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
-	if err = ctx.Err(); err != nil {
-		return attempts, err
+func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, _ error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	err = retry.Do(ctx, s.x.DB().DB,
-		func(ctx context.Context, _ *sql.Conn) (err error) {
-			if err = ctx.Err(); err != nil {
+	err := retry.Do(ctx, d.xe.DB().DB,
+		func(ctx context.Context, _ *sql.Conn) error {
+			if err := ctx.Err(); err != nil {
 				return err
 			}
 
-			_, err = s.x.Context(ctx).SetExpr("hash", fmt.Sprintf("Digest::NumericHash(%d)", row.ID)).Insert(row)
+			_, err := d.xe.Context(ctx).SetExpr("hash", fmt.Sprintf("Digest::NumericHash(%d)", row.ID)).Insert(row)
 
 			return err
 		},
@@ -172,49 +167,36 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 	return attempts, err
 }
 
-func (s *Storage) createTable(ctx context.Context) error {
+func (d *db) CreateTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	return retry.Do(ctx, s.x.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
-		return s.x.Context(ctx).CreateTable(generator.Row{})
-	})
-}
-
-func (s *Storage) dropTable(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	return retry.Do(ctx, s.x.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
-		return s.x.Context(ctx).DropTable(generator.Row{})
+	return retry.Do(ctx, d.xe.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
+		return d.xe.Context(ctx).CreateTable(generator.Row{})
 	})
 }
 
-func (s *Storage) close(ctx context.Context) error {
+func (d *db) DropTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	if err := s.x.Context(ctx).Close(); err != nil {
-		return fmt.Errorf("error close sessions pool: %w", err)
-	}
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
+	defer cancel()
 
-	if err := s.db.Close(); err != nil {
-		return fmt.Errorf("error close database/sql driver: %w", err)
-	}
+	return retry.Do(ctx, d.xe.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
+		return d.xe.Context(ctx).DropTable(generator.Row{})
+	})
+}
 
-	if err := s.c.Close(); err != nil {
-		return fmt.Errorf("error close connector: %w", err)
-	}
+func (d *db) Close(ctx context.Context) error {
+	_ = d.xe.Context(ctx).Close()
+	_ = d.sqlDB.Close()
+	_ = d.connector.Close()
 
-	if err := s.cc.Close(ctx); err != nil {
-		return fmt.Errorf("error close ydb driver: %w", err)
-	}
-
-	return nil
+	return d.driver.Close(ctx)
 }

@@ -5,28 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
-	"slo/internal/config"
+	"slo/internal/framework"
 	"slo/internal/generator"
+	"slo/internal/kv"
 )
-
-type Storage struct {
-	db          *ydb.Driver
-	cfg         *config.Config
-	tablePath   string
-	retryBudget interface {
-		budget.Budget
-
-		Stop()
-	}
-}
 
 const writeQuery = `
 DECLARE $id AS Uint64;
@@ -65,58 +53,65 @@ CREATE TABLE IF NOT EXISTS %s (
 )
 `
 
-const dropTableQuery = `
-DROP TABLE %s
-`
+const dropTableQuery = `DROP TABLE %s`
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label string) (*Storage, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
+type db struct {
+	driver            *ydb.Driver
+	tablePath         string // "`path`" with backticks for Query API
+	readTimeout       time.Duration
+	writeTimeout      time.Duration
+	partitionSize     uint
+	minPartitionCount uint
+	maxPartitionCount uint
+}
+
+func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workload, error) {
+	params := kv.ParseParams(fw, "native-query", nil)
+
+	connectCtx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
 	defer cancel()
 
-	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:mnd
-
-	db, err := ydb.Open(ctx,
-		cfg.Endpoint+cfg.DB,
-		ydb.WithSessionPoolSizeLimit(poolSize),
-		ydb.WithRetryBudget(retryBudget),
+	driver, err := ydb.Open(connectCtx,
+		fw.Config.Endpoint+fw.Config.Database,
+		ydb.WithRetryBudget(params.RetryBudget),
+		ydb.WithSessionPoolSizeLimit(params.PoolSize()),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	prefix := path.Join(db.Name(), label)
-
-	s := &Storage{
-		db:          db,
-		cfg:         cfg,
-		tablePath:   "`" + path.Join(prefix, cfg.Table) + "`",
-		retryBudget: retryBudget,
-	}
-
-	return s, nil
+	return kv.New(fw, params, &db{
+		driver:            driver,
+		tablePath:         fmt.Sprintf("`%s`", params.TablePath),
+		readTimeout:       params.ReadTimeout,
+		writeTimeout:      params.WriteTimeout,
+		partitionSize:     params.PartitionSize,
+		minPartitionCount: params.MinPartitionCount,
+		maxPartitionCount: params.MaxPartitionCount,
+	}), nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, finalErr error) {
+func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, attempts int, _ error) {
 	if err := ctx.Err(); err != nil {
-		return generator.Row{}, attempts, err
+		return generator.Row{}, 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.readTimeout)
 	defer cancel()
 
-	e := generator.Row{}
+	var row generator.Row
 
-	err := s.db.Query().Do(ctx,
-		func(ctx context.Context, session query.Session) (err error) {
-			if err = ctx.Err(); err != nil {
+	err := d.driver.Query().Do(ctx,
+		func(ctx context.Context, session query.Session) error {
+			if err := ctx.Err(); err != nil {
 				return err
 			}
 
 			res, err := session.Query(ctx,
-				fmt.Sprintf(readQuery, s.tablePath),
+				fmt.Sprintf(readQuery, d.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
-						Param("$id").Uint64(entryID).
+						Param("$id").Uint64(id).
 						Build(),
 				),
 				query.WithTxControl(query.TxControl(
@@ -140,7 +135,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 				return err
 			}
 
-			row, err := rs.NextRow(ctx)
+			r, err := rs.NextRow(ctx)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
 					return nil
@@ -149,12 +144,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 				return err
 			}
 
-			err = row.ScanStruct(&e, query.WithScanStructAllowMissingColumnsFromSelect())
-			if err != nil {
-				return err
-			}
-
-			return nil
+			return r.ScanStruct(&row, query.WithScanStructAllowMissingColumnsFromSelect())
 		},
 		query.WithIdempotent(),
 		query.WithTrace(&trace.Query{
@@ -167,27 +157,27 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 		query.WithLabel("READ"),
 	)
 
-	return e, attempts, err
+	return row, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, finalErr error) {
+func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, _ error) {
 	if err := ctx.Err(); err != nil {
-		return attempts, err
+		return 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	err := s.db.Query().Do(ctx,
-		func(ctx context.Context, session query.Session) (err error) {
+	err := d.driver.Query().Do(ctx,
+		func(ctx context.Context, session query.Session) error {
 			return session.Exec(ctx,
-				fmt.Sprintf(writeQuery, s.tablePath),
+				fmt.Sprintf(writeQuery, d.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
-						Param("$id").Uint64(e.ID).
-						Param("$payload_str").Text(*e.PayloadStr).
-						Param("$payload_double").Double(*e.PayloadDouble).
-						Param("$payload_timestamp").Timestamp(*e.PayloadTimestamp).
+						Param("$id").Uint64(row.ID).
+						Param("$payload_str").Text(*row.PayloadStr).
+						Param("$payload_double").Double(*row.PayloadDouble).
+						Param("$payload_timestamp").Timestamp(*row.PayloadTimestamp).
 						Build(),
 				),
 			)
@@ -206,32 +196,40 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 	return attempts, err
 }
 
-func (s *Storage) CreateTable(ctx context.Context) error {
-	return s.db.Query().Do(ctx,
+func (d *db) CreateTable(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
+	defer cancel()
+
+	return d.driver.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			return session.Exec(ctx,
-				fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
-					s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
+				fmt.Sprintf(createTableQuery,
+					d.tablePath,
+					d.minPartitionCount,
+					d.partitionSize,
+					d.minPartitionCount,
+					d.maxPartitionCount,
 				),
 				query.WithTxControl(query.EmptyTxControl()),
 			)
-		}, query.WithIdempotent(),
+		},
+		query.WithIdempotent(),
 		query.WithLabel("CREATE TABLE"),
 	)
 }
 
-func (s *Storage) DropTable(ctx context.Context) error {
+func (d *db) DropTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	return s.db.Query().Do(ctx,
+	return d.driver.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			return session.Exec(ctx,
-				fmt.Sprintf(dropTableQuery, s.tablePath),
+				fmt.Sprintf(dropTableQuery, d.tablePath),
 				query.WithTxControl(query.EmptyTxControl()),
 			)
 		},
@@ -240,19 +238,6 @@ func (s *Storage) DropTable(ctx context.Context) error {
 	)
 }
 
-func (s *Storage) Close(ctx context.Context) error {
-	s.retryBudget.Stop()
-
-	var (
-		shutdownCtx    context.Context
-		shutdownCancel context.CancelFunc
-	)
-	if s.cfg.ShutdownTime > 0 {
-		shutdownCtx, shutdownCancel = context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
-	} else {
-		shutdownCtx, shutdownCancel = context.WithCancel(ctx)
-	}
-	defer shutdownCancel()
-
-	return s.db.Close(shutdownCtx)
+func (d *db) Close(ctx context.Context) error {
+	return d.driver.Close(ctx)
 }
