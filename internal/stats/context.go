@@ -31,9 +31,9 @@ func ModeCallbackFromContext(ctx context.Context) *ModeCallback {
 	return nil
 }
 
-// ModeCallbackFromContextOverried extracts the ModeCallback from the context,
+// ModeCallbackFromContextWith extracts the ModeCallback from the context,
 // appending a configuration to the context mode.
-func ModeCallbackFromContextOverried(ctx context.Context, mode Mode, callback func(QueryStats)) *ModeCallback {
+func ModeCallbackFromContextWith(ctx context.Context, mode Mode, callback func(QueryStats)) *ModeCallback {
 	fn := callback
 
 	if v, ok := ctx.Value(ctxModeCallbackKey{}).(*ModeCallback); ok {

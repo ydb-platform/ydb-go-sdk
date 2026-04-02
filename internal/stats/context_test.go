@@ -50,7 +50,7 @@ func TestStatsModeContextWithDefault(t *testing.T) {
 			ctx    = context.Background()
 		)
 
-		sm := stats.ModeCallbackFromContextOverried(ctx, stats.ModeBasic, func(_ stats.QueryStats) {
+		sm := stats.ModeCallbackFromContextWith(ctx, stats.ModeBasic, func(_ stats.QueryStats) {
 			called = true
 		})
 
@@ -61,7 +61,7 @@ func TestStatsModeContextWithDefault(t *testing.T) {
 		assert.Equal(t, stats.ModeBasic, sm.Mode)
 	})
 
-	t.Run("defined", func(t *testing.T) {
+	t.Run("with", func(t *testing.T) {
 		var (
 			called1, called2 bool
 			ctx              = context.Background()
@@ -71,14 +71,14 @@ func TestStatsModeContextWithDefault(t *testing.T) {
 			called1 = true
 		})
 
-		sm := stats.ModeCallbackFromContextOverried(ctx, stats.ModeBasic, func(_ stats.QueryStats) { called2 = true })
+		sm := stats.ModeCallbackFromContextWith(ctx, stats.ModeBasic, func(_ stats.QueryStats) { called2 = true })
 		require.NotNil(t, sm)
 
-		require.Equal(t, stats.ModeFull, sm.Mode)
+		assert.Equal(t, stats.ModeFull, sm.Mode)
 
 		sm.Callback(nil)
 
-		require.True(t, called1)
-		require.True(t, called2)
+		assert.True(t, called1)
+		assert.True(t, called2)
 	})
 }
