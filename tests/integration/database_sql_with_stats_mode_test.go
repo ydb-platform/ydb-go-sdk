@@ -8,10 +8,11 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestDatabaseSqlWithStatsMode(t *testing.T) {
@@ -34,8 +35,9 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 			t.Run("Basic", func(t *testing.T) {
 				t.Run("Exec", func(t *testing.T) {
 					var callbackCalled atomic.Bool
-					ctx := ydb.WithStatsModeBasic(scope.Ctx, func(s stats.QueryStats) {
+					ctx := ydb.WithStatsModeBasic(scope.Ctx, func(qs query.Stats) {
 						callbackCalled.Store(true)
+						assertUpdates(t, 1, qs)
 					})
 
 					_, err := db.ExecContext(ctx,
@@ -47,8 +49,9 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 
 				t.Run("Query", func(t *testing.T) {
 					var callbackCalled atomic.Bool
-					ctx := ydb.WithStatsModeBasic(scope.Ctx, func(s stats.QueryStats) {
+					ctx := ydb.WithStatsModeBasic(scope.Ctx, func(qs query.Stats) {
 						callbackCalled.Store(true)
+						assertUpdates(t, 0, qs)
 					})
 
 					rows, err := db.QueryContext(ctx, "SELECT id, val FROM `"+tableName+"`")
@@ -69,8 +72,9 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 			t.Run("Full", func(t *testing.T) {
 				t.Run("Exec", func(t *testing.T) {
 					var callbackCalled atomic.Bool
-					ctx := ydb.WithStatsModeFull(scope.Ctx, func(s stats.QueryStats) {
+					ctx := ydb.WithStatsModeFull(scope.Ctx, func(qs query.Stats) {
 						callbackCalled.Store(true)
+						assertUpdates(t, 1, qs)
 					})
 
 					result, err := db.ExecContext(ctx,
@@ -89,8 +93,9 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 
 				t.Run("Query", func(t *testing.T) {
 					var callbackCalled atomic.Bool
-					ctx := ydb.WithStatsModeFull(scope.Ctx, func(s stats.QueryStats) {
+					ctx := ydb.WithStatsModeFull(scope.Ctx, func(qs query.Stats) {
 						callbackCalled.Store(true)
+						assertUpdates(t, 0, qs)
 					})
 
 					rows, err := db.QueryContext(ctx, "SELECT id, val FROM `"+tableName+"`")
@@ -111,8 +116,9 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 			t.Run("Profile", func(t *testing.T) {
 				t.Run("Exec", func(t *testing.T) {
 					var callbackCalled atomic.Bool
-					ctx := ydb.WithStatsModeProfile(scope.Ctx, func(s stats.QueryStats) {
+					ctx := ydb.WithStatsModeProfile(scope.Ctx, func(qs query.Stats) {
 						callbackCalled.Store(true)
+						assertUpdates(t, 1, qs)
 					})
 
 					result, err := db.ExecContext(ctx,
@@ -131,8 +137,9 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 
 				t.Run("Query", func(t *testing.T) {
 					var callbackCalled atomic.Bool
-					ctx := ydb.WithStatsModeProfile(scope.Ctx, func(s stats.QueryStats) {
+					ctx := ydb.WithStatsModeProfile(scope.Ctx, func(qs query.Stats) {
 						callbackCalled.Store(true)
+						assertUpdates(t, 0, qs)
 					})
 
 					rows, err := db.QueryContext(ctx, "SELECT id, val FROM `"+tableName+"`")
@@ -156,7 +163,7 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 					require.NoError(t, err)
 
 					var callbackCalled atomic.Bool
-					ctx := ydb.WithStatsModeFull(scope.Ctx, func(s stats.QueryStats) {
+					ctx := ydb.WithStatsModeFull(scope.Ctx, func(qs query.Stats) {
 						callbackCalled.Store(true)
 					})
 
@@ -189,7 +196,7 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 					require.NoError(t, err)
 
 					var callbackCalled atomic.Bool
-					ctx := ydb.WithStatsModeProfile(scope.Ctx, func(s stats.QueryStats) {
+					ctx := ydb.WithStatsModeProfile(scope.Ctx, func(s query.Stats) {
 						callbackCalled.Store(true)
 					})
 
@@ -204,4 +211,17 @@ func TestDatabaseSqlWithStatsMode(t *testing.T) {
 			})
 		})
 	}
+}
+
+func assertUpdates(t *testing.T, expected uint64, qs query.Stats) {
+	t.Helper()
+
+	var rowsAffected uint64
+	for queryPhase := range qs.QueryPhases() {
+		for tableAccess := range queryPhase.TableAccess() {
+			rowsAffected += tableAccess.Updates.Rows
+		}
+	}
+
+	assert.Equal(t, expected, rowsAffected)
 }
