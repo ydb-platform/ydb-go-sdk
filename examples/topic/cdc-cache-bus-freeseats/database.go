@@ -65,7 +65,7 @@ UPSERT INTO bus (id, freeSeats) VALUES ("bus1", 40), ("bus2", 60);
 }
 
 func createCosumers(ctx context.Context, db *ydb.Driver, consumersCount int) error {
-	for i := 0; i < consumersCount; i++ {
+	for i := range consumersCount {
 		err := db.Topic().Alter(ctx, "bus/updates", topicoptions.AlterWithAddConsumers(topictypes.Consumer{
 			Name: consumerName(i),
 		}))

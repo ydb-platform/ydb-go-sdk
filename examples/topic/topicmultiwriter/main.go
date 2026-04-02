@@ -32,6 +32,7 @@ import (
 
 	"github.com/google/uuid"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -74,7 +75,11 @@ func main() {
 		wg.Add(1)
 		go func(writerID int) {
 			defer wg.Done()
-			if err := runWriter(ctx, topicClient, cfg, writerID, &messagesWritten, &bytesWritten, &writeErrors, &firstErr); err != nil {
+			err := runWriter(
+				ctx, topicClient, cfg, writerID,
+				&messagesWritten, &bytesWritten, &writeErrors, &firstErr,
+			)
+			if err != nil {
 				storeFirstError(&firstErr, err)
 			}
 		}(w)
@@ -228,6 +233,7 @@ func (c *config) validate() error {
 	if c.duration <= 0 {
 		return fmt.Errorf("duration must be positive")
 	}
+
 	return nil
 }
 
@@ -249,7 +255,8 @@ func parseFlags() config {
 	}
 
 	fs.StringVar(&c.dsn, "ydb", "grpc://localhost:2136/local", "YDB connection string")
-	fs.BoolVar(&c.useEnvCredentials, "use-env-credentials", false, "Use credentials from environment (ydb-go-sdk-auth-environ)")
+	fs.BoolVar(&c.useEnvCredentials, "use-env-credentials", false,
+		"Use credentials from environment (ydb-go-sdk-auth-environ)")
 
 	fs.StringVar(&c.topicPath, "topic", "", "Topic path (required)")
 	fs.IntVar(&c.minMsgBytes, "min-bytes", 64, "Minimum message payload size in bytes")

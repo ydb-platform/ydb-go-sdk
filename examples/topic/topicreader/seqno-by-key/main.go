@@ -25,6 +25,7 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
@@ -82,11 +83,7 @@ func main() {
 	)
 
 readLoop:
-	for {
-		if cfg.maxMessages > 0 && total >= cfg.maxMessages {
-			break
-		}
-
+	for cfg.maxMessages <= 0 || total < cfg.maxMessages {
 		msg, err := reader.ReadMessage(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -99,8 +96,8 @@ readLoop:
 		if prev, seen := lastSeq[sk]; seen {
 			if msg.SeqNo <= prev {
 				violation = fmt.Errorf(
-					"SeqNo must strictly increase for the same partitioning key (message group id) within the same producer/partition: "+
-						"key %q producer %q partition %d: got seqNo %d after %d",
+					"SeqNo must strictly increase for the same partitioning key (message group id) "+
+						"within the same producer/partition: key %q producer %q partition %d: got seqNo %d after %d",
 					sk.messageGroupLabel(),
 					msg.ProducerID,
 					msg.PartitionID(),
@@ -108,6 +105,7 @@ readLoop:
 					prev,
 				)
 				_ = reader.Commit(msg.Context(), msg)
+
 				break readLoop
 			}
 		}
@@ -148,6 +146,7 @@ func (k streamKey) messageGroupLabel() string {
 	if k.messageGroupID != "" {
 		return k.messageGroupID
 	}
+
 	return "<empty message group id>"
 }
 
@@ -171,6 +170,7 @@ func (c *config) validate() error {
 	if c.maxMessages < 0 {
 		return fmt.Errorf("max-messages must be >= 0")
 	}
+
 	return nil
 }
 
@@ -180,7 +180,8 @@ func parseFlags() config {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.Usage = func() {
 		out := fs.Output()
-		_, _ = fmt.Fprintf(out, "Read a topic and verify SeqNo is strictly increasing per partitioning key, producer, and partition.\n\n")
+		_, _ = fmt.Fprintf(out,
+			"Read a topic and verify SeqNo is strictly increasing per partitioning key, producer, and partition.\n\n")
 		_, _ = fmt.Fprintf(out, "Usage:\n  %s [options]\n\n", os.Args[0])
 		_, _ = fmt.Fprintf(out, "Example (from the examples module root):\n")
 		_, _ = fmt.Fprintf(out, "  go run ./topic/topicreader/seqno-by-key/ \\\n")
@@ -192,11 +193,13 @@ func parseFlags() config {
 	}
 
 	fs.StringVar(&c.dsn, "ydb", "grpc://localhost:2136/local", "YDB connection string")
-	fs.BoolVar(&c.useEnvCredentials, "use-env-credentials", false, "Use credentials from environment (ydb-go-sdk-auth-environ)")
+	fs.BoolVar(&c.useEnvCredentials, "use-env-credentials", false,
+		"Use credentials from environment (ydb-go-sdk-auth-environ)")
 
 	fs.StringVar(&c.topicPath, "topic", "", "Topic path (required)")
 	fs.StringVar(&c.consumer, "consumer", "", "Consumer name (required)")
-	fs.BoolVar(&c.readFromStart, "read-from-start", true, "Read from topic beginning (ReadFrom epoch); if false, use consumer offsets only")
+	fs.BoolVar(&c.readFromStart, "read-from-start", true,
+		"Read from topic beginning (ReadFrom epoch); if false, use consumer offsets only")
 	fs.Int64Var(&c.maxMessages, "max-messages", 0, "Stop after this many messages (0 = until interrupted)")
 	fs.BoolVar(&c.verbose, "verbose", false, "Log progress every 1000 messages")
 

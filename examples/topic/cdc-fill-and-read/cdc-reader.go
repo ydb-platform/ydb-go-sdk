@@ -25,7 +25,7 @@ func cdcRead(ctx context.Context, db *ydb.Driver, consumerName, topicPath string
 			panic(fmt.Errorf("failed to read message: %w", err))
 		}
 
-		var event interface{}
+		var event any
 		err = topicsugar.JSONUnmarshal(msg, &event)
 		if err != nil {
 			panic(fmt.Errorf("failed to unmarshal json cdc: %w", err))
