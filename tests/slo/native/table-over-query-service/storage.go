@@ -68,7 +68,7 @@ type db struct {
 }
 
 func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workload, error) {
-	params := kv.ParseParams(fw, "native-table", nil)
+	params := kv.ParseParams(fw, "native-table-over-query-service", nil)
 
 	connectCtx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
 	defer cancel()
@@ -77,6 +77,7 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workloa
 		fw.Config.Endpoint+fw.Config.Database,
 		ydb.WithSessionPoolSizeLimit(params.PoolSize()),
 		ydb.WithRetryBudget(params.RetryBudget),
+		ydb.WithExecuteDataQueryOverQueryClient(true),
 	)
 	if err != nil {
 		return nil, err
