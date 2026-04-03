@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -74,6 +75,32 @@ func (c *Client) DescribeConsumer(ctx context.Context, req DescribeConsumerReque
 	err = res.FromProto(resp)
 
 	return res, err
+}
+
+func (c *Client) CommitOffset(
+	ctx context.Context,
+	operationParams rawydb.OperationParams,
+	path string,
+	partitionID int64,
+	consumer string,
+	offset int64,
+	readSessionID string,
+) error {
+	resp, err := c.service.CommitOffset(ctx, &Ydb_Topic.CommitOffsetRequest{
+		OperationParams: operationParams.ToProto(),
+		Path:            path,
+		PartitionId:     partitionID,
+		Consumer:        consumer,
+		Offset:          offset,
+		ReadSessionId:   readSessionID,
+	})
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: commit offset grpc failed: %w", err))
+	}
+
+	var operation rawydb.Operation
+
+	return xerrors.WithStackTrace(operation.FromProtoWithStatusCheck(resp.GetOperation()))
 }
 
 func (c *Client) DropTopic(
