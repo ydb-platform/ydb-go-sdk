@@ -1,3 +1,6 @@
+* Added `topic.Client.CommitOffset()` method for committing a consumer offset without an active read session
+* Added `topicreader.Reader.ReadSessionID()` method for obtaining the current read session identifier
+
 ## v3.131.0
 * Added `ydb.WithStatsModeBasic`, `ydb.WithStatsModeFull`, `ydb.WithStatsModeProfile` context options for collecting query statistics via `database/sql`
 
@@ -91,8 +94,8 @@
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
 
 ## v3.125.1
-* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to 
-`ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to 
+* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to
+`ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to
 distinguish between hits and misses
 * Bumped `golang.org/x/net` from 0.35.0 to 0.38.0
 
