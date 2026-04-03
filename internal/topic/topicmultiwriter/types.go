@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -26,7 +26,7 @@ func (p *PartitionInfo) Splitted() bool {
 }
 
 type message struct {
-	topicwriterinternal.PublicMessage
+	topicwritercommon.MessageWithDataContent
 
 	onAckCallback func()
 	ackReceived   bool

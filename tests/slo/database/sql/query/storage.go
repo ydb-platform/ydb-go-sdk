@@ -4,130 +4,127 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"path"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
-	"slo/internal/config"
+	"slo/internal/framework"
 	"slo/internal/generator"
+	"slo/internal/kv"
 )
 
-const (
-	createTemplate = `
-		CREATE TABLE IF NOT EXISTS ` + "`%s`" + ` (
-			hash              Uint64,
-			id                Uint64,
-			payload_str       Utf8,
-			payload_double    Double,
-			payload_timestamp Timestamp,
-			payload_hash      Uint64,
-			PRIMARY KEY (
-				hash,
-				id
-			)
-		) WITH (
-			AUTO_PARTITIONING_BY_SIZE = ENABLED,
-			AUTO_PARTITIONING_BY_LOAD = ENABLED,
-			AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
-			AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
-			AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d,
-			UNIFORM_PARTITIONS = %d
-		);
-	`
-	dropTemplate = `
-		DROP TABLE IF EXISTS ` + "`%s`" + `;
-	`
-	upsertTemplate = `
-		UPSERT INTO ` + "`%s`" + ` (
-			id, hash, payload_str, payload_double, payload_timestamp
-		) VALUES (
-			$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
-		);
-	`
-	selectTemplate = `
-		SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-		FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
-	`
-)
+const createTableQuery = `
+	CREATE TABLE IF NOT EXISTS %s (
+		hash              Uint64,
+		id                Uint64,
+		payload_str       Utf8,
+		payload_double    Double,
+		payload_timestamp Timestamp,
+		payload_hash      Uint64,
+		PRIMARY KEY (
+			hash,
+			id
+		)
+	) WITH (
+		AUTO_PARTITIONING_BY_SIZE = ENABLED,
+		AUTO_PARTITIONING_BY_LOAD = ENABLED,
+		AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
+		AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
+		AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d,
+		UNIFORM_PARTITIONS = %d
+	);
+`
 
-type Storage struct {
-	cc          *ydb.Driver
-	c           ydb.SQLConnector
-	db          *sql.DB
-	cfg         *config.Config
-	createQuery string
-	dropQuery   string
-	upsertQuery string
-	selectQuery string
-	retryBudget interface {
-		budget.Budget
+const dropTableQuery = `
+	DROP TABLE IF EXISTS %s;
+`
 
-		Stop()
-	}
+const writeQuery = `
+	UPSERT INTO %s (
+		id, hash, payload_str, payload_double, payload_timestamp
+	) VALUES (
+		$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+	);
+`
+
+const readQuery = `
+	SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
+	FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
+`
+
+type db struct {
+	sqlDB        *sql.DB
+	connector    ydb.SQLConnector
+	driver       *ydb.Driver
+	createSQL    string
+	dropSQL      string
+	upsertSQL    string
+	selectSQL    string
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 }
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
+func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workload, error) {
+	params := kv.ParseParams(fw, "database-sql-query", nil)
+
+	connectCtx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
 	defer cancel()
 
-	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:mnd
-
-	s = &Storage{
-		cfg: cfg,
-		createQuery: fmt.Sprintf(createTemplate, cfg.Table,
-			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),
-		dropQuery:   fmt.Sprintf(dropTemplate, cfg.Table),
-		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
-		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
-		retryBudget: retryBudget,
-	}
-
-	s.cc, err = ydb.Open(
-		ctx,
-		s.cfg.Endpoint+s.cfg.DB,
-		ydb.WithRetryBudget(retryBudget),
+	driver, err := ydb.Open(connectCtx,
+		fw.Config.Endpoint+fw.Config.Database,
+		ydb.WithRetryBudget(params.RetryBudget),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Open error: %w", err)
 	}
 
-	s.c, err = ydb.Connector(s.cc,
+	connector, err := ydb.Connector(driver,
 		ydb.WithAutoDeclare(),
-		ydb.WithTablePathPrefix(path.Join(s.cc.Name(), label)),
 		ydb.WithQueryService(true),
+		ydb.WithTablePathPrefix(fw.Config.Label),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Connector error: %w", err)
 	}
 
-	s.db = sql.OpenDB(s.c)
+	sqlDB := sql.OpenDB(connector)
+	sqlDB.SetMaxOpenConns(params.PoolSize())
+	sqlDB.SetMaxIdleConns(params.PoolSize())
+	sqlDB.SetConnMaxIdleTime(time.Second)
 
-	s.db.SetMaxOpenConns(poolSize)
-	s.db.SetMaxIdleConns(poolSize)
-	s.db.SetConnMaxIdleTime(time.Second)
-
-	return s, nil
+	return kv.New(fw, params, &db{
+		sqlDB:     sqlDB,
+		connector: connector,
+		driver:    driver,
+		createSQL: fmt.Sprintf(createTableQuery, fmt.Sprintf("`%s`", params.TablePath),
+			params.PartitionSize, params.MinPartitionCount, params.MaxPartitionCount, params.MinPartitionCount),
+		dropSQL:      fmt.Sprintf(dropTableQuery, fmt.Sprintf("`%s`", params.TablePath)),
+		upsertSQL:    fmt.Sprintf(writeQuery, fmt.Sprintf("`%s`", params.TablePath)),
+		selectSQL:    fmt.Sprintf(readQuery, fmt.Sprintf("`%s`", params.TablePath)),
+		readTimeout:  params.ReadTimeout,
+		writeTimeout: params.WriteTimeout,
+	}), nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res generator.Row, attempts int, err error) {
-	if err = ctx.Err(); err != nil {
-		return generator.Row{}, attempts, err
+func (d *db) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, _ error) {
+	if err := ctx.Err(); err != nil {
+		return generator.Row{}, 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.readTimeout)
 	defer cancel()
 
-	err = retry.Do(ctx, s.db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
-			if err = ctx.Err(); err != nil {
+	var res generator.Row
+
+	err := retry.Do(ctx, d.sqlDB,
+		func(ctx context.Context, cc *sql.Conn) error {
+			if err := ctx.Err(); err != nil {
 				return err
 			}
 
-			row := cc.QueryRowContext(ctx, s.selectQuery,
+			row := cc.QueryRowContext(ctx, d.selectSQL,
 				sql.Named("id", &entryID),
 			)
 
@@ -150,21 +147,21 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 	return res, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err error) {
-	if err = ctx.Err(); err != nil {
-		return attempts, err
+func (d *db) Write(ctx context.Context, e generator.Row) (attempts int, _ error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	err = retry.Do(ctx, s.db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
-			if err = ctx.Err(); err != nil {
+	err := retry.Do(ctx, d.sqlDB,
+		func(ctx context.Context, cc *sql.Conn) error {
+			if err := ctx.Err(); err != nil {
 				return err
 			}
 
-			_, err = cc.ExecContext(ctx, s.upsertQuery,
+			_, err := cc.ExecContext(ctx, d.upsertSQL,
 				sql.Named("id", e.ID),
 				sql.Named("payload_str", *e.PayloadStr),
 				sql.Named("payload_double", *e.PayloadDouble),
@@ -188,55 +185,37 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 	return attempts, err
 }
 
-func (s *Storage) createTable(ctx context.Context) error {
+func (d *db) CreateTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	return retry.Do(ctx, s.db,
-		func(ctx context.Context, cc *sql.Conn) error {
-			_, err := s.db.ExecContext(ctx, s.createQuery)
+	return retry.Do(ctx, d.sqlDB,
+		func(ctx context.Context, _ *sql.Conn) error {
+			_, err := d.sqlDB.ExecContext(ctx, d.createSQL)
 
 			return err
 		}, retry.WithIdempotent(true),
 	)
 }
 
-func (s *Storage) dropTable(ctx context.Context) error {
+func (d *db) DropTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
-	return retry.Do(ctx, s.db,
-		func(ctx context.Context, cc *sql.Conn) error {
-			_, err := s.db.ExecContext(ctx, s.dropQuery)
+	return retry.Do(ctx, d.sqlDB,
+		func(ctx context.Context, _ *sql.Conn) error {
+			_, err := d.sqlDB.ExecContext(ctx, d.dropSQL)
 
 			return err
 		}, retry.WithIdempotent(true),
 	)
 }
 
-func (s *Storage) close(ctx context.Context) error {
-	s.retryBudget.Stop()
+func (d *db) Close(ctx context.Context) error {
+	_ = d.sqlDB.Close()
+	_ = d.connector.Close()
 
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	if err := s.db.Close(); err != nil {
-		return fmt.Errorf("error close database/sql driver: %w", err)
-	}
-
-	if err := s.c.Close(); err != nil {
-		return fmt.Errorf("error close connector: %w", err)
-	}
-
-	if err := s.cc.Close(ctx); err != nil {
-		return fmt.Errorf("error close ydb driver: %w", err)
-	}
-
-	return nil
+	return d.driver.Close(ctx)
 }

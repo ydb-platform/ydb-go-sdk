@@ -13,6 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
@@ -35,7 +36,7 @@ type writerWithAutopartitioning struct {
 	producerIDPrefix      string
 	wakeUpChan            chan empty.Struct
 	closeChan             chan empty.Struct
-	messagesToProcess     xlist.List[topicwriterinternal.PublicMessage]
+	messagesToProcess     xlist.List[topicwritercommon.MessageWithDataContent]
 	splitted              atomic.Bool
 }
 
@@ -70,7 +71,7 @@ func NewWriterWithAutopartitioning(
 		mu:                    mu,
 		wakeUpChan:            make(chan empty.Struct, 1),
 		closeChan:             make(chan empty.Struct),
-		messagesToProcess:     xlist.New[topicwriterinternal.PublicMessage](),
+		messagesToProcess:     xlist.New[topicwritercommon.MessageWithDataContent](),
 	}
 
 	go w.work()
@@ -148,7 +149,10 @@ func (w *writerWithAutopartitioning) processMessages() {
 	}
 }
 
-func (w *writerWithAutopartitioning) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
+func (w *writerWithAutopartitioning) WriteInternal(
+	ctx context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -182,9 +186,5 @@ func (w *writerWithAutopartitioning) Close(ctx context.Context) error {
 	w.closed = true
 	close(w.closeChan)
 
-	return nil
-}
-
-func (w *writerWithAutopartitioning) GetBufferedMessages() []topicwriterinternal.PublicMessage {
 	return nil
 }

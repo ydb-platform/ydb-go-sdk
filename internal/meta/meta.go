@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"sync/atomic"
 
 	"google.golang.org/grpc/metadata"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -30,6 +33,12 @@ func New(
 		credentials: credentials,
 		database:    database,
 	}
+
+	m.buildInfo.Store(&buildInfo{
+		frameworks:      make(map[string]string),
+		buildInfoHeader: buildInfoFirstPart,
+	})
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(m)
@@ -44,6 +53,35 @@ type Option func(m *Meta)
 func WithApplicationNameOption(applicationName string) Option {
 	return func(m *Meta) {
 		m.applicationName = applicationName
+	}
+}
+
+func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
+	return func(m *Meta) {
+		var buildInfo buildInfo
+
+		if frameworks := m.buildInfo.Load().frameworks; len(frameworks) > 0 {
+			buildInfo.frameworks = make(map[string]string, len(frameworks)+1)
+			for frameworkName, frameworkVersion := range frameworks {
+				buildInfo.frameworks[frameworkName] = frameworkVersion
+			}
+			buildInfo.frameworks[frameworkName] = frameworkVersion
+		} else {
+			buildInfo.frameworks = map[string]string{
+				frameworkName: frameworkVersion,
+			}
+		}
+
+		buildInfo.buildInfoHeader = buildInfoFirstPart + ";" + strings.Join(
+			xslices.Transform(
+				xslices.Keys(buildInfo.frameworks),
+				func(frameworkName string) string {
+					return frameworkName + "/" + buildInfo.frameworks[frameworkName]
+				},
+			), ";",
+		)
+
+		m.buildInfo.Store(&buildInfo)
 	}
 }
 
@@ -72,15 +110,24 @@ func ForbidOption(feature string) Option {
 	}
 }
 
-type Meta struct {
-	pid             string
-	trace           *trace.Driver
-	credentials     credentials.Credentials
-	database        string
-	requestsType    string
-	applicationName string
-	capabilities    []string
-}
+type (
+	buildInfo struct {
+		frameworks      map[string]string // frameworkName -> version
+		buildInfoHeader string
+	}
+	Meta struct {
+		pid             string
+		trace           *trace.Driver
+		credentials     credentials.Credentials
+		database        string
+		buildInfo       atomic.Pointer[buildInfo]
+		requestsType    string
+		applicationName string
+		capabilities    []string
+	}
+)
+
+const buildInfoFirstPart = version.FullVersion
 
 func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
@@ -95,7 +142,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 
 	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, version.FullVersion)
+		md.Set(HeaderVersion, m.buildInfo.Load().buildInfoHeader)
 	}
 
 	if m.requestsType != "" {
@@ -136,6 +183,22 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md.Set(HeaderTicket, token)
 
 	return md, nil
+}
+
+func ValidateBuildInfo(frameworkName string, frameworkVersion string) error {
+	if frameworkName == version.Package {
+		return xerrors.WithStackTrace(errReservedPackageName)
+	}
+
+	if strings.ContainsAny(frameworkName, ";") {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %q", errWrongFrameworkName, frameworkName))
+	}
+
+	if strings.ContainsAny(frameworkVersion, ";") {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %q", errWrongFrameworkVersion, frameworkVersion))
+	}
+
+	return nil
 }
 
 func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {

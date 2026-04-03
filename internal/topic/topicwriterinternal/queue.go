@@ -79,6 +79,12 @@ func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter
 	q.m.Lock()
 	defer q.m.Unlock()
 
+	if q.stopReceiveMessagesReason != nil {
+		return waiter, xerrors.WithStackTrace(
+			fmt.Errorf("ydb: add message to closed message queue: %w", q.stopReceiveMessagesReason),
+		)
+	}
+
 	if err := q.checkNewMessagesBeforeAddNeedLock(messages); err != nil {
 		return waiter, err
 	}
@@ -89,12 +95,6 @@ func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter
 		if needWaiter {
 			waiter.AddWaitIndex(messageIndex)
 		}
-	}
-
-	if q.stopReceiveMessagesReason != nil {
-		return waiter, xerrors.WithStackTrace(
-			fmt.Errorf("ydb: add message to closed message queue: %w", q.stopReceiveMessagesReason),
-		)
 	}
 
 	q.notifyNewMessages()
@@ -200,23 +200,6 @@ func (q *messageQueue) stopAddNewMessagesNeedLock(reason error) {
 	if q.stopReceiveMessagesReason == nil {
 		q.stopReceiveMessagesReason = reason
 	}
-}
-
-func (q *messageQueue) getBufferedMessages() []PublicMessage {
-	q.m.Lock()
-	defer q.m.Unlock()
-
-	res := make([]PublicMessage, 0, q.lastWrittenIndex-q.lastSentIndex)
-	for i := range q.messagesByOrder {
-		msg := q.messagesByOrder[i]
-		if msg.hasRawContent {
-			msg.Data = &msg.rawBuf
-		}
-
-		res = append(res, msg.PublicMessage)
-	}
-
-	return res
 }
 
 func (q *messageQueue) Close(err error) error {

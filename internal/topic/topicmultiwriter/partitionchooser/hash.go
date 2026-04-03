@@ -39,6 +39,8 @@ func (c *HashPartitionChooser) AddNewPartitions(partitions ...topictypes.Partiti
 		c.partitions = append(c.partitions, partition.PartitionID)
 	}
 
+	slices.Sort(c.partitions)
+
 	return nil
 }
 

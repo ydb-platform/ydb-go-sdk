@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
 
@@ -15,6 +16,7 @@ type MultiWriter struct {
 	ctx          context.Context //nolint:containedctx
 	cfg          *MultiWriterConfig
 	writerCfg    *topicwriterinternal.WriterReconnectorConfig
+	encoders     *topicwritercommon.MultiEncoder
 	closed       atomic.Bool
 	orchestrator *orchestrator
 	background   *background.Worker
@@ -32,12 +34,18 @@ func NewMultiWriter(
 	var (
 		ctx, cancel = context.WithCancel(context.Background())
 		background  = background.NewWorker(ctx, "topic multiwriter background")
+		encoders    = topicwritercommon.NewMultiEncoder()
 	)
+
+	for codec, creator := range writerCfg.AdditionalEncoders {
+		encoders.AddEncoder(codec, creator)
+	}
 
 	p := &MultiWriter{
 		ctx:          ctx,
 		cfg:          multiWriterCfg,
 		writerCfg:    writerCfg,
+		encoders:     encoders,
 		orchestrator: newOrchestrator(ctx, cancel, topicDescriber, background, writerCfg, multiWriterCfg),
 		background:   background,
 	}
@@ -57,7 +65,7 @@ func NewMultiWriter(
 func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
 	for _, msg := range messages {
 		if err := p.orchestrator.pushMessage(ctx, message{
-			PublicMessage: msg,
+			MessageWithDataContent: topicwritercommon.NewMessageDataWithContent(msg, p.encoders),
 		}); err != nil {
 			return err
 		}

@@ -121,15 +121,11 @@ func (p *partitionWriterPool) createNonDirectWriter(partitionID int64) (writer, 
 	return writer, err
 }
 
-func (p *partitionWriterPool) get(partitionID int64, direct bool, doNotCreate bool) (*writerWrapper, error) {
+func (p *partitionWriterPool) get(partitionID int64, direct bool) (*writerWrapper, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	finish := func() (*writerWrapper, error) {
-		if doNotCreate {
-			return nil, nil //nolint:nilnil
-		}
-
 		return p.createNewWriter(partitionID, direct)
 	}
 

@@ -10,7 +10,7 @@ import (
 )
 
 func messageWithKey(key string) topicwriterinternal.PublicMessage {
-	return topicwriterinternal.PublicMessage{Key: key}
+	return topicwriterinternal.PublicMessage{Key: key, Metadata: make(map[string][]byte)}
 }
 
 func TestBoundPartitionChooser(t *testing.T) {
@@ -26,7 +26,9 @@ func TestBoundPartitionChooser(t *testing.T) {
 
 		require.NoError(t, chooser.AddNewPartitions(partitions...))
 
-		partitionID, err := chooser.ChoosePartition(messageWithKey("key-a"))
+		msg := messageWithKey("key-a")
+		partitionID, err := chooser.ChoosePartition(msg)
+		require.Equal(t, []byte(defaultKeyHasher("key-a")), msg.Metadata[PartitionKeyMetadataKey])
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
 	})

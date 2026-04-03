@@ -1,5 +1,23 @@
 * Fixed `nil` value passed as a `database/sql` argument now produces `NullType` instead of `Void`, allowing it to be used with optional YDB columns
 
+## v3.131.0
+* Added `ydb.WithStatsModeBasic`, `ydb.WithStatsModeFull`, `ydb.WithStatsModeProfile` context options for collecting query statistics via `database/sql`
+
+## v3.130.0
+* Changed default for `database/sql` driver from `TABLE` service to `QUERY` service
+* Added `__ydb_partition_key` metadata key to messages for topic writer to store the key used to choose the partition
+
+## v3.129.0
+* Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
+* Automatically added (if used) `database/sql` framework to `x-ydb-sdk-build-info` header
+
+## v3.128.4
+* Fixed panic when topic writer is closed unexpectedly
+
+## v3.128.3
+* Fixed panic and `unsupported type` error when passing a nil pointer to a `json.Marshaler`-implementing type as a `database/sql` query parameter (`toType` now handles `json.Marshaler` and returns `types.JSON`, matching the existing `toValue` behaviour)
+* Supported pool of decoders, which implement ResettableReader interface
+
 ## v3.128.2
 * Downgraded direct dependency `google.golang.org/grpc` to v1.78.0
 

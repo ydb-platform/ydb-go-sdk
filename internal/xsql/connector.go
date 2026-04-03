@@ -212,11 +212,13 @@ func Open(
 		balancer:    balancer,
 		queryConfig: queryConfig,
 		processor: func() Engine {
-			if overQueryService, _ := strconv.ParseBool(os.Getenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE")); overQueryService {
-				return QUERY
+			overQueryService, err := strconv.ParseBool(os.Getenv("YDB_DATABASE_SQL_OVER_QUERY_SERVICE"))
+			if err == nil && !overQueryService {
+				return TABLE
 			}
 
-			return TABLE
+			// default is Query Engine
+			return QUERY
 		}(),
 		clock:          clockwork.NewRealClock(),
 		done:           make(chan struct{}),

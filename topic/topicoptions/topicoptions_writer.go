@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -19,10 +20,10 @@ type WriterOption = topicwriterinternal.PublicWriterOption
 type WriteSessionMetadata map[string]string
 
 // CreateEncoderFunc for create message decoders
-type CreateEncoderFunc = topicwriterinternal.PublicCreateEncoderFunc
+type CreateEncoderFunc = topicwritercommon.PublicCreateEncoderFunc
 
 // ResettableWriter is able to reset a nested writer between uses.
-type ResetableWriter = topicwriterinternal.PublicResetableWriter
+type ResetableWriter = topicwritercommon.PublicResetableWriter
 
 // WithWriterAddEncoder add custom codec implementation to writer.
 // It allows to set custom codecs implementations for custom and internal codecs.
