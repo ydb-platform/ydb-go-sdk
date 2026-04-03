@@ -1,3 +1,4 @@
+## v3.132.0
 * Added `topic.Client.CommitOffset()` method for committing a consumer offset without an active read session
 * Added `topicreader.Reader.ReadSessionID()` method for obtaining the current read session identifier
 
