@@ -10,9 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
+	"golang.org/x/sync/errgroup"
 
 	"slo/internal/framework"
 	"slo/internal/generator"

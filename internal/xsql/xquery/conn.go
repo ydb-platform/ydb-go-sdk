@@ -57,7 +57,8 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	}
 
 	r := &resultWithStats{}
-	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
+	sm := stats.ModeCallbackFromContextWith(ctx, stats.ModeBasic, r.onQueryStats)
+	opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
 
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
@@ -83,6 +84,10 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 
 	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
 		opts = append(opts, options.WithTxControl(txControl))
+	}
+
+	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
+		opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
 	}
 
 	res, err := c.session.Query(ctx, sql, opts...)

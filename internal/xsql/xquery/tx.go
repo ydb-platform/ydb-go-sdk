@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
@@ -35,7 +36,8 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 	}
 
 	r := &resultWithStats{}
-	opts = append(opts, options.WithStatsMode(options.StatsModeBasic, r.onQueryStats))
+	sm := stats.ModeCallbackFromContextWith(ctx, stats.ModeBasic, r.onQueryStats)
+	opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
 
 	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {
@@ -56,6 +58,10 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 
 	if tx.CommitTxFromContext(ctx) {
 		opts = append(opts, options.WithCommit())
+	}
+
+	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
+		opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
 	}
 
 	res, err := t.tx.Query(ctx, sql, opts...)

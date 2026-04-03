@@ -6,10 +6,12 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 var _ common.Tx = (*transaction)(nil)
@@ -32,9 +34,22 @@ func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Para
 	if m != DataQueryMode {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("%q: %w", m.String(), ErrWrongQueryMode))
 	}
-	_, err := tx.tx.Execute(ctx, sql, params, tx.conn.dataOpts...)
+
+	dataOpts := tx.conn.dataOpts
+	sm := stats.ModeCallbackFromContext(ctx)
+	if sm != nil {
+		dataOpts = append(tx.conn.dataOpts, options.WithCollectStatsMode(toTableCollectStatsMode(sm.Mode)))
+	}
+
+	res, err := tx.tx.Execute(ctx, sql, params, dataOpts...)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	if sm != nil {
+		if s := res.Stats(); s != nil {
+			sm.Callback(s)
+		}
 	}
 
 	return resultNoRows{}, nil
@@ -47,11 +62,24 @@ func (tx *transaction) Query(ctx context.Context, sql string, params *params.Par
 			fmt.Errorf("%s: %w", m.String(), ErrWrongQueryMode),
 		)
 	}
+
+	dataOpts := tx.conn.dataOpts
+	sm := stats.ModeCallbackFromContext(ctx)
+	if sm != nil {
+		dataOpts = append(tx.conn.dataOpts, options.WithCollectStatsMode(toTableCollectStatsMode(sm.Mode)))
+	}
+
 	res, err := tx.tx.Execute(ctx,
-		sql, params, tx.conn.dataOpts...,
+		sql, params, dataOpts...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	if sm != nil {
+		if s := res.Stats(); s != nil {
+			sm.Callback(s)
+		}
 	}
 
 	if err = res.Err(); err != nil {

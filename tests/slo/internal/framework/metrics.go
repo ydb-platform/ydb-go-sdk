@@ -21,8 +21,8 @@ const (
 	sdk        = "go"
 	sdkVersion = ydb.Version
 
-	hdrMinMicroseconds  = 1
-	hdrMaxMicroseconds  = 60_000_000
+	hdrMinMicroseconds   = 1
+	hdrMaxMicroseconds   = 60_000_000
 	hdrSignificantDigits = 5
 )
 
@@ -61,14 +61,14 @@ func (h *latencyHistogram) Record(latencyMicroseconds int64, attrs attribute.Set
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	h.hdrh.RecordValue(latencyMicroseconds)
+	_ = h.hdrh.RecordValue(latencyMicroseconds)
 
 	hist, ok := h.histograms[attrs]
 	if !ok {
 		hist = hdrhistogram.New(hdrMinMicroseconds, hdrMaxMicroseconds, hdrSignificantDigits)
 		h.histograms[attrs] = hist
 	}
-	hist.RecordValue(latencyMicroseconds)
+	_ = hist.RecordValue(latencyMicroseconds)
 }
 
 func (h *latencyHistogram) GetPercentilesByAttrs() map[attribute.Set][]int64 {
