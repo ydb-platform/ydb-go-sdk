@@ -1,3 +1,4 @@
+## v3.131.0
 * Added `ydb.WithStatsModeBasic`, `ydb.WithStatsModeFull`, `ydb.WithStatsModeProfile` context options for collecting query statistics via `database/sql`
 
 ## v3.130.0
