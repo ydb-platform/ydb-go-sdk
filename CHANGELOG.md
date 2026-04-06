@@ -1,3 +1,4 @@
+## v3.133.1
 * Added `TopicListener.ReadSessionID()` getter
 
 ## v3.133.0
