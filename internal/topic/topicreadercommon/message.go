@@ -86,7 +86,7 @@ type PublicMessageContentUnmarshaler interface {
 
 func createReader(decoders *MultiDecoder, codec rawtopiccommon.Codec, rawBytes []byte) oneTimeReader {
 	var maker readerMaker = func() io.Reader {
-		reader, err := decoders.Decode(codec, bytes.NewReader(rawBytes))
+		reader, err := decoders.Decode(codec, rawBytes)
 		if err != nil {
 			reader = errorReader{
 				err: fmt.Errorf("failed to decode message with codec '%v': %w", codec, err),

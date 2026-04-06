@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
 type PublicResettableReader interface {
@@ -40,12 +41,18 @@ func newDecoderPool() *decoderPool {
 type MultiDecoder struct {
 	m map[rawtopiccommon.Codec]PublicCreateDecoderFunc
 
+	bp xsync.Pool[bytes.Reader]
 	dp map[rawtopiccommon.Codec]*decoderPool
 }
 
 func NewMultiDecoder() *MultiDecoder {
 	md := &MultiDecoder{
-		m:  make(map[rawtopiccommon.Codec]PublicCreateDecoderFunc),
+		m: make(map[rawtopiccommon.Codec]PublicCreateDecoderFunc),
+		bp: xsync.Pool[bytes.Reader]{
+			New: func() *bytes.Reader {
+				return bytes.NewReader(nil)
+			},
+		},
 		dp: make(map[rawtopiccommon.Codec]*decoderPool),
 	}
 
@@ -64,7 +71,12 @@ func (d *MultiDecoder) AddDecoder(codec rawtopiccommon.Codec, createFunc PublicC
 	d.dp[codec] = newDecoderPool()
 }
 
-func (d *MultiDecoder) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Reader, error) {
+func (d *MultiDecoder) Decode(codec rawtopiccommon.Codec, rawBytes []byte) (io.Reader, error) {
+	input := d.bp.GetOrNew()
+	defer d.bp.Put(input)
+
+	input.Reset(rawBytes)
+
 	dec, err := d.createDecodeReader(codec, input)
 	if err != nil {
 		return nil, err

@@ -1,3 +1,5 @@
+* Added sync.Pool for the decoder buffers
+
 ## v3.133.1
 * Added `TopicListener.ReadSessionID()` getter
 
