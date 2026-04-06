@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
@@ -34,6 +35,7 @@ type executeSettings interface {
 	Label() string
 	ConcurrentResultSets() bool
 	UserProvidedTxControl() bool
+	IssuesOpts() func([]*Ydb_Issue.IssueMessage)
 }
 
 type executeScriptConfig interface {
