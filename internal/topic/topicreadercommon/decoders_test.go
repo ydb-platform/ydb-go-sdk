@@ -13,7 +13,7 @@ import (
 )
 
 func TestMultiDecoder(t *testing.T) {
-	compressGzip := func(data string) io.Reader {
+	compressGzip := func(data string) []byte {
 		buf := &bytes.Buffer{}
 
 		gzipWriter := gzip.NewWriter(buf)
@@ -21,7 +21,7 @@ func TestMultiDecoder(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, gzipWriter.Close())
 
-		return buf
+		return buf.Bytes()
 	}
 
 	t.Run("NotResettableReader", func(t *testing.T) {
@@ -29,11 +29,7 @@ func TestMultiDecoder(t *testing.T) {
 		require.Len(t, testMultiDecoder.m, 2)
 		require.Len(t, testMultiDecoder.dp, 2)
 
-		buf := &bytes.Buffer{}
-		_, err := buf.WriteString("test_data")
-		require.NoError(t, err)
-
-		decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecRaw, buf)
+		decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecRaw, []byte("test_data"))
 		require.NoError(t, err)
 
 		decoded, err := io.ReadAll(decodedReader)
@@ -44,16 +40,16 @@ func TestMultiDecoder(t *testing.T) {
 	t.Run("ResettableReader", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
 
-		encodedReader := compressGzip("test_data_1")
-		decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecGzip, encodedReader)
+		encodedData := compressGzip("test_data_1")
+		decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecGzip, encodedData)
 		require.NoError(t, err)
 
 		decoded, err := io.ReadAll(decodedReader)
 		require.NoError(t, err)
 		require.Equal(t, "test_data_1", string(decoded))
 
-		encodedReader = compressGzip("test_data_2")
-		decodedReader, err = testMultiDecoder.Decode(rawtopiccommon.CodecGzip, encodedReader)
+		encodedData = compressGzip("test_data_2")
+		decodedReader, err = testMultiDecoder.Decode(rawtopiccommon.CodecGzip, encodedData)
 		require.NoError(t, err)
 
 		decoded, err = io.ReadAll(decodedReader)
@@ -71,8 +67,8 @@ func TestMultiDecoder(t *testing.T) {
 		require.Len(t, testMultiDecoder.m, 3)
 		require.Len(t, testMultiDecoder.dp, 3)
 
-		encodedReader := compressGzip("test_data_1")
-		decodedReader, err := testMultiDecoder.Decode(customCodec, encodedReader)
+		encodedData := compressGzip("test_data_1")
+		decodedReader, err := testMultiDecoder.Decode(customCodec, encodedData)
 		require.NoError(t, err)
 
 		decoded, err := io.ReadAll(decodedReader)
@@ -85,9 +81,9 @@ func TestMultiDecoder(t *testing.T) {
 
 		for i := 0; i < 50; i++ {
 			testMsg := fmt.Sprintf("test_data_%d", i)
-			encodedReader := compressGzip(testMsg)
+			encodedData := compressGzip(testMsg)
 
-			decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecGzip, encodedReader)
+			decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecGzip, encodedData)
 			require.NoError(t, err)
 
 			decoded, err := io.ReadAll(decodedReader)
