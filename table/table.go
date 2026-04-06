@@ -115,6 +115,12 @@ type Session interface {
 		opts ...options.DescribeTableOption,
 	) (desc options.Description, err error)
 
+	DescribeExternalDataSource(ctx context.Context, path string,
+	) (desc options.ExternalDataSourceDescription, err error)
+
+	DescribeExternalTable(ctx context.Context, path string,
+	) (desc options.ExternalTableDescription, err error)
+
 	DropTable(ctx context.Context, path string,
 		opts ...options.DropTableOption,
 	) (err error)
