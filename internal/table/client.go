@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -150,13 +151,13 @@ func (c *Client) DescribeExternalDataSource(ctx context.Context, path string) (
 	}
 
 	var desc options.ExternalDataSourceDescription
-	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+	svc := Ydb_Table_V1.NewTableServiceClient(c.cc)
 	config := c.retryOptions()
 	config.RetryOptions = append(config.RetryOptions, retry.WithIdempotent(true))
 
 	err := retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
-			desc, err = DescribeExternalDataSource(ctx, client, path)
+			desc, err = externalDataSourceDescription(ctx, svc, path)
 
 			return err
 		},
@@ -180,13 +181,13 @@ func (c *Client) DescribeExternalTable(ctx context.Context, path string) (
 	}
 
 	var desc options.ExternalTableDescription
-	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+	svc := Ydb_Table_V1.NewTableServiceClient(c.cc)
 	config := c.retryOptions()
 	config.RetryOptions = append(config.RetryOptions, retry.WithIdempotent(true))
 
 	err := retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
-			desc, err = DescribeExternalTable(ctx, client, path)
+			desc, err = externalTableDescription(ctx, svc, path)
 
 			return err
 		},
@@ -591,4 +592,64 @@ func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx
 	}
 
 	return op(xcontext.MarkRetryCall(ctx), tx)
+}
+
+func externalDataSourceDescription(
+	ctx context.Context,
+	svc Ydb_Table_V1.TableServiceClient,
+	path string,
+) (desc options.ExternalDataSourceDescription, err error) {
+	request := &Ydb_Table.DescribeExternalDataSourceRequest{
+		Path:            path,
+		OperationParams: operation.Params(ctx, 0, 0, operation.ModeSync),
+	}
+	response, err := svc.DescribeExternalDataSource(ctx, request)
+	if err != nil {
+		return desc, xerrors.WithStackTrace(err)
+	}
+
+	var result Ydb_Table.DescribeExternalDataSourceResult
+	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
+		return desc, xerrors.WithStackTrace(err)
+	}
+
+	desc = options.ExternalDataSourceDescription{
+		Name:       result.GetSelf().GetName(),
+		SourceType: result.GetSourceType(),
+		Location:   result.GetLocation(),
+		Properties: result.GetProperties(),
+	}
+
+	return desc, nil
+}
+
+func externalTableDescription(
+	ctx context.Context,
+	svc Ydb_Table_V1.TableServiceClient,
+	path string,
+) (desc options.ExternalTableDescription, err error) {
+	request := &Ydb_Table.DescribeExternalTableRequest{
+		Path:            path,
+		OperationParams: operation.Params(ctx, 0, 0, operation.ModeSync),
+	}
+	response, err := svc.DescribeExternalTable(ctx, request)
+	if err != nil {
+		return desc, xerrors.WithStackTrace(err)
+	}
+
+	var result Ydb_Table.DescribeExternalTableResult
+	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
+		return desc, xerrors.WithStackTrace(err)
+	}
+
+	desc = options.ExternalTableDescription{
+		Name:           result.GetSelf().GetName(),
+		SourceType:     result.GetSourceType(),
+		DataSourcePath: result.GetDataSourcePath(),
+		Location:       result.GetLocation(),
+		Columns:        processColumns(result.GetColumns()),
+		Content:        result.GetContent(),
+	}
+
+	return desc, nil
 }
