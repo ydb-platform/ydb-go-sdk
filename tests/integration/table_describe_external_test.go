@@ -8,8 +8,10 @@ import (
 	"path"
 	"testing"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"google.golang.org/grpc/codes"
 )
 
 func TestDescribeExternalDataSource(t *testing.T) {
@@ -25,6 +27,9 @@ func TestDescribeExternalDataSource(t *testing.T) {
 			AUTH_METHOD = "NONE"
 		)`,
 	)
+	if ydb.IsTransportError(err, codes.Unimplemented) {
+		t.Skip("external data sources are not supported in this YDB version")
+	}
 	scope.Require.NoError(err)
 
 	var desc options.ExternalDataSourceDescription
@@ -58,6 +63,9 @@ func TestDescribeExternalTable(t *testing.T) {
 			AUTH_METHOD = "NONE"
 		)`,
 	)
+	if ydb.IsTransportError(err, codes.Unimplemented) {
+		t.Skip("external data sources are not supported in this YDB version")
+	}
 	scope.Require.NoError(err)
 
 	tablePath := path.Join(folder, "test_external_table")

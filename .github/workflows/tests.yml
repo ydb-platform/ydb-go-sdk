@@ -122,6 +122,7 @@ jobs:
         volumes:
           - /tmp/ydb_certs:/ydb_certs
         env:
+          YDB_FEATURE_FLAGS: enable_external_data_sources
           YDB_LOCAL_SURVIVE_RESTART: true
           YDB_USE_IN_MEMORY_PDISKS: true
           YDB_TABLE_ENABLE_PREPARED_DDL: true
