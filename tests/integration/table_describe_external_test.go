@@ -28,9 +28,6 @@ func TestDescribeExternalDataSource(t *testing.T) {
 			AUTH_METHOD = "NONE"
 		)`,
 	)
-	if ydb.IsTransportError(err, codes.Unimplemented) {
-		t.Skip("external data sources are not supported in this YDB version")
-	}
 	scope.Require.NoError(err)
 
 	var desc options.ExternalDataSourceDescription
@@ -40,6 +37,9 @@ func TestDescribeExternalDataSource(t *testing.T) {
 
 		return descErr
 	}, table.WithIdempotent())
+	if ydb.IsTransportError(err, codes.Unimplemented) {
+		t.Skip("external data sources are not supported in this YDB version")
+	}
 	scope.Require.NoError(err)
 
 	scope.Require.Equal("test_external_data_source", desc.Name)
@@ -64,9 +64,6 @@ func TestDescribeExternalTable(t *testing.T) {
 			AUTH_METHOD = "NONE"
 		)`,
 	)
-	if ydb.IsTransportError(err, codes.Unimplemented) {
-		t.Skip("external data sources are not supported in this YDB version")
-	}
 	scope.Require.NoError(err)
 
 	tablePath := path.Join(folder, "test_external_table")
@@ -92,6 +89,9 @@ func TestDescribeExternalTable(t *testing.T) {
 
 		return descErr
 	}, table.WithIdempotent())
+	if ydb.IsTransportError(err, codes.Unimplemented) {
+		t.Skip("external data sources are not supported in this YDB version")
+	}
 	scope.Require.NoError(err)
 
 	scope.Require.Equal("test_external_table", desc.Name)
