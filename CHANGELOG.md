@@ -1,3 +1,7 @@
+## v3.133.1
+* Added `TopicListener.ReadSessionID()` getter
+
+## v3.133.0
 * Added `ydb.WithIssuesHandler` context option for surfacing YDB `QueryService` issues to `database/sql` callers
 
 ## v3.132.0
