@@ -200,20 +200,25 @@ func runWriter(
 		}
 		messagesWritten.Add(1)
 		bytesWritten.Add(int64(size))
+
+		if cfg.durationBetweenWrites > 0 {
+			time.Sleep(cfg.durationBetweenWrites)
+		}
 	}
 
 	return nil
 }
 
 type config struct {
-	dsn               string
-	useEnvCredentials bool
-	topicPath         string
-	minMsgBytes       int
-	maxMsgBytes       int
-	duration          time.Duration
-	writers           int
-	keysNumber        int
+	dsn                   string
+	useEnvCredentials     bool
+	topicPath             string
+	minMsgBytes           int
+	maxMsgBytes           int
+	duration              time.Duration
+	writers               int
+	keysNumber            int
+	durationBetweenWrites time.Duration
 }
 
 func (c *config) validate() error {
@@ -263,6 +268,7 @@ func parseFlags() config {
 	fs.DurationVar(&c.duration, "duration", time.Minute, "How long each writer runs")
 	fs.IntVar(&c.writers, "writers", 4, "Number of concurrent writers (goroutines)")
 	fs.IntVar(&c.keysNumber, "keys-number", 10000, "Number of keys")
+	fs.DurationVar(&c.durationBetweenWrites, "duration-between-writes", 0, "Duration between writes")
 
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		fs.Usage()

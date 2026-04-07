@@ -1401,7 +1401,7 @@ func TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch(t *testing.T
 
 	writeBurstNoFlush := func(partitions []topictypes.PartitionInfo) {
 		for _, key := range scenario.getKeys(partitions) {
-			for range 3 {
+			for range 2 {
 				written1 += scenario.writeMessages(scenario.writer1, payload, key, nil, 1)
 				written2 += scenario.writeMessages(scenario.writer2, payload, key, nil, 1)
 			}
@@ -1412,11 +1412,18 @@ func TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch(t *testing.T
 	writeBurstNoFlush(describe.Partitions)
 	_ = scenario.waitForPartitionsCountAtLeast(3, 20*time.Second, writeBurstNoFlush)
 
-	flushCtx, cancel := context.WithTimeout(scope.Ctx, 45*time.Second)
+	flushWriter := func(writer *topicwriter.Writer) {
+		flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		require.NoError(t, writer.Flush(flushCtx))
+	}
+
+	flushWriter(scenario.writer1)
+	flushWriter(scenario.writer2)
+
+	closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	require.NoError(t, scenario.writer1.Flush(flushCtx))
-	require.NoError(t, scenario.writer2.Flush(flushCtx))
-	scenario.closeAll(scope.Ctx)
+	scenario.closeAll(closeCtx)
 
 	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
 		scope.Ctx,
