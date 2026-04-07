@@ -8,10 +8,11 @@ import (
 	"path"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"google.golang.org/grpc/codes"
 )
 
 func TestDescribeExternalDataSource(t *testing.T) {
