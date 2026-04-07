@@ -134,7 +134,6 @@ jobs:
       YDB_VERSION: ${{ matrix.ydb-version }}
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
-      YDB_FEATURE_FLAGS: enable_external_data_sources
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
       YDB_DATABASE_SQL_OVER_QUERY_SERVICE: 1
