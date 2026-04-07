@@ -1,3 +1,6 @@
+* Fixed `sugar.RemoveRecursive()` for directories containing external data sources or external tables
+* Added `table.DescribeExternalDataSource()` and `table.DescribeExternalTable()` methods for describing external data sources and external tables
+
 ## v3.133.1
 * Added `TopicListener.ReadSessionID()` getter
 
