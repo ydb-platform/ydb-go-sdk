@@ -525,6 +525,59 @@ func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
 	require.ErrorIs(t, reconnector.streamErr, testErr)
 }
 
+// streamWithSessionID is a minimal batchedStreamReader stub that also implements
+// readSessionIDer, allowing tests to verify ReadSessionID delegation without
+// pulling in the full topicStreamReaderImpl.
+type streamWithSessionID struct {
+	MockbatchedStreamReader
+
+	sessionID string
+}
+
+func (s *streamWithSessionID) ReadSessionID() string {
+	return s.sessionID
+}
+
+func TestReaderReconnectorReadSessionID(t *testing.T) {
+	t.Run("NilStream", func(t *testing.T) {
+		r := &readerReconnector{}
+		r.initChannelsAndClock()
+		require.Equal(t, "", r.ReadSessionID())
+	})
+
+	t.Run("StreamWithoutSessionID", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		// Plain mock does not implement readSessionIDer — should return empty string.
+		stream := NewMockbatchedStreamReader(mc)
+		r := &readerReconnector{
+			streamVal:           stream,
+			streamContextCancel: func(cause error) {},
+			tracer:              &trace.Topic{},
+		}
+		r.initChannelsAndClock()
+		require.Equal(t, "", r.ReadSessionID())
+	})
+
+	t.Run("StreamWithSessionID", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		stream := &streamWithSessionID{
+			MockbatchedStreamReader: *NewMockbatchedStreamReader(mc),
+			sessionID:               "test-session-id",
+		}
+		r := &readerReconnector{
+			streamVal:           stream,
+			streamContextCancel: func(cause error) {},
+			tracer:              &trace.Topic{},
+		}
+		r.initChannelsAndClock()
+		require.Equal(t, "test-session-id", r.ReadSessionID())
+	})
+}
+
 type readerConnectFuncAnswer struct {
 	callback readerConnectFunc
 	stream   batchedStreamReader

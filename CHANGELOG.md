@@ -1,3 +1,19 @@
+* Fixed `sugar.RemoveRecursive()` for directories containing external data sources or external tables
+* Added `table.DescribeExternalDataSource()` and `table.DescribeExternalTable()` methods for describing external data sources and external tables
+
+## v3.133.1
+* Added `TopicListener.ReadSessionID()` getter
+
+## v3.133.0
+* Added `ydb.WithIssuesHandler` context option for surfacing YDB `QueryService` issues to `database/sql` callers
+
+## v3.132.0
+* Added `topic.Client.CommitOffset()` method for committing a consumer offset without an active read session
+* Added `topicreader.Reader.ReadSessionID()` method for obtaining the current read session identifier
+
+## v3.131.0
+* Added `ydb.WithStatsModeBasic`, `ydb.WithStatsModeFull`, `ydb.WithStatsModeProfile` context options for collecting query statistics via `database/sql`
+
 ## v3.130.0
 * Changed default for `database/sql` driver from `TABLE` service to `QUERY` service
 * Added `__ydb_partition_key` metadata key to messages for topic writer to store the key used to choose the partition
@@ -88,8 +104,8 @@
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
 
 ## v3.125.1
-* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to 
-`ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to 
+* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to
+`ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to
 distinguish between hits and misses
 * Bumped `golang.org/x/net` from 0.35.0 to 0.38.0
 

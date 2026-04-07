@@ -1,4 +1,4 @@
-package node_hints
+package nodehints
 
 import (
 	"context"
