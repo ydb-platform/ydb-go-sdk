@@ -139,6 +139,66 @@ func (c *Client) DescribeTable(ctx context.Context, path string, opts ...options
 	return &desc, nil
 }
 
+func (c *Client) DescribeExternalDataSource(ctx context.Context, path string) (
+	*options.ExternalDataSourceDescription, error,
+) {
+	if c == nil {
+		return nil, xerrors.WithStackTrace(errNilClient)
+	}
+	if c.isClosed() {
+		return nil, xerrors.WithStackTrace(errClosedClient)
+	}
+
+	var desc options.ExternalDataSourceDescription
+	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+	config := c.retryOptions()
+	config.RetryOptions = append(config.RetryOptions, retry.WithIdempotent(true))
+
+	err := retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			desc, err = DescribeExternalDataSource(ctx, client, path)
+
+			return err
+		},
+		config.RetryOptions...,
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return &desc, nil
+}
+
+func (c *Client) DescribeExternalTable(ctx context.Context, path string) (
+	*options.ExternalTableDescription, error,
+) {
+	if c == nil {
+		return nil, xerrors.WithStackTrace(errNilClient)
+	}
+	if c.isClosed() {
+		return nil, xerrors.WithStackTrace(errClosedClient)
+	}
+
+	var desc options.ExternalTableDescription
+	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
+	config := c.retryOptions()
+	config.RetryOptions = append(config.RetryOptions, retry.WithIdempotent(true))
+
+	err := retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			desc, err = DescribeExternalTable(ctx, client, path)
+
+			return err
+		},
+		config.RetryOptions...,
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return &desc, nil
+}
+
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)

@@ -653,18 +653,6 @@ func DescribeExternalDataSource(
 	return desc, nil
 }
 
-func (s *Session) DescribeExternalDataSource(
-	ctx context.Context,
-	path string,
-) (options.ExternalDataSourceDescription, error) {
-	desc, err := DescribeExternalDataSource(ctx, s.client, path)
-	if err != nil {
-		return desc, xerrors.WithStackTrace(err)
-	}
-
-	return desc, nil
-}
-
 type describeExternalTableClient interface {
 	DescribeExternalTable(
 		ctx context.Context, in *Ydb_Table.DescribeExternalTableRequest, opts ...grpc.CallOption,
@@ -697,18 +685,6 @@ func DescribeExternalTable(
 		Location:       result.GetLocation(),
 		Columns:        processColumns(result.GetColumns()),
 		Content:        result.GetContent(),
-	}
-
-	return desc, nil
-}
-
-func (s *Session) DescribeExternalTable(
-	ctx context.Context,
-	path string,
-) (options.ExternalTableDescription, error) {
-	desc, err := DescribeExternalTable(ctx, s.client, path)
-	if err != nil {
-		return desc, xerrors.WithStackTrace(err)
 	}
 
 	return desc, nil

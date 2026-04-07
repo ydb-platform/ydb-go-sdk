@@ -4,15 +4,12 @@
 package integration
 
 import (
-	"context"
 	"path"
 	"testing"
 
 	"google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 func TestDescribeExternalDataSource(t *testing.T) {
@@ -30,13 +27,7 @@ func TestDescribeExternalDataSource(t *testing.T) {
 	)
 	scope.Require.NoError(err)
 
-	var desc options.ExternalDataSourceDescription
-	err = driver.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
-		var descErr error
-		desc, descErr = s.DescribeExternalDataSource(ctx, "/"+dsPath)
-
-		return descErr
-	}, table.WithIdempotent())
+	desc, err := driver.Table().DescribeExternalDataSource(scope.Ctx, "/"+dsPath)
 	if ydb.IsTransportError(err, codes.Unimplemented) {
 		t.Skip("external data sources are not supported in this YDB version")
 	}
@@ -82,13 +73,7 @@ func TestDescribeExternalTable(t *testing.T) {
 	)
 	scope.Require.NoError(err)
 
-	var desc options.ExternalTableDescription
-	err = driver.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
-		var descErr error
-		desc, descErr = s.DescribeExternalTable(ctx, tablePath)
-
-		return descErr
-	}, table.WithIdempotent())
+	desc, err := driver.Table().DescribeExternalTable(scope.Ctx, tablePath)
 	if ydb.IsTransportError(err, codes.Unimplemented) {
 		t.Skip("external data sources are not supported in this YDB version")
 	}

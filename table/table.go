@@ -80,6 +80,14 @@ type Client interface {
 		opts ...options.DescribeTableOption,
 	) (desc *options.Description, err error)
 
+	// DescribeExternalDataSource returns metadata for an external data source at the given path.
+	DescribeExternalDataSource(ctx context.Context, path string,
+	) (desc *options.ExternalDataSourceDescription, err error)
+
+	// DescribeExternalTable returns metadata for an external table at the given path.
+	DescribeExternalTable(ctx context.Context, path string,
+	) (desc *options.ExternalTableDescription, err error)
+
 	// ReadRows reads a batch of rows non-transactionally.
 	ReadRows(
 		ctx context.Context, path string, keys types.Value,
@@ -114,12 +122,6 @@ type Session interface {
 	DescribeTable(ctx context.Context, path string,
 		opts ...options.DescribeTableOption,
 	) (desc options.Description, err error)
-
-	DescribeExternalDataSource(ctx context.Context, path string,
-	) (desc options.ExternalDataSourceDescription, err error)
-
-	DescribeExternalTable(ctx context.Context, path string,
-	) (desc options.ExternalTableDescription, err error)
 
 	DropTable(ctx context.Context, path string,
 		opts ...options.DropTableOption,
