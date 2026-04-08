@@ -27,11 +27,8 @@ func TestIssueHandlerContext(t *testing.T) {
 		})
 
 		ih := IssuesHandlerFromContext(ctx)
-		if ih == nil {
-			t.Fatal("expected non-nil issues handler option")
-		}
-		if ih.Callback == nil {
-			t.Fatal("expected non-nil issues handler callback")
+		if ih == nil || ih.Callback == nil {
+			t.Fatal("expected non-nil issues handler with non-nil callback")
 		}
 
 		ih.Callback(expected)

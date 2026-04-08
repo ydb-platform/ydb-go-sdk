@@ -120,6 +120,22 @@ func TestDatabaseSqlScanner(t *testing.T) {
 			},
 		},
 		{
+			name: "YSON_to_bytes",
+			sql:  "SELECT CAST('<a=1>[3;%false]' AS Yson)",
+			scan: func(row *sql.Row) (_ error, act, exp any) {
+				var v []byte
+				return row.Scan(&v), v, []byte("<a=1>[3;%false]")
+			},
+		},
+		{
+			name: "YSON_to_string",
+			sql:  "SELECT CAST('<a=1>[3;%false]' AS Yson)",
+			scan: func(row *sql.Row) (_ error, act, exp any) {
+				var v string
+				return row.Scan(&v), v, "<a=1>[3;%false]"
+			},
+		},
+		{
 			name: "Int8",
 			sql:  "SELECT CAST(42 AS Int8)",
 			scan: func(row *sql.Row) (_ error, act, exp any) {
