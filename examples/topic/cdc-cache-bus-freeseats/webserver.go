@@ -21,7 +21,7 @@ type server struct {
 	cache     *Cache
 	mux       http.ServeMux
 	db        *ydb.Driver
-	dbCounter int64
+	dbCounter atomic.Int64
 	id        int
 }
 
@@ -102,7 +102,7 @@ func (s *server) getFreeSeats(ctx context.Context, id string) (int64, error) {
 }
 
 func (s *server) getContentFromDB(ctx context.Context, id string) (int64, error) {
-	atomic.AddInt64(&s.dbCounter, 1)
+	s.dbCounter.Add(1)
 	var freeSeats int64
 	err := s.db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		var err error
