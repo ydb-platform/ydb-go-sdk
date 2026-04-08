@@ -1548,7 +1548,7 @@ func (v *listValue) castTo(dst any) error {
 		*dstValue = v
 
 		return nil
-	case interface{}:
+	case any:
 		ptr := reflect.ValueOf(dstValue)
 
 		inner := reflect.Indirect(ptr)
@@ -1679,7 +1679,7 @@ func (v *setValue) castTo(dst any) error {
 		*dstValue = v
 
 		return nil
-	case interface{}:
+	case any:
 		ptr := reflect.ValueOf(dstValue)
 
 		inner := reflect.Indirect(ptr)
@@ -1889,7 +1889,7 @@ func (v *structValue) castTo(dst any) error {
 		*dstValue = v
 
 		return nil
-	case interface{}:
+	case any:
 		ptr := reflect.ValueOf(dst)
 
 		inner := reflect.Indirect(ptr)

@@ -173,8 +173,8 @@ func (w *Writer) typeImports(dst []dep, t types.Type) []dep {
 }
 
 func forEachField(s *types.Struct, fn func(*types.Var)) {
-	for i := 0; i < s.NumFields(); i++ {
-		fn(s.Field(i))
+	for field := range s.Fields() {
+		fn(field)
 	}
 }
 
@@ -638,8 +638,7 @@ func (w *Writer) constructStruct(n types.Type, s *types.Struct, vars []string) (
 	p := w.declare("p")
 	// maybe skip pointers from flattening to not allocate anyhing during trace.
 	w.line(`var `, p, ` `, w.typeString(n))
-	for i := 0; i < s.NumFields(); i++ {
-		v := s.Field(i)
+	for v := range s.Fields() {
 		if !v.Exported() {
 			continue
 		}

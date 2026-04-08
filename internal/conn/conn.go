@@ -405,8 +405,8 @@ func invoke(
 func (c *conn) Invoke(
 	ctx context.Context,
 	method string,
-	req interface{},
-	res interface{},
+	req any,
+	res any,
 	opts ...grpc.CallOption,
 ) (err error) {
 	var (

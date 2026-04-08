@@ -102,7 +102,7 @@ var codeToString = map[MethodCode]string{
 	TableStreamExecuteScanQuery: lastSegment("/Ydb.Table.V1.TableService/StreamExecuteScanQuery"),
 }
 
-func setField(name string, dst, value interface{}) {
+func setField(name string, dst, value any) {
 	x := reflect.ValueOf(dst).Elem()
 	t := x.Type()
 	f, ok := t.FieldByName(name)
@@ -126,8 +126,8 @@ type balancerStub struct {
 	onInvoke func(
 		ctx context.Context,
 		method string,
-		args interface{},
-		reply interface{},
+		args any,
+		reply any,
 		opts ...grpc.CallOption,
 	) error
 	onNewStream func(
@@ -141,8 +141,8 @@ type balancerStub struct {
 func (b *balancerStub) Invoke(
 	ctx context.Context,
 	method string,
-	args interface{},
-	reply interface{},
+	args any,
+	reply any,
 	opts ...grpc.CallOption,
 ) (err error) {
 	if b.onInvoke == nil {
@@ -183,7 +183,7 @@ func (b *balancerStub) Close(ctx context.Context) error {
 }
 
 type (
-	InvokeHandlers    map[MethodCode]func(request interface{}) (result proto.Message, err error)
+	InvokeHandlers    map[MethodCode]func(request any) (result proto.Message, err error)
 	NewStreamHandlers map[MethodCode]func(desc *grpc.StreamDesc) (grpc.ClientStream, error)
 )
 
@@ -194,8 +194,8 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 		r.onInvoke = func(
 			ctx context.Context,
 			method string,
-			args interface{},
-			reply interface{},
+			args any,
+			reply any,
 			opts ...grpc.CallOption,
 		) (err error) {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
@@ -260,8 +260,8 @@ type clientConn struct {
 	onInvoke func(
 		ctx context.Context,
 		method string,
-		args interface{},
-		reply interface{},
+		args any,
+		reply any,
 		opts ...grpc.CallOption,
 	) error
 	onNewStream func(
@@ -284,8 +284,8 @@ func (c *clientConn) Address() string {
 func (c *clientConn) Invoke(
 	ctx context.Context,
 	method string,
-	args interface{},
-	reply interface{},
+	args any,
+	reply any,
 	opts ...grpc.CallOption,
 ) error {
 	if c.onInvoke == nil {
@@ -313,8 +313,8 @@ type ClientStream struct {
 	OnTrailer   func() metadata.MD
 	OnCloseSend func() error
 	OnContext   func() context.Context
-	OnSendMsg   func(m interface{}) error
-	OnRecvMsg   func(m interface{}) error
+	OnSendMsg   func(m any) error
+	OnRecvMsg   func(m any) error
 }
 
 func (s *ClientStream) Header() (metadata.MD, error) {
@@ -349,7 +349,7 @@ func (s *ClientStream) Context() context.Context {
 	return s.OnContext()
 }
 
-func (s *ClientStream) SendMsg(m interface{}) error {
+func (s *ClientStream) SendMsg(m any) error {
 	if s.OnSendMsg == nil {
 		return xerrors.WithStackTrace(ErrNotImplemented)
 	}
@@ -357,7 +357,7 @@ func (s *ClientStream) SendMsg(m interface{}) error {
 	return s.OnSendMsg(m)
 }
 
-func (s *ClientStream) RecvMsg(m interface{}) error {
+func (s *ClientStream) RecvMsg(m any) error {
 	if s.OnRecvMsg == nil {
 		return xerrors.WithStackTrace(ErrNotImplemented)
 	}

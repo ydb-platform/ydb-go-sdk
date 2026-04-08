@@ -18,7 +18,7 @@ type Common struct {
 
 	disableSessionBalancer bool
 
-	panicCallback func(e interface{})
+	panicCallback func(e any)
 }
 
 // AutoRetry defines auto-retry flag
@@ -28,7 +28,7 @@ func (c *Common) AutoRetry() bool {
 
 // PanicCallback returns user-defined panic callback
 // If nil - panic callback not defined
-func (c *Common) PanicCallback() func(e interface{}) {
+func (c *Common) PanicCallback() func(e any) {
 	return c.panicCallback
 }
 
@@ -87,7 +87,7 @@ func SetOperationCancelAfter(c *Common, operationCancelAfter time.Duration) {
 }
 
 // SetPanicCallback applies panic callback to config
-func SetPanicCallback(c *Common, panicCallback func(e interface{})) {
+func SetPanicCallback(c *Common, panicCallback func(e any)) {
 	c.panicCallback = panicCallback
 }
 

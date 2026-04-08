@@ -379,9 +379,9 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 			)
 			require.EqualValues(t, 1, p.config.limit)
-			var lambdaCounter int64
+			var lambdaCounter atomic.Int64
 			err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
-				if atomic.AddInt64(&lambdaCounter, 1) < 10 {
+				if lambdaCounter.Add(1) < 10 {
 					return xerrors.Retryable(errors.New("test"))
 				}
 
@@ -391,11 +391,11 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.EqualValues(t, 2, newCounter)
 		})
 		t.Run("WithCreateItemFunc", func(t *testing.T) {
-			var newCounter int64
+			var newCounter atomic.Int64
 			p := New(rootCtx,
 				WithLimit[*testItem, testItem](1),
 				WithCreateItemFunc(func(context.Context) (*testItem, error) {
-					atomic.AddInt64(&newCounter, 1)
+					newCounter.Add(1)
 					var v testItem
 
 					return &v, nil
@@ -406,7 +406,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				return nil
 			})
 			require.NoError(t, err)
-			require.EqualValues(t, p.config.limit, atomic.LoadInt64(&newCounter))
+			require.EqualValues(t, p.config.limit, newCounter.Load())
 		})
 	})
 	t.Run("Close", func(t *testing.T) {
@@ -666,14 +666,14 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("CreateItem", func(t *testing.T) {
 			t.Run("context", func(t *testing.T) {
 				t.Run("Cancelled", func(t *testing.T) {
-					var counter int64
+					var counter atomic.Int64
 					p := New(rootCtx,
 						WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 						WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 						WithCreateItemFunc(func(context.Context) (*testItem, error) {
-							atomic.AddInt64(&counter, 1)
+							counter.Add(1)
 
-							if atomic.LoadInt64(&counter) < 10 {
+							if counter.Load() < 10 {
 								return nil, context.Canceled
 							}
 
@@ -686,17 +686,17 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						return nil
 					})
 					require.NoError(t, err)
-					require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+					require.GreaterOrEqual(t, counter.Load(), int64(10))
 				})
 				t.Run("DeadlineExceeded", func(t *testing.T) {
-					var counter int64
+					var counter atomic.Int64
 					p := New(rootCtx,
 						WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 						WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 						WithCreateItemFunc(func(context.Context) (*testItem, error) {
-							atomic.AddInt64(&counter, 1)
+							counter.Add(1)
 
-							if atomic.LoadInt64(&counter) < 10 {
+							if counter.Load() < 10 {
 								return nil, context.DeadlineExceeded
 							}
 
@@ -709,18 +709,18 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						return nil
 					})
 					require.NoError(t, err)
-					require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+					require.GreaterOrEqual(t, counter.Load(), int64(10))
 				})
 			})
 			t.Run("OnTransportError", func(t *testing.T) {
-				var counter int64
+				var counter atomic.Int64
 				p := New(rootCtx,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
-						atomic.AddInt64(&counter, 1)
+						counter.Add(1)
 
-						if atomic.LoadInt64(&counter) < 10 {
+						if counter.Load() < 10 {
 							return nil, xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
 						}
 
@@ -733,17 +733,17 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					return nil
 				})
 				require.NoError(t, err)
-				require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+				require.GreaterOrEqual(t, counter.Load(), int64(10))
 			})
 			t.Run("OnOperationError", func(t *testing.T) {
-				var counter int64
+				var counter atomic.Int64
 				p := New(rootCtx,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
-						atomic.AddInt64(&counter, 1)
+						counter.Add(1)
 
-						if atomic.LoadInt64(&counter) < 10 {
+						if counter.Load() < 10 {
 							return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 						}
 
@@ -756,7 +756,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					return nil
 				})
 				require.NoError(t, err)
-				require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+				require.GreaterOrEqual(t, counter.Load(), int64(10))
 			})
 			t.Run("NilNil", func(t *testing.T) {
 				xtest.TestManyTimes(t, func(t testing.TB) {
@@ -880,17 +880,17 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("Close", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var (
-					createCounter int64
-					closeCounter  int64
+					createCounter atomic.Int64
+					closeCounter  atomic.Int64
 				)
 				p := New(rootCtx,
 					WithLimit[*testItem, testItem](1),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
-						atomic.AddInt64(&createCounter, 1)
+						createCounter.Add(1)
 
 						v := &testItem{
 							onClose: func() error {
-								atomic.AddInt64(&closeCounter, 1)
+								closeCounter.Add(1)
 
 								return nil
 							},
@@ -903,10 +903,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					return nil
 				})
 				require.NoError(t, err)
-				require.GreaterOrEqual(t, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
+				require.GreaterOrEqual(t, createCounter.Load(), closeCounter.Load())
 				err = p.Close(rootCtx)
 				require.NoError(t, err)
-				require.EqualValues(t, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
+				require.EqualValues(t, createCounter.Load(), closeCounter.Load())
 			})
 		})
 		t.Run("IsAlive", func(t *testing.T) {
@@ -1252,12 +1252,12 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 	})
 	t.Run("PreferredNodeID", func(t *testing.T) {
 		t.Run("AlwaysSatisfiedWhenIdleAvailable", func(t *testing.T) {
-			var createdCount int32
+			var createdCount atomic.Int32
 
 			p := New[*testItem, testItem](rootCtx,
 				WithLimit[*testItem, testItem](3),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
-					idx := atomic.AddInt32(&createdCount, 1) - 1
+					idx := createdCount.Add(1) - 1
 
 					return &testItem{
 						v: idx,
