@@ -42,6 +42,19 @@ const (
 	defaultMessageString = "hello"
 )
 
+func cloneBytesMetadata(src map[string][]byte) map[string][]byte {
+	if src == nil {
+		return nil
+	}
+
+	dst := make(map[string][]byte, len(src))
+	for k, v := range src {
+		dst[k] = bytes.Clone(v)
+	}
+
+	return dst
+}
+
 func writeAndReadMessages(
 	t testing.TB,
 	ctx context.Context,
@@ -74,17 +87,35 @@ func writeAndReadMessages(
 	)
 }
 
-func cloneBytesMetadata(src map[string][]byte) map[string][]byte {
-	if src == nil {
-		return nil
+// readMessagesAndAssertOrderedBySeqNo reads exactly expectedCount messages from the topic and asserts that
+// within each (partitionID, producerID) pair seqNo is strictly increasing.
+func readMessagesAndAssertOrderedBySeqNo(
+	ctx context.Context,
+	client topic.Client,
+	topicPath string,
+	consumerName string,
+	expectedCount int,
+	timeout time.Duration,
+	expectedPayload []byte,
+) error {
+	messages, err := readMessagesDetailed(ctx, client, topicPath, consumerName, expectedCount, timeout)
+	if err != nil {
+		return err
+	}
+	for _, m := range messages {
+		if !bytes.Equal(expectedPayload, m.payload) {
+			return fmt.Errorf(
+				"partition %d, producerId %s: payload mismatch, expected %d bytes, got %d bytes, seqNo %d",
+				m.partitionID,
+				m.producerID,
+				len(expectedPayload),
+				len(m.payload),
+				m.seqNo,
+			)
+		}
 	}
 
-	dst := make(map[string][]byte, len(src))
-	for k, v := range src {
-		dst[k] = bytes.Clone(v)
-	}
-
-	return dst
+	return assertMessagesOrderedBySeqNo(messages)
 }
 
 func readMessagesDetailed(
@@ -180,37 +211,6 @@ func assertMessagesOrderedBySeqNo(messages []receivedTopicMessage) error {
 	}
 
 	return nil
-}
-
-// readMessagesAndAssertOrderedBySeqNo reads exactly expectedCount messages from the topic and asserts that
-// within each (partitionID, producerID) pair seqNo is strictly increasing.
-func readMessagesAndAssertOrderedBySeqNo(
-	ctx context.Context,
-	client topic.Client,
-	topicPath string,
-	consumerName string,
-	expectedCount int,
-	timeout time.Duration,
-	expectedPayload []byte,
-) error {
-	messages, err := readMessagesDetailed(ctx, client, topicPath, consumerName, expectedCount, timeout)
-	if err != nil {
-		return err
-	}
-	for _, m := range messages {
-		if !bytes.Equal(expectedPayload, m.payload) {
-			return fmt.Errorf(
-				"partition %d, producerId %s: payload mismatch, expected %d bytes, got %d bytes, seqNo %d",
-				m.partitionID,
-				m.producerID,
-				len(expectedPayload),
-				len(m.payload),
-				m.seqNo,
-			)
-		}
-	}
-
-	return assertMessagesOrderedBySeqNo(messages)
 }
 
 // readPartitionByPayload reads from the topic until each distinct payload in wantPayloads has been

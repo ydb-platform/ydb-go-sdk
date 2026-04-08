@@ -411,7 +411,6 @@ func TestUpdateToken(t *testing.T) {
 	db := scope.Driver()
 	dbLogging := scope.DriverWithGRPCLogging()
 	topicPath := scope.TopicPath()
-	activityCtx, stopActivityCtx := context.WithCancel(ctx)
 
 	tokenInterval := time.Second
 	reader, err := dbLogging.Topic().StartReader(
@@ -441,7 +440,7 @@ func TestUpdateToken(t *testing.T) {
 			}
 
 			msgContent := []byte(strconv.Itoa(i))
-			err = writer.Write(activityCtx, topicwriter.Message{Data: bytes.NewReader(msgContent)})
+			err := writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(msgContent)})
 			if errors.Is(err, context.Canceled) {
 				return
 			}
@@ -460,12 +459,12 @@ func TestUpdateToken(t *testing.T) {
 				return
 			}
 
-			msg, err := reader.ReadMessage(activityCtx)
+			msg, err := reader.ReadMessage(ctx)
 			if errors.Is(err, context.Canceled) {
 				return
 			}
 			scope.Require.NoError(err)
-			err = reader.Commit(activityCtx, msg)
+			err = reader.Commit(ctx, msg)
 			if errors.Is(err, context.Canceled) {
 				return
 			}
@@ -483,7 +482,6 @@ func TestUpdateToken(t *testing.T) {
 	}
 
 	stopTopicActivity.Store(true)
-	stopActivityCtx()
 
 	activityStopped := make(empty.Chan)
 	go func() {

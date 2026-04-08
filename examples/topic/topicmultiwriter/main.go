@@ -15,6 +15,8 @@
 // With authentication from the environment (see ydb-go-sdk-auth-environ), add:
 //
 //	-use-env-credentials
+//
+// this is a benchmark tool to test the performance of the YDB topic multi-writer (multiple partitions).
 package main
 
 import (
