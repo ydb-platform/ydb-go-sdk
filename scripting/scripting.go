@@ -14,7 +14,9 @@ const (
 	ExplainModeUnknown ExplainMode = iota
 	ExplainModeValidate
 	ExplainModePlan
+)
 
+const (
 	ExplainModeDefault = ExplainModePlan
 )
 

@@ -21,7 +21,7 @@ type testScanner struct {
 	err error
 }
 
-func (s testScanner) Scan(dst ...interface{}) error {
+func (s testScanner) Scan(dst ...any) error {
 	return s.err
 }
 
@@ -29,7 +29,7 @@ func (s testScanner) ScanNamed(dst ...scanner.NamedDestination) error {
 	return s.err
 }
 
-func (s testScanner) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error {
+func (s testScanner) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
 	return s.err
 }
 
@@ -112,7 +112,7 @@ func generateData(count int) []*Row {
 		},
 	}}
 	rows := make([]*Row, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		rows[i] = NewRow(columns, &Ydb.Value{
 			Items: []*Ydb.Value{{
 				Value: &Ydb.Value_Uint64Value{

@@ -132,12 +132,12 @@ func TestUnboundedChanMultipleMessages(t *testing.T) {
 	const count = 1000
 
 	// Send many messages
-	for i := 0; i < count; i++ {
+	for i := range count {
 		ch.Send(i)
 	}
 
 	// Receive them all
-	for i := 0; i < count; i++ {
+	for i := range count {
 		msg, ok, err := ch.Receive(ctx)
 		if err != nil || !ok || msg != i {
 			t.Errorf("Receive() = (%v, %v, %v), want (%d, true, nil)", msg, ok, err, i)
@@ -150,12 +150,12 @@ func TestUnboundedChanSignalChannelBehavior(t *testing.T) {
 	ch := NewUnboundedChan[int]()
 
 	// Send multiple messages rapidly
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		ch.Send(i)
 	}
 
 	// Should receive all messages despite signal channel being buffered
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		msg, ok, err := ch.Receive(ctx)
 		if err != nil || !ok || msg != i {
 			t.Errorf("Receive() = (%v, %v, %v), want (%d, true, nil)", msg, ok, err, i)
@@ -231,7 +231,7 @@ func TestUnboundedChanConcurrentSendReceive(t *testing.T) {
 		// Start sender goroutine
 		go func() {
 			defer close(senderDone)
-			for i := 0; i < count; i++ {
+			for i := range count {
 				ch.Send(i)
 			}
 		}()
@@ -271,7 +271,7 @@ func TestUnboundedChanConcurrentSendReceive(t *testing.T) {
 			}
 
 			// Verify we received the correct messages
-			for i := 0; i < count; i++ {
+			for i := range count {
 				if !received[i] {
 					t.Errorf("Missing message: %d", i)
 
@@ -294,9 +294,9 @@ func TestUnboundedChanConcurrentMerge(t *testing.T) {
 		done := make(empty.Chan)
 
 		// Start multiple sender goroutines
-		for i := 0; i < numSenders; i++ {
+		for i := range numSenders {
 			go func(id int) {
-				for j := 0; j < count; j++ {
+				for range count {
 					ch.SendWithMerge(TestMessage{ID: id, Data: "test"}, mergeTestMessages)
 				}
 			}(i)
@@ -341,7 +341,7 @@ func TestUnboundedChanConcurrentMerge(t *testing.T) {
 
 // allSendersHaveMessages checks if all sender IDs have sent at least one message
 func allSendersHaveMessages(received map[int]int, numSenders int) bool {
-	for i := 0; i < numSenders; i++ {
+	for i := range numSenders {
 		if received[i] == 0 {
 			return false
 		}

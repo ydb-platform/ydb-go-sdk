@@ -79,7 +79,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	return nil
 }
 
-func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
+func (s *grpcClientStream) SendMsg(m any) (err error) {
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamSendMsg(s.parentConn.config.Trace(), &ctx,
@@ -127,7 +127,7 @@ func (s *grpcClientStream) finish(err error) {
 	s.streamCancel()
 }
 
-func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
+func (s *grpcClientStream) RecvMsg(m any) (err error) {
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,

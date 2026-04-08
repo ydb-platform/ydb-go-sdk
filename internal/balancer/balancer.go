@@ -45,7 +45,7 @@ type streamWrapper struct {
 	onErr func(error)
 }
 
-func (s *streamWrapper) SendMsg(m interface{}) error {
+func (s *streamWrapper) SendMsg(m any) error {
 	err := s.ClientStream.SendMsg(m)
 	if err != nil && !errors.Is(err, io.EOF) {
 		s.onErr(err)
@@ -54,7 +54,7 @@ func (s *streamWrapper) SendMsg(m interface{}) error {
 	return err
 }
 
-func (s *streamWrapper) RecvMsg(m interface{}) error {
+func (s *streamWrapper) RecvMsg(m any) error {
 	err := s.ClientStream.RecvMsg(m)
 	if err != nil && !errors.Is(err, io.EOF) {
 		s.onErr(err)
@@ -370,8 +370,8 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 func (b *Balancer) Invoke(
 	ctx context.Context,
 	method string,
-	args interface{},
-	reply interface{},
+	args any,
+	reply any,
 	opts ...grpc.CallOption,
 ) error {
 	if b.closed.Load() {

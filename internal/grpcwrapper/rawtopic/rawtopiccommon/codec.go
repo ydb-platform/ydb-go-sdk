@@ -1,6 +1,8 @@
 package rawtopiccommon
 
 import (
+	"slices"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 )
 
@@ -8,7 +10,7 @@ import (
 type Codec int32
 
 const (
-	CodecUNSPECIFIED Codec = iota
+	CodecUNSPECIFIED Codec = Codec(Ydb_Topic.Codec_CODEC_UNSPECIFIED)
 	CodecRaw               = Codec(Ydb_Topic.Codec_CODEC_RAW)
 	CodecGzip              = Codec(Ydb_Topic.Codec_CODEC_GZIP)
 	CodecLzop              = Codec(Ydb_Topic.Codec_CODEC_LZOP)
@@ -48,13 +50,7 @@ func (c *SupportedCodecs) AllowedByCodecsList(need Codec) bool {
 }
 
 func (c *SupportedCodecs) Contains(need Codec) bool {
-	for _, v := range *c {
-		if v == need {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(*c, need)
 }
 
 func (c *SupportedCodecs) Clone() SupportedCodecs {

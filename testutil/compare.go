@@ -94,7 +94,7 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 	return values
 }
 
-func notComparableError(lhs, rhs interface{}) error {
+func notComparableError(lhs, rhs any) error {
 	return xerrors.WithStackTrace(fmt.Errorf("%w: %v and %v", ErrNotComparable, lhs, rhs), xerrors.WithSkipDepth(1))
 }
 

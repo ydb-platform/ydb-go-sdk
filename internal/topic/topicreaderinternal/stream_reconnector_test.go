@@ -131,7 +131,7 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 		cancelledCtx, cancelledCtxCancel := xcontext.WithCancel(context.Background())
 		cancelledCtxCancel()
 
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			reconnector := &readerReconnector{tracer: &trace.Topic{}}
 			reconnector.initChannelsAndClock()
 

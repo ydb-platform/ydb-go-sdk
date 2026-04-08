@@ -9,7 +9,7 @@ import (
 func TestToJSON(t *testing.T) {
 	for _, tt := range []struct {
 		name string
-		v    interface{}
+		v    any
 		s    string
 	}{
 		{

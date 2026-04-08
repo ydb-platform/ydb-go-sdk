@@ -25,7 +25,7 @@ func (s *SyncedTest) Cleanup(f func()) {
 	s.T.Cleanup(f)
 }
 
-func (s *SyncedTest) Error(args ...interface{}) {
+func (s *SyncedTest) Error(args ...any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.T.Helper()
@@ -33,7 +33,7 @@ func (s *SyncedTest) Error(args ...interface{}) {
 	s.T.Error(args...)
 }
 
-func (s *SyncedTest) Errorf(format string, args ...interface{}) {
+func (s *SyncedTest) Errorf(format string, args ...any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.T.Helper()
@@ -65,7 +65,7 @@ func (s *SyncedTest) Failed() bool {
 	return s.T.Failed()
 }
 
-func (s *SyncedTest) Fatal(args ...interface{}) {
+func (s *SyncedTest) Fatal(args ...any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.T.Helper()
@@ -73,7 +73,7 @@ func (s *SyncedTest) Fatal(args ...interface{}) {
 	s.T.Fatal(args...)
 }
 
-func (s *SyncedTest) Fatalf(format string, args ...interface{}) {
+func (s *SyncedTest) Fatalf(format string, args ...any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.T.Helper()
@@ -88,7 +88,7 @@ func (s *SyncedTest) Fatalf(format string, args ...interface{}) {
 //	s.T.Helper()
 //}
 
-func (s *SyncedTest) Log(args ...interface{}) {
+func (s *SyncedTest) Log(args ...any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.T.Helper()
@@ -96,7 +96,7 @@ func (s *SyncedTest) Log(args ...interface{}) {
 	s.T.Log(args...)
 }
 
-func (s *SyncedTest) Logf(format string, args ...interface{}) {
+func (s *SyncedTest) Logf(format string, args ...any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.T.Helper()
@@ -135,7 +135,7 @@ func (s *SyncedTest) Setenv(key, value string) {
 	panic("not implemented")
 }
 
-func (s *SyncedTest) Skip(args ...interface{}) {
+func (s *SyncedTest) Skip(args ...any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.T.Helper()
@@ -151,7 +151,7 @@ func (s *SyncedTest) SkipNow() {
 	s.T.SkipNow()
 }
 
-func (s *SyncedTest) Skipf(format string, args ...interface{}) {
+func (s *SyncedTest) Skipf(format string, args ...any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.T.Helper()

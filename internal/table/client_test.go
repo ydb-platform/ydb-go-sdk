@@ -54,7 +54,7 @@ func TestRaceWgClosed(t *testing.T) {
 		wg := sync.WaitGroup{}
 		p := New(ctx,
 			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+				testutil.TableCreateSession: func(any) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
 						SessionId: testutil.SessionID(),
 					}, nil
@@ -131,48 +131,48 @@ func newTestBulkRequest(t *testing.T, itemsLen int) *Ydb_Table.BulkUpsertRequest
 	return req
 }
 
-var okHandler = func(interface{}) (proto.Message, error) {
+var okHandler = func(any) (proto.Message, error) {
 	return &emptypb.Empty{}, nil
 }
 
 var simpleCluster = testutil.NewBalancer(
 	testutil.WithInvokeHandlers(
 		testutil.InvokeHandlers{
-			testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
+			testutil.TableExecuteDataQuery: func(any) (proto.Message, error) {
 				return &Ydb_Table.ExecuteQueryResult{
 					TxMeta: &Ydb_Table.TransactionMeta{
 						Id: "",
 					},
 				}, nil
 			},
-			testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
+			testutil.TableBeginTransaction: func(any) (proto.Message, error) {
 				return &Ydb_Table.BeginTransactionResult{
 					TxMeta: &Ydb_Table.TransactionMeta{
 						Id: "",
 					},
 				}, nil
 			},
-			testutil.TableExplainDataQuery: func(interface{}) (proto.Message, error) {
+			testutil.TableExplainDataQuery: func(any) (proto.Message, error) {
 				return &Ydb_Table.ExecuteQueryResult{}, nil
 			},
-			testutil.TablePrepareDataQuery: func(interface{}) (proto.Message, error) {
+			testutil.TablePrepareDataQuery: func(any) (proto.Message, error) {
 				return &Ydb_Table.PrepareQueryResult{}, nil
 			},
-			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+			testutil.TableCreateSession: func(any) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
 				}, nil
 			},
-			testutil.TableDeleteSession: func(interface{}) (proto.Message, error) {
+			testutil.TableDeleteSession: func(any) (proto.Message, error) {
 				return &Ydb_Table.DeleteSessionResponse{}, nil
 			},
-			testutil.TableCommitTransaction: func(interface{}) (proto.Message, error) {
+			testutil.TableCommitTransaction: func(any) (proto.Message, error) {
 				return &Ydb_Table.CommitTransactionResponse{}, nil
 			},
-			testutil.TableRollbackTransaction: func(interface{}) (proto.Message, error) {
+			testutil.TableRollbackTransaction: func(any) (proto.Message, error) {
 				return &Ydb_Table.RollbackTransactionResponse{}, nil
 			},
-			testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
+			testutil.TableKeepAlive: func(any) (proto.Message, error) {
 				return &Ydb_Table.KeepAliveResult{}, nil
 			},
 		},

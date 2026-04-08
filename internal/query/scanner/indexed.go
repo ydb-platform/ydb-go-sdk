@@ -17,7 +17,7 @@ func Indexed(data *Data) IndexedScanner {
 	}
 }
 
-func (s IndexedScanner) Scan(dst ...interface{}) (err error) {
+func (s IndexedScanner) Scan(dst ...any) (err error) {
 	if len(dst) != len(s.data.columns) {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("%w: %d != %d",
