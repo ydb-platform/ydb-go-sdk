@@ -1,8 +1,6 @@
 module slo
 
-go 1.24.3
-
-toolchain go1.24.10
+go 1.25.0
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.2.0
@@ -11,11 +9,11 @@ require (
 	github.com/ydb-platform/gorm-driver v0.1.3
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.67.0
-	go.opentelemetry.io/otel v1.40.0
+	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.38.0
-	go.opentelemetry.io/otel/metric v1.40.0
-	go.opentelemetry.io/otel/sdk v1.40.0
-	go.opentelemetry.io/otel/sdk/metric v1.40.0
+	go.opentelemetry.io/otel/metric v1.43.0
+	go.opentelemetry.io/otel/sdk v1.43.0
+	go.opentelemetry.io/otel/sdk/metric v1.43.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/time v0.11.0
 	gorm.io/gorm v1.25.10
@@ -46,10 +44,10 @@ require (
 	github.com/ydb-platform/ydb-go-yc v0.12.1 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel/trace v1.40.0 // indirect
+	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
