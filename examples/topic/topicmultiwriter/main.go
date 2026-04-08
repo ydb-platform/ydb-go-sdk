@@ -9,8 +9,7 @@
 //	  -topic 'database_path/topic_name' \
 //	  -min-bytes 64 \
 //	  -max-bytes 4096 \
-//	  -duration 5m \
-//	  -writers 8
+//	  -duration 5m
 //
 // With authentication from the environment (see ydb-go-sdk-auth-environ), add:
 //
