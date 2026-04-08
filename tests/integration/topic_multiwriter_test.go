@@ -1397,20 +1397,50 @@ func TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch(t *testing.T
 	scope := newScope(t)
 	scenario, describe := newAutoPartitioningScenario(t, scope, "--auto-part-inflight--", "autopartitioning_inflight")
 	payload := bytes.Repeat([]byte{'i'}, 1<<20)
-	var written1, written2 int
+	var written1, written2, written3, written4 int
 
-	writeBurstNoFlush := func(partitions []topictypes.PartitionInfo) {
+	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
 		for _, key := range scenario.getKeys(partitions) {
-			for range 2 {
-				written1 += scenario.writeMessages(scenario.writer1, payload, key, nil, 1)
-				written2 += scenario.writeMessages(scenario.writer2, payload, key, nil, 1)
-			}
+			written1 += scenario.writeMessages(scenario.writer1, payload, key, nil, 1)
+			written2 += scenario.writeMessages(scenario.writer2, payload, key, nil, 1)
 		}
+		scenario.flushBoth(scenario.ctx)
 	}
 
-	writeBurstNoFlush(describe.Partitions)
-	writeBurstNoFlush(describe.Partitions)
-	_ = scenario.waitForPartitionsCountAtLeast(3, 20*time.Second, writeBurstNoFlush)
+	writeBurstNoFlush := func(writer *topicwriter.Writer, partitions []topictypes.PartitionInfo) int {
+		written := 0
+		for _, key := range scenario.getKeys(partitions) {
+			written += scenario.writeMessages(writer, payload, key, nil, 1)
+		}
+
+		return written
+	}
+
+	writeLoadRound(describe.Partitions)
+	writeLoadRound(describe.Partitions)
+	describe = scenario.waitForPartitionsCountAtLeast(3, 20*time.Second, writeLoadRound)
+
+	inflightWriter1 := createMultiWriterForAutoPartitioning(
+		t,
+		"autopartitioning_inflight_3",
+		scope.Ctx,
+		scenario.topicPath,
+		scenario.topicClient,
+		scenario.firstPartitionKey,
+	)
+	inflightWriter2 := createMultiWriterForAutoPartitioning(
+		t,
+		"autopartitioning_inflight_4",
+		scope.Ctx,
+		scenario.topicPath,
+		scenario.topicClient,
+		scenario.firstPartitionKey,
+	)
+
+	written3 += writeBurstNoFlush(inflightWriter1, describe.Partitions)
+	written4 += writeBurstNoFlush(inflightWriter2, describe.Partitions)
+
+	_ = scenario.waitForPartitionsCountAtLeast(4, 30*time.Second, writeLoadRound)
 
 	flushWriter := func(writer *topicwriter.Writer) {
 		flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -1418,19 +1448,19 @@ func TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch(t *testing.T
 		require.NoError(t, writer.Flush(flushCtx))
 	}
 
-	flushWriter(scenario.writer1)
-	flushWriter(scenario.writer2)
+	flushWriter(inflightWriter1)
+	flushWriter(inflightWriter2)
 
 	closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	scenario.closeAll(closeCtx)
+	scenario.closeAll(closeCtx, inflightWriter1, inflightWriter2)
 
 	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
 		scope.Ctx,
 		scenario.topicClient,
 		scenario.topicPath,
 		consumerName,
-		written1+written2,
+		written1+written2+written3+written4,
 		2*time.Minute,
 		payload,
 	))
