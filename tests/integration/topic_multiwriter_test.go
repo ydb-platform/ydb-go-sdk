@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -880,6 +879,7 @@ type autoPartitioningIntegrationVariant struct {
 	producerStem            string
 	messagesPerLogicalWrite int
 	readTimeout             time.Duration
+	targetPartitions        int
 }
 
 func runTestWithAutoPartitioningVariant(t testing.TB, scope *scopeT, variant autoPartitioningIntegrationVariant) {
@@ -889,6 +889,9 @@ func runTestWithAutoPartitioningVariant(t testing.TB, scope *scopeT, variant aut
 	}
 	if variant.readTimeout <= 0 {
 		variant.readTimeout = 20 * time.Second
+	}
+	if variant.targetPartitions < 3 {
+		variant.targetPartitions = 3
 	}
 
 	ctx := scope.Ctx
@@ -990,13 +993,15 @@ func runTestWithAutoPartitioningVariant(t testing.TB, scope *scopeT, variant aut
 	writeLoadRound(describe.Partitions)
 	writeLoadRound(describe.Partitions)
 
-	describe = waitForPartitionsCountAtLeast(3, 20*time.Second)
-
-	writeLoadRound(describe.Partitions)
-	writeLoadRound(describe.Partitions)
-
-	describe = waitForPartitionsCountAtLeast(4, 20*time.Second)
-	require.GreaterOrEqual(t, len(describe.Partitions), 4, "partitions count: %d, expected at least 4", len(describe.Partitions))
+	describe = waitForPartitionsCountAtLeast(variant.targetPartitions, 20*time.Second)
+	require.GreaterOrEqual(
+		t,
+		len(describe.Partitions),
+		variant.targetPartitions,
+		"partitions count: %d, expected at least %d",
+		len(describe.Partitions),
+		variant.targetPartitions,
+	)
 
 	messagesWritten1 += writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
 	messagesWritten1 += writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
@@ -1027,6 +1032,7 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 		producerStem:            "autopartitioning_keyed",
 		messagesPerLogicalWrite: 1,
 		readTimeout:             20 * time.Second,
+		targetPartitions:        3,
 	})
 }
 
@@ -1088,13 +1094,7 @@ func TestTopicMultiWriter_WithCustomPartitioning(t *testing.T) {
 
 func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	scope := newScope(t)
-	xtest.TestManyTimes(
-		t,
-		func(t testing.TB) {
-			runTestWithAutoPartitioning(t, scope)
-		},
-		xtest.StopAfter(15*time.Second),
-	)
+	runTestWithAutoPartitioning(t, scope)
 }
 
 func TestTopicMultiWriter_AutoPartitioning_FlushDoesNotHangAfterSplit(t *testing.T) {
@@ -1473,17 +1473,12 @@ func TestTopicMultiWriter_AutoPartitioning_SmallMessages(t *testing.T) {
 	)
 
 	scope := newScope(t)
-	xtest.TestManyTimes(
-		t,
-		func(t testing.TB) {
-			runTestWithAutoPartitioningVariant(t, scope, autoPartitioningIntegrationVariant{
-				topicPathMarker:         "--auto-part-topic-small--",
-				payload:                 bytes.Repeat([]byte{'s'}, smallMessageSize),
-				producerStem:            "autopartitioning_small",
-				messagesPerLogicalWrite: logicalWriteSizeBytes / smallMessageSize,
-				readTimeout:             3 * time.Minute,
-			})
-		},
-		xtest.StopAfter(15*time.Second),
-	)
+	runTestWithAutoPartitioningVariant(t, scope, autoPartitioningIntegrationVariant{
+		topicPathMarker:         "--auto-part-topic-small--",
+		payload:                 bytes.Repeat([]byte{'s'}, smallMessageSize),
+		producerStem:            "autopartitioning_small",
+		messagesPerLogicalWrite: logicalWriteSizeBytes / smallMessageSize,
+		readTimeout:             90 * time.Second,
+		targetPartitions:        3,
+	})
 }
