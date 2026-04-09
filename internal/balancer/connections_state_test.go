@@ -192,7 +192,7 @@ func TestSelectRandomConnection(t *testing.T) {
 		}
 		first := 0
 		second := 0
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			c, _ := s.selectRandomConnection(conns, false)
 			if c.Endpoint().Address() == "1" {
 				first++
@@ -210,7 +210,7 @@ func TestSelectRandomConnection(t *testing.T) {
 			&mock.Conn{AddrField: "2", State: state.Banned},
 		}
 		totalFailed := 0
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			c, failed := s.selectRandomConnection(conns, false)
 			require.Nil(t, c)
 			totalFailed += failed
@@ -226,7 +226,7 @@ func TestSelectRandomConnection(t *testing.T) {
 		first := 0
 		second := 0
 		failed := 0
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			c, checkFailed := s.selectRandomConnection(conns, false)
 			failed += checkFailed
 			switch c.Endpoint().Address() {
@@ -421,7 +421,7 @@ func TestConnection(t *testing.T) {
 		}), balancerConfig.Info{}, true)
 		preferred := 0
 		fallback := 0
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			c, failed := s.GetConnection(context.Background())
 			require.NotNil(t, c)
 			require.Equal(t, 2, failed)

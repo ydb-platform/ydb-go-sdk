@@ -129,7 +129,7 @@ func (s *service) check(ctx context.Context, urls []string) error {
 	wg := &sync.WaitGroup{}
 	rows := make([]row, len(urls))
 	for idx := range urls {
-		for _, u := range strings.Split(urls[idx], " ") {
+		for u := range strings.SplitSeq(urls[idx], " ") {
 			wg.Add(1)
 			go func(idx int, u string) {
 				defer wg.Done()

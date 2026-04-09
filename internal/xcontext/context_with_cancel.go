@@ -45,7 +45,7 @@ func (ctx *cancelCtx) Err() error {
 	return ctx.err
 }
 
-func (ctx *cancelCtx) Value(key interface{}) interface{} {
+func (ctx *cancelCtx) Value(key any) any {
 	return ctx.ctx.Value(key)
 }
 

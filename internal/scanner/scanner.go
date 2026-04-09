@@ -64,7 +64,7 @@ type RawValue interface {
 	//   [16]byte
 	//   uuid
 	//
-	Any() interface{}
+	Any() any
 
 	// Unwrap unwraps current item under scan interpreting it as Optional<Type> types.
 	Unwrap()

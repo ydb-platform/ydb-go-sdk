@@ -278,10 +278,10 @@ func (w *commitWaiter) checkCondition(
 	return session == w.Session && offset >= w.EndOffset
 }
 
-var commitWaiterLastID int64
+var commitWaiterLastID atomic.Int64
 
 func newCommitWaiter(session *PartitionSession, endOffset rawtopiccommon.Offset) commitWaiter {
-	id := atomic.AddInt64(&commitWaiterLastID, 1)
+	id := commitWaiterLastID.Add(1)
 
 	return commitWaiter{
 		ID:        id,

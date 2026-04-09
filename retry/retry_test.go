@@ -189,10 +189,10 @@ func TestRetryWithBudget(t *testing.T) {
 
 type MockPanicCallback struct {
 	called   bool
-	received interface{}
+	received any
 }
 
-func (m *MockPanicCallback) Call(e interface{}) {
+func (m *MockPanicCallback) Call(e any) {
 	m.called = true
 	m.received = e
 }

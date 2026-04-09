@@ -10,7 +10,7 @@ import (
 
 // ToDatabaseSQLValue convert native go values to subset of types for use
 // with database/sql.Scanner interface
-func ToDatabaseSQLValue(v interface{}) driver.Value {
+func ToDatabaseSQLValue(v any) driver.Value {
 	// convert types to one of safe database sql types for scan it by scanners
 	// https://pkg.go.dev/database/sql@go1.25.5#Scanner
 	switch val := v.(type) {

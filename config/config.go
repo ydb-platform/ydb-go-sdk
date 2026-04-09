@@ -257,7 +257,7 @@ func WithNoAutoRetry() Option {
 }
 
 // WithPanicCallback applies panic callback to config
-func WithPanicCallback(panicCallback func(e interface{})) Option {
+func WithPanicCallback(panicCallback func(e any)) Option {
 	return func(c *Config) {
 		config.SetPanicCallback(&c.Common, panicCallback)
 	}

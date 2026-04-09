@@ -376,7 +376,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
-		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m interface{}) error {
+		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m any) error {
 			resp := m.(*Ydb_Query.ExecuteQueryResponsePart)
 			resp.Status = Ydb.StatusIds_SUCCESS
 
@@ -554,7 +554,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
-		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m interface{}) error {
+		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m any) error {
 			resp := m.(*Ydb_Query.ExecuteQueryResponsePart)
 			resp.Status = Ydb.StatusIds_UNAVAILABLE
 
@@ -587,7 +587,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		mockStream := mock.NewMockClientStream(ctrl)
 
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
-		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m interface{}) error {
+		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m any) error {
 			resp := m.(*Ydb_Query.ExecuteQueryResponsePart)
 			resp.Status = Ydb.StatusIds_UNAVAILABLE
 

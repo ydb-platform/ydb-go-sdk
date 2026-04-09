@@ -373,7 +373,7 @@ func (s *valueScanner) setColumnIndexes(columns []string) {
 //	    uuid
 //
 //nolint:gocyclo,funlen
-func (s *valueScanner) any() interface{} {
+func (s *valueScanner) any() any {
 	x := s.stack.current()
 	if s.Err() != nil || x.isEmpty() {
 		return nil
@@ -842,7 +842,7 @@ func (s *valueScanner) setByte(dst *[]byte) {
 	}
 }
 
-func (s *valueScanner) trySetByteArray(v interface{}, optional, def bool) bool {
+func (s *valueScanner) trySetByteArray(v any, optional, def bool) bool {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
@@ -884,7 +884,7 @@ func (s *valueScanner) trySetByteArray(v interface{}, optional, def bool) bool {
 }
 
 //nolint:gocyclo,funlen
-func (s *valueScanner) scanRequired(v interface{}) {
+func (s *valueScanner) scanRequired(v any) {
 	switch v := v.(type) {
 	case *bool:
 		*v = s.bool()
@@ -926,7 +926,7 @@ func (s *valueScanner) scanRequired(v interface{}) {
 		*v = s.uuidBytesWithIssue1501()
 	case *uuid.UUID:
 		*v = s.uuid()
-	case *interface{}:
+	case *any:
 		*v = s.any()
 	case *value.Value:
 		*v = s.value()
@@ -964,7 +964,7 @@ func (s *valueScanner) scanRequired(v interface{}) {
 }
 
 //nolint:gocyclo, funlen
-func (s *valueScanner) scanOptional(v interface{}, defaultValueForOptional bool) {
+func (s *valueScanner) scanOptional(v any, defaultValueForOptional bool) {
 	if defaultValueForOptional {
 		if s.isNull() {
 			s.setDefaultValue(v)
@@ -1123,7 +1123,7 @@ func (s *valueScanner) scanOptional(v interface{}, defaultValueForOptional bool)
 			src := s.uuid()
 			*v = &src
 		}
-	case **interface{}:
+	case **any:
 		if s.isNull() {
 			*v = nil
 		} else {
@@ -1186,7 +1186,7 @@ func (s *valueScanner) scanOptional(v interface{}, defaultValueForOptional bool)
 }
 
 //nolint:funlen
-func (s *valueScanner) setDefaultValue(dst interface{}) {
+func (s *valueScanner) setDefaultValue(dst any) {
 	switch v := dst.(type) {
 	case *bool:
 		*v = false
@@ -1220,7 +1220,7 @@ func (s *valueScanner) setDefaultValue(dst interface{}) {
 		*v = nil
 	case *[16]byte:
 		*v = [16]byte{}
-	case *interface{}:
+	case *any:
 		*v = nil
 	case *value.Value:
 		*v = s.value()
@@ -1255,7 +1255,7 @@ func (r *baseResult) SetErr(err error) {
 	})
 }
 
-func (s *valueScanner) errorf(depth int, f string, args ...interface{}) error {
+func (s *valueScanner) errorf(depth int, f string, args ...any) error {
 	s.errMtx.Lock()
 	defer s.errMtx.Unlock()
 	if s.err != nil {
@@ -1266,7 +1266,7 @@ func (s *valueScanner) errorf(depth int, f string, args ...interface{}) error {
 	return s.err
 }
 
-func (s *valueScanner) typeError(act, exp interface{}) {
+func (s *valueScanner) typeError(act, exp any) {
 	_ = s.errorf(
 		2, //nolint:mnd
 		"unexpected types during scan at %q %s: %s; want %s",
@@ -1277,7 +1277,7 @@ func (s *valueScanner) typeError(act, exp interface{}) {
 	)
 }
 
-func (s *valueScanner) valueTypeError(act, exp interface{}) {
+func (s *valueScanner) valueTypeError(act, exp any) {
 	// unexpected value during scan at \"migration_status\" Int64: NullFlag; want Int64
 	_ = s.errorf(
 		2, //nolint:mnd
@@ -1313,7 +1313,7 @@ func (s *valueScanner) noColumnError(name string) error {
 	)
 }
 
-func (s *valueScanner) overflowError(i, n interface{}) error {
+func (s *valueScanner) overflowError(i, n any) error {
 	return s.errorf(
 		2, //nolint:mnd
 		"overflow error: %d overflows capacity of %t",
@@ -1401,7 +1401,7 @@ func (s *scanStack) current() item {
 	return s.v[s.p]
 }
 
-func (s *scanStack) currentValue() interface{} {
+func (s *scanStack) currentValue() any {
 	if v := s.current().v; v != nil {
 		return v.GetValue()
 	}
@@ -1409,7 +1409,7 @@ func (s *scanStack) currentValue() interface{} {
 	return nil
 }
 
-func (s *scanStack) currentType() interface{} {
+func (s *scanStack) currentType() any {
 	if t := s.current().t; t != nil {
 		return t.GetType()
 	}

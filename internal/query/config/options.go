@@ -52,11 +52,7 @@ func WithSessionPoolSessionUsageLimit[T interface{ uint64 | time.Duration }](lim
 // If sessionCreateTimeout is less than or equal to zero then no used timeout on create session request
 func WithSessionCreateTimeout(createSessionTimeout time.Duration) Option {
 	return func(c *Config) {
-		if createSessionTimeout > 0 {
-			c.sessionCreateTimeout = createSessionTimeout
-		} else {
-			c.sessionCreateTimeout = 0
-		}
+		c.sessionCreateTimeout = max(createSessionTimeout, 0)
 	}
 }
 
