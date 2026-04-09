@@ -13,7 +13,7 @@ require (
 	github.com/ydb-platform/gorm-driver v0.1.3
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0
 	github.com/ydb-platform/ydb-go-sdk-prometheus/v2 v2.1.2
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.95.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.130.0
 	github.com/ydb-platform/ydb-go-yc v0.12.1
 	golang.org/x/sync v0.19.0
 	google.golang.org/genproto v0.0.0-20250324211829-b45e905df463
