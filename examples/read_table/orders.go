@@ -71,7 +71,7 @@ FROM AS_TABLE($ordersData);
 	dateLayout = "2006-01-02"
 )
 
-func render(t *template.Template, data interface{}) string {
+func render(t *template.Template, data any) string {
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, data); err != nil {
 		panic(err)

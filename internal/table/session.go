@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"strconv"
 	"sync"
@@ -697,9 +698,7 @@ func processColumnFamilies(families []*Ydb_Table.ColumnFamily) []options.ColumnF
 
 func processAttributes(attrs map[string]string) map[string]string {
 	attributes := make(map[string]string, len(attrs))
-	for k, v := range attrs {
-		attributes[k] = v
-	}
+	maps.Copy(attributes, attrs)
 
 	return attributes
 }

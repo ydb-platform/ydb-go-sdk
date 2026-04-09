@@ -15,8 +15,8 @@ func TestIndexed(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		s    IndexedScanner
-		dst  [][]interface{}
-		exp  [][]interface{}
+		dst  [][]any
+		exp  [][]any
 	}{
 		{
 			name: "Ydb.Type_UTF8",
@@ -38,11 +38,11 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v string) *string { return &v }("")},
 				{func(v []byte) *[]byte { return &v }([]byte(""))},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v string) *string { return &v }("test")},
 				{func(v []byte) *[]byte { return &v }([]byte("test"))},
 			},
@@ -67,11 +67,11 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v string) *string { return &v }("")},
 				{func(v []byte) *[]byte { return &v }([]byte(""))},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v string) *string { return &v }("test")},
 				{func(v []byte) *[]byte { return &v }([]byte("test"))},
 			},
@@ -96,10 +96,10 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v uint64) *uint64 { return &v }(0)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v uint64) *uint64 { return &v }(123)},
 			},
 		},
@@ -123,10 +123,10 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v int64) *int64 { return &v }(0)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v int64) *int64 { return &v }(123)},
 			},
 		},
@@ -150,13 +150,13 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v uint64) *uint64 { return &v }(0)},
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v uint32) *uint32 { return &v }(0)},
 				{func(v float64) *float64 { return &v }(0)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v uint64) *uint64 { return &v }(123)},
 				{func(v int64) *int64 { return &v }(123)},
 				{func(v uint32) *uint32 { return &v }(123)},
@@ -183,14 +183,14 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v int32) *int32 { return &v }(0)},
 				{func(v int) *int { return &v }(0)},
 				{func(v float32) *float32 { return &v }(0)},
 				{func(v float64) *float64 { return &v }(0)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v int64) *int64 { return &v }(123)},
 				{func(v int32) *int32 { return &v }(123)},
 				{func(v int) *int { return &v }(123)},
@@ -218,7 +218,7 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v uint64) *uint64 { return &v }(0)},
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v uint32) *uint32 { return &v }(0)},
@@ -226,7 +226,7 @@ func TestIndexed(t *testing.T) {
 				{func(v float32) *float32 { return &v }(0)},
 				{func(v float64) *float64 { return &v }(0)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v uint64) *uint64 { return &v }(123)},
 				{func(v int64) *int64 { return &v }(123)},
 				{func(v uint32) *uint32 { return &v }(123)},
@@ -255,13 +255,13 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v int32) *int32 { return &v }(0)},
 				{func(v float32) *float32 { return &v }(0)},
 				{func(v float64) *float64 { return &v }(0)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v int64) *int64 { return &v }(123)},
 				{func(v int32) *int32 { return &v }(123)},
 				{func(v float32) *float32 { return &v }(123)},
@@ -288,7 +288,7 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v uint64) *uint64 { return &v }(0)},
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v uint32) *uint32 { return &v }(0)},
@@ -297,7 +297,7 @@ func TestIndexed(t *testing.T) {
 				{func(v float32) *float32 { return &v }(0)},
 				{func(v float64) *float64 { return &v }(0)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v uint64) *uint64 { return &v }(123)},
 				{func(v int64) *int64 { return &v }(123)},
 				{func(v uint32) *uint32 { return &v }(123)},
@@ -327,14 +327,14 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v int32) *int32 { return &v }(0)},
 				{func(v int8) *int8 { return &v }(0)},
 				{func(v float32) *float32 { return &v }(0)},
 				{func(v float64) *float64 { return &v }(0)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v int64) *int64 { return &v }(123)},
 				{func(v int32) *int32 { return &v }(123)},
 				{func(v int8) *int8 { return &v }(123)},
@@ -362,10 +362,10 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v bool) *bool { return &v }(false)},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v bool) *bool { return &v }(true)},
 			},
 		},
@@ -389,13 +389,13 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v uint64) *uint64 { return &v }(0)},
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v int32) *int32 { return &v }(0)},
 				{func(v time.Time) *time.Time { return &v }(time.Unix(0, 0))},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v uint64) *uint64 { return &v }(100500)},
 				{func(v int64) *int64 { return &v }(100500)},
 				{func(v int32) *int32 { return &v }(100500)},
@@ -422,13 +422,13 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v uint64) *uint64 { return &v }(0)},
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v uint32) *uint32 { return &v }(0)},
 				{func(v time.Time) *time.Time { return &v }(time.Unix(0, 0))},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v uint64) *uint64 { return &v }(100500)},
 				{func(v int64) *int64 { return &v }(100500)},
 				{func(v uint32) *uint32 { return &v }(100500)},
@@ -455,11 +455,11 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v uint64) *uint64 { return &v }(0)},
 				{func(v time.Time) *time.Time { return &v }(time.Unix(0, 0))},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v uint64) *uint64 { return &v }(12345678987654321)},
 				{func(v time.Time) *time.Time { return &v }(time.Unix(12345678987, 654321000))},
 			},
@@ -484,11 +484,11 @@ func TestIndexed(t *testing.T) {
 					},
 				},
 			)),
-			dst: [][]interface{}{
+			dst: [][]any{
 				{func(v int64) *int64 { return &v }(0)},
 				{func(v time.Duration) *time.Duration { return &v }(time.Duration(0))},
 			},
-			exp: [][]interface{}{
+			exp: [][]any{
 				{func(v int64) *int64 { return &v }(100500)},
 				{func(v time.Duration) *time.Duration { return &v }(time.Duration(100500000))},
 			},

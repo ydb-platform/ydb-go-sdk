@@ -276,7 +276,7 @@ func TestCluster(t *testing.T) {
 		)
 		endpoints := make([]endpoint.Endpoint, buckets)
 
-		for i := 0; i < buckets; i++ {
+		for i := range buckets {
 			endpoints[i] = &mock.Endpoint{
 				AddrField:   strconv.Itoa(i),
 				NodeIDField: uint32(i),
@@ -286,7 +286,7 @@ func TestCluster(t *testing.T) {
 		s := New(endpoints)
 
 		distribution := make([]int, len(endpoints))
-		for i := 0; i < total; i++ {
+		for range total {
 			e, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, e)

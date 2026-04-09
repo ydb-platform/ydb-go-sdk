@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -89,10 +90,8 @@ func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTyp
 			continue
 		}
 		childrenType := d.Children[i].Type
-		for _, entryType := range entryTypes {
-			if childrenType == entryType {
-				return true, nil
-			}
+		if slices.Contains(entryTypes, childrenType) {
+			return true, nil
 		}
 
 		return false, xerrors.WithStackTrace(fmt.Errorf(

@@ -6,7 +6,7 @@ import (
 )
 
 type valuer struct {
-	v interface{}
+	v any
 }
 
 func (v *valuer) UnmarshalYDB(raw scanner.RawValue) error {
@@ -15,6 +15,6 @@ func (v *valuer) UnmarshalYDB(raw scanner.RawValue) error {
 	return nil
 }
 
-func (v *valuer) Value() interface{} {
+func (v *valuer) Value() any {
 	return common.ToDatabaseSQLValue(v.v)
 }
