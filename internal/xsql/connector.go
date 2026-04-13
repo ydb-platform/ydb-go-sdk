@@ -108,7 +108,7 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 	return nil, xerrors.WithStackTrace(driver.ErrSkip)
 }
 
-func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) { //nolint:funlen
+func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
