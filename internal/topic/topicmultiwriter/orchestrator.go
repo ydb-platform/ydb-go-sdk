@@ -189,6 +189,7 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 	return partitionID, nil
 }
 
+//nolint:funlen
 func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error) {
 	// Same idea as WriterReconnector.waitFirstInitResponse: do not process writes until
 	// orchestrator init() finished (describe topic, seq baseline, partition chooser).
