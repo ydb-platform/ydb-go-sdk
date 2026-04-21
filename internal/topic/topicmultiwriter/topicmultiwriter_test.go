@@ -379,6 +379,28 @@ func TestMultiWriter_DescribeError(t *testing.T) {
 	require.True(t, errors.Is(err, describeErr) || errors.Is(err, context.DeadlineExceeded))
 }
 
+func TestMultiWriter_Write_WaitsForInit(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithInitDelay(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		200*time.Millisecond,
+	)
+
+	err := multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data:  bytes.NewReader([]byte("hello")),
+		SeqNo: 1,
+		Key:   "partition-key-1",
+	}})
+	require.NoError(t, err)
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
 func TestMultiWriter_Write_WithBasicWriter(t *testing.T) {
 	t.Parallel()
 

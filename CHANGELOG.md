@@ -1,3 +1,5 @@
+* Fixed multiwriter `Write` to wait for background initialization before touching partition chooser or sequence numbers, preventing races and errors when writing immediately after `StartWriter`
+
 ## v3.134.0
 * Fixed `sugar.RemoveRecursive()` for directories containing external data sources or external tables
 * Added `table.DescribeExternalDataSource()` and `table.DescribeExternalTable()` methods for describing external data sources and external tables

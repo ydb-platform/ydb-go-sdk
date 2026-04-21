@@ -197,6 +197,10 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		}
 	}()
 
+	if err := o.waitInitDone(ctx); err != nil {
+		return err
+	}
+
 	var autoSetSeqNo bool
 	o.mu.WithLock(func() {
 		autoSetSeqNo = o.writerCfg.AutoSetSeqNo
