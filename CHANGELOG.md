@@ -1,3 +1,5 @@
+* Changed multi-partition topic writer (`topicoptions.WithWriteToManyPartitions`) so `Write` and `Flush` block until internal initialization completes, consistent with single-partition writers
+
 ## v3.134.0
 * Fixed `sugar.RemoveRecursive()` for directories containing external data sources or external tables
 * Added `table.DescribeExternalDataSource()` and `table.DescribeExternalTable()` methods for describing external data sources and external tables
