@@ -1,3 +1,4 @@
+## v3.134.1
 * Changed multi-partition topic writer (`topicoptions.WithWriteToManyPartitions`) so `Write` and `Flush` block until internal initialization completes, consistent with single-partition writers
 
 ## v3.134.0
