@@ -86,6 +86,9 @@ func (c *Config) Secure() bool {
 //     resolves to the IPv6 literal);
 //   - endpoints with only IPv6 addresses or with no resolved addresses at all
 //     (FQDN only) are kept unchanged.
+//
+// The logic is strict IPv6-only: if there are no IPv6-reachable nodes, discovery
+// yields an empty set and connection cannot be established, with no IPv4 fallback.
 func (c *Config) OnlyIPv6() bool {
 	return c.onlyIPv6
 }
@@ -136,8 +139,9 @@ func WithSecure(ssl bool) Option {
 	}
 }
 
-// WithOnlyIPv6 instructs the discovery to filter out endpoints that cannot be
-// reached over IPv6. See Config.OnlyIPv6 for details.
+// WithOnlyIPv6 instructs the discovery to filter out IPv4-only endpoints so
+// only IPv6-reachable ones remain (strict IPv6-only, ONLY; no IPv4 fallback).
+// See Config.OnlyIPv6 (method on Config) for full behavior.
 func WithOnlyIPv6() Option {
 	return func(c *Config) {
 		c.onlyIPv6 = true

@@ -433,6 +433,10 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 //   - endpoints with only IPv6 or with no resolved addresses (FQDN-only) are
 //     kept unchanged.
 //
+// The logic is strict IPv6-only: if discovery does not provide any
+// IPv6-reachable cluster node (all candidates are dropped as IPv4-only), the
+// connection cannot be established, and the driver will not fall back to IPv4.
+//
 // The initial discovery endpoint (the one from the DSN) is not affected: its
 // address resolution is handled by the OS / gRPC resolver.
 func WithOnlyIPv6() Option {
