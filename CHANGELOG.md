@@ -1,3 +1,4 @@
+## v3.134.2
 * Fixed `table.Session.Execute` ignoring `options.WithCommit()` so transactions were not committed when the option was passed
 
 ## v3.134.1
