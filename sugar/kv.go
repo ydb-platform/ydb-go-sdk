@@ -25,7 +25,6 @@ type (
 	}
 	tableConfig struct {
 		tablePath   string
-		api         api
 		createTable bool
 		cols        columnModel
 	}
@@ -35,7 +34,7 @@ type (
 		api api
 	}
 	kvClientBuilder struct {
-		ctx    context.Context
+		ctx    context.Context //nolint:containedctx
 		config kvConfig
 		db     *ydb.Driver
 	}
@@ -43,10 +42,23 @@ type (
 		config kvConfig
 		db     *ydb.Driver
 	}
+	api int
 )
 
-// ClientBackend selects how GET/SET are executed. KEYS always uses [ydb.Driver.Query].
-type api int
+const (
+	KV_API_QUERY     api = iota //nolint:revive
+	KV_API_KEY_VALUE            //nolint:revive
+)
+
+const (
+	defaultAPI          = KV_API_KEY_VALUE
+	defaultTablePath    = "kv"
+	defaultKeyColumn    = "key"
+	defaultValueColumn  = "value"
+	defaultExpireColumn = "expire_at"
+)
+
+var nullTimestamp = types.NullValue(types.TypeTimestamp)
 
 func (api api) String() any {
 	switch api {
@@ -58,24 +70,6 @@ func (api api) String() any {
 		return fmt.Sprintf("unknown API: %d", api)
 	}
 }
-
-const (
-	// KV_API_QUERY uses YQL via [ydb.Driver.Query] for all data paths including DEL and KEYS.
-	KV_API_QUERY api = iota
-	// KV_API_KEY_VALUE uses [ydb.Driver.Table] BulkUpsert for SET and ReadRows for GET.
-	// DEL and KEYS still use Query.
-	KV_API_KEY_VALUE
-
-	defaultAPI          = KV_API_KEY_VALUE
-	defaultTablePath    = "kv"
-	defaultKeyColumn    = "key"
-	defaultValueColumn  = "value"
-	defaultExpireColumn = "expire_at"
-)
-
-var (
-	nullTimestamp = types.NullValue(types.TypeTimestamp)
-)
 
 func quote(name string) string {
 	return "`" + name + "`"
@@ -191,7 +185,7 @@ func (c *kvClient) verifyTable(ctx context.Context, absPath string) error {
 		return xerrors.WithStackTrace(fmt.Errorf("describe %q failed: %w", absPath, err))
 	}
 
-	if !(e.IsTable() || e.IsColumnTable()) {
+	if !e.IsTable() && !e.IsColumnTable() {
 		return xerrors.WithStackTrace(fmt.Errorf("%q is not a table (type=%s)", absPath, e.Type.String()))
 	}
 
@@ -484,6 +478,7 @@ func redisGlobToLIKE(glob string) string {
 			i++
 			writeLIKELiteral(&b, escape, glob[i])
 			i++
+
 			continue
 		}
 		switch glob[i] {
@@ -529,6 +524,7 @@ func redisGlobToRE2Match(glob string) (string, error) {
 		if glob[i] == '\\' && i+1 < len(glob) {
 			b.WriteString(regexp.QuoteMeta(string(glob[i+1])))
 			i += 2
+
 			continue
 		}
 		switch glob[i] {
