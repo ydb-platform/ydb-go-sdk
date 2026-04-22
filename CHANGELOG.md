@@ -1,3 +1,5 @@
+* Fixed `table.Session.Execute` ignoring `options.WithCommit()` so transactions were not committed when the option was passed
+
 ## v3.134.1
 * Changed multi-partition topic writer (`topicoptions.WithWriteToManyPartitions`) so `Write` and `Flush` block until internal initialization completes, consistent with single-partition writers
 
