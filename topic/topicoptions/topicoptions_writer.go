@@ -59,6 +59,32 @@ func WithWriterMaxQueueLen(num int) WriterOption {
 	return topicwriterinternal.WithMaxQueueLen(num)
 }
 
+// WithWriterErrOnQueueFull configures topic writer Write behavior when the internal
+// message queue is full.
+//
+// When enable is false (default), the call blocks until queue space becomes
+// available or the call context is cancelled. This preserves the pre-existing
+// behavior.
+//
+// When enable is true, the call returns with ErrQueueLimitExceed
+// (see package topic/topicwriter) immediately, without blocking. This is useful for
+// preventing unbounded memory growth (OOM) when
+// messages are produced faster than the writer can flush them to the server, for
+// example during connection problems or when the consumer is slow. In this mode the
+// caller is responsible for implementing back-pressure (e.g. dropping messages,
+// logging, retrying with its own budget).
+//
+// Note: when the queue is completely empty, the implementation may still accept
+// a single request larger than the queue size (soft limit), in order not to
+// break large batches on otherwise idle writers. Later calls may fail with the same
+// ErrQueueLimitExceed as soon
+// as the queue is non-full but cannot fit the new batch.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithWriterErrOnQueueFull(enable bool) WriterOption {
+	return topicwriterinternal.WithErrOnQueueFull(enable)
+}
+
 // WithWriterMessageMaxBytesSize set max body size of one message in bytes.
 // Writer will return error in message will be more than the size.
 func WithWriterMessageMaxBytesSize(size int) WriterOption {
