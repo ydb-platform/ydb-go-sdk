@@ -59,7 +59,7 @@ GET: 3895.60 requests per second, p50=1.991 msec
 
 Summary table:
 
-| CMD                 | Redis   | KV API  | `KV` / `Origin` | Query API | `Query` / `Origin` |
+| CMD                 | Redis   | KV API  | `KV` / `Redis` | Query API | `Query` / `Redis` |
 |---------------------|---------|---------|-----------------|-----------|--------------------|
 | `SET`<br/>(p50, мс) | `0,287` | `2,175` | `x7,58`         | `3,439`   | `x11,98`           |
 | `GET`<br/>(p50, мс) | `0,295` | `0,847` | `x2,87`         | `1,991`   | `x6,75`            |
