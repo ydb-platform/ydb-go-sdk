@@ -1,6 +1,9 @@
 * Added `topicoptions.WithWriterErrOnQueueFull(bool)` option for topic writer to make `Write` return `topicwriter.ErrQueueLimitExceed` immediately when the internal queue is full, instead of blocking. Useful for preventing OOM when the writer cannot keep up with produced messages.
 * Un-deprecated `topicwriter.ErrQueueLimitExceed`: it is returned by `Write` when a writer is created with `topicoptions.WithWriterErrOnQueueFull(true)` and the internal queue is full.
 
+## v3.134.2
+* Fixed `table.Session.Execute` ignoring `options.WithCommit()` so transactions were not committed when the option was passed
+
 ## v3.134.1
 * Changed multi-partition topic writer (`topicoptions.WithWriteToManyPartitions`) so `Write` and `Flush` block until internal initialization completes, consistent with single-partition writers
 
