@@ -79,8 +79,6 @@ func WithWriterMaxQueueLen(num int) WriterOption {
 // break large batches on otherwise idle writers. Later calls may fail with the same
 // ErrQueueLimitExceed as soon
 // as the queue is non-full but cannot fit the new batch.
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithWriterErrOnQueueFull(enable bool) WriterOption {
 	return topicwriterinternal.WithErrOnQueueFull(enable)
 }
