@@ -10,15 +10,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 func TestTableTxControl(t *testing.T) {
 	scope := newScope(t)
-	driver := scope.Driver(ydb.WithBalancer(balancers.SingleConn()))
+	driver := scope.Driver()
 
 	t.Run("rw-auto-commit", func(t *testing.T) {
 		txControl := table.TxControl(
