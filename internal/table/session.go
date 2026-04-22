@@ -168,12 +168,10 @@ func (e queryClientExecutor) execute(
 
 func (e tableClientExecutor) execute(
 	ctx context.Context,
-	txControl *tx.Control,
+	_ *tx.Control,
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (*transaction, result.Result, error) {
-	request.TxControl = txControl.ToYdbTableTransactionControl()
-
 	r, err := executeDataQuery(ctx, e.client, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
