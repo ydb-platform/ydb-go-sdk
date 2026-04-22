@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
@@ -107,7 +105,7 @@ func TestTableTxControl(t *testing.T) {
 
 			var actual *string
 			err = res.Scan(&actual)
-			require.NoError(t, err)
+			scope.Require.NoError(err)
 			scope.Require.Equal(value, *actual)
 
 			return res.Err()
