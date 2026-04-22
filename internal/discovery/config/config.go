@@ -23,6 +23,7 @@ type Config struct {
 	meta           *meta.Meta
 	addressMutator func(address string) string
 	clock          clockwork.Clock
+	onlyIPv6       bool
 
 	interval time.Duration
 	trace    *trace.Discovery
@@ -74,6 +75,21 @@ func (c *Config) Secure() bool {
 	return c.secure
 }
 
+// OnlyIPv6 reports whether discovery must filter out endpoints that
+// can only be reached over IPv4.
+//
+// When true:
+//   - endpoints whose discovery record provides only IPv4 resolved addresses
+//     are dropped;
+//   - endpoints whose discovery record provides both IPv4 and IPv6 resolved
+//     addresses keep only IPv6 (so the subsequent endpoint.Address() call
+//     resolves to the IPv6 literal);
+//   - endpoints with only IPv6 addresses or with no resolved addresses at all
+//     (FQDN only) are kept unchanged.
+func (c *Config) OnlyIPv6() bool {
+	return c.onlyIPv6
+}
+
 func (c *Config) Trace() *trace.Discovery {
 	return c.trace
 }
@@ -117,6 +133,14 @@ func WithAddressMutator(addressMutator func(address string) string) Option {
 func WithSecure(ssl bool) Option {
 	return func(c *Config) {
 		c.secure = ssl
+	}
+}
+
+// WithOnlyIPv6 instructs the discovery to filter out endpoints that cannot be
+// reached over IPv6. See Config.OnlyIPv6 for details.
+func WithOnlyIPv6() Option {
+	return func(c *Config) {
+		c.onlyIPv6 = true
 	}
 }
 
