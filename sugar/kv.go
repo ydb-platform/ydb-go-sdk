@@ -46,12 +46,12 @@ type (
 )
 
 const (
-	KV_API_QUERY     api = iota //nolint:revive
-	KV_API_KEY_VALUE            //nolint:revive
+	apiQuery api = iota //nolint:revive
+	apiKV               //nolint:revive
 )
 
 const (
-	defaultAPI          = KV_API_KEY_VALUE
+	defaultAPI          = apiKV
 	defaultTablePath    = "kv"
 	defaultKeyColumn    = "key"
 	defaultValueColumn  = "value"
@@ -62,9 +62,9 @@ var nullTimestamp = types.NullValue(types.TypeTimestamp)
 
 func (api api) String() any {
 	switch api {
-	case KV_API_QUERY:
+	case apiQuery:
 		return "QUERY"
-	case KV_API_KEY_VALUE:
+	case apiKV:
 		return "KV"
 	default:
 		return fmt.Sprintf("unknown API: %d", api)
@@ -94,8 +94,14 @@ func NewKV(ctx context.Context, db *ydb.Driver) kvClientBuilder {
 	}
 }
 
-func (builder kvClientBuilder) WithAPI(api api) kvClientBuilder {
-	builder.config.api = api
+func (builder kvClientBuilder) WithQueryAPI() kvClientBuilder {
+	builder.config.api = apiQuery
+
+	return builder
+}
+
+func (builder kvClientBuilder) WithKVAPI() kvClientBuilder {
+	builder.config.api = apiKV
 
 	return builder
 }
@@ -204,7 +210,7 @@ func (*kvClient) Close() {}
 
 // Get returns the value for key. [ErrNotFound] if missing or expired.
 func (c *kvClient) Get(ctx context.Context, key string) ([]byte, error) {
-	if c.config.api == KV_API_KEY_VALUE {
+	if c.config.api == apiKV {
 		vv, err := c.getValueByKeyUsingReadRows(ctx, key)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -296,7 +302,7 @@ func (c *kvClient) Set(ctx context.Context, key string, value []byte, ttl *time.
 		}
 	}
 
-	if c.config.api == KV_API_KEY_VALUE {
+	if c.config.api == apiKV {
 		err := c.db.Table().BulkUpsert(ctx,
 			c.config.tablePath,
 			table.BulkUpsertDataRows(types.ListValue(types.StructValue(

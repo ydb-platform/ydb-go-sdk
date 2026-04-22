@@ -38,9 +38,9 @@ func main() {
 	if api := strings.TrimSpace(os.Getenv(envAPI)); api != "" {
 		switch api := strings.ToLower(api); api {
 		case "query":
-			kv = kv.WithAPI(sugar.KV_API_QUERY)
+			kv = kv.WithQueryAPI()
 		case "kv":
-			kv = kv.WithAPI(sugar.KV_API_KEY_VALUE)
+			kv = kv.WithKVAPI()
 		default:
 			log.Fatalf("wrong YDB API: %q", api)
 		}
