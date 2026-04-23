@@ -1,5 +1,9 @@
 * Added `ydb.WithOnlyIPv6()` option to filter out endpoints that can be reached only over IPv4, useful in environments where outbound IPv4 traffic is blocked by a firewall
 
+## v3.135.0
+* Added `topicoptions.WithWriterErrOnQueueFull(bool)` option for topic writer to make `Write` return `topicwriter.ErrQueueLimitExceed` immediately when the internal queue is full, instead of blocking. Useful for preventing OOM when the writer cannot keep up with produced messages.
+* Un-deprecated `topicwriter.ErrQueueLimitExceed`: it is returned by `Write` when a writer is created with `topicoptions.WithWriterErrOnQueueFull(true)` and the internal queue is full.
+
 ## v3.134.2
 * Fixed `table.Session.Execute` ignoring `options.WithCommit()` so transactions were not committed when the option was passed
 
