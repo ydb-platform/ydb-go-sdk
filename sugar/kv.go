@@ -370,11 +370,15 @@ func (c *kvClient) Del(ctx context.Context, keys ...string) (int, error) {
 	}
 	params := lb.EndList().Build()
 
-	q := fmt.Sprintf(`
-		DELETE FROM %s
+	q := fmt.Sprintf(
+		`DELETE FROM %s
 		WHERE %s IN $keys
-		RETURNING %s, %s;
-	`, c.config.tablePath, c.keyColumn(), c.keyColumn(), c.expireColumn())
+		RETURNING %s, %s;`,
+		quoteIfNotQuoted(c.config.tablePath),
+		quoteIfNotQuoted(c.keyColumn()),
+		quoteIfNotQuoted(c.keyColumn()),
+		quoteIfNotQuoted(c.expireColumn()),
+	)
 	rs, err := c.db.Query().QueryResultSet(ctx, q,
 		query.WithParameters(params),
 		query.WithIdempotent(),
