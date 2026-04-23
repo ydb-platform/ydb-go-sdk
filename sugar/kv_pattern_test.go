@@ -96,17 +96,17 @@ func TestRedisKeysPatternToYQL(t *testing.T) {
 		{
 			name: "default pattern",
 			in:   "",
-			out: listPattern{useMatch: false, like: "%"},
+			out:  listPattern{useMatch: false, like: "%"},
 		},
 		{
 			name: "like pattern",
 			in:   `a\*\?%_!`,
-			out: listPattern{useMatch: false, like: "a*?!%!_!!"},
+			out:  listPattern{useMatch: false, like: "a*?!%!_!!"},
 		},
 		{
 			name: "match pattern",
 			in:   "k[!ab]",
-			out: listPattern{useMatch: true, re2: "^k[^ab]$"},
+			out:  listPattern{useMatch: true, re2: "^k[^ab]$"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
