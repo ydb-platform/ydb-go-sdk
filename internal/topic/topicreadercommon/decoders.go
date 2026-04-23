@@ -30,10 +30,6 @@ func (p *resettableDecoderPool) Put(rd PublicResettableReader) {
 	p.pool.Put(rd)
 }
 
-func newResettableDecoderPool() *resettableDecoderPool {
-	return &resettableDecoderPool{}
-}
-
 type resettableDecoderWrapper struct {
 	rd     PublicResettableReader
 	pool   *resettableDecoderPool
@@ -74,20 +70,16 @@ func (w *resettableDecoderWrapper) Close() error {
 
 type decoderCreator struct {
 	create PublicCreateDecoderFunc
-	pool   *resettableDecoderPool
+	pool   resettableDecoderPool
 }
 
 func (c *decoderCreator) getDecoder(input io.Reader) (io.Reader, error) {
-	if c.pool == nil {
-		return c.create(input)
-	}
-
 	if rd := c.pool.Get(); rd != nil {
 		if err := rd.Reset(input); err != nil {
 			return nil, err
 		}
 
-		return wrapResettableDecoder(rd, c.pool), nil
+		return wrapResettableDecoder(rd, &c.pool), nil
 	}
 
 	dec, err := c.create(input)
@@ -96,7 +88,7 @@ func (c *decoderCreator) getDecoder(input io.Reader) (io.Reader, error) {
 	}
 
 	if rd, ok := dec.(PublicResettableReader); ok {
-		return wrapResettableDecoder(rd, c.pool), nil
+		return wrapResettableDecoder(rd, &c.pool), nil
 	}
 
 	return dec, nil
@@ -111,43 +103,22 @@ func NewMultiDecoder() *MultiDecoder {
 		m: make(map[rawtopiccommon.Codec]*decoderCreator),
 	}
 
-	md.addDecoder(
-		rawtopiccommon.CodecRaw,
-		func(input io.Reader) (io.Reader, error) {
-			return input, nil
-		},
-		// Do not use pool for raw codec since it uses identity createFunc.
-		// Otherwise input that implements PublicResettableReader will be put to pool.
-		false,
-	)
-	md.addDecoder(
-		rawtopiccommon.CodecGzip,
-		func(input io.Reader) (io.Reader, error) {
-			return gzip.NewReader(input)
-		},
-		true,
-	)
+	md.AddDecoder(rawtopiccommon.CodecGzip, func(input io.Reader) (io.Reader, error) {
+		return gzip.NewReader(input)
+	})
 
 	return md
 }
 
 func (d *MultiDecoder) AddDecoder(codec rawtopiccommon.Codec, createFunc PublicCreateDecoderFunc) {
-	d.addDecoder(codec, createFunc, true)
-}
-
-func (d *MultiDecoder) addDecoder(codec rawtopiccommon.Codec, createFunc PublicCreateDecoderFunc, usePool bool) {
-	var pool *resettableDecoderPool
-	if usePool {
-		pool = newResettableDecoderPool()
-	}
-
-	d.m[codec] = &decoderCreator{
-		create: createFunc,
-		pool:   pool,
-	}
+	d.m[codec] = &decoderCreator{create: createFunc}
 }
 
 func (d *MultiDecoder) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Reader, error) {
+	if codec == rawtopiccommon.CodecRaw {
+		return input, nil
+	}
+
 	if creator, ok := d.m[codec]; ok {
 		return creator.getDecoder(input)
 	}

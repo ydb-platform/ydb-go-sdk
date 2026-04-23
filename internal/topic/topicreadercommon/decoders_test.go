@@ -34,12 +34,6 @@ func TestMultiDecoder(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
 		require.Len(t, testMultiDecoder.m, defaultDecodersCount)
 
-		creator := testMultiDecoder.m[rawtopiccommon.CodecRaw]
-		require.Nil(t, creator.pool, "raw codec must not own a pool")
-
-		var createCount, resetCount int
-		creator.create = wrapCreate(creator.create, &createCount, &resetCount)
-
 		buf := &bytes.Buffer{}
 		_, err := buf.WriteString("test_data")
 		require.NoError(t, err)
@@ -50,9 +44,6 @@ func TestMultiDecoder(t *testing.T) {
 		decoded, err := io.ReadAll(decodedReader)
 		require.NoError(t, err)
 		require.Equal(t, "test_data", string(decoded))
-
-		require.Equal(t, 1, createCount, "raw codec must always go through create")
-		require.Zero(t, resetCount, "raw codec must never reuse via Reset")
 	})
 
 	t.Run("ResettableReader", func(t *testing.T) {
@@ -170,8 +161,6 @@ func TestMultiDecoder(t *testing.T) {
 
 	t.Run("CodecRawDoesNotPoolResettableInput", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
-		creator := testMultiDecoder.m[rawtopiccommon.CodecRaw]
-		require.Nil(t, creator.pool, "raw codec must not own a pool")
 
 		input1 := &resettableReaderTracker{Reader: bytes.NewBufferString("raw_payload_1")}
 		decodedReader1, err := testMultiDecoder.Decode(rawtopiccommon.CodecRaw, input1)
