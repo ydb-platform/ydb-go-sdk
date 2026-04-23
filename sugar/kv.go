@@ -407,7 +407,7 @@ func (c *kvClient) Del(ctx context.Context, keys ...string) (int, error) {
 }
 
 // Keys returns keys matching pattern (Redis KEYS). Always uses YQL via [ydb.Driver.Query].
-func (c *kvClient) Keys(ctx context.Context, pattern string) ([]string, error) {
+func (c *kvClient) Keys(ctx context.Context, pattern string) ([]string, error) { //nolint:funlen
 	keyCol := c.keyColumn()
 
 	lp, err := redisKeysPatternToYQL(pattern)
