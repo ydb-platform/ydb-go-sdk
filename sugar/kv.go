@@ -205,10 +205,7 @@ func (c *kvClient) expireColumn() string { return quote(c.config.cols.Expire) }
 // API reports how GET/SET are executed.
 func (c *kvClient) API() api { return c.config.api }
 
-// Close is a no-op; TTL-based eviction is handled by the YDB table TTL setting.
-func (*kvClient) Close() {}
-
-// Get returns the value for key. [ErrNotFound] if missing or expired.
+// Get returns the value for key. [io.EOF] if missing or expired.
 func (c *kvClient) Get(ctx context.Context, key string) ([]byte, error) {
 	if c.config.api == apiKV {
 		vv, err := c.getValueByKeyUsingReadRows(ctx, key)
@@ -424,7 +421,10 @@ func (c *kvClient) Keys(ctx context.Context, pattern string) ([]string, error) {
 
 	defer func() { _ = rs.Close(ctx) }()
 
-	var out []string
+	var (
+		out []string
+		now = time.Now().UTC()
+	)
 	for row, err := range rs.Rows(ctx) {
 		if err != nil {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("redis keys row: %w", err))
@@ -438,7 +438,7 @@ func (c *kvClient) Keys(ctx context.Context, pattern string) ([]string, error) {
 		); err != nil {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("redis keys scan: %w", err))
 		}
-		if exp != nil && !exp.After(time.Now().UTC()) {
+		if exp != nil && !exp.After(now) {
 			continue
 		}
 		out = append(out, k)

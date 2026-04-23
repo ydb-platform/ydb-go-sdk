@@ -143,7 +143,7 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 				return
 			}
 			log.Warn("GET", "err", err)
-			conn.WriteError("ERR " + err.Error())
+			conn.WriteError("ERR: look for details in the server error log")
 
 			return
 		}

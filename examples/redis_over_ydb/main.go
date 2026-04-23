@@ -50,7 +50,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("new client: %v", err)
 	}
-	defer client.Close()
 
 	srv := NewServer("tcp", *addr, client)
 	ready := make(chan error, 1)
