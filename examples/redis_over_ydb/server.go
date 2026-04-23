@@ -22,12 +22,10 @@ const (
 // Compatible with redis-cli and redis-benchmark for GET, SET, SETEX, DEL, KEYS, PING.
 type (
 	Server struct {
-		net    string
-		addr   string
-		srv    *redcon.Server
-		client interface {
-		}
-		log *slog.Logger
+		net  string
+		addr string
+		srv  *redcon.Server
+		log  *slog.Logger
 	}
 	kvClient interface {
 		Get(ctx context.Context, s string) ([]byte, error)
@@ -43,14 +41,15 @@ func NewServer(network, addr string, client kvClient) *Server {
 	h := func(conn redcon.Conn, cmd redcon.Command) {
 		handleCommand(context.Background(), log, client, conn, cmd)
 	}
+
 	return &Server{
-		net:    network,
-		addr:   addr,
-		client: client,
-		log:    log,
+		net:  network,
+		addr: addr,
+		log:  log,
 		srv: redcon.NewServerNetwork(network, addr, h,
 			func(conn redcon.Conn) bool {
 				log.Debug("redis accept", "remote", conn.RemoteAddr())
+
 				return true
 			},
 			func(conn redcon.Conn, err error) {
@@ -66,6 +65,7 @@ func NewServer(network, addr string, client kvClient) *Server {
 // When ready is non-nil, the server sends nil when listening or an error on failure.
 func (s *Server) Start(ready chan error) error {
 	s.log.Info("starting sugar redis server", "addr", s.addr)
+
 	return s.srv.ListenServeAndSignal(ready)
 }
 
@@ -77,6 +77,7 @@ func (s *Server) Stop() error {
 func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redcon.Conn, cmd redcon.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("ERR empty command")
+
 		return
 	}
 	name := strings.ToLower(string(cmd.Args[0]))
@@ -85,6 +86,7 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 	case "ping":
 		if len(args) > 1 {
 			conn.WriteError("ERR wrong number of arguments for 'ping' command")
+
 			return
 		}
 		if len(args) == 0 {
@@ -95,6 +97,7 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 	case "echo":
 		if len(args) != 1 {
 			conn.WriteError("ERR wrong number of arguments for 'echo' command")
+
 			return
 		}
 		conn.WriteBulk(args[0])
@@ -102,6 +105,7 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 		// Single logical DB; accept for redis-cli compatibility.
 		if len(args) != 1 {
 			conn.WriteError("ERR wrong number of arguments for 'select' command")
+
 			return
 		}
 		conn.WriteString("OK")
@@ -112,6 +116,7 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 		// RESP3 handshake (redis-cli 6+); RESP2 is enough for this server.
 		if len(args) < 1 {
 			conn.WriteError("ERR wrong number of arguments for 'hello' command")
+
 			return
 		}
 		conn.WriteArray(6)
@@ -127,22 +132,26 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 	case "get":
 		if len(args) != 1 {
 			conn.WriteError("ERR wrong number of arguments for 'get' command")
+
 			return
 		}
 		v, err := c.Get(ctx, string(args[0]))
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				conn.WriteNull()
+
 				return
 			}
 			log.Warn("GET", "err", err)
 			conn.WriteError("ERR " + err.Error())
+
 			return
 		}
 		conn.WriteBulk(v)
 	case "set":
 		if len(args) < 2 {
 			conn.WriteError("ERR wrong number of arguments for 'set' command")
+
 			return
 		}
 		key := string(args[0])
@@ -154,11 +163,13 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 			case "ex", "px":
 				if i+1 >= len(args) {
 					conn.WriteError("ERR syntax error")
+
 					return
 				}
 				n, err := strconv.Atoi(string(args[i+1]))
 				if err != nil || n < 0 {
 					conn.WriteError("ERR value is not an integer or out of range")
+
 					return
 				}
 				if flag == "ex" {
@@ -169,39 +180,46 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 				i++
 			case "nx", "xx", "get", "keepttl":
 				conn.WriteError("ERR unsupported SET option")
+
 				return
 			default:
 				conn.WriteError("ERR syntax error")
+
 				return
 			}
 		}
 		if err := c.Set(ctx, key, val, &d); err != nil {
 			log.Warn("SET", "err", err)
 			conn.WriteError("ERR " + err.Error())
+
 			return
 		}
 		conn.WriteString("OK")
 	case "setex":
 		if len(args) != 3 {
 			conn.WriteError("ERR wrong number of arguments for 'setex' command")
+
 			return
 		}
 		key := string(args[0])
 		sec, err := strconv.Atoi(string(args[1]))
 		if err != nil || sec < 0 {
 			conn.WriteError("ERR value is not an integer or out of range")
+
 			return
 		}
 		ttl := time.Duration(sec) * time.Second
 		if err := c.Set(ctx, key, args[2], &ttl); err != nil {
 			log.Warn("SETEX", "err", err)
 			conn.WriteError("ERR " + err.Error())
+
 			return
 		}
 		conn.WriteString("OK")
 	case "del":
 		if len(args) < 1 {
 			conn.WriteError("ERR wrong number of arguments for 'del' command")
+
 			return
 		}
 		keys := make([]string, len(args))
@@ -212,12 +230,14 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 		if err != nil {
 			log.Warn("DEL", "err", err)
 			conn.WriteError("ERR " + err.Error())
+
 			return
 		}
 		conn.WriteInt(n)
 	case "keys":
 		if len(args) != 1 {
 			conn.WriteError("ERR wrong number of arguments for 'keys' command")
+
 			return
 		}
 		pat := string(args[0])
@@ -225,6 +245,7 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 		if err != nil {
 			log.Warn("KEYS", "err", err)
 			conn.WriteError("ERR " + err.Error())
+
 			return
 		}
 		conn.WriteArray(len(keys))

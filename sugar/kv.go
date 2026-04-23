@@ -46,8 +46,8 @@ type (
 )
 
 const (
-	apiQuery api = iota //nolint:revive
-	apiKV               //nolint:revive
+	apiQuery api = iota
+	apiKV
 )
 
 const (
