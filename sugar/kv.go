@@ -60,7 +60,7 @@ const (
 
 var nullTimestamp = types.NullValue(types.TypeTimestamp)
 
-func (api api) String() any {
+func (api api) String() string {
 	switch api {
 	case apiQuery:
 		return "QUERY"
