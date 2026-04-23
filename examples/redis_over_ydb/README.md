@@ -4,13 +4,13 @@ This example is a small **key-value server with redis-like API** so you can use 
 
 ## Table path (database-relative)
 
-The query session is scoped to the **database** from your DSN. Table names in YQL must be **relative to that database** (e.g. `` `kv` ``). Do **not** prepend `ydb.Driver.Name()` in YQL paths.
+This example keeps the configured table name **database-relative** by default (for example, `` `kv` ``).
 
-The **table service** (`BulkUpsert` / `ReadRows`) uses the absolute path `path.Join(db.Name(), tableRel)`.
+In code, this repository uses both database-relative names and absolute paths built with `path.Join(db.Name(), tableRel)` in YQL/Query API examples. To stay consistent with the rest of the repo and with the **table service** (`BulkUpsert` / `ReadRows`), this example treats `YDB_KV_TABLE_PATH` / `WithTable` / `-table` as the table path relative to the current database and constructs the absolute path with `path.Join(db.Name(), tableRel)` where needed.
 
-Default table: `kv` (`DefaultTableRel`). Override with `WithTable`, `-table`, or `YDB_KV_TABLE_PATH`.
+Default table: `kv`. Override with `sugar.NewKV(...).WithTable(...)` or `YDB_KV_TABLE_PATH`.
 
-Create parent directories first (`ydb scheme mkdir`, or [`sugar.MakeRecursive`](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3/sugar#MakeRecursive)) before the first run if `WithCreateTable(true)`.
+Create parent directories first (`ydb scheme mkdir`, or [`sugar.MakeRecursive`](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3/sugar#MakeRecursive)) before the first run if you use `WithCreateTableIfNotExists(...)`.
 
 ## Environment variables
 
@@ -61,5 +61,5 @@ Summary table:
 
 | CMD                 | Redis   | KV API  | `KV` / `Redis` | Query API | `Query` / `Redis` |
 |---------------------|---------|---------|-----------------|-----------|--------------------|
-| `SET`<br/>(p50, мс) | `0,287` | `2,175` | `x7,58`         | `3,439`   | `x11,98`           |
-| `GET`<br/>(p50, мс) | `0,295` | `0,847` | `x2,87`         | `1,991`   | `x6,75`            |
+| `SET`<br/>(p50, ms) | `0,287` | `2.175` | `x7.58`         | `3.439`   | `x11.98`           |
+| `GET`<br/>(p50, ms) | `0.295` | `0.847` | `x2.87`         | `1.991`   | `x6.75`            |

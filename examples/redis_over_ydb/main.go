@@ -76,6 +76,5 @@ func main() {
 		log.Printf("server stop: %v", err)
 	}
 
-	client.Close()
 	log.Println("shutdown complete")
 }

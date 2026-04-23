@@ -218,9 +218,10 @@ func (c *kvClient) Get(ctx context.Context, key string) ([]byte, error) {
 
 	row, err := c.db.Query().QueryRow(ctx,
 		fmt.Sprintf(
-			`SELECT %s FROM %s
+			`SELECT %s, %s FROM %s
 			WHERE %s = $key AND (%s IS NULL OR %s > CurrentUtcTimestamp());`,
 			quoteIfNotQuoted(c.valueColumn()),
+			quoteIfNotQuoted(c.expireColumn()),
 			quoteIfNotQuoted(c.config.tablePath),
 			quoteIfNotQuoted(c.keyColumn()),
 			quoteIfNotQuoted(c.expireColumn()),
@@ -237,9 +238,20 @@ func (c *kvClient) Get(ctx context.Context, key string) ([]byte, error) {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("redis get: %w", err))
 	}
 
-	var v []byte
-	if err := row.ScanNamed(query.Named(c.config.cols.Value, &v)); err != nil {
+	var (
+		v   []byte
+		exp *time.Time
+		now = time.Now()
+	)
+	if err := row.ScanNamed(
+		query.Named(c.config.cols.Value, &v),
+		query.Named(c.config.cols.Expire, &exp),
+	); err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("redis get scan: %w", err))
+	}
+
+	if exp != nil && !exp.After(now) {
+		return nil, xerrors.WithStackTrace(io.EOF)
 	}
 
 	return v, nil
@@ -274,6 +286,7 @@ func (c *kvClient) getValueByKeyUsingReadRows(ctx context.Context, key string) (
 	var (
 		v   []byte
 		exp *time.Time
+		now = time.Now().UTC()
 	)
 
 	if err := res.ScanNamed(
@@ -283,14 +296,15 @@ func (c *kvClient) getValueByKeyUsingReadRows(ctx context.Context, key string) (
 		return nil, xerrors.WithStackTrace(fmt.Errorf("redis get scan: %w", err))
 	}
 
-	if exp != nil && !exp.After(time.Now().UTC()) {
+	if exp != nil && !exp.After(now) {
 		return nil, xerrors.WithStackTrace(io.EOF)
 	}
 
 	return v, nil
 }
 
-// Set stores value under key. Use [withTTL] or [WithExpireAt] for expiration.
+// Set the value of the key to a specified value.
+// If the TTL (time to live) is not nil, it enables the expiration behavior for the key.
 func (c *kvClient) Set(ctx context.Context, key string, value []byte, ttl *time.Duration) error {
 	expireAt := nullTimestamp
 	if ttl != nil {
@@ -406,18 +420,30 @@ func (c *kvClient) Keys(ctx context.Context, pattern string) ([]string, error) {
 		params ydb.Params
 	)
 	if lp.useMatch {
-		q = fmt.Sprintf(`
-			SELECT %s AS rkey, %s AS expire_at FROM %s
+		q = fmt.Sprintf(
+			`SELECT %s AS rkey, %s AS expire_at FROM %s
 			WHERE (%s IS NULL OR %s > CurrentUtcTimestamp())
-			  AND %s MATCH $re;
-		`, keyCol, c.expireColumn(), c.config.tablePath, c.expireColumn(), c.expireColumn(), keyCol)
+			  AND %s MATCH $re;`,
+			quoteIfNotQuoted(keyCol),
+			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(c.config.tablePath),
+			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(keyCol),
+		)
 		params = ydb.ParamsBuilder().Param("$re").Text(lp.re2).Build()
 	} else {
-		q = fmt.Sprintf(`
-			SELECT %s AS rkey, %s AS expire_at FROM %s
+		q = fmt.Sprintf(
+			`SELECT %s AS rkey, %s AS expire_at FROM %s
 			WHERE (%s IS NULL OR %s > CurrentUtcTimestamp())
-			  AND %s LIKE $like ESCAPE '!';
-		`, keyCol, c.expireColumn(), c.config.tablePath, c.expireColumn(), c.expireColumn(), keyCol)
+			  AND %s LIKE $like ESCAPE '!';`,
+			quoteIfNotQuoted(keyCol),
+			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(c.config.tablePath),
+			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(keyCol),
+		)
 		params = ydb.ParamsBuilder().Param("$like").Text(lp.like).Build()
 	}
 	rs, err := c.db.Query().QueryResultSet(ctx, q,
@@ -456,7 +482,7 @@ func (c *kvClient) Keys(ctx context.Context, pattern string) ([]string, error) {
 	return out, nil
 }
 
-// listPattern describes how to filter keys in [kvClientBuilder.List].
+// listPattern describes how to filter keys in [kvClient.Keys].
 type listPattern struct {
 	// useMatch means use Re2::Match (YQL MATCH); otherwise LIKE with ESCAPE.
 	useMatch bool
