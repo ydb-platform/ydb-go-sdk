@@ -148,7 +148,7 @@ func (builder kvClientBuilder) Build() (*kvClient, error) {
 		db:     builder.db,
 	}
 
-	client.config.tablePath = strings.Join([]string{client.db.Name(), client.config.tablePath}, "/")
+	client.config.tablePath = normalizePath(client.db, client.config.tablePath)
 
 	if client.config.createTable {
 		if err := client.db.Query().Exec(builder.ctx,
