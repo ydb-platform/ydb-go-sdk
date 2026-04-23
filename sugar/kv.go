@@ -71,8 +71,8 @@ func (api api) String() any {
 	}
 }
 
-func quote(name string) string {
-	return "`" + name + "`"
+func quoteIfNotQuoted(name string) string {
+	return "`" + strings.Trim(name, "`") + "`"
 }
 
 func NewKV(ctx context.Context, db *ydb.Driver) kvClientBuilder {
@@ -152,8 +152,8 @@ func (builder kvClientBuilder) Build() (*kvClient, error) {
 
 	if client.config.createTable {
 		if err := client.db.Query().Exec(builder.ctx,
-			fmt.Sprintf(`
-				CREATE TABLE IF NOT EXISTS %s (
+			fmt.Sprintf(
+				`CREATE TABLE IF NOT EXISTS %s (
 					%s Text NOT NULL,
 					%s Bytes NOT NULL,
 					%s Timestamp,
@@ -166,12 +166,12 @@ func (builder kvClientBuilder) Build() (*kvClient, error) {
 					AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 100,
 					AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 				);`,
-				quote(client.config.tablePath),
-				quote(client.config.cols.Key),
-				quote(client.config.cols.Value),
-				quote(client.config.cols.Expire),
-				quote(client.config.cols.Key),
-				quote(client.config.cols.Expire),
+				quoteIfNotQuoted(client.config.tablePath),
+				quoteIfNotQuoted(client.config.cols.Key),
+				quoteIfNotQuoted(client.config.cols.Value),
+				quoteIfNotQuoted(client.config.cols.Expire),
+				quoteIfNotQuoted(client.config.cols.Key),
+				quoteIfNotQuoted(client.config.cols.Expire),
 			), query.WithIdempotent(),
 		); err != nil {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("create table failed: %w", err))
@@ -198,9 +198,9 @@ func (c *kvClient) verifyTable(ctx context.Context, absPath string) error {
 	return nil
 }
 
-func (c *kvClient) keyColumn() string    { return quote(c.config.cols.Key) }
-func (c *kvClient) valueColumn() string  { return quote(c.config.cols.Value) }
-func (c *kvClient) expireColumn() string { return quote(c.config.cols.Expire) }
+func (c *kvClient) keyColumn() string    { return quoteIfNotQuoted(c.config.cols.Key) }
+func (c *kvClient) valueColumn() string  { return quoteIfNotQuoted(c.config.cols.Value) }
+func (c *kvClient) expireColumn() string { return quoteIfNotQuoted(c.config.cols.Expire) }
 
 // API reports how GET/SET are executed.
 func (c *kvClient) API() api { return c.config.api }
@@ -217,10 +217,15 @@ func (c *kvClient) Get(ctx context.Context, key string) ([]byte, error) {
 	}
 
 	row, err := c.db.Query().QueryRow(ctx,
-		fmt.Sprintf(`
-			SELECT %s FROM %s
-			WHERE %s = $key AND (%s IS NULL OR %s > CurrentUtcTimestamp());
-		`, c.valueColumn(), quote(c.config.tablePath), c.keyColumn(), c.expireColumn(), c.expireColumn()),
+		fmt.Sprintf(
+			`SELECT %s FROM %s
+			WHERE %s = $key AND (%s IS NULL OR %s > CurrentUtcTimestamp());`,
+			quoteIfNotQuoted(c.valueColumn()),
+			quoteIfNotQuoted(c.config.tablePath),
+			quoteIfNotQuoted(c.keyColumn()),
+			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(c.expireColumn()),
+		),
 		query.WithParameters(ydb.ParamsBuilder().Param("$key").Text(key).Build()),
 		query.WithIdempotent(),
 	)
@@ -317,9 +322,13 @@ func (c *kvClient) Set(ctx context.Context, key string, value []byte, ttl *time.
 	}
 
 	err := c.db.Query().Exec(ctx,
-		fmt.Sprintf(`
-			UPSERT INTO %s (%s, %s, %s) VALUES ($key, $value, $expire_at)
-		`, quote(c.config.tablePath), c.keyColumn(), c.valueColumn(), c.expireColumn()),
+		fmt.Sprintf(
+			`UPSERT INTO %s (%s, %s, %s) VALUES ($key, $value, $expire_at)`,
+			quoteIfNotQuoted(c.config.tablePath),
+			quoteIfNotQuoted(c.keyColumn()),
+			quoteIfNotQuoted(c.valueColumn()),
+			quoteIfNotQuoted(c.expireColumn()),
+		),
 		query.WithParameters(ydb.ParamsBuilder().
 			Param("$key").Text(key).
 			Param("$value").Bytes(value).
