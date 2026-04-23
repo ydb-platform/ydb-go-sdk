@@ -14,6 +14,10 @@ import (
 
 var defaultDecodersCount = len(NewMultiDecoder().m)
 
+// Number of iterations to ensure pooled decoder reuse
+// despite sync.Pool 25% of Put calls being dropped when race detector is enabled.
+const decoderPoolReuseIterations = 30
+
 func TestMultiDecoder(t *testing.T) {
 	compressGzip := func(data string) io.Reader {
 		buf := &bytes.Buffer{}
@@ -30,6 +34,12 @@ func TestMultiDecoder(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
 		require.Len(t, testMultiDecoder.m, defaultDecodersCount)
 
+		creator := testMultiDecoder.m[rawtopiccommon.CodecRaw]
+		require.Nil(t, creator.pool, "raw codec must not own a pool")
+
+		var createCount, resetCount int
+		creator.create = wrapCreate(creator.create, &createCount, &resetCount)
+
 		buf := &bytes.Buffer{}
 		_, err := buf.WriteString("test_data")
 		require.NoError(t, err)
@@ -41,84 +51,107 @@ func TestMultiDecoder(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "test_data", string(decoded))
 
-		creator := testMultiDecoder.m[rawtopiccommon.CodecRaw]
-		require.Nil(t, creator.pool)
+		require.Equal(t, 1, createCount, "raw codec must always go through create")
+		require.Zero(t, resetCount, "raw codec must never reuse via Reset")
 	})
 
 	t.Run("ResettableReader", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
-
-		encodedReader := compressGzip("test_data_1")
-		decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecGzip, encodedReader)
-		require.NoError(t, err)
-
-		decoded, err := io.ReadAll(decodedReader)
-		require.NoError(t, err)
-		require.Equal(t, "test_data_1", string(decoded))
-
-		encodedReader = compressGzip("test_data_2")
-		decodedReader, err = testMultiDecoder.Decode(rawtopiccommon.CodecGzip, encodedReader)
-		require.NoError(t, err)
-
-		decoded, err = io.ReadAll(decodedReader)
-		require.NoError(t, err)
-		require.Equal(t, "test_data_2", string(decoded))
-
 		creator := testMultiDecoder.m[rawtopiccommon.CodecGzip]
-		require.NotNil(t, creator.pool.Get())
+
+		var createCount, resetCount int
+		creator.create = wrapCreate(creator.create, &createCount, &resetCount)
+
+		for i := range decoderPoolReuseIterations {
+			msg := fmt.Sprintf("test_data_%d", i)
+			decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecGzip, compressGzip(msg))
+			require.NoError(t, err)
+
+			decoded, err := io.ReadAll(decodedReader)
+			require.NoError(t, err)
+			require.Equal(t, msg, string(decoded))
+		}
+
+		require.Equal(t, decoderPoolReuseIterations, createCount+resetCount,
+			"each decode must call exactly one of create or Reset")
+		require.GreaterOrEqual(t, createCount, 1, "first decode must call create")
+		require.Greater(t, resetCount, 0, "subsequent decodes must reuse pooled decoders via Reset")
 	})
 
 	t.Run("NotResettableReaderCustom", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
 
 		customCodec := rawtopiccommon.Codec(1001)
-		testMultiDecoder.AddDecoder(customCodec, func(r io.Reader) (io.Reader, error) {
-			rd, err := gzip.NewReader(r)
-			if err != nil {
-				return nil, err
-			}
 
-			return &notResettableReader{Reader: rd}, nil
-		})
+		var createCount, resetCount int
+		testMultiDecoder.AddDecoder(customCodec, wrapCreate(
+			func(r io.Reader) (io.Reader, error) {
+				rd, err := gzip.NewReader(r)
+				if err != nil {
+					return nil, err
+				}
+
+				return &notResettableReader{Reader: rd}, nil
+			},
+			&createCount, &resetCount,
+		))
 		require.Len(t, testMultiDecoder.m, defaultDecodersCount+1)
 
-		encodedReader := compressGzip("test_data_1")
-		decodedReader, err := testMultiDecoder.Decode(customCodec, encodedReader)
-		require.NoError(t, err)
+		for i := range decoderPoolReuseIterations {
+			msg := fmt.Sprintf("test_data_%d", i)
+			decodedReader, err := testMultiDecoder.Decode(customCodec, compressGzip(msg))
+			require.NoError(t, err)
 
-		decoded, err := io.ReadAll(decodedReader)
-		require.NoError(t, err)
-		require.Equal(t, "test_data_1", string(decoded))
+			decoded, err := io.ReadAll(decodedReader)
+			require.NoError(t, err)
+			require.Equal(t, msg, string(decoded))
+		}
 
-		creator := testMultiDecoder.m[customCodec]
-		require.Nil(t, creator.pool.Get())
+		require.Equal(t, decoderPoolReuseIterations, createCount,
+			"non-resettable decoder must be created on every decode")
+		require.Zero(t, resetCount, "non-resettable decoder must never be reused via Reset")
 	})
 
 	t.Run("ResettableReaderCustom", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
 
 		customCodec := rawtopiccommon.Codec(1001)
-		testMultiDecoder.AddDecoder(customCodec, func(r io.Reader) (io.Reader, error) {
-			return gzip.NewReader(r)
-		})
+
+		var createCount, resetCount int
+		testMultiDecoder.AddDecoder(customCodec, wrapCreate(
+			func(r io.Reader) (io.Reader, error) {
+				return gzip.NewReader(r)
+			},
+			&createCount, &resetCount,
+		))
 		require.Len(t, testMultiDecoder.m, defaultDecodersCount+1)
 
-		encodedReader := compressGzip("test_data_1")
-		decodedReader, err := testMultiDecoder.Decode(customCodec, encodedReader)
-		require.NoError(t, err)
+		for i := range decoderPoolReuseIterations {
+			msg := fmt.Sprintf("test_data_%d", i)
+			decodedReader, err := testMultiDecoder.Decode(customCodec, compressGzip(msg))
+			require.NoError(t, err)
 
-		decoded, err := io.ReadAll(decodedReader)
-		require.NoError(t, err)
-		require.Equal(t, "test_data_1", string(decoded))
+			decoded, err := io.ReadAll(decodedReader)
+			require.NoError(t, err)
+			require.Equal(t, msg, string(decoded))
+		}
 
-		creator := testMultiDecoder.m[customCodec]
-		require.NotNil(t, creator.pool.Get())
+		require.Equal(t, decoderPoolReuseIterations, createCount+resetCount,
+			"each decode must call exactly one of create or Reset")
+		require.GreaterOrEqual(t, createCount, 1, "first decode must call create")
+		require.Greater(t, resetCount, 0,
+			"custom resettable decoder must be reused via Reset on subsequent decodes")
 	})
 
 	t.Run("ResettableReaderManyMessages", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
+		creator := testMultiDecoder.m[rawtopiccommon.CodecGzip]
 
-		for i := range 50 {
+		var createCount, resetCount int
+		creator.create = wrapCreate(creator.create, &createCount, &resetCount)
+
+		const iterations = 50
+		for i := range iterations {
 			testMsg := fmt.Sprintf("test_data_%d", i)
 			encodedReader := compressGzip(testMsg)
 
@@ -130,13 +163,13 @@ func TestMultiDecoder(t *testing.T) {
 			require.Equal(t, testMsg, string(decoded))
 		}
 
-		creator := testMultiDecoder.m[rawtopiccommon.CodecGzip]
-		require.NotNil(t, creator.pool.Get())
+		require.Equal(t, iterations, createCount+resetCount,
+			"each decode must call exactly one of create or Reset")
+		require.Greater(t, resetCount, 0, "pooled decoders must be reused via Reset")
 	})
 
 	t.Run("CodecRawDoesNotPoolResettableInput", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
-
 		creator := testMultiDecoder.m[rawtopiccommon.CodecRaw]
 		require.Nil(t, creator.pool, "raw codec must not own a pool")
 
@@ -162,6 +195,10 @@ func TestMultiDecoder(t *testing.T) {
 
 	t.Run("ReadAfterEOFDoesNotDoublePool", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
+		creator := testMultiDecoder.m[rawtopiccommon.CodecGzip]
+
+		var createCount, resetCount int
+		creator.create = wrapCreate(creator.create, &createCount, &resetCount)
 
 		decodedReader, err := testMultiDecoder.Decode(rawtopiccommon.CodecGzip, compressGzip("payload"))
 		require.NoError(t, err)
@@ -170,6 +207,9 @@ func TestMultiDecoder(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "payload", string(decoded))
 
+		require.Equal(t, 1, createCount, "first decode must call create exactly once")
+		require.Zero(t, resetCount, "first decode must not Reset anything")
+
 		buf := make([]byte, 16)
 		for range 3 {
 			n, err := decodedReader.Read(buf)
@@ -177,9 +217,8 @@ func TestMultiDecoder(t *testing.T) {
 			require.ErrorIs(t, err, io.EOF)
 		}
 
-		creator := testMultiDecoder.m[rawtopiccommon.CodecGzip]
-		require.NotNil(t, creator.pool.Get(), "pool should contain the returned decoder")
-		require.Nil(t, creator.pool.Get(), "pool must not contain a duplicate put")
+		require.Equal(t, 1, createCount, "extra reads after EOF must not trigger create")
+		require.Zero(t, resetCount, "extra reads after EOF must not trigger Reset")
 	})
 
 	t.Run("ReadAfterEOFDoesNotUsePooledReader", func(t *testing.T) {
@@ -212,12 +251,38 @@ type notResettableReader struct {
 type resettableReaderTracker struct {
 	io.Reader
 
-	resetCalls int
+	resetCalls *int
 }
 
-func (r *resettableReaderTracker) Reset(rd io.Reader) error {
-	r.resetCalls++
-	r.Reader = rd
+func (r *resettableReaderTracker) Reset(input io.Reader) error {
+	*r.resetCalls++
+
+	if rd, ok := r.Reader.(PublicResettableReader); ok {
+		return rd.Reset(input)
+	}
 
 	return nil
+}
+
+func wrapCreate(
+	create PublicCreateDecoderFunc,
+	createCount, resetCount *int,
+) PublicCreateDecoderFunc {
+	return func(input io.Reader) (io.Reader, error) {
+		*createCount++
+
+		dec, err := create(input)
+		if err != nil {
+			return nil, err
+		}
+
+		if rd, ok := dec.(PublicResettableReader); ok {
+			return &resettableReaderTracker{
+				Reader:     rd,
+				resetCalls: resetCount,
+			}, nil
+		}
+
+		return dec, nil
+	}
 }
