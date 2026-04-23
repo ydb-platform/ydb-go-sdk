@@ -35,7 +35,6 @@ type (
 	}
 )
 
-// NewServer creates a RESP server. It does not call [kvClientBuilder.Close]; stop the client when the database is closed.
 func NewServer(network, addr string, client kvClient) *Server {
 	log := slog.Default()
 	h := func(conn redcon.Conn, cmd redcon.Command) {
@@ -74,6 +73,7 @@ func (s *Server) Stop() error {
 	return s.srv.Close()
 }
 
+//nolint:gocyclo
 func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redcon.Conn, cmd redcon.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("ERR empty command")
@@ -129,7 +129,7 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 	case "command":
 		// Minimal stub so newer redis-cli stays happy.
 		conn.WriteArray(0)
-	case "get":
+	case "get": //nolint:goconst
 		if len(args) != 1 {
 			conn.WriteError("ERR wrong number of arguments for 'get' command")
 
@@ -160,7 +160,7 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 		for i := 2; i < len(args); i++ {
 			flag := strings.ToLower(string(args[i]))
 			switch flag {
-			case "ex", "px":
+			case "ex", "px": //nolint:goconst
 				if i+1 >= len(args) {
 					conn.WriteError("ERR syntax error")
 
