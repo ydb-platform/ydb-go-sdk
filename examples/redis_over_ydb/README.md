@@ -36,30 +36,37 @@ redis-cli -p 6379 PING
 
 ## Performance
 
-Command for measure performance:
+Command for measure performance (concurency=900):
 ```bash
-redis-benchmark -p 6379 -q -c 10 -n 10000 -r 1000 -t get,set
+redis-benchmark -p 6379 -q -c 900 -n 10000 -r 1000 -t get,set
 ```
 
 - origin Redis server (v8.6.2):
 ```
-SET: 32786.88 requests per second, p50=0.287 msec
-GET: 31645.57 requests per second, p50=0.295 msec
+SET: 62111.80 requests per second, p50=11.951 msec      
+GET: 57803.47 requests per second, p50=13.335 msec
 ```
-- using KV API:
+- redis-over-ydb using KV API (without session pool limitation):
 ```
-SET: 4194.63 requests per second, p50=2.175 msec
-GET: 11111.11 requests per second, p50=0.847 msec
+SET: 16339.87 requests per second, p50=46.495 msec                    
+GET: 21786.49 requests per second, p50=35.455 msec 
 ```
-- using Query API
+- redis-over-ydb using Query API (default session pool limit - 50)
 ```
-SET: 2649.71 requests per second, p50=3.439 msec
-GET: 3895.60 requests per second, p50=1.991 msec
+SET: 5144.03 requests per second, p50=151.551 msec                    
+GET: 4833.25 requests per second, p50=137.727 msec 
 ```
 
-Summary table:
+Summary table of latencies (p50, msec):
 
-| CMD                 | Redis   | KV API  | `KV` / `Redis` | Query API | `Query` / `Redis` |
-|---------------------|---------|---------|-----------------|-----------|--------------------|
-| `SET`<br/>(p50, ms) | `0,287` | `2.175` | `x7.58`         | `3.439`   | `x11.98`           |
-| `GET`<br/>(p50, ms) | `0.295` | `0.847` | `x2.87`         | `1.991`   | `x6.75`            |
+| CMD   | Redis    | KV API   | `KV` / `Redis` | Query API  | `Query` / `Redis` |
+|-------|----------|----------|----------------|------------|-------------------|
+| `SET` | `11.951` | `46.495` | `x3.89`        | `151.551`  | `x12.68`          |
+| `GET` | `13.335` | `35.455` | `x2.66`        | `137.727`  | `x10.33`          |
+
+Summary table of throughput (requests per second):
+
+| CMD   | Redis   | KV API  | `Redis` / `KV` | Query API | `Redis` / `Query` |
+|-------|---------|---------|----------------|-----------|-------------------|
+| `SET` | `62111` | `16339` | `x3.80`        | `5144`    | `x12.07`          |
+| `GET` | `57803` | `21786` | `x2.65`        | `4833`    | `x12.00`          |

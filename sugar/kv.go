@@ -618,6 +618,7 @@ func findUnescapedClassEnd(glob string, start int) int {
 	for i := start; i < len(glob); i++ {
 		if escaped {
 			escaped = false
+
 			continue
 		}
 		switch glob[i] {
