@@ -107,7 +107,7 @@ func (builder kvClientBuilder) WithKVAPI() kvClientBuilder {
 }
 
 func (builder kvClientBuilder) WithTable(tablePath string) kvClientBuilder {
-	builder.config.tablePath = tablePath
+	builder.config.tablePath = strings.Trim(tablePath, "`")
 
 	return builder
 }
@@ -119,7 +119,7 @@ func (builder kvClientBuilder) WithCreateTableIfNotExists(b bool) kvClientBuilde
 }
 
 func (builder kvClientBuilder) WithColumnNameForKey(name string) kvClientBuilder {
-	if name != "" {
+	if name := strings.Trim(name, "`"); name != "" {
 		builder.config.cols.Key = name
 	}
 
@@ -127,7 +127,7 @@ func (builder kvClientBuilder) WithColumnNameForKey(name string) kvClientBuilder
 }
 
 func (builder kvClientBuilder) WithColumnNameForValue(name string) kvClientBuilder {
-	if name != "" {
+	if name := strings.Trim(name, "`"); name != "" {
 		builder.config.cols.Value = name
 	}
 
@@ -135,7 +135,7 @@ func (builder kvClientBuilder) WithColumnNameForValue(name string) kvClientBuild
 }
 
 func (builder kvClientBuilder) WithColumnNameForExpire(name string) kvClientBuilder {
-	if name != "" {
+	if name := strings.Trim(name, "`"); name != "" {
 		builder.config.cols.Expire = name
 	}
 
