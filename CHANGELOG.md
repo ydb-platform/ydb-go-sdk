@@ -1,4 +1,4 @@
-* Added helper `sugar.NewKV(ctx, db)` for use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
+* Added helper `sugar.NewKV(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 
 ## v3.135.0
 * Added `topicoptions.WithWriterErrOnQueueFull(bool)` option for topic writer to make `Write` return `topicwriter.ErrQueueLimitExceed` immediately when the internal queue is full, instead of blocking. Useful for preventing OOM when the writer cannot keep up with produced messages.
