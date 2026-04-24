@@ -581,18 +581,19 @@ func redisGlobToRE2Match(glob string) (string, error) {
 			b.WriteByte('.')
 			i++
 		case '[':
-			end := strings.IndexByte(glob[i+1:], ']')
+			end := findUnescapedClassEnd(glob, i+1)
 			if end < 0 {
 				return "", xerrors.WithStackTrace(fmt.Errorf("unclosed '[' in KEYS pattern"))
 			}
-
-			end += i + 1
 			inner := glob[i+1 : end]
 			if inner == "" {
 				return "", xerrors.WithStackTrace(fmt.Errorf("empty character class in KEYS pattern"))
 			}
 
 			if inner[0] == '!' {
+				if len(inner) == 1 {
+					return "", xerrors.WithStackTrace(fmt.Errorf("empty character class in KEYS pattern"))
+				}
 				b.WriteString("[^")
 				b.WriteString(inner[1:])
 				b.WriteByte(']')
@@ -610,4 +611,22 @@ func redisGlobToRE2Match(glob string) (string, error) {
 	b.WriteByte('$')
 
 	return b.String(), nil
+}
+
+func findUnescapedClassEnd(glob string, start int) int {
+	escaped := false
+	for i := start; i < len(glob); i++ {
+		if escaped {
+			escaped = false
+			continue
+		}
+		switch glob[i] {
+		case '\\':
+			escaped = true
+		case ']':
+			return i
+		}
+	}
+
+	return -1
 }

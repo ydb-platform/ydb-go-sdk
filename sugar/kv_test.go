@@ -61,6 +61,16 @@ func TestRedisGlobToRE2Match(t *testing.T) {
 			out:  "^k[^ab]$",
 		},
 		{
+			name: "escaped closing bracket in class",
+			in:   `k[\]]`,
+			out:  `^k[\]]$`,
+		},
+		{
+			name: "escaped closing bracket in negated class",
+			in:   `k[!\]]`,
+			out:  `^k[^\]]$`,
+		},
+		{
 			name: "escaped special chars",
 			in:   `\*\?\.`,
 			out:  `^\*\?\.$`,
@@ -84,6 +94,9 @@ func TestRedisGlobToRE2MatchInvalidPattern(t *testing.T) {
 	require.ErrorContains(t, err, "unclosed '['")
 
 	_, err = redisGlobToRE2Match("a[]")
+	require.ErrorContains(t, err, "empty character class")
+
+	_, err = redisGlobToRE2Match("a[!]")
 	require.ErrorContains(t, err, "empty character class")
 }
 
