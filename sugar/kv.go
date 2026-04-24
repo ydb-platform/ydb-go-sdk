@@ -304,7 +304,8 @@ func (c *kvClient) getValueByKeyUsingReadRows(ctx context.Context, key string) (
 }
 
 // Set the value of the key to a specified value.
-// If the TTL (time to live) is not nil, it enables the expiration behavior for the key.
+// If the TTL (time to live) is not nil and greater than zero, it enables expiration behavior for the key.
+// A TTL of zero leaves the key without expiration, and a negative TTL returns an error.
 func (c *kvClient) Set(ctx context.Context, key string, value []byte, ttl *time.Duration) error {
 	expireAt := nullTimestamp
 	if ttl != nil {
