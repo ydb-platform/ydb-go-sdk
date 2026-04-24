@@ -18,6 +18,7 @@ Create parent directories first (`ydb scheme mkdir`, or [`sugar.MakeRecursive`](
 |---------------------|--------|-----------------|---------|-------------------------------------------------|
 | `YDB_KV_TABLE_PATH` | String |                 | `kv`    | Table path relative to<br/>the root of database |
 | `YDB_API`           | Enum   | `query` / `kv`  | `kv`    | YDB API for work in<br/>GET/SET commands        |
+| `YDB_KV_TABLE_LRU`  | Number | `>=0`           | 0       | LRU cache limit for table                       |
 
 ## Run
 

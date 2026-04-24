@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -21,7 +22,7 @@ import (
 // kvClientBuilder is a Redis-like string key-value store backed by YDB.
 type (
 	columnModel struct {
-		Key, Value, Expire string
+		Key, Value, Expire, LastUsage string
 	}
 	tableConfig struct {
 		tablePath   string
@@ -51,11 +52,12 @@ const (
 )
 
 const (
-	defaultAPI          = apiKV
-	defaultTablePath    = "kv"
-	defaultKeyColumn    = "key"
-	defaultValueColumn  = "value"
-	defaultExpireColumn = "expire_at"
+	defaultAPI             = apiKV
+	defaultTablePath       = "kv"
+	defaultKeyColumn       = "key"
+	defaultValueColumn     = "value"
+	defaultExpireColumn    = "expire_at"
+	defaultLastUsageColumn = "last_usage"
 )
 
 var nullTimestamp = types.NullValue(types.TypeTimestamp)
@@ -83,9 +85,10 @@ func NewKV(ctx context.Context, db *ydb.Driver) kvClientBuilder {
 				tablePath:   defaultTablePath,
 				createTable: true,
 				cols: columnModel{
-					Key:    defaultKeyColumn,
-					Value:  defaultValueColumn,
-					Expire: defaultExpireColumn,
+					Key:       defaultKeyColumn,
+					Value:     defaultValueColumn,
+					Expire:    defaultExpireColumn,
+					LastUsage: defaultLastUsageColumn,
 				},
 			},
 			api: defaultAPI,
@@ -142,6 +145,14 @@ func (builder kvClientBuilder) WithColumnNameForExpire(name string) kvClientBuil
 	return builder
 }
 
+func (builder kvClientBuilder) WithColumnNameForLastUsage(name string) kvClientBuilder {
+	if name := strings.Trim(name, "`"); name != "" {
+		builder.config.cols.LastUsage = name
+	}
+
+	return builder
+}
+
 func (builder kvClientBuilder) Build() (*kvClient, error) {
 	client := &kvClient{
 		config: builder.config,
@@ -157,19 +168,19 @@ func (builder kvClientBuilder) Build() (*kvClient, error) {
 					%s Text NOT NULL,
 					%s Bytes NOT NULL,
 					%s Timestamp,
+					%s Timestamp,
 					PRIMARY KEY (%s)
 				) WITH (
 					TTL = Interval("PT1H") ON %s,
 					STORE = ROW,
 					AUTO_PARTITIONING_BY_SIZE = ENABLED,
-					AUTO_PARTITIONING_BY_LOAD = ENABLED,
-					AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 100,
-					AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
+					AUTO_PARTITIONING_BY_LOAD = ENABLED
 				);`,
 				quoteIfNotQuoted(client.config.tablePath),
 				quoteIfNotQuoted(client.config.cols.Key),
 				quoteIfNotQuoted(client.config.cols.Value),
 				quoteIfNotQuoted(client.config.cols.Expire),
+				quoteIfNotQuoted(client.config.cols.LastUsage),
 				quoteIfNotQuoted(client.config.cols.Key),
 				quoteIfNotQuoted(client.config.cols.Expire),
 			), query.WithIdempotent(),
@@ -185,6 +196,42 @@ func (builder kvClientBuilder) Build() (*kvClient, error) {
 	return client, nil
 }
 
+func (c *kvClient) KeysSortedByLastUsage(ctx context.Context, offset uint64) (keys []string, _ error) {
+	rows, err := c.db.Query().QueryResultSet(ctx,
+		fmt.Sprintf(`
+			SELECT %s FROM %s
+			ORDER BY %s DESC
+			LIMIT %d
+			OFFSET %d;`,
+			quoteIfNotQuoted(c.keyColumn()),
+			quoteIfNotQuoted(c.config.tablePath),
+			quoteIfNotQuoted(c.lastUsageColumn()),
+			int64(math.MaxInt64),
+			offset,
+		),
+		query.WithIdempotent(),
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	defer func() { _ = rows.Close(ctx) }()
+
+	for row, err := range rows.Rows(ctx) {
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		var key string
+		if err := row.Scan(&key); err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		keys = append(keys, key)
+	}
+
+	return keys, nil
+}
+
 func (c *kvClient) verifyTable(ctx context.Context, absPath string) error {
 	e, err := c.db.Scheme().DescribePath(ctx, absPath)
 	if err != nil {
@@ -198,9 +245,10 @@ func (c *kvClient) verifyTable(ctx context.Context, absPath string) error {
 	return nil
 }
 
-func (c *kvClient) keyColumn() string    { return quoteIfNotQuoted(c.config.cols.Key) }
-func (c *kvClient) valueColumn() string  { return quoteIfNotQuoted(c.config.cols.Value) }
-func (c *kvClient) expireColumn() string { return quoteIfNotQuoted(c.config.cols.Expire) }
+func (c *kvClient) keyColumn() string       { return quoteIfNotQuoted(c.config.cols.Key) }
+func (c *kvClient) valueColumn() string     { return quoteIfNotQuoted(c.config.cols.Value) }
+func (c *kvClient) expireColumn() string    { return quoteIfNotQuoted(c.config.cols.Expire) }
+func (c *kvClient) lastUsageColumn() string { return quoteIfNotQuoted(c.config.cols.LastUsage) }
 
 // API reports how GET/SET are executed.
 func (c *kvClient) API() api { return c.config.api }
@@ -217,14 +265,17 @@ func (c *kvClient) Get(ctx context.Context, key string) ([]byte, error) {
 	}
 
 	row, err := c.db.Query().QueryRow(ctx,
-		fmt.Sprintf(
-			`SELECT %s, %s FROM %s
-			WHERE %s = $key AND (%s IS NULL OR %s > CurrentUtcTimestamp());`,
-			quoteIfNotQuoted(c.valueColumn()),
-			quoteIfNotQuoted(c.expireColumn()),
+		fmt.Sprintf(`
+			UPDATE %s 
+			SET %s = CurrentUtcTimestamp()
+			WHERE %s = $key AND (%s IS NULL OR %s > CurrentUtcTimestamp())
+			RETURNING %s, %s;`,
 			quoteIfNotQuoted(c.config.tablePath),
+			quoteIfNotQuoted(c.lastUsageColumn()),
 			quoteIfNotQuoted(c.keyColumn()),
 			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(c.valueColumn()),
 			quoteIfNotQuoted(c.expireColumn()),
 		),
 		query.WithParameters(ydb.ParamsBuilder().Param("$key").Text(key).Build()),
@@ -300,6 +351,13 @@ func (c *kvClient) getValueByKeyUsingReadRows(ctx context.Context, key string) (
 		return nil, xerrors.WithStackTrace(io.EOF)
 	}
 
+	if err := c.db.Table().BulkUpsert(ctx, c.config.tablePath, table.BulkUpsertDataRows(types.ListValue(types.StructValue(
+		types.StructFieldValue(c.config.cols.Key, types.TextValue(key)),
+		types.StructFieldValue(c.config.cols.LastUsage, types.TimestampValueFromTime(now)),
+	))), table.WithIdempotent()); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
 	return v, nil
 }
 
@@ -326,6 +384,7 @@ func (c *kvClient) Set(ctx context.Context, key string, value []byte, ttl *time.
 				types.StructFieldValue(c.config.cols.Key, types.TextValue(key)),
 				types.StructFieldValue(c.config.cols.Value, types.BytesValue(value)),
 				types.StructFieldValue(c.config.cols.Expire, expireAt),
+				types.StructFieldValue(c.config.cols.LastUsage, types.TimestampValueFromTime(time.Now().UTC())),
 			))),
 			table.WithIdempotent(),
 		)
@@ -337,12 +396,14 @@ func (c *kvClient) Set(ctx context.Context, key string, value []byte, ttl *time.
 	}
 
 	err := c.db.Query().Exec(ctx,
-		fmt.Sprintf(
-			`UPSERT INTO %s (%s, %s, %s) VALUES ($key, $value, $expire_at)`,
+		fmt.Sprintf(`
+			UPSERT INTO %s (%s, %s, %s, %s) 
+			VALUES ($key, $value, $expire_at, CurrentUtcTimestamp())`,
 			quoteIfNotQuoted(c.config.tablePath),
 			quoteIfNotQuoted(c.keyColumn()),
 			quoteIfNotQuoted(c.valueColumn()),
 			quoteIfNotQuoted(c.expireColumn()),
+			quoteIfNotQuoted(c.lastUsageColumn()),
 		),
 		query.WithParameters(ydb.ParamsBuilder().
 			Param("$key").Text(key).

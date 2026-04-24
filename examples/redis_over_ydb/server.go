@@ -15,6 +15,7 @@ import (
 
 const (
 	envTablePath = "YDB_KV_TABLE_PATH"
+	envTableLRU  = "YDB_KV_TABLE_LRU"
 	envAPI       = "YDB_API"
 )
 
