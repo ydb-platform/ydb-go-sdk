@@ -33,6 +33,7 @@ type (
 		Set(ctx context.Context, key string, value []byte, ttl *time.Duration) error
 		Del(ctx context.Context, keys ...string) (int, error)
 		Keys(ctx context.Context, pattern string) ([]string, error)
+		KeysSortedByLastUsage(ctx context.Context, offset uint64) (keys []string, _ error)
 	}
 )
 
