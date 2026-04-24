@@ -173,9 +173,9 @@ func handleCommand(ctx context.Context, log *slog.Logger, c kvClient, conn redco
 					return
 				}
 				if flag == "ex" {
-					d += time.Duration(n) * time.Second
+					d = time.Duration(n) * time.Second
 				} else {
-					d += time.Duration(n) * time.Millisecond
+					d = time.Duration(n) * time.Millisecond
 				}
 				i++
 			case "nx", "xx", "get", "keepttl":
