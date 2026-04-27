@@ -138,7 +138,9 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	r, err := newResult(ctx, stream, append(opts,
+	// newResult must use executeCtx, like ExecuteQuery: parent ctx may be done
+	// (e.g. session death) while the gRPC stream is still readable until executeCancel.
+	r, err := newResult(executeCtx, stream, append(opts,
 		withStreamResultStatsCallback(settings.StatsCallback()),
 		withStreamResultOnClose(executeCancel),
 	)...)
