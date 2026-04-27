@@ -1,3 +1,4 @@
+## v3.135.1
 * Fixed `database/sql` query service transactions to map connection-related errors to `driver.ErrBadConn` (begin, commit, rollback, exec, and query) so the pool can discard bad connections
 
 ## v3.135.0
