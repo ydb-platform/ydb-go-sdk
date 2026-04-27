@@ -1,6 +1,7 @@
 * Fixed `database/sql` query service transactions to map connection-related errors to `driver.ErrBadConn` (begin, commit, rollback, exec, and query) so the pool can discard bad connections
 
 ## v3.135.0
+* Fixed `database/sql` query service transactions to map connection-related errors to `driver.ErrBadConn` (begin, commit, rollback, exec, and query) so the pool can discard bad connections
 * Added `topicoptions.WithWriterErrOnQueueFull(bool)` option for topic writer to make `Write` return `topicwriter.ErrQueueLimitExceed` immediately when the internal queue is full, instead of blocking. Useful for preventing OOM when the writer cannot keep up with produced messages.
 * Un-deprecated `topicwriter.ErrQueueLimitExceed`: it is returned by `Write` when a writer is created with `topicoptions.WithWriterErrOnQueueFull(true)` and the internal queue is full.
 
