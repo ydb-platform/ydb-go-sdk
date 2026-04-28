@@ -481,6 +481,57 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			require.True(t, closed[2]) // after putItem s3 must be closed
 		})
+		t.Run("WithCancelledContext", func(t *testing.T) {
+			// Regression test: closing idle items from the pool must succeed even
+			// when the context passed to Close is already cancelled.
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				var closedCount atomic.Int32
+
+				p := New[*testItem, testItem](rootCtx,
+					WithLimit[*testItem, testItem](3),
+					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
+					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
+					WithCreateItemFunc(func(context.Context) (*testItem, error) {
+						var v testItem
+
+						return &v, nil
+					}),
+					WithTrace[*testItem, testItem](defaultTrace),
+				)
+
+				// Override the close func to detect context-cancelled failures.
+				// In a real scenario (e.g. gRPC session close), a cancelled context
+				// would cause the close call to fail immediately.
+				p.config.closeItemFunc = func(ctx context.Context, item *testItem) {
+					if ctx.Err() != nil {
+						// context already cancelled — item would not be closed in practice
+						return
+					}
+					closedCount.Add(1)
+				}
+
+				s1 := mustGetItem(t, p)
+				s2 := mustGetItem(t, p)
+				s3 := mustGetItem(t, p)
+
+				mustPutItem(t, p, s1)
+				mustPutItem(t, p, s2)
+
+				require.Equal(t, 2, p.idle.Len())
+
+				// Close the pool with an already-cancelled context.
+				cancelCtx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				err := p.Close(cancelCtx)
+				require.NoError(t, err)
+
+				// Both idle items must have been closed despite the cancelled context.
+				require.EqualValues(t, 2, closedCount.Load())
+
+				_ = s3 // s3 is still "in use" and not in the idle list
+			})
+		})
 		t.Run("WhenWaiting", func(t *testing.T) {
 			for _, test := range []struct {
 				name string
