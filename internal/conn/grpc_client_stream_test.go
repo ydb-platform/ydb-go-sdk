@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -173,6 +174,42 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		require.True(t, xerrors.IsContextError(err))
 	})
 
+	t.Run("StreamContextDoneReturnsNonTransportError", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStream := mock.NewMockClientStream(ctrl)
+
+		// Use a non-gRPC-status error that gRPC may return on stream termination.
+		// IsContextError returns false for such errors, so the old code fell through
+		// to transport wrapping even when the stream context was already cancelled.
+		streamErr := errors.New("stream transport: connection closed")
+		mockStream.EXPECT().CloseSend().Return(streamErr)
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		parentConn := newConn(e, config)
+
+		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancel() // cancel the stream context before calling CloseSend
+
+		s := &grpcClientStream{
+			parentConn: parentConn,
+			stream:     mockStream,
+			streamCtx:  cancelledCtx,
+			wrapping:   true,
+			traceID:    "test-trace-id",
+		}
+
+		err := s.CloseSend()
+		require.Error(t, err)
+		// When the stream context is done, the error must NOT be wrapped as a
+		// transport error regardless of what gRPC returned.
+		require.False(t, xerrors.IsTransportError(err))
+		require.ErrorIs(t, err, streamErr)
+	})
+
 	t.Run("TransportErrorWithWrapping", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mockStream := mock.NewMockClientStream(ctrl)
@@ -278,6 +315,44 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		err := s.SendMsg(msg)
 		require.Error(t, err)
 		require.True(t, xerrors.IsContextError(err))
+	})
+
+	t.Run("StreamContextDoneReturnsNonTransportError", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStream := mock.NewMockClientStream(ctrl)
+
+		msg := &Ydb_Query.ExecuteQueryRequest{}
+		// Use a non-gRPC-status error that gRPC may return on stream termination.
+		// IsContextError returns false for such errors, so the old code fell through
+		// to transport wrapping even when the stream context was already cancelled.
+		streamErr := errors.New("stream transport: connection closed")
+		mockStream.EXPECT().SendMsg(msg).Return(streamErr)
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		parentConn := newConn(e, config)
+
+		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancel() // cancel the stream context before calling SendMsg
+
+		s := &grpcClientStream{
+			parentConn: parentConn,
+			stream:     mockStream,
+			streamCtx:  cancelledCtx,
+			wrapping:   true,
+			traceID:    "test-trace-id",
+			sentMark:   &modificationMark{},
+		}
+
+		err := s.SendMsg(msg)
+		require.Error(t, err)
+		// When the stream context is done, the error must NOT be wrapped as a
+		// transport error regardless of what gRPC returned.
+		require.False(t, xerrors.IsTransportError(err))
+		require.ErrorIs(t, err, streamErr)
 	})
 
 	t.Run("TransportErrorRetryable", func(t *testing.T) {
@@ -455,6 +530,45 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		err := s.RecvMsg(msg)
 		require.Error(t, err)
 		require.True(t, xerrors.IsContextError(err))
+	})
+
+	t.Run("StreamContextDoneReturnsNonTransportError", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStream := mock.NewMockClientStream(ctrl)
+
+		msg := &Ydb_Query.ExecuteQueryResponsePart{}
+		// Use a non-gRPC-status error that gRPC may return on stream termination.
+		// IsContextError returns false for such errors, so the old code fell through
+		// to transport wrapping even when the stream context was already cancelled.
+		streamErr := errors.New("stream transport: connection closed")
+		mockStream.EXPECT().RecvMsg(msg).Return(streamErr)
+		mockStream.EXPECT().Trailer().Return(metadata.MD{})
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		parentConn := newConn(e, config)
+
+		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancel() // cancel the stream context before calling RecvMsg
+
+		s := &grpcClientStream{
+			parentConn: parentConn,
+			stream:     mockStream,
+			streamCtx:  cancelledCtx,
+			wrapping:   true,
+			traceID:    "test-trace-id",
+			sentMark:   &modificationMark{},
+		}
+
+		err := s.RecvMsg(msg)
+		require.Error(t, err)
+		// When the stream context is done, the error must NOT be wrapped as a
+		// transport error regardless of what gRPC returned.
+		require.False(t, xerrors.IsTransportError(err))
+		require.ErrorIs(t, err, streamErr)
 	})
 
 	t.Run("TransportErrorRetryable", func(t *testing.T) {

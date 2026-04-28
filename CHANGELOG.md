@@ -1,5 +1,11 @@
 * Fixed query `Execute`/`Query` sometimes returning `context.Canceled` instead of retrying on idempotent operations when the session was closed while the gRPC stream was still valid, by using the stream-scoped context when creating the result reader
 
+## v3.135.3
+* Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
+
+## v3.135.2
+* Fixed closing idle sessions from the session pool when the `Close` context is already cancelled
+
 ## v3.135.1
 * Fixed `database/sql` query service transactions to map connection-related errors to `driver.ErrBadConn` (begin, commit, rollback, exec, and query) so the pool can discard bad connections
 
