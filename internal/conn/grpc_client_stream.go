@@ -61,8 +61,8 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 	err = s.stream.CloseSend()
 	if err != nil {
-		if s.streamCtx.Err() != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", err))
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
 		if !s.wrapping {
@@ -96,8 +96,8 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 
 	err = s.stream.SendMsg(m)
 	if err != nil {
-		if s.streamCtx.Err() != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", err))
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
 		if !s.wrapping {
@@ -151,8 +151,8 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 			return io.EOF
 		}
 
-		if s.streamCtx.Err() != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", err))
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
 		if !s.wrapping {
