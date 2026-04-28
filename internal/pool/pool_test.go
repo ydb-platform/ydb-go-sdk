@@ -527,7 +527,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				require.NoError(t, err)
 
 				// Both idle items must have been closed despite the cancelled context.
-				require.EqualValues(t, 2, closedCount.Load())
+				require.EqualValues(t, int32(2), closedCount.Load())
 
 				_ = s3 // s3 is still "in use" and not in the idle list
 			})
