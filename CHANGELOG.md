@@ -1,4 +1,6 @@
 * Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
+
+## v3.135.2
 * Fixed closing idle sessions from the session pool when the `Close` context is already cancelled
 
 ## v3.135.1
