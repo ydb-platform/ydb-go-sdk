@@ -1,3 +1,4 @@
+## v3.135.2
 * Fixed closing idle sessions from the session pool when the `Close` context is already cancelled
 
 ## v3.135.1
