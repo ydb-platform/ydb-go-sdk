@@ -169,7 +169,7 @@ func selectScan(ctx context.Context, db *sql.DB) (err error) {
 
 func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 	series, seasonsData, episodesData := getData()
-	args := []interface{}{
+	args := []any{
 		sql.Named("seriesData", types.ListValue(series...)),
 		sql.Named("seasonsData", types.ListValue(seasonsData...)),
 		sql.Named("episodesData", types.ListValue(episodesData...)),

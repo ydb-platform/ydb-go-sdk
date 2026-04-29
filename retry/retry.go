@@ -28,7 +28,7 @@ type retryOptions struct {
 	slowBackoff backoff.Backoff
 	budget      budget.Budget
 
-	panicCallback func(e interface{})
+	panicCallback func(e any)
 }
 
 type Option interface {
@@ -225,7 +225,7 @@ func WithSlowBackoff(b backoff.Backoff) slowBackoffOption {
 var _ Option = panicCallbackOption{}
 
 type panicCallbackOption struct {
-	callback func(e interface{})
+	callback func(e any)
 }
 
 func (o panicCallbackOption) ApplyRetryOption(opts *retryOptions) {
@@ -242,7 +242,7 @@ func (o panicCallbackOption) ApplyDoTxOption(opts *doTxOptions) {
 
 // WithPanicCallback returns panic callback option
 // If not defined - panic would not intercept with driver
-func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
+func WithPanicCallback(panicCallback func(e any)) panicCallbackOption {
 	return panicCallbackOption{callback: panicCallback}
 }
 

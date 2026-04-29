@@ -213,14 +213,14 @@ func TestSoftWeightedSemaphore(t *testing.T) {
 			done := make(chan struct{})
 
 			// Launch multiple goroutines
-			for i := 0; i < goroutines; i++ {
+			for range goroutines {
 				go func() {
 					defer func() {
 						done <- struct{}{}
 					}()
 
 					// Each goroutine tries to acquire and release semaphore multiple times
-					for j := 0; j < 10; j++ {
+					for range 10 {
 						if sem.TryAcquire(3) {
 							time.Sleep(time.Millisecond)
 							sem.Release(3)
@@ -235,7 +235,7 @@ func TestSoftWeightedSemaphore(t *testing.T) {
 			}
 
 			// Wait for all goroutines to complete
-			for i := 0; i < goroutines; i++ {
+			for range goroutines {
 				<-done
 			}
 		})

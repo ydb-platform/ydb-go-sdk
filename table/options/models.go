@@ -173,6 +173,22 @@ type (
 	DescribeTableOption func(d *DescribeTableDesc)
 )
 
+type ExternalDataSourceDescription struct {
+	Name       string
+	SourceType string
+	Location   string
+	Properties map[string]string
+}
+
+type ExternalTableDescription struct {
+	Name           string
+	SourceType     string
+	DataSourcePath string
+	Location       string
+	Columns        []Column
+	Content        map[string]string
+}
+
 type ReadReplicasSettings struct {
 	Type  ReadReplicasType
 	Count uint64

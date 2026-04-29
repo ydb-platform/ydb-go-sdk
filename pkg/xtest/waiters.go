@@ -83,7 +83,7 @@ func SpinWaitConditionWithTimeout(tb testing.TB, l sync.Locker, condWaitTimeout 
 }
 
 // SpinWaitProgress failed if result of progress func no changes without timeout
-func SpinWaitProgress(tb testing.TB, progress func() (progressValue interface{}, finished bool)) {
+func SpinWaitProgress(tb testing.TB, progress func() (progressValue any, finished bool)) {
 	tb.Helper()
 	SpinWaitProgressWithTimeout(tb, commonWaitTimeout, progress)
 }
@@ -91,7 +91,7 @@ func SpinWaitProgress(tb testing.TB, progress func() (progressValue interface{},
 func SpinWaitProgressWithTimeout(
 	tb testing.TB,
 	timeout time.Duration,
-	progress func() (progressValue interface{}, finished bool),
+	progress func() (progressValue any, finished bool),
 ) {
 	tb.Helper()
 

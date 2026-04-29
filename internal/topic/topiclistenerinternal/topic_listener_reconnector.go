@@ -48,6 +48,17 @@ func NewTopicListenerReconnector(
 	return res, nil
 }
 
+func (lr *TopicListenerReconnector) ReadSessionID() string {
+	lr.m.Lock()
+	sl := lr.streamListener
+	lr.m.Unlock()
+	if sl != nil {
+		return sl.ReadSessionID()
+	}
+
+	return ""
+}
+
 func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) error {
 	if !lr.closing.CompareAndSwap(false, true) {
 		return errTopicListenerClosed

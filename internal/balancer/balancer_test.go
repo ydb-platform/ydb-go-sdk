@@ -256,7 +256,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		require.Equal(t, state.Banned, cc1.GetState())
 
 		// nextConn must only return cc2 now.
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			c, nextErr := b.nextConn(ctx)
 			require.NoError(t, nextErr)
 			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
@@ -400,7 +400,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
 		require.Equal(t, state.Banned, cc1.GetState())
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			c, nextErr := b.nextConn(ctx)
 			require.NoError(t, nextErr)
 			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
@@ -454,7 +454,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
 		require.Equal(t, state.Banned, cc1.GetState())
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			c, nextErr := b.nextConn(ctx)
 			require.NoError(t, nextErr)
 			require.Equal(t, cc2.AddrField, c.Endpoint().Address())

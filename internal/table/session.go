@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"strconv"
 	"sync"
@@ -167,12 +168,10 @@ func (e queryClientExecutor) execute(
 
 func (e tableClientExecutor) execute(
 	ctx context.Context,
-	txControl *tx.Control,
+	_ *tx.Control,
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (*transaction, result.Result, error) {
-	request.TxControl = txControl.ToYdbTableTransactionControl()
-
 	r, err := executeDataQuery(ctx, e.client, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
@@ -697,9 +696,7 @@ func processColumnFamilies(families []*Ydb_Table.ColumnFamily) []options.ColumnF
 
 func processAttributes(attrs map[string]string) map[string]string {
 	attributes := make(map[string]string, len(attrs))
-	for k, v := range attrs {
-		attributes[k] = v
-	}
+	maps.Copy(attributes, attrs)
 
 	return attributes
 }

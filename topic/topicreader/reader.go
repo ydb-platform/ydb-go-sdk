@@ -42,6 +42,13 @@ func (r *Reader) WaitInit(ctx context.Context) error {
 	return r.reader.WaitInit(ctx)
 }
 
+// ReadSessionID returns the current read session identifier.
+// It can be passed to Topic().CommitOffset() to avoid interrupting the read session.
+// The session ID changes after reconnects.
+func (r *Reader) ReadSessionID() string {
+	return r.reader.ReadSessionID()
+}
+
 // ReadMessage read exactly one message
 // exactly one of message, error is nil
 func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {

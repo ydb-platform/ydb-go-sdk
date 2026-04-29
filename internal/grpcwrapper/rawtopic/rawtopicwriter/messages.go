@@ -344,7 +344,7 @@ type MessageWriteStatus struct {
 	SkippedReason WriteStatusSkipReason
 }
 
-func (s *MessageWriteStatus) fromProto(status interface{}) error {
+func (s *MessageWriteStatus) fromProto(status any) error {
 	switch v := status.(type) {
 	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_:
 		s.Type = WriteStatusTypeWritten

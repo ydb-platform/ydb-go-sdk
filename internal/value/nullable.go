@@ -427,7 +427,7 @@ func NullableDyNumberValue(v *string) Value {
 // Warning: type interface will be replaced in the future with typed parameters pattern from go1.18
 //
 //nolint:gocyclo, funlen
-func Nullable(t types.Type, v interface{}) Value {
+func Nullable(t types.Type, v any) Value {
 	switch t {
 	case types.Bool:
 		tt, ok := v.(*bool)

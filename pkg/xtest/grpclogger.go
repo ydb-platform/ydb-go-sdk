@@ -29,7 +29,7 @@ func NewGrpcLogger(t testing.TB) GrpcLogger {
 func (l GrpcLogger) UnaryClientInterceptor(
 	ctx context.Context,
 	method string,
-	req, reply interface{},
+	req, reply any,
 	cc *grpc.ClientConn,
 	invoker grpc.UnaryInvoker,
 	opts ...grpc.CallOption,
@@ -88,7 +88,7 @@ func (g grpcLoggerStream) CloseSend() error {
 	return err
 }
 
-func (g grpcLoggerStream) SendMsg(m interface{}) error {
+func (g grpcLoggerStream) SendMsg(m any) error {
 	err := g.ClientStream.SendMsg(m)
 	if err != nil {
 		g.t.Logf("SendMsg (streamID: %v) with err '%v':\n%v ", g.streamID, err, m)
@@ -99,7 +99,7 @@ func (g grpcLoggerStream) SendMsg(m interface{}) error {
 	return err
 }
 
-func (g grpcLoggerStream) RecvMsg(m interface{}) error {
+func (g grpcLoggerStream) RecvMsg(m any) error {
 	err := g.ClientStream.RecvMsg(m)
 	if err != nil {
 		g.t.Logf("RecvMsg (streamID: %v) with err '%v':\n%v ", g.streamID, err, m)

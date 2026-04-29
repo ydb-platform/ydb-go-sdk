@@ -307,7 +307,7 @@ func TestCommitterBuffer(t *testing.T) {
 			return nil
 		}
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			_, err := c.pushCommit(
 				CommitRange{
 					PartitionSession: newTestPartitionSession(

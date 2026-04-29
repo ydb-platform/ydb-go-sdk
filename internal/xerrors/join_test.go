@@ -12,7 +12,7 @@ func TestJoin(t *testing.T) {
 	for _, tt := range []struct {
 		join error
 		iss  []error
-		ass  []interface{}
+		ass  []any
 		s    string
 	}{
 		{
@@ -24,7 +24,7 @@ func TestJoin(t *testing.T) {
 		{
 			join: Join(context.Canceled, context.DeadlineExceeded, Operation()),
 			iss:  []error{context.Canceled, context.DeadlineExceeded},
-			ass: []interface{}{func() interface{} {
+			ass: []any{func() any {
 				var i isYdbError
 
 				return &i

@@ -395,7 +395,7 @@ func TestBatcherConcurency(t *testing.T) {
 		session := &topicreadercommon.PartitionSession{}
 
 		go func() {
-			for i := 0; i < count; i++ {
+			for i := range count {
 				_ = b.PushRawMessage(session, &rawtopicreader.StartPartitionSessionRequest{
 					CommittedOffset:  rawtopiccommon.NewOffset(int64(i)),
 					PartitionOffsets: rawtopiccommon.OffsetRange{},
@@ -406,7 +406,7 @@ func TestBatcherConcurency(t *testing.T) {
 		ctx, cancel := xcontext.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		for i := 0; i < count; i++ {
+		for i := range count {
 			res, err := b.Pop(ctx, batcherGetOptions{MinCount: 1})
 			require.NoError(tb, err)
 			require.Equal(

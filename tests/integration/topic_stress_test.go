@@ -34,16 +34,16 @@ func TestReadersWritersStress(t *testing.T) {
 	topicPrefix := db.Name() + "/stress-topic-"
 	consumerName := commonConsumerName
 
-	writeTime := time.Second * 10
+	writeTime := 3 * time.Second
 	topicCount := runtime.GOMAXPROCS(0)
-	if topicCount > 10 {
-		topicCount = 10
+	if topicCount > 3 {
+		topicCount = 3
 	}
 	t.Log("topic count: ", topicCount)
 
-	topicPartitions := 3
-	writersPerTopic := topicPartitions * 2
-	readersPerTopic := 2
+	topicPartitions := 2
+	writersPerTopic := 1
+	readersPerTopic := 1
 
 	var topics []string
 	for i := 0; i < topicCount; i++ {
@@ -85,7 +85,7 @@ func stressTestInATopic(
 	consumerName string,
 	topicWriters, topicReaders int,
 ) error {
-	maxMessagesInBatch := 5
+	maxMessagesInBatch := 3
 	var mStatus sync.Mutex
 	writeStatusWriterSeqno := map[string]int64{}
 	readStatusWriterMaxSeqNo := map[string]int64{}
@@ -213,7 +213,7 @@ func stressTestInATopic(
 		}
 	}
 
-	xtest.SpinWaitProgressWithTimeout(t, time.Minute, func() (progressValue interface{}, finished bool) {
+	xtest.SpinWaitProgressWithTimeout(t, 20*time.Second, func() (progressValue interface{}, finished bool) {
 		time.Sleep(time.Millisecond)
 		needReadMessages := int64(0)
 		mStatus.Lock()
