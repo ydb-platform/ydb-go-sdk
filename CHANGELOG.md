@@ -1,3 +1,4 @@
+## v3.135.4
 * Fixed query `Execute`/`Query` sometimes returning `context.Canceled` instead of retrying when the session was closed while the gRPC stream was still valid, by using the stream-scoped context when creating the result reader
 
 ## v3.135.3
