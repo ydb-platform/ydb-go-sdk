@@ -549,7 +549,7 @@ func TestExecute(t *testing.T) {
 func TestNewResult_DecoupledExecuteCtx(t *testing.T) {
 	t.Run("CancelledParentCtxCausesImmediateError", func(t *testing.T) {
 		// With the parent ctx passed directly, a cancelled ctx makes newResult
-		// fail before it ever calls Recv(). This is the old (buggy) behaviour
+		// fail before it ever calls Recv(). This is the old (buggy) behavior
 		// that the fix addresses at the execute() call-site.
 		parentCtx, parentCancel := context.WithCancel(context.Background())
 		parentCancel()
