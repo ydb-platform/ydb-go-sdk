@@ -155,6 +155,7 @@ func execute(
 				xerrors.WithName("streamResultContext"),
 			))
 		}
+
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
 	}
