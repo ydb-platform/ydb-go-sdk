@@ -503,24 +503,24 @@ func TestExecute(t *testing.T) {
 		// Regression test for https://github.com/ydb-platform/ydb-go-sdk/issues/2081.
 		//
 		// When the parent ctx is cancelled inside ExecuteQuery (simulating session expiry
-		// while the gRPC stream is still open), the AfterFunc goroutine that propagates
-		// the cancellation to executeCtx is guaranteed to have been started by the time
-		// stop() is called. execute() must detect this via stop() returning false and
-		// return a retryable error — not a non-retryable context.Canceled — so the pool
-		// can retry with a new session.
+		// while the gRPC stream is still open), ctx.Done() is already closed by the time
+		// execute() checks it after ExecuteQuery returns. For idempotent operations,
+		// execute() must detect this via the non-blocking ctx.Done() select and return a
+		// retryable error so the pool can retry with a new session.
 		//
-		// RED before fix: the old code (no stop() check before newResult) would either
-		// let the AfterFunc goroutine race with newResult's Recv() (returning a
-		// non-retryable error) or succeed, making it flaky on multi-core systems.
-		// GREEN after fix: stop() always returns false here (AfterFunc goroutine already
-		// started when cancel() fires ctx.Done()), so execute() deterministically returns
-		// a retryable error without calling Recv() at all.
+		// RED before fix: the old code (no ctx.Done() check before newResult) proceeded
+		// to newResult, which called Recv() on the mock — but no Recv() expectation is
+		// registered, causing a gomock "unexpected call" failure.
+		// GREEN after fix: ctx.Done() is already closed when execute() checks it, so it
+		// returns a retryable error without calling Recv() at all.
 		t.Run("CancelParentContextAfterStreamOpen", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			// Mark the context as idempotent so that cancellation during ExecuteQuery
+			// is classified as a retryable error (non-idempotent returns ctx.Err() directly).
+			ctx, cancel := context.WithCancel(xcontext.WithIdempotent(xtest.Context(t), true))
 
 			// Recv must NOT be called: execute() returns a retryable error before
-			// reaching newResult because stop() detects the AfterFunc was already started.
+			// reaching newResult because ctx.Done() is already closed.
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 
 			client := NewMockQueryServiceClient(ctrl)
@@ -528,8 +528,8 @@ func TestExecute(t *testing.T) {
 				func(_ context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
 					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
 				) {
-					// Simulate session expiry: canceling ctx starts the AfterFunc goroutine.
-					// stop() called after this returns will always return false.
+					// Simulate session expiry: canceling ctx closes ctx.Done() so that
+					// the non-blocking check in execute() fires after ExecuteQuery returns.
 					cancel()
 
 					return stream, nil
