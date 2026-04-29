@@ -2,7 +2,6 @@ package topicmultiwriter
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -77,14 +76,6 @@ func (w *MultiWriterWithTransaction) Write(
 	ctx context.Context,
 	messages []topicwriterinternal.PublicMessage,
 ) error {
-	if err := w.tx.UnLazy(ctx); err != nil {
-		return fmt.Errorf("ydb: failed to materialize transaction: %w", err)
-	}
-
-	for i := range messages {
-		messages[i].Tx = w.tx
-	}
-
 	return w.multiWriter.Write(ctx, messages)
 }
 
