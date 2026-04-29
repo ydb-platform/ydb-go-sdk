@@ -1,4 +1,5 @@
 ## v3.135.3
+* Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`) and transactional multi-writer (`WithWriteToManyPartitions`) materializing the transaction and attaching it to messages before writes
 * Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
 
 ## v3.135.2
