@@ -501,43 +501,43 @@ func TestExecute(t *testing.T) {
 		})
 
 		// Regression test for https://github.com/ydb-platform/ydb-go-sdk/issues/2081.
-		// execute() must pass executeCtx (decoupled from parent via xcontext.ValueOnly) to
-		// newResult(), not the parent ctx. If newResult receives the parent ctx and that ctx is
-		// already done, the initial ctx.Done() check in newResult returns context.Canceled
-		// immediately — before any Recv() — causing retries to classify it as non-retryable.
+		//
+		// When the parent ctx is cancelled inside ExecuteQuery (simulating session expiry
+		// while the gRPC stream is still open), the AfterFunc goroutine that propagates
+		// the cancellation to executeCtx is guaranteed to have been started by the time
+		// stop() is called. execute() must detect this via stop() returning false and
+		// return a retryable error — not a non-retryable context.Canceled — so the pool
+		// can retry with a new session.
+		//
+		// RED before fix: the old code (no stop() check before newResult) would either
+		// let the AfterFunc goroutine race with newResult's Recv() (returning a
+		// non-retryable error) or succeed, making it flaky on multi-core systems.
+		// GREEN after fix: stop() always returns false here (AfterFunc goroutine already
+		// started when cancel() fires ctx.Done()), so execute() deterministically returns
+		// a retryable error without calling Recv() at all.
 		t.Run("CancelParentContextAfterStreamOpen", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			ctx, cancel := context.WithCancel(xtest.Context(t))
 
+			// Recv must NOT be called: execute() returns a retryable error before
+			// reaching newResult because stop() detects the AfterFunc was already started.
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-				Status: Ydb.StatusIds_SUCCESS,
-				TxMeta: &Ydb_Query.TransactionMeta{
-					Id: "456",
-				},
-				ResultSetIndex: 0,
-				ResultSet:      &Ydb.ResultSet{},
-			}, nil)
-			stream.EXPECT().Recv().Return(nil, io.EOF)
 
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(_ context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
 					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
 				) {
-					// Simulate session expiry: parent ctx is cancelled while the gRPC
-					// stream is still open. execute() must still succeed because
-					// newResult() is called with executeCtx (not the parent ctx).
+					// Simulate session expiry: cancelling ctx starts the AfterFunc goroutine.
+					// stop() called after this returns will always return false.
 					cancel()
 
 					return stream, nil
 				})
 
-			r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
-			require.NoError(t, err)
-			if r != nil {
-				r.Close(context.Background())
-			}
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			require.Error(t, err)
+			require.True(t, xerrors.IsRetryableError(err), "expected retryable error, got: %v", err)
 		})
 	})
 }
