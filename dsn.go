@@ -100,7 +100,7 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 		}
 	}
 	if fakeTx := info.Params.Get("go_fake_tx"); fakeTx != "" {
-		for _, queryMode := range strings.Split(fakeTx, ",") {
+		for queryMode := range strings.SplitSeq(fakeTx, ",") {
 			switch mode := queryModeFromString(queryMode); mode {
 			case unknownQueryMode:
 				return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
@@ -111,8 +111,8 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 	}
 	if info.Params.Has("go_query_bind") {
 		var binders []xsql.Option
-		queryTransformers := strings.Split(info.Params.Get("go_query_bind"), ",")
-		for _, transformer := range queryTransformers {
+		queryTransformers := strings.SplitSeq(info.Params.Get("go_query_bind"), ",")
+		for transformer := range queryTransformers {
 			switch transformer {
 			case "declare":
 				binders = append(binders, xsql.WithQueryBind(bind.AutoDeclare{}))

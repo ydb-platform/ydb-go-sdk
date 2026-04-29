@@ -130,11 +130,7 @@ func WithKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 // If createSessionTimeout is less than or equal to zero then no used timeout on create session request
 func WithCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(c *Config) {
-		if createSessionTimeout > 0 {
-			c.createSessionTimeout = createSessionTimeout
-		} else {
-			c.createSessionTimeout = 0
-		}
+		c.createSessionTimeout = max(createSessionTimeout, 0)
 	}
 }
 

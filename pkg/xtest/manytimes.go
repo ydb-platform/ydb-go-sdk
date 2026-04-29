@@ -95,28 +95,28 @@ func (tw *testWrapper) Cleanup(f func()) {
 	tw.cleanup = append(tw.cleanup, f)
 }
 
-func (tw *testWrapper) Error(args ...interface{}) {
+func (tw *testWrapper) Error(args ...any) {
 	tw.TB.Helper()
 
 	tw.flushLogs()
 	tw.TB.Error(args...)
 }
 
-func (tw *testWrapper) Errorf(format string, args ...interface{}) {
+func (tw *testWrapper) Errorf(format string, args ...any) {
 	tw.TB.Helper()
 
 	tw.flushLogs()
 	tw.TB.Errorf(format, args...)
 }
 
-func (tw *testWrapper) Fatal(args ...interface{}) {
+func (tw *testWrapper) Fatal(args ...any) {
 	tw.TB.Helper()
 
 	tw.flushLogs()
 	tw.TB.Fatal(args...)
 }
 
-func (tw *testWrapper) Fatalf(format string, args ...interface{}) {
+func (tw *testWrapper) Fatalf(format string, args ...any) {
 	tw.TB.Helper()
 
 	tw.flushLogs()
@@ -137,7 +137,7 @@ func (tw *testWrapper) FailNow() {
 	tw.TB.FailNow()
 }
 
-func (tw *testWrapper) Log(args ...interface{}) {
+func (tw *testWrapper) Log(args ...any) {
 	tw.TB.Helper()
 
 	tw.m.Lock()
@@ -153,7 +153,7 @@ func (tw *testWrapper) Log(args ...interface{}) {
 	}
 }
 
-func (tw *testWrapper) Logf(format string, args ...interface{}) {
+func (tw *testWrapper) Logf(format string, args ...any) {
 	tw.TB.Helper()
 
 	tw.m.Lock()
@@ -199,5 +199,5 @@ func (tw *testWrapper) doCleanup() {
 
 type logRecord struct {
 	format string
-	args   []interface{}
+	args   []any
 }

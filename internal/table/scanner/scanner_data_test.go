@@ -24,7 +24,7 @@ type column struct {
 
 type intIncScanner int64
 
-func (s *intIncScanner) Scan(src interface{}) error {
+func (s *intIncScanner) Scan(src any) error {
 	v, ok := src.(int64)
 	if !ok {
 		return fmt.Errorf("wrong type: %T, exp: int64", src)
@@ -36,7 +36,7 @@ func (s *intIncScanner) Scan(src interface{}) error {
 
 type dateScanner time.Time
 
-func (s *dateScanner) Scan(src interface{}) error {
+func (s *dateScanner) Scan(src any) error {
 	v, ok := src.(time.Time)
 	if !ok {
 		return fmt.Errorf("wrong type: %T, exp: time.Time", src)
@@ -529,7 +529,7 @@ func generateScannerData(count int) *valueScanner {
 		},
 	}}
 	res.set.Rows = []*Ydb.Value{}
-	for i := 0; i < count; i++ {
+	for i := range count {
 		res.set.Rows = append(res.set.GetRows(), &Ydb.Value{
 			Items: []*Ydb.Value{{
 				Value: &Ydb.Value_Uint64Value{

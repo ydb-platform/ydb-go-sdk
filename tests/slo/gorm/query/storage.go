@@ -7,7 +7,6 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
-	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbSDK "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -15,8 +14,9 @@ import (
 	"gorm.io/gorm/clause"
 	gormLogger "gorm.io/gorm/logger"
 
-	"slo/internal/config"
+	"slo/internal/framework"
 	"slo/internal/generator"
+	"slo/internal/kv"
 )
 
 const optionsTemplate = `
@@ -29,73 +29,74 @@ WITH (
     UNIFORM_PARTITIONS = %d
 )`
 
-type Storage struct {
-	db           *gorm.DB
-	cfg          *config.Config
+type db struct {
+	gormDB       *gorm.DB
+	tableName    string
 	tableOptions string
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 }
 
-func NewStorage(cfg *config.Config, poolSize int) (*Storage, error) {
-	s := &Storage{
-		cfg: cfg,
-		tableOptions: fmt.Sprintf(optionsTemplate,
-			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),
-	}
+func NewStorage(_ context.Context, fw *framework.Framework) (framework.Workload, error) {
+	params := kv.ParseParams(fw, "gorm-query", nil)
 
-	var err error
-	s.db, err = gorm.Open(
+	gormDB, err := gorm.Open(
 		ydb.Open(
-			cfg.Endpoint+cfg.DB,
-			ydb.WithMaxOpenConns(poolSize),
-			ydb.WithMaxIdleConns(poolSize),
-			ydb.WithTablePathPrefix(label),
-			ydb.With(
-				environ.WithEnvironCredentials(),
-			),
+			fw.Config.Endpoint+fw.Config.Database,
+			ydb.WithMaxOpenConns(params.PoolSize()),
+			ydb.WithMaxIdleConns(params.PoolSize()),
+			ydb.WithTablePathPrefix(fw.Config.Label),
 		),
 		&gorm.Config{
 			Logger: gormLogger.Default.LogMode(gormLogger.Warn),
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gorm.Open error: %w", err)
 	}
 
-	return s, nil
+	return kv.New(fw, params, &db{
+		gormDB:    gormDB,
+		tableName: fw.Config.Ref,
+		tableOptions: fmt.Sprintf(optionsTemplate,
+			params.PartitionSize,
+			params.MinPartitionCount,
+			params.MaxPartitionCount,
+			params.MinPartitionCount,
+		),
+		readTimeout:  params.ReadTimeout,
+		writeTimeout: params.WriteTimeout,
+	}), nil
 }
 
-func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row, attempts int, err error) {
+func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, attempts int, err error) {
 	if err = ctx.Err(); err != nil {
-		return generator.Row{}, attempts, err
+		return generator.Row{}, 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.readTimeout)
 	defer cancel()
 
-	db, err := s.db.DB()
+	rawDB, err := d.gormDB.DB()
 	if err != nil {
-		return generator.Row{}, attempts, err
+		return generator.Row{}, 0, err
 	}
 
-	err = retry.Do(ctx, db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
+	var r generator.Row
+	err = retry.Do(ctx, rawDB,
+		func(ctx context.Context, _ *sql.Conn) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
 
-			err = s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&generator.Row{}).
+			return d.gormDB.WithContext(ctx).Scopes(scopeTable(d.tableName)).Model(&generator.Row{}).
 				First(&r, "hash = ? AND id = ?",
 					clause.Expr{
 						SQL:  "Digest::NumericHash(?)",
-						Vars: []interface{}{id},
+						Vars: []any{id},
 					},
 					id,
 				).Error
-			if err != nil {
-				return err
-			}
-
-			return nil
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
@@ -112,30 +113,30 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 	return r, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
+func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
 	if err = ctx.Err(); err != nil {
-		return attempts, err
+		return 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	db, err := s.db.DB()
+	rawDB, err := d.gormDB.DB()
 	if err != nil {
-		return attempts, err
+		return 0, err
 	}
 
-	err = retry.Do(ctx, db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
+	err = retry.Do(ctx, rawDB,
+		func(ctx context.Context, _ *sql.Conn) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
 
-			return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&generator.Row{}).
-				Create(map[string]interface{}{
+			return d.gormDB.WithContext(ctx).Scopes(scopeTable(d.tableName)).Model(&generator.Row{}).
+				Create(map[string]any{
 					"Hash": clause.Expr{
 						SQL:  "Digest::NumericHash(?)",
-						Vars: []interface{}{row.ID},
+						Vars: []any{row.ID},
 					},
 					"ID":               row.ID,
 					"PayloadStr":       row.PayloadStr,
@@ -158,55 +159,49 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 	return attempts, err
 }
 
-func (s *Storage) createTable(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).
-		Set("gorm:table_options", s.tableOptions).AutoMigrate(&generator.Row{})
-}
-
-func (s *Storage) dropTable(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+func (d *db) CreateTable(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Migrator().DropTable(&generator.Row{})
+	return d.gormDB.WithContext(ctx).
+		Set("gorm:table_options", d.tableOptions).
+		Scopes(scopeTable(d.tableName)).
+		AutoMigrate(&generator.Row{})
 }
 
-func (s *Storage) close(ctx context.Context) error {
+func (d *db) DropTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	db, err := s.db.WithContext(ctx).DB()
-	if err != nil {
-		return fmt.Errorf("error get db/sql driver: %w", err)
-	}
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
+	defer cancel()
 
-	cc, err := ydbSDK.Unwrap(db)
-	if err != nil {
-		return fmt.Errorf("error unwrap ydb driver: %w", err)
-	}
-
-	err = db.Close()
-	if err != nil {
-		return fmt.Errorf("error close database/sql driver: %w", err)
-	}
-
-	err = cc.Close(ctx)
-	if err != nil {
-		return fmt.Errorf("error close ydb driver: %w", err)
-	}
-
-	return nil
+	return d.gormDB.WithContext(ctx).
+		Scopes(scopeTable(d.tableName)).
+		Migrator().
+		DropTable(&generator.Row{})
 }
 
-func addTableToScope(tableName string) func(tx *gorm.DB) *gorm.DB {
+func (d *db) Close(ctx context.Context) error {
+	rawDB, err := d.gormDB.WithContext(ctx).DB()
+	if err != nil {
+		return fmt.Errorf("get db/sql driver: %w", err)
+	}
+
+	driver, err := ydbSDK.Unwrap(rawDB)
+	if err != nil {
+		return fmt.Errorf("unwrap ydb driver: %w", err)
+	}
+
+	if err = rawDB.Close(); err != nil {
+		return fmt.Errorf("close database/sql driver: %w", err)
+	}
+
+	return driver.Close(ctx)
+}
+
+func scopeTable(tableName string) func(tx *gorm.DB) *gorm.DB {
 	return func(tx *gorm.DB) *gorm.DB {
 		return tx.Table(tableName)
 	}

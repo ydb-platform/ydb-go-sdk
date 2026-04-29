@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -30,13 +31,14 @@ import (
 )
 
 var (
-	errConnTimeout                                 = xerrors.Wrap(errors.New("ydb: connection timeout"))
-	errStopWriterReconnector                       = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	ErrNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))                         //nolint:lll
-	errNonZeroCreatedAt                            = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
-	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
-	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
-	ErrPublicQueueIsFull                           = xerrors.Wrap(errors.New("ydb: queue is full"))                                                                                                                                                                                                                          // Deprecated.
+	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
+	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
+	ErrNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
+	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
+	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
+	ErrPublicQueueIsFull     = xerrors.Wrap(
+		errors.New("ydb: queue is full"),
+	)
 	ErrPublicMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 	errWritingByKeyNotSupported                    = xerrors.Wrap(errors.New("ydb: writing by key is not supported for single writer, use WithWriterPartitionByKey or WithPartitionByPartitionID options"))                                                                                                                  //nolint:lll
@@ -55,7 +57,7 @@ type WriterReconnectorConfig struct {
 	MaxMessageSize               int
 	MaxQueueLen                  int
 	Common                       config.Common
-	AdditionalEncoders           map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	AdditionalEncoders           map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc
 	Connect                      ConnectFunc
 	WaitServerAck                bool
 	AutoSetSeqNo                 bool
@@ -63,6 +65,12 @@ type WriterReconnectorConfig struct {
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 	OnAckReceivedCallback        func(seqNo int64)
 	MultiMode                    bool
+
+	// ErrOnQueueFull controls Write behavior when the internal message queue is full.
+	// false (default): Write blocks until queue space becomes available or ctx is cancelled.
+	// true: Write returns ErrPublicQueueIsFull immediately without blocking,
+	// allowing callers to implement back-pressure and avoid unbounded memory growth.
+	ErrOnQueueFull bool
 
 	MultiWriterConfig any
 	RetrySettings     topic.RetrySettings
@@ -144,7 +152,7 @@ type WriterReconnector struct {
 	semaphore                      *xsync.SoftWeightedSemaphore
 	firstInitResponseProcessedChan empty.Chan
 	lastSeqNo                      int64
-	encodersMap                    *MultiEncoder
+	encodersMap                    *topicwritercommon.MultiEncoder
 	initDoneCh                     empty.Chan
 	initInfo                       InitialInfo
 	m                              xsync.RWMutex
@@ -176,7 +184,7 @@ func newWriterReconnectorStopped(
 		queue:                          newMessageQueue(),
 		lastSeqNo:                      -1,
 		firstInitResponseProcessedChan: make(empty.Chan),
-		encodersMap:                    NewMultiEncoder(),
+		encodersMap:                    topicwritercommon.NewMultiEncoder(),
 		writerInstanceID:               writerInstanceID.String(),
 		retrySettings:                  cfg.RetrySettings,
 	}
@@ -195,31 +203,26 @@ func newWriterReconnectorStopped(
 	return res
 }
 
-func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error {
-	var now time.Time
-
+func (w *WriterReconnector) fillFields(messages []messageWithDataContent, preserveAssignedFields bool) error {
 	for i := range messages {
 		msg := &messages[i]
 
 		// SetSeqNo
 		if w.cfg.AutoSetSeqNo {
 			if msg.SeqNo != 0 {
-				return xerrors.WithStackTrace(ErrNonZeroSeqNo)
-			}
-			w.lastSeqNo++
-			msg.SeqNo = w.lastSeqNo
-		}
-
-		// Set created time
-		if w.cfg.AutoSetCreatedTime {
-			if msg.CreatedAt.IsZero() {
-				if now.IsZero() {
-					now = w.cfg.clock.Now()
+				if !preserveAssignedFields {
+					return xerrors.WithStackTrace(ErrNonZeroSeqNo)
 				}
-				msg.CreatedAt = now
 			} else {
-				return xerrors.WithStackTrace(errNonZeroCreatedAt)
+				w.lastSeqNo++
+				msg.SeqNo = w.lastSeqNo
 			}
+		}
+	}
+
+	if w.cfg.AutoSetCreatedTime {
+		if err := topicwritercommon.FillCreatedAt(messages, w.cfg.Now(), preserveAssignedFields); err != nil {
+			return err
 		}
 	}
 
@@ -232,27 +235,75 @@ func (w *WriterReconnector) start() {
 }
 
 func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) (resErr error) {
+	if err := w.validateWriteMessages(messages); err != nil {
+		return err
+	}
+
+	return w.writePrepared(ctx, len(messages), func() ([]topicwritercommon.MessageWithDataContent, error) {
+		return w.createMessagesWithContent(messages)
+	}, false)
+}
+
+func (w *WriterReconnector) WriteInternal(
+	ctx context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) (resErr error) {
+	return w.writePrepared(ctx, len(messages), func() ([]topicwritercommon.MessageWithDataContent, error) {
+		return messages, nil
+	}, true)
+}
+
+func (w *WriterReconnector) validateWriteMessages(messages []PublicMessage) error {
 	for i := range messages {
 		if !w.cfg.MultiMode && (messages[i].Key != "" || messages[i].PartitionID != 0) {
 			return xerrors.WithStackTrace(errWritingByKeyNotSupported)
 		}
 	}
 
+	return nil
+}
+
+// acquireQueueSpaceForWrite reserves capacity in the internal message queue for weight messages.
+// On success the caller must release the same weight with w.semaphore.Release (typically in defer).
+func (w *WriterReconnector) acquireQueueSpaceForWrite(ctx context.Context, weight int64) error {
+	if w.cfg.ErrOnQueueFull {
+		// Non-blocking path: fail fast with ErrPublicQueueIsFull when the queue has no room.
+		// This lets callers avoid unbounded memory growth and implement their own back-pressure.
+		if !w.semaphore.TryAcquire(weight) {
+			return xerrors.WithStackTrace(ErrPublicQueueIsFull)
+		}
+
+		return nil
+	}
+
+	if err := w.semaphore.Acquire(ctx, weight); err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("ydb: timeout waiting for queue space to become available: %w", err),
+		)
+	}
+
+	return nil
+}
+
+func (w *WriterReconnector) writePrepared(
+	ctx context.Context,
+	messageCount int,
+	prepareMessages func() ([]topicwritercommon.MessageWithDataContent, error),
+	preserveAssignedFields bool,
+) (resErr error) {
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if len(messages) == 0 {
+	if messageCount == 0 {
 		return nil
 	}
 
-	semaphoreWeight := int64(len(messages))
-	if err := w.semaphore.Acquire(ctx, semaphoreWeight); err != nil {
-		return xerrors.WithStackTrace(
-			fmt.Errorf("ydb: timeout waiting for queue space to become available: %w", err),
-		)
+	semaphoreWeight := int64(messageCount)
+	if err := w.acquireQueueSpaceForWrite(ctx, semaphoreWeight); err != nil {
+		return err
 	}
 	defer func() {
 		w.semaphore.Release(semaphoreWeight)
@@ -262,16 +313,25 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		return err
 	}
 
-	messagesSlice, err := w.createMessagesWithContent(messages)
+	messages, err := prepareMessages()
 	if err != nil {
 		return err
 	}
 
-	if err = w.checkMessages(messagesSlice); err != nil {
+	return w.writeCommon(ctx, messages, &semaphoreWeight, preserveAssignedFields)
+}
+
+func (w *WriterReconnector) writeCommon(
+	ctx context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+	semaphoreWeight *int64,
+	preserveAssignedFields bool,
+) (resErr error) {
+	if err := w.checkMessages(messages); err != nil {
 		return err
 	}
 
-	waiter, err := w.addMessageToInternalQueueWithLock(messagesSlice, &semaphoreWeight)
+	waiter, err := w.addMessageToInternalQueueWithLock(messages, semaphoreWeight, preserveAssignedFields)
 	if err != nil {
 		return err
 	}
@@ -291,6 +351,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 func (w *WriterReconnector) addMessageToInternalQueueWithLock(
 	messagesSlice []messageWithDataContent,
 	semaphoreWeight *int64,
+	preserveAssignedFields bool,
 ) (MessageQueueAckWaiter, error) {
 	var (
 		waiter MessageQueueAckWaiter
@@ -298,7 +359,7 @@ func (w *WriterReconnector) addMessageToInternalQueueWithLock(
 	)
 	w.m.WithLock(func() {
 		// need set numbers and add to queue atomically
-		err = w.fillFields(messagesSlice)
+		err = w.fillFields(messagesSlice, preserveAssignedFields)
 		if err != nil {
 			return
 		}
@@ -355,7 +416,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	if targetCodec == rawtopiccommon.CodecUNSPECIFIED {
 		targetCodec = rawtopiccommon.CodecRaw
 	}
-	err := cacheMessages(res, targetCodec, w.cfg.compressorCount)
+	err := topicwritercommon.CacheMessages(res, targetCodec, w.cfg.compressorCount)
 	onCompressDone(err)
 
 	if err != nil {
@@ -658,18 +719,14 @@ func (w *WriterReconnector) GetSessionID() (sessionID string) {
 	return sessionID
 }
 
-func (w *WriterReconnector) GetBufferedMessages() []PublicMessage {
-	return w.queue.getBufferedMessages()
-}
-
 func allMessagesHasSameBufCodec(messages []messageWithDataContent) bool {
 	if len(messages) <= 1 {
 		return true
 	}
 
-	codec := messages[0].bufCodec
+	codec := messages[0].BufCodec
 	for i := range messages {
-		if messages[i].bufCodec != codec {
+		if messages[i].BufCodec != codec {
 			return false
 		}
 	}
@@ -683,12 +740,12 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 	}
 
 	currentGroupStart := 0
-	currentCodec := messages[0].bufCodec
+	currentCodec := messages[0].BufCodec
 	for i := range messages {
-		if messages[i].bufCodec != currentCodec {
+		if messages[i].BufCodec != currentCodec {
 			res = append(res, messages[currentGroupStart:i:i])
 			currentGroupStart = i
-			currentCodec = messages[i].bufCodec
+			currentCodec = messages[i].BufCodec
 		}
 	}
 	res = append(res, messages[currentGroupStart:len(messages):len(messages)])
@@ -701,16 +758,16 @@ func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopicc
 	err error,
 ) {
 	for i := 1; i < len(messages); i++ {
-		if messages[i-1].tx != messages[i].tx {
+		if messages[i-1].Tx != messages[i].Tx {
 			return nil, xerrors.WithStackTrace(errDiffetentTransactions)
 		}
 	}
 
 	res = &rawtopicwriter.WriteRequest{}
 
-	if len(messages) > 0 && messages[0].tx != nil {
-		res.Tx.ID = messages[0].tx.ID()
-		res.Tx.Session = messages[0].tx.SessionID()
+	if len(messages) > 0 && messages[0].Tx != nil {
+		res.Tx.ID = messages[0].Tx.ID()
+		res.Tx.Session = messages[0].Tx.SessionID()
 	}
 
 	res.Codec = targetCodec
@@ -733,12 +790,12 @@ func createRawMessageData(
 	res.SeqNo = mess.SeqNo
 
 	switch {
-	case mess.futurePartitioning.hasPartitionID:
+	case mess.FuturePartitioning.HasPartitionID:
 		res.Partitioning.Type = rawtopicwriter.PartitioningPartitionID
-		res.Partitioning.PartitionID = mess.futurePartitioning.partitionID
-	case mess.futurePartitioning.messageGroupID != "":
+		res.Partitioning.PartitionID = mess.FuturePartitioning.PartitionID
+	case mess.FuturePartitioning.MessageGroupID != "":
 		res.Partitioning.Type = rawtopicwriter.PartitioningMessageGroupID
-		res.Partitioning.MessageGroupID = mess.futurePartitioning.messageGroupID
+		res.Partitioning.MessageGroupID = mess.FuturePartitioning.MessageGroupID
 	default:
 		// pass
 	}
@@ -759,7 +816,7 @@ func createRawMessageData(
 	return res, err
 }
 
-func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, multiEncoder *MultiEncoder,
+func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, multiEncoder *topicwritercommon.MultiEncoder,
 	serverCodecs rawtopiccommon.SupportedCodecs,
 ) rawtopiccommon.SupportedCodecs {
 	if forceCodec != rawtopiccommon.CodecUNSPECIFIED {

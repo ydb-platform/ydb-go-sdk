@@ -69,7 +69,7 @@ func TestWithNamesRaceRegression(t *testing.T) {
 
 		start := make(chan bool)
 		finished := make(chan bool)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			go func(index int) {
 				<-start
 				res[index] = WithNames(ctx, strconv.Itoa(index))
@@ -80,11 +80,11 @@ func TestWithNamesRaceRegression(t *testing.T) {
 		time.Sleep(time.Microsecond)
 		close(start)
 
-		for i := 0; i < count; i++ {
+		for range count {
 			<-finished
 		}
 
-		for i := 0; i < count; i++ {
+		for i := range count {
 			expected := []string{"test", "test", "test", strconv.Itoa(i)}
 			require.Equal(t, expected, NamesFromContext(res[i]))
 		}

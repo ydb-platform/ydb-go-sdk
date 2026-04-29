@@ -90,78 +90,97 @@ func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate stri
 // RemoveRecursive method is equivalent to the bash command `rm -rf ~/path/to/remove`
 // where `~` is the root of the database.
 func RemoveRecursive(ctx context.Context, db driver, pathToRemove string) error {
+	pathToRemove = normalizePathUnderDatabase(db, pathToRemove)
 	fullSysTablePath := path.Join(db.Name(), sysDirectory)
 
-	var rmPath func(int, string) error
-	rmPath = func(depth int, currentPath string) error {
-		exists, err := IsDirectoryExists(ctx, db.Scheme(), currentPath)
-		if err != nil {
-			return xerrors.WithStackTrace(
-				fmt.Errorf("failed to check if directory %q exists: %w", currentPath, err),
-			)
-		} else if !exists {
-			return nil
-		}
-
-		entry, err := db.Scheme().DescribePath(ctx, currentPath)
-		if err != nil {
-			return xerrors.WithStackTrace(
-				fmt.Errorf("cannot describe path %q: %w", currentPath, err),
-			)
-		}
-
-		if entry.Type != scheme.EntryDirectory && entry.Type != scheme.EntryDatabase {
-			return nil
-		}
-
-		dir, err := db.Scheme().ListDirectory(ctx, currentPath)
-		if err != nil {
-			return xerrors.WithStackTrace(
-				fmt.Errorf("failed to list directory %q: %w", currentPath, err),
-			)
-		}
-
-		for i := range dir.Children {
-			child := &dir.Children[i]
-			childPath := path.Join(currentPath, child.Name)
-			if childPath == fullSysTablePath {
-				continue
-			}
-			if err := handleEntry(ctx, db, rmPath, depth, child, childPath); err != nil {
-				return err
-			}
-		}
-
-		if entry.Type == scheme.EntryDirectory {
-			if err := db.Scheme().RemoveDirectory(ctx, currentPath); err != nil {
-				return xerrors.WithStackTrace(
-					fmt.Errorf("failed to remove directory %q: %w", currentPath, err),
-				)
-			}
-		}
-
+	exists, err := IsDirectoryExists(ctx, db.Scheme(), pathToRemove)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("failed to check if directory %q exists: %w", pathToRemove, err),
+		)
+	}
+	if !exists {
 		return nil
 	}
 
-	if !strings.HasPrefix(pathToRemove, db.Name()) {
-		pathToRemove = path.Join(db.Name(), pathToRemove)
+	entry, err := db.Scheme().DescribePath(ctx, pathToRemove)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("cannot describe path %q: %w", pathToRemove, err),
+		)
 	}
 
-	return rmPath(0, pathToRemove)
+	if entry.Type != scheme.EntryDirectory && entry.Type != scheme.EntryDatabase {
+		return nil
+	}
+
+	dir, err := db.Scheme().ListDirectory(ctx, pathToRemove)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("failed to list directory %q: %w", pathToRemove, err),
+		)
+	}
+
+	var deferredExternalDataSources []string
+	for i := range dir.Children {
+		child := &dir.Children[i]
+		childPath := path.Join(pathToRemove, child.Name)
+		if childPath == fullSysTablePath {
+			continue
+		}
+		if child.Type == scheme.EntryExternalDataSource {
+			deferredExternalDataSources = append(deferredExternalDataSources, childPath)
+
+			continue
+		}
+		if err := handleEntry(ctx, db, child, childPath); err != nil {
+			return err
+		}
+	}
+	if err := removeDeferredExternalDataSources(ctx, db, deferredExternalDataSources); err != nil {
+		return err
+	}
+
+	if entry.Type == scheme.EntryDirectory {
+		if err := db.Scheme().RemoveDirectory(ctx, pathToRemove); err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("failed to remove directory %q: %w", pathToRemove, err),
+			)
+		}
+	}
+
+	return nil
+}
+
+func normalizePathUnderDatabase(db dbName, pathToRemove string) string {
+	if strings.HasPrefix(pathToRemove, db.Name()) {
+		return pathToRemove
+	}
+
+	return path.Join(db.Name(), pathToRemove)
+}
+
+// removeDeferredExternalDataSources drops paths collected while listing directory children.
+// Call it only after other children (including nested directories) are removed: external tables
+// reference an external data source and must be dropped first.
+func removeDeferredExternalDataSources(ctx context.Context, db driver, paths []string) error {
+	for i := range paths {
+		p := paths[i]
+		if err := dropExternalDataSource(ctx, db, p); err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("failed to remove external data source %q: %w", p, err),
+			)
+		}
+	}
+
+	return nil
 }
 
 // handleEntry processes and removes different types of database entries
-func handleEntry(
-	ctx context.Context,
-	db driver,
-	rmPath func(int, string) error,
-	depth int,
-	entry *scheme.Entry,
-	entryPath string,
-) error {
+func handleEntry(ctx context.Context, db driver, entry *scheme.Entry, entryPath string) error {
 	switch entry.Type {
 	case scheme.EntryDirectory:
-		if err := rmPath(depth+1, entryPath); err != nil {
+		if err := RemoveRecursive(ctx, db, entryPath); err != nil {
 			return xerrors.WithStackTrace(
 				fmt.Errorf("failed to recursively remove directory %q: %w", entryPath, err),
 			)
@@ -170,6 +189,12 @@ func handleEntry(
 		if err := removeTable(ctx, db, entryPath); err != nil {
 			return xerrors.WithStackTrace(
 				fmt.Errorf("failed to remove table %q: %w", entryPath, err),
+			)
+		}
+	case scheme.EntryExternalTable:
+		if err := dropExternalTable(ctx, db, entryPath); err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("failed to remove external table %q: %w", entryPath, err),
 			)
 		}
 	case scheme.EntryTopic:
@@ -185,6 +210,22 @@ func handleEntry(
 	}
 
 	return nil
+}
+
+func dropExternalTable(ctx context.Context, db driver, entryPath string) error {
+	sql := fmt.Sprintf("DROP EXTERNAL TABLE `%s`", entryPath)
+
+	return db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+		return s.ExecuteSchemeQuery(ctx, sql)
+	}, table.WithIdempotent())
+}
+
+func dropExternalDataSource(ctx context.Context, db driver, entryPath string) error {
+	sql := fmt.Sprintf("DROP EXTERNAL DATA SOURCE `%s`", entryPath)
+
+	return db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+		return s.ExecuteSchemeQuery(ctx, sql)
+	}, table.WithIdempotent())
 }
 
 // removeTable removes a table in the database

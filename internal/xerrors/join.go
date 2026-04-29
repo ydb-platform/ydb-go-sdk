@@ -43,7 +43,7 @@ func (e *joinError) Error() string {
 	return b.String()
 }
 
-func (e *joinError) As(target interface{}) bool {
+func (e *joinError) As(target any) bool {
 	for _, err := range e.errs {
 		if As(err, target) {
 			return true

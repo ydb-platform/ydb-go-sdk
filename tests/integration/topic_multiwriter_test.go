@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -28,11 +27,32 @@ type partitionProducerKey struct {
 	producerID  string
 }
 
+type receivedTopicMessage struct {
+	partitionID int64
+	producerID  string
+	seqNo       int64
+	payload     []byte
+	metadata    map[string][]byte
+}
+
 const (
 	defaultMessageCount  = 1000
 	defaultReadTimeout   = 20 * time.Second
 	defaultMessageString = "hello"
 )
+
+func cloneBytesMetadata(src map[string][]byte) map[string][]byte {
+	if src == nil {
+		return nil
+	}
+
+	dst := make(map[string][]byte, len(src))
+	for k, v := range src {
+		dst[k] = bytes.Clone(v)
+	}
+
+	return dst
+}
 
 func writeAndReadMessages(
 	t testing.TB,
@@ -77,6 +97,34 @@ func readMessagesAndAssertOrderedBySeqNo(
 	timeout time.Duration,
 	expectedPayload []byte,
 ) error {
+	messages, err := readMessagesDetailed(ctx, client, topicPath, consumerName, expectedCount, timeout)
+	if err != nil {
+		return err
+	}
+	for _, m := range messages {
+		if !bytes.Equal(expectedPayload, m.payload) {
+			return fmt.Errorf(
+				"partition %d, producerId %s: payload mismatch, expected %d bytes, got %d bytes, seqNo %d",
+				m.partitionID,
+				m.producerID,
+				len(expectedPayload),
+				len(m.payload),
+				m.seqNo,
+			)
+		}
+	}
+
+	return assertMessagesOrderedBySeqNo(messages)
+}
+
+func readMessagesDetailed(
+	ctx context.Context,
+	client topic.Client,
+	topicPath string,
+	consumerName string,
+	expectedCount int,
+	timeout time.Duration,
+) ([]receivedTopicMessage, error) {
 	reader, err := client.StartReader(
 		consumerName,
 		topicoptions.ReadSelectors{
@@ -88,25 +136,18 @@ func readMessagesAndAssertOrderedBySeqNo(
 		topicoptions.WithReaderSupportSplitMergePartitions(true),
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		_ = reader.Close(context.Background())
 	}()
 
-	type message struct {
-		partitionID int64
-		producerID  string
-		seqNo       int64
-		payload     []byte
-	}
-
-	messages := make([]message, 0, expectedCount)
+	messages := make([]receivedTopicMessage, 0, expectedCount)
 	deadline := time.Now().Add(timeout)
 
 	for len(messages) < expectedCount {
 		if time.Now().After(deadline) {
-			return fmt.Errorf(
+			return nil, fmt.Errorf(
 				"expected to read %d messages within %s, got %d",
 				expectedCount,
 				timeout,
@@ -114,40 +155,36 @@ func readMessagesAndAssertOrderedBySeqNo(
 			)
 		}
 
-		readCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+		readCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		msg, err := reader.ReadMessage(readCtx)
 		cancel()
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				// Retry until overall timeout is reached.
 				continue
 			}
 
-			return err
+			return nil, err
 		}
 
 		payload := make([]byte, msg.UncompressedSize)
 		_, err = msg.Read(payload)
 		if err != nil && !errors.Is(err, io.EOF) {
-			return err
+			return nil, err
 		}
 
-		messages = append(messages, message{
+		messages = append(messages, receivedTopicMessage{
 			partitionID: msg.PartitionID(),
 			producerID:  msg.ProducerID,
 			seqNo:       msg.SeqNo,
 			payload:     payload,
+			metadata:    cloneBytesMetadata(msg.Metadata),
 		})
 	}
 
-	if len(messages) != expectedCount {
-		return fmt.Errorf(
-			"read message count mismatch: got %d, expected %d",
-			len(messages),
-			expectedCount,
-		)
-	}
+	return messages, nil
+}
 
+func assertMessagesOrderedBySeqNo(messages []receivedTopicMessage) error {
 	byPartitionAndProducer := make(map[partitionProducerKey][]int64)
 	for _, m := range messages {
 		key := partitionProducerKey{
@@ -155,16 +192,6 @@ func readMessagesAndAssertOrderedBySeqNo(
 			producerID:  m.producerID,
 		}
 		byPartitionAndProducer[key] = append(byPartitionAndProducer[key], m.seqNo)
-		if !bytes.Equal(expectedPayload, m.payload) {
-			return fmt.Errorf(
-				"partition %d, producerId %s: payload mismatch, expected %d bytes, got %d bytes, seqNo %d",
-				key.partitionID,
-				key.producerID,
-				len(expectedPayload),
-				len(m.payload),
-				m.seqNo,
-			)
-		}
 	}
 
 	for key, seqNos := range byPartitionAndProducer {
@@ -183,6 +210,80 @@ func readMessagesAndAssertOrderedBySeqNo(
 	}
 
 	return nil
+}
+
+// readPartitionByPayload reads from the topic until each distinct payload in wantPayloads has been
+// observed at least once, and returns the partition ID of the first message with that payload.
+func readPartitionByPayload(
+	ctx context.Context,
+	client topic.Client,
+	topicPath string,
+	wantPayloads [][]byte,
+	timeout time.Duration,
+) (map[string]int64, error) {
+	reader, err := client.StartReader(
+		consumerName,
+		topicoptions.ReadSelectors{
+			{
+				Path:     topicPath,
+				ReadFrom: time.Unix(0, 0).UTC(),
+			},
+		},
+		topicoptions.WithReaderSupportSplitMergePartitions(true),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = reader.Close(context.Background())
+	}()
+
+	wantSet := make(map[string]struct{}, len(wantPayloads))
+	for _, p := range wantPayloads {
+		wantSet[string(p)] = struct{}{}
+	}
+
+	found := make(map[string]int64, len(wantSet))
+	deadline := time.Now().Add(timeout)
+
+	for len(found) < len(wantSet) {
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf(
+				"readPartitionByPayload: timeout after %s, found %d/%d payloads",
+				timeout,
+				len(found),
+				len(wantSet),
+			)
+		}
+
+		readCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		msg, err := reader.ReadMessage(readCtx)
+		cancel()
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		payload := make([]byte, msg.UncompressedSize)
+		_, err = msg.Read(payload)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+
+		ps := string(payload)
+		if _, want := wantSet[ps]; !want {
+			continue
+		}
+
+		if _, ok := found[ps]; !ok {
+			found[ps] = msg.PartitionID()
+		}
+	}
+
+	return found, nil
 }
 
 // CreateTopicWithAutoPartitioning creates a topic with auto partitioning.
@@ -254,6 +355,168 @@ func createMultiWriterForAutoPartitioning(
 	err = multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 	return multiWriter
+}
+
+func createKafkaHashMultiWriter(
+	t testing.TB,
+	ctx context.Context,
+	topicClient topic.Client,
+	topicPath string,
+	producerIDPrefix string,
+) *topicwriter.Writer {
+	t.Helper()
+
+	writer, err := topicClient.StartWriter(
+		topicPath,
+		topicoptions.WithWriterSetAutoSeqNo(true),
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+			topicoptions.WithProducerIDPrefix(producerIDPrefix),
+		),
+	)
+	require.NoError(t, err)
+	require.NoError(t, writer.WaitInit(ctx))
+
+	return writer
+}
+
+type autoPartitioningScenario struct {
+	t                 testing.TB
+	ctx               context.Context
+	topicClient       topic.Client
+	topicPath         string
+	firstPartitionKey string
+	writer1           *topicwriter.Writer
+	writer2           *topicwriter.Writer
+}
+
+func newAutoPartitioningScenario(
+	t testing.TB,
+	scope *scopeT,
+	topicPathMarker string,
+	producerStem string,
+) (*autoPartitioningScenario, topictypes.TopicDescription) {
+	t.Helper()
+
+	const firstPartitionKey = "__first_partition__"
+
+	ctx := scope.Ctx
+	db := scope.Driver()
+	topicClient := db.Topic()
+
+	topicPath := db.Name() + "/" + t.Name() + topicPathMarker + uuid.NewString()
+	_ = topicClient.Drop(ctx, topicPath)
+	require.NoError(t, createTopicWithAutoPartitioning(ctx, db, topicPath))
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = topicClient.Drop(cleanupCtx, topicPath)
+	})
+
+	describe, err := topicClient.Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Len(t, describe.Partitions, 2)
+	if len(describe.Partitions[0].FromBound) == 0 && len(describe.Partitions[0].ToBound) == 0 {
+		t.Skip("skipping test because autosplit does not work in this version of YDB")
+	}
+
+	scenario := &autoPartitioningScenario{
+		t:                 t,
+		ctx:               ctx,
+		topicClient:       topicClient,
+		topicPath:         topicPath,
+		firstPartitionKey: firstPartitionKey,
+		writer1:           createMultiWriterForAutoPartitioning(t, fmt.Sprintf("%s_1", producerStem), ctx, topicPath, topicClient, firstPartitionKey),
+		writer2:           createMultiWriterForAutoPartitioning(t, fmt.Sprintf("%s_2", producerStem), ctx, topicPath, topicClient, firstPartitionKey),
+	}
+
+	return scenario, describe
+}
+
+func (s *autoPartitioningScenario) getKeys(partitions []topictypes.PartitionInfo) []string {
+	keys := make([]string, 0, len(partitions))
+	for _, p := range partitions {
+		if len(p.FromBound) == 0 {
+			keys = append(keys, s.firstPartitionKey)
+
+			continue
+		}
+
+		keys = append(keys, string(p.FromBound))
+	}
+
+	return keys
+}
+
+func (s *autoPartitioningScenario) writeMessages(
+	writer *topicwriter.Writer,
+	payload []byte,
+	key string,
+	metadata map[string][]byte,
+	count int,
+) int {
+	s.t.Helper()
+	if count <= 0 {
+		count = 1
+	}
+
+	messages := make([]topicwriter.Message, 0, count)
+	for range count {
+		messages = append(messages, topicwriter.Message{
+			Data:     bytes.NewReader(payload),
+			Key:      key,
+			Metadata: cloneBytesMetadata(metadata),
+		})
+	}
+
+	require.NoError(s.t, writer.Write(s.ctx, messages...))
+
+	return len(messages)
+}
+
+func (s *autoPartitioningScenario) flushBoth(ctx context.Context) {
+	s.t.Helper()
+	require.NoError(s.t, s.writer1.Flush(ctx))
+	require.NoError(s.t, s.writer2.Flush(ctx))
+}
+
+func (s *autoPartitioningScenario) closeAll(ctx context.Context, extraWriters ...*topicwriter.Writer) {
+	s.t.Helper()
+	for _, writer := range extraWriters {
+		require.NoError(s.t, writer.Close(ctx))
+	}
+	require.NoError(s.t, s.writer1.Close(ctx))
+	require.NoError(s.t, s.writer2.Close(ctx))
+}
+
+func (s *autoPartitioningScenario) waitForPartitionsCountAtLeast(
+	minCount int,
+	timeout time.Duration,
+	onTick func(partitions []topictypes.PartitionInfo),
+) topictypes.TopicDescription {
+	s.t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	nextActionAt := time.Now()
+
+	for {
+		describeResult, describeErr := s.topicClient.Describe(s.ctx, s.topicPath)
+		require.NoError(s.t, describeErr)
+		if len(describeResult.Partitions) >= minCount {
+			return describeResult
+		}
+
+		if time.Now().After(deadline) {
+			s.t.Fatalf("partitions count: %d, expected at least %d", len(describeResult.Partitions), minCount)
+		}
+
+		if onTick != nil && time.Now().After(nextActionAt) {
+			onTick(describeResult.Partitions)
+			nextActionAt = time.Now().Add(500 * time.Millisecond)
+		}
+
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 // TestTopicMultiWriter_WaitInitAndClose verifies that internal topic multi writer
@@ -334,6 +597,183 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 			}
 		},
 	)
+}
+
+// TestTopicMultiWriter_KafkaHashPartitionStableAcrossWriterRestart checks that with Kafka-style hash
+// partitioning, the same message key maps to the same partition after closing the writer and
+// starting a new one (simulating application restart).
+func TestTopicMultiWriter_KafkaHashPartitionStableAcrossWriterRestart(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	const (
+		producerPrefix = "kafka-hash-restart-producer"
+		stableKey      = "stable-partitioning-key-restart-42"
+	)
+	payloadFirst := []byte("payload-kafka-hash-first-session")
+	payloadSecond := []byte("payload-kafka-hash-second-session")
+
+	multiWriterOpts := []topicoptions.MultiWriterOption{
+		topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+		topicoptions.WithProducerIDPrefix(producerPrefix),
+	}
+
+	startWriter := func() *topicwriter.Writer {
+		w, wErr := topicClient.StartWriter(
+			topicPath,
+			topicoptions.WithWriterSetAutoSeqNo(true),
+			topicoptions.WithWriteToManyPartitions(multiWriterOpts...),
+		)
+		require.NoError(t, wErr)
+		require.NoError(t, w.WaitInit(ctx))
+
+		return w
+	}
+
+	w1 := startWriter()
+	require.NoError(t, w1.Write(ctx, topicwriter.Message{
+		Data: bytes.NewReader(payloadFirst),
+		Key:  stableKey,
+	}))
+	require.NoError(t, w1.Flush(ctx))
+	require.NoError(t, w1.Close(ctx))
+
+	w2 := startWriter()
+	require.NoError(t, w2.Write(ctx, topicwriter.Message{
+		Data: bytes.NewReader(payloadSecond),
+		Key:  stableKey,
+	}))
+	require.NoError(t, w2.Flush(ctx))
+	require.NoError(t, w2.Close(ctx))
+
+	partitionsByPayload, err := readPartitionByPayload(
+		ctx,
+		topicClient,
+		topicPath,
+		[][]byte{payloadFirst, payloadSecond},
+		defaultReadTimeout,
+	)
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		partitionsByPayload[string(payloadFirst)],
+		partitionsByPayload[string(payloadSecond)],
+		"same key must map to the same partition after writer restart (Kafka hash strategy)",
+	)
+}
+
+func TestTopicMultiWriter_KafkaHashChooser_SameKeySamePartitionAcrossManyRestarts(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	const (
+		restartCount   = 5
+		producerPrefix = "kafka-hash-many-restarts"
+		stableKey      = "same-key-across-many-restarts"
+	)
+
+	payloads := make([][]byte, 0, restartCount)
+	for i := range restartCount {
+		payload := []byte(fmt.Sprintf("payload-kafka-many-restarts-%d", i))
+		payloads = append(payloads, payload)
+
+		writer := createKafkaHashMultiWriter(t, ctx, topicClient, topicPath, producerPrefix)
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{
+			Data: bytes.NewReader(payload),
+			Key:  stableKey,
+		}))
+		require.NoError(t, writer.Flush(ctx))
+		require.NoError(t, writer.Close(ctx))
+	}
+
+	partitionsByPayload, err := readPartitionByPayload(
+		ctx,
+		topicClient,
+		topicPath,
+		payloads,
+		defaultReadTimeout,
+	)
+	require.NoError(t, err)
+
+	require.Len(t, partitionsByPayload, restartCount)
+	var expectedPartition int64
+	for i, payload := range payloads {
+		partitionID := partitionsByPayload[string(payload)]
+		if i == 0 {
+			expectedPartition = partitionID
+
+			continue
+		}
+
+		require.Equal(t, expectedPartition, partitionID)
+	}
+}
+
+func TestTopicMultiWriter_KafkaHashChooser_DifferentKeysDistributeAcrossPartitions(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	writer := createKafkaHashMultiWriter(t, ctx, topicClient, topicPath, "kafka-hash-distribution")
+
+	const keyCount = 32
+	payloads := make([][]byte, 0, keyCount)
+	for i := range keyCount {
+		payload := []byte(fmt.Sprintf("payload-kafka-distribution-%02d", i))
+		payloads = append(payloads, payload)
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{
+			Data: bytes.NewReader(payload),
+			Key:  fmt.Sprintf("distribution-key-%02d", i),
+		}))
+	}
+	require.NoError(t, writer.Close(ctx))
+
+	partitionsByPayload, err := readPartitionByPayload(
+		ctx,
+		topicClient,
+		topicPath,
+		payloads,
+		defaultReadTimeout,
+	)
+	require.NoError(t, err)
+
+	uniquePartitions := make(map[int64]struct{})
+	for _, payload := range payloads {
+		uniquePartitions[partitionsByPayload[string(payload)]] = struct{}{}
+	}
+
+	require.Greater(t, len(uniquePartitions), 1, "different keys should not all map to one partition")
 }
 
 func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
@@ -429,17 +869,44 @@ func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
 	)
 }
 
-func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
+// autoPartitioningIntegrationVariant selects topic path fragment, per-message payload, and producer ID stem
+// (writers use stem_1, stem_2, stem_3) for the shared auto-partitioning integration scenario.
+// messagesPerLogicalWrite allows representing one "logical" write by several physical messages
+// with the same key, e.g. to keep total written bytes equal across payload sizes.
+type autoPartitioningIntegrationVariant struct {
+	topicPathMarker         string
+	payload                 []byte
+	producerStem            string
+	messagesPerLogicalWrite int
+	readTimeout             time.Duration
+	targetPartitions        int
+}
+
+func runTestWithAutoPartitioningVariant(t testing.TB, scope *scopeT, variant autoPartitioningIntegrationVariant) {
 	const firstPartitionKey = "__first_partition__"
+	if variant.messagesPerLogicalWrite <= 0 {
+		variant.messagesPerLogicalWrite = 1
+	}
+	if variant.readTimeout <= 0 {
+		variant.readTimeout = 20 * time.Second
+	}
+	if variant.targetPartitions < 3 {
+		variant.targetPartitions = 3
+	}
 
 	ctx := scope.Ctx
 
 	db := scope.Driver()
 	topicClient := db.Topic()
 
-	topicPath := db.Name() + "/" + t.Name() + "--auto-part-topic--" + uuid.NewString()
+	topicPath := db.Name() + "/" + t.Name() + variant.topicPathMarker + uuid.NewString()
 	_ = topicClient.Drop(ctx, topicPath)
 	require.NoError(t, createTopicWithAutoPartitioning(ctx, db, topicPath))
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = topicClient.Drop(cleanupCtx, topicPath)
+	})
 
 	describe, err := topicClient.Describe(ctx, topicPath)
 	require.NoError(t, err)
@@ -448,9 +915,13 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 		t.Skip("skipping test because autosplit does not work in this version of YDB")
 	}
 
-	multiWriter1 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_1", ctx, topicPath, topicClient, firstPartitionKey)
-	multiWriter2 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_2", ctx, topicPath, topicClient, firstPartitionKey)
-	msgData := bytes.Repeat([]byte{'a'}, 1<<20) // 1 MB
+	producerID := func(i int) string {
+		return fmt.Sprintf("%s_%d", variant.producerStem, i)
+	}
+
+	multiWriter1 := createMultiWriterForAutoPartitioning(t, producerID(1), ctx, topicPath, topicClient, firstPartitionKey)
+	multiWriter2 := createMultiWriterForAutoPartitioning(t, producerID(2), ctx, topicPath, topicClient, firstPartitionKey)
+	msgData := variant.payload
 
 	var messagesWritten1, messagesWritten2 int
 
@@ -471,21 +942,24 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 
 	require.NotEmpty(t, getKeys(describe.Partitions))
 
-	writeMessage := func(m *topicwriter.Writer, payload []byte, key string) {
-		msg := topicwriter.Message{
-			Data: bytes.NewReader(payload),
-			Key:  key,
+	writeMessage := func(m *topicwriter.Writer, payload []byte, key string) int {
+		messages := make([]topicwriter.Message, 0, variant.messagesPerLogicalWrite)
+		for range variant.messagesPerLogicalWrite {
+			messages = append(messages, topicwriter.Message{
+				Data: bytes.NewReader(payload),
+				Key:  key,
+			})
 		}
 
-		require.NoError(t, m.Write(ctx, msg))
+		require.NoError(t, m.Write(ctx, messages...))
+
+		return len(messages)
 	}
 
 	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
 		for _, key := range getKeys(partitions) {
-			writeMessage(multiWriter1, msgData, key)
-			messagesWritten1++
-			writeMessage(multiWriter2, msgData, key)
-			messagesWritten2++
+			messagesWritten1 += writeMessage(multiWriter1, msgData, key)
+			messagesWritten2 += writeMessage(multiWriter2, msgData, key)
 		}
 
 		require.NoError(t, multiWriter1.Flush(ctx))
@@ -519,21 +993,22 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 	writeLoadRound(describe.Partitions)
 	writeLoadRound(describe.Partitions)
 
-	describe = waitForPartitionsCountAtLeast(3, 20*time.Second)
+	describe = waitForPartitionsCountAtLeast(variant.targetPartitions, 20*time.Second)
+	require.GreaterOrEqual(
+		t,
+		len(describe.Partitions),
+		variant.targetPartitions,
+		"partitions count: %d, expected at least %d",
+		len(describe.Partitions),
+		variant.targetPartitions,
+	)
 
-	writeLoadRound(describe.Partitions)
-	writeLoadRound(describe.Partitions)
-
-	describe = waitForPartitionsCountAtLeast(4, 20*time.Second)
-	require.GreaterOrEqual(t, len(describe.Partitions), 4, "partitions count: %d, expected at least 4", len(describe.Partitions))
-
-	writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
-	writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
-	messagesWritten1 += 2
+	messagesWritten1 += writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
+	messagesWritten1 += writeMessage(multiWriter1, msgData, getKeys(describe.Partitions)[0])
 	require.NoError(t, multiWriter1.Flush(ctx))
 	require.NoError(t, multiWriter2.Flush(ctx))
 
-	multiWriter3 := createMultiWriterForAutoPartitioning(t, "autopartitioning_keyed_3", ctx, topicPath, topicClient, firstPartitionKey)
+	multiWriter3 := createMultiWriterForAutoPartitioning(t, producerID(3), ctx, topicPath, topicClient, firstPartitionKey)
 
 	require.NoError(t, multiWriter3.Close(ctx))
 	require.NoError(t, multiWriter1.Close(ctx))
@@ -545,9 +1020,20 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 		topicPath,
 		consumerName,
 		messagesWritten1+messagesWritten2,
-		20*time.Second,
+		variant.readTimeout,
 		msgData,
 	))
+}
+
+func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
+	runTestWithAutoPartitioningVariant(t, scope, autoPartitioningIntegrationVariant{
+		topicPathMarker:         "--auto-part-topic--",
+		payload:                 bytes.Repeat([]byte{'a'}, 1<<20), // 1 MiB
+		producerStem:            "autopartitioning_keyed",
+		messagesPerLogicalWrite: 1,
+		readTimeout:             20 * time.Second,
+		targetPartitions:        3,
+	})
 }
 
 type customPartitionChooser struct{}
@@ -606,18 +1092,393 @@ func TestTopicMultiWriter_WithCustomPartitioning(t *testing.T) {
 	)
 }
 
-func TestTopicMultiWriter_AutoPartitioning_Once(t *testing.T) {
+func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
 	scope := newScope(t)
 	runTestWithAutoPartitioning(t, scope)
 }
 
-func TestTopicMultiWriter_AutoPartitioning(t *testing.T) {
+func TestTopicMultiWriter_AutoPartitioning_FlushDoesNotHangAfterSplit(t *testing.T) {
 	scope := newScope(t)
-	xtest.TestManyTimes(
-		t,
-		func(t testing.TB) {
-			runTestWithAutoPartitioning(t, scope)
-		},
-		xtest.StopAfter(60*time.Second),
+	scenario, describe := newAutoPartitioningScenario(t, scope, "--auto-part-flush--", "autopartitioning_flush")
+	payload := bytes.Repeat([]byte{'f'}, 1<<20)
+	var written1, written2 int
+
+	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
+		for _, key := range scenario.getKeys(partitions) {
+			written1 += scenario.writeMessages(scenario.writer1, payload, key, nil, 1)
+			written2 += scenario.writeMessages(scenario.writer2, payload, key, nil, 1)
+		}
+		scenario.flushBoth(scenario.ctx)
+	}
+
+	writeLoadRound(describe.Partitions)
+	writeLoadRound(describe.Partitions)
+	_ = scenario.waitForPartitionsCountAtLeast(3, 20*time.Second, writeLoadRound)
+
+	flushCtx, cancel := context.WithTimeout(scope.Ctx, 30*time.Second)
+	defer cancel()
+	require.NoError(t, scenario.writer1.Flush(flushCtx))
+	require.NoError(t, scenario.writer2.Flush(flushCtx))
+	scenario.closeAll(scope.Ctx)
+
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
+		scope.Ctx,
+		scenario.topicClient,
+		scenario.topicPath,
+		consumerName,
+		written1+written2,
+		30*time.Second,
+		payload,
+	))
+}
+
+func TestTopicMultiWriter_AutoPartitioning_CloseDoesNotHangAfterSplit(t *testing.T) {
+	scope := newScope(t)
+	scenario, describe := newAutoPartitioningScenario(t, scope, "--auto-part-close--", "autopartitioning_close")
+	payload := bytes.Repeat([]byte{'c'}, 1<<20)
+	var written1, written2 int
+
+	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
+		for _, key := range scenario.getKeys(partitions) {
+			written1 += scenario.writeMessages(scenario.writer1, payload, key, nil, 1)
+			written2 += scenario.writeMessages(scenario.writer2, payload, key, nil, 1)
+		}
+		scenario.flushBoth(scenario.ctx)
+	}
+
+	writeLoadRound(describe.Partitions)
+	writeLoadRound(describe.Partitions)
+	_ = scenario.waitForPartitionsCountAtLeast(3, 20*time.Second, writeLoadRound)
+
+	closeCtx, cancel := context.WithTimeout(scope.Ctx, 30*time.Second)
+	defer cancel()
+	require.NoError(t, scenario.writer1.Close(closeCtx))
+	require.NoError(t, scenario.writer2.Close(closeCtx))
+
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
+		scope.Ctx,
+		scenario.topicClient,
+		scenario.topicPath,
+		consumerName,
+		written1+written2,
+		30*time.Second,
+		payload,
+	))
+}
+
+func TestTopicMultiWriter_AutoPartitioning_MixedLargeAndSmallMessages(t *testing.T) {
+	scope := newScope(t)
+	scenario, describe := newAutoPartitioningScenario(t, scope, "--auto-part-mixed--", "autopartitioning_mixed")
+	smallPayload := bytes.Repeat([]byte{'s'}, 64)
+	largePayload := bytes.Repeat([]byte{'l'}, 1<<20)
+	var (
+		smallCount int
+		largeCount int
+		roundNo    int
 	)
+
+	writeMixedLoadRound := func(partitions []topictypes.PartitionInfo) {
+		keys := scenario.getKeys(partitions)
+		for i, key := range keys {
+			payload := smallPayload
+			if (roundNo+i)%10 == 0 {
+				payload = largePayload
+				largeCount += 2
+			} else {
+				smallCount += 2
+			}
+			scenario.writeMessages(scenario.writer1, payload, key, nil, 1)
+			scenario.writeMessages(scenario.writer2, payload, key, nil, 1)
+		}
+		roundNo += len(keys)
+		scenario.flushBoth(scenario.ctx)
+	}
+
+	writeMixedLoadRound(describe.Partitions)
+	writeMixedLoadRound(describe.Partitions)
+	describe = scenario.waitForPartitionsCountAtLeast(3, 20*time.Second, writeMixedLoadRound)
+	writeMixedLoadRound(describe.Partitions)
+	writeMixedLoadRound(describe.Partitions)
+	scenario.closeAll(scope.Ctx)
+
+	messages, err := readMessagesDetailed(
+		scope.Ctx,
+		scenario.topicClient,
+		scenario.topicPath,
+		consumerName,
+		smallCount+largeCount,
+		60*time.Second,
+	)
+	require.NoError(t, err)
+	require.NoError(t, assertMessagesOrderedBySeqNo(messages))
+
+	var readSmallCount, readLargeCount int
+	for _, msg := range messages {
+		switch {
+		case bytes.Equal(msg.payload, smallPayload):
+			readSmallCount++
+		case bytes.Equal(msg.payload, largePayload):
+			readLargeCount++
+		default:
+			t.Fatalf("unexpected payload size %d", len(msg.payload))
+		}
+	}
+
+	require.Equal(t, smallCount, readSmallCount)
+	require.Equal(t, largeCount, readLargeCount)
+}
+
+func TestTopicMultiWriter_AutoPartitioning_OrderPerProducerAfterSplit(t *testing.T) {
+	scope := newScope(t)
+	runTestWithAutoPartitioning(t, scope)
+}
+
+func TestTopicMultiWriter_BoundChooser_FirstPartitionKeyRemainsStableAfterSplit(t *testing.T) {
+	scope := newScope(t)
+	scenario, describe := newAutoPartitioningScenario(t, scope, "--auto-part-first-key--", "autopartitioning_first_key")
+	payload := bytes.Repeat([]byte{'b'}, 1<<20)
+
+	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
+		for _, key := range scenario.getKeys(partitions) {
+			scenario.writeMessages(scenario.writer1, payload, key, nil, 1)
+			scenario.writeMessages(scenario.writer2, payload, key, nil, 1)
+		}
+		scenario.flushBoth(scenario.ctx)
+	}
+
+	writeLoadRound(describe.Partitions)
+	writeLoadRound(describe.Partitions)
+	describe = scenario.waitForPartitionsCountAtLeast(4, 20*time.Second, writeLoadRound)
+	require.GreaterOrEqual(t, len(describe.Partitions), 4)
+
+	specialPayloads := [][]byte{
+		[]byte("first-partition-key-after-split-1"),
+		[]byte("first-partition-key-after-split-2"),
+		[]byte("first-partition-key-after-split-3"),
+	}
+	for _, payload := range specialPayloads {
+		scenario.writeMessages(scenario.writer1, payload, scenario.firstPartitionKey, nil, 1)
+	}
+	scenario.flushBoth(scenario.ctx)
+	scenario.closeAll(scope.Ctx)
+
+	partitionsByPayload, err := readPartitionByPayload(
+		scope.Ctx,
+		scenario.topicClient,
+		scenario.topicPath,
+		specialPayloads,
+		defaultReadTimeout,
+	)
+	require.NoError(t, err)
+
+	var expectedPartition int64
+	for i, payload := range specialPayloads {
+		partitionID := partitionsByPayload[string(payload)]
+		if i == 0 {
+			expectedPartition = partitionID
+
+			continue
+		}
+
+		require.Equal(t, expectedPartition, partitionID)
+	}
+}
+
+func TestTopicMultiWriter_AutoPartitioning_NoPayloadCorruptionOnResend(t *testing.T) {
+	scope := newScope(t)
+	scenario, describe := newAutoPartitioningScenario(t, scope, "--auto-part-no-corruption--", "autopartitioning_payload")
+
+	expectedPayloads := make(map[string]struct{})
+	uniquePayload := func(prefix string, idx int) []byte {
+		payload := bytes.Repeat([]byte{'p'}, 1<<20)
+		copy(payload, []byte(fmt.Sprintf("%s-%03d", prefix, idx)))
+		expectedPayloads[string(payload)] = struct{}{}
+
+		return payload
+	}
+
+	messageIdx := 0
+	writeUniqueLoadRound := func(partitions []topictypes.PartitionInfo) {
+		for _, key := range scenario.getKeys(partitions) {
+			scenario.writeMessages(scenario.writer1, uniquePayload("w1", messageIdx), key, nil, 1)
+			messageIdx++
+			scenario.writeMessages(scenario.writer2, uniquePayload("w2", messageIdx), key, nil, 1)
+			messageIdx++
+		}
+		scenario.flushBoth(scenario.ctx)
+	}
+
+	writeUniqueLoadRound(describe.Partitions)
+	writeUniqueLoadRound(describe.Partitions)
+	describe = scenario.waitForPartitionsCountAtLeast(4, 20*time.Second, writeUniqueLoadRound)
+	writeUniqueLoadRound(describe.Partitions)
+	scenario.closeAll(scope.Ctx)
+
+	messages, err := readMessagesDetailed(
+		scope.Ctx,
+		scenario.topicClient,
+		scenario.topicPath,
+		consumerName,
+		len(expectedPayloads),
+		2*time.Minute,
+	)
+	require.NoError(t, err)
+	require.NoError(t, assertMessagesOrderedBySeqNo(messages))
+
+	seenPayloads := make(map[string]struct{}, len(messages))
+	for _, msg := range messages {
+		payloadKey := string(msg.payload)
+		if _, ok := expectedPayloads[payloadKey]; !ok {
+			t.Fatalf("unexpected payload read back, size=%d", len(msg.payload))
+		}
+		seenPayloads[payloadKey] = struct{}{}
+	}
+	require.Len(t, seenPayloads, len(expectedPayloads))
+}
+
+func TestTopicMultiWriter_AutoPartitioning_MetadataPreservedOnResend(t *testing.T) {
+	scope := newScope(t)
+	scenario, describe := newAutoPartitioningScenario(t, scope, "--auto-part-metadata--", "autopartitioning_metadata")
+
+	expectedMetadata := make(map[string]string)
+	payloadFor := func(prefix string, idx int) []byte {
+		payload := bytes.Repeat([]byte{'m'}, 1<<20)
+		copy(payload, []byte(fmt.Sprintf("%s-payload-%03d", prefix, idx)))
+
+		return payload
+	}
+
+	messageIdx := 0
+	writeMetadataLoadRound := func(partitions []topictypes.PartitionInfo) {
+		for _, key := range scenario.getKeys(partitions) {
+			payload1 := payloadFor("w1", messageIdx)
+			meta1 := fmt.Sprintf("meta-w1-%03d", messageIdx)
+			expectedMetadata[string(payload1)] = meta1
+			scenario.writeMessages(scenario.writer1, payload1, key, map[string][]byte{
+				"custom-meta": []byte(meta1),
+			}, 1)
+			messageIdx++
+
+			payload2 := payloadFor("w2", messageIdx)
+			meta2 := fmt.Sprintf("meta-w2-%03d", messageIdx)
+			expectedMetadata[string(payload2)] = meta2
+			scenario.writeMessages(scenario.writer2, payload2, key, map[string][]byte{
+				"custom-meta": []byte(meta2),
+			}, 1)
+			messageIdx++
+		}
+		scenario.flushBoth(scenario.ctx)
+	}
+
+	writeMetadataLoadRound(describe.Partitions)
+	writeMetadataLoadRound(describe.Partitions)
+	_ = scenario.waitForPartitionsCountAtLeast(4, 20*time.Second, writeMetadataLoadRound)
+	scenario.closeAll(scope.Ctx)
+
+	messages, err := readMessagesDetailed(
+		scope.Ctx,
+		scenario.topicClient,
+		scenario.topicPath,
+		consumerName,
+		len(expectedMetadata),
+		2*time.Minute,
+	)
+	require.NoError(t, err)
+	require.NoError(t, assertMessagesOrderedBySeqNo(messages))
+
+	for _, msg := range messages {
+		expectedMeta, ok := expectedMetadata[string(msg.payload)]
+		require.True(t, ok, "unexpected payload %q", string(msg.payload))
+		require.Equal(t, expectedMeta, string(msg.metadata["custom-meta"]))
+	}
+}
+
+func TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch(t *testing.T) {
+	scope := newScope(t)
+	scenario, describe := newAutoPartitioningScenario(t, scope, "--auto-part-inflight--", "autopartitioning_inflight")
+	payload := bytes.Repeat([]byte{'i'}, 1<<20)
+	var written1, written2, written3, written4 int
+
+	writeLoadRound := func(partitions []topictypes.PartitionInfo) {
+		for _, key := range scenario.getKeys(partitions) {
+			written1 += scenario.writeMessages(scenario.writer1, payload, key, nil, 1)
+			written2 += scenario.writeMessages(scenario.writer2, payload, key, nil, 1)
+		}
+		scenario.flushBoth(scenario.ctx)
+	}
+
+	writeBurstNoFlush := func(writer *topicwriter.Writer, partitions []topictypes.PartitionInfo) int {
+		written := 0
+		for _, key := range scenario.getKeys(partitions) {
+			written += scenario.writeMessages(writer, payload, key, nil, 1)
+		}
+
+		return written
+	}
+
+	writeLoadRound(describe.Partitions)
+	writeLoadRound(describe.Partitions)
+	describe = scenario.waitForPartitionsCountAtLeast(3, 20*time.Second, writeLoadRound)
+
+	inflightWriter1 := createMultiWriterForAutoPartitioning(
+		t,
+		"autopartitioning_inflight_3",
+		scope.Ctx,
+		scenario.topicPath,
+		scenario.topicClient,
+		scenario.firstPartitionKey,
+	)
+	inflightWriter2 := createMultiWriterForAutoPartitioning(
+		t,
+		"autopartitioning_inflight_4",
+		scope.Ctx,
+		scenario.topicPath,
+		scenario.topicClient,
+		scenario.firstPartitionKey,
+	)
+
+	written3 += writeBurstNoFlush(inflightWriter1, describe.Partitions)
+	written4 += writeBurstNoFlush(inflightWriter2, describe.Partitions)
+
+	_ = scenario.waitForPartitionsCountAtLeast(4, 30*time.Second, writeLoadRound)
+
+	flushWriter := func(writer *topicwriter.Writer) {
+		flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		require.NoError(t, writer.Flush(flushCtx))
+	}
+
+	flushWriter(inflightWriter1)
+	flushWriter(inflightWriter2)
+
+	closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	scenario.closeAll(closeCtx, inflightWriter1, inflightWriter2)
+
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
+		scope.Ctx,
+		scenario.topicClient,
+		scenario.topicPath,
+		consumerName,
+		written1+written2+written3+written4,
+		2*time.Minute,
+		payload,
+	))
+}
+
+func TestTopicMultiWriter_AutoPartitioning_SmallMessages(t *testing.T) {
+	const (
+		smallMessageSize      = 65536 // 64KB
+		logicalWriteSizeBytes = 1 << 20
+	)
+
+	scope := newScope(t)
+	runTestWithAutoPartitioningVariant(t, scope, autoPartitioningIntegrationVariant{
+		topicPathMarker:         "--auto-part-topic-small--",
+		payload:                 bytes.Repeat([]byte{'s'}, smallMessageSize),
+		producerStem:            "autopartitioning_small",
+		messagesPerLogicalWrite: logicalWriteSizeBytes / smallMessageSize,
+		readTimeout:             90 * time.Second,
+		targetPartitions:        3,
+	})
 }

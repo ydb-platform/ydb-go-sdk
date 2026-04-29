@@ -21,7 +21,7 @@ func New(msg string) error {
 	return &Error{xerrors.IsTarget(errors.New(msg), driver.ErrBadConn)}
 }
 
-func Errorf(format string, args ...interface{}) error {
+func Errorf(format string, args ...any) error {
 	return &Error{xerrors.IsTarget(fmt.Errorf(format, args...), driver.ErrBadConn)}
 }
 

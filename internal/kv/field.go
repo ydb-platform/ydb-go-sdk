@@ -37,7 +37,7 @@ type KeyValue struct {
 
 	vint int64
 	vstr string
-	vany interface{}
+	vany any
 }
 
 func (f KeyValue) Type() FieldType {
@@ -112,7 +112,7 @@ func (f KeyValue) ErrorValue() error {
 }
 
 // AnyValue is a value getter for fields with AnyType type
-func (f KeyValue) AnyValue() interface{} {
+func (f KeyValue) AnyValue() any {
 	switch f.ftype {
 	case AnyType:
 		return f.vany
@@ -282,7 +282,7 @@ func Error(value error) KeyValue {
 }
 
 // Any constructs untyped KeyValue.
-func Any(key string, value interface{}) KeyValue {
+func Any(key string, value any) KeyValue {
 	return KeyValue{
 		ftype: AnyType,
 		key:   key,

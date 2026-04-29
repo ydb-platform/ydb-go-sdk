@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -122,10 +123,8 @@ func (c *Conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 		return false, xerrors.WithStackTrace(err)
 	}
 
-	for _, pkCol := range d.PrimaryKey {
-		if pkCol == columnName {
-			return true, nil
-		}
+	if slices.Contains(d.PrimaryKey, columnName) {
+		return true, nil
 	}
 
 	return false, nil

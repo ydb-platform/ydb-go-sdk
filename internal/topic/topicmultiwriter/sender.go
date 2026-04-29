@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -86,7 +86,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			wr, err := s.writerPool.get(msg.PartitionID, true, false)
+			wr, err := s.writerPool.get(msg.PartitionID, true)
 			if err != nil {
 				return fmt.Errorf("failed to get writer: %w", err)
 			}
@@ -101,7 +101,10 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			if err = wr.Write(s.ctx, []topicwriterinternal.PublicMessage{msg.PublicMessage}); err != nil {
+			if err = wr.WriteInternal(
+				s.ctx,
+				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
+			); err != nil {
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
@@ -138,9 +141,20 @@ func (s *sender) step() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	checkPartitionLocked := func(partitionID int64) bool {
+		partition, ok := s.partitions[partitionID]
+		if !ok {
+			return true
+		}
+
+		return partition.Locked
+	}
+
 	if err := s.iterateThroughMessagesIndex(
 		s.buf.messagesToResendIndex,
-		func(msg messagePtr) bool { return false },
+		func(msg messagePtr) bool {
+			return checkPartitionLocked(msg.Value.PartitionID)
+		},
 		true,
 	); err != nil {
 		return err
@@ -149,6 +163,10 @@ func (s *sender) step() error {
 	return s.iterateThroughMessagesIndex(
 		s.buf.pendingMessagesIndex,
 		func(msg messagePtr) bool {
+			if checkPartitionLocked(msg.Value.PartitionID) {
+				return true
+			}
+
 			_, ok := s.buf.messagesToResendIndex[msg.Value.PartitionID]
 
 			return ok

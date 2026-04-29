@@ -17,7 +17,7 @@ import (
 var errBatcherPopConcurency = xerrors.Wrap(errors.New("ydb: batch pop concurency, internal state error"))
 
 type batcher struct {
-	popInFlight    int64
+	popInFlight    atomic.Int64
 	closeErr       error
 	hasNewMessages empty.Chan
 
@@ -176,8 +176,8 @@ func (o batcherGetOptions) splitBatch(batch *topicreadercommon.PublicBatch) (
 }
 
 func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMessageOrderItem, err error) {
-	counter := atomic.AddInt64(&b.popInFlight, 1)
-	defer atomic.AddInt64(&b.popInFlight, -1)
+	counter := b.popInFlight.Add(1)
+	defer b.popInFlight.Add(-1)
 
 	if counter != 1 {
 		return batcherMessageOrderItem{}, xerrors.WithStackTrace(errBatcherPopConcurency)

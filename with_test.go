@@ -139,7 +139,7 @@ func TestWithCertificatesCached(t *testing.T) {
 
 			hitCounter, missCounter = 0, 0
 
-			for i := 0; i < n; i++ {
+			for range n {
 				_, _, err := db.with(ctx,
 					func(ctx context.Context, c *Driver) error {
 						return nil // nothing to do

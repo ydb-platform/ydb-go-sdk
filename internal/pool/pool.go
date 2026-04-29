@@ -376,20 +376,26 @@ func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, opts ...closeItemO
 		}
 	}
 
-	if t := p.config.closeTimeout; t > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, t)
-		defer cancel()
-	}
-
 	if options.wg != nil {
 		options.wg.Add(1)
 		go func() {
 			defer options.wg.Done()
 
+			if t := p.config.closeTimeout; t > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(xcontext.ValueOnly(ctx), t)
+				defer cancel()
+			}
+
 			p.config.closeItemFunc(ctx, item)
 		}()
 	} else {
+		if t := p.config.closeTimeout; t > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, t)
+			defer cancel()
+		}
+
 		p.config.closeItemFunc(ctx, item)
 	}
 }
