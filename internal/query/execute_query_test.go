@@ -504,9 +504,9 @@ func TestExecute(t *testing.T) {
 		//
 		// When the parent ctx is cancelled inside ExecuteQuery (simulating session expiry
 		// while the gRPC stream is still open), ctx.Done() is already closed by the time
-		// execute() checks it after ExecuteQuery returns. For idempotent operations,
-		// execute() must detect this via the non-blocking ctx.Done() select and return a
-		// retryable error so the pool can retry with a new session.
+		// execute() checks it after ExecuteQuery returns. execute() must detect this via
+		// the non-blocking ctx.Done() select and return a retryable error so the pool
+		// can retry with a new session — regardless of whether the operation is idempotent.
 		//
 		// RED before fix: the old code (no ctx.Done() check before newResult) proceeded
 		// to newResult, which called Recv() on the mock — but no Recv() expectation is
@@ -515,9 +515,7 @@ func TestExecute(t *testing.T) {
 		// returns a retryable error without calling Recv() at all.
 		t.Run("CancelParentContextAfterStreamOpen", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			// Mark the context as idempotent so that cancellation during ExecuteQuery
-			// is classified as a retryable error (non-idempotent returns ctx.Err() directly).
-			ctx, cancel := context.WithCancel(xcontext.WithIdempotent(xtest.Context(t), true))
+			ctx, cancel := context.WithCancel(xtest.Context(t))
 
 			// Recv must NOT be called: execute() returns a retryable error before
 			// reaching newResult because ctx.Done() is already closed.
