@@ -1,3 +1,5 @@
+* Fixed `nil` value passed as a `database/sql` argument now produces `NullType` instead of `Void`, allowing it to be used with optional YDB columns
+
 ## v3.135.3
 * Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
 
