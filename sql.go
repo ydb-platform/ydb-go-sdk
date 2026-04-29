@@ -6,9 +6,14 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
@@ -46,7 +51,12 @@ func (d *sqlDriver) Open(string) (driver.Conn, error) {
 }
 
 func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, error) {
-	db, err := Open(context.Background(), dataSourceName)
+	db, err := Open(context.Background(), dataSourceName,
+		With(config.WithBuildInfo(
+			"database/sql",
+			version.Version,
+		)),
+	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf(
 			"failed to connect by data source name '%s': %w",
@@ -128,6 +138,14 @@ func WithTxControl(ctx context.Context, txControl *tx.Control) context.Context {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithCommitTxContext(ctx context.Context) context.Context {
 	return tx.WithCommitTx(ctx)
+}
+
+// WithIssuesHandler sets a callback which is invoked for query
+// execution result to receive YDB issue messages.
+//
+// Supported only for QueryService.
+func WithIssuesHandler(ctx context.Context, callback func([]*Ydb_Issue.IssueMessage)) context.Context {
+	return xquery.WithIssuesHandler(ctx, callback)
 }
 
 type ConnectorOption = xsql.Option
@@ -259,6 +277,11 @@ type SQLConnector interface {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
+	meta.WithBuildInfo(
+		"database/sql",
+		version.Version,
+	)(parent.config.Meta())
+
 	c, err := xsql.Open(parent, parent.metaBalancer, parent.query.Must().Config(),
 		append(
 			append(

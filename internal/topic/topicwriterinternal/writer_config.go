@@ -29,3 +29,23 @@ type WritersCommonConfig struct {
 	clock              clockwork.Clock
 	forceCodec         rawtopiccommon.Codec
 }
+
+func (c *WritersCommonConfig) Topic() string {
+	return c.topic
+}
+
+func (c *WritersCommonConfig) PartitionID() (int64, bool) {
+	if c.defaultPartitioning.Type == rawtopicwriter.PartitioningPartitionID {
+		return c.defaultPartitioning.PartitionID, true
+	}
+
+	return 0, false
+}
+
+func (c *WritersCommonConfig) ProducerID() string {
+	return c.producerID
+}
+
+func (c *WritersCommonConfig) Now() time.Time {
+	return c.clock.Now()
+}

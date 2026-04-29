@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -60,8 +61,8 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 	err = s.stream.CloseSend()
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
 		if !s.wrapping {
@@ -79,7 +80,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	return nil
 }
 
-func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
+func (s *grpcClientStream) SendMsg(m any) (err error) {
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamSendMsg(s.parentConn.config.Trace(), &ctx,
@@ -95,13 +96,9 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 	err = s.stream.SendMsg(m)
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
-
-		defer func() {
-			s.parentConn.onTransportError(ctx, err)
-		}()
 
 		if !s.wrapping {
 			return err
@@ -131,7 +128,7 @@ func (s *grpcClientStream) finish(err error) {
 	s.streamCancel()
 }
 
-func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
+func (s *grpcClientStream) RecvMsg(m any) (err error) {
 	var (
 		ctx    = s.streamCtx
 		onDone = trace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
@@ -154,13 +151,9 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
 			return io.EOF
 		}
 
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
-
-		defer func() {
-			s.parentConn.onTransportError(ctx, err)
-		}()
 
 		if !s.wrapping {
 			return err

@@ -5,7 +5,7 @@ import "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawt
 func ReadRawBatchesToPublicBatches(
 	msg *rawtopicreader.ReadResponse,
 	sessions *PartitionSessionStorage,
-	decoders DecoderMap,
+	decoders *MultiDecoder,
 ) ([]*PublicBatch, error) {
 	batchesCount := 0
 	for i := range msg.PartitionData {

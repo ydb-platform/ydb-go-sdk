@@ -86,7 +86,7 @@ func parameterOptionsToDeclares(v []table.ParameterOption) string {
 }
 
 func namedArgsToDeclares(v []sql.NamedArg) (string, error) {
-	vv, err := bind.Params(func() (newArgs []interface{}) {
+	vv, err := bind.Params(func() (newArgs []any) {
 		for i := range v {
 			newArgs = append(newArgs, v[i])
 		}

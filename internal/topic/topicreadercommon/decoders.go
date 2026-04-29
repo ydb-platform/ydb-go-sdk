@@ -1,39 +1,102 @@
 package topicreadercommon
 
 import (
+	"bytes"
 	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-type DecoderMap struct {
-	m map[rawtopiccommon.Codec]PublicCreateDecoderFunc
+type PublicResettableReader interface {
+	io.Reader
+	Reset(rd io.Reader) error
 }
 
-func NewDecoderMap() DecoderMap {
-	return DecoderMap{
-		m: map[rawtopiccommon.Codec]PublicCreateDecoderFunc{
-			rawtopiccommon.CodecRaw: func(input io.Reader) (io.Reader, error) {
-				return input, nil
-			},
-			rawtopiccommon.CodecGzip: func(input io.Reader) (io.Reader, error) {
-				return gzip.NewReader(input)
-			},
-		},
+type decoderPool struct {
+	pool sync.Pool
+}
+
+func (p *decoderPool) Get() PublicResettableReader {
+	dec, _ := p.pool.Get().(PublicResettableReader)
+
+	return dec
+}
+
+func (p *decoderPool) Put(rd PublicResettableReader) {
+	p.pool.Put(rd)
+}
+
+func newDecoderPool() *decoderPool {
+	return &decoderPool{
+		pool: sync.Pool{},
 	}
 }
 
-func (m *DecoderMap) AddDecoder(codec rawtopiccommon.Codec, createFunc PublicCreateDecoderFunc) {
-	m.m[codec] = createFunc
+type MultiDecoder struct {
+	m map[rawtopiccommon.Codec]PublicCreateDecoderFunc
+
+	dp map[rawtopiccommon.Codec]*decoderPool
 }
 
-func (m *DecoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Reader, error) {
-	if f := m.m[codec]; f != nil {
-		return f(input)
+func NewMultiDecoder() *MultiDecoder {
+	md := &MultiDecoder{
+		m:  make(map[rawtopiccommon.Codec]PublicCreateDecoderFunc),
+		dp: make(map[rawtopiccommon.Codec]*decoderPool),
+	}
+
+	md.AddDecoder(rawtopiccommon.CodecRaw, func(input io.Reader) (io.Reader, error) {
+		return input, nil
+	})
+	md.AddDecoder(rawtopiccommon.CodecGzip, func(input io.Reader) (io.Reader, error) {
+		return gzip.NewReader(input)
+	})
+
+	return md
+}
+
+func (d *MultiDecoder) AddDecoder(codec rawtopiccommon.Codec, createFunc PublicCreateDecoderFunc) {
+	d.m[codec] = createFunc
+	d.dp[codec] = newDecoderPool()
+}
+
+func (d *MultiDecoder) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Reader, error) {
+	dec, err := d.createDecodeReader(codec, input)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := &bytes.Buffer{}
+	_, err = buf.ReadFrom(dec)
+	if err != nil {
+		return nil, err
+	}
+
+	if resettableDec, ok := dec.(PublicResettableReader); ok {
+		d.dp[codec].Put(resettableDec)
+	}
+
+	return buf, nil
+}
+
+func (d *MultiDecoder) createDecodeReader(codec rawtopiccommon.Codec, source io.Reader) (io.Reader, error) {
+	if dPool, ok := d.dp[codec]; ok {
+		rd := dPool.Get()
+		if rd != nil {
+			if err := rd.Reset(source); err != nil {
+				return nil, err
+			}
+
+			return rd, nil
+		}
+	}
+
+	if decoderCreator, ok := d.m[codec]; ok {
+		return decoderCreator(source)
 	}
 
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(

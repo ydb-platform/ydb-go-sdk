@@ -81,13 +81,8 @@ type filterLocations []string
 
 func (locations filterLocations) Allow(_ balancerConfig.Info, e endpoint.Info) bool {
 	location := strings.ToUpper(e.Location())
-	for _, l := range locations {
-		if location == l {
-			return true
-		}
-	}
 
-	return false
+	return slices.Contains(locations, location)
 }
 
 func (locations filterLocations) String() string {

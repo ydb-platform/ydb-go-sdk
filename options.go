@@ -657,7 +657,7 @@ func WithIgnoreTruncated() Option {
 // Warning: WithPanicCallback must be defined on start of all options
 // (before `WithTrace{Driver,Table,Scheme,Scripting,Coordination,Ratelimiter}` and other options)
 // If not defined - panic would not intercept with driver
-func WithPanicCallback(panicCallback func(e interface{})) Option {
+func WithPanicCallback(panicCallback func(e any)) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.panicCallback = panicCallback
 		d.options = append(d.options, config.WithPanicCallback(panicCallback))

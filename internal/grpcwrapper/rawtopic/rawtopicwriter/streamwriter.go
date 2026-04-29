@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -26,7 +27,7 @@ type GrpcStream interface {
 }
 
 type StreamWriter struct {
-	readCounter int32
+	readCounter atomic.Int32
 
 	sendCloseMtx sync.Mutex
 	Stream       GrpcStream
@@ -46,8 +47,8 @@ func (w *StreamWriter) Endpoint() endpoint.Endpoint { return w.PeerEndpoint }
 
 //nolint:funlen
 func (w *StreamWriter) Recv() (ServerMessage, error) {
-	readCnt := atomic.AddInt32(&w.readCounter, 1)
-	defer atomic.AddInt32(&w.readCounter, -1)
+	readCnt := w.readCounter.Add(1)
+	defer w.readCounter.Add(-1)
 
 	if readCnt != 1 {
 		return nil, xerrors.WithStackTrace(errConcurencyReadDenied)
@@ -77,7 +78,9 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		return nil, err
 	}
 	if !meta.Status.IsSuccess() {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
+		opErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_StatusCode(meta.Status)))
+
+		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %w", opErr))
 	}
 
 	switch v := grpcMsg.GetServerMessage().(type) {

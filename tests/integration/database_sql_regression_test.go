@@ -319,7 +319,7 @@ func TestUUIDSerializationDatabaseSQLIssue1501(t *testing.T) {
 
 		require.Error(t, row.Err())
 		require.True(t, xerrors.IsOperationError(row.Err(), Ydb.StatusIds_BAD_REQUEST))
-		require.ErrorContains(t, row.Err(), "Parameter $val type mismatch, expected:")
+		require.ErrorContains(t, row.Err(), "Parameter $val type mismatch")
 	})
 	t.Run("good-send", func(t *testing.T) {
 		var (

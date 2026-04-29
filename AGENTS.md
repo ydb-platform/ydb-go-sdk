@@ -39,3 +39,10 @@ Example entry format:
 
 If the pull request contains no user-facing changes, add the label `no changelog` to the PR to skip the changelog check.
 
+## Dependencies
+
+**Do not update `go.mod` or `go.sum` unless the task explicitly requires it.**
+
+- Do not add, remove, or upgrade dependencies as a side effect of making code changes.
+- If a dependency change is truly necessary to complete the task, document it clearly in the PR description.
+- Never run `go mod tidy` or `go get` unless the task requires a dependency change.

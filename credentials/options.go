@@ -142,7 +142,7 @@ func WithSigningMethodName(method string) credentials.JWTTokenSourceOption {
 }
 
 // PrivateKey
-func WithPrivateKey(key interface{}) credentials.JWTTokenSourceOption {
+func WithPrivateKey(key any) credentials.JWTTokenSourceOption {
 	return credentials.WithPrivateKey(key)
 }
 

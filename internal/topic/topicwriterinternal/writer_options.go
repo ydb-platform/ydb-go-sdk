@@ -1,6 +1,7 @@
 package topicwriterinternal
 
 import (
+	"maps"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -10,15 +11,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type PublicWriterOption func(cfg *WriterReconnectorConfig)
 
-func WithAddEncoder(codec rawtopiccommon.Codec, encoderFunc PublicCreateEncoderFunc) PublicWriterOption {
+func WithAddEncoder(
+	codec rawtopiccommon.Codec,
+	encoderFunc topicwritercommon.PublicCreateEncoderFunc,
+) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		if cfg.AdditionalEncoders == nil {
-			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]PublicCreateEncoderFunc{}
+			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc{}
 		}
 		cfg.AdditionalEncoders[codec] = encoderFunc
 	}
@@ -55,6 +60,12 @@ func WithMaxGrpcMessageBytes(num int) PublicWriterOption {
 func WithTokenUpdateInterval(interval time.Duration) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.credUpdateInterval = interval
+	}
+}
+
+func WithOnAckReceivedCallback(handler func(seqNo int64)) func(cfg *WriterReconnectorConfig) {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.OnAckReceivedCallback = handler
 	}
 }
 
@@ -116,6 +127,16 @@ func WithMaxQueueLen(num int) PublicWriterOption {
 	}
 }
 
+// WithErrOnQueueFull controls WriterReconnector.Write when the internal message queue
+// is full. When enable is false (default), the call blocks until space is available
+// or ctx is cancelled. When enable is true, the call returns ErrPublicQueueIsFull
+// immediately without blocking.
+func WithErrOnQueueFull(enable bool) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.ErrOnQueueFull = enable
+	}
+}
+
 func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.defaultPartitioning = partitioning.ToRaw()
@@ -139,9 +160,7 @@ func WithSessionMeta(meta map[string]string) PublicWriterOption {
 			cfg.writerMeta = nil
 		} else {
 			cfg.writerMeta = make(map[string]string, len(meta))
-			for k, v := range meta {
-				cfg.writerMeta[k] = v
-			}
+			maps.Copy(cfg.writerMeta, meta)
 		}
 	}
 }

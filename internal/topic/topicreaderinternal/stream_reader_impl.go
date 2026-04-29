@@ -78,7 +78,7 @@ type topicStreamReaderConfig struct {
 	Trace                           *trace.Topic
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
 	CommitMode                      topicreadercommon.PublicCommitMode
-	Decoders                        topicreadercommon.DecoderMap
+	Decoders                        *topicreadercommon.MultiDecoder
 	EnableSplitMergeSupport         bool
 }
 
@@ -90,7 +90,7 @@ func newTopicStreamReaderConfig() topicStreamReaderConfig {
 		CredUpdateInterval:      time.Hour,
 		CommitMode:              topicreadercommon.CommitModeAsync,
 		CommitterBatchTimeLag:   time.Second,
-		Decoders:                topicreadercommon.NewDecoderMap(),
+		Decoders:                topicreadercommon.NewMultiDecoder(),
 		Trace:                   &trace.Topic{},
 		EnableSplitMergeSupport: true,
 	}
@@ -178,6 +178,10 @@ func newTopicStreamReaderStopped(
 	res.batchTxStorage = newBatchTxStorage(cfg.Consumer)
 
 	return res
+}
+
+func (r *topicStreamReaderImpl) ReadSessionID() string {
+	return r.readConnectionID
 }
 
 func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {

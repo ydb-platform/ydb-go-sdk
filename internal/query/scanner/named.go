@@ -14,11 +14,11 @@ type (
 	}
 	namedDestination struct {
 		name string
-		ref  interface{}
+		ref  any
 	}
 	NamedDestination interface {
 		Name() string
-		Ref() interface{}
+		Ref() any
 	}
 )
 
@@ -26,11 +26,11 @@ func (dst namedDestination) Name() string {
 	return dst.name
 }
 
-func (dst namedDestination) Ref() interface{} {
+func (dst namedDestination) Ref() any {
 	return dst.ref
 }
 
-func NamedRef(columnName string, destinationValueReference interface{}) (dst namedDestination) {
+func NamedRef(columnName string, destinationValueReference any) (dst namedDestination) {
 	if columnName == "" {
 		panic("columnName must be not empty")
 	}

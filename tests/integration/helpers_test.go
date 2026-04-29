@@ -230,7 +230,7 @@ func (scope *scopeT) TopicConsumerName() string {
 	return "test-consumer"
 }
 
-func (scope *scopeT) TopicPath() string {
+func (scope *scopeT) TopicPath(opts ...topicoptions.CreateOption) string {
 	f := func() (*fixenv.GenericResult[string], error) {
 		topicName := strings.Replace(scope.T().Name(), "/", "__", -1)
 		topicPath := path.Join(scope.Folder(), topicName)
@@ -249,11 +249,16 @@ func (scope *scopeT) TopicPath() string {
 		}
 
 		scope.Logf("Creating topic %q", topicPath)
-		err := client.Create(scope.Ctx, topicPath, topicoptions.CreateWithConsumer(
-			topictypes.Consumer{
-				Name: scope.TopicConsumerName(),
-			},
-		))
+
+		options := []topicoptions.CreateOption{
+			topicoptions.CreateWithConsumer(
+				topictypes.Consumer{
+					Name: scope.TopicConsumerName(),
+				},
+			),
+		}
+		options = append(options, opts...)
+		err := client.Create(scope.Ctx, topicPath, options...)
 
 		scope.Logf("Topic created: %q", topicPath)
 

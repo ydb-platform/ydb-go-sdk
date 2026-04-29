@@ -28,8 +28,8 @@ func movingAverage[T interface {
 
 func nameLabelValuesToString(name string, labelValues map[string]string) string {
 	var buffer bytes.Buffer
-	fmt.Fprintf(&buffer, name)
-	fmt.Fprintf(&buffer, "{")
+	fmt.Fprint(&buffer, name)
+	fmt.Fprint(&buffer, "{")
 	labels := make([]string, 0, len(labelValues))
 	for k := range labelValues {
 		labels = append(labels, k)
@@ -37,26 +37,26 @@ func nameLabelValuesToString(name string, labelValues map[string]string) string 
 	sort.Strings(labels)
 	for i, l := range labels {
 		if i != 0 {
-			fmt.Fprintf(&buffer, ",")
+			fmt.Fprint(&buffer, ",")
 		}
 		fmt.Fprintf(&buffer, "%s=%s", l, labelValues[l])
 	}
-	fmt.Fprintf(&buffer, "}")
+	fmt.Fprint(&buffer, "}")
 	return buffer.String()
 }
 
 func nameLabelNamesToString(name string, labelNames []string) string {
 	var buffer bytes.Buffer
-	fmt.Fprintf(&buffer, name)
-	fmt.Fprintf(&buffer, "{")
+	fmt.Fprint(&buffer, name)
+	fmt.Fprint(&buffer, "{")
 	sort.Strings(labelNames)
 	for i, name := range labelNames {
 		if i != 0 {
-			fmt.Fprintf(&buffer, ",")
+			fmt.Fprint(&buffer, ",")
 		}
-		fmt.Fprintf(&buffer, name)
+		fmt.Fprint(&buffer, name)
 	}
-	fmt.Fprintf(&buffer, "}")
+	fmt.Fprint(&buffer, "}")
 	return buffer.String()
 }
 

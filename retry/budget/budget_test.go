@@ -61,7 +61,7 @@ func TestPercent(t *testing.T) {
 			b       = Percent(int(percent * 100))
 			success int
 		)
-		for i := 0; i < total; i++ {
+		for range total {
 			if b.Acquire(ctx) == nil {
 				success++
 			}

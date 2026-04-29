@@ -8,12 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
 func TestMiddleware_WithContextModifier(t *testing.T) {
 	t.Run("ModifyContextInInvoke", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		cc := NewMockClientConnInterface(ctrl)
+		cc := mock.NewMockClientConnInterface(ctrl)
 		var capturedCtx context.Context
 		cc.EXPECT().Invoke(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
@@ -34,7 +36,7 @@ func TestMiddleware_WithContextModifier(t *testing.T) {
 
 	t.Run("ModifyContextInNewStream", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		cc := NewMockClientConnInterface(ctrl)
+		cc := mock.NewMockClientConnInterface(ctrl)
 		var capturedCtx context.Context
 		cc.EXPECT().NewStream(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
@@ -57,7 +59,7 @@ func TestMiddleware_WithContextModifier(t *testing.T) {
 func TestMiddleware_WithAppendOptions(t *testing.T) {
 	t.Run("AppendOptionsToInvoke", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		cc := NewMockClientConnInterface(ctrl)
+		cc := mock.NewMockClientConnInterface(ctrl)
 		var capturedOpts []grpc.CallOption
 		cc.EXPECT().Invoke(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
@@ -76,7 +78,7 @@ func TestMiddleware_WithAppendOptions(t *testing.T) {
 
 	t.Run("AppendOptionsToNewStream", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		cc := NewMockClientConnInterface(ctrl)
+		cc := mock.NewMockClientConnInterface(ctrl)
 
 		var capturedOpts []grpc.CallOption
 		cc.EXPECT().NewStream(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
@@ -98,7 +100,7 @@ func TestMiddleware_WithAppendOptions(t *testing.T) {
 func TestMiddleware_WithBeforeFunc(t *testing.T) {
 	t.Run("CallBeforeFuncInInvoke", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		cc := NewMockClientConnInterface(ctrl)
+		cc := mock.NewMockClientConnInterface(ctrl)
 
 		called := false
 		cc.EXPECT().Invoke(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
@@ -114,7 +116,7 @@ func TestMiddleware_WithBeforeFunc(t *testing.T) {
 
 	t.Run("CallBeforeFuncInNewStream", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		cc := NewMockClientConnInterface(ctrl)
+		cc := mock.NewMockClientConnInterface(ctrl)
 
 		called := false
 		cc.EXPECT().NewStream(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("test error"))
@@ -132,7 +134,7 @@ func TestMiddleware_WithBeforeFunc(t *testing.T) {
 func TestMiddleware_Chaining(t *testing.T) {
 	t.Run("ChainMultipleMiddlewares", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		cc := NewMockClientConnInterface(ctrl)
+		cc := mock.NewMockClientConnInterface(ctrl)
 
 		var capturedCtx context.Context
 		beforeCalled := false

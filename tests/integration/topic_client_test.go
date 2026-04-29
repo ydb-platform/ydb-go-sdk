@@ -155,6 +155,10 @@ func TestTopicDescribe(t *testing.T) {
 		requireAndCleanSubset(&topicDesc.Consumers[i].Attributes, &expected.Consumers[i].Attributes)
 	}
 
+	for i := range topicDesc.Partitions {
+		topicDesc.Partitions[i].FromBound = nil
+		topicDesc.Partitions[i].ToBound = nil
+	}
 	require.Equal(t, expected, topicDesc)
 }
 
@@ -339,6 +343,10 @@ func TestDescribePartitionSettings(t *testing.T) {
 	}
 
 	requireAndCleanSubset(&topicDesc.Attributes, &expected.Attributes)
+	for i := range topicDesc.Partitions {
+		topicDesc.Partitions[i].FromBound = nil
+		topicDesc.Partitions[i].ToBound = nil
+	}
 	require.Equal(t, expected, topicDesc)
 }
 
@@ -666,6 +674,10 @@ func TestAlterTopic(t *testing.T) {
 	}
 
 	requireAndCleanSubset(&topicDesc.Attributes, &expected.Attributes)
+	for i := range topicDesc.Partitions {
+		topicDesc.Partitions[i].FromBound = nil
+		topicDesc.Partitions[i].ToBound = nil
+	}
 	require.Equal(t, expected, topicDesc)
 
 	// Test altering max active partitions

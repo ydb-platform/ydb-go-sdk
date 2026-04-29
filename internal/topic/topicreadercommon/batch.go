@@ -24,7 +24,7 @@ type PublicBatch struct {
 }
 
 func NewBatch(session *PartitionSession, messages []*PublicMessage) (*PublicBatch, error) {
-	for i := 0; i < len(messages); i++ {
+	for i := range messages {
 		msg := messages[i]
 
 		if msg.commitRange.PartitionSession == nil {
@@ -59,7 +59,7 @@ func NewBatch(session *PartitionSession, messages []*PublicMessage) (*PublicBatc
 }
 
 func NewBatchFromStream(
-	decoders DecoderMap,
+	decoders *MultiDecoder,
 	session *PartitionSession,
 	sb rawtopicreader.Batch, //nolint:gocritic
 ) (*PublicBatch, error) {

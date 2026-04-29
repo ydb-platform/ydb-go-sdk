@@ -28,8 +28,8 @@ var (
 )
 
 var (
-	uuidType    = reflect.TypeOf(uuid.UUID{})
-	uuidPtrType = reflect.TypeOf((*uuid.UUID)(nil))
+	uuidType    = reflect.TypeFor[uuid.UUID]()
+	uuidPtrType = reflect.TypeFor[*uuid.UUID]()
 )
 
 func asUUID(v any) (value.Value, bool) {
@@ -201,6 +201,8 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen,gocyclo
 		return types.Timestamp, nil
 	case time.Duration:
 		return types.Interval, nil
+	case json.Marshaler:
+		return types.JSON, nil
 	default:
 		rv := reflect.ValueOf(x)
 		if converted := tryConvertToBaseType(rv); converted != nil {

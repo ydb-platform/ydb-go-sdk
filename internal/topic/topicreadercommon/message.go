@@ -84,7 +84,7 @@ type PublicMessageContentUnmarshaler interface {
 	UnmarshalYDBTopicMessage(data []byte) error
 }
 
-func createReader(decoders DecoderMap, codec rawtopiccommon.Codec, rawBytes []byte) oneTimeReader {
+func createReader(decoders *MultiDecoder, codec rawtopiccommon.Codec, rawBytes []byte) oneTimeReader {
 	var maker readerMaker = func() io.Reader {
 		reader, err := decoders.Decode(codec, bytes.NewReader(rawBytes))
 		if err != nil {

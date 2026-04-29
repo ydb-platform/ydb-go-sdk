@@ -3,6 +3,7 @@ package xerrors
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 
 	grpcCodes "google.golang.org/grpc/codes"
@@ -130,10 +131,8 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 		if len(codes) == 0 {
 			return true
 		}
-		for _, code := range codes {
-			if status.Code() == code {
-				return true
-			}
+		if slices.Contains(codes, status.Code()) {
+			return true
 		}
 	}
 

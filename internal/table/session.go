@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"strconv"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
@@ -166,12 +168,10 @@ func (e queryClientExecutor) execute(
 
 func (e tableClientExecutor) execute(
 	ctx context.Context,
-	txControl *tx.Control,
+	_ *tx.Control,
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (*transaction, result.Result, error) {
-	request.TxControl = txControl.ToYdbTableTransactionControl()
-
 	r, err := executeDataQuery(ctx, e.client, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
@@ -277,7 +277,8 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 func newTableSession(
 	ctx context.Context, cc grpc.ClientConnInterface, config *config.Config,
 ) (*Session, error) {
-	response, err := Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(ctx,
+	response, err := Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(
+		balancer.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED),
 		&Ydb_Table.CreateSessionRequest{
 			OperationParams: operation.Params(
 				ctx,
@@ -695,9 +696,7 @@ func processColumnFamilies(families []*Ydb_Table.ColumnFamily) []options.ColumnF
 
 func processAttributes(attrs map[string]string) map[string]string {
 	attributes := make(map[string]string, len(attrs))
-	for k, v := range attrs {
-		attributes[k] = v
-	}
+	maps.Copy(attributes, attrs)
 
 	return attributes
 }

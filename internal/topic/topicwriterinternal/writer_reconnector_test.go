@@ -21,13 +21,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var testCommonEncoders = NewMultiEncoder()
+var testCommonEncoders = topicwritercommon.NewMultiEncoder()
 
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
@@ -52,7 +53,7 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 
 		const messCount = 1000
 		wg.Add(messCount)
-		for i := 0; i < messCount; i++ {
+		for i := range messCount {
 			go fWrite(i)
 		}
 		wg.Wait()
@@ -87,6 +88,20 @@ func TestWriterImpl_CheckMessages(t *testing.T) {
 	})
 }
 
+func TestWriterImpl_WriteWithKey(t *testing.T) {
+	t.Run("WriteWithKeyToSingleWriter", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig())
+		w.firstConnectionHandled.Store(true)
+
+		maxSize := 5
+		w.cfg.MaxMessageSize = maxSize
+
+		err := w.Write(ctx, []PublicMessage{{Data: bytes.NewReader(make([]byte, maxSize)), Key: "test"}})
+		require.ErrorIs(t, err, errWritingByKeyNotSupported)
+	})
+}
+
 func TestWriterImpl_Write(t *testing.T) {
 	t.Run("PushToQueue", func(t *testing.T) {
 		ctx := context.Background()
@@ -107,7 +122,7 @@ func TestWriterImpl_Write(t *testing.T) {
 			mess := expectedMap[k]
 			_, err = mess.GetEncodedBytes(rawtopiccommon.CodecRaw)
 			require.NoError(t, err)
-			mess.metadataCached = true
+			mess.MetadataCached = true
 			expectedMap[k] = mess
 		}
 
@@ -182,6 +197,27 @@ func TestWriterImpl_Write(t *testing.T) {
 	})
 }
 
+func TestWriterImpl_WriteInternal(t *testing.T) {
+	t.Run("PreserveCreatedAt", func(t *testing.T) {
+		ctx := context.Background()
+		w := newTestWriterStopped()
+		w.firstConnectionHandled.Store(true)
+
+		messageTime := time.Date(2022, 9, 7, 11, 34, 0, 0, time.UTC)
+		msg := topicwritercommon.NewMessageDataWithContent(PublicMessage{
+			SeqNo:     1,
+			CreatedAt: messageTime,
+			Data:      bytes.NewReader([]byte("123")),
+		}, testCommonEncoders)
+		require.NoError(t, msg.CacheMessageData(rawtopiccommon.CodecRaw))
+
+		err := w.WriteInternal(ctx, []topicwritercommon.MessageWithDataContent{msg})
+		require.NoError(t, err)
+		require.Len(t, w.queue.messagesByOrder, 1)
+		require.Equal(t, messageTime, w.queue.messagesByOrder[1].CreatedAt)
+	})
+}
+
 func TestWriterImpl_WriteCodecs(t *testing.T) {
 	t.Run("ForceRaw", func(t *testing.T) {
 		var err error
@@ -253,11 +289,11 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			messReceived <- writeReq.Codec
 
 			return nil
-		}).Times(codecMeasureIntervalBatches * 2)
+		}).Times(topicwritercommon.CodecMeasureIntervalBatches * 2)
 
 		codecs := make(map[rawtopiccommon.Codec]empty.Struct)
 
-		for i := 0; i < codecMeasureIntervalBatches; i++ {
+		for range topicwritercommon.CodecMeasureIntervalBatches {
 			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentShort),
 			}}))
@@ -266,7 +302,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			codecs[codec] = empty.Struct{}
 		}
 
-		for i := 0; i < codecMeasureIntervalBatches; i++ {
+		for range topicwritercommon.CodecMeasureIntervalBatches {
 			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentLong),
 			}}))
@@ -465,7 +501,7 @@ func TestWriterImpl_InitSession(t *testing.T) {
 	require.True(t, isClosed(w.firstInitResponseProcessedChan))
 }
 
-func TestWriterImpl_WaitInit(t *testing.T) {
+func TestWriterImpl_WaitInitInfo(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
 		expectedInitData := InitialInfo{
@@ -476,7 +512,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			LastSeqNumRequested: true,
 		})
 
-		initData, err := w.WaitInit(context.Background())
+		initData, err := w.WaitInitInfo(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, expectedInitData, initData)
 
@@ -484,7 +520,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		require.NoError(t, err)
 
 		// one more run is needed to check idempotency
-		anotherInitData, err := w.WaitInit(context.Background())
+		anotherInitData, err := w.WaitInitInfo(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, initData, anotherInitData)
 
@@ -501,7 +537,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			cancel()
 		}()
 
-		_, err := w.WaitInit(ctx)
+		err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, ctx.Err())
 	})
 
@@ -509,7 +545,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		_, err := w.WaitInit(ctx)
+		err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, ctx.Err())
 
 		w.onWriterChange(&SingleStreamWriter{})
@@ -525,7 +561,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			_ = w.close(ctx, testErr)
 		}()
 
-		_, err := w.WaitInit(ctx)
+		err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, testErr)
 
 		w.onWriterChange(&SingleStreamWriter{})
@@ -808,9 +844,9 @@ func TestAllMessagesHasSameBufCodec(t *testing.T) {
 		require.True(t, allMessagesHasSameBufCodec(newTestMessagesWithContent(1, 2, 3)))
 	})
 	t.Run("DifferCodecs", func(t *testing.T) {
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			messages := newTestMessagesWithContent(1, 2, 3)
-			messages[i].bufCodec = rawtopiccommon.CodecGzip
+			messages[i].BufCodec = rawtopiccommon.CodecGzip
 			require.False(t, allMessagesHasSameBufCodec(messages))
 		}
 	})
@@ -906,7 +942,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 			var messages []messageWithDataContent
 			for index, codec := range test {
 				mess := newTestMessageWithDataContent(index)
-				mess.bufCodec = codec
+				mess.BufCodec = codec
 				messages = append(messages, mess)
 			}
 
@@ -918,7 +954,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 				require.Len(t, group, cap(group))
 				for _, mess := range group {
 					expectedNum++
-					require.Equal(t, test[int(expectedNum)], mess.bufCodec)
+					require.Equal(t, test[int(expectedNum)], mess.BufCodec)
 					mess.SeqNo = expectedNum
 				}
 			}
@@ -931,7 +967,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 func TestCalculateAllowedCodecs(t *testing.T) {
 	customCodecSupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst)
 	customCodecUnsupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst + 1)
-	encoders := NewMultiEncoder()
+	encoders := topicwritercommon.NewMultiEncoder()
 	encoders.AddEncoder(customCodecSupported, func(writer io.Writer) (io.WriteCloser, error) {
 		return nil, errors.New("test")
 	})
@@ -1044,7 +1080,7 @@ func TestWriterReconnector_WaitInit(t *testing.T) {
 					SupportedCodecs:       rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
 				})
 			}()
-			_, err := env.writer.WaitInit(env.ctx)
+			err := env.writer.WaitInit(env.ctx)
 			require.NoError(t, err)
 		})
 	})
@@ -1063,7 +1099,7 @@ func TestWriterReconnector_WaitInit(t *testing.T) {
 				time.Sleep(time.Millisecond)
 				_ = env.writer.close(env.ctx, testErr)
 			}()
-			_, err := env.writer.WaitInit(env.ctx)
+			err := env.writer.WaitInit(env.ctx)
 			require.ErrorIs(t, err, testErr)
 		})
 	})
@@ -1081,7 +1117,7 @@ func TestWriterReconnector_WaitInit(t *testing.T) {
 			ctx, cancel := context.WithTimeout(env.ctx, time.Millisecond)
 			defer cancel()
 
-			_, err := env.writer.WaitInit(ctx)
+			err := env.writer.WaitInit(ctx)
 			require.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 	})
@@ -1156,7 +1192,7 @@ type testEnv struct {
 	sendFromServerChannel chan sendFromServerResponse
 	stopReadEvents        empty.Chan
 	partitionID           int64
-	connectCount          int64
+	connectCount          atomic.Int64
 }
 
 type testEnvOptions struct {
@@ -1185,7 +1221,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 			RawTopicWriterStream,
 			error,
 		) {
-			connectNum := atomic.AddInt64(&res.connectCount, 1)
+			connectNum := res.connectCount.Add(1)
 			if connectNum > 1 {
 				t.Fatalf("test: default env support most one connection")
 			}

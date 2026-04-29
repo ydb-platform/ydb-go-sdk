@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -18,10 +20,10 @@ type WriterOption = topicwriterinternal.PublicWriterOption
 type WriteSessionMetadata map[string]string
 
 // CreateEncoderFunc for create message decoders
-type CreateEncoderFunc = topicwriterinternal.PublicCreateEncoderFunc
+type CreateEncoderFunc = topicwritercommon.PublicCreateEncoderFunc
 
 // ResettableWriter is able to reset a nested writer between uses.
-type ResetableWriter = topicwriterinternal.PublicResetableWriter
+type ResetableWriter = topicwritercommon.PublicResetableWriter
 
 // WithWriterAddEncoder add custom codec implementation to writer.
 // It allows to set custom codecs implementations for custom and internal codecs.
@@ -55,6 +57,30 @@ func WithWriterCompressorCount(num int) WriterOption {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithWriterMaxQueueLen(num int) WriterOption {
 	return topicwriterinternal.WithMaxQueueLen(num)
+}
+
+// WithWriterErrOnQueueFull configures topic writer Write behavior when the internal
+// message queue is full.
+//
+// When enable is false (default), the call blocks until queue space becomes
+// available or the call context is cancelled. This preserves the pre-existing
+// behavior.
+//
+// When enable is true, the call returns with ErrQueueLimitExceed
+// (see package topic/topicwriter) immediately, without blocking. This is useful for
+// preventing unbounded memory growth (OOM) when
+// messages are produced faster than the writer can flush them to the server, for
+// example during connection problems or when the consumer is slow. In this mode the
+// caller is responsible for implementing back-pressure (e.g. dropping messages,
+// logging, retrying with its own budget).
+//
+// Note: when the queue is completely empty, the implementation may still accept
+// a single request larger than the queue size (soft limit), in order not to
+// break large batches on otherwise idle writers. Later calls may fail with the same
+// ErrQueueLimitExceed as soon
+// as the queue is non-full but cannot fit the new batch.
+func WithWriterErrOnQueueFull(enable bool) WriterOption {
+	return topicwriterinternal.WithErrOnQueueFull(enable)
 }
 
 // WithWriterMessageMaxBytesSize set max body size of one message in bytes.
@@ -221,5 +247,18 @@ func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
 func WithWriterLogContext(ctx context.Context) WriterOption {
 	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
 		cfg.LogContext = ctx
+	}
+}
+
+// WithWriteToManyPartitions sets configuration for writing to multiple partitions.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithWriteToManyPartitions(opts ...MultiWriterOption) WriterOption {
+	return func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
+		multiWriterCfg := &topicmultiwriter.MultiWriterConfig{}
+		for _, opt := range opts {
+			opt(multiWriterCfg)
+		}
+		writerCfg.MultiWriterConfig = multiWriterCfg
 	}
 }

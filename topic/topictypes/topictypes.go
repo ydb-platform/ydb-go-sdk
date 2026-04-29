@@ -1,6 +1,7 @@
 package topictypes
 
 import (
+	"maps"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
@@ -230,9 +231,7 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	d.RetentionStorageMB = raw.RetentionStorageMB
 
 	d.Attributes = make(map[string]string)
-	for k, v := range raw.Attributes {
-		d.Attributes[k] = v
-	}
+	maps.Copy(d.Attributes, raw.Attributes)
 
 	d.Consumers = make([]Consumer, len(raw.Consumers))
 	for i := 0; i < len(raw.Consumers); i++ {
@@ -249,6 +248,8 @@ type PartitionInfo struct {
 	ChildPartitionIDs  []int64
 	ParentPartitionIDs []int64
 	PartitionStats     PartitionStats
+	FromBound          []byte
+	ToBound            []byte
 }
 
 // FromRaw convert from internal format to public. Used internally only.
@@ -259,6 +260,8 @@ func (p *PartitionInfo) FromRaw(raw *rawtopic.PartitionInfo) {
 	p.ChildPartitionIDs = clone.Int64Slice(raw.ChildPartitionIDs)
 	p.ParentPartitionIDs = clone.Int64Slice(raw.ParentPartitionIDs)
 	p.PartitionStats.FromRaw(&raw.PartitionStats)
+	p.FromBound = raw.FromBound
+	p.ToBound = raw.ToBound
 }
 
 type MultipleWindowsStat struct {

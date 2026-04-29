@@ -17,7 +17,7 @@ func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, _ error) {
 
 		return nil, xerrors.WithStackTrace(fmt.Errorf("%T is not a *driverWrapper", v))
 	case *sql.Conn:
-		if err := vv.Raw(func(driverConn interface{}) error {
+		if err := vv.Raw(func(driverConn any) error {
 			if cc, ok := driverConn.(*Conn); ok {
 				connector = cc.connector
 

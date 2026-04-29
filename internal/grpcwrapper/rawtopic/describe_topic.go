@@ -99,6 +99,8 @@ type PartitionInfo struct {
 	ChildPartitionIDs  []int64
 	ParentPartitionIDs []int64
 	PartitionStats     PartitionStats
+	FromBound          []byte
+	ToBound            []byte
 }
 
 func (pi *PartitionInfo) FromProto(proto *Ydb_Topic.DescribeTopicResult_PartitionInfo) error {
@@ -107,6 +109,12 @@ func (pi *PartitionInfo) FromProto(proto *Ydb_Topic.DescribeTopicResult_Partitio
 
 	pi.ChildPartitionIDs = clone.Int64Slice(proto.GetChildPartitionIds())
 	pi.ParentPartitionIDs = clone.Int64Slice(proto.GetParentPartitionIds())
+
+	keyRange := proto.GetKeyRange()
+	if keyRange != nil {
+		pi.FromBound = keyRange.GetFromBound()
+		pi.ToBound = keyRange.GetToBound()
+	}
 
 	return pi.PartitionStats.FromProto(proto.GetPartitionStats())
 }

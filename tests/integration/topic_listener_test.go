@@ -7,6 +7,7 @@ import (
 	"context"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -167,6 +168,167 @@ func TestTopicListenerCommit(t *testing.T) {
 
 		require.NoError(t, listener.Close(scope.Ctx))
 	})
+}
+
+// TestTopicListenerCommitOffsetWithSessionIDKeepsListenerAlive verifies that passing a valid
+// read_session_id to CommitOffset does not interrupt the active listener session: messages
+// keep arriving and the session ID remains unchanged.
+func TestTopicListenerCommitOffsetWithSessionIDKeepsListenerAlive(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	err := scope.TopicWriter().Write(ctx,
+		topicwriter.Message{Data: strings.NewReader("msg0")},
+		topicwriter.Message{Data: strings.NewReader("msg1")},
+	)
+	require.NoError(t, err)
+
+	type firstMsgData struct {
+		partitionID int64
+		nextOffset  int64
+	}
+
+	firstMsgCh := make(chan firstMsgData, 1)
+	secondMsgDone := make(empty.Chan)
+	var msgCount atomic.Int32
+
+	handler := &TestTopicListener_Handler{
+		onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
+			for _, msg := range event.Batch.Messages {
+				n := msgCount.Add(1)
+				if n == 1 {
+					firstMsgCh <- firstMsgData{
+						partitionID: event.Batch.PartitionID(),
+						nextOffset:  msg.Offset + 1,
+					}
+				} else if n == 2 {
+					close(secondMsgDone)
+				}
+			}
+
+			return nil
+		},
+	}
+
+	listener, err := scope.Driver().Topic().StartListener(
+		scope.TopicConsumerName(),
+		handler,
+		topicoptions.ReadTopic(scope.TopicPath()),
+	)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close(ctx) }()
+
+	var firstMsg firstMsgData
+	select {
+	case firstMsg = <-firstMsgCh:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for first message")
+	}
+
+	sessionIDBefore := listener.ReadSessionID()
+	require.NotEmpty(t, sessionIDBefore)
+
+	err = scope.Driver().Topic().CommitOffset(
+		ctx,
+		scope.TopicPath(),
+		firstMsg.partitionID,
+		scope.TopicConsumerName(),
+		firstMsg.nextOffset,
+		topicoptions.WithCommitOffsetReadSessionID(sessionIDBefore),
+	)
+	require.NoError(t, err)
+
+	xtest.WaitChannelClosed(t, secondMsgDone)
+
+	// Session ID must not change — the listener was not interrupted.
+	require.Equal(t, sessionIDBefore, listener.ReadSessionID())
+
+	desc, err := scope.Driver().Topic().DescribeTopicConsumer(
+		ctx,
+		scope.TopicPath(),
+		scope.TopicConsumerName(),
+		topicoptions.IncludeConsumerStats(),
+	)
+	require.NoError(t, err)
+	require.EqualValues(t, firstMsg.nextOffset, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
+}
+
+// TestTopicListenerCommitOffsetWithoutSessionIDReconnectsListener verifies that omitting
+// read_session_id causes the server to interrupt the active session. The listener
+// reconnects automatically and continues delivering messages.
+func TestTopicListenerCommitOffsetWithoutSessionIDReconnectsListener(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	err := scope.TopicWriter().Write(ctx,
+		topicwriter.Message{Data: strings.NewReader("msg0")},
+		topicwriter.Message{Data: strings.NewReader("msg1")},
+	)
+	require.NoError(t, err)
+
+	type firstMsgData struct {
+		partitionID int64
+		nextOffset  int64
+	}
+
+	firstMsgCh := make(chan firstMsgData, 1)
+	secondMsgDone := make(empty.Chan)
+	var msgCount atomic.Int32
+
+	handler := &TestTopicListener_Handler{
+		onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
+			for _, msg := range event.Batch.Messages {
+				n := msgCount.Add(1)
+				if n == 1 {
+					firstMsgCh <- firstMsgData{
+						partitionID: event.Batch.PartitionID(),
+						nextOffset:  msg.Offset + 1,
+					}
+				} else if n == 2 {
+					close(secondMsgDone)
+				}
+			}
+
+			return nil
+		},
+	}
+
+	listener, err := scope.Driver().Topic().StartListener(
+		scope.TopicConsumerName(),
+		handler,
+		topicoptions.ReadTopic(scope.TopicPath()),
+	)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close(ctx) }()
+
+	var firstMsg firstMsgData
+	select {
+	case firstMsg = <-firstMsgCh:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for first message")
+	}
+
+	// Commit without session ID — server will interrupt the active session.
+	err = scope.Driver().Topic().CommitOffset(
+		ctx,
+		scope.TopicPath(),
+		firstMsg.partitionID,
+		scope.TopicConsumerName(),
+		firstMsg.nextOffset,
+	)
+	require.NoError(t, err)
+
+	// Listener must reconnect and deliver the second message.
+	xtest.WaitChannelClosed(t, secondMsgDone)
+
+	desc, err := scope.Driver().Topic().DescribeTopicConsumer(
+		ctx,
+		scope.TopicPath(),
+		scope.TopicConsumerName(),
+		topicoptions.IncludeConsumerStats(),
+	)
+	require.NoError(t, err)
+	require.EqualValues(t, firstMsg.nextOffset, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
 }
 
 type TestTopicListener_Handler struct {

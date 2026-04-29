@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
+	internalmultiwriter "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -232,6 +233,42 @@ func (c *Client) DescribeTopicConsumer(
 	return res, nil
 }
 
+// CommitOffset commits the processed offset for a partition.
+// Pass topicoptions.WithCommitOffsetReadSessionID (from reader.ReadSessionID()) to associate
+// the commit with the current read session and avoid interrupting it.
+// If not set, the server will interrupt the active read session for the partition.
+func (c *Client) CommitOffset(
+	ctx context.Context,
+	path string,
+	partitionID int64,
+	consumer string,
+	offset int64,
+	opts ...topicoptions.CommitOffsetOption,
+) error {
+	options := topicoptions.CommitOffsetOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+
+	call := func(ctx context.Context) error {
+		return c.rawClient.CommitOffset(
+			ctx, c.defaultOperationParams, path, partitionID, consumer, offset, options.ReadSessionID,
+		)
+	}
+
+	if c.cfg.AutoRetry() {
+		return retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+			retry.WithBudget(c.cfg.RetryBudget()),
+		)
+	}
+
+	return call(ctx)
+}
+
 // Drop topic
 func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
 	req := rawtopic.DropTopicRequest{}
@@ -331,9 +368,37 @@ func (c *Client) StartReader(
 
 // StartWriter create new topic writer wrapper
 func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
-	cfg := c.createWriterConfig(topicPath, append(opts, topicwriterinternal.WithMaxGrpcMessageBytes(
-		c.cfg.MaxGrpcMessageSize,
-	)))
+	cfg := c.createWriterConfig(
+		topicPath, append(
+			opts,
+			func(writerCfg *topicwriterinternal.WriterReconnectorConfig) {
+				topicwriterinternal.WithMaxGrpcMessageBytes(c.cfg.MaxGrpcMessageSize)
+			},
+		),
+	)
+
+	mwCfg, ok := cfg.MultiWriterConfig.(*internalmultiwriter.MultiWriterConfig)
+
+	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
+	// a multi-writer instead of a single-writer.
+	if ok && mwCfg != nil {
+		cfg.MultiMode = true
+
+		internal, err := internalmultiwriter.NewMultiWriter(
+			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+				return c.Describe(ctx, path)
+			},
+			&cfg,
+			mwCfg,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// internal multi-writer already implements the necessary interface for topicwriter.Writer.
+		return topicwriter.NewWriterWrapper(internal), nil
+	}
+
 	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
 	if err != nil {
 		return nil, err
@@ -344,7 +409,7 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 
 func (c *Client) StartTransactionalWriter(
 	transaction tx.Identifier,
-	topicpath string,
+	topicPath string,
 	opts ...topicoptions.WriterOption,
 ) (*topicwriter.TxWriter, error) {
 	internalTx, ok := transaction.(tx.Transaction)
@@ -352,7 +417,36 @@ func (c *Client) StartTransactionalWriter(
 		return nil, xerrors.WithStackTrace(errUnsupportedTransactionType)
 	}
 
-	cfg := c.createWriterConfig(topicpath, opts)
+	cfg := c.createWriterConfig(topicPath, opts)
+
+	mwCfg, ok := cfg.MultiWriterConfig.(*internalmultiwriter.MultiWriterConfig)
+
+	// If WithMultiWriter was used, cfg.Extra will contain MultiWriter options and we construct
+	// a multi-writer instead of a single-writer.
+	if ok && mwCfg != nil {
+		cfg.MultiMode = true
+
+		multiwriter, err := internalmultiwriter.NewMultiWriter(
+			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+				return c.Describe(ctx, path)
+			},
+			&cfg,
+			mwCfg,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		multiWriterWithTx := internalmultiwriter.NewTopicMultiWriterTransaction(
+			multiwriter,
+			internalTx,
+			c.cfg.Trace,
+		)
+
+		// internal multi-writer already implements the necessary interface for topicwriter.Writer.
+		return topicwriter.NewTxWriterWrapper(multiWriterWithTx), nil
+	}
+
 	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
 	if err != nil {
 		return nil, err
@@ -367,13 +461,15 @@ func (c *Client) createWriterConfig(
 	topicPath string,
 	opts []topicoptions.WriterOption,
 ) topicwriterinternal.WriterReconnectorConfig {
-	options := []topicoptions.WriterOption{
+	options := make([]topicwriterinternal.PublicWriterOption, 0, len(opts)+5)
+	options = append(
+		options,
 		topicwriterinternal.WithRawClient(&c.rawClient),
 		topicwriterinternal.WithTopic(topicPath),
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
 		topicwriterinternal.WithTrace(c.cfg.Trace),
 		topicwriterinternal.WithCredentials(c.cred),
-	}
+	)
 
 	options = append(options, opts...)
 

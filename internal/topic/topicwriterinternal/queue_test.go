@@ -128,10 +128,10 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		go func() {
 			//nolint:gosec
 			sendRand := rand.New(rand.NewSource(0))
-			for i := 0; i < iterations; i++ {
+			for range iterations {
 				count := sendRand.Intn(10) + 1
-				var m []messageWithDataContent
-				for k := 0; k < count; k++ {
+				m := make([]messageWithDataContent, 0, count)
+				for range count {
 					number := int(atomic.AddInt64(&lastSentSeqNo, 1))
 					m = append(m, newTestMessageWithDataContent(number))
 				}
