@@ -204,25 +204,31 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	p *Pool[PT, T],
 ) func(ctx context.Context, withReservedSpace bool) (PT, error) {
 	return func(ctx context.Context, withReservedSpace bool) (PT, error) {
-		if !xsync.WithLock(&p.mu, func() bool {
-			if withReservedSpace {
-				return true
-			}
-			if len(p.index)+p.createInProgress < p.config.limit {
-				p.createInProgress++
+		// When withReservedSpace=true, createInProgress was already incremented by
+		// getItem; this function must not touch it. The caller (getItem) is responsible
+		// for decrementing createInProgress after this function returns.
+		if !withReservedSpace {
+			if !xsync.WithLock(&p.mu, func() bool {
+				if len(p.index)+p.createInProgress < p.config.limit {
+					p.createInProgress++
 
-				return true
+					return true
+				}
+
+				return false
+			}) {
+				return nil, xerrors.WithStackTrace(errPoolIsOverflow)
 			}
 
-			return false
-		}) {
-			return nil, xerrors.WithStackTrace(errPoolIsOverflow)
+			// Release the reserved slot on any exit from this function, including
+			// early returns due to context cancellation or pool closure. This covers
+			// all code paths without tracking individual exits.
+			defer func() {
+				p.mu.WithLock(func() {
+					p.createInProgress--
+				})
+			}()
 		}
-		defer func() {
-			p.mu.WithLock(func() {
-				p.createInProgress--
-			})
-		}()
 
 		var (
 			ch = make(chan struct {
@@ -269,11 +275,11 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 				err:  xerrors.WithStackTrace(err),
 			}:
 			case <-done:
-				if newItem == nil {
-					return
+				// Outer function has returned (caller context canceled or pool closed).
+				// Return the item to the pool if it was successfully created.
+				if newItem != nil {
+					_ = p.putItem(createCtx, newItem)
 				}
-
-				_ = p.putItem(createCtx, newItem)
 			}
 		}()
 
@@ -281,18 +287,18 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 		case <-p.done:
 			return nil, xerrors.WithStackTrace(errClosedPool)
 		case <-ctx.Done():
-			// Try non-blocking read from ch to check if goroutine has already completed
+			// Try non-blocking read from ch to check if goroutine has already completed.
 			select {
 			case result, has := <-ch:
 				if has {
 					if result.err != nil {
-						// Goroutine completed with an error, join it with context error
 						return nil, xerrors.WithStackTrace(xerrors.Join(result.err, ctx.Err()))
 					}
-					// Goroutine completed successfully, return the item
+
 					return result.item, nil
 				}
 			default:
+				// Goroutine is still running; it will call putItem when it finishes.
 			}
 
 			return nil, xerrors.WithStackTrace(ctx.Err())
@@ -889,6 +895,16 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		}
 
 		item, err := p.createItemFunc(ctx, reservedSpace)
+		if reservedSpace {
+			// The slot was reserved by this getItem call (createInProgress was
+			// incremented here). Release it now that createItemFunc has returned,
+			// whether it succeeded or not. The background goroutine (if still running)
+			// will call putItem when it finishes; putItem's overflow guard protects
+			// against exceeding the limit in the rare concurrent-getItem race.
+			p.mu.WithLock(func() {
+				p.createInProgress--
+			})
+		}
 		if item != nil {
 			return item, nil
 		}
@@ -1053,6 +1069,15 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 			)
 
 			return xerrors.WithStackTrace(errItemIsNotAlive)
+		}
+
+		if len(p.index) > p.config.limit {
+			p.closeItem(ctx, item,
+				closeItemNotifyStats(),
+				closeItemWithDeleteFromPool(),
+			)
+
+			return xerrors.WithStackTrace(errPoolIsOverflow)
 		}
 
 		if p.idle.Len() >= p.config.limit {
