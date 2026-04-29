@@ -190,7 +190,6 @@ func TestTopicTransactionalWriterWithLazyTx(t *testing.T) {
 	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 		writer, err := db.Topic().StartTransactionalWriter(tx, scope.TopicPath(),
 			topicoptions.WithWriterWaitServerAck(true))
-
 		if err != nil {
 			return fmt.Errorf("start transactional writer: %w", err)
 		}
@@ -236,7 +235,6 @@ func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
 			Data: strings.NewReader(payload),
 			Key:  "abc",
 		})
-
 		if err != nil {
 			return fmt.Errorf("write message: %w", err)
 		}
