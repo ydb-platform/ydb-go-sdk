@@ -140,18 +140,22 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	// If ctx was cancelled during ExecuteQuery, return a retryable error so the
-	// caller can obtain a fresh session and retry the operation.
+	// If ctx was cancelled during ExecuteQuery, return a retryable error only
+	// for idempotent operations so non-idempotent queries are not retried after
+	// an indeterminate cancellation point.
 	// The check is non-blocking (ctx.Done() is a closed channel once cancelled),
 	// so it does not affect the "cancel during Recv" path: when ctx is cancelled
 	// only after ExecuteQuery returns, the AfterFunc remains active and will
 	// propagate the cancellation to executeCtx during the blocking Recv call.
 	select {
 	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(xerrors.Retryable(
-			ctx.Err(),
-			xerrors.WithName("streamResultContext"),
-		))
+		if xcontext.IsIdempotent(ctx) {
+			return nil, xerrors.WithStackTrace(xerrors.Retryable(
+				ctx.Err(),
+				xerrors.WithName("streamResultContext"),
+			))
+		}
+		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
 	}
 
