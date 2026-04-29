@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -45,7 +46,7 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 
 	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return r, nil
@@ -74,7 +75,7 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 
 	res, err := t.tx.Query(ctx, sql, opts...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return &rows{
@@ -91,7 +92,7 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (common.T
 
 	nativeTx, err := c.session.Begin(ctx, query.TxSettings(txc))
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return &transaction{
@@ -102,7 +103,7 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (common.T
 
 func (t *transaction) Commit(ctx context.Context) (finalErr error) {
 	if err := t.tx.CommitTx(ctx); err != nil {
-		return xerrors.WithStackTrace(err)
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return nil
@@ -110,7 +111,7 @@ func (t *transaction) Commit(ctx context.Context) (finalErr error) {
 
 func (t *transaction) Rollback(ctx context.Context) (finalErr error) {
 	if err := t.tx.Rollback(ctx); err != nil {
-		return xerrors.WithStackTrace(err)
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return nil
