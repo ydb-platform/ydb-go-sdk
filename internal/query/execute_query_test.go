@@ -528,7 +528,7 @@ func TestExecute(t *testing.T) {
 				func(_ context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
 					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
 				) {
-					// Simulate session expiry: cancelling ctx starts the AfterFunc goroutine.
+					// Simulate session expiry: canceling ctx starts the AfterFunc goroutine.
 					// stop() called after this returns will always return false.
 					cancel()
 

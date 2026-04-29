@@ -125,7 +125,7 @@ func execute(
 	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 
 	// AfterFunc propagates parent cancellation to executeCtx during ExecuteQuery,
-	// ensuring the gRPC call honours ctx's lifetime (e.g. user cancel, deadline).
+	// ensuring the gRPC call honors ctx's lifetime (e.g. user cancel, deadline).
 	stop := context.AfterFunc(ctx, executeCancel)
 	defer stop()
 
