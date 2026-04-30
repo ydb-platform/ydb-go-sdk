@@ -1,3 +1,5 @@
+* Added helper `sugar.NewKV(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
+
 ## v3.135.5
 * Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
 

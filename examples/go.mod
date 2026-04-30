@@ -10,10 +10,11 @@ require (
 	github.com/lib/pq v1.10.2
 	github.com/pressly/goose/v3 v3.22.1
 	github.com/prometheus/client_golang v1.21.1
+	github.com/tidwall/redcon v1.6.2
 	github.com/ydb-platform/gorm-driver v0.1.3
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0
 	github.com/ydb-platform/ydb-go-sdk-prometheus/v2 v2.1.2
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.130.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.95.0
 	github.com/ydb-platform/ydb-go-yc v0.12.1
 	golang.org/x/sync v0.19.0
 	google.golang.org/genproto v0.0.0-20250324211829-b45e905df463
@@ -58,6 +59,8 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
+	github.com/tidwall/btree v1.1.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20220815090733-4c139c0154e2 // indirect
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260311095541-ebbf792c1180 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1 // indirect
@@ -67,9 +70,9 @@ require (
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251029180050-ab9386a59fda // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
-	google.golang.org/grpc v1.79.3 // indirect
+	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.55.3 // indirect
