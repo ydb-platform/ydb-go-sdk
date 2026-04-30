@@ -1,3 +1,4 @@
+## v3.135.5
 * Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
 
 ## v3.135.4
