@@ -6,9 +6,7 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"google.golang.org/grpc"
@@ -18,7 +16,6 @@ import (
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
@@ -51,8 +48,6 @@ type (
 		onClose               []func(*Connector)
 
 		clock          clockwork.Clock
-		idleThreshold  time.Duration
-		conns          xsync.Map[uuid.UUID, *Conn]
 		done           chan struct{}
 		trace          *trace.DatabaseSQL
 		traceRetry     *trace.Retry
@@ -113,7 +108,7 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 	return nil, xerrors.WithStackTrace(driver.ErrSkip)
 }
 
-func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) { //nolint:funlen
+func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
 	)
@@ -132,22 +127,13 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		id := uuid.New()
-
 		conn := &Conn{
 			processor: QUERY,
-			cc: xquery.New(ctx, s, append(
-				c.QueryOpts,
-				xquery.WithOnClose(func() {
-					c.conns.Delete(id)
-				}))...,
-			),
+			cc:        xquery.New(ctx, s, c.QueryOpts...),
 			ctx:       ctx,
 			connector: c,
 			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
-
-		c.conns.Set(id, conn)
 
 		return conn, nil
 
@@ -160,21 +146,13 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		id := uuid.New()
-
 		conn := &Conn{
 			processor: TABLE,
-			cc: xtable.New(ctx, c.parent.Scripting(), s, append(c.TableOpts,
-				xtable.WithOnClose(func() {
-					c.conns.Delete(id)
-				}))...,
-			),
+			cc:        xtable.New(ctx, c.parent.Scripting(), s, c.TableOpts...),
 			ctx:       ctx,
 			connector: c,
 			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
-
-		c.conns.Set(id, conn)
 
 		return conn, nil
 	default:
@@ -233,31 +211,6 @@ func Open(
 				return nil, err
 			}
 		}
-	}
-
-	if c.idleThreshold > 0 {
-		ctx, cancel := xcontext.WithDone(context.Background(), c.done)
-		go func() {
-			defer cancel()
-			for {
-				idleThresholdTimer := c.clock.NewTimer(c.idleThreshold)
-				select {
-				case <-ctx.Done():
-					idleThresholdTimer.Stop()
-
-					return
-				case <-idleThresholdTimer.Chan():
-					idleThresholdTimer.Stop() // no really need, stop for common style only
-					c.conns.Range(func(_ uuid.UUID, cc *Conn) bool {
-						if c.clock.Since(cc.LastUsage()) > c.idleThreshold {
-							_ = cc.Close()
-						}
-
-						return true
-					})
-				}
-			}
-		}()
 	}
 
 	return c, nil

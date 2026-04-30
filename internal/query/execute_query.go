@@ -124,6 +124,8 @@ func execute(
 
 	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 
+	// AfterFunc propagates parent cancellation to executeCtx during ExecuteQuery,
+	// ensuring the gRPC call honors ctx's lifetime (e.g. user cancel, deadline).
 	stop := context.AfterFunc(ctx, executeCancel)
 	defer stop()
 
@@ -138,7 +140,28 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	r, err := newResult(ctx, stream, append(opts,
+	// If ctx was cancelled during ExecuteQuery, return a retryable error so the
+	// pool can retry with a fresh session. This is safe regardless of idempotency
+	// because the retry loop operates on the caller's (user's) context: if ctx
+	// was cancelled only due to session death the user context is still alive and
+	// a retry is warranted; if the user cancelled their own context the retry loop
+	// will see its own ctx.Done() and stop without retrying.
+	// The check is non-blocking (ctx.Done() is a closed channel once cancelled),
+	// so it does not affect the "cancel during Recv" path: when ctx is cancelled
+	// only after ExecuteQuery returns, the AfterFunc remains active and will
+	// propagate the cancellation to executeCtx during the blocking Recv call.
+	select {
+	case <-ctx.Done():
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(
+			ctx.Err(),
+			xerrors.WithName("streamResultContext"),
+		))
+	default:
+	}
+
+	// newResult must use executeCtx, not the parent ctx: parent ctx may already
+	// be done (e.g. session death) while the gRPC stream is still readable.
+	r, err := newResult(executeCtx, stream, append(opts,
 		withStreamResultStatsCallback(settings.StatsCallback()),
 		withStreamResultOnClose(executeCancel),
 	)...)
