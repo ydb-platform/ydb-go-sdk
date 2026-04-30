@@ -139,6 +139,22 @@ var errsToCheck = []struct {
 		},
 	},
 	{
+		err:     xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "trying to send message larger than max (70792102 vs. 64000000)")), //nolint:lll
+		backoff: backoff.TypeNoBackoff,
+		canRetry: map[idempotency]bool{
+			idempotent:    false,
+			nonIdempotent: false,
+		},
+	},
+	{
+		err:     xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "received message larger than max (70792102 vs. 64000000)")), //nolint:lll
+		backoff: backoff.TypeNoBackoff,
+		canRetry: map[idempotency]bool{
+			idempotent:    false,
+			nonIdempotent: false,
+		},
+	},
+	{
 		err:     xerrors.Transport(grpcStatus.Error(grpcCodes.FailedPrecondition, "")),
 		backoff: backoff.TypeNoBackoff,
 		canRetry: map[idempotency]bool{
