@@ -164,4 +164,142 @@ func TestDiscover(t *testing.T) {
 			),
 		}, endpoints)
 	})
+	t.Run("WithOnlyIPv6", func(t *testing.T) {
+		// Discovery response contains a mix of endpoints:
+		//   dualstack  - has both IPv4 and IPv6 resolved addresses -> IPv4 must be dropped
+		//   v4only     - has only IPv4 resolved addresses -> must be skipped entirely
+		//   v6only     - has only IPv6 resolved addresses -> must be kept as-is
+		//   fqdnonly   - has neither resolved address -> must be kept as-is (DNS-resolved at dial time)
+		//   filtered   - fails the SSL filter, must be skipped regardless of OnlyIPv6
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		clock := clockwork.NewFakeClock()
+		client := NewMockDiscoveryServiceClient(ctrl)
+		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
+			Database: "test",
+		}).Return(&Ydb_Discovery.ListEndpointsResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+				Result: xtest.Must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
+					Endpoints: []*Ydb_Discovery.EndpointInfo{
+						{
+							Address: "dualstack.ydb",
+							Port:    1,
+							Ssl:     true,
+							IpV4:    []string{"10.0.0.1"},
+							IpV6:    []string{"2001:db8::1"},
+						},
+						{
+							Address: "v4only.ydb",
+							Port:    2,
+							Ssl:     true,
+							IpV4:    []string{"10.0.0.2"},
+						},
+						{
+							Address: "v6only.ydb",
+							Port:    3,
+							Ssl:     true,
+							IpV6:    []string{"2001:db8::2"},
+						},
+						{
+							Address: "fqdnonly.ydb",
+							Port:    4,
+							Ssl:     true,
+						},
+						{
+							Address: "filtered.ydb",
+							Port:    5,
+							Ssl:     false,
+							IpV6:    []string{"2001:db8::3"},
+						},
+					},
+					SelfLocation: "AZ0",
+				})),
+			},
+		}, nil)
+		endpoints, location, err := Discover(ctx, client, config.New(
+			config.WithDatabase("test"),
+			config.WithSecure(true),
+			config.WithOnlyIPv6(),
+			config.WithClock(clock),
+		))
+		require.NoError(t, err)
+		require.EqualValues(t, "AZ0", location)
+		require.EqualValues(t, []endpoint.Endpoint{
+			endpoint.New("dualstack.ydb:1",
+				endpoint.WithLocalDC(false),
+				endpoint.WithLastUpdated(clock.Now()),
+				endpoint.WithIPV6([]string{"2001:db8::1"}),
+			),
+			endpoint.New("v6only.ydb:3",
+				endpoint.WithLocalDC(false),
+				endpoint.WithLastUpdated(clock.Now()),
+				endpoint.WithIPV6([]string{"2001:db8::2"}),
+			),
+			endpoint.New("fqdnonly.ydb:4",
+				endpoint.WithLocalDC(false),
+				endpoint.WithLastUpdated(clock.Now()),
+			),
+		}, endpoints)
+
+		for _, e := range endpoints {
+			require.NotContains(t, e.Address(), "10.0.0.",
+				"IPv6-only endpoint must not resolve to an IPv4 address: %s", e.Address(),
+			)
+		}
+	})
+	t.Run("WithOnlyIPv6DefaultOff", func(t *testing.T) {
+		// Without WithOnlyIPv6 the behavior must stay unchanged:
+		// IPv4 addresses (when present) are kept and are preferred by endpoint.Address().
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		clock := clockwork.NewFakeClock()
+		client := NewMockDiscoveryServiceClient(ctrl)
+		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
+			Database: "test",
+		}).Return(&Ydb_Discovery.ListEndpointsResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+				Result: xtest.Must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
+					Endpoints: []*Ydb_Discovery.EndpointInfo{
+						{
+							Address: "dualstack.ydb",
+							Port:    1,
+							Ssl:     true,
+							IpV4:    []string{"10.0.0.1"},
+							IpV6:    []string{"2001:db8::1"},
+						},
+						{
+							Address: "v4only.ydb",
+							Port:    2,
+							Ssl:     true,
+							IpV4:    []string{"10.0.0.2"},
+						},
+					},
+					SelfLocation: "AZ0",
+				})),
+			},
+		}, nil)
+		endpoints, _, err := Discover(ctx, client, config.New(
+			config.WithDatabase("test"),
+			config.WithSecure(true),
+			config.WithClock(clock),
+		))
+		require.NoError(t, err)
+		require.EqualValues(t, []endpoint.Endpoint{
+			endpoint.New("dualstack.ydb:1",
+				endpoint.WithLocalDC(false),
+				endpoint.WithLastUpdated(clock.Now()),
+				endpoint.WithIPV4([]string{"10.0.0.1"}),
+				endpoint.WithIPV6([]string{"2001:db8::1"}),
+			),
+			endpoint.New("v4only.ydb:2",
+				endpoint.WithLocalDC(false),
+				endpoint.WithLastUpdated(clock.Now()),
+				endpoint.WithIPV4([]string{"10.0.0.2"}),
+			),
+		}, endpoints)
+	})
 }

@@ -23,6 +23,7 @@ type Config struct {
 	meta           *meta.Meta
 	addressMutator func(address string) string
 	clock          clockwork.Clock
+	onlyIPv6       bool
 
 	interval time.Duration
 	trace    *trace.Discovery
@@ -74,6 +75,24 @@ func (c *Config) Secure() bool {
 	return c.secure
 }
 
+// OnlyIPv6 reports whether discovery must filter out endpoints that
+// can only be reached over IPv4.
+//
+// When true:
+//   - endpoints whose discovery record provides only IPv4 resolved addresses
+//     are dropped;
+//   - endpoints whose discovery record provides both IPv4 and IPv6 resolved
+//     addresses keep only IPv6 (so the subsequent endpoint.Address() call
+//     resolves to the IPv6 literal);
+//   - endpoints with only IPv6 addresses or with no resolved addresses at all
+//     (FQDN only) are kept unchanged.
+//
+// The logic is strict IPv6-only: if there are no IPv6-reachable nodes, discovery
+// yields an empty set and connection cannot be established, with no IPv4 fallback.
+func (c *Config) OnlyIPv6() bool {
+	return c.onlyIPv6
+}
+
 func (c *Config) Trace() *trace.Discovery {
 	return c.trace
 }
@@ -117,6 +136,15 @@ func WithAddressMutator(addressMutator func(address string) string) Option {
 func WithSecure(ssl bool) Option {
 	return func(c *Config) {
 		c.secure = ssl
+	}
+}
+
+// WithOnlyIPv6 instructs the discovery to filter out IPv4-only endpoints so
+// only IPv6-reachable ones remain (strict IPv6-only, ONLY; no IPv4 fallback).
+// See Config.OnlyIPv6 (method on Config) for full behavior.
+func WithOnlyIPv6() Option {
+	return func(c *Config) {
+		c.onlyIPv6 = true
 	}
 }
 
