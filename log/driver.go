@@ -211,6 +211,14 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 						kv.Version(),
 					)
 				}
+				for _, issue := range info.Issues {
+					l.Log(WithLevel(ctx, WARN), "YQL issue",
+						kv.String("method", method),
+						kv.Stringer("endpoint", endpoint),
+						kv.String("message", issue.GetMessage()),
+						kv.Int("code", int(issue.GetIssueCode())),
+					)
+				}
 			}
 		},
 		OnConnNewStream: func(
