@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -60,8 +61,8 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 	err = s.stream.CloseSend()
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
 		if !s.wrapping {
@@ -95,8 +96,8 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 
 	err = s.stream.SendMsg(m)
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
 		if !s.wrapping {
@@ -150,8 +151,8 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 			return io.EOF
 		}
 
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
+		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
 		if !s.wrapping {

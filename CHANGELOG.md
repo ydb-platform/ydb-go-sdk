@@ -1,5 +1,20 @@
 * Added `ydb.WithOnlyIPv6()` option to filter out endpoints that can be reached only over IPv4, useful in environments where outbound IPv4 traffic is blocked by a firewall
 
+## v3.135.5
+* Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
+
+## v3.135.4
+* Fixed query `Execute`/`Query` sometimes returning `context.Canceled` instead of retrying when the session was closed while the gRPC stream was still valid, by using the stream-scoped context when creating the result reader
+
+## v3.135.3
+* Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
+
+## v3.135.2
+* Fixed closing idle sessions from the session pool when the `Close` context is already cancelled
+
+## v3.135.1
+* Fixed `database/sql` query service transactions to map connection-related errors to `driver.ErrBadConn` (begin, commit, rollback, exec, and query) so the pool can discard bad connections
+
 ## v3.135.0
 * Added `topicoptions.WithWriterErrOnQueueFull(bool)` option for topic writer to make `Write` return `topicwriter.ErrQueueLimitExceed` immediately when the internal queue is full, instead of blocking. Useful for preventing OOM when the writer cannot keep up with produced messages.
 * Un-deprecated `topicwriter.ErrQueueLimitExceed`: it is returned by `Write` when a writer is created with `topicoptions.WithWriterErrOnQueueFull(true)` and the internal queue is full.
