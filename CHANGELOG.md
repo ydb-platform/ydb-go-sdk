@@ -1,3 +1,6 @@
+* Removed intermediate `bytes.Buffer` allocation in topic message decoding: `MultiDecoder.Decode` now returns a streaming reader that releases the underlying decoder back to the pool on EOF/Close, instead of buffering the whole decoded payload into memory before returning.
+* Fixed `CodecRaw` decoder pooling resettable inputs: when a caller passed an `io.Reader` that happened to implement `PublicResettableReader`, the raw codec previously stored it in its decoder pool and `Reset()` it on subsequent reads, hijacking caller-owned reader state. The raw codec no longer maintains a pool.
+
 ## v3.135.5
 * Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
 
