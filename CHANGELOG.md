@@ -1,3 +1,5 @@
+* Fixed a bug where the pool could exceed its item limit when a context was canceled after slot reservation but before item creation completed
+
 ## v3.135.6
 * Added logging for YQL compiler warnings returned via `trace.DriverConnInvokeDoneInfo.Issues` so they become visible in SDK logs (including when `trace.DetailsAll` is enabled), instead of being silently dropped.
 
