@@ -4,7 +4,6 @@
 package integration
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -13,12 +12,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 //nolint:errcheck
-func TestCoordinationSemaphore(t *testing.T) {
-	ctx := context.TODO()
+func TestCoordinationSemaphore(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
+	ctx := xtest.Context(t)
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
@@ -30,9 +31,15 @@ func TestCoordinationSemaphore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}
-	defer db.Close(ctx) // cleanup resourcess
+	defer db.Close(ctx) // cleanup resources
 
 	const nodePath = "/local/coordination/node/test"
+
+	// drop node if it already exists (e.g. from a previous failed test run)
+	err = db.Coordination().DropNode(ctx, nodePath)
+	if err != nil && !ydb.IsOperationErrorSchemeError(err) {
+		t.Fatalf("failed to drop node: %v", err)
+	}
 
 	// create node
 	err = db.Coordination().CreateNode(ctx, nodePath, coordination.NodeConfig{
@@ -46,7 +53,11 @@ func TestCoordinationSemaphore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create node: %v", err)
 	}
-	defer db.Coordination().DropNode(ctx, nodePath)
+	defer func() {
+		if err = db.Coordination().DropNode(ctx, nodePath); err != nil {
+			t.Errorf("failed to drop node: %v", err)
+		}
+	}()
 	e, c, err := db.Coordination().DescribeNode(ctx, nodePath)
 	if err != nil {
 		t.Fatalf("failed to describe node: %v\n", err)
