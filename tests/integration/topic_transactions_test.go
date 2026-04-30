@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
@@ -174,6 +175,80 @@ func TestTopicWriterTLI(t *testing.T) {
 	content, err := io.ReadAll(batch.Messages[0])
 	scope.Require.NoError(err)
 	scope.Require.Equal("test", string(content))
+}
+
+// TestTopicTransactionalWriterWithLazyTx exercises transactional topic writes when the query transaction is lazy
+// (`query.WithLazyTx(true)`). Without materializing the transaction before the topic stream sends the tx id, YDB
+// returns `Transaction not found: LAZY_TX` on the topic writer receive path.
+func TestTopicTransactionalWriterWithLazyTx(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	reader := scope.TopicReader()
+
+	const payload = "lazy-tx-writer"
+	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		writer, err := db.Topic().StartTransactionalWriter(tx, scope.TopicPath(),
+			topicoptions.WithWriterWaitServerAck(true))
+		if err != nil {
+			return fmt.Errorf("start transactional writer: %w", err)
+		}
+
+		err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(payload)})
+		if err != nil {
+			return fmt.Errorf("write message: %w", err)
+		}
+
+		return nil
+	}, query.WithLazyTx(true))
+	require.NoError(t, err)
+
+	batch, err := reader.ReadMessagesBatch(ctx)
+	require.NoError(t, err)
+	require.Len(t, batch.Messages, 1)
+	content, err := io.ReadAll(batch.Messages[0])
+	require.NoError(t, err)
+	require.Equal(t, payload, string(content))
+}
+
+// TestTopicTransactionalMultiWriterWithLazyTx uses StartTransactionalWriter with
+// topicoptions.WithWriteToManyPartitions (internal multi-writer) together with lazy query transactions.
+func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	reader := scope.TopicReader()
+
+	const payload = "lazy-tx-multi-writer"
+	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		writer, err := db.Topic().StartTransactionalWriter(tx, scope.TopicPath(),
+			topicoptions.WithWriterWaitServerAck(true),
+			topicoptions.WithWriteToManyPartitions(
+				topicoptions.WithProducerIDPrefix("lazy-tx-multi"),
+			),
+		)
+		if err != nil {
+			return fmt.Errorf("start transactional writer: %w", err)
+		}
+
+		err = writer.Write(ctx, topicwriter.Message{
+			Data: strings.NewReader(payload),
+			Key:  "abc",
+		})
+		if err != nil {
+			return fmt.Errorf("write message: %w", err)
+		}
+
+		return nil
+	}, query.WithLazyTx(true))
+	require.NoError(t, err)
+
+	batch, err := reader.ReadMessagesBatch(ctx)
+	require.NoError(t, err)
+	require.Len(t, batch.Messages, 1)
+	content, err := io.ReadAll(batch.Messages[0])
+	require.NoError(t, err)
+	require.Equal(t, payload, string(content))
 }
 
 func TestWriteInTransaction(t *testing.T) {

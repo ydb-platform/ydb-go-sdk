@@ -1,5 +1,11 @@
 * Fixed `transport/ResourceExhausted` errors with description "trying to send message larger than max" or "received message larger than max" to be treated as non-retryable, so callers get an immediate error instead of repeated retries that cannot succeed
 
+## v3.135.5
+* Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
+
+## v3.135.4
+* Fixed query `Execute`/`Query` sometimes returning `context.Canceled` instead of retrying when the session was closed while the gRPC stream was still valid, by using the stream-scoped context when creating the result reader
+
 ## v3.135.3
 * Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
 
