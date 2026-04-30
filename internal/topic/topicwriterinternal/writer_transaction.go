@@ -2,6 +2,7 @@ package topicwriterinternal
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -58,6 +59,10 @@ func (w *WriterWithTransaction) WaitInitInfo(ctx context.Context) (InitialInfo, 
 }
 
 func (w *WriterWithTransaction) Write(ctx context.Context, messages []PublicMessage) error {
+	if err := w.tx.UnLazy(ctx); err != nil {
+		return fmt.Errorf("ydb: failed to materialize transaction: %w", err)
+	}
+
 	for i := range messages {
 		messages[i].Tx = w.tx
 	}
