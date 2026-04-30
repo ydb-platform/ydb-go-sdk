@@ -1,6 +1,21 @@
 * Removed intermediate `bytes.Buffer` allocation in topic message decoding: `MultiDecoder.Decode` now returns a streaming reader that releases the underlying decoder back to the pool on EOF/Close, instead of buffering the whole decoded payload into memory before returning.
 * Fixed `CodecRaw` decoder pooling resettable inputs: when a caller passed an `io.Reader` that happened to implement `PublicResettableReader`, the raw codec previously stored it in its decoder pool and `Reset()` it on subsequent reads, hijacking caller-owned reader state. The raw codec no longer maintains a pool.
 
+## v3.135.5
+* Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
+
+## v3.135.4
+* Fixed query `Execute`/`Query` sometimes returning `context.Canceled` instead of retrying when the session was closed while the gRPC stream was still valid, by using the stream-scoped context when creating the result reader
+
+## v3.135.3
+* Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
+
+## v3.135.2
+* Fixed closing idle sessions from the session pool when the `Close` context is already cancelled
+
+## v3.135.1
+* Fixed `database/sql` query service transactions to map connection-related errors to `driver.ErrBadConn` (begin, commit, rollback, exec, and query) so the pool can discard bad connections
+
 ## v3.135.0
 * Added `topicoptions.WithWriterErrOnQueueFull(bool)` option for topic writer to make `Write` return `topicwriter.ErrQueueLimitExceed` immediately when the internal queue is full, instead of blocking. Useful for preventing OOM when the writer cannot keep up with produced messages.
 * Un-deprecated `topicwriter.ErrQueueLimitExceed`: it is returned by `Write` when a writer is created with `topicoptions.WithWriterErrOnQueueFull(true)` and the internal queue is full.
