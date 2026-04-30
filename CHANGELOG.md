@@ -1,5 +1,8 @@
 * Added `ydb.WithOnlyIPv6()` option to filter out endpoints that can be reached only over IPv4, useful in environments where outbound IPv4 traffic is blocked by a firewall
 
+## v3.135.6
+* Added logging for YQL compiler warnings returned via `trace.DriverConnInvokeDoneInfo.Issues` so they become visible in SDK logs (including when `trace.DetailsAll` is enabled), instead of being silently dropped.
+
 ## v3.135.5
 * Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
 
