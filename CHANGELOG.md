@@ -1,3 +1,4 @@
+## v3.135.6
 * Added logging for YQL compiler warnings returned via `trace.DriverConnInvokeDoneInfo.Issues` so they become visible in SDK logs (including when `trace.DetailsAll` is enabled), instead of being silently dropped.
 
 ## v3.135.5
