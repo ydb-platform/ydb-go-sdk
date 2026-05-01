@@ -405,9 +405,7 @@ func (c *Config) With(opts ...Option) *Config {
 func ipv6OnlyDialer(ctx context.Context, addr string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		// addr has no port – treat the whole string as the host.
-		host = addr
-		port = ""
+		return nil, fmt.Errorf("ydb: OnlyIPv6 dialer could not parse address %q: %w", addr, err)
 	}
 
 	if ip := net.ParseIP(host); ip != nil {
@@ -422,7 +420,7 @@ func ipv6OnlyDialer(ctx context.Context, addr string) (net.Conn, error) {
 	// FQDN: resolve via DNS and pick the first IPv6 result.
 	ips, err := net.DefaultResolver.LookupHost(ctx, host)
 	if err != nil {
-		return nil, fmt.Errorf("ydb: DNS lookup for %q failed: %w", host, err)
+		return nil, fmt.Errorf("ydb: OnlyIPv6 DNS lookup for %q failed: %w", host, err)
 	}
 
 	for _, resolved := range ips {
