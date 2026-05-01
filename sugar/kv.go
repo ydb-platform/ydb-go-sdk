@@ -292,7 +292,7 @@ func (c *kvClient) Get(ctx context.Context, key string) ([]byte, error) {
 	var (
 		v   []byte
 		exp *time.Time
-		now = time.Now()
+		now = time.Now().UTC()
 	)
 	if err := row.ScanNamed(
 		query.Named(c.config.cols.Value, &v),
