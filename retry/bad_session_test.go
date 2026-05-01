@@ -45,9 +45,9 @@ func (c *badSessionConn) QueryContext(_ context.Context, _ string, _ []driver.Na
 }
 
 // IsValid returns false, simulating a session that has been invalidated by a
-// BAD_SESSION error from the server.  database/sql calls this before caching
-// the connection; returning false causes the connection to be discarded rather
-// than returned to the pool.
+// BAD_SESSION error from the server.  database/sql calls this when retrieving a
+// connection from the pool and before returning it; returning false causes the
+// connection to be discarded rather than returned to the pool.
 func (c *badSessionConn) IsValid() bool { return false }
 
 // badSessionConnector creates badSessionConn instances and counts how many
@@ -77,7 +77,7 @@ func (bc *badSessionConnector) Driver() driver.Driver { return bc }
 // database/sql had no way to detect that the session was dead and continued
 // returning the same connection from its pool on every retry.
 //
-// Implementing driver.Validator on xsql.Conn so that returning false from
+// Implemented driver.Validator on xsql.Conn so that returning false from
 // IsValid() causes database/sql to discard the connection instead of pooling it.
 //
 // This test verifies the behavior at the database/sql level using a mock
