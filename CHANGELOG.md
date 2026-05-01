@@ -1,4 +1,4 @@
-* Implemented `driver.Validator` on `*sql.Conn` so that `database/sql` discards invalidated sessions before reusing connections from its pool
+* Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
 * Fixed `query.Session.Begin` to return `BAD_SESSION` immediately for dead lazy-tx sessions instead of silently creating a transaction that would fail on the next server call
 * Fixed `Rollback` to signal `driver.ErrBadConn` to `database/sql` when the session is no longer alive after a rollback, ensuring the dead connection is discarded
 
