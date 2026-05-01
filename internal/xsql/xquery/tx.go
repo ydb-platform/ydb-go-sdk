@@ -115,7 +115,7 @@ func (t *transaction) Rollback(ctx context.Context) (finalErr error) {
 	}
 
 	if !t.conn.IsValid() {
-		return badconn.New("session is not alive after rollback")
+		return badconn.New("session is not valid for reuse after rollback")
 	}
 
 	return nil
