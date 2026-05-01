@@ -22,6 +22,9 @@ const (
 	IPv4 IPType = 1 << iota
 	// IPv6 allows IPv6 addresses.
 	IPv6
+
+	// AllIPTypes is the default mask permitting both IPv4 and IPv6 addresses.
+	AllIPTypes = IPv4 | IPv6
 )
 
 // Filter returns an address-filter function that accepts resolved IP:port
@@ -31,10 +34,9 @@ const (
 // are permitted (no filtering needed).
 func (t IPType) Filter() func(addr string) bool {
 	// No filter needed: zero mask or both families permitted.
-	if t == 0 || t == IPv4|IPv6 {
+	if t == 0 || t == AllIPTypes {
 		return nil
 	}
-
 	return func(addr string) bool {
 		host, _, err := net.SplitHostPort(addr)
 		if err != nil {

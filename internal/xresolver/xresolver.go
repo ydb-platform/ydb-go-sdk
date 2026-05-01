@@ -37,7 +37,7 @@ func (c *clientConn) Endpoint() string {
 
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	if c.addressFilter != nil {
-		filtered := state.Addresses[:0:0]
+		filtered := make([]resolver.Address, 0, len(state.Addresses))
 		for _, addr := range state.Addresses {
 			if c.addressFilter(addr.Addr) {
 				filtered = append(filtered, addr)

@@ -73,7 +73,7 @@ func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns
 }
 
 func TestWithTypeIP(t *testing.T) {
-	t.Run("DefaultIsRandomChoice", func(t *testing.T) {
+	t.Run("SetsIPTypeOnConfig", func(t *testing.T) {
 		cfg := WithTypeIP(IPv6)
 		require.NotNil(t, cfg)
 		require.Equal(t, IPv6, cfg.AllowedIPTypes)
@@ -84,9 +84,11 @@ func TestWithTypeIP(t *testing.T) {
 		var noMask IPType
 		require.Nil(t, noMask.Filter())
 
-		// Both families – no filtering needed.
-		bothFamilies := IPv4 | IPv6
-		require.Nil(t, bothFamilies.Filter())
+		// AllIPTypes – no filtering needed.
+		require.Nil(t, AllIPTypes.Filter())
+
+		// Explicit both families – same as AllIPTypes.
+		require.Nil(t, (IPv4 | IPv6).Filter())
 	})
 
 	t.Run("FilterIPv6Only", func(t *testing.T) {

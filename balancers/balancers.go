@@ -11,7 +11,10 @@ import (
 )
 
 // IPType is a bit-mask that controls which IP address families are permitted
-// when the gRPC DNS resolver resolves a cluster endpoint FQDN.
+// when the gRPC resolver forwards resolved addresses to the connection manager.
+//
+// The filter is applied to all resolved addresses, whether they came from DNS
+// resolution of a FQDN or were literal IP addresses in the discovery response.
 //
 // The constants can be combined with the bitwise OR operator:
 //
@@ -25,6 +28,8 @@ const (
 	IPv4 = balancerConfig.IPv4
 	// IPv6 allows IPv6 resolved addresses when dialling cluster endpoints.
 	IPv6 = balancerConfig.IPv6
+	// AllIPTypes allows both IPv4 and IPv6 addresses (the default).
+	AllIPTypes = balancerConfig.AllIPTypes
 )
 
 // Deprecated: RoundRobin is an alias to RandomChoice now
