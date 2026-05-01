@@ -1,3 +1,6 @@
+* Removed intermediate `bytes.Buffer` allocation in topic message decoding: `MultiDecoder.Decode` now returns a streaming reader that releases the underlying decoder back to the pool on EOF/Close, instead of buffering the whole decoded payload into memory before returning.
+* Fixed `CodecRaw` decoder pooling resettable inputs: when a caller passed an `io.Reader` that happened to implement `PublicResettableReader`, the raw codec previously stored it in its decoder pool and `Reset()` it on subsequent reads, hijacking caller-owned reader state. The raw codec no longer maintains a pool.
+
 ## v3.135.7
 * Fixed `transport/ResourceExhausted` errors with description "trying to send message larger than max" or "received message larger than max" to be treated as non-retryable, so callers get an immediate error instead of repeated retries that cannot succeed
 
