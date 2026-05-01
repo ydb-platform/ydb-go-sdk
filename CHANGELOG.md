@@ -1,3 +1,4 @@
+## v3.135.8
 * Fixed a race condition in the session pool where canceling a caller's context while a creation goroutine was still running could allow the pool to exceed its size limit
 
 ## v3.135.7
