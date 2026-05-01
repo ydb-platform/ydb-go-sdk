@@ -42,6 +42,10 @@ func (m *mockConfig) GrpcDialOptions() []grpc.DialOption {
 	return m.grpcDialOpts
 }
 
+func (m *mockConfig) AddressFilter() func(addr string) bool {
+	return nil
+}
+
 func TestPool_Get(t *testing.T) {
 	t.Run("GetSameConnectionTwice", func(t *testing.T) {
 		ctx := context.Background()

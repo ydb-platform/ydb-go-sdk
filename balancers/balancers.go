@@ -10,6 +10,23 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
+// IPType is a bit-mask that controls which IP address families are permitted
+// when the gRPC DNS resolver resolves a cluster endpoint FQDN.
+//
+// The constants can be combined with the bitwise OR operator:
+//
+//	balancers.WithTypeIP(balancers.IPv4 | balancers.IPv6) // both families (default)
+//	balancers.WithTypeIP(balancers.IPv6)                  // IPv6 only
+//	balancers.WithTypeIP(balancers.IPv4)                  // IPv4 only
+type IPType = balancerConfig.IPType
+
+const (
+	// IPv4 allows IPv4 resolved addresses when dialling cluster endpoints.
+	IPv4 = balancerConfig.IPv4
+	// IPv6 allows IPv6 resolved addresses when dialling cluster endpoints.
+	IPv6 = balancerConfig.IPv6
+)
+
 // Deprecated: RoundRobin is an alias to RandomChoice now
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
@@ -170,6 +187,30 @@ func PreferWithFallback(balancer *balancerConfig.Config, filter func(endpoint En
 	balancer.AllowFallback = true
 
 	return balancer
+}
+
+// WithTypeIP configures the SDK to use only IP addresses of the allowed families
+// when establishing connections to cluster endpoints.
+//
+// The filter is applied at the gRPC resolver level: after DNS resolution of a
+// cluster endpoint FQDN, only the resolved addresses whose IP family matches
+// the mask are passed to the gRPC connection balancer. All matching addresses
+// are kept, preserving the round-robin connection behaviour.
+//
+// Example – IPv6-only (useful in environments where outbound IPv4 is blocked):
+//
+//	ydb.Open(ctx, dsn, ydb.WithBalancer(balancers.WithTypeIP(balancers.IPv6)))
+//
+// The returned *balancerConfig.Config uses RandomChoice as its base balancing
+// algorithm. Wrap it with other balancer functions if a different algorithm
+// is needed:
+//
+//	ydb.WithBalancer(balancers.PreferNearestDC(balancers.WithTypeIP(balancers.IPv6)))
+func WithTypeIP(t IPType) *balancerConfig.Config {
+	c := RandomChoice()
+	c.AllowedIPTypes = t
+
+	return c
 }
 
 // Default balancer used by default

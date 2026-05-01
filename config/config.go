@@ -1,11 +1,8 @@
 package config
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
-	"net"
 	"time"
 
 	"google.golang.org/grpc"
@@ -39,8 +36,6 @@ type Config struct {
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
 	disableOptimisticUnban           bool
-
-	onlyIPv6 bool
 }
 
 func (c *Config) Credentials() credentials.Credentials {
@@ -56,25 +51,24 @@ func (c *Config) DisableOptimisticUnban() bool {
 	return c.disableOptimisticUnban
 }
 
-// OnlyIPv6 reports whether only IPv6 connections must be used.
-// When true, a custom gRPC context dialer is injected (via WithContextDialer)
-// that drops any attempt to connect to an IPv4 address and, for FQDN targets,
-// resolves DNS and selects only IPv6 results.
-func (c *Config) OnlyIPv6() bool {
-	return c.onlyIPv6
+// AddressFilter returns an optional filter function that is applied by the
+// gRPC resolver to every resolved IP:port address before it is forwarded to
+// the connection manager.  Addresses for which the function returns false are
+// dropped.  Returns nil when no filtering is configured.
+func (c *Config) AddressFilter() func(addr string) bool {
+	if c.balancerConfig == nil {
+		return nil
+	}
+
+	return c.balancerConfig.AllowedIPTypes.Filter()
 }
 
 // GrpcDialOptions reports about used grpc dialing options
 func (c *Config) GrpcDialOptions() []grpc.DialOption {
-	opts := append(
+	return append(
 		defaultGrpcOptions(c.secure, c.tlsConfig),
 		c.grpcOptions...,
 	)
-	if c.onlyIPv6 {
-		opts = append(opts, grpc.WithContextDialer(ipv6OnlyDialer))
-	}
-
-	return opts
 }
 
 // GrpcMaxMessageSize return client settings for max grpc message size
@@ -352,18 +346,6 @@ func WithDisableOptimisticUnban() Option {
 	}
 }
 
-// WithOnlyIPv6 sets a flag that instructs gRPC to connect over IPv6 only.
-// A custom ContextDialer is injected into the gRPC dial options so that:
-//   - direct IPv4 address targets are rejected;
-//   - for FQDN targets, DNS is resolved and only IPv6 results are used.
-//
-// This option is used internally by ydb.WithOnlyIPv6.
-func WithOnlyIPv6() Option {
-	return func(c *Config) {
-		c.onlyIPv6 = true
-	}
-}
-
 func New(opts ...Option) *Config {
 	c := defaultConfig()
 
@@ -393,46 +375,4 @@ func (c *Config) With(opts ...Option) *Config {
 	)
 
 	return c
-}
-
-// ipv6OnlyDialer is a gRPC ContextDialer that refuses IPv4 connections.
-//
-// When gRPC dials an endpoint the target address passed to this function may be:
-//   - an IPv4 literal  ("1.2.3.4:2135")    → rejected with an error;
-//   - an IPv6 literal  ("[::1]:2135")       → dialled directly over tcp6;
-//   - an FQDN          ("host.example:2135") → DNS is resolved and only the
-//     first IPv6 result is used; if there are none an error is returned.
-func ipv6OnlyDialer(ctx context.Context, addr string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return nil, fmt.Errorf("ydb: OnlyIPv6 dialer could not parse address %q: %w", addr, err)
-	}
-
-	if ip := net.ParseIP(host); ip != nil {
-		// The address is already a resolved IP literal.
-		if ip.To4() != nil {
-			return nil, fmt.Errorf("ydb: OnlyIPv6 option is set but got IPv4 address %q", addr)
-		}
-		// IPv6 literal – dial directly.
-		return (&net.Dialer{}).DialContext(ctx, "tcp6", addr)
-	}
-
-	// FQDN: resolve via DNS and pick the first IPv6 result.
-	ips, err := net.DefaultResolver.LookupHost(ctx, host)
-	if err != nil {
-		return nil, fmt.Errorf("ydb: OnlyIPv6 DNS lookup for %q failed: %w", host, err)
-	}
-
-	for _, resolved := range ips {
-		ip := net.ParseIP(resolved)
-		if ip == nil || ip.To4() != nil {
-			// skip non-parseable or IPv4 results
-			continue
-		}
-		target := net.JoinHostPort(resolved, port)
-
-		return (&net.Dialer{}).DialContext(ctx, "tcp6", target)
-	}
-
-	return nil, fmt.Errorf("ydb: OnlyIPv6 option is set but no IPv6 address found for %q", host)
 }

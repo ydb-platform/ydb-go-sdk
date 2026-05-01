@@ -71,3 +71,49 @@ func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns
 
 	return res
 }
+
+func TestWithTypeIP(t *testing.T) {
+	t.Run("DefaultIsRandomChoice", func(t *testing.T) {
+		cfg := WithTypeIP(IPv6)
+		require.NotNil(t, cfg)
+		require.Equal(t, IPv6, cfg.AllowedIPTypes)
+	})
+
+	t.Run("FilterNilWhenNoRestriction", func(t *testing.T) {
+		// Zero mask – no filtering.
+		var noMask IPType
+		require.Nil(t, noMask.Filter())
+
+		// Both families – no filtering needed.
+		bothFamilies := IPv4 | IPv6
+		require.Nil(t, bothFamilies.Filter())
+	})
+
+	t.Run("FilterIPv6Only", func(t *testing.T) {
+		filter := IPv6.Filter()
+		require.NotNil(t, filter)
+
+		// IPv4 literals must be rejected.
+		require.False(t, filter("1.2.3.4:2135"))
+		require.False(t, filter("10.0.0.1:2135"))
+
+		// IPv6 literals must be accepted.
+		require.True(t, filter("[::1]:2135"))
+		require.True(t, filter("[2001:db8::1]:2135"))
+
+		// Malformed / non-IP (should pass through).
+		require.True(t, filter("not-an-ip:2135"))
+	})
+
+	t.Run("FilterIPv4Only", func(t *testing.T) {
+		filter := IPv4.Filter()
+		require.NotNil(t, filter)
+
+		// IPv4 literals must be accepted.
+		require.True(t, filter("1.2.3.4:2135"))
+
+		// IPv6 literals must be rejected.
+		require.False(t, filter("[::1]:2135"))
+		require.False(t, filter("[2001:db8::1]:2135"))
+	})
+}

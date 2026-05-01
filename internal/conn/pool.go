@@ -229,7 +229,7 @@ func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 						}
 					}
 				},
-			})),
+			}), config.AddressFilter()),
 		),
 	)
 

@@ -415,41 +415,6 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
-// WithOnlyIPv6 instructs the driver to use only IPv6 when connecting to YDB cluster
-// endpoints.
-//
-// This is useful when a client runs in an environment that can only reach the YDB
-// cluster over IPv6 (for example, a serverless database where outbound IPv4 is
-// blocked by a firewall). Without this option, the driver may repeatedly attempt
-// IPv4 connections that are destined to fail, flooding logs with connection errors.
-//
-// The option applies filtering at two levels:
-//
-//  1. Discovery (ListEndpoints) level: endpoints whose record provides only IPv4
-//     resolved addresses are dropped; for endpoints that provide both IPv4 and
-//     IPv6 addresses only the IPv6 set is kept.  Endpoints that carry no resolved
-//     addresses at all (FQDN-only records) are left unchanged at this level.
-//
-//  2. gRPC dialer level: a custom ContextDialer is injected so that whenever
-//     gRPC establishes a TCP connection:
-//   - IPv4 literal targets are rejected outright;
-//   - FQDN targets are DNS-resolved and only the first IPv6 result is used
-//     (if none is found the dial attempt returns an error).
-//
-// The logic is strict IPv6-only with no IPv4 fallback. If no IPv6-reachable
-// node can be found after filtering, connection cannot be established.
-//
-// The initial discovery endpoint (from the DSN) is covered by the dialer-level
-// filter as well, so it too must be resolvable to an IPv6 address.
-func WithOnlyIPv6() Option {
-	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithOnlyIPv6())
-		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithOnlyIPv6())
-
-		return nil
-	}
-}
-
 // WithRetryBudget sets retry budget for all calls of all retryers.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
