@@ -80,23 +80,12 @@ func Discover(
 }
 
 // convertEndpoint converts a protobuf endpoint record to an endpoint.Endpoint.
-// It returns ok=false if the record must be skipped (wrong SSL mode or filtered
-// out by Config.OnlyIPv6).
+// It returns ok=false if the record must be skipped (wrong SSL mode).
 func convertEndpoint(
 	e *Ydb_Discovery.EndpointInfo, location string, config *config.Config,
 ) (endpoint.Endpoint, bool) {
 	if e.GetSsl() != config.Secure() {
 		return nil, false
-	}
-	ipv4, ipv6 := e.GetIpV4(), e.GetIpV6()
-	if config.OnlyIPv6() {
-		// When OnlyIPv6 is set, drop endpoints that can be reached only over IPv4.
-		// An endpoint with no resolved IPs at all is kept: its FQDN is resolved at
-		// dial time by gRPC and is outside the SDK's control.
-		if len(ipv6) == 0 && len(ipv4) > 0 {
-			return nil, false
-		}
-		ipv4 = nil
 	}
 
 	return endpoint.New(
@@ -110,8 +99,8 @@ func convertEndpoint(
 		endpoint.WithLocalDC(e.GetLocation() == location),
 		endpoint.WithServices(e.GetService()),
 		endpoint.WithLastUpdated(config.Clock().Now()),
-		endpoint.WithIPV4(ipv4),
-		endpoint.WithIPV6(ipv6),
+		endpoint.WithIPV4(e.GetIpV4()),
+		endpoint.WithIPV6(e.GetIpV6()),
 		endpoint.WithSslTargetNameOverride(e.GetSslTargetNameOverride()),
 	), true
 }

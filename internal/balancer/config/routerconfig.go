@@ -14,7 +14,7 @@ import (
 // when the gRPC resolver resolves a FQDN target.
 //
 // Zero value (no bits set) means no filtering – both IPv4 and IPv6 addresses
-// are used, which is the default SDK behaviour.
+// are used, which is the default SDK behavior.
 type IPType uint8
 
 const (
@@ -37,6 +37,7 @@ func (t IPType) Filter() func(addr string) bool {
 	if t == 0 || t == AllIPTypes {
 		return nil
 	}
+
 	return func(addr string) bool {
 		host, _, err := net.SplitHostPort(addr)
 		if err != nil {

@@ -36,16 +36,6 @@ func (c *clientConn) Endpoint() string {
 }
 
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
-	if c.addressFilter != nil {
-		filtered := make([]resolver.Address, 0, len(state.Addresses))
-		for _, addr := range state.Addresses {
-			if c.addressFilter(addr.Addr) {
-				filtered = append(filtered, addr)
-			}
-		}
-		state.Addresses = filtered
-	}
-
 	onDone := trace.DriverOnResolve(c.trace,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver.(*clientConn).UpdateState"),
 		c.Endpoint(), func() (addrs []string) {
@@ -56,8 +46,23 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 			return
 		}(),
 	)
+
+	if c.addressFilter != nil {
+		filtered := make([]resolver.Address, 0, len(state.Addresses))
+		for _, addr := range state.Addresses {
+			if c.addressFilter(addr.Addr) {
+				filtered = append(filtered, addr)
+			}
+		}
+		state.Addresses = filtered
+	}
+
 	defer func() {
-		onDone(err)
+		filtered := make([]string, 0, len(state.Addresses))
+		for i := range state.Addresses {
+			filtered = append(filtered, state.Addresses[i].Addr)
+		}
+		onDone(filtered, err)
 	}()
 
 	err = c.ClientConn.UpdateState(state)
@@ -90,7 +95,7 @@ func (d *dnsBuilder) Scheme() string {
 // If addressFilter is non-nil, it is called for every resolved address before
 // the address list is forwarded to the gRPC connection manager. Addresses for
 // which addressFilter returns false are dropped. All addresses that pass the
-// filter are kept, so connection round-robin behaviour is preserved.
+// filter are kept, so connection round-robin behavior is preserved.
 func New(scheme string, trace *trace.Driver, addressFilter func(addr string) bool) resolver.Builder {
 	return &dnsBuilder{
 		Builder:       resolver.Get("dns"),

@@ -12,6 +12,7 @@ import (
 // fakeCC records the last state passed to UpdateState.
 type fakeCC struct {
 	resolver.ClientConn
+
 	lastState resolver.State
 }
 

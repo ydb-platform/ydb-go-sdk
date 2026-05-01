@@ -24,9 +24,9 @@ import (
 type IPType = balancerConfig.IPType
 
 const (
-	// IPv4 allows IPv4 resolved addresses when dialling cluster endpoints.
+	// IPv4 allows IPv4 resolved addresses when dialing cluster endpoints.
 	IPv4 = balancerConfig.IPv4
-	// IPv6 allows IPv6 resolved addresses when dialling cluster endpoints.
+	// IPv6 allows IPv6 resolved addresses when dialing cluster endpoints.
 	IPv6 = balancerConfig.IPv6
 	// AllIPTypes allows both IPv4 and IPv6 addresses (the default).
 	AllIPTypes = balancerConfig.AllIPTypes
@@ -200,7 +200,7 @@ func PreferWithFallback(balancer *balancerConfig.Config, filter func(endpoint En
 // The filter is applied at the gRPC resolver level: after DNS resolution of a
 // cluster endpoint FQDN, only the resolved addresses whose IP family matches
 // the mask are passed to the gRPC connection balancer. All matching addresses
-// are kept, preserving the round-robin connection behaviour.
+// are kept, preserving the round-robin connection behavior.
 //
 // Example – IPv6-only (useful in environments where outbound IPv4 is blocked):
 //
