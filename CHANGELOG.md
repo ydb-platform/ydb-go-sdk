@@ -1,3 +1,5 @@
+* Fixed repeated `BAD_SESSION` errors on the server side when using `database/sql` over query-service: `*sql.Conn` now implements `driver.Validator` so `database/sql` discards invalidated sessions before reusing a connection from its pool; `Session.Begin` now returns `BAD_SESSION` immediately for dead lazy-tx sessions instead of silently proceeding; and `Rollback` now signals a bad connection to `database/sql` when the session is no longer alive after a rollback
+
 ## v3.135.7
 * Fixed `transport/ResourceExhausted` errors with description "trying to send message larger than max" or "received message larger than max" to be treated as non-retryable, so callers get an immediate error instead of repeated retries that cannot succeed
 

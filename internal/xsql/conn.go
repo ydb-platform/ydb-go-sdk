@@ -102,6 +102,13 @@ func (c *Conn) Close() (finalErr error) {
 	return nil
 }
 
+// IsValid implements driver.Validator interface.
+// database/sql calls IsValid before reusing a connection from the pool.
+// If IsValid returns false, the connection is discarded and a new one is requested.
+func (c *Conn) IsValid() bool {
+	return c.cc.IsValid()
+}
+
 func (c *Conn) Begin() (_ driver.Tx, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnBegin(c.connector.trace, &c.ctx,
 		stack.FunctionID("database/sql.(*Conn).Begin", stack.Package("database/sql")),

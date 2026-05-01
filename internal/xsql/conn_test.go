@@ -50,6 +50,28 @@ func TestConn_CheckNamedValue(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestConn_IsValid(t *testing.T) {
+	t.Run("ValidConn", func(t *testing.T) {
+		conn := &Conn{
+			cc: &mockCommonConn{},
+		}
+		require.True(t, conn.IsValid())
+	})
+
+	t.Run("InvalidConn", func(t *testing.T) {
+		conn := &Conn{
+			cc: &mockInvalidConn{},
+		}
+		require.False(t, conn.IsValid())
+	})
+
+	t.Run("ImplementsDriverValidator", func(t *testing.T) {
+		// Verify that *Conn implements driver.Validator so that database/sql
+		// discards invalid connections before reusing them from the pool.
+		var _ driver.Validator = &Conn{}
+	})
+}
+
 func TestConn_Prepare(t *testing.T) {
 	conn := &Conn{}
 	stmt, err := conn.Prepare("SELECT 1")
