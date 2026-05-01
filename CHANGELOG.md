@@ -1,5 +1,8 @@
 * Added `balancers.WithTypeIP(t balancers.IPType)` option (with `balancers.IPv4` and `balancers.IPv6` bit-flag constants) to restrict the IP address families used when connecting to YDB cluster endpoints; the filter is applied at the gRPC resolver level so all matching resolved addresses are preserved, keeping round-robin balancing intact; use `ydb.WithBalancer(balancers.WithTypeIP(balancers.IPv6))` in environments where outbound IPv4 is blocked
 
+## v3.135.8
+* Fixed a race condition in the session pool where canceling a caller's context while a creation goroutine was still running could allow the pool to exceed its size limit
+
 ## v3.135.7
 * Fixed `transport/ResourceExhausted` errors with description "trying to send message larger than max" or "received message larger than max" to be treated as non-retryable, so callers get an immediate error instead of repeated retries that cannot succeed
 

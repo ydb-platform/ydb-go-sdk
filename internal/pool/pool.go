@@ -218,12 +218,11 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 		}) {
 			return nil, xerrors.WithStackTrace(errPoolIsOverflow)
 		}
-		defer func() {
-			p.mu.WithLock(func() {
-				p.createInProgress--
-			})
-		}()
-
+		// NOTE: createInProgress is decremented by the goroutine below,
+		// not by a defer on the outer function. This keeps the slot reserved
+		// until the item is actually added to the index (or creation fails),
+		// preventing pool overflow when the caller's context is canceled while
+		// the creation goroutine is still running.
 		var (
 			ch = make(chan struct {
 				item PT
@@ -236,6 +235,18 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 
 		go func() {
 			defer close(ch)
+
+			// decrementDone tracks whether createInProgress has already been
+			// decremented (atomically with adding the item to the index).
+			// If item creation fails (nil item), the defer below handles it.
+			decrementDone := false
+			defer func() {
+				if !decrementDone {
+					p.mu.WithLock(func() {
+						p.createInProgress--
+					})
+				}
+			}()
 
 			createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
 			defer cancelCreate()
@@ -257,6 +268,10 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 						lastUsage:  now,
 						useCounter: &useCounter,
 					}
+					// Decrement atomically with adding the item to the index so
+					// the slot is never visible as free while the item is in flight.
+					p.createInProgress--
+					decrementDone = true
 				})
 			}
 
