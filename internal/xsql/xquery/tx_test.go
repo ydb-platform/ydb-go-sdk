@@ -20,12 +20,18 @@ type txFakeCore struct {
 	done   chan struct{}
 }
 
-func (f *txFakeCore) NodeID() uint32                   { return 0 }
-func (f *txFakeCore) ID() string                       { return f.id }
-func (f *txFakeCore) Status() string                   { return f.status.String() }
-func (f *txFakeCore) Close(_ context.Context) error    { return nil }
-func (f *txFakeCore) IsAlive() bool                    { return internalQuery.IsAlive(f.status) }
-func (f *txFakeCore) Done() <-chan struct{}            { return f.done }
+func (f *txFakeCore) NodeID() uint32 { return 0 }
+
+func (f *txFakeCore) ID() string { return f.id }
+
+func (f *txFakeCore) Status() string { return f.status.String() }
+
+func (f *txFakeCore) Close(_ context.Context) error { return nil }
+
+func (f *txFakeCore) IsAlive() bool { return internalQuery.IsAlive(f.status) }
+
+func (f *txFakeCore) Done() <-chan struct{} { return f.done }
+
 func (f *txFakeCore) SetStatus(s internalQuery.Status) { f.status = s }
 
 // txFakeRollbackNil implements query.Transaction with Rollback returning nil.
@@ -36,25 +42,25 @@ type txFakeRollbackNil struct {
 }
 
 func (f *txFakeRollbackNil) Exec(_ context.Context, _ string, _ ...query.ExecuteOption) error {
-	panic("not implemented in test")
+	panic("txFakeRollbackNil.Exec not implemented in test")
 }
 
 func (f *txFakeRollbackNil) Query(_ context.Context, _ string, _ ...query.ExecuteOption) (query.Result, error) {
-	panic("not implemented in test")
+	panic("txFakeRollbackNil.Query not implemented in test")
 }
 
 func (f *txFakeRollbackNil) QueryResultSet(
 	_ context.Context, _ string, _ ...query.ExecuteOption,
 ) (query.ClosableResultSet, error) {
-	panic("not implemented in test")
+	panic("txFakeRollbackNil.QueryResultSet not implemented in test")
 }
 
 func (f *txFakeRollbackNil) QueryRow(_ context.Context, _ string, _ ...query.ExecuteOption) (query.Row, error) {
-	panic("not implemented in test")
+	panic("txFakeRollbackNil.QueryRow not implemented in test")
 }
 
 func (f *txFakeRollbackNil) CommitTx(_ context.Context) error {
-	panic("not implemented in test")
+	panic("txFakeRollbackNil.CommitTx not implemented in test")
 }
 
 func (f *txFakeRollbackNil) Rollback(_ context.Context) error {
