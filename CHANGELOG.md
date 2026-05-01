@@ -1,4 +1,4 @@
-* Added `ydb.WithOnlyIPv6()` option to filter out endpoints that can be reached only over IPv4, useful in environments where outbound IPv4 traffic is blocked by a firewall
+* Added `ydb.WithOnlyIPv6()` option to force IPv6-only connections: filters IPv4-only endpoints from discovery responses and injects a custom gRPC dialer that rejects IPv4 literals and resolves FQDNs to IPv6-only addresses, covering environments where the YDB cluster exposes only FQDNs
 
 ## v3.135.7
 * Fixed `transport/ResourceExhausted` errors with description "trying to send message larger than max" or "received message larger than max" to be treated as non-retryable, so callers get an immediate error instead of repeated retries that cannot succeed

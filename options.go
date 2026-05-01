@@ -415,32 +415,35 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
-// WithOnlyIPv6 instructs the driver to use only IPv6-reachable endpoints returned
-// by the cluster discovery.
+// WithOnlyIPv6 instructs the driver to use only IPv6 when connecting to YDB cluster
+// endpoints.
 //
 // This is useful when a client runs in an environment that can only reach the YDB
 // cluster over IPv6 (for example, a serverless database where outbound IPv4 is
-// blocked by a firewall) while the discovery response contains both IPv4 and IPv6
-// resolved addresses. By default the driver prefers IPv4 when it is present in
-// the discovery response, which leads to repeated connection failures in such
-// environments.
+// blocked by a firewall). Without this option, the driver may repeatedly attempt
+// IPv4 connections that are destined to fail, flooding logs with connection errors.
 //
-// When the option is active:
-//   - endpoints whose discovery record provides only IPv4 resolved addresses are
-//     dropped;
-//   - for endpoints with both IPv4 and IPv6 resolved addresses only IPv6 is kept,
-//     so the gRPC dial target resolves to an IPv6 literal;
-//   - endpoints with only IPv6 or with no resolved addresses (FQDN-only) are
-//     kept unchanged.
+// The option applies filtering at two levels:
 //
-// The logic is strict IPv6-only: if discovery does not provide any
-// IPv6-reachable cluster node (all candidates are dropped as IPv4-only), the
-// connection cannot be established, and the driver will not fall back to IPv4.
+//  1. Discovery (ListEndpoints) level: endpoints whose record provides only IPv4
+//     resolved addresses are dropped; for endpoints that provide both IPv4 and
+//     IPv6 addresses only the IPv6 set is kept.  Endpoints that carry no resolved
+//     addresses at all (FQDN-only records) are left unchanged at this level.
 //
-// The initial discovery endpoint (the one from the DSN) is not affected: its
-// address resolution is handled by the OS / gRPC resolver.
+//  2. gRPC dialer level: a custom ContextDialer is injected so that whenever
+//     gRPC establishes a TCP connection:
+//   - IPv4 literal targets are rejected outright;
+//   - FQDN targets are DNS-resolved and only the first IPv6 result is used
+//     (if none is found the dial attempt returns an error).
+//
+// The logic is strict IPv6-only with no IPv4 fallback. If no IPv6-reachable
+// node can be found after filtering, connection cannot be established.
+//
+// The initial discovery endpoint (from the DSN) is covered by the dialer-level
+// filter as well, so it too must be resolvable to an IPv6 address.
 func WithOnlyIPv6() Option {
 	return func(ctx context.Context, d *Driver) error {
+		d.options = append(d.options, config.WithOnlyIPv6())
 		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithOnlyIPv6())
 
 		return nil
