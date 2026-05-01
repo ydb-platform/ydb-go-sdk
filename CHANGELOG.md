@@ -1,5 +1,8 @@
 * Added helper `sugar.NewKV(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 
+## v3.135.7
+* Fixed `transport/ResourceExhausted` errors with description "trying to send message larger than max" or "received message larger than max" to be treated as non-retryable, so callers get an immediate error instead of repeated retries that cannot succeed
+
 ## v3.135.6
 * Added logging for YQL compiler warnings returned via `trace.DriverConnInvokeDoneInfo.Issues` so they become visible in SDK logs (including when `trace.DetailsAll` is enabled), instead of being silently dropped.
 
