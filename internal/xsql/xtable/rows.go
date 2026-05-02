@@ -10,7 +10,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -95,7 +94,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 	r.nextSet.Do(func() {})
 	err := r.result.NextResultSetErr(context.Background())
 	if err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -111,10 +110,10 @@ func (r *rows) Next(dst []driver.Value) error {
 		err = r.result.NextResultSetErr(context.Background())
 	})
 	if err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 	if err = r.result.Err(); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 	if !r.result.NextRow() {
 		return io.EOF
@@ -124,7 +123,7 @@ func (r *rows) Next(dst []driver.Value) error {
 		values[i] = &valuer{}
 	}
 	if err = r.result.Scan(values...); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 	for i := range values {
 		val, ok := values[i].(*valuer)
@@ -135,7 +134,7 @@ func (r *rows) Next(dst []driver.Value) error {
 		dst[i] = val.Value()
 	}
 	if err = r.result.Err(); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil

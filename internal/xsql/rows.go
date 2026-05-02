@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"io"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 )
 
 type singleRow struct {
@@ -48,4 +50,47 @@ func (r *singleRow) Next(dst []driver.Value) error {
 	r.readAll = true
 
 	return nil
+}
+
+// badconnRows wraps driver.RowsNextResultSet and applies badconn.Map to errors
+// returned by Next and NextResultSet so that session-invalidating errors
+// during row iteration are correctly signaled to database/sql.
+type badconnRows struct {
+	driver.RowsNextResultSet
+}
+
+func newBadconnRows(rows driver.RowsNextResultSet) driver.RowsNextResultSet {
+	if rows == nil {
+		return nil
+	}
+
+	return &badconnRows{RowsNextResultSet: rows}
+}
+
+func (r *badconnRows) Next(dst []driver.Value) error {
+	return badconn.Map(r.RowsNextResultSet.Next(dst))
+}
+
+func (r *badconnRows) NextResultSet() error {
+	return badconn.Map(r.RowsNextResultSet.NextResultSet())
+}
+
+// ColumnTypeDatabaseTypeName forwards to the underlying rows if it implements
+// driver.RowsColumnTypeDatabaseTypeName.
+func (r *badconnRows) ColumnTypeDatabaseTypeName(index int) string {
+	if v, ok := r.RowsNextResultSet.(driver.RowsColumnTypeDatabaseTypeName); ok {
+		return v.ColumnTypeDatabaseTypeName(index)
+	}
+
+	return ""
+}
+
+// ColumnTypeNullable forwards to the underlying rows if it implements
+// driver.RowsColumnTypeNullable.
+func (r *badconnRows) ColumnTypeNullable(index int) (nullable, ok bool) {
+	if v, ok := r.RowsNextResultSet.(driver.RowsColumnTypeNullable); ok {
+		return v.ColumnTypeNullable(index)
+	}
+
+	return false, false
 }

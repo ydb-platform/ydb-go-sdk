@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -48,7 +49,12 @@ func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return stmt.processor.Query(ctx, sql, params)
+	rows, err := stmt.processor.Query(ctx, sql, params)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	return newBadconnRows(rows), nil
 }
 
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
@@ -73,7 +79,12 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return stmt.processor.Exec(ctx, sql, params)
+	result, err := stmt.processor.Exec(ctx, sql, params)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+
+	return result, nil
 }
 
 func (stmt *Stmt) NumInput() int {

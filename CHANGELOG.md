@@ -1,4 +1,5 @@
 ## v3.135.9
+* Centralised `badconn.Map` error wrapping exclusively in the `internal/xsql` proxy layer (`Conn`, `Tx`, `Stmt`); removed duplicate wrapping from `internal/xsql/xtable` and `internal/xsql/xquery` to guarantee that every YDB session-invalidating error returned to `database/sql` passes `errors.Is(err, driver.ErrBadConn)`, preventing broken connections from being pooled and reused
 * Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
 * Fixed `query.Session.Begin` to return `BAD_SESSION` immediately for dead lazy-tx sessions instead of silently creating a transaction that would fail on the next server call
 * Fixed `Rollback` to signal `driver.ErrBadConn` to `database/sql` when the session is no longer alive after a rollback, ensuring the dead connection is discarded

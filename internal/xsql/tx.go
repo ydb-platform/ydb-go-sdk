@@ -48,7 +48,7 @@ func (tx *Tx) Commit() (finalErr error) {
 	}()
 
 	if err := tx.tx.Commit(tx.ctx); err != nil {
-		return xerrors.WithStackTrace(err)
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return nil
@@ -72,10 +72,10 @@ func (tx *Tx) Rollback() (finalErr error) {
 
 	err := tx.tx.Rollback(tx.ctx)
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
-	return err
+	return nil
 }
 
 func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
@@ -97,7 +97,7 @@ func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedV
 	if isExplain(ctx) {
 		ast, plan, err := tx.conn.cc.Explain(ctx, sql, params)
 		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 
 		return rowByAstPlan(ast, plan), nil
@@ -105,10 +105,10 @@ func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedV
 
 	rows, err := tx.tx.Query(ctx, sql, params)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 
-	return rows, nil
+	return newBadconnRows(rows), nil
 }
 
 func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
@@ -129,7 +129,7 @@ func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedVa
 
 	result, err := tx.tx.Exec(ctx, sql, params)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 
 	return result, nil
