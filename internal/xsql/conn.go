@@ -78,7 +78,7 @@ func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx,
 
 	tx, err := c.cc.BeginTx(ctx, opts)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	c.currentTx = &Tx{
@@ -100,7 +100,7 @@ func (c *Conn) Close() (finalErr error) {
 
 	err := c.cc.Close()
 	if err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	return nil
@@ -182,7 +182,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 	if isExplain(ctx) {
 		ast, plan, err := c.cc.Explain(ctx, sql, params)
 		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
+			return nil, xerrors.WithStackTrace(badconn.Map(err))
 		}
 
 		return rowByAstPlan(ast, plan), nil
@@ -191,7 +191,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 	if c.currentTx != nil {
 		rows, err := c.currentTx.tx.Query(ctx, sql, params)
 		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
+			return nil, xerrors.WithStackTrace(badconn.Map(err))
 		}
 
 		return newBadconnRows(rows), nil
@@ -227,7 +227,7 @@ func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 	if c.currentTx != nil {
 		result, err := c.currentTx.tx.Exec(ctx, sql, params)
 		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
+			return nil, xerrors.WithStackTrace(badconn.Map(err))
 		}
 
 		return result, nil

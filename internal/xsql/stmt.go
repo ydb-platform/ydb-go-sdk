@@ -51,7 +51,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 
 	rows, err := stmt.processor.Query(ctx, sql, params)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	return newBadconnRows(rows), nil
@@ -81,7 +81,7 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 
 	result, err := stmt.processor.Exec(ctx, sql, params)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	return result, nil
