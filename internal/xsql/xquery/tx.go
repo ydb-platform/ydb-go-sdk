@@ -114,5 +114,12 @@ func (t *transaction) Rollback(ctx context.Context) (finalErr error) {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
+	// Validate connection after rollback RPC - to avoid storing invalid connections in the
+	// database/SQL pool after this call. The symmetric commit method does not have this
+	// logic, as it needs to inform the upper code about successful commit.
+	if !t.conn.IsValid() {
+		return badconn.New("session is not valid for reuse after rollback")
+	}
+
 	return nil
 }
