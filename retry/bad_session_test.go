@@ -16,16 +16,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 )
 
-// badSessionConn simulates a query-service driver connection whose underlying
-// session has been invalidated (BAD_SESSION).  It implements driver.Validator
-// so database/sql can detect the dead session and discard it instead of
-// returning it to the connection pool.
 type (
+	// badSessionConn simulates a query-service driver connection whose underlying
+	// session has been invalidated (BAD_SESSION).
 	badSessionConn struct {
 		beginErr       error
 		beginTxCounter int
 		onBeginTx      func(beginTxCounter int)
 	}
+	// badSessionConnValidator implements driver.Validator
+	// so database/sql can detect the dead session and discard it instead of
+	// returning it to the connection pool.
 	badSessionConnValidator struct {
 		driver.Conn
 	}
