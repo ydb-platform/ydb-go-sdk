@@ -90,6 +90,5 @@ func TestTransactionRollbackReturnsErrBadConnWhenSessionInvalid(t *testing.T) {
 
 	err := tx.Rollback(ctx)
 	require.Error(t, err)
-	require.ErrorIs(t, err, driver.ErrBadConn,
-		"expected driver.ErrBadConn when session is invalid after a nil-error rollback, got: %v", err)
+	require.ErrorIs(t, err, driver.ErrBadConn)
 }

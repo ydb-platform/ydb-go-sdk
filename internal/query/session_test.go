@@ -41,8 +41,7 @@ func TestSessionBeginLazyTxDeadSession(t *testing.T) {
 	tx, err := s.Begin(lazyCtx, query.TxSettings(query.WithSerializableReadWrite()))
 	require.Error(t, err)
 	require.Nil(t, tx)
-	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION),
-		"expected BAD_SESSION operation error, got: %v", err)
+	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION))
 }
 
 func TestCreateSession(t *testing.T) {
