@@ -75,7 +75,7 @@ func (tx *Tx) Rollback() (finalErr error) {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 
-	return nil
+	return err
 }
 
 func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (

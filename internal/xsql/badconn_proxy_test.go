@@ -259,3 +259,37 @@ func TestStmtProxy_BadConnMapping(t *testing.T) {
 		})
 	}
 }
+
+// mockErrRows is a driver.RowsNextResultSet whose Next and NextResultSet always
+// return the given error.
+type mockErrRows struct {
+	err error
+}
+
+func (m *mockErrRows) Columns() []string           { return nil }
+func (m *mockErrRows) Close() error                { return nil }
+func (m *mockErrRows) HasNextResultSet() bool      { return false }
+func (m *mockErrRows) Next(_ []driver.Value) error { return m.err }
+func (m *mockErrRows) NextResultSet() error        { return m.err }
+
+// TestBadconnRows_BadConnMapping verifies that the badconnRows wrapper applies
+// badconn.Map to errors from Next and NextResultSet.
+func TestBadconnRows_BadConnMapping(t *testing.T) {
+	for _, ydbErr := range errYdbErrors {
+		wantBadConn := xerrors.MustDeleteTableOrQuerySession(ydbErr)
+		t.Run(ydbErr.Error(), func(t *testing.T) {
+			rows := newBadconnRows(&mockErrRows{err: ydbErr})
+
+			t.Run("Next", func(t *testing.T) {
+				err := rows.Next(nil)
+				require.Equal(t, wantBadConn, xerrors.Is(err, driver.ErrBadConn))
+			})
+
+			t.Run("NextResultSet", func(t *testing.T) {
+				rows := newBadconnRows(&mockErrRows{err: ydbErr})
+				err := rows.(interface{ NextResultSet() error }).NextResultSet()
+				require.Equal(t, wantBadConn, xerrors.Is(err, driver.ErrBadConn))
+			})
+		})
+	}
+}
