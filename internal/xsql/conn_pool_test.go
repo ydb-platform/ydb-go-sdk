@@ -188,12 +188,7 @@ func TestXsqlConnIsValidPreventsDeadSessionPoolReuse(t *testing.T) {
 			//
 			// If IsValid() were removed from xsql.Conn, database/sql would pool
 			// the same connection every time → connectCounter == 1 (regression).
-			assert.Equal(t, maxAttempts, bc.connectCounter,
-				"expected one new xsql.Conn per attempt (%d total); "+
-					"got %d — this likely means xsql.Conn.IsValid() is not signaling "+
-					"the dead session to database/sql, causing pool reuse",
-				maxAttempts, bc.connectCounter,
-			)
+			assert.Equal(t, maxAttempts, bc.connectCounter)
 			assert.Equal(t, maxAttempts, beginTxCounter)
 		})
 	}
