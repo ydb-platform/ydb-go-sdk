@@ -441,8 +441,12 @@ func (s *session) receiveLoop( //nolint:funlen
 
 			return
 		case *Ydb_Coordination.SessionResponse_SessionStarted_:
-			sessionStarted <- message.GetSessionStarted()
+			// Update the keep-alive timestamp BEFORE signaling mainLoop. If the update happened after
+			// the channel send, mainLoop could race into the keep-alive inner loop and see a zero
+			// lastGoodResponseTime, causing the keep-alive timer to fire immediately and triggering a
+			// spurious reconnect that would fail any non-idempotent operations in the queue.
 			s.updateLastGoodResponseTime()
+			sessionStarted <- message.GetSessionStarted()
 		case *Ydb_Coordination.SessionResponse_SessionStopped_:
 			sessionStopped <- message.GetSessionStopped()
 			s.cancel()
