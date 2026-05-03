@@ -25,6 +25,7 @@ type (
 	Server struct {
 		net  string
 		addr string
+		stop context.CancelFunc
 		srv  *redcon.Server
 		log  *slog.Logger
 	}
@@ -39,13 +40,15 @@ type (
 
 func NewServer(network, addr string, client kvClient) *Server {
 	log := slog.Default()
+	ctx, stop := context.WithCancel(context.Background())
 	h := func(conn redcon.Conn, cmd redcon.Command) {
-		handleCommand(context.Background(), log, client, conn, cmd)
+		handleCommand(ctx, log, client, conn, cmd)
 	}
 
 	return &Server{
 		net:  network,
 		addr: addr,
+		stop: stop,
 		log:  log,
 		srv: redcon.NewServerNetwork(network, addr, h,
 			func(conn redcon.Conn) bool {
@@ -72,6 +75,8 @@ func (s *Server) Start(ready chan error) error {
 
 // Stop closes the listener. The YDB [kvClientBuilder] is not closed.
 func (s *Server) Stop() error {
+	s.stop()
+
 	return s.srv.Close()
 }
 

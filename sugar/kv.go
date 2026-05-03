@@ -443,7 +443,6 @@ func (c *kvClient) Del(ctx context.Context, keys ...string) (int, error) {
 	)
 	rs, err := c.db.Query().QueryResultSet(ctx, q,
 		query.WithParameters(params),
-		query.WithIdempotent(),
 	)
 	if err != nil {
 		return 0, xerrors.WithStackTrace(fmt.Errorf("redis del: %w", err))
