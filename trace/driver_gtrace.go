@@ -1330,7 +1330,7 @@ func DriverOnPoolRelease(t *Driver, c *context.Context, call call) func(error) {
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnResolve(t *Driver, call call, target string, resolved []string) func([]string, error) {
+func DriverOnResolve(t *Driver, call call, target string, resolved []string) func(filtered []string, _ error) {
 	var p DriverResolveStartInfo
 	p.Call = call
 	p.Target = target
