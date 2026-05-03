@@ -3,6 +3,7 @@ package xsql
 import (
 	"context"
 	"database/sql/driver"
+	"io"
 	"testing"
 
 	"github.com/jonboulle/clockwork"
@@ -294,4 +295,14 @@ func TestRows_BadConnMapping(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestRows_IOEOFPreserved(t *testing.T) {
+	rows := newRows(&mockErrRows{err: io.EOF})
+	err := rows.Next(nil)
+	require.Equal(t, io.EOF, err)
+
+	rows = newRows(&mockErrRows{err: io.EOF})
+	err = rows.(interface{ NextResultSet() error }).NextResultSet()
+	require.Equal(t, io.EOF, err)
 }

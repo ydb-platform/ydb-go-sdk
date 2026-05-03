@@ -71,6 +71,9 @@ func newRows(rows common.Rows) driver.RowsNextResultSet {
 
 func (r *Rows) Next(dst []driver.Value) error {
 	if err := r.Rows.Next(dst); err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return io.EOF
+		}
 		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
@@ -79,6 +82,17 @@ func (r *Rows) Next(dst []driver.Value) error {
 
 func (r *Rows) NextResultSet() error {
 	if err := r.Rows.NextResultSet(); err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return io.EOF
+		}
+		return xerrors.WithStackTrace(badconn.Map(err))
+	}
+
+	return nil
+}
+
+func (r *Rows) Close() error {
+	if err := r.Rows.Close(); err != nil {
 		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
