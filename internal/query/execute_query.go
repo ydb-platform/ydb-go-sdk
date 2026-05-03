@@ -169,11 +169,16 @@ func execute(
 		// If context.Canceled is returned, executeCtx was cancelled before or
 		// during newResult's first Recv call. This happens in the race window
 		// between the ctx.Done() check above and newResult when the session dies
-		// or the parent context is cancelled. Wrap as retryable so the pool can
-		// retry with a fresh session (same semantics as the select check above).
+		// or the parent context is cancelled. Wrap the actual cancellation as
+		// retryable so the pool can retry with a fresh session (same semantics
+		// as the select check above).
 		if xerrors.Is(err, context.Canceled) {
+			cancelErr := executeCtx.Err()
+			if cancelErr == nil {
+				cancelErr = err
+			}
 			return nil, xerrors.WithStackTrace(xerrors.Retryable(
-				ctx.Err(),
+				cancelErr,
 				xerrors.WithName("streamResultContext"),
 			))
 		}
