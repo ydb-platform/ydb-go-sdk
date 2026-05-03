@@ -1,3 +1,5 @@
+* Added `balancers.WithTypeIP(t balancers.IPType)` option (with `balancers.IPv4` and `balancers.IPv6` bit-flag constants) to restrict the IP address families used when connecting to YDB cluster endpoints; the filter is applied at the gRPC resolver level so all matching resolved addresses are preserved, keeping round-robin balancing intact; use `ydb.WithBalancer(balancers.WithTypeIP(balancers.IPv6))` in environments where outbound IPv4 is blocked
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 

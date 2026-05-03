@@ -71,26 +71,38 @@ func Discover(
 	location = result.GetSelfLocation()
 	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
 	for _, e := range result.GetEndpoints() {
-		if e.GetSsl() == config.Secure() {
-			endpoints = append(endpoints, endpoint.New(
-				net.JoinHostPort(
-					config.MutateAddress(e.GetAddress()),
-					strconv.Itoa(int(e.GetPort())),
-				),
-				endpoint.WithLocation(e.GetLocation()),
-				endpoint.WithID(e.GetNodeId()),
-				endpoint.WithLoadFactor(e.GetLoadFactor()),
-				endpoint.WithLocalDC(e.GetLocation() == location),
-				endpoint.WithServices(e.GetService()),
-				endpoint.WithLastUpdated(config.Clock().Now()),
-				endpoint.WithIPV4(e.GetIpV4()),
-				endpoint.WithIPV6(e.GetIpV6()),
-				endpoint.WithSslTargetNameOverride(e.GetSslTargetNameOverride()),
-			))
+		if converted, ok := convertEndpoint(e, location, config); ok {
+			endpoints = append(endpoints, converted)
 		}
 	}
 
 	return endpoints, result.GetSelfLocation(), nil
+}
+
+// convertEndpoint converts a protobuf endpoint record to an endpoint.Endpoint.
+// It returns ok=false if the record must be skipped (wrong SSL mode).
+func convertEndpoint(
+	e *Ydb_Discovery.EndpointInfo, location string, config *config.Config,
+) (endpoint.Endpoint, bool) {
+	if e.GetSsl() != config.Secure() {
+		return nil, false
+	}
+
+	return endpoint.New(
+		net.JoinHostPort(
+			config.MutateAddress(e.GetAddress()),
+			strconv.Itoa(int(e.GetPort())),
+		),
+		endpoint.WithLocation(e.GetLocation()),
+		endpoint.WithID(e.GetNodeId()),
+		endpoint.WithLoadFactor(e.GetLoadFactor()),
+		endpoint.WithLocalDC(e.GetLocation() == location),
+		endpoint.WithServices(e.GetService()),
+		endpoint.WithLastUpdated(config.Clock().Now()),
+		endpoint.WithIPV4(e.GetIpV4()),
+		endpoint.WithIPV6(e.GetIpV6()),
+		endpoint.WithSslTargetNameOverride(e.GetSslTargetNameOverride()),
+	), true
 }
 
 // Discover cluster endpoints

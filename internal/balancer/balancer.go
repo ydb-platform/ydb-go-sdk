@@ -131,7 +131,7 @@ func (b *Balancer) discoveryConn(ctx context.Context) (*grpc.ClientConn, error) 
 		append(
 			b.driverConfig.GrpcDialOptions(),
 			grpc.WithResolvers(
-				xresolver.New("ydb", b.driverConfig.Trace()),
+				xresolver.New("ydb", b.driverConfig.Trace(), b.driverConfig.AddressFilter()),
 			),
 			grpc.WithBlock(), //nolint:staticcheck,nolintlint
 		)...,

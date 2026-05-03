@@ -51,6 +51,18 @@ func (c *Config) DisableOptimisticUnban() bool {
 	return c.disableOptimisticUnban
 }
 
+// AddressFilter returns an optional filter function that is applied by the
+// gRPC resolver to every resolved IP:port address before it is forwarded to
+// the connection manager.  Addresses for which the function returns false are
+// dropped.  Returns nil when no filtering is configured.
+func (c *Config) AddressFilter() func(addr string) bool {
+	if c.balancerConfig == nil {
+		return nil
+	}
+
+	return c.balancerConfig.AllowedIPTypes.Filter()
+}
+
 // GrpcDialOptions reports about used grpc dialing options
 func (c *Config) GrpcDialOptions() []grpc.DialOption {
 	return append(

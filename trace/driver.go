@@ -178,7 +178,8 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverResolveDoneInfo struct {
-		Error error
+		Filtered []string
+		Error    error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerUpdateStartInfo struct {
