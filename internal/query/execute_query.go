@@ -177,6 +177,7 @@ func execute(
 			if cancelErr == nil {
 				cancelErr = err
 			}
+
 			return nil, xerrors.WithStackTrace(xerrors.Retryable(
 				cancelErr,
 				xerrors.WithName("streamResultContext"),

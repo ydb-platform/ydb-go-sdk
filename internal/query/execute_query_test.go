@@ -464,7 +464,7 @@ func TestExecute(t *testing.T) {
 			// can retry with a fresh session (fix for the race between the
 			// ctx.Done() check and newResult's first Recv call).
 			require.ErrorIs(t, err, context.Canceled)
-			require.True(t, xerrors.IsRetryableError(err), "expected retryable error when ctx is cancelled during Recv, got: %v", err)
+			require.True(t, xerrors.IsRetryableError(err), "expected retryable error: %v", err)
 		})
 
 		t.Run("CancelAfterExecute", func(t *testing.T) {
