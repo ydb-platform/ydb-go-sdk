@@ -58,7 +58,7 @@ func (t IPType) Filter() func(addr string) bool {
 			return true
 		}
 
-		if t&IPv6 != 0 && !isIPv4 {
+		if t&IPv6 != 0 && !isIPv6 {
 			return true
 		}
 
