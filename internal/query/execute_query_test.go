@@ -460,8 +460,11 @@ func TestExecute(t *testing.T) {
 			// When execute() with context, cancelled in progress
 			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
 
-			// Then context cancellation error is returned
+			// Then a retryable context cancellation error is returned so the pool
+			// can retry with a fresh session (fix for the race between the
+			// ctx.Done() check and newResult's first Recv call).
 			require.ErrorIs(t, err, context.Canceled)
+			require.True(t, xerrors.IsRetryableError(err), "expected retryable error when ctx is cancelled during Recv, got: %v", err)
 		})
 
 		t.Run("CancelAfterExecute", func(t *testing.T) {

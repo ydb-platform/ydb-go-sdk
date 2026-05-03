@@ -166,6 +166,18 @@ func execute(
 		withStreamResultOnClose(executeCancel),
 	)...)
 	if err != nil {
+		// If context.Canceled is returned, executeCtx was cancelled before or
+		// during newResult's first Recv call. This happens in the race window
+		// between the ctx.Done() check above and newResult when the session dies
+		// or the parent context is cancelled. Wrap as retryable so the pool can
+		// retry with a fresh session (same semantics as the select check above).
+		if xerrors.Is(err, context.Canceled) {
+			return nil, xerrors.WithStackTrace(xerrors.Retryable(
+				ctx.Err(),
+				xerrors.WithName("streamResultContext"),
+			))
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 

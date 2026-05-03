@@ -1,3 +1,5 @@
+* Fixed a race condition in the query client where a `context canceled` error from a dying session was incorrectly treated as non-retryable, causing `QueryRow` and related calls to fail instead of retrying with a fresh session
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 
