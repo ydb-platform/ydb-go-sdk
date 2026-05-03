@@ -41,7 +41,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	}()
 
 	if err := c.cc.Ping(ctx); err != nil {
-		return badconn.Map(err)
+		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	return nil
