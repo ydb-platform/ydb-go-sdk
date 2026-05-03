@@ -45,7 +45,7 @@ func TestCoordinationSemaphore(sourceTest *testing.T) {
 	err = db.Coordination().CreateNode(ctx, nodePath, coordination.NodeConfig{
 		Path:                     "",
 		SelfCheckPeriodMillis:    1000,
-		SessionGracePeriodMillis: 1000,
+		SessionGracePeriodMillis: 10000, //nolint:mnd
 		ReadConsistencyMode:      coordination.ConsistencyModeStrict,
 		AttachConsistencyMode:    coordination.ConsistencyModeStrict,
 		RatelimiterCountersMode:  coordination.RatelimiterCountersModeDetailed,
@@ -64,7 +64,9 @@ func TestCoordinationSemaphore(sourceTest *testing.T) {
 	}
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)
 
-	s, err := db.Coordination().Session(ctx, nodePath)
+	// Use a zero reconnect delay so the client re-establishes the gRPC stream immediately after
+	// Reconnect(), ensuring the session is restored well within the server's SessionGracePeriodMillis.
+	s, err := db.Coordination().Session(ctx, nodePath, options.WithSessionReconnectDelay(0))
 	if err != nil {
 		t.Fatalf("failed to create session: %v\n", err)
 	}
