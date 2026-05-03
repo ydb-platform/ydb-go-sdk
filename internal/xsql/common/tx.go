@@ -11,7 +11,7 @@ type Tx interface {
 	ID() string
 
 	Exec(ctx context.Context, sql string, params *params.Params) (driver.Result, error)
-	Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error)
+	Query(ctx context.Context, sql string, params *params.Params) (Rows, error)
 
 	Rollback(ctx context.Context) error
 	Commit(ctx context.Context) error

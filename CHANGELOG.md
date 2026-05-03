@@ -1,5 +1,13 @@
 * Added `balancers.WithTypeIP(t balancers.IPType)` option (with `balancers.IPv4` and `balancers.IPv6` bit-flag constants) to restrict the IP address families used when connecting to YDB cluster endpoints; the filter is applied at the gRPC resolver level so all matching resolved addresses are preserved, keeping round-robin balancing intact; use `ydb.WithBalancer(balancers.WithTypeIP(balancers.IPv6))` in environments where outbound IPv4 is blocked
 
+## v3.135.10
+* Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
+
+## v3.135.9
+* Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
+* Fixed `query.Session.Begin` to return `BAD_SESSION` immediately for dead lazy-tx sessions instead of silently creating a transaction that would fail on the next server call
+* Fixed `Rollback` to signal `driver.ErrBadConn` to `database/sql` when the session is no longer alive after a rollback, ensuring the dead connection is discarded
+
 ## v3.135.8
 * Fixed a race condition in the session pool where canceling a caller's context while a creation goroutine was still running could allow the pool to exceed its size limit
 
