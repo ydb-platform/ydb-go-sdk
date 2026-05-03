@@ -139,6 +139,12 @@ func (s *Session) Begin(
 	}()
 
 	if lazyTx := baseTx.LazyTxFromContext(ctx, s.lazyTx); lazyTx {
+		if !s.IsAlive() {
+			return nil, xerrors.WithStackTrace(xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+			))
+		}
+
 		return &Transaction{
 			s:          s,
 			txSettings: txSettings,

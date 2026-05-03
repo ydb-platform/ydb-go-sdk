@@ -46,13 +46,13 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 
 	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return r, nil
 }
 
-func (t *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
+func (t *transaction) Query(ctx context.Context, sql string, params *params.Params) (common.Rows, error) {
 	opts := []query.ExecuteOption{
 		options.WithParameters(params),
 	}
@@ -75,7 +75,7 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 
 	res, err := t.tx.Query(ctx, sql, opts...)
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &rows{
@@ -92,7 +92,7 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (common.T
 
 	nativeTx, err := c.session.Begin(ctx, query.TxSettings(txc))
 	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &transaction{
@@ -103,7 +103,7 @@ func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (common.T
 
 func (t *transaction) Commit(ctx context.Context) (finalErr error) {
 	if err := t.tx.CommitTx(ctx); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -111,7 +111,14 @@ func (t *transaction) Commit(ctx context.Context) (finalErr error) {
 
 func (t *transaction) Rollback(ctx context.Context) (finalErr error) {
 	if err := t.tx.Rollback(ctx); err != nil {
-		return badconn.Map(xerrors.WithStackTrace(err))
+		return xerrors.WithStackTrace(err)
+	}
+
+	// Validate connection after rollback RPC - to avoid storing invalid connections in the
+	// database/SQL pool after this call. The symmetric commit method does not have this
+	// logic, as it needs to inform the upper code about successful commit.
+	if !t.conn.IsValid() {
+		return badconn.New("session is not valid for reuse after rollback")
 	}
 
 	return nil

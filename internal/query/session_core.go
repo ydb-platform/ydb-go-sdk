@@ -312,7 +312,7 @@ func StatusFromErr(err error) Status {
 	switch {
 	case xerrors.IsTransportError(err):
 		return StatusError
-	case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY, Ydb.StatusIds_BAD_SESSION):
+	case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY):
 		return StatusError
 	case xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION):
 		return StatusClosed

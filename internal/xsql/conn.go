@@ -40,7 +40,11 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	return c.cc.Ping(ctx)
+	if err := c.cc.Ping(ctx); err != nil {
+		return xerrors.WithStackTrace(badconn.Map(err))
+	}
+
+	return nil
 }
 
 func (c *Conn) CheckNamedValue(value *driver.NamedValue) (finalErr error) {
@@ -74,7 +78,7 @@ func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx,
 
 	tx, err := c.cc.BeginTx(ctx, opts)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	c.currentTx = &Tx{
@@ -96,10 +100,17 @@ func (c *Conn) Close() (finalErr error) {
 
 	err := c.cc.Close()
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	return nil
+}
+
+// IsValid implements driver.Validator interface.
+// database/sql calls IsValid before reusing a connection from the pool.
+// If IsValid returns false, the connection is discarded and a new one is requested.
+func (c *Conn) IsValid() bool {
+	return c.cc.IsValid()
 }
 
 func (c *Conn) Begin() (_ driver.Tx, finalErr error) {
@@ -171,22 +182,27 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 	if isExplain(ctx) {
 		ast, plan, err := c.cc.Explain(ctx, sql, params)
 		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
+			return nil, xerrors.WithStackTrace(badconn.Map(err))
 		}
 
 		return rowByAstPlan(ast, plan), nil
 	}
 
 	if c.currentTx != nil {
-		return c.currentTx.tx.Query(ctx, sql, params)
+		rows, err := c.currentTx.tx.Query(ctx, sql, params)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(badconn.Map(err))
+		}
+
+		return newRows(rows), nil
 	}
 
 	result, err := c.cc.Query(ctx, sql, params)
 	if err != nil {
-		return nil, badconn.Map(err)
+		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
-	return result, nil
+	return newRows(result), nil
 }
 
 func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
@@ -209,12 +225,17 @@ func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 	}
 
 	if c.currentTx != nil {
-		return c.currentTx.tx.Exec(ctx, sql, params)
+		result, err := c.currentTx.tx.Exec(ctx, sql, params)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(badconn.Map(err))
+		}
+
+		return result, nil
 	}
 
 	result, err := c.cc.Exec(ctx, sql, params)
 	if err != nil {
-		return nil, badconn.Map(err)
+		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	return result, nil

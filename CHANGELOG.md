@@ -1,5 +1,13 @@
 * Added helper `sugar.NewKV(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 
+## v3.135.10
+* Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
+
+## v3.135.9
+* Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
+* Fixed `query.Session.Begin` to return `BAD_SESSION` immediately for dead lazy-tx sessions instead of silently creating a transaction that would fail on the next server call
+* Fixed `Rollback` to signal `driver.ErrBadConn` to `database/sql` when the session is no longer alive after a rollback, ensuring the dead connection is discarded
+
 ## v3.135.8
 * Fixed a race condition in the session pool where canceling a caller's context while a creation goroutine was still running could allow the pool to exceed its size limit
 
