@@ -1,3 +1,5 @@
+* Added helper `sugar.NewKV(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 
