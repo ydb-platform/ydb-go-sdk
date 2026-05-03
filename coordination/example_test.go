@@ -114,6 +114,11 @@ func Example_semaphore() {
 	fmt.Printf("session 1 acquired semaphore 10\n")
 
 	s.Reconnect()
+	if err = s.WaitConnected(ctx); err != nil {
+		fmt.Printf("failed to wait for reconnect: %v", err)
+
+		return
+	}
 	fmt.Printf("session 1 reconnected\n")
 
 	desc, err := s.DescribeSemaphore(

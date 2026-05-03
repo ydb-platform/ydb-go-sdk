@@ -40,9 +40,12 @@ type (
 		controller        *conversation.Controller
 		sessionID         uint64
 
-		mutex                sync.Mutex // guards the field below
+		mutex                sync.Mutex // guards the fields below
 		lastGoodResponseTime time.Time
 		cancelStream         context.CancelFunc
+		// connectedChan is nil when the session is connected; it is set to a new unclosed channel by Reconnect and
+		// closed (and reset to nil) by mainLoop when the session reconnects successfully.
+		connectedChan chan struct{}
 
 		onCreate []func(s *session)
 		onClose  []func(s *session)
@@ -306,10 +309,16 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 			trace.CoordinationOnSessionStarted(s.trace, start.GetSessionId(), s.sessionID)
 			if s.sessionID == 0 {
 				s.sessionID = start.GetSessionId()
+				// Mark as connected before closing sessionStartedChan so that WaitConnected callers see the correct
+				// state even if Reconnect is called immediately after Session() returns.
+				s.markConnected()
 				close(sessionStartedChan)
 			} else if start.GetSessionId() != s.sessionID {
 				// Reconnect if the server response is invalid.
 				cancelStream()
+			} else {
+				// Reconnect has successfully restored the existing session.
+				s.markConnected()
 			}
 			close(startSending)
 		case <-time.After(s.sessionStartTimeout):
@@ -536,12 +545,50 @@ func (s *session) Close(ctx context.Context) error {
 	return nil
 }
 
+func (s *session) markConnected() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.connectedChan != nil {
+		close(s.connectedChan)
+		s.connectedChan = nil
+	}
+}
+
 func (s *session) Reconnect() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	if s.cancelStream != nil {
 		s.cancelStream()
+	}
+
+	// Create a new notification channel so that callers of WaitConnected will block until the next successful
+	// reconnect completes. If a channel already exists (i.e. a previous reconnect is still in progress), keep it so
+	// that all waiters are unblocked by the same event.
+	if s.connectedChan == nil {
+		s.connectedChan = make(chan struct{})
+	}
+}
+
+// WaitConnected blocks until the session has reconnected to the server following a Reconnect call, or until the
+// provided ctx is canceled or the session context is done.
+func (s *session) WaitConnected(ctx context.Context) error {
+	s.mutex.Lock()
+	ch := s.connectedChan
+	s.mutex.Unlock()
+
+	if ch == nil {
+		return nil
+	}
+
+	select {
+	case <-ch:
+		return nil
+	case <-s.ctx.Done():
+		return s.ctx.Err()
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 

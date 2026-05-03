@@ -85,6 +85,9 @@ func TestCoordinationSemaphore(sourceTest *testing.T) {
 	fmt.Printf("session 1 acquired semaphore 10\n")
 
 	s.Reconnect()
+	if err = s.WaitConnected(ctx); err != nil {
+		t.Fatalf("failed to wait for reconnect: %v", err)
+	}
 	fmt.Printf("session 1 reconnected\n")
 
 	desc, err := s.DescribeSemaphore(
