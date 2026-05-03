@@ -137,7 +137,20 @@ func execute(
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		// If ctx was already cancelled (e.g. session death closed the
+		// session-merged ctx before or during ExecuteQuery), the balancer's
+		// nextConn returns context.Canceled without us even reaching the
+		// ctx.Done() select below. Apply the same retryable wrapping here so
+		// the pool can retry with a fresh session.
+		select {
+		case <-ctx.Done():
+			return nil, xerrors.WithStackTrace(xerrors.Retryable(
+				ctx.Err(),
+				xerrors.WithName("streamResultContext"),
+			))
+		default:
+			return nil, xerrors.WithStackTrace(err)
+		}
 	}
 
 	// If ctx was cancelled during ExecuteQuery, return a retryable error so the

@@ -581,6 +581,40 @@ func TestExecute(t *testing.T) {
 				"expected retryable error when executeCtx cancelled but parent ctx is alive, got: %v", err)
 			require.ErrorIs(t, err, context.Canceled)
 		})
+
+		// Regression test for the CI failure in TestBasicExampleQuery/ExecuteDataQuery:
+		// context.Canceled returned from ExecuteQuery itself (not newResult) when the
+		// session-merged ctx is already cancelled before the gRPC call, causing the
+		// balancer's nextConn to return context.Canceled immediately.
+		//
+		// Session.execute merges user ctx with session lifetime via xcontext.WithDone,
+		// so when the session dies its Done channel is closed, cancelling the merged ctx
+		// passed to execute(). AfterFunc then fires executeCancel immediately, and the
+		// balancer's nextConn finds executeCtx.Err() != nil before ExecuteQuery even runs.
+		//
+		// execute() must detect the parent ctx cancellation in the ExecuteQuery error
+		// path and return retryable, not propagate a non-retryable context.Canceled.
+		t.Run("SessionDiesBeforeExecuteQuery", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			ctx, cancel := context.WithCancel(xtest.Context(t))
+			// Cancel ctx before calling execute — simulates the session having died
+			// before session.execute hands ctx to execute().
+			cancel()
+
+			// ExecuteQuery must NOT be called (or if called, returns error).
+			// The balancer would fail immediately because executeCtx is already done.
+			// We simulate that: ExecuteQuery is called but returns context.Canceled
+			// (what happens when nextConn sees a cancelled ctx).
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).
+				Return(nil, context.Canceled).AnyTimes()
+
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			require.Error(t, err)
+			require.True(t, xerrors.IsRetryableError(err),
+				"expected retryable error when ctx cancelled before ExecuteQuery, got: %v", err)
+			require.ErrorIs(t, err, context.Canceled)
+		})
 	})
 }
 
