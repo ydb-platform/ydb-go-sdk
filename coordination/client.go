@@ -124,11 +124,6 @@ type Session interface {
 	// Reconnect forcibly shuts down the underlying gRPC stream and initiates a new one. This method is highly unlikely
 	// to be of use in a typical application but is extremely useful for testing an API implementation.
 	Reconnect()
-
-	// WaitConnected blocks until the session has (re)connected to the server and the session handshake is complete, or
-	// until either the provided ctx is canceled or the session itself is closed, lost, or otherwise canceled. It is
-	// intended to be called after Reconnect to wait for the reconnect to finish before performing further operations.
-	WaitConnected(ctx context.Context) error
 }
 
 // Lease is the object which defines the rights of the session to the acquired semaphore. Lease is alive until its
