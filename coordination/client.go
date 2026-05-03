@@ -126,8 +126,8 @@ type Session interface {
 	Reconnect()
 
 	// WaitConnected blocks until the session has (re)connected to the server and the session handshake is complete, or
-	// until the provided ctx is canceled. It is intended to be called after Reconnect to wait for the reconnect to
-	// finish before performing further operations.
+	// until either the provided ctx is canceled or the session itself is closed, lost, or otherwise canceled. It is
+	// intended to be called after Reconnect to wait for the reconnect to finish before performing further operations.
 	WaitConnected(ctx context.Context) error
 }
 
