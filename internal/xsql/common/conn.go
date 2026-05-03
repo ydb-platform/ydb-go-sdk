@@ -15,7 +15,7 @@ type Conn interface {
 	NodeID() uint32
 
 	Exec(ctx context.Context, sql string, params *params.Params) (result driver.Result, err error)
-	Query(ctx context.Context, sql string, params *params.Params) (result driver.RowsNextResultSet, err error)
+	Query(ctx context.Context, sql string, params *params.Params) (result Rows, err error)
 	Explain(ctx context.Context, sql string, params *params.Params) (ast string, plan string, err error)
 	BeginTx(ctx context.Context, opts driver.TxOptions) (Tx, error)
 

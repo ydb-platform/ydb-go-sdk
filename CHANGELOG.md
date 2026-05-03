@@ -1,3 +1,5 @@
+* Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
+
 ## v3.135.9
 * Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
 * Fixed `query.Session.Begin` to return `BAD_SESSION` immediately for dead lazy-tx sessions instead of silently creating a transaction that would fail on the next server call
