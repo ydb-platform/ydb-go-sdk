@@ -1,6 +1,7 @@
+* Added `coordination.Session.WaitConnected(ctx context.Context) error` to allow callers to wait until the session has fully reconnected after a `Reconnect()` call
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
-* Added `coordination.Session.WaitConnected(ctx context.Context) error` to allow callers to wait until the session has fully reconnected after a `Reconnect()` call
 
 ## v3.135.9
 * Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
