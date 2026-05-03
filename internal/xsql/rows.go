@@ -5,7 +5,9 @@ import (
 	"database/sql/driver"
 	"io"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
 
 type singleRow struct {
@@ -52,45 +54,33 @@ func (r *singleRow) Next(dst []driver.Value) error {
 	return nil
 }
 
-// badconnRows wraps driver.RowsNextResultSet and applies badconn.Map to errors
+// Rows wraps driver.RowsNextResultSet and applies badconn.Map to errors
 // returned by Next and NextResultSet so that session-invalidating errors
 // during row iteration are correctly signaled to database/sql.
-type badconnRows struct {
-	driver.RowsNextResultSet
+type Rows struct {
+	common.Rows
 }
 
-func newBadconnRows(rows driver.RowsNextResultSet) driver.RowsNextResultSet {
+func newRows(rows common.Rows) driver.RowsNextResultSet {
 	if rows == nil {
 		return nil
 	}
 
-	return &badconnRows{RowsNextResultSet: rows}
+	return &Rows{Rows: rows}
 }
 
-func (r *badconnRows) Next(dst []driver.Value) error {
-	return badconn.Map(r.RowsNextResultSet.Next(dst))
-}
-
-func (r *badconnRows) NextResultSet() error {
-	return badconn.Map(r.RowsNextResultSet.NextResultSet())
-}
-
-// ColumnTypeDatabaseTypeName forwards to the underlying rows if it implements
-// driver.RowsColumnTypeDatabaseTypeName.
-func (r *badconnRows) ColumnTypeDatabaseTypeName(index int) string {
-	if v, ok := r.RowsNextResultSet.(driver.RowsColumnTypeDatabaseTypeName); ok {
-		return v.ColumnTypeDatabaseTypeName(index)
+func (r *Rows) Next(dst []driver.Value) error {
+	if err := r.Rows.Next(dst); err != nil {
+		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
-	return ""
+	return nil
 }
 
-// ColumnTypeNullable forwards to the underlying rows if it implements
-// driver.RowsColumnTypeNullable.
-func (r *badconnRows) ColumnTypeNullable(index int) (nullable, ok bool) {
-	if v, ok := r.RowsNextResultSet.(driver.RowsColumnTypeNullable); ok {
-		return v.ColumnTypeNullable(index)
+func (r *Rows) NextResultSet() error {
+	if err := r.Rows.NextResultSet(); err != nil {
+		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
-	return false, false
+	return nil
 }

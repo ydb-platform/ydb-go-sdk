@@ -39,7 +39,7 @@ func (c *deadSessionCommonConn) Close() error                 { return nil }
 
 func (c *deadSessionCommonConn) Query(
 	_ context.Context, _ string, _ *params.Params,
-) (driver.RowsNextResultSet, error) {
+) (common.Rows, error) {
 	return nil, c.beginTxFn()
 }
 

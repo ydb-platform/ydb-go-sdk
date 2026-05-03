@@ -24,7 +24,7 @@ func (t *txFake) Exec(ctx context.Context, sql string, params *params.Params) (d
 	return result, nil
 }
 
-func (t *txFake) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
+func (t *txFake) Query(ctx context.Context, sql string, params *params.Params) (common.Rows, error) {
 	rows, err := t.conn.Query(ctx, sql, params)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

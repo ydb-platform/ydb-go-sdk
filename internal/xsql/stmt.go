@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -15,7 +16,7 @@ type Stmt struct {
 	conn      *Conn
 	processor interface {
 		Exec(ctx context.Context, sql string, params *params.Params) (driver.Result, error)
-		Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error)
+		Query(ctx context.Context, sql string, params *params.Params) (common.Rows, error)
 	}
 	sql string
 	ctx context.Context //nolint:containedctx
@@ -54,7 +55,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
-	return newBadconnRows(rows), nil
+	return newRows(rows), nil
 }
 
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {

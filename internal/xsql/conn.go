@@ -194,7 +194,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 			return nil, xerrors.WithStackTrace(badconn.Map(err))
 		}
 
-		return newBadconnRows(rows), nil
+		return newRows(rows), nil
 	}
 
 	result, err := c.cc.Query(ctx, sql, params)
@@ -202,7 +202,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 		return nil, badconn.Map(err)
 	}
 
-	return newBadconnRows(result), nil
+	return newRows(result), nil
 }
 
 func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (

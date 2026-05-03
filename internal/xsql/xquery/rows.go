@@ -19,7 +19,7 @@ import (
 
 var (
 	_ driver.Rows                           = &rows{}
-	_ driver.RowsNextResultSet              = &rows{}
+	_ common.Rows                           = &rows{}
 	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
 	_ driver.RowsColumnTypeNullable         = &rows{}
 

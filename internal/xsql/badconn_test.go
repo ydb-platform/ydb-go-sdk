@@ -50,7 +50,7 @@ func (m *mockErrConn) Close() error { return m.err }
 
 func (m *mockErrConn) Query(
 	_ context.Context, _ string, _ *params.Params,
-) (driver.RowsNextResultSet, error) {
+) (common.Rows, error) {
 	return nil, m.err
 }
 
@@ -85,7 +85,7 @@ func (m *mockErrTx) Exec(
 
 func (m *mockErrTx) Query(
 	_ context.Context, _ string, _ *params.Params,
-) (driver.RowsNextResultSet, error) {
+) (common.Rows, error) {
 	return nil, m.err
 }
 
@@ -102,7 +102,7 @@ func (m *mockErrProcessor) Exec(
 
 func (m *mockErrProcessor) Query(
 	_ context.Context, _ string, _ *params.Params,
-) (driver.RowsNextResultSet, error) {
+) (common.Rows, error) {
 	return nil, m.err
 }
 
@@ -266,19 +266,21 @@ type mockErrRows struct {
 	err error
 }
 
-func (m *mockErrRows) Columns() []string           { return nil }
-func (m *mockErrRows) Close() error                { return nil }
-func (m *mockErrRows) HasNextResultSet() bool      { return false }
-func (m *mockErrRows) Next(_ []driver.Value) error { return m.err }
-func (m *mockErrRows) NextResultSet() error        { return m.err }
+func (m *mockErrRows) ColumnTypeDatabaseTypeName(index int) string      { return "" }
+func (m *mockErrRows) ColumnTypeNullable(index int) (nullable, ok bool) { return false, false }
+func (m *mockErrRows) Columns() []string                                { return nil }
+func (m *mockErrRows) Close() error                                     { return nil }
+func (m *mockErrRows) HasNextResultSet() bool                           { return false }
+func (m *mockErrRows) Next(_ []driver.Value) error                      { return m.err }
+func (m *mockErrRows) NextResultSet() error                             { return m.err }
 
-// TestBadconnRows_BadConnMapping verifies that the badconnRows wrapper applies
+// TestRows_BadConnMapping verifies that the Rows wrapper applies
 // badconn.Map to errors from Next and NextResultSet.
-func TestBadconnRows_BadConnMapping(t *testing.T) {
+func TestRows_BadConnMapping(t *testing.T) {
 	for _, ydbErr := range errYdbErrors {
 		wantBadConn := xerrors.MustDeleteTableOrQuerySession(ydbErr)
 		t.Run(ydbErr.Error(), func(t *testing.T) {
-			rows := newBadconnRows(&mockErrRows{err: ydbErr})
+			rows := newRows(&mockErrRows{err: ydbErr})
 
 			t.Run("Next", func(t *testing.T) {
 				err := rows.Next(nil)
@@ -286,7 +288,7 @@ func TestBadconnRows_BadConnMapping(t *testing.T) {
 			})
 
 			t.Run("NextResultSet", func(t *testing.T) {
-				rows := newBadconnRows(&mockErrRows{err: ydbErr})
+				rows := newRows(&mockErrRows{err: ydbErr})
 				err := rows.(interface{ NextResultSet() error }).NextResultSet()
 				require.Equal(t, wantBadConn, xerrors.Is(err, driver.ErrBadConn))
 			})

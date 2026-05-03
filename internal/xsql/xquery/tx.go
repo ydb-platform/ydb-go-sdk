@@ -52,7 +52,7 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 	return r, nil
 }
 
-func (t *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
+func (t *transaction) Query(ctx context.Context, sql string, params *params.Params) (common.Rows, error) {
 	opts := []query.ExecuteOption{
 		options.WithParameters(params),
 	}

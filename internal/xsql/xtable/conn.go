@@ -75,7 +75,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (res
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
-	result driver.RowsNextResultSet, finalErr error,
+	result common.Rows, finalErr error,
 ) {
 	if !c.isReady() {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
@@ -214,7 +214,7 @@ func (c *Conn) executeScriptingQuery(ctx context.Context, sql string, params *pa
 }
 
 func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error,
+	common.Rows, error,
 ) {
 	dataOpts := c.dataOpts
 	sm := stats.ModeCallbackFromContext(ctx)
@@ -247,7 +247,7 @@ func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Par
 }
 
 func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error,
+	common.Rows, error,
 ) {
 	res, err := c.session.StreamExecuteScanQuery(ctx,
 		sql, params, c.scanOpts...,
@@ -266,7 +266,7 @@ func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Par
 }
 
 func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error,
+	common.Rows, error,
 ) {
 	res, err := c.scriptingClient.StreamExecute(ctx, sql, params)
 	if err != nil {

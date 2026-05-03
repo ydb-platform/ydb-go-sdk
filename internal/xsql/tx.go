@@ -108,7 +108,7 @@ func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedV
 		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
-	return newBadconnRows(rows), nil
+	return newRows(rows), nil
 }
 
 func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (

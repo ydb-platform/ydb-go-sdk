@@ -54,7 +54,7 @@ func (tx *transaction) Exec(ctx context.Context, sql string, params *params.Para
 	return resultNoRows{}, nil
 }
 
-func (tx *transaction) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
+func (tx *transaction) Query(ctx context.Context, sql string, params *params.Params) (common.Rows, error) {
 	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
 	if m != DataQueryMode {
 		return nil, xerrors.WithStackTrace(
