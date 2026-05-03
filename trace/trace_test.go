@@ -7,13 +7,13 @@ import (
 )
 
 // Stub is a helper function that stubs all functional fields of x with given f.
-func Stub(x interface{}, f func(name string, args ...interface{})) {
+func Stub(x any, f func(name string, args ...any)) {
 	(FieldStubber{
 		OnCall: f,
 	}).Stub(reflect.ValueOf(x))
 }
 
-func ClearContext(x interface{}) interface{} {
+func ClearContext(x any) any {
 	p := reflect.ValueOf(x).Index(0)
 	t := p.Elem().Type()
 	f, has := t.FieldByName("Context")
@@ -39,7 +39,7 @@ type FieldStubber struct {
 	// OnCall is an optional callback that will be called for each stubbed
 	// field getting called.
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	OnCall func(name string, args ...interface{})
+	OnCall func(name string, args ...any)
 }
 
 // Stub fills in given x struct.
@@ -70,7 +70,7 @@ func (f FieldStubber) Stub(x reflect.Value) {
 			if f.OnCall == nil {
 				return out
 			}
-			params := make([]interface{}, len(args))
+			params := make([]any, len(args))
 			for i, arg := range args {
 				params[i] = arg.Interface()
 			}
@@ -114,7 +114,7 @@ func TestDatabaseSQL(t *testing.T) {
 	testSingleTrace(t, &DatabaseSQL{}, "DatabaseSQL")
 }
 
-func testSingleTrace(t *testing.T, x interface{}, traceName string) {
+func testSingleTrace(t *testing.T, x any, traceName string) {
 	t.Helper()
 	v := reflect.ValueOf(x)
 	m := v.MethodByName("Compose")
@@ -141,7 +141,7 @@ func stubEachFunc(x reflect.Value) map[string]bool {
 		OnStub: func(name string) {
 			fs[name] = false
 		},
-		OnCall: func(name string, _ ...interface{}) {
+		OnCall: func(name string, _ ...any) {
 			fs[name] = true
 		},
 	}).Stub(x)

@@ -62,7 +62,7 @@ func HideEOF(err error) error {
 
 // As is a proxy to errors.As
 // This need to single import errors
-func As(err error, targets ...interface{}) bool {
+func As(err error, targets ...any) bool {
 	if err == nil {
 		panic("nil err")
 	}

@@ -1,6 +1,7 @@
 package topicoptions
 
 import (
+	"slices"
 	"sort"
 	"time"
 
@@ -43,9 +44,7 @@ func CreateWithRetentionStorageMB(retentionStorageMB int64) CreateOption {
 
 // CreateWithSupportedCodecs set supported codecs for the topic
 func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
-	sort.Slice(codecs, func(i, j int) bool {
-		return codecs[i] < codecs[j]
-	})
+	slices.Sort(codecs)
 
 	return withSupportedCodecs(codecs)
 }

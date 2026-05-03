@@ -461,7 +461,7 @@ func TestPool_ConnParker(t *testing.T) {
 		go pool.connParker(ctx, ttl, interval)
 
 		// Advance clock multiple times and verify parker is running
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			fakeClock.Advance(interval)
 			fakeClock.Advance(ttl)
 			time.Sleep(50 * time.Millisecond)

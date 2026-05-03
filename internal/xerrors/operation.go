@@ -152,13 +152,8 @@ func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 	if len(codes) == 0 {
 		return true
 	}
-	for _, code := range codes {
-		if op.code == code {
-			return true
-		}
-	}
 
-	return false
+	return slices.Contains(codes, op.code)
 }
 
 func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {

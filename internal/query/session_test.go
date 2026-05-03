@@ -10,10 +10,39 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+// TestSessionBeginLazyTxDeadSession ensures that Begin returns BAD_SESSION
+// for a lazy transaction when the session is no longer alive. This prevents
+// the dead session from being silently reused inside a new transaction.
+func TestSessionBeginLazyTxDeadSession(t *testing.T) {
+	ctx := xtest.Context(t)
+
+	// Create a session whose underlying Core reports IsAlive() == false
+	// (simulates a session that was previously invalidated by BAD_SESSION).
+	deadCore := &sessionControllerMock{
+		id:     "dead-session",
+		status: StatusError,
+		done:   make(chan struct{}),
+	}
+	s := &Session{
+		Core:   deadCore,
+		trace:  &trace.Query{},
+		lazyTx: true, // lazy-tx mode
+	}
+
+	// Begin should refuse to create a lazy transaction for a dead session.
+	lazyCtx := baseTx.WithLazyTx(ctx, true)
+	tx, err := s.Begin(lazyCtx, query.TxSettings(query.WithSerializableReadWrite()))
+	require.Error(t, err)
+	require.Nil(t, tx)
+	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION))
+}
 
 func TestCreateSession(t *testing.T) {
 	trace := &trace.Query{

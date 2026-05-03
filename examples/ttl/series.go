@@ -267,7 +267,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 		return err
 	}
 
-	for i := 0; i < expirationQueueCount; i++ {
+	for i := range expirationQueueCount {
 		tableName := path.Join(prefix, fmt.Sprintf("expiration_queue_%v", i))
 		err = c.Do(ctx,
 			func(ctx context.Context, s table.Session) error {

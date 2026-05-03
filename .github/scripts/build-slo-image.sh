@@ -9,16 +9,12 @@ Usage:
     --context <path> \
     --tag <docker-tag> \
     --src-path <sdk-path> \
-    --job-name <job-name> \
-    --ref <git-ref> \
     --fallback-image <docker-tag>
 
 Options:
   --context         Docker build context directory (e.g. $GITHUB_WORKSPACE/current).
   --tag             Docker image tag to build (e.g. ydb-app-current).
   --src-path        Value for Docker build arg SRC_PATH (e.g. native/table).
-  --job-name        Value for Docker build arg JOB_NAME (e.g. native-table).
-  --ref             Value for Docker build arg REF (e.g. branch name / sha).
   --fallback-image  Image tag to return if initial Docker image build fails
 EOF
 }
@@ -31,9 +27,7 @@ die() {
 context_dir=""
 dockerfile="tests/slo/Dockerfile"
 tag=""
-ref=""
 src_path=""
-job_name=""
 fallback_image=""
 
 while [[ $# -gt 0 ]]; do
@@ -46,16 +40,8 @@ while [[ $# -gt 0 ]]; do
       tag="${2:-}"
       shift 2
       ;;
-    --ref)
-      ref="${2:-}"
-      shift 2
-      ;;
     --src-path)
       src_path="${2:-}"
-      shift 2
-      ;;
-    --job-name)
-      job_name="${2:-}"
       shift 2
       ;;
     --fallback-image)
@@ -72,7 +58,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$context_dir" || -z "$tag" || -z "$src_path" || -z "$job_name" || -z "$ref" ]]; then
+if [[ -z "$context_dir" || -z "$tag" || -z "$src_path" ]]; then
   usage
   die "Incomplete argument set"
 fi
@@ -84,17 +70,14 @@ context_dir="$(cd "$context_dir" && pwd)"
 
 echo "Building SLO image..."
 echo "  TAG:        $tag"
-echo "  REF:        $ref"
 echo "  SRC_PATH:   $src_path"
-echo "  JOB_NAME:   $job_name"
 
 (
   set +e
   cd "$context_dir"
   docker build -t "$tag" \
+    --platform linux/amd64 \
     --build-arg "SRC_PATH=$src_path" \
-    --build-arg "JOB_NAME=$job_name" \
-    --build-arg "REF=$ref" \
     -f "$dockerfile" .
   exit_code=$?
   echo "Docker build exit code: $exit_code"

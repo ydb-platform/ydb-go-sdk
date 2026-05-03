@@ -60,7 +60,7 @@ func (s *syncMessageSender) waitForMessage(ctx context.Context) error {
 
 // waitForMessages waits for at least n messages to be sent
 func (s *syncMessageSender) waitForMessages(ctx context.Context, n int) error {
-	for i := 0; i < n; i++ {
+	for range n {
 		if err := s.waitForMessage(ctx); err != nil {
 			return err
 		}

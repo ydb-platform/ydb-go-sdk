@@ -20,7 +20,7 @@ func TestQueryBind(t *testing.T) {
 	for _, tt := range []struct {
 		b      testutil.QueryBindings
 		sql    string
-		args   []interface{}
+		args   []any
 		yql    string
 		params *table.QueryParameters
 		err    error
@@ -34,7 +34,7 @@ func TestQueryBind(t *testing.T) {
 			sql: `$cnt = (SELECT 2 * COUNT(*) FROM my_table);
 
 UPDATE my_table SET data = CAST($cnt AS Optional<Uint64>) WHERE id = ?;`,
-			args: []interface{}{uint64(6)},
+			args: []any{uint64(6)},
 			yql: `-- bind TablePathPrefix
 PRAGMA TablePathPrefix("/local/test");
 
@@ -58,7 +58,7 @@ UPDATE my_table SET data = CAST($cnt AS Optional<Uint64>) WHERE id = $p0;`,
 			sql: `$cnt = (SELECT 2 * COUNT(*) FROM my_table);
 
 UPDATE my_table SET data = CAST($cnt AS Uint64) WHERE id = $1;`,
-			args: []interface{}{uint64(6)},
+			args: []any{uint64(6)},
 			yql: `-- bind TablePathPrefix
 PRAGMA TablePathPrefix("/local/test");
 
@@ -101,7 +101,7 @@ SELECT ?, $1, $p0`,
 				ydb.WithAutoDeclare(),
 			),
 			sql: "SELECT $p0, $p1, $p2, $p0, $p1",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -132,7 +132,7 @@ SELECT $p0, $p1, $p2, $p0, $p1`,
 				ydb.WithPositionalArgs(),
 			),
 			sql: "SELECT ?, ?, ?",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -165,7 +165,7 @@ SELECT $p0, $p1, $p2`,
 				ydb.WithNumericArgs(),
 			),
 			sql: "SELECT ?, ?, ?",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -198,7 +198,7 @@ SELECT $p0, $p1, $p2`,
 				ydb.WithPositionalArgs(),
 			),
 			sql: "SELECT ?, ?, ?",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -231,7 +231,7 @@ SELECT $p0, $p1, $p2`,
 				ydb.WithNumericArgs(),
 			),
 			sql: "SELECT $1, $2, $3",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -264,7 +264,7 @@ SELECT $p0, $p1, $p2`,
 				ydb.WithPositionalArgs(),
 			),
 			sql: "SELECT $1, $2, $3",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -296,7 +296,7 @@ SELECT $p0, $p1, $p2`,
 				ydb.WithNumericArgs(),
 			),
 			sql: "SELECT $1, $2, $3, $1, $2",
-			args: []interface{}{
+			args: []any{
 				1,
 				"test",
 				[]string{
@@ -329,7 +329,7 @@ SELECT $p0, $p1, $p2, $p0, $p1`,
 				ydb.WithPositionalArgs(),
 			),
 			sql: "SELECT a, b, c WHERE id = ? AND date < ? AND value IN (?)",
-			args: []interface{}{
+			args: []any{
 				1, now, []string{"3"},
 			},
 			yql: `-- bind TablePathPrefix
@@ -371,7 +371,7 @@ SELECT 1`,
 DECLARE $param1 AS Text; -- some comment
 DECLARE $param2 AS Text;
 SELECT $param1, $param2`,
-			args: []interface{}{
+			args: []any{
 				sql.Named("param1", 100),
 				sql.Named("$param2", 200),
 			},
@@ -399,7 +399,7 @@ SELECT $param1, $param2`,
 			sql: `
 DECLARE $param2 AS Text; -- some comment
 SELECT $param1, $param2`,
-			args: []interface{}{
+			args: []any{
 				sql.Named("param1", 100),
 				sql.Named("$param2", 200),
 			},
@@ -433,7 +433,7 @@ SELECT 1`,
 		{
 			b:   testutil.QueryBind(ydb.WithPositionalArgs()),
 			sql: "SELECT ?, ?",
-			args: []interface{}{
+			args: []any{
 				1,
 			},
 			err: bind.ErrInconsistentArgs,
@@ -441,7 +441,7 @@ SELECT 1`,
 		{
 			b:   testutil.QueryBind(ydb.WithNumericArgs()),
 			sql: "SELECT $0, $1",
-			args: []interface{}{
+			args: []any{
 				1, 1,
 			},
 			err: bind.ErrUnexpectedNumericArgZero,
@@ -449,7 +449,7 @@ SELECT 1`,
 		{
 			b:   testutil.QueryBind(ydb.WithPositionalArgs()),
 			sql: "SELECT ?, ? -- some comment",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -463,7 +463,7 @@ SELECT $p0, $p1 -- some comment`,
 		{
 			b:   testutil.QueryBind(ydb.WithPositionalArgs()),
 			sql: "SELECT ?, ? -- some comment",
-			args: []interface{}{
+			args: []any{
 				100,
 			},
 			yql: `-- origin query with positional args replacement
@@ -476,7 +476,7 @@ SELECT $p0, $p1 -- some comment`,
 		{
 			b:   testutil.QueryBind(ydb.WithPositionalArgs()),
 			sql: "SELECT ?, ?, ?",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -492,7 +492,7 @@ SELECT $p0, $p1`,
 			b: testutil.QueryBind(ydb.WithPositionalArgs()),
 			sql: `
 SELECT ? /* some comment with ? */, ?`,
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -510,7 +510,7 @@ SELECT $p0 /* some comment with ? */, $p1`,
 				ydb.WithPositionalArgs(),
 			),
 			sql: "SELECT ?, ?",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -531,7 +531,7 @@ SELECT $p0, $p1`,
 				ydb.WithPositionalArgs(),
 			),
 			sql: "SELECT ?, ?",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -552,7 +552,7 @@ SELECT $p0, $p1`,
 		{
 			b:   testutil.QueryBind(ydb.WithNumericArgs()),
 			sql: "SELECT $1 /* some comment with $3 */, $2",
-			args: []interface{}{
+			args: []any{
 				1,
 			},
 			err: bind.ErrInconsistentArgs,
@@ -560,7 +560,7 @@ SELECT $p0, $p1`,
 		{
 			b:   testutil.QueryBind(ydb.WithNumericArgs()),
 			sql: "SELECT $1 /* some comment with $3 */, $2",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -577,7 +577,7 @@ SELECT $p0 /* some comment with $3 */, $p1`,
 				ydb.WithNumericArgs(),
 			),
 			sql: "SELECT $1, $2",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -596,7 +596,7 @@ SELECT $p0, $p1`,
 			b: testutil.QueryBind(ydb.WithNumericArgs()),
 			sql: `
 SELECT $1, $2`,
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -614,7 +614,7 @@ SELECT $p0, $p1`,
 				ydb.WithNumericArgs(),
 			),
 			sql: "SELECT $1 /* some comment with $3 */, $2",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -635,7 +635,7 @@ SELECT $p0 /* some comment with $3 */, $p1`,
 				ydb.WithNumericArgs(),
 			),
 			sql: "SELECT $1, $2",
-			args: []interface{}{
+			args: []any{
 				100,
 				200,
 			},
@@ -680,7 +680,7 @@ SELECT 1`,
 				ydb.WithAutoDeclare(),
 			),
 			sql: "SELECT $param1, $param2",
-			args: []interface{}{
+			args: []any{
 				sql.Named("param1", 100),
 				sql.Named("$param2", 200),
 			},
@@ -703,7 +703,7 @@ SELECT $param1, $param2`,
 				ydb.WithPositionalArgs(),
 			),
 			sql:  `SELECT ?;`,
-			args: []interface{}{time.Unix(123, 456)},
+			args: []any{time.Unix(123, 456)},
 			yql: `-- bind declares
 DECLARE $p0 AS Timestamp;
 
@@ -718,7 +718,7 @@ SELECT $p0;`,
 				ydb.WithWideTimeTypes(true),
 			),
 			sql:  `SELECT ?;`,
-			args: []interface{}{time.Unix(123, 456)},
+			args: []any{time.Unix(123, 456)},
 			yql: `-- bind declares
 DECLARE $p0 AS Timestamp64;
 

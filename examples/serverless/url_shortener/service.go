@@ -56,7 +56,7 @@ func isLongCorrect(link string) bool {
 	return long.FindStringIndex(link) != nil
 }
 
-func render(t *template.Template, data interface{}) string {
+func render(t *template.Template, data any) string {
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, data); err != nil {
 		panic(err)
@@ -349,7 +349,7 @@ func (s *service) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	data := map[string]interface{}{
+	data := map[string]any{
 		"userAgent": r.UserAgent(),
 	}
 	if err = tpl.Execute(w, data); err != nil {

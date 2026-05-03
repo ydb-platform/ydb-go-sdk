@@ -18,7 +18,7 @@ import (
 func TestFieldName(t *testing.T) {
 	for _, tt := range []struct {
 		name string
-		in   interface{}
+		in   any
 		out  string
 	}{
 		{

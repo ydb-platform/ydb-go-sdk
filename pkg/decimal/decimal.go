@@ -38,8 +38,8 @@ const (
 // ParseDecimal parses a decimal string into a big.Int and exponent.
 // Returns (n, e) such that n * 10^(-e) equals the original number.
 func ParseDecimal(s string) (_ *big.Int, exp uint32, _ error) {
-	dotIndex := strings.Index(s, ".")
-	if dotIndex == -1 {
+	integerPart, fractionalPart, ok := strings.Cut(s, ".")
+	if !ok {
 		n := &big.Int{}
 		if _, ok := n.SetString(s, 10); !ok {
 			return nil, 0, xerrors.WithStackTrace(fmt.Errorf("invalid integer: %s", s))
@@ -47,9 +47,6 @@ func ParseDecimal(s string) (_ *big.Int, exp uint32, _ error) {
 
 		return n, 0, nil
 	}
-
-	integerPart := s[:dotIndex]
-	fractionalPart := s[dotIndex+1:]
 
 	combined := integerPart + fractionalPart
 	n := &big.Int{}
@@ -368,7 +365,7 @@ func put(x *big.Int, p []byte) {
 	}
 	i := len(p)
 	for _, d := range x.Bits() {
-		for j := 0; j < wordSize; j++ {
+		for range wordSize {
 			i--
 			p[i] = byte(d)
 			d >>= 8

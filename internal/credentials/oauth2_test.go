@@ -501,7 +501,7 @@ func TestJWTTokenSource(t *testing.T) {
 
 	for _, method := range methods {
 		for _, binary := range binaryOpts {
-			var publicKey interface{}
+			var publicKey any
 			var src TokenSource
 			var err error
 
@@ -563,7 +563,7 @@ func TestJWTTokenSource(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			getPublicKey := func(*jwt.Token) (interface{}, error) {
+			getPublicKey := func(*jwt.Token) (any, error) {
 				return publicKey, nil
 			}
 
@@ -626,7 +626,7 @@ func TestJWTTokenSourceReadPrivateKeyFromFile(t *testing.T) {
 			defer os.Remove(f.Name())
 			defer f.Close()
 
-			var publicKey interface{}
+			var publicKey any
 			var src TokenSource
 
 			//nolint:nestif
@@ -743,7 +743,7 @@ func TestJWTTokenSourceReadPrivateKeyFromFile(t *testing.T) {
 			require.NoError(t, err)
 
 			// parse token
-			getPublicKey := func(*jwt.Token) (interface{}, error) {
+			getPublicKey := func(*jwt.Token) (any, error) {
 				return publicKey, nil
 			}
 

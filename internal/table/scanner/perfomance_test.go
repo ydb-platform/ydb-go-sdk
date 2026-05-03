@@ -103,7 +103,7 @@ func TestOverallSliceApproaches(t *testing.T) {
 
 func BenchmarkTestSliceIncrement(b *testing.B) {
 	slice := make([]*column, testSize)
-	for j := 0; j < testSize; j++ {
+	for j := range testSize {
 		slice[j] = &column{}
 	}
 	var cnt int
@@ -111,7 +111,7 @@ func BenchmarkTestSliceIncrement(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cnt = 0
-		for i := 0; i < testSize; i++ {
+		for range testSize {
 			row = *slice[cnt]
 			cnt++
 		}
@@ -121,12 +121,12 @@ func BenchmarkTestSliceIncrement(b *testing.B) {
 
 func BenchmarkTestTempValue(b *testing.B) {
 	slice := make([]*column, testSize)
-	for j := 0; j < testSize; j++ {
+	for j := range testSize {
 		slice[j] = &column{}
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for i := 0; i < testSize; i++ {
+		for i := range testSize {
 			col := slice[i]
 			col.name = "test1"
 			col.typeID = 1
@@ -136,12 +136,12 @@ func BenchmarkTestTempValue(b *testing.B) {
 
 func BenchmarkTestDoubleIndex(b *testing.B) {
 	slice := make([]*column, testSize)
-	for j := 0; j < testSize; j++ {
+	for j := range testSize {
 		slice[j] = &column{}
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for i := 0; i < testSize; i++ {
+		for i := range testSize {
 			slice[i].name = "test2"
 			slice[i].typeID = 1
 		}

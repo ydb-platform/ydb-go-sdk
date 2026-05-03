@@ -1,4 +1,65 @@
-* Fixed flaky `TestReadersWritersStress` integration test: added nil guards for `writer.Close`/`reader.Close` calls when `StartWriter`/`StartReader` fails, and increased WaitGroup timeouts from 1s to 1 minute to accommodate slow CI environments
+## v3.135.10
+* Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
+
+## v3.135.9
+* Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
+* Fixed `query.Session.Begin` to return `BAD_SESSION` immediately for dead lazy-tx sessions instead of silently creating a transaction that would fail on the next server call
+* Fixed `Rollback` to signal `driver.ErrBadConn` to `database/sql` when the session is no longer alive after a rollback, ensuring the dead connection is discarded
+
+## v3.135.8
+* Fixed a race condition in the session pool where canceling a caller's context while a creation goroutine was still running could allow the pool to exceed its size limit
+
+## v3.135.7
+* Fixed `transport/ResourceExhausted` errors with description "trying to send message larger than max" or "received message larger than max" to be treated as non-retryable, so callers get an immediate error instead of repeated retries that cannot succeed
+
+## v3.135.6
+* Added logging for YQL compiler warnings returned via `trace.DriverConnInvokeDoneInfo.Issues` so they become visible in SDK logs (including when `trace.DetailsAll` is enabled), instead of being silently dropped.
+
+## v3.135.5
+* Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
+
+## v3.135.4
+* Fixed query `Execute`/`Query` sometimes returning `context.Canceled` instead of retrying when the session was closed while the gRPC stream was still valid, by using the stream-scoped context when creating the result reader
+
+## v3.135.3
+* Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
+
+## v3.135.2
+* Fixed closing idle sessions from the session pool when the `Close` context is already cancelled
+
+## v3.135.1
+* Fixed `database/sql` query service transactions to map connection-related errors to `driver.ErrBadConn` (begin, commit, rollback, exec, and query) so the pool can discard bad connections
+
+## v3.135.0
+* Added `topicoptions.WithWriterErrOnQueueFull(bool)` option for topic writer to make `Write` return `topicwriter.ErrQueueLimitExceed` immediately when the internal queue is full, instead of blocking. Useful for preventing OOM when the writer cannot keep up with produced messages.
+* Un-deprecated `topicwriter.ErrQueueLimitExceed`: it is returned by `Write` when a writer is created with `topicoptions.WithWriterErrOnQueueFull(true)` and the internal queue is full.
+
+## v3.134.2
+* Fixed `table.Session.Execute` ignoring `options.WithCommit()` so transactions were not committed when the option was passed
+
+## v3.134.1
+* Changed multi-partition topic writer (`topicoptions.WithWriteToManyPartitions`) so `Write` and `Flush` block until internal initialization completes, consistent with single-partition writers
+
+## v3.134.0
+* Fixed `sugar.RemoveRecursive()` for directories containing external data sources or external tables
+* Added `table.DescribeExternalDataSource()` and `table.DescribeExternalTable()` methods for describing external data sources and external tables
+
+## v3.133.1
+* Added `TopicListener.ReadSessionID()` getter
+
+## v3.133.0
+* Added `ydb.WithIssuesHandler` context option for surfacing YDB `QueryService` issues to `database/sql` callers
+
+## v3.132.0
+* Added `topic.Client.CommitOffset()` method for committing a consumer offset without an active read session
+* Added `topicreader.Reader.ReadSessionID()` method for obtaining the current read session identifier
+
+## v3.131.0
+* Added `ydb.WithStatsModeBasic`, `ydb.WithStatsModeFull`, `ydb.WithStatsModeProfile` context options for collecting query statistics via `database/sql`
+
+## v3.130.0
+* Changed default for `database/sql` driver from `TABLE` service to `QUERY` service
+* Added `__ydb_partition_key` metadata key to messages for topic writer to store the key used to choose the partition
 
 ## v3.129.0
 * Added `config.WithBuildInfo` option to append child frameworks to `x-ydb-sdk-build-info` header for all API requests
@@ -86,8 +147,8 @@
 * Added public named errors `query.{ErrNoRows,ErrMoreThanOneRow,ErrMoreThanOneResultSet,ErrNoResultSets}` in the `query` package
 
 ## v3.125.1
-* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to 
-`ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to 
+* Renamed `ydb_go_sdk_ydb_table_pool_node_hint_miss` and `ydb_go_sdk_ydb_query_pool_node_hint_miss` metrics to
+`ydb_go_sdk_ydb_table_pool_node_hint` and `ydb_go_sdk_ydb_query_pool_node_hint`. Added `hit` label for them to
 distinguish between hits and misses
 * Bumped `golang.org/x/net` from 0.35.0 to 0.38.0
 

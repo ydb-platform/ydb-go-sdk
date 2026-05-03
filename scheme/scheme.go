@@ -36,6 +36,8 @@ const (
 	EntryTopic
 	EntryColumnStore
 	EntryColumnTable
+	EntryExternalTable
+	EntryExternalDataSource
 )
 
 func (t EntryType) String() string {
@@ -62,6 +64,10 @@ func (t EntryType) String() string {
 		return "ColumnStore"
 	case EntryColumnTable:
 		return "ColumnTable"
+	case EntryExternalTable:
+		return "ExternalTable"
+	case EntryExternalDataSource:
+		return "ExternalDataSource"
 	}
 }
 
@@ -141,6 +147,10 @@ func entryType(t Ydb_Scheme.Entry_Type) EntryType {
 		return EntryColumnStore
 	case Ydb_Scheme.Entry_COLUMN_TABLE:
 		return EntryColumnTable
+	case Ydb_Scheme.Entry_EXTERNAL_TABLE:
+		return EntryExternalTable
+	case Ydb_Scheme.Entry_EXTERNAL_DATA_SOURCE:
+		return EntryExternalDataSource
 	default:
 		return EntryTypeUnknown
 	}

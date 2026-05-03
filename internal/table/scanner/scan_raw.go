@@ -295,7 +295,7 @@ func (s *rawConverter) DyNumber() (v string) {
 	return s.text()
 }
 
-func (s *rawConverter) Any() interface{} {
+func (s *rawConverter) Any() any {
 	return s.any()
 }
 
@@ -824,7 +824,7 @@ func (s *rawConverter) decimalTypeError(t types.Type) {
 	)
 }
 
-func nameIface(v interface{}) string {
+func nameIface(v any) string {
 	if v == nil {
 		return "nil"
 	}

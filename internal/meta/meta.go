@@ -3,6 +3,7 @@ package meta
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"strconv"
 	"strings"
@@ -62,9 +63,7 @@ func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 
 		if frameworks := m.buildInfo.Load().frameworks; len(frameworks) > 0 {
 			buildInfo.frameworks = make(map[string]string, len(frameworks)+1)
-			for frameworkName, frameworkVersion := range frameworks {
-				buildInfo.frameworks[frameworkName] = frameworkVersion
-			}
+			maps.Copy(buildInfo.frameworks, frameworks)
 			buildInfo.frameworks[frameworkName] = frameworkVersion
 		} else {
 			buildInfo.frameworks = map[string]string{

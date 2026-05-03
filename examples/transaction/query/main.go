@@ -98,7 +98,7 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 				ORDER BY ord;
 			`,
 			query.WithParameters(
-				ydb.ParamsFromMap(map[string]interface{}{
+				ydb.ParamsFromMap(map[string]any{
 					"$word1": "in",
 					"$word2": "transaction",
 					"$word3": "retries",

@@ -542,6 +542,11 @@ func (c *confirmStorage[T]) Get() (val T, ok bool) {
 	return val, false
 }
 
+// ReadSessionID returns the current read session identifier from the server.
+func (l *streamListener) ReadSessionID() string {
+	return l.sessionID
+}
+
 // SendRaw implements MessageSender interface for PartitionWorkers
 func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 	l.sendMessage(msg)

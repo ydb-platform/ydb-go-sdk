@@ -233,6 +233,42 @@ func (c *Client) DescribeTopicConsumer(
 	return res, nil
 }
 
+// CommitOffset commits the processed offset for a partition.
+// Pass topicoptions.WithCommitOffsetReadSessionID (from reader.ReadSessionID()) to associate
+// the commit with the current read session and avoid interrupting it.
+// If not set, the server will interrupt the active read session for the partition.
+func (c *Client) CommitOffset(
+	ctx context.Context,
+	path string,
+	partitionID int64,
+	consumer string,
+	offset int64,
+	opts ...topicoptions.CommitOffsetOption,
+) error {
+	options := topicoptions.CommitOffsetOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+
+	call := func(ctx context.Context) error {
+		return c.rawClient.CommitOffset(
+			ctx, c.defaultOperationParams, path, partitionID, consumer, offset, options.ReadSessionID,
+		)
+	}
+
+	if c.cfg.AutoRetry() {
+		return retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+			retry.WithBudget(c.cfg.RetryBudget()),
+		)
+	}
+
+	return call(ctx)
+}
+
 // Drop topic
 func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
 	req := rawtopic.DropTopicRequest{}

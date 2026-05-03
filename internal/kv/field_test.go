@@ -66,7 +66,7 @@ func TestField_AnyValue(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		f    KeyValue
-		want interface{}
+		want any
 	}{
 		{name: "int", f: Int("any", 1), want: 1},
 		{name: "int64", f: Int64("any", 9223372036854775807), want: int64(9223372036854775807)},

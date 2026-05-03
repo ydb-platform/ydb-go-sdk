@@ -8,7 +8,7 @@ func (err *alreadyHasTxError) Error() string {
 	return "сonn already has an open currentTx: " + err.currentTx
 }
 
-func (err *alreadyHasTxError) As(target interface{}) bool {
+func (err *alreadyHasTxError) As(target any) bool {
 	switch t := target.(type) {
 	case *alreadyHasTxError:
 		t.currentTx = err.currentTx

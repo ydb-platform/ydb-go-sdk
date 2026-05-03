@@ -28,6 +28,28 @@ type Client interface {
 		ctx context.Context, path string, consumer string, opts ...topicoptions.DescribeConsumerOption,
 	) (topictypes.TopicConsumerDescription, error)
 
+	// CommitOffset commits the processed offset for a consumer on a partition.
+	// This call is not tied to an active read session.
+	//
+	// Use topicoptions.WithCommitOffsetReadSessionID (from reader.ReadSessionID()) to avoid
+	// interrupting the current read session. Without it, the server will interrupt the active
+	// read session for this partition, causing the reader to reconnect.
+	//
+	// Server behavior for notable offset values:
+	//
+	//   offset > end of partition  → BAD_REQUEST error (cannot commit past the end)
+	//   offset < 0                 → BAD_REQUEST error (negative offset rejected)
+	//   offset < committed         → accepted silently; committed position is rolled back
+	//   offset == committed        → no-op, accepted silently
+	CommitOffset(
+		ctx context.Context,
+		path string,
+		partitionID int64,
+		consumer string,
+		offset int64,
+		opts ...topicoptions.CommitOffsetOption,
+	) error
+
 	// Drop topic
 	Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error
 

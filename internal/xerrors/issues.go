@@ -100,7 +100,7 @@ func (e *withIssuesError) Error() string {
 	return b.String()
 }
 
-func (e *withIssuesError) As(target interface{}) bool {
+func (e *withIssuesError) As(target any) bool {
 	for _, err := range e.issues {
 		if As(err, target) {
 			return true

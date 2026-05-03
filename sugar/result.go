@@ -42,7 +42,7 @@ func (r *result) NextRow() bool {
 }
 
 func (r *result) Scan(indexedValues ...indexed.RequiredOrOptional) error {
-	values := make([]interface{}, 0, len(indexedValues))
+	values := make([]any, 0, len(indexedValues))
 	for _, value := range indexedValues {
 		values = append(values, value)
 	}
@@ -59,7 +59,7 @@ func (r *result) ScanNamed(namedValues ...named.Value) error {
 	return r.row.ScanNamed(values...)
 }
 
-func (r *result) ScanStruct(dst interface{}) error {
+func (r *result) ScanStruct(dst any) error {
 	return r.row.ScanStruct(dst)
 }
 

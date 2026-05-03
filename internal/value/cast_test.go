@@ -13,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
-func ptr[T any]() interface{} {
+func ptr[T any]() any {
 	var zeroValue T
 
 	return &zeroValue
@@ -23,7 +23,7 @@ func value2ptr[T any](v T) *T {
 	return &v
 }
 
-func unwrapPtr(v interface{}) interface{} {
+func unwrapPtr(v any) any {
 	return reflect.ValueOf(v).Elem().Interface()
 }
 
@@ -60,14 +60,14 @@ func TestCastTo(t *testing.T) {
 	testsCases := []struct {
 		name  string
 		value Value
-		dst   interface{}
-		exp   interface{}
+		dst   any
+		exp   any
 		err   error
 	}{
 		{
 			name:  xtest.CurrentFileLine(),
 			value: TextValue("test"),
-			dst:   (interface{})(nil),
+			dst:   (any)(nil),
 			err:   errNilDestination,
 		},
 
@@ -712,7 +712,7 @@ func TestCastToDriverValue(t *testing.T) {
 	testsCases := []struct {
 		name  string
 		value Value
-		exp   interface{}
+		exp   any
 		err   error
 	}{
 		{

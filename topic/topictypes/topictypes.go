@@ -1,6 +1,7 @@
 package topictypes
 
 import (
+	"maps"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
@@ -230,9 +231,7 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	d.RetentionStorageMB = raw.RetentionStorageMB
 
 	d.Attributes = make(map[string]string)
-	for k, v := range raw.Attributes {
-		d.Attributes[k] = v
-	}
+	maps.Copy(d.Attributes, raw.Attributes)
 
 	d.Consumers = make([]Consumer, len(raw.Consumers))
 	for i := 0; i < len(raw.Consumers); i++ {

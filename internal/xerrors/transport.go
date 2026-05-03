@@ -3,7 +3,9 @@ package xerrors
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -83,11 +85,25 @@ func (e *transportError) Unwrap() error {
 	return e.err
 }
 
+// isMessageLargerThanMax reports whether the error describes a gRPC message that
+// exceeds the configured send/receive size limit.  Such errors are always
+// non-retryable because the payload size does not change between attempts.
+func (e *transportError) isMessageLargerThanMax() bool {
+	msg := e.status.Message()
+
+	return strings.Contains(msg, "trying to send message larger than max") ||
+		strings.Contains(msg, "received message larger than max")
+}
+
 func (e *transportError) Type() Type {
 	switch e.status.Code() {
-	case
-		grpcCodes.Aborted,
-		grpcCodes.ResourceExhausted:
+	case grpcCodes.ResourceExhausted:
+		if e.isMessageLargerThanMax() {
+			return TypeNonRetryable
+		}
+
+		return TypeRetryable
+	case grpcCodes.Aborted:
 		return TypeRetryable
 	case
 		grpcCodes.Internal,
@@ -109,6 +125,10 @@ func (e *transportError) BackoffType() backoff.Type {
 		grpcCodes.Unavailable:
 		return backoff.TypeFast
 	case grpcCodes.ResourceExhausted:
+		if e.isMessageLargerThanMax() {
+			return backoff.TypeNoBackoff
+		}
+
 		return backoff.TypeSlow
 	default:
 		return backoff.TypeNoBackoff
@@ -130,10 +150,8 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 		if len(codes) == 0 {
 			return true
 		}
-		for _, code := range codes {
-			if status.Code() == code {
-				return true
-			}
+		if slices.Contains(codes, status.Code()) {
+			return true
 		}
 	}
 

@@ -24,7 +24,7 @@ type PublicBatch struct {
 }
 
 func NewBatch(session *PartitionSession, messages []*PublicMessage) (*PublicBatch, error) {
-	for i := 0; i < len(messages); i++ {
+	for i := range messages {
 		msg := messages[i]
 
 		if msg.commitRange.PartitionSession == nil {

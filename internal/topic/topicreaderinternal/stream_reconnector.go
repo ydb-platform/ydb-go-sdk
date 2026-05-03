@@ -81,6 +81,26 @@ func newReaderReconnector(
 	return res
 }
 
+// readSessionIDer is a local interface to retrieve the read session ID from the
+// underlying stream without adding it to the broader batchedStreamReader contract.
+type readSessionIDer interface {
+	ReadSessionID() string
+}
+
+func (r *readerReconnector) ReadSessionID() string {
+	// RLock is required: streamVal may be replaced by the reconnect goroutine.
+	// No deadlock risk: ReadSessionID() on the underlying stream is a simple getter
+	// with no locking of its own.
+	var sessionID string
+	r.m.WithRLock(func() {
+		if p, ok := r.streamVal.(readSessionIDer); ok {
+			sessionID = p.ReadSessionID()
+		}
+	})
+
+	return sessionID
+}
+
 func (r *readerReconnector) TopicOnReaderStart(consumer string, err error) {
 	logCtx := r.logContext
 	trace.TopicOnReaderStart(r.tracer, &logCtx, r.readerID, consumer, err)

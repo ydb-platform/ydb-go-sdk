@@ -60,7 +60,7 @@ func (ctx *timeoutCtx) Err() error {
 	return nil
 }
 
-func (ctx *timeoutCtx) Value(key interface{}) interface{} {
+func (ctx *timeoutCtx) Value(key any) any {
 	return ctx.ctx.Value(key)
 }
 

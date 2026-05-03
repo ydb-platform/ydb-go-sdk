@@ -162,11 +162,8 @@ func TestSessionCoreClose(t *testing.T) {
 		<-stopRecv
 
 		var wg sync.WaitGroup
-		parallel := runtime.GOMAXPROCS(0)
-		if parallel > 10 {
-			parallel = 10
-		}
-		for i := 0; i < parallel; i++ {
+		parallel := min(runtime.GOMAXPROCS(0), 10)
+		for i := range parallel {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()

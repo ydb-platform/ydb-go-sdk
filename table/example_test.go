@@ -153,7 +153,7 @@ func Example_bulkUpsert() {
 	// prepare native go data
 	const batchSize = 10000
 	logs := make([]logMessage, 0, batchSize)
-	for i := 0; i < batchSize; i++ {
+	for i := range batchSize {
 		logs = append(logs, logMessage{
 			App:       fmt.Sprintf("App_%d", i/256),
 			Host:      fmt.Sprintf("192.168.0.%d", i%256),
@@ -313,7 +313,7 @@ func Example_bulkUpsertWithCompression() {
 	// prepare native go data
 	const batchSize = 10000
 	logs := make([]logMessage, 0, batchSize)
-	for i := 0; i < batchSize; i++ {
+	for i := range batchSize {
 		logs = append(logs, logMessage{
 			App:       fmt.Sprintf("App_%d", i/256),
 			Host:      fmt.Sprintf("192.168.0.%d", i%256),

@@ -25,7 +25,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 		cc: testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					testutil.TableBeginTransaction: func(request interface{}) (proto.Message, error) {
+					testutil.TableBeginTransaction: func(request any) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.BeginTransactionRequest)
 						if !ok {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.BeginTransactionRequest", request)
@@ -38,7 +38,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							},
 						}, nil
 					},
-					testutil.TableCommitTransaction: func(request interface{}) (proto.Message, error) {
+					testutil.TableCommitTransaction: func(request any) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.CommitTransactionRequest)
 						if !ok {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.CommitTransactionRequest", request)
@@ -47,7 +47,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 
 						return &Ydb_Table.CommitTransactionResult{}, nil
 					},
-					testutil.TableRollbackTransaction: func(request interface{}) (proto.Message, error) {
+					testutil.TableRollbackTransaction: func(request any) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.RollbackTransactionRequest)
 						if !ok {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.RollbackTransactionRequest", request)
@@ -61,7 +61,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							},
 						}, nil
 					},
-					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					testutil.TableCreateSession: func(any) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil

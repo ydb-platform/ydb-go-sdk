@@ -374,7 +374,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 					} else {
 						mask.WriteString("****")
 					}
-					mask.WriteString(fmt.Sprintf("(CRC-32c: %08X)", crc32.Checksum([]byte(info.Token), crc32.IEEETable)))
+					fmt.Fprintf(&mask, "(CRC-32c: %08X)", crc32.Checksum([]byte(info.Token), crc32.IEEETable))
 					parent.Log(functionID,
 						kv.String("token", mask.String()),
 					)

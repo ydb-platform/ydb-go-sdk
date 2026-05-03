@@ -512,6 +512,6 @@ func NullableDyNumberValue(v *string) Value {
 	return value.NullableDyNumberValue(v)
 }
 
-func Nullable(t Type, v interface{}) Value {
+func Nullable(t Type, v any) Value {
 	return value.Nullable(t, v)
 }

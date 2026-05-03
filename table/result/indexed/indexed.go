@@ -8,7 +8,7 @@ package indexed
 //	type Required interface {
 //	  *int8 | *int64 | *string | types.Scanner | json.Unmarshaler
 //	}
-type Required interface{}
+type Required any
 
 // Optional is a type scan destination of optional ydb values
 // Optional must be a double pointer value destination
@@ -22,7 +22,7 @@ type Required interface{}
 // or alias such as
 //
 //	type Optional *Required
-type Optional interface{}
+type Optional any
 
 // RequiredOrOptional is a type scan destination of ydb values
 // This is a proxy type for preparing go1.18 type set constrains such as
@@ -30,4 +30,4 @@ type Optional interface{}
 //	type valueType interface {
 //	  Required | Optional
 //	}
-type RequiredOrOptional interface{}
+type RequiredOrOptional any

@@ -110,19 +110,3 @@ func (b logBackoff) Delay(i int) time.Duration {
 
 	return f + time.Duration(b.r.Int64(int64(d-f)+1))
 }
-
-func min(a, b uint) uint {
-	if a < b {
-		return a
-	}
-
-	return b
-}
-
-func max(a, b uint) uint {
-	if a > b {
-		return a
-	}
-
-	return b
-}

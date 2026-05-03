@@ -24,7 +24,7 @@ func (ctx *MergedContexts) Err() error {
 	return ctx.deadlineContext.Err()
 }
 
-func (ctx *MergedContexts) Value(key interface{}) interface{} {
+func (ctx *MergedContexts) Value(key any) any {
 	if ctx.deadlineContext.Value(key) != nil {
 		return ctx.deadlineContext.Value(key)
 	}

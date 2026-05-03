@@ -83,7 +83,7 @@ func TestMultiDecoder(t *testing.T) {
 	t.Run("ResettableReaderManyMessages", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
 
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			testMsg := fmt.Sprintf("test_data_%d", i)
 			encodedReader := compressGzip(testMsg)
 

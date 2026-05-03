@@ -18,13 +18,13 @@ type Row struct {
 	data *scanner.Data
 
 	indexedScanner interface {
-		Scan(dst ...interface{}) error
+		Scan(dst ...any) error
 	}
 	namedScanner interface {
 		ScanNamed(dst ...scanner.NamedDestination) error
 	}
 	structScanner interface {
-		ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error
+		ScanStruct(dst any, opts ...scanner.ScanStructOption) error
 	}
 }
 
@@ -43,7 +43,7 @@ func NewRow(columns []*Ydb.Column, v *Ydb.Value) *Row {
 	}
 }
 
-func (r Row) Scan(dst ...interface{}) error {
+func (r Row) Scan(dst ...any) error {
 	err := r.indexedScanner.Scan(dst...)
 	if err != nil {
 		return xerrors.WithStackTrace(
@@ -67,7 +67,7 @@ func (r Row) ScanNamed(dst ...scanner.NamedDestination) error {
 	return nil
 }
 
-func (r Row) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error {
+func (r Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
 	err := r.structScanner.ScanStruct(dst, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(

@@ -980,6 +980,14 @@ func WithCollectStatsModeBasic() ExecuteDataQueryOption {
 	})
 }
 
+func WithCollectStatsMode(mode Ydb_Table.QueryStatsCollection_Mode) ExecuteDataQueryOption {
+	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc) []grpc.CallOption {
+		d.CollectStats = mode
+
+		return nil
+	})
+}
+
 type (
 	BulkUpsertOption interface {
 		ApplyBulkUpsertOption() []grpc.CallOption

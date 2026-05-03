@@ -14,13 +14,13 @@ func ProtoUnmarshal(msg *topicreader.Message, dst proto.Message) error {
 }
 
 // JSONUnmarshal unmarshal json message content to dst must by pointer to struct
-func JSONUnmarshal(msg *topicreader.Message, dst interface{}) error {
+func JSONUnmarshal(msg *topicreader.Message, dst any) error {
 	return UnmarshalMessageWith(msg, json.Unmarshal, dst)
 }
 
 // UnmarshalMessageWith call unmarshaller func with message content
 // unmarshaller func must not use received byte slice after return.
-func UnmarshalMessageWith(msg *topicreader.Message, unmarshaler UnmarshalFunc, v interface{}) error {
+func UnmarshalMessageWith(msg *topicreader.Message, unmarshaler UnmarshalFunc, v any) error {
 	return msg.UnmarshalTo(messageUnmarshaler{unmarshaler: unmarshaler, dst: v})
 }
 
@@ -40,7 +40,7 @@ func (c messageUnmarhalerToCallback) UnmarshalYDBTopicMessage(data []byte) error
 
 // UnmarshalFunc is func to unmarshal data to interface, for example
 // json.Unmarshal from standard library
-type UnmarshalFunc func(data []byte, dst interface{}) error
+type UnmarshalFunc func(data []byte, dst any) error
 
 type protobufUnmarshaler struct {
 	dst proto.Message
@@ -53,7 +53,7 @@ func (m protobufUnmarshaler) UnmarshalYDBTopicMessage(data []byte) error {
 
 type messageUnmarshaler struct {
 	unmarshaler UnmarshalFunc
-	dst         interface{}
+	dst         any
 }
 
 // UnmarshalYDBTopicMessage implement unmarshaller

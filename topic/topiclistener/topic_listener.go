@@ -32,6 +32,13 @@ func NewTopicListener(
 	return res, nil
 }
 
+// ReadSessionID returns the current read session identifier.
+// It can be passed to Topic().CommitOffset() to avoid interrupting the read session.
+// The session ID changes after reconnects.
+func (cr *TopicListener) ReadSessionID() string {
+	return cr.listenerReconnector.ReadSessionID()
+}
+
 func (cr *TopicListener) WaitInit(ctx context.Context) error {
 	return cr.listenerReconnector.WaitInit(ctx)
 }

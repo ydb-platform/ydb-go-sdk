@@ -6,6 +6,8 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -136,6 +138,14 @@ func WithTxControl(ctx context.Context, txControl *tx.Control) context.Context {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithCommitTxContext(ctx context.Context) context.Context {
 	return tx.WithCommitTx(ctx)
+}
+
+// WithIssuesHandler sets a callback which is invoked for query
+// execution result to receive YDB issue messages.
+//
+// Supported only for QueryService.
+func WithIssuesHandler(ctx context.Context, callback func([]*Ydb_Issue.IssueMessage)) context.Context {
+	return xquery.WithIssuesHandler(ctx, callback)
 }
 
 type ConnectorOption = xsql.Option

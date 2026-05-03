@@ -37,8 +37,8 @@ type (
 	Row interface {
 		Values() []value.Value
 
-		Scan(dst ...interface{}) error
+		Scan(dst ...any) error
 		ScanNamed(dst ...scanner.NamedDestination) error
-		ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error
+		ScanStruct(dst any, opts ...scanner.ScanStructOption) error
 	}
 )

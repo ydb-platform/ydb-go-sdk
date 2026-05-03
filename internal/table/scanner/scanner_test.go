@@ -21,7 +21,7 @@ import (
 )
 
 //nolint:gocyclo
-func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{}) {
+func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 	rv := r.Int64(math.MaxInt16)
 	switch c.typeID {
 	case Ydb.Type_BOOL:
@@ -544,7 +544,7 @@ func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [
 
 	r := xrand.New(xrand.WithLock())
 	testValues = make([][]indexed.RequiredOrOptional, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		var items []*Ydb.Value
 		var vals []indexed.RequiredOrOptional
 		for j := range result.GetColumns() {

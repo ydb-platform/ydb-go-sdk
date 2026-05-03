@@ -633,7 +633,7 @@ func TestOptionalValueCastTo(t *testing.T) {
 		name string
 		v    *optionalValue
 		dst  **string
-		exp  interface{}
+		exp  any
 		err  error
 	}{
 		{
@@ -681,7 +681,7 @@ func TestNullable(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		t    types.Type
-		v    interface{}
+		v    any
 		exp  Value
 	}{
 		{
@@ -1126,7 +1126,7 @@ func TestCastNumbers(t *testing.T) {
 		},
 	}
 	numberDestinations := []struct {
-		destination interface{}
+		destination any
 		signed      bool
 		len         int
 	}{
@@ -1221,8 +1221,8 @@ func TestCastNumbers(t *testing.T) {
 	}
 	for _, tt := range []struct {
 		v      Value
-		dst    interface{}
-		result interface{}
+		dst    any
+		result any
 		error  bool
 	}{
 		{
@@ -1365,8 +1365,8 @@ func TestCastNumbers(t *testing.T) {
 func TestCastList(t *testing.T) {
 	for _, tt := range []struct {
 		v      Value
-		dst    interface{}
-		result interface{}
+		dst    any
+		result any
 		error  bool
 	}{
 		{
@@ -1412,8 +1412,8 @@ func TestCastList(t *testing.T) {
 func TestCastSet(t *testing.T) {
 	for _, tt := range []struct {
 		v      Value
-		dst    interface{}
-		result interface{}
+		dst    any
+		result any
 		error  bool
 	}{
 		{
@@ -1463,8 +1463,8 @@ func TestCastStruct(t *testing.T) {
 	}
 	for _, tt := range []struct {
 		v      Value
-		dst    interface{}
-		result interface{}
+		dst    any
+		result any
 		error  bool
 	}{
 		{
@@ -1504,8 +1504,8 @@ func TestCastStruct(t *testing.T) {
 func TestCastOtherTypes(t *testing.T) {
 	for _, tt := range []struct {
 		v      Value
-		dst    interface{}
-		result interface{}
+		dst    any
+		result any
 		error  bool
 	}{
 		{

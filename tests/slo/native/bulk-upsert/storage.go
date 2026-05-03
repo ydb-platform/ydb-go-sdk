@@ -2,22 +2,22 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
-	"path"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
-	"slo/internal/config"
+	"slo/internal/framework"
 	"slo/internal/generator"
+	"slo/internal/kv"
 )
 
 const createTableQuery = `
@@ -39,58 +39,58 @@ CREATE TABLE IF NOT EXISTS` + " `%s` " + `(
 
 const dropTableQuery = "DROP TABLE IF EXISTS `%s`;"
 
-type Storage struct {
-	db          *ydb.Driver
-	cfg         *config.Config
-	tablePath   string
-	retryBudget interface {
-		budget.Budget
-		Stop()
-	}
+type db struct {
+	driver       *ydb.Driver
+	tablePath    string
+	createSQL    string
+	dropSQL      string
+	writeTimeout time.Duration
+	readTimeout  time.Duration
 }
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label string) (*Storage, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
+func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workload, error) {
+	var batchSize uint
+
+	params := kv.ParseParams(fw, "bulk-upsert", func(fs *flag.FlagSet) {
+		fs.UintVar(&batchSize, "batch-size", 1, "batch size for bulk operations")
+	})
+
+	connectCtx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
 	defer cancel()
 
-	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:mnd
-
-	db, err := ydb.Open(ctx,
-		cfg.Endpoint+cfg.DB,
-		ydb.WithSessionPoolSizeLimit(poolSize),
-		ydb.WithRetryBudget(retryBudget),
-		ydb.WithInsecure(),
-		ydb.WithAnonymousCredentials(),
-		ydb.WithTLSSInsecureSkipVerify(),
+	driver, err := ydb.Open(connectCtx,
+		fw.Config.Endpoint+fw.Config.Database,
+		ydb.WithSessionPoolSizeLimit(params.PoolSize()),
+		ydb.WithRetryBudget(params.RetryBudget),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	prefix := path.Join(db.Name(), label)
-
-	s := &Storage{
-		db:          db,
-		cfg:         cfg,
-		tablePath:   path.Join(prefix, cfg.Table),
-		retryBudget: retryBudget,
-	}
-
-	return s, nil
+	return kv.NewBatch(fw, params, batchSize, &db{
+		driver:    driver,
+		tablePath: params.TablePath,
+		createSQL: fmt.Sprintf(createTableQuery, params.TablePath,
+			params.MinPartitionCount, params.PartitionSize,
+			params.MinPartitionCount, params.MaxPartitionCount,
+		),
+		dropSQL:      fmt.Sprintf(dropTableQuery, params.TablePath),
+		writeTimeout: params.WriteTimeout,
+		readTimeout:  params.ReadTimeout,
+	}), nil
 }
 
-func (s *Storage) WriteBatch(ctx context.Context, e []generator.Row) (attempts int, finalErr error) {
+func (d *db) WriteBatch(ctx context.Context, rows []generator.Row) (attempts int, _ error) {
 	if err := ctx.Err(); err != nil {
-		return attempts, err
+		return 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	rows := make([]types.Value, 0, len(e))
-
-	for _, row := range e {
-		rows = append(rows, types.StructValue(
+	values := make([]types.Value, 0, len(rows))
+	for _, row := range rows {
+		values = append(values, types.StructValue(
 			types.StructFieldValue("id", types.Uint64Value(row.ID)),
 			types.StructFieldValue("payload_str", types.OptionalValue(types.TextValue(*row.PayloadStr))),
 			types.StructFieldValue("payload_double", types.OptionalValue(types.DoubleValue(*row.PayloadDouble))),
@@ -110,10 +110,10 @@ func (s *Storage) WriteBatch(ctx context.Context, e []generator.Row) (attempts i
 		},
 	}
 
-	err := s.db.Table().BulkUpsert(
+	err := d.driver.Table().BulkUpsert(
 		ctx,
-		s.tablePath,
-		table.BulkUpsertDataRows(types.ListValue(rows...)),
+		d.tablePath,
+		table.BulkUpsertDataRows(types.ListValue(values...)),
 		table.WithRetryOptions([]retry.Option{ //nolint:staticcheck
 			retry.WithTrace(t),
 		}),
@@ -124,16 +124,12 @@ func (s *Storage) WriteBatch(ctx context.Context, e []generator.Row) (attempts i
 	return attempts, err
 }
 
-func (s *Storage) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (
-	_ []generator.Row,
-	attempts int,
-	finalErr error,
-) {
+func (d *db) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (_ []generator.Row, attempts int, _ error) {
 	if err := ctx.Err(); err != nil {
-		return []generator.Row{}, attempts, err
+		return nil, 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.readTimeout)
 	defer cancel()
 
 	t := &trace.Retry{
@@ -146,13 +142,12 @@ func (s *Storage) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (
 
 	keys := make([]types.Value, 0, len(rowIDs))
 	for _, rowID := range rowIDs {
-		key := types.StructValue(
+		keys = append(keys, types.StructValue(
 			types.StructFieldValue("id", types.Uint64Value(rowID)),
-		)
-		keys = append(keys, key)
+		))
 	}
 
-	res, err := s.db.Table().ReadRows(ctx, s.tablePath, types.ListValue(keys...), []options.ReadRowsOption{},
+	res, err := d.driver.Table().ReadRows(ctx, d.tablePath, types.ListValue(keys...), []options.ReadRowsOption{},
 		table.WithRetryOptions([]retry.Option{ //nolint:staticcheck
 			retry.WithTrace(t),
 		}),
@@ -167,7 +162,6 @@ func (s *Storage) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (
 	}()
 
 	readRows := make([]generator.Row, 0, len(rowIDs))
-
 	for res.NextResultSet(ctx) {
 		if err = res.Err(); err != nil {
 			return nil, attempts, err
@@ -178,78 +172,54 @@ func (s *Storage) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (
 		}
 
 		for res.NextRow() {
-			readRow := generator.Row{}
-			scans := []named.Value{
-				named.Required("id", &readRow.ID),
-				named.Optional("payload_str", &readRow.PayloadStr),
-				named.Optional("payload_double", &readRow.PayloadDouble),
-				named.Optional("payload_timestamp", &readRow.PayloadTimestamp),
-				named.Optional("payload_hash", &readRow.PayloadHash),
-			}
-
-			err = res.ScanNamed(scans...)
+			var row generator.Row
+			err = res.ScanNamed(
+				named.Required("id", &row.ID),
+				named.Optional("payload_str", &row.PayloadStr),
+				named.Optional("payload_double", &row.PayloadDouble),
+				named.Optional("payload_timestamp", &row.PayloadTimestamp),
+				named.Optional("payload_hash", &row.PayloadHash),
+			)
 			if err != nil {
 				return nil, attempts, err
 			}
 
-			readRows = append(readRows, readRow)
+			readRows = append(readRows, row)
 		}
 	}
 
 	return readRows, attempts, nil
 }
 
-func (s *Storage) CreateTable(ctx context.Context) error {
-	return s.db.Query().Do(ctx,
-		func(ctx context.Context, session query.Session) error {
-			fmt.Println(fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
-				s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
-			))
+func (d *db) CreateTable(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
+	defer cancel()
 
-			return session.Exec(ctx,
-				fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
-					s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
-				),
-				query.WithTxControl(query.EmptyTxControl()),
-			)
+	return d.driver.Query().Do(ctx,
+		func(ctx context.Context, session query.Session) error {
+			return session.Exec(ctx, d.createSQL, query.WithTxControl(query.EmptyTxControl()))
 		}, query.WithIdempotent(),
 		query.WithLabel("CREATE TABLE"),
 	)
 }
 
-func (s *Storage) DropTable(ctx context.Context) error {
+func (d *db) DropTable(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	return s.db.Query().Do(ctx,
+	return d.driver.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
-			return session.Exec(ctx,
-				fmt.Sprintf(dropTableQuery, s.tablePath),
-				query.WithTxControl(query.EmptyTxControl()),
-			)
+			return session.Exec(ctx, d.dropSQL, query.WithTxControl(query.EmptyTxControl()))
 		},
 		query.WithIdempotent(),
 		query.WithLabel("DROP TABLE"),
 	)
 }
 
-func (s *Storage) Close(ctx context.Context) error {
-	s.retryBudget.Stop()
-
-	var (
-		shutdownCtx    context.Context
-		shutdownCancel context.CancelFunc
-	)
-	if s.cfg.ShutdownTime > 0 {
-		shutdownCtx, shutdownCancel = context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
-	} else {
-		shutdownCtx, shutdownCancel = context.WithCancel(ctx)
-	}
-	defer shutdownCancel()
-
-	return s.db.Close(shutdownCtx)
+func (d *db) Close(ctx context.Context) error {
+	return d.driver.Close(ctx)
 }

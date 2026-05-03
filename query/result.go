@@ -16,7 +16,7 @@ type (
 	ScanStructOption  = scanner.ScanStructOption
 )
 
-func Named(columnName string, destinationValueReference interface{}) (dst NamedDestination) {
+func Named(columnName string, destinationValueReference any) (dst NamedDestination) {
 	return scanner.NamedRef(columnName, destinationValueReference)
 }
 

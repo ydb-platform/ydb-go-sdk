@@ -9,7 +9,7 @@ import (
 var _ grpc.ClientConnInterface = (*middleware)(nil)
 
 type (
-	invoker  func(context.Context, string, interface{}, interface{}, ...grpc.CallOption) error
+	invoker  func(context.Context, string, any, any, ...grpc.CallOption) error
 	streamer func(context.Context, *grpc.StreamDesc, string, ...grpc.CallOption) (grpc.ClientStream, error)
 )
 
@@ -19,7 +19,7 @@ type middleware struct {
 }
 
 func (m *middleware) Invoke(
-	ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption,
+	ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption,
 ) error {
 	return m.invoke(ctx, method, args, reply, opts...)
 }
@@ -35,7 +35,7 @@ func WithContextModifier(
 	modifyCtx func(ctx context.Context) context.Context,
 ) grpc.ClientConnInterface {
 	return &middleware{
-		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+		invoke: func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 			ctx = modifyCtx(ctx)
 
 			return cc.Invoke(ctx, method, args, reply, opts...)
@@ -52,7 +52,7 @@ func WithContextModifier(
 
 func WithAppendOptions(cc grpc.ClientConnInterface, appendOpts ...grpc.CallOption) grpc.ClientConnInterface {
 	return &middleware{
-		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+		invoke: func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 			opts = append(opts, appendOpts...)
 
 			return cc.Invoke(ctx, method, args, reply, opts...)
@@ -72,7 +72,7 @@ func WithBeforeFunc(
 	before func(),
 ) grpc.ClientConnInterface {
 	return &middleware{
-		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+		invoke: func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 			before()
 
 			return cc.Invoke(ctx, method, args, reply, opts...)

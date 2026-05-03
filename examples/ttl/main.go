@@ -104,7 +104,7 @@ func main() {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	for i := uint64(0); i < expirationQueueCount; i++ {
+	for i := range uint64(expirationQueueCount) {
 		if err = deleteExpired(ctx, db.Table(), prefix, i, 1); err != nil {
 			panic(fmt.Errorf("delete expired failed: %w", err))
 		}
@@ -131,7 +131,7 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	for i := uint64(0); i < expirationQueueCount; i++ {
+	for i := range uint64(expirationQueueCount) {
 		if err = deleteExpired(ctx, db.Table(), prefix, i, 2); err != nil {
 			panic(fmt.Errorf("delete expired failed: %w", err))
 		}

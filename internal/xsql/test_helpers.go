@@ -41,7 +41,7 @@ func (m *mockCommonConn) Close() error {
 	return nil
 }
 
-func (m *mockCommonConn) Query(ctx context.Context, sql string, p *params.Params) (driver.RowsNextResultSet, error) {
+func (m *mockCommonConn) Query(ctx context.Context, sql string, p *params.Params) (common.Rows, error) {
 	return nil, nil //nolint:nilnil // valid for test mock
 }
 
@@ -74,7 +74,7 @@ func (m *mockTx) Exec(ctx context.Context, sql string, p *params.Params) (driver
 	return nil, nil //nolint:nilnil // valid for test mock
 }
 
-func (m *mockTx) Query(ctx context.Context, sql string, p *params.Params) (driver.RowsNextResultSet, error) {
+func (m *mockTx) Query(ctx context.Context, sql string, p *params.Params) (common.Rows, error) {
 	return nil, nil //nolint:nilnil // valid for test mock
 }
 
@@ -101,6 +101,6 @@ func (m *mockProcessor) Exec(ctx context.Context, sql string, p *params.Params) 
 	return nil, nil //nolint:nilnil // valid for test mock
 }
 
-func (m *mockProcessor) Query(ctx context.Context, sql string, p *params.Params) (driver.RowsNextResultSet, error) {
+func (m *mockProcessor) Query(ctx context.Context, sql string, p *params.Params) (common.Rows, error) {
 	return nil, nil //nolint:nilnil // valid for test mock
 }

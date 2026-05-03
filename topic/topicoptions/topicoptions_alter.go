@@ -1,6 +1,7 @@
 package topicoptions
 
 import (
+	"slices"
 	"sort"
 	"time"
 
@@ -40,9 +41,7 @@ func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
 
 // AlterWithSupportedCodecs change set of codec, allowed for the topic
 func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
-	sort.Slice(codecs, func(i, j int) bool {
-		return codecs[i] < codecs[j]
-	})
+	slices.Sort(codecs)
 
 	return withSupportedCodecs(codecs)
 }
@@ -96,9 +95,7 @@ func AlterConsumerWithReadFrom(name string, readFrom time.Time) AlterOption {
 
 // AlterConsumerWithSupportedCodecs change codecs, supported by the consumer
 func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) AlterOption {
-	sort.Slice(codecs, func(i, j int) bool {
-		return codecs[i] < codecs[j]
-	})
+	slices.Sort(codecs)
 
 	return withConsumerWithSupportedCodecs{
 		name:   name,

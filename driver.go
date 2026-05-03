@@ -109,7 +109,7 @@ type (
 		onClose     []func(c *Driver)
 		closed      atomic.Bool
 
-		panicCallback func(e interface{})
+		panicCallback func(e any)
 	}
 	balancerWithMeta struct {
 		balancer *balancer.Balancer

@@ -28,8 +28,8 @@ var (
 )
 
 var (
-	uuidType    = reflect.TypeOf(uuid.UUID{})
-	uuidPtrType = reflect.TypeOf((*uuid.UUID)(nil))
+	uuidType    = reflect.TypeFor[uuid.UUID]()
+	uuidPtrType = reflect.TypeFor[*uuid.UUID]()
 )
 
 func asUUID(v any) (value.Value, bool) {

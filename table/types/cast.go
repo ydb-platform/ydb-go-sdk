@@ -12,7 +12,7 @@ import (
 var errNilValue = errors.New("nil value")
 
 // CastTo try cast value to destination type value
-func CastTo(v Value, dst interface{}) error {
+func CastTo(v Value, dst any) error {
 	if v == nil {
 		return xerrors.WithStackTrace(errNilValue)
 	}

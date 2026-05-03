@@ -18,7 +18,7 @@ import (
 
 func TestGenerateDeclareSection(t *testing.T) {
 	splitDeclares := func(declaresSection string) (declares []string) {
-		for _, s := range strings.Split(declaresSection, ";") {
+		for s := range strings.SplitSeq(declaresSection, ";") {
 			s = strings.TrimSpace(s)
 			if s != "" {
 				declares = append(declares, s)
@@ -118,7 +118,7 @@ func TestGenerateDeclareSection(t *testing.T) {
 func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 	b := testutil.QueryBind(bind.AutoDeclare{})
 	getDeclares := func(declaresSection string) (declares []string) {
-		for _, s := range strings.Split(declaresSection, "\n") {
+		for s := range strings.SplitSeq(declaresSection, "\n") {
 			s = strings.TrimSpace(s)
 			if s != "" && !strings.HasPrefix(s, "--") {
 				declares = append(declares, strings.TrimRight(s, ";"))
@@ -129,11 +129,11 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 		return declares
 	}
 	for _, tt := range []struct {
-		params   []interface{}
+		params   []any
 		declares []string
 	}{
 		{
-			params: []interface{}{
+			params: []any{
 				table.ValueParam(
 					"$values",
 					types.ListValue(
@@ -150,7 +150,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				table.ValueParam(
 					"$delta",
 					types.IntervalValueFromDuration(time.Hour),
@@ -161,7 +161,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				table.ValueParam(
 					"$ts",
 					types.TimestampValueFromTime(time.Now()),
@@ -172,7 +172,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				table.ValueParam(
 					"$a",
 					types.BoolValue(true),
@@ -193,7 +193,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				table.ValueParam(
 					"$a",
 					types.BoolValue(true),
@@ -225,7 +225,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 	b := testutil.QueryBind(bind.AutoDeclare{})
 	getDeclares := func(declaresSection string) (declares []string) {
-		for _, s := range strings.Split(declaresSection, "\n") {
+		for s := range strings.SplitSeq(declaresSection, "\n") {
 			s = strings.TrimSpace(s)
 			if s != "" && !strings.HasPrefix(s, "--") {
 				declares = append(declares, strings.TrimRight(s, ";"))
@@ -236,11 +236,11 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 		return declares
 	}
 	for _, tt := range []struct {
-		params   []interface{}
+		params   []any
 		declares []string
 	}{
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named(
 					"values",
 					types.ListValue(
@@ -257,7 +257,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named(
 					"delta",
 					types.IntervalValueFromDuration(time.Hour),
@@ -268,7 +268,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named(
 					"ts",
 					types.TimestampValueFromTime(time.Now()),
@@ -279,7 +279,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named(
 					"a",
 					types.BoolValue(true),
@@ -300,7 +300,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named(
 					"a",
 					types.BoolValue(true),
@@ -322,7 +322,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 		},
 
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named("delta", time.Hour),
 			},
 			declares: []string{
@@ -330,7 +330,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named("ts", time.Now()),
 			},
 			declares: []string{
@@ -338,7 +338,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named("$a", true),
 				sql.Named("$b", int64(123)),
 				sql.Named("$c", func(s string) *string { return &s }("test")),
@@ -350,7 +350,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			},
 		},
 		{
-			params: []interface{}{
+			params: []any{
 				sql.Named("$a", func(b bool) *bool { return &b }(true)),
 				sql.Named("b", func(i int64) *int64 { return &i }(123)),
 				sql.Named("c", func(s string) *string { return &s }("test")),

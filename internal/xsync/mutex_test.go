@@ -68,12 +68,12 @@ func TestRWMutex(t *testing.T) {
 		var badSummCount int64
 		var wg sync.WaitGroup
 
-		for reader := 0; reader < 100; reader++ {
+		for range 100 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 
-				for i := 0; i < 1000; i++ {
+				for range 1000 {
 					m.WithRLock(func() {
 						if a+b != 2 {
 							atomic.AddInt64(&badSummCount, 1)
@@ -88,7 +88,7 @@ func TestRWMutex(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				m.WithLock(func() {
 					a++
 					b--

@@ -8,7 +8,9 @@ const (
 	ConsistencyModeUnset ConsistencyMode = iota
 	ConsistencyModeStrict
 	ConsistencyModeRelaxed
+)
 
+const (
 	consistencyAggregated = "Aggregated"
 	consistencyDetailed   = "Detailed"
 	consistencyRelaxed    = "Relaxed"

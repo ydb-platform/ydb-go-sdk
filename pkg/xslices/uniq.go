@@ -2,13 +2,11 @@ package xslices
 
 import (
 	"cmp"
-	"sort"
+	"slices"
 )
 
 func Uniq[T cmp.Ordered](in []T) (out []T) {
-	sort.Slice(in, func(i, j int) bool {
-		return in[i] < in[j]
-	})
+	slices.Sort(in)
 
 	out = make([]T, 0, len(in))
 	out = append(out, in[0])

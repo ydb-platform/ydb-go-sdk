@@ -46,7 +46,10 @@ func (s *Session) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
+	r, err := s.execute(ctx, q, settings,
+		withStreamResultTrace(s.trace),
+		withIssuesHandler(settings.IssuesOpts()),
+	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -91,7 +94,10 @@ func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execut
 		onDone(finalErr)
 	}()
 
-	row, err := s.queryRow(ctx, q, settings, withStreamResultTrace(s.trace))
+	row, err := s.queryRow(ctx, q, settings,
+		withStreamResultTrace(s.trace),
+		withIssuesHandler(settings.IssuesOpts()),
+	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -133,6 +139,12 @@ func (s *Session) Begin(
 	}()
 
 	if lazyTx := baseTx.LazyTxFromContext(ctx, s.lazyTx); lazyTx {
+		if !s.IsAlive() {
+			return nil, xerrors.WithStackTrace(xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+			))
+		}
+
 		return &Transaction{
 			s:          s,
 			txSettings: txSettings,
@@ -190,7 +202,10 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
+	r, err := s.execute(ctx, q, settings,
+		withStreamResultTrace(s.trace),
+		withIssuesHandler(settings.IssuesOpts()),
+	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -223,7 +238,10 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings, withStreamResultTrace(s.trace))
+	r, err := s.execute(ctx, q, settings,
+		withStreamResultTrace(s.trace),
+		withIssuesHandler(settings.IssuesOpts()),
+	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

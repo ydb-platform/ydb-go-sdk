@@ -440,7 +440,10 @@ func TestUpdateToken(t *testing.T) {
 			}
 
 			msgContent := []byte(strconv.Itoa(i))
-			err = writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(msgContent)})
+			err := writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(msgContent)})
+			if errors.Is(err, context.Canceled) {
+				return
+			}
 			scope.Require.NoError(err)
 		}
 	}()
@@ -457,8 +460,15 @@ func TestUpdateToken(t *testing.T) {
 			}
 
 			msg, err := reader.ReadMessage(ctx)
+			if errors.Is(err, context.Canceled) {
+				return
+			}
 			scope.Require.NoError(err)
-			scope.Require.NoError(reader.Commit(ctx, msg))
+			err = reader.Commit(ctx, msg)
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+			scope.Require.NoError(err)
 			hasMessages.Store(true)
 		}
 	}()
@@ -479,6 +489,11 @@ func TestUpdateToken(t *testing.T) {
 		close(activityStopped)
 	}()
 	xtest.WaitChannelClosed(t, activityStopped)
+
+	closeCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	scope.Require.NoError(reader.Close(closeCtx))
+	scope.Require.NoError(writer.Close(closeCtx))
 }
 
 func TestTopicWriterWithManualPartitionSelect(t *testing.T) {

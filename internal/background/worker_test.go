@@ -108,7 +108,7 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 
 		stopNewStarts := atomic.Bool{}
 		var wgStarters sync.WaitGroup
-		for i := 0; i < parallel; i++ {
+		for range parallel {
 			wgStarters.Add(1)
 			go func() {
 				defer wgStarters.Done()

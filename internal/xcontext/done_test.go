@@ -17,8 +17,7 @@ func TestWithDone(t *testing.T) {
 		require.Error(t, ctx1.Err())
 	})
 	t.Run("WithExplicitCancel", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		done := make(chan struct{})
 		ctx1, cancel1 := WithDone(ctx, done)
 		require.NoError(t, ctx1.Err())

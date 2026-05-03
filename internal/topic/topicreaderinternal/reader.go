@@ -120,6 +120,14 @@ func (r *Reader) WaitInit(ctx context.Context) error {
 	return r.reader.WaitInit(ctx)
 }
 
+func (r *Reader) ReadSessionID() string {
+	if p, ok := r.reader.(readSessionIDer); ok {
+		return p.ReadSessionID()
+	}
+
+	return ""
+}
+
 func (r *Reader) ID() int64 {
 	return r.readerID
 }

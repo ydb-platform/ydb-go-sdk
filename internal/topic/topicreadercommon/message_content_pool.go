@@ -13,8 +13,8 @@ import (
 //
 //go:generate mockgen -destination=pool_interface_mock_test.go --typed -write_package_comment=false -package=topicreadercommon github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon Pool
 type Pool interface {
-	Get() interface{}
-	Put(x interface{})
+	Get() any
+	Put(x any)
 }
 
 // CallbackWithMessageContentFunc is callback function for work with message content

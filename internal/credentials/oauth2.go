@@ -516,17 +516,17 @@ type OAuth2TokenSourceConfig struct {
 }
 
 func signingMethodNotSupportedError(method string) error {
-	var supported string
+	var supported strings.Builder
 	for i, alg := range GetSupportedOauth2TokenExchangeJwtAlgorithms() {
 		if i != 0 {
-			supported += ", "
+			supported.WriteString(", ")
 		}
-		supported += "\""
-		supported += alg
-		supported += "\""
+		supported.WriteString("\"")
+		supported.WriteString(alg)
+		supported.WriteString("\"")
 	}
 
-	return fmt.Errorf("%w: %q. Supported signing methods are %s", errUnsupportedSigningMethod, method, supported)
+	return fmt.Errorf("%w: %q. Supported signing methods are %s", errUnsupportedSigningMethod, method, supported.String())
 }
 
 func (cfg *OAuth2TokenSourceConfig) applyConfigFixed(tokenSrcType int) (*tokenSourceOption, error) {
@@ -1242,7 +1242,7 @@ func WithKeyID(id string) keyIDOption {
 
 // PrivateKey
 type privateKeyOption struct {
-	key interface{}
+	key any
 }
 
 func (key *privateKeyOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
@@ -1251,7 +1251,7 @@ func (key *privateKeyOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error 
 	return nil
 }
 
-func WithPrivateKey(key interface{}) *privateKeyOption {
+func WithPrivateKey(key any) *privateKeyOption {
 	return &privateKeyOption{key}
 }
 
@@ -1436,7 +1436,7 @@ func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*jwtTokenSource, error) {
 type jwtTokenSource struct {
 	signingMethod jwt.SigningMethod
 	keyID         string
-	privateKey    interface{} // symmetric key in case of symmetric algorithm
+	privateKey    any // symmetric key in case of symmetric algorithm
 
 	// JWT claims
 	issuer   string
@@ -1454,7 +1454,7 @@ func (s *jwtTokenSource) Token() (Token, error) {
 		err    error
 	)
 	t := jwt.Token{
-		Header: map[string]interface{}{
+		Header: map[string]any{
 			"typ": "JWT",
 			"alg": s.signingMethod.Alg(),
 			"kid": s.keyID,

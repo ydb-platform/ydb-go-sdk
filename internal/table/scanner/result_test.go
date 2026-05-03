@@ -22,7 +22,7 @@ func TestResultAny(t *testing.T) {
 		name    string
 		columns []options.Column
 		values  []value.Value
-		exp     []interface{}
+		exp     []any
 	}{
 		{
 			columns: []options.Column{
@@ -36,7 +36,7 @@ func TestResultAny(t *testing.T) {
 				value.OptionalValue(value.Uint32Value(43)),
 				value.NullValue(types.Uint32),
 			},
-			exp: []interface{}{
+			exp: []any{
 				uint32(43),
 				nil,
 			},
@@ -53,7 +53,7 @@ func TestResultAny(t *testing.T) {
 				nil,
 			)
 			var i int
-			var act interface{}
+			var act any
 			for res.NextResultSet(context.Background()) {
 				for res.NextRow() {
 					err := res.ScanWithDefaults(&act)

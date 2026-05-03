@@ -38,7 +38,7 @@ func TestCheckFastestAddress(t *testing.T) {
 		var firstCount int64
 		var secondCount int64
 
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
 			require.NoError(t, err)
 			listen2, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
@@ -153,7 +153,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 	err := r.clusterDiscoveryAttempt(ctx, nil)
 	require.NoError(t, err)
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		conn, _ := r.connections().GetConnection(ctx)
 		require.Equal(t, "b:234", conn.Endpoint().Address())
 		require.Equal(t, "b", conn.Endpoint().Location())

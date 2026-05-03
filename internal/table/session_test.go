@@ -44,10 +44,10 @@ func TestSessionKeepAlive(t *testing.T) {
 		cc: testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
+					testutil.TableKeepAlive: func(any) (proto.Message, error) {
 						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
 					},
-					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					testutil.TableCreateSession: func(any) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
@@ -98,12 +98,12 @@ func TestSessionDescribeTable(t *testing.T) {
 		cc: testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					testutil.TableCreateSession: func(any) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					testutil.TableDescribeTable: func(interface{}) (proto.Message, error) {
+					testutil.TableDescribeTable: func(any) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)
 
@@ -373,41 +373,41 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 						client := New(context.Background(), testutil.NewBalancer(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
-									testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
+									testutil.TableExecuteDataQuery: func(any) (proto.Message, error) {
 										return &Ydb_Table.ExecuteQueryResult{
 											TxMeta: &Ydb_Table.TransactionMeta{
 												Id: "",
 											},
 										}, nil
 									},
-									testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
+									testutil.TableBeginTransaction: func(any) (proto.Message, error) {
 										return &Ydb_Table.BeginTransactionResult{
 											TxMeta: &Ydb_Table.TransactionMeta{
 												Id: "",
 											},
 										}, nil
 									},
-									testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableExplainDataQuery: func(request any) (result proto.Message, err error) {
 										return &Ydb_Table.ExplainQueryResult{}, nil
 									},
-									testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+									testutil.TablePrepareDataQuery: func(request any) (result proto.Message, err error) {
 										return &Ydb_Table.PrepareQueryResult{}, nil
 									},
-									testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+									testutil.TableCreateSession: func(any) (proto.Message, error) {
 										return &Ydb_Table.CreateSessionResult{
 											SessionId: testutil.SessionID(),
 										}, nil
 									},
-									testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableDeleteSession: func(request any) (result proto.Message, err error) {
 										return &Ydb_Table.DeleteSessionResponse{}, nil
 									},
-									testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableCommitTransaction: func(request any) (result proto.Message, err error) {
 										return &Ydb_Table.CommitTransactionResult{}, nil
 									},
-									testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableRollbackTransaction: func(request any) (result proto.Message, err error) {
 										return &Ydb_Table.RollbackTransactionResponse{}, nil
 									},
-									testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableKeepAlive: func(request any) (result proto.Message, err error) {
 										return &Ydb_Table.KeepAliveResult{}, nil
 									},
 								},
@@ -430,12 +430,12 @@ func TestCreateTableRegression(t *testing.T) {
 	client := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
+				testutil.TableCreateSession: func(request any) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
 						SessionId: "",
 					}, nil
 				},
-				testutil.TableCreateTable: func(act interface{}) (proto.Message, error) {
+				testutil.TableCreateTable: func(act any) (proto.Message, error) {
 					exp := &Ydb_Table.CreateTableRequest{
 						SessionId: "",
 						Path:      "episodes",
@@ -529,12 +529,12 @@ func TestDescribeTableRegression(t *testing.T) {
 	client := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
+				testutil.TableCreateSession: func(request any) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
 						SessionId: "",
 					}, nil
 				},
-				testutil.TableDescribeTable: func(act interface{}) (proto.Message, error) {
+				testutil.TableDescribeTable: func(act any) (proto.Message, error) {
 					return &Ydb_Table.DescribeTableResult{
 						Self: &Ydb_Scheme.Entry{
 							Name: "episodes",

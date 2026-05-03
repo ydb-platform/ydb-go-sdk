@@ -407,7 +407,7 @@ func describeTable(ctx context.Context, c table.Client, path string) error {
 	)
 }
 
-func render(t *template.Template, data interface{}) string {
+func render(t *template.Template, data any) string {
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, data); err != nil {
 		panic(err)

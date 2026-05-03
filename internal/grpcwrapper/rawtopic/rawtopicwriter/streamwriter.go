@@ -27,7 +27,7 @@ type GrpcStream interface {
 }
 
 type StreamWriter struct {
-	readCounter int32
+	readCounter atomic.Int32
 
 	sendCloseMtx sync.Mutex
 	Stream       GrpcStream
@@ -47,8 +47,8 @@ func (w *StreamWriter) Endpoint() endpoint.Endpoint { return w.PeerEndpoint }
 
 //nolint:funlen
 func (w *StreamWriter) Recv() (ServerMessage, error) {
-	readCnt := atomic.AddInt32(&w.readCounter, 1)
-	defer atomic.AddInt32(&w.readCounter, -1)
+	readCnt := w.readCounter.Add(1)
+	defer w.readCounter.Add(-1)
 
 	if readCnt != 1 {
 		return nil, xerrors.WithStackTrace(errConcurencyReadDenied)

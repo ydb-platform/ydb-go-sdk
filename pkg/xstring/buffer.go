@@ -10,7 +10,7 @@ type buffer struct {
 	bytes.Buffer
 }
 
-var buffersPool = sync.Pool{New: func() interface{} {
+var buffersPool = sync.Pool{New: func() any {
 	return &buffer{}
 }}
 
