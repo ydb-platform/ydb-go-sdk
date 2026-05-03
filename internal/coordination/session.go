@@ -545,6 +545,11 @@ func (s *session) Close(ctx context.Context) error {
 	return nil
 }
 
+// markConnected signals that the session has successfully connected (or reconnected) to the server. It closes
+// the notification channel set by Reconnect and resets it to nil. It is safe to call even when no reconnect is
+// pending (i.e. connectedChan is already nil), in which case it is a no-op. Must be called with s.mutex held
+// or under a guarantee that no concurrent Reconnect call is in progress; in practice it is always invoked from
+// mainLoop which uses s.mutex.
 func (s *session) markConnected() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
