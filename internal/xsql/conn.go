@@ -199,7 +199,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 
 	result, err := c.cc.Query(ctx, sql, params)
 	if err != nil {
-		return nil, badconn.Map(err)
+		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	return newRows(result), nil
