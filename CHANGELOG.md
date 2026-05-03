@@ -1,4 +1,4 @@
-* Centralised `badconn.Map` error wrapping exclusively in the `internal/xsql` proxy layer (`Conn`, `Tx`, `Stmt`); removed duplicate wrapping from `internal/xsql/xtable` and `internal/xsql/xquery` to guarantee that every YDB session-invalidating error returned to `database/sql` passes `errors.Is(err, driver.ErrBadConn)`, preventing broken connections from being pooled and reused
+* Refactored the `internal/xsql` package to ensure YDB error mapping to `driver.ErrBadConn` (for pass `errors.Is(err, driver.ErrBadConn)` check) where possible by consolidating all error handling in `internal/xsql` proxy types 
 
 ## v3.135.9
 * Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
