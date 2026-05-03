@@ -235,7 +235,7 @@ func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 
 	result, err := c.cc.Exec(ctx, sql, params)
 	if err != nil {
-		return nil, badconn.Map(err)
+		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
 	return result, nil

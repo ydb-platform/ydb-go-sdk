@@ -270,7 +270,7 @@ type mockErrRows struct {
 func (m *mockErrRows) ColumnTypeDatabaseTypeName(index int) string      { return "" }
 func (m *mockErrRows) ColumnTypeNullable(index int) (nullable, ok bool) { return false, false }
 func (m *mockErrRows) Columns() []string                                { return nil }
-func (m *mockErrRows) Close() error                                     { return nil }
+func (m *mockErrRows) Close() error                                     { return m.err }
 func (m *mockErrRows) HasNextResultSet() bool                           { return false }
 func (m *mockErrRows) Next(_ []driver.Value) error                      { return m.err }
 func (m *mockErrRows) NextResultSet() error                             { return m.err }
@@ -291,6 +291,12 @@ func TestRows_BadConnMapping(t *testing.T) {
 			t.Run("NextResultSet", func(t *testing.T) {
 				rows := newRows(&mockErrRows{err: ydbErr})
 				err := rows.(interface{ NextResultSet() error }).NextResultSet()
+				require.Equal(t, wantBadConn, xerrors.Is(err, driver.ErrBadConn))
+			})
+
+			t.Run("Close", func(t *testing.T) {
+				rows := newRows(&mockErrRows{err: ydbErr})
+				err := rows.Close()
 				require.Equal(t, wantBadConn, xerrors.Is(err, driver.ErrBadConn))
 			})
 		})

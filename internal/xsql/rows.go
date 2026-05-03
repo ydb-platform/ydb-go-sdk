@@ -74,6 +74,7 @@ func (r *Rows) Next(dst []driver.Value) error {
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF
 		}
+
 		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
@@ -85,6 +86,7 @@ func (r *Rows) NextResultSet() error {
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF
 		}
+
 		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 
