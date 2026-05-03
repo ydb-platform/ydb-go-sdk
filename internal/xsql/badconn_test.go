@@ -238,7 +238,8 @@ func TestStmtProxy_BadConnMapping(t *testing.T) {
 					conn: &Conn{
 						cc: &mockCommonConn{},
 						connector: &Connector{
-							trace: &trace.DatabaseSQL{},
+							trace:    &trace.DatabaseSQL{},
+							bindings: newMockBindings(),
 						},
 						ctx: context.Background(),
 					},
