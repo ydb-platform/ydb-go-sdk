@@ -53,13 +53,12 @@ func (t IPType) Filter() func(addr string) bool {
 		}
 
 		isIPv4 := ip.To4() != nil
-		isIPv6 := ip.To6() != nil
 
 		if t&IPv4 != 0 && isIPv4 {
 			return true
 		}
 
-		if t&IPv6 != 0 && !isIPv6 {
+		if t&IPv6 != 0 && !isIPv4 {
 			return true
 		}
 
