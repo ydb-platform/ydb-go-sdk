@@ -111,6 +111,7 @@ func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryConten
 	}
 }
 
+//nolint:funlen
 func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
 	q string, settings executeSettings, opts ...resultOption,
