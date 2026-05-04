@@ -588,7 +588,7 @@ func TestExecute(t *testing.T) {
 		// balancer's nextConn to return context.Canceled immediately.
 		//
 		// Session.execute merges user ctx with session lifetime via xcontext.WithDone,
-		// so when the session dies its Done channel is closed, cancelling the merged ctx
+		// so when the session dies its Done channel is closed, canceling the merged ctx
 		// passed to execute(). AfterFunc then fires executeCancel immediately, and the
 		// balancer's nextConn finds executeCtx.Err() != nil before ExecuteQuery even runs.
 		//
