@@ -6,9 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
 func TestJoin(t *testing.T) {
@@ -70,15 +71,52 @@ func TestUnwrapJoined(t *testing.T) {
 }
 
 func TestJoinAsError(t *testing.T) {
-	ctxGuard := xcontext.NewCancelsGuard()
-	err1, cancel1 := ctxGuard.WithCancel(t.Context())
-	err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
+	for _, joined := range []error{
+		Join(context.Canceled, Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))),
+		Join(Transport(grpcStatus.Error(grpcCodes.Canceled, "test")), context.Canceled),
+		WithStackTrace(Join(context.Canceled, Transport(grpcStatus.Error(grpcCodes.Canceled, "test")))),
+		WithStackTrace(Join(Transport(grpcStatus.Error(grpcCodes.Canceled, "test")), context.Canceled)),
+		func() error {
+			ctxGuard := xcontext.NewCancelsGuard()
+			defer ctxGuard.Cancel()
+			err1, cancel1 := ctxGuard.WithCancel(t.Context())
+			defer cancel1()
+			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
 
-	cancel1()
+			return Join(err2, err1.Err())
+		}(),
+		func() error {
+			ctxGuard := xcontext.NewCancelsGuard()
+			defer ctxGuard.Cancel()
+			err1, cancel1 := ctxGuard.WithCancel(t.Context())
+			defer cancel1()
+			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
 
-	joined := WithStackTrace(Join(err1.Err(), err2))
+			return WithStackTrace(Join(err2, err1.Err()))
+		}(),
+		func() error {
+			ctxGuard := xcontext.NewCancelsGuard()
+			defer ctxGuard.Cancel()
+			err1, cancel1 := ctxGuard.WithCancel(t.Context())
+			defer cancel1()
+			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
 
-	var ydbErr Error
-	require.True(t, As(joined, &ydbErr))
-	require.EqualValues(t, grpcCodes.Canceled, ydbErr.Code())
+			return Join(err1.Err(), err2)
+		}(),
+		func() error {
+			ctxGuard := xcontext.NewCancelsGuard()
+			defer ctxGuard.Cancel()
+			err1, cancel1 := ctxGuard.WithCancel(t.Context())
+			defer cancel1()
+			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
+
+			return WithStackTrace(Join(err1.Err(), err2))
+		}(),
+	} {
+		t.Run(joined.Error(), func(t *testing.T) {
+			var ydbErr Error
+			require.True(t, As(joined, &ydbErr))
+			require.EqualValues(t, grpcCodes.Canceled, ydbErr.Code())
+		})
+	}
 }
