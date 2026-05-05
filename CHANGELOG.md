@@ -1,3 +1,5 @@
+* Optimized `updateColumns` in the query-service `database/sql` rows implementation to reuse existing slices instead of reallocating on every result-set boundary
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 

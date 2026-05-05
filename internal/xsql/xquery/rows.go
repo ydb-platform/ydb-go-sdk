@@ -43,8 +43,17 @@ type rows struct {
 func (r *rows) updateColumns() {
 	if r.nextErr == nil {
 		r.allColumns = r.nextSet.Columns()
-		r.columns = make([]string, 0, len(r.allColumns))
-		r.discarded = make([]bool, len(r.allColumns))
+		n := len(r.allColumns)
+		if cap(r.columns) >= n {
+			r.columns = r.columns[:0]
+		} else {
+			r.columns = make([]string, 0, n)
+		}
+		if cap(r.discarded) >= n {
+			r.discarded = r.discarded[:n]
+		} else {
+			r.discarded = make([]bool, n)
+		}
 		for i, v := range r.allColumns {
 			r.discarded[i] = strings.HasPrefix(v, ignoreColumnPrefixName)
 			if !r.discarded[i] {
