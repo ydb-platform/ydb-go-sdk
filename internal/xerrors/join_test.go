@@ -6,6 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
+	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 )
 
 func TestJoin(t *testing.T) {
@@ -64,4 +67,18 @@ func TestUnwrapJoined(t *testing.T) {
 	inners := unwrappable.Unwrap()
 	assert.Contains(t, inners, err1)
 	assert.Contains(t, inners, err2)
+}
+
+func TestJoinAsError(t *testing.T) {
+	ctxGuard := xcontext.NewCancelsGuard()
+	err1, cancel1 := ctxGuard.WithCancel(t.Context())
+	err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
+
+	cancel1()
+
+	joined := WithStackTrace(Join(err1.Err(), err2))
+
+	var ydbErr Error
+	require.True(t, As(joined, &ydbErr))
+	require.EqualValues(t, grpcCodes.Canceled, ydbErr.Code())
 }
