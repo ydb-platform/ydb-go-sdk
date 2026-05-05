@@ -288,22 +288,6 @@ func startMockYDBServer(tb testing.TB) *grpcMockYDB {
 
 const benchmarkDatabaseSQLMockSessionPoolSize = 600
 
-// BenchmarkDatabaseSQLMock mirrors BenchmarkDatabaseSQL but talks to an in-process mock gRPC
-// stack instead of a real YDB cluster.
-//
-//	goos: darwin
-//	goarch: arm64
-//	pkg: github.com/ydb-platform/ydb-go-sdk/v3/tests/integration
-//	cpu: Apple M3 Pro
-//	BenchmarkDatabaseSQLMock
-//	BenchmarkDatabaseSQLMock/QueryService-1
-//	BenchmarkDatabaseSQLMock/QueryService-1-12                 11082            106915 ns/op         28950 B/op        478 allocs/op
-//	BenchmarkDatabaseSQLMock/QueryService-100
-//	BenchmarkDatabaseSQLMock/QueryService-100-12               12282             99268 ns/op         31535 B/op        518 allocs/op
-//	BenchmarkDatabaseSQLMock/TableService-1
-//	BenchmarkDatabaseSQLMock/TableService-1-12                 14702             80738 ns/op         19746 B/op        325 allocs/op
-//	BenchmarkDatabaseSQLMock/TableService-100
-//	BenchmarkDatabaseSQLMock/TableService-100-12               13524             79155 ns/op         21386 B/op        349 allocs/op
 func BenchmarkDatabaseSQLMock(b *testing.B) {
 	ctx := b.Context()
 
@@ -332,56 +316,64 @@ func BenchmarkDatabaseSQLMock(b *testing.B) {
 			useQueryService: false,
 		},
 	} {
-		connector, err := ydb.Connector(nativeDriver,
-			ydb.WithQueryService(engine.useQueryService),
-		)
-		require.NoError(b, err)
+		b.Run(engine.name, func(b *testing.B) {
+			connector, err := ydb.Connector(nativeDriver,
+				ydb.WithQueryService(engine.useQueryService),
+			)
+			require.NoError(b, err)
 
-		defer func() {
-			_ = connector.Close()
-		}()
+			defer func() {
+				_ = connector.Close()
+			}()
 
-		db := sql.OpenDB(connector)
-		defer func() {
-			_ = db.Close()
-		}()
+			db := sql.OpenDB(connector)
+			defer func() {
+				_ = db.Close()
+			}()
 
-		db.SetMaxOpenConns(benchmarkDatabaseSQLMockSessionPoolSize)
+			db.SetMaxOpenConns(benchmarkDatabaseSQLMockSessionPoolSize)
 
-		warmUpMock(ctx, b, db)
+			warmUpMock(ctx, b, db)
 
-		for _, parallelism := range []int{100} {
-			b.Run(engine.name+"-"+strconv.Itoa(parallelism), func(b *testing.B) {
-				b.SetParallelism(parallelism)
-				b.ResetTimer()
-				b.ReportAllocs()
-				b.RunParallel(func(pb *testing.PB) {
-					var (
-						v    int
-						rows *sql.Rows
-						err  error
-					)
+			for _, parallelism := range []int{100} {
+				b.Run(engine.name+"-"+strconv.Itoa(parallelism), func(b *testing.B) {
+					b.SetParallelism(parallelism)
+					b.ResetTimer()
+					b.ReportAllocs()
+					b.RunParallel(func(pb *testing.PB) {
+						var (
+							v    int
+							rows *sql.Rows
+							err  error
+						)
 
-					for pb.Next() {
-						func() {
-							rows, err = db.QueryContext(ctx, `SELECT 42`)
-							require.NoError(b, err)
-							defer func() {
-								require.NoError(b, rows.Close())
+						for pb.Next() {
+							func() {
+								rows, err = db.QueryContext(ctx, `SELECT 42`)
+								if !assert.NoError(b, err) {
+									return
+								}
+								defer func() {
+									assert.NoError(b, rows.Close())
+								}()
+
+								for rows.Next() {
+									if !assert.NoError(b, rows.Scan(&v)) {
+										return
+									}
+									if !assert.Equal(b, 42, v) {
+										return
+									}
+									v = 0
+								}
+
+								assert.NoError(b, rows.Err())
 							}()
-
-							for rows.Next() {
-								require.NoError(b, rows.Scan(&v))
-								assert.Equal(b, 42, v)
-								v = 0
-							}
-
-							require.NoError(b, rows.Err())
-						}()
-					}
+						}
+					})
 				})
-			})
-		}
+			}
+		})
 	}
 }
 
@@ -389,22 +381,29 @@ func warmUpMock(ctx context.Context, t testing.TB, db *sql.DB) {
 	t.Helper()
 
 	wg := sync.WaitGroup{}
+	wg.Add(benchmarkDatabaseSQLMockSessionPoolSize)
+
 	for range benchmarkDatabaseSQLMockSessionPoolSize {
-		wg.Go(func() {
+		func() {
+			defer wg.Done()
 			rows, err := db.QueryContext(ctx, `SELECT 42`)
-			require.NoError(t, err)
+			if !assert.NoError(t, err) {
+				return
+			}
 			defer func() {
-				require.NoError(t, rows.Close())
+				assert.NoError(t, rows.Close())
 			}()
 
 			var v int
 
 			for rows.Next() {
-				require.NoError(t, rows.Scan(&v))
+				if !assert.NoError(t, rows.Scan(&v)) {
+					return
+				}
 			}
 
-			require.NoError(t, rows.Err())
-		})
+			assert.NoError(t, rows.Err())
+		}()
 	}
 
 	wg.Wait()
