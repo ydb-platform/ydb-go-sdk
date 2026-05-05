@@ -29,6 +29,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
+// cpu: Apple M3 Pro
+// BenchmarkDatabaseSQLMock/QueryService-100-12         	   92022	     13158 ns/op	   27862 B/op	     471 allocs/op
+// BenchmarkDatabaseSQLMock/TableService-100-12         	  107782	     10091 ns/op	   19327 B/op	     322 allocs/op
+
 // grpcMockYDB is a local in-process gRPC stack (Discovery + Table + Query) with fixed
 // "SELECT 42" style responses. It does not require a real YDB endpoint.
 type grpcMockYDB struct {
@@ -346,9 +350,11 @@ func BenchmarkDatabaseSQLMock(b *testing.B) {
 
 		warmUpMock(ctx, b, db)
 
-		for _, parallelism := range []int{1, 100} {
+		for _, parallelism := range []int{100} {
 			b.Run(engine.name+"-"+strconv.Itoa(parallelism), func(b *testing.B) {
 				b.SetParallelism(parallelism)
+				b.ResetTimer()
+				b.ReportAllocs()
 				b.RunParallel(func(pb *testing.PB) {
 					var (
 						v    int
