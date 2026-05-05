@@ -16,9 +16,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
+)
+
+var (
+	executeQueryRequestPool xsync.Pool[Ydb_Query.ExecuteQueryRequest]
+	queryQueryContentPool   xsync.Pool[Ydb_Query.QueryContent]
 )
 
 type executeSettings interface {
@@ -84,24 +90,44 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	request := &Ydb_Query.ExecuteQueryRequest{
-		SessionId: sessionID,
-		ExecMode:  Ydb_Query.ExecMode(cfg.ExecMode()),
-		TxControl: cfg.TxControl().ToYdbQueryTransactionControl(),
-		Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-			QueryContent: &Ydb_Query.QueryContent{
-				Syntax: Ydb_Query.Syntax(cfg.Syntax()),
-				Text:   q,
-			},
-		},
-		Parameters:             params,
-		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
-		ConcurrentResultSets:   cfg.ConcurrentResultSets(),
-		PoolId:                 cfg.ResourcePool(),
-		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
+	qc := queryQueryContentPool.GetOrNew()
+	qc.Syntax = Ydb_Query.Syntax(cfg.Syntax())
+	qc.Text = q
+
+	request := executeQueryRequestPool.GetOrNew()
+	request.SessionId = sessionID
+	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
+	request.TxControl = cfg.TxControl().ToYdbQueryTransactionControl()
+	request.Query = &Ydb_Query.ExecuteQueryRequest_QueryContent{
+		QueryContent: qc,
 	}
+	request.Parameters = params
+	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
+	request.ConcurrentResultSets = cfg.ConcurrentResultSets()
+	request.PoolId = cfg.ResourcePool()
+	request.ResponsePartLimitBytes = cfg.ResponsePartLimitSizeBytes()
 
 	return request, cfg.CallOptions(), nil
+}
+
+// releaseExecuteQueryRequest resets the request and its nested QueryContent and
+// returns both to their respective pools.  It must be called after the gRPC
+// client has serialized the request (i.e. after ExecuteQuery returns).
+func releaseExecuteQueryRequest(request *Ydb_Query.ExecuteQueryRequest) {
+	if request == nil {
+		return
+	}
+
+	// Extract QueryContent before Reset clears the Query field.
+	if qcw, ok := request.GetQuery().(*Ydb_Query.ExecuteQueryRequest_QueryContent); ok && qcw != nil {
+		if qc := qcw.QueryContent; qc != nil {
+			qc.Reset()
+			queryQueryContentPool.Put(qc)
+		}
+	}
+
+	request.Reset()
+	executeQueryRequestPool.Put(request)
 }
 
 func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
@@ -136,6 +162,8 @@ func execute(
 	}()
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
+	// The gRPC client has serialized request at this point; return it to the pool.
+	releaseExecuteQueryRequest(request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

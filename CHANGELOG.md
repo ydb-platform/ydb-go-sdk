@@ -1,3 +1,5 @@
+* Reduced per-query allocations by recycling `ExecuteQueryRequest` and `QueryContent` proto structs via `sync.Pool` in both Query service and Table service execute paths
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 

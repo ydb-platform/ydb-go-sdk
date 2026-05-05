@@ -43,6 +43,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var (
+	queryClientExecuteRequestPool xsync.Pool[Ydb_Query.ExecuteQueryRequest]
+	queryClientExecuteContentPool xsync.Pool[Ydb_Query.QueryContent]
+)
+
 type (
 	dataQueryExecutor interface {
 		execute(
@@ -136,16 +141,16 @@ func (e queryClientExecutor) execute(
 	executeDataQueryRequest *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (_ *transaction, _ result.Result, finalErr error) {
-	request := &Ydb_Query.ExecuteQueryRequest{}
+	qc := queryClientExecuteContentPool.GetOrNew()
+	qc.Syntax = Ydb_Query.Syntax_SYNTAX_YQL_V1
+	qc.Text = executeDataQueryRequest.GetQuery().GetYqlText()
 
+	request := queryClientExecuteRequestPool.GetOrNew()
 	request.SessionId = executeDataQueryRequest.GetSessionId()
 	request.ExecMode = Ydb_Query.ExecMode_EXEC_MODE_EXECUTE
 	request.TxControl = txControl.ToYdbQueryTransactionControl()
 	request.Query = &Ydb_Query.ExecuteQueryRequest_QueryContent{
-		QueryContent: &Ydb_Query.QueryContent{
-			Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-			Text:   executeDataQueryRequest.GetQuery().GetYqlText(),
-		},
+		QueryContent: qc,
 	}
 	request.Parameters = executeDataQueryRequest.GetParameters()
 	request.StatsMode = statsModeToStatsMode(executeDataQueryRequest.GetCollectStats())
@@ -155,6 +160,16 @@ func (e queryClientExecutor) execute(
 	defer cancel()
 
 	stream, err := e.client.ExecuteQuery(ctx, request, callOptions...)
+	// The gRPC client has serialized request at this point; return it to the pool.
+	if qcw, ok := request.GetQuery().(*Ydb_Query.ExecuteQueryRequest_QueryContent); ok && qcw != nil {
+		if pooledQC := qcw.QueryContent; pooledQC != nil {
+			pooledQC.Reset()
+			queryClientExecuteContentPool.Put(pooledQC)
+		}
+	}
+	request.Reset()
+	queryClientExecuteRequestPool.Put(request)
+
 	if err != nil {
 		if status := query.StatusFromErr(err); status != query.StatusUnknown {
 			e.core.SetStatus(status)
