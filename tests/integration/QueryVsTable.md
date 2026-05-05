@@ -47,6 +47,11 @@ go tool pprof -http=localhost:8080 mock-mem-query.prof
 
 Полезные режимы в веб-интерфейсе: flame graph, top, просмотр по функциям. Порт можно сменить, если `8080` занят.
 
+Экспорт из `go tool pprof` можно сохранить как SVG или HTML (`svg`, `png`, в браузере — **Download** / «Share» в зависимости от версии). В этом каталоге лежат примеры готовых отчётов:
+
+- [CPU flame graph (SVG)](pprof001.svg)
+- [CPU profile (HTML)](integration.test%20cpu.html)
+
 Запись профилей при прогоне бенча (пример для mock — из корня модуля с указанием пакета):
 
 ```bash
