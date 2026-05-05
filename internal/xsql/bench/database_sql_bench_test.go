@@ -30,8 +30,8 @@ import (
 )
 
 // cpu: Apple M3 Pro
-// BenchmarkDatabaseSQLMock/QueryService-100-12         	   92022	     13158 ns/op	   27862 B/op	     471 allocs/op
-// BenchmarkDatabaseSQLMock/TableService-100-12         	  107782	     10091 ns/op	   19327 B/op	     322 allocs/op
+// BenchmarkDatabaseSQLMock/QueryService-12         	   82195	     14945 ns/op	   27786 B/op	     470 allocs/op
+// BenchmarkDatabaseSQLMock/TableService-12         	  105393	     10962 ns/op	   19349 B/op	     323 allocs/op
 
 // grpcMockYDB is a local in-process gRPC stack (Discovery + Table + Query) with fixed
 // "SELECT 42" style responses. It does not require a real YDB endpoint.
@@ -281,7 +281,15 @@ func startMockYDBServer(tb testing.TB) *grpcMockYDB {
 
 	tb.Cleanup(m.Close)
 
-	time.Sleep(2 * time.Millisecond)
+	for range 100 {
+		conn, err := net.Dial("tcp", lis.Addr().String()) //nolint:noctx
+		if err == nil {
+			conn.Close()
+
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
 
 	return m
 }
@@ -290,6 +298,7 @@ const benchmarkDatabaseSQLMockSessionPoolSize = 600
 
 func BenchmarkDatabaseSQLMock(b *testing.B) {
 	ctx := b.Context()
+	parallelism := 100
 
 	mockSrv := startMockYDBServer(b)
 
@@ -335,44 +344,40 @@ func BenchmarkDatabaseSQLMock(b *testing.B) {
 
 			warmUpMock(ctx, b, db)
 
-			for _, parallelism := range []int{100} {
-				b.Run(engine.name+"-"+strconv.Itoa(parallelism), func(b *testing.B) {
-					b.SetParallelism(parallelism)
-					b.ResetTimer()
-					b.ReportAllocs()
-					b.RunParallel(func(pb *testing.PB) {
-						var (
-							v    int
-							rows *sql.Rows
-							err  error
-						)
+			b.SetParallelism(parallelism)
+			b.ResetTimer()
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				var (
+					v    int
+					rows *sql.Rows
+					err  error
+				)
 
-						for pb.Next() {
-							func() {
-								rows, err = db.QueryContext(ctx, `SELECT 42`)
-								if !assert.NoError(b, err) {
-									return
-								}
-								defer func() {
-									assert.NoError(b, rows.Close())
-								}()
-
-								for rows.Next() {
-									if !assert.NoError(b, rows.Scan(&v)) {
-										return
-									}
-									if !assert.Equal(b, 42, v) {
-										return
-									}
-									v = 0
-								}
-
-								assert.NoError(b, rows.Err())
-							}()
+				for pb.Next() {
+					func() {
+						rows, err = db.QueryContext(ctx, `SELECT 42`)
+						if !assert.NoError(b, err) {
+							return
 						}
-					})
-				})
-			}
+						defer func() {
+							assert.NoError(b, rows.Close())
+						}()
+
+						for rows.Next() {
+							if !assert.NoError(b, rows.Scan(&v)) {
+								return
+							}
+							if !assert.Equal(b, 42, v) {
+								return
+							}
+							v = 0
+						}
+
+						assert.NoError(b, rows.Err())
+					}()
+				}
+			})
 		})
 	}
 }
@@ -384,7 +389,7 @@ func warmUpMock(ctx context.Context, t testing.TB, db *sql.DB) {
 	wg.Add(benchmarkDatabaseSQLMockSessionPoolSize)
 
 	for range benchmarkDatabaseSQLMockSessionPoolSize {
-		func() {
+		go func() {
 			defer wg.Done()
 			rows, err := db.QueryContext(ctx, `SELECT 42`)
 			if !assert.NoError(t, err) {
