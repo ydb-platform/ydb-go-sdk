@@ -80,41 +80,33 @@ func TestJoinAsYDBError(t *testing.T) {
 			ctxGuard := xcontext.NewCancelsGuard()
 			defer ctxGuard.Cancel()
 			ctx, cancel := ctxGuard.WithCancel(t.Context())
-			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
-
 			cancel()
 
-			return Join(err2, ctx.Err())
+			return Join(Transport(grpcStatus.Error(grpcCodes.Canceled, "test")), ctx.Err())
 		}(),
 		func() error {
 			ctxGuard := xcontext.NewCancelsGuard()
 			defer ctxGuard.Cancel()
 			ctx, cancel := ctxGuard.WithCancel(t.Context())
-			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
-
 			cancel()
 
-			return WithStackTrace(Join(err2, ctx.Err()))
+			return WithStackTrace(Join(Transport(grpcStatus.Error(grpcCodes.Canceled, "test")), ctx.Err()))
 		}(),
 		func() error {
 			ctxGuard := xcontext.NewCancelsGuard()
 			defer ctxGuard.Cancel()
 			ctx, cancel := ctxGuard.WithCancel(t.Context())
-			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
-
 			cancel()
 
-			return Join(ctx.Err(), err2)
+			return Join(ctx.Err(), Transport(grpcStatus.Error(grpcCodes.Canceled, "test")))
 		}(),
 		func() error {
 			ctxGuard := xcontext.NewCancelsGuard()
 			defer ctxGuard.Cancel()
 			ctx, cancel := ctxGuard.WithCancel(t.Context())
-			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
-
 			cancel()
 
-			return WithStackTrace(Join(ctx.Err(), err2))
+			return WithStackTrace(Join(ctx.Err(), Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))))
 		}(),
 	} {
 		t.Run(joined.Error(), func(t *testing.T) {
