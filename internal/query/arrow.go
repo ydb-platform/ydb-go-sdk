@@ -3,6 +3,7 @@ package query
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -51,11 +52,15 @@ func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
 
 	part, err := r.stream.Recv()
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
-		return nil, xerrors.WithStackTrace(io.EOF)
+		return nil, io.EOF
 	}
 	r.resultSetIndex = part.GetResultSetIndex()
 

@@ -82,7 +82,7 @@ func (r *materializedResult) Close(ctx context.Context) error {
 
 func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, error) {
 	if r.idx == len(r.resultSets) {
-		return nil, xerrors.WithStackTrace(io.EOF)
+		return nil, io.EOF
 	}
 
 	defer func() {
@@ -189,7 +189,11 @@ func (r *streamResult) nextPart(ctx context.Context) (
 
 	select {
 	case <-r.closer.Done():
-		return nil, xerrors.WithStackTrace(r.closer.Err())
+		if err := r.closer.Err(); errors.Is(err, io.EOF) {
+			return nil, io.EOF
+		} else {
+			return nil, xerrors.WithStackTrace(err)
+		}
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
@@ -216,6 +220,10 @@ func (r *streamResult) nextPart(ctx context.Context) (
 				callback(err)
 			}
 
+			if errors.Is(err, io.EOF) {
+				return nil, io.EOF
+			}
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 
@@ -238,6 +246,10 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 ) {
 	part, err = stream.Recv()
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -288,7 +300,11 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 	for {
 		select {
 		case <-r.closer.Done():
-			return nil, xerrors.WithStackTrace(r.closer.Err())
+			if err := r.closer.Err(); errors.Is(err, io.EOF) {
+				return nil, io.EOF
+			} else {
+				return nil, xerrors.WithStackTrace(err)
+			}
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
@@ -298,17 +314,21 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 				return newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart), nil
 			}
 			if r.stream == nil {
-				return nil, xerrors.WithStackTrace(io.EOF)
+				return nil, io.EOF
 			}
 			part, err := r.nextPart(ctx)
 			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil, io.EOF
+				}
+
 				return nil, xerrors.WithStackTrace(err)
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
 				r.closer.Close(nil)
 
 				if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
-					return nil, xerrors.WithStackTrace(io.EOF)
+					return nil, io.EOF
 				}
 
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
@@ -331,13 +351,21 @@ func (r *streamResult) nextPartFunc(
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		case <-r.closer.Done():
-			return nil, xerrors.WithStackTrace(r.closer.Err())
+			if err := r.closer.Err(); errors.Is(err, io.EOF) {
+				return nil, io.EOF
+			} else {
+				return nil, xerrors.WithStackTrace(err)
+			}
 		default:
 			if r.stream == nil {
-				return nil, xerrors.WithStackTrace(io.EOF)
+				return nil, io.EOF
 			}
 			part, err := r.nextPart(ctx)
 			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil, io.EOF
+				}
+
 				return nil, xerrors.WithStackTrace(err)
 			}
 			r.lastPart = part
