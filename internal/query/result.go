@@ -175,6 +175,7 @@ func newResult(
 	}
 }
 
+//nolint:funlen
 func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, err error,
 ) {
