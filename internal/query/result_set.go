@@ -167,13 +167,15 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 				if err != nil {
 					if xerrors.Is(err, io.EOF) {
 						close(rs.done)
-
-						return nil, io.EOF
 					}
 
 					if rs.mustBeLastResultSet && errors.Is(err, errReadNextResultSet) {
 						// prevent detect io.EOF in the error
 						return nil, xerrors.WithStackTrace(xerrors.Wrap(errors.New(err.Error())))
+					}
+
+					if err == io.EOF {
+						return nil, io.EOF
 					}
 
 					return nil, xerrors.WithStackTrace(err)
