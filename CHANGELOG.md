@@ -1,4 +1,4 @@
-* Fixed context cancellation/timeout errors being silently swallowed in pagination examples (`examples/ttl/series.go`, `examples/serverless/url_shortener/service.go`, `examples/topic/cdc-cache-bus-freeseats/webserver.go`, `examples/pagination/cities.go`) when a query produced no result set or rows
+* Fixed context cancellation/timeout errors being silently swallowed in examples when a query produced no result set or rows: `examples/pagination/cities.go`, `examples/ttl/series.go`, `examples/serverless/url_shortener/service.go`, `examples/topic/cdc-cache-bus-freeseats/webserver.go`
 
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
