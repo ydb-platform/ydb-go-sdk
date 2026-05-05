@@ -47,10 +47,10 @@ func BenchmarkDatabaseSQL(b *testing.B) {
 			name:            "QueryService",
 			useQueryService: true,
 		},
-		// {
-		// 	name:            "TableService",
-		// 	useQueryService: false,
-		// },
+		{
+			name:            "TableService",
+			useQueryService: false,
+		},
 	} {
 		connector, err := ydb.Connector(nativeDriver,
 			ydb.WithQueryService(engine.useQueryService),
