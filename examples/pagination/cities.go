@@ -68,13 +68,16 @@ func selectPaging(
 				_ = res.Close()
 			}()
 			if !res.NextResultSet(ctx) || !res.HasNextRow() {
-				empty = true
-
 				if err := ctx.Err(); err != nil {
 					return err
 				}
 
-				return res.Err()
+				if err := res.Err(); err != nil {
+					return err
+				}
+
+				empty = true
+				return nil
 			}
 			var addr string
 			for res.NextRow() {
