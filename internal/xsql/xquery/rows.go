@@ -14,7 +14,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
 var (
@@ -38,6 +37,9 @@ type rows struct {
 	allColumns, columns []string
 	columnsType         []types.Type
 	discarded           []bool
+
+	scanValues []value.Value // pre-allocated buffer reused across row scans
+	scanDst    []any         // pre-allocated scan destinations pointing into scanValues
 }
 
 func (r *rows) updateColumns() {
@@ -53,6 +55,13 @@ func (r *rows) updateColumns() {
 		}
 		r.columnsType = r.nextSet.ColumnTypes()
 		r.columnsFetchError = r.nextErr
+
+		n := len(r.allColumns)
+		r.scanValues = make([]value.Value, n)
+		r.scanDst = make([]any, n)
+		for i := range r.scanValues {
+			r.scanDst[i] = &r.scanValues[i]
+		}
 	}
 }
 
@@ -142,22 +151,19 @@ func (r *rows) Next(dst []driver.Value) error {
 		return xerrors.WithStackTrace(err)
 	}
 
-	values := xslices.Transform(make([]value.Value, len(r.allColumns)), func(v value.Value) any { return &v })
-	if err = nextRow.Scan(values...); err != nil {
+	if err = nextRow.Scan(r.scanDst...); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	dstI := 0
-	for i := range values {
+	for i := range r.scanDst {
 		if !r.discarded[i] {
-			if v := values[i]; v != nil {
-				dst[dstI], err = value.Any(*(v.(*value.Value))) //nolint:forcetypeassert
-				if err != nil {
-					return xerrors.WithStackTrace(err)
-				}
-
-				dst[dstI] = common.ToDatabaseSQLValue(dst[dstI])
+			dst[dstI], err = value.Any(r.scanValues[i])
+			if err != nil {
+				return xerrors.WithStackTrace(err)
 			}
+
+			dst[dstI] = common.ToDatabaseSQLValue(dst[dstI])
 			dstI++
 		}
 	}

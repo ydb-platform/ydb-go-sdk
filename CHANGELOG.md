@@ -1,3 +1,5 @@
+* Eliminated per-row heap allocations in `database/sql` driver's query-service row scanner by pre-allocating scan buffers in the `rows` struct and reusing them across `Next` calls
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 
