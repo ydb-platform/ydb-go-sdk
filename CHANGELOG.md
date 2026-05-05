@@ -1,3 +1,5 @@
+* Optimized `lastUsage.Start()` to replace `sync.OnceFunc` with an `atomic.Bool`-based approach, reducing heap allocations per query start
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 
