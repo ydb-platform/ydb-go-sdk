@@ -304,6 +304,14 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+
+	if err := res.Err(); err != nil {
+		return "", err
+	}
+
 	return "", fmt.Errorf("hash '%s' is not found", hash)
 }
 

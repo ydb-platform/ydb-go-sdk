@@ -182,7 +182,9 @@ func (s *server) IndexPageHandler(writer http.ResponseWriter, request *http.Requ
 			return err
 		}
 
-		res.NextResultSet(ctx, "id")
+		if err := res.NextResultSetErr(ctx, "id"); err != nil {
+			return err
+		}
 
 		for res.HasNextRow() {
 			res.NextRow()
@@ -194,7 +196,7 @@ func (s *server) IndexPageHandler(writer http.ResponseWriter, request *http.Requ
 			busIDs = append(busIDs, id)
 		}
 
-		return nil
+		return res.Err()
 	})
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
