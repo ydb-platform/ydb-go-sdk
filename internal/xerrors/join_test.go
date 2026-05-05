@@ -70,7 +70,7 @@ func TestUnwrapJoined(t *testing.T) {
 	assert.Contains(t, inners, err2)
 }
 
-func TestJoinAsError(t *testing.T) {
+func TestJoinAsYDBError(t *testing.T) {
 	for _, joined := range []error{
 		Join(context.Canceled, Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))),
 		Join(Transport(grpcStatus.Error(grpcCodes.Canceled, "test")), context.Canceled),
@@ -79,38 +79,42 @@ func TestJoinAsError(t *testing.T) {
 		func() error {
 			ctxGuard := xcontext.NewCancelsGuard()
 			defer ctxGuard.Cancel()
-			err1, cancel1 := ctxGuard.WithCancel(t.Context())
-			defer cancel1()
+			ctx, cancel := ctxGuard.WithCancel(t.Context())
 			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
 
-			return Join(err2, err1.Err())
+			cancel()
+
+			return Join(err2, ctx.Err())
 		}(),
 		func() error {
 			ctxGuard := xcontext.NewCancelsGuard()
 			defer ctxGuard.Cancel()
-			err1, cancel1 := ctxGuard.WithCancel(t.Context())
-			defer cancel1()
+			ctx, cancel := ctxGuard.WithCancel(t.Context())
 			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
 
-			return WithStackTrace(Join(err2, err1.Err()))
+			cancel()
+
+			return WithStackTrace(Join(err2, ctx.Err()))
 		}(),
 		func() error {
 			ctxGuard := xcontext.NewCancelsGuard()
 			defer ctxGuard.Cancel()
-			err1, cancel1 := ctxGuard.WithCancel(t.Context())
-			defer cancel1()
+			ctx, cancel := ctxGuard.WithCancel(t.Context())
 			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
 
-			return Join(err1.Err(), err2)
+			cancel()
+
+			return Join(ctx.Err(), err2)
 		}(),
 		func() error {
 			ctxGuard := xcontext.NewCancelsGuard()
 			defer ctxGuard.Cancel()
-			err1, cancel1 := ctxGuard.WithCancel(t.Context())
-			defer cancel1()
+			ctx, cancel := ctxGuard.WithCancel(t.Context())
 			err2 := Transport(grpcStatus.Error(grpcCodes.Canceled, "test"))
 
-			return WithStackTrace(Join(err1.Err(), err2))
+			cancel()
+
+			return WithStackTrace(Join(ctx.Err(), err2))
 		}(),
 	} {
 		t.Run(joined.Error(), func(t *testing.T) {
