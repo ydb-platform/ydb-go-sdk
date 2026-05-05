@@ -2,23 +2,29 @@ package spans
 
 import (
 	"io"
-	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// query produces the QueryService spans following OTel semantic conventions.
+//
+// User-facing span names:
+//   - ydb.CreateSession (CLIENT) — QueryService session creation
+//     (CreateSession + first AttachStream message)
+//   - ydb.ExecuteQuery  (CLIENT) — single ExecuteQuery RPC, including reading
+//     the response stream from start to end
+//   - ydb.Commit        (CLIENT) — CommitTransaction RPC
+//   - ydb.Rollback      (CLIENT) — RollbackTransaction RPC
+//
+// All client-kind spans are augmented with the OTel database semantic
+// attributes (db.system.name, db.namespace, server.address, server.port,
+// network.peer.address, network.peer.port) by the adapter implementation;
+// only the ydb.node.id custom tag is attached at this level.
+//
 //nolint:funlen,gocyclo
 func query(adapter Adapter) trace.Query {
-	nodeID := func(session interface{ NodeID() uint32 }) int64 {
-		if session != nil {
-			return int64(session.NodeID())
-		}
-
-		return 0
-	}
-
 	return trace.Query{
 		OnNew: func(info trace.QueryNewStartInfo) func(info trace.QueryNewDoneInfo) {
 			if adapter.Details()&trace.QueryEvents == 0 {
@@ -115,7 +121,6 @@ func query(adapter Adapter) trace.Query {
 				finish(
 					start,
 					info.Error,
-					kv.Int("Attempts", info.Attempts),
 				)
 			}
 		},
@@ -171,7 +176,6 @@ func query(adapter Adapter) trace.Query {
 				finish(
 					start,
 					info.Error,
-					kv.Int("Attempts", info.Attempts),
 				)
 			}
 		},
@@ -189,7 +193,6 @@ func query(adapter Adapter) trace.Query {
 				finish(
 					start,
 					info.Error,
-					kv.Int("Attempts", info.Attempts),
 				)
 			}
 		},
@@ -200,8 +203,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
 			)
 
 			return func(info trace.QueryExecDoneInfo) {
@@ -218,8 +220,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
 			)
 
 			return func(info trace.QueryQueryDoneInfo) {
@@ -236,8 +237,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
 			)
 
 			return func(info trace.QueryQueryResultSetDoneInfo) {
@@ -254,8 +254,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
 			)
 
 			return func(info trace.QueryQueryRowDoneInfo) {
@@ -272,16 +271,12 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				SpanNameCreateSession,
 			)
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					kv.String("SessionID", safeID(info.Session)),
-					kv.String("SessionStatus", safeStatus(info.Session)),
-					kv.Int64("NodeID", nodeID(info.Session)),
+				finish(start, info.Error,
+					kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 				)
 			}
 		},
@@ -311,6 +306,7 @@ func query(adapter Adapter) trace.Query {
 				adapter,
 				info.Context,
 				info.Call.String(),
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 			)
 
 			return func(info trace.QuerySessionDeleteDoneInfo) {
@@ -327,8 +323,8 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 			)
 
 			return func(info trace.QuerySessionExecDoneInfo) {
@@ -345,8 +341,8 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 			)
 
 			return func(info trace.QuerySessionQueryDoneInfo) {
@@ -365,8 +361,8 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 			)
 
 			return func(info trace.QuerySessionQueryResultSetDoneInfo) {
@@ -383,8 +379,8 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 			)
 
 			return func(info trace.QuerySessionQueryRowDoneInfo) {
@@ -402,13 +398,49 @@ func query(adapter Adapter) trace.Query {
 				adapter,
 				info.Context,
 				info.Call.String(),
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 			)
 
 			return func(info trace.QuerySessionBeginDoneInfo) {
 				finish(
 					start,
 					info.Error,
-					kv.String("TransactionID", safeID(info.Tx)),
+				)
+			}
+		},
+		OnTxCommit: func(info trace.QueryTxCommitStartInfo) func(info trace.QueryTxCommitDoneInfo) {
+			if adapter.Details()&trace.QueryTransactionEvents == 0 {
+				return nil
+			}
+			start := childSpanWithReplaceCtx(
+				adapter,
+				info.Context,
+				SpanNameCommit,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
+			)
+
+			return func(info trace.QueryTxCommitDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		},
+		OnTxRollback: func(info trace.QueryTxRollbackStartInfo) func(info trace.QueryTxRollbackDoneInfo) {
+			if adapter.Details()&trace.QueryTransactionEvents == 0 {
+				return nil
+			}
+			start := childSpanWithReplaceCtx(
+				adapter,
+				info.Context,
+				SpanNameRollback,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
+			)
+
+			return func(info trace.QueryTxRollbackDoneInfo) {
+				finish(
+					start,
+					info.Error,
 				)
 			}
 		},
@@ -488,8 +520,8 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 				kv.Bool("WithCommit", info.WithCommit),
 			)
 
@@ -507,8 +539,8 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 				kv.Bool("WithCommit", info.WithCommit),
 			)
 
@@ -526,8 +558,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
 				kv.Bool("WithCommit", info.WithCommit),
 			)
 
@@ -545,8 +576,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
-				kv.String("Query", strings.TrimSpace(info.Query)),
+				SpanNameExecuteQuery,
 				kv.Bool("WithCommit", info.WithCommit),
 			)
 

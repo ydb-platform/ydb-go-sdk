@@ -2,6 +2,7 @@ package spans
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
@@ -37,19 +38,57 @@ func finish(
 	fields ...KeyValue,
 ) {
 	if err != nil {
-		s.Error(err)
+		setSpanException(s, err)
 	}
 	s.End(fields...)
 }
 
-func logError(s Span, err error, fields ...KeyValue) {
-	var ydbErr ydb.Error
-	if xerrors.As(err, &ydbErr) {
-		fields = append(fields,
-			kv.Int("error.ydb.code", int(ydbErr.Code())),
-			kv.String("error.ydb.name", ydbErr.Name()),
-		)
+// setSpanException is the Go counterpart of OTel SDK's SetException for
+// dotnet/java. It marks the span as failed and attaches OTel-compliant error
+// attributes:
+//
+//   - error.type
+//   - db.response.status_code (only when the error carries a YDB status code)
+//
+// The `error.type` value is:
+//   - "transport_error" for grpc transport errors,
+//   - "ydb_error"       for any other ydb.Error,
+//   - the Go dynamic type name (e.g. "*errors.errorString",
+//     "context.deadlineExceededError") otherwise.
+func setSpanException(s Span, err error) {
+	s.Error(err, errorAttrs(err)...)
+}
+
+// errorAttrs returns OTel-compliant error attributes derived from err.
+func errorAttrs(err error) []KeyValue {
+	if err == nil {
+		return nil
 	}
+	var (
+		fields []KeyValue
+		ydbErr ydb.Error
+	)
+	if xerrors.As(err, &ydbErr) {
+		errorType := ErrorTypeYDB
+		if xerrors.IsTransportError(err) {
+			errorType = ErrorTypeTransport
+		}
+		fields = append(fields,
+			kv.String(AttrErrorType, errorType),
+			kv.Int(AttrDBResponseStatusCode, int(ydbErr.Code())),
+		)
+
+		return fields
+	}
+	fields = append(fields,
+		kv.String(AttrErrorType, fmt.Sprintf("%T", err)),
+	)
+
+	return fields
+}
+
+func logError(s Span, err error, fields ...KeyValue) {
+	fields = append(fields, errorAttrs(err)...)
 	s.Error(err, fields...)
 }
 

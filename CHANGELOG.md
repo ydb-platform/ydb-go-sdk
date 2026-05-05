@@ -1,3 +1,10 @@
+* Renamed `spans` package QueryService spans to follow OpenTelemetry semantic conventions: `ydb.CreateSession` (CLIENT), `ydb.ExecuteQuery` (CLIENT, emitted for `Query`/`Exec`/`SessionQuery`/`SessionExec`/`TxQuery`/`TxExec` and their result-set/row variants), `ydb.Commit` (CLIENT) and `ydb.Rollback` (CLIENT). The previous full-package-path span names are no longer emitted for these events
+* Renamed `spans` package retry spans to `ydb.RunWithRetry` (INTERNAL, wraps the whole retry loop) and `ydb.Try` (INTERNAL, one per attempt). Each `ydb.Try` carries the `ydb.retry.backoff_ms` attribute equal to the sleep waited before that attempt (`0` for the first attempt)
+* Added OpenTelemetry-aligned span attribute key constants in the `spans` package: `db.system.name`, `db.namespace`, `server.address`, `server.port`, `network.peer.address`, `network.peer.port`, plus YDB-specific `ydb.node.id`, `ydb.node.dc` and `ydb.retry.backoff_ms`
+* Added `SetException`-equivalent error attributes on every span produced by the `spans` package: `error.type` (`"transport_error"` for grpc transport errors, `"ydb_error"` for any other `ydb.Error`, dynamic Go type name otherwise) and `db.response.status_code` (only when the error carries a YDB status code)
+* Added `trace.Retry.OnRetryAttempt` event fired once per retry attempt (including the first), carrying the attempt number and the backoff duration that was waited before the attempt
+* Added a new `examples/opentelemetry` example showing how to map the `spans.Adapter` interface onto the OpenTelemetry Go SDK with a docker-compose stack of OTel Collector / Tempo / Prometheus / Grafana, including a `Dockerfile` that runs the demo program inside the same compose network as the rest of the stack so spans share a common wall clock — mirrors the `Ydb.Sdk.AdoNet.OpenTelemetry` .NET example
+
 ## v3.138.2
 * Added an internal query transaction trace field `WithCommit` for spans and logs
 
