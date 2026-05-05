@@ -21,10 +21,28 @@ type grpcClientStream struct {
 	parentConn   *conn
 	stream       grpc.ClientStream
 	streamCtx    context.Context //nolint:containedctx
+	// parentCtx is the caller-provided context passed to NewStream before the
+	// per-stream child context was derived from it.  It is used to distinguish
+	// a genuine user-initiated cancellation (parentCtx.Err() != nil) from a
+	// stream-lifecycle cancellation triggered by (*grpcClientStream).finish,
+	// which only cancels streamCtx.
+	parentCtx    context.Context //nolint:containedctx
 	streamCancel context.CancelFunc
 	wrapping     bool
 	traceID      string
 	sentMark     *modificationMark
+}
+
+// callerCtxErr returns a non-nil error if the caller-provided context (the
+// context passed to NewStream before the per-stream context was derived from
+// it) has been canceled.  Returns nil when parentCtx has not been set, so
+// that direct struct construction in tests is safe.
+func (s *grpcClientStream) callerCtxErr() error {
+	if s.parentCtx != nil {
+		return s.parentCtx.Err()
+	}
+
+	return nil
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
@@ -61,7 +79,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 	err = s.stream.CloseSend()
 	if err != nil {
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+		if ctxErr := s.callerCtxErr(); ctxErr != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
@@ -96,7 +114,7 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 
 	err = s.stream.SendMsg(m)
 	if err != nil {
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+		if ctxErr := s.callerCtxErr(); ctxErr != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 
@@ -151,7 +169,7 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 			return io.EOF
 		}
 
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
+		if ctxErr := s.callerCtxErr(); ctxErr != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
 		}
 

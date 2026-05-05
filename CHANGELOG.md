@@ -1,3 +1,5 @@
+* Fixed topic writer regression where a server-side gRPC `Canceled` (`Cancelled on the server side`) was incorrectly classified as a local context cancellation when stream teardown and `RecvMsg`/`SendMsg`/`CloseSend` raced; server-initiated stream closure is now correctly propagated as a retryable transport error
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 

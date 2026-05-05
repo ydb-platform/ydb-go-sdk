@@ -198,6 +198,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 			parentConn: parentConn,
 			stream:     mockStream,
 			streamCtx:  cancelledCtx,
+			parentCtx:  cancelledCtx,
 			wrapping:   true,
 			traceID:    "test-trace-id",
 		}
@@ -208,6 +209,41 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		// transport error regardless of what gRPC returned.
 		require.False(t, xerrors.IsTransportError(err))
 		require.ErrorIs(t, err, streamErr)
+	})
+
+	t.Run("ServerSideCanceledIsTransportErrorWhenCallerContextAlive", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStream := mock.NewMockClientStream(ctrl)
+
+		// gRPC returns codes.Canceled with "Cancelled on the server side".
+		// finish() has already run and cancelled streamCtx, but the caller
+		// context is still alive.  The error must be classified as a transport
+		// error, NOT a context-cancelled error.
+		serverCancelErr := grpcStatus.Error(grpcCodes.Canceled, "Cancelled on the server side")
+		mockStream.EXPECT().CloseSend().Return(serverCancelErr)
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		parentConn := newConn(e, config)
+
+		streamCtx, streamCancel := context.WithCancel(context.Background())
+		streamCancel() // simulate finish() cancelling the stream context
+
+		s := &grpcClientStream{
+			parentConn: parentConn,
+			stream:     mockStream,
+			streamCtx:  streamCtx,
+			parentCtx:  context.Background(), // caller context is still alive
+			wrapping:   true,
+			traceID:    "test-trace-id",
+		}
+
+		err := s.CloseSend()
+		require.Error(t, err)
+		require.True(t, xerrors.IsTransportError(err))
 	})
 
 	t.Run("TransportErrorWithWrapping", func(t *testing.T) {
@@ -342,6 +378,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 			parentConn: parentConn,
 			stream:     mockStream,
 			streamCtx:  cancelledCtx,
+			parentCtx:  cancelledCtx,
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   &modificationMark{},
@@ -353,6 +390,43 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		// transport error regardless of what gRPC returned.
 		require.False(t, xerrors.IsTransportError(err))
 		require.ErrorIs(t, err, streamErr)
+	})
+
+	t.Run("ServerSideCanceledIsTransportErrorWhenCallerContextAlive", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStream := mock.NewMockClientStream(ctrl)
+
+		msg := &Ydb_Query.ExecuteQueryRequest{}
+		// gRPC returns codes.Canceled with "Cancelled on the server side".
+		// finish() has already run and cancelled streamCtx, but the caller
+		// context is still alive.  The error must be classified as a transport
+		// error, NOT a context-cancelled error.
+		serverCancelErr := grpcStatus.Error(grpcCodes.Canceled, "Cancelled on the server side")
+		mockStream.EXPECT().SendMsg(msg).Return(serverCancelErr)
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		parentConn := newConn(e, config)
+
+		streamCtx, streamCancel := context.WithCancel(context.Background())
+		streamCancel() // simulate finish() cancelling the stream context
+
+		s := &grpcClientStream{
+			parentConn: parentConn,
+			stream:     mockStream,
+			streamCtx:  streamCtx,
+			parentCtx:  context.Background(), // caller context is still alive
+			wrapping:   true,
+			traceID:    "test-trace-id",
+			sentMark:   &modificationMark{},
+		}
+
+		err := s.SendMsg(msg)
+		require.Error(t, err)
+		require.True(t, xerrors.IsTransportError(err))
 	})
 
 	t.Run("TransportErrorRetryable", func(t *testing.T) {
@@ -558,6 +632,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 			parentConn: parentConn,
 			stream:     mockStream,
 			streamCtx:  cancelledCtx,
+			parentCtx:  cancelledCtx,
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   &modificationMark{},
@@ -569,6 +644,44 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		// transport error regardless of what gRPC returned.
 		require.False(t, xerrors.IsTransportError(err))
 		require.ErrorIs(t, err, streamErr)
+	})
+
+	t.Run("ServerSideCanceledIsTransportErrorWhenCallerContextAlive", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStream := mock.NewMockClientStream(ctrl)
+
+		msg := &Ydb_Query.ExecuteQueryResponsePart{}
+		// gRPC returns codes.Canceled with "Cancelled on the server side".
+		// finish() has already run and cancelled streamCtx, but the caller
+		// context is still alive.  The error must be classified as a transport
+		// error, NOT a context-cancelled error.
+		serverCancelErr := grpcStatus.Error(grpcCodes.Canceled, "Cancelled on the server side")
+		mockStream.EXPECT().RecvMsg(msg).Return(serverCancelErr)
+		mockStream.EXPECT().Trailer().Return(metadata.MD{})
+
+		config := &mockConfig{
+			dialTimeout:   5 * time.Second,
+			connectionTTL: 0,
+		}
+		e := endpoint.New("test-endpoint:2135")
+		parentConn := newConn(e, config)
+
+		streamCtx, streamCancel := context.WithCancel(context.Background())
+		streamCancel() // simulate finish() cancelling the stream context
+
+		s := &grpcClientStream{
+			parentConn: parentConn,
+			stream:     mockStream,
+			streamCtx:  streamCtx,
+			parentCtx:  context.Background(), // caller context is still alive
+			wrapping:   true,
+			traceID:    "test-trace-id",
+			sentMark:   &modificationMark{},
+		}
+
+		err := s.RecvMsg(msg)
+		require.Error(t, err)
+		require.True(t, xerrors.IsTransportError(err))
 	})
 
 	t.Run("TransportErrorRetryable", func(t *testing.T) {
