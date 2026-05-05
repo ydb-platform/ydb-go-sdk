@@ -70,6 +70,10 @@ func selectPaging(
 			if !res.NextResultSet(ctx) || !res.HasNextRow() {
 				empty = true
 
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+
 				return res.Err()
 			}
 			var addr string
