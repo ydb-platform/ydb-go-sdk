@@ -1,3 +1,5 @@
+* Optimized `context.AfterFunc` registration in query result streaming: changed from per-`Recv` to once-per-stream, reducing allocations during result iteration
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 
