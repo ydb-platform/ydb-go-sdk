@@ -43,11 +43,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var (
-	queryClientExecuteRequestPool xsync.Pool[Ydb_Query.ExecuteQueryRequest]
-	queryClientExecuteContentPool xsync.Pool[Ydb_Query.QueryContent]
-)
-
 type (
 	dataQueryExecutor interface {
 		execute(
@@ -141,11 +136,11 @@ func (e queryClientExecutor) execute(
 	executeDataQueryRequest *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (_ *transaction, _ result.Result, finalErr error) {
-	qc := queryClientExecuteContentPool.GetOrNew()
+	qc := query.AcquireQueryContent()
 	qc.Syntax = Ydb_Query.Syntax_SYNTAX_YQL_V1
 	qc.Text = executeDataQueryRequest.GetQuery().GetYqlText()
 
-	request := queryClientExecuteRequestPool.GetOrNew()
+	request := query.AcquireExecuteQueryRequest()
 	request.SessionId = executeDataQueryRequest.GetSessionId()
 	request.ExecMode = Ydb_Query.ExecMode_EXEC_MODE_EXECUTE
 	request.TxControl = txControl.ToYdbQueryTransactionControl()
@@ -161,14 +156,7 @@ func (e queryClientExecutor) execute(
 
 	stream, err := e.client.ExecuteQuery(ctx, request, callOptions...)
 	// The gRPC client has serialized request at this point; return it to the pool.
-	if qcw, ok := request.GetQuery().(*Ydb_Query.ExecuteQueryRequest_QueryContent); ok && qcw != nil {
-		if pooledQC := qcw.QueryContent; pooledQC != nil {
-			pooledQC.Reset()
-			queryClientExecuteContentPool.Put(pooledQC)
-		}
-	}
-	request.Reset()
-	queryClientExecuteRequestPool.Put(request)
+	query.ReleaseExecuteQueryRequest(request)
 
 	if err != nil {
 		if status := query.StatusFromErr(err); status != query.StatusUnknown {

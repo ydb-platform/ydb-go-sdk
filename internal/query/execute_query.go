@@ -90,11 +90,11 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	qc := queryQueryContentPool.GetOrNew()
+	qc := AcquireQueryContent()
 	qc.Syntax = Ydb_Query.Syntax(cfg.Syntax())
 	qc.Text = q
 
-	request := executeQueryRequestPool.GetOrNew()
+	request := AcquireExecuteQueryRequest()
 	request.SessionId = sessionID
 	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
 	request.TxControl = cfg.TxControl().ToYdbQueryTransactionControl()
@@ -110,24 +110,37 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 	return request, cfg.CallOptions(), nil
 }
 
-// releaseExecuteQueryRequest resets the request and its nested QueryContent and
-// returns both to their respective pools.  It must be called after the gRPC
+// AcquireExecuteQueryRequest returns an ExecuteQueryRequest from the shared pool.
+// The caller must call ReleaseExecuteQueryRequest when done with it.
+func AcquireExecuteQueryRequest() *Ydb_Query.ExecuteQueryRequest {
+	return executeQueryRequestPool.GetOrNew()
+}
+
+// AcquireQueryContent returns a QueryContent from the shared pool.
+// The caller must ensure the returned value is returned via ReleaseExecuteQueryRequest.
+func AcquireQueryContent() *Ydb_Query.QueryContent {
+	return queryQueryContentPool.GetOrNew()
+}
+
+// ReleaseExecuteQueryRequest resets r and its nested QueryContent and returns
+// both to their respective shared pools. It must be called after the gRPC
 // client has serialized the request (i.e. after ExecuteQuery returns).
-func releaseExecuteQueryRequest(request *Ydb_Query.ExecuteQueryRequest) {
-	if request == nil {
+// It is safe to call with a nil r.
+func ReleaseExecuteQueryRequest(r *Ydb_Query.ExecuteQueryRequest) {
+	if r == nil {
 		return
 	}
 
 	// Extract QueryContent before Reset clears the Query field.
-	if qcw, ok := request.GetQuery().(*Ydb_Query.ExecuteQueryRequest_QueryContent); ok && qcw != nil {
+	if qcw, ok := r.GetQuery().(*Ydb_Query.ExecuteQueryRequest_QueryContent); ok {
 		if qc := qcw.QueryContent; qc != nil {
 			qc.Reset()
 			queryQueryContentPool.Put(qc)
 		}
 	}
 
-	request.Reset()
-	executeQueryRequestPool.Put(request)
+	r.Reset()
+	executeQueryRequestPool.Put(r)
 }
 
 func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
@@ -163,7 +176,7 @@ func execute(
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	// The gRPC client has serialized request at this point; return it to the pool.
-	releaseExecuteQueryRequest(request)
+	ReleaseExecuteQueryRequest(request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
