@@ -1,4 +1,5 @@
 * Optimized `context.AfterFunc` registration in query result streaming: changed from per-`Recv` to once-per-stream, reducing allocations during result iteration
+* Optimized `io.EOF` handling in QueryService result iteration by returning `io.EOF` directly instead of wrapping it with `xerrors.WithStackTrace`, reducing per-query allocations
 
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections

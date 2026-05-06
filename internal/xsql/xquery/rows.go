@@ -3,7 +3,6 @@ package xquery
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 	"io"
 	"strings"
 	"sync"
@@ -103,7 +102,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 	r.nextErr = err
 	r.nextSet = res
 
-	if errors.Is(r.nextErr, io.EOF) {
+	if xerrors.Is(r.nextErr, io.EOF) {
 		return io.EOF
 	}
 
@@ -126,7 +125,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	ctx := context.Background()
 
 	if r.nextErr != nil {
-		if errors.Is(r.nextErr, io.EOF) {
+		if xerrors.Is(r.nextErr, io.EOF) {
 			return io.EOF
 		}
 
@@ -135,7 +134,7 @@ func (r *rows) Next(dst []driver.Value) error {
 
 	nextRow, err := r.nextSet.NextRow(ctx)
 	if err != nil {
-		if errors.Is(err, io.EOF) {
+		if xerrors.Is(err, io.EOF) {
 			return io.EOF
 		}
 
