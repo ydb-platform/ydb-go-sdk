@@ -16,7 +16,7 @@ type newTraceIDOpts struct {
 	newRandom func() (uuid.UUID, error)
 }
 
-var lo, hi = func() (seed, counter uint64) {
+var lo, hi = func() (uint64, uint64) {
 	var buffer [16]byte
 	_, _ = rand.Read(buffer[:])
 
