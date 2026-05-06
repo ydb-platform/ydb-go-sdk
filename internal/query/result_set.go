@@ -106,7 +106,7 @@ func (rs *resultSet) Columns() (columnNames []string) {
 
 func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error) {
 	if rs.rowIndex == len(rs.rows) {
-		return nil, xerrors.WithStackTrace(io.EOF)
+		return nil, io.EOF
 	}
 
 	defer func() {
@@ -174,6 +174,10 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 						return nil, xerrors.WithStackTrace(xerrors.Wrap(errors.New(err.Error())))
 					}
 
+					if xerrors.Is(err, io.EOF) {
+						return nil, io.EOF
+					}
+
 					return nil, xerrors.WithStackTrace(err)
 				}
 				rs.rowIndex = 0
@@ -181,7 +185,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 				if part == nil {
 					close(rs.done)
 
-					return nil, xerrors.WithStackTrace(io.EOF)
+					return nil, io.EOF
 				}
 			}
 			if rs.currentPart.GetResultSet() != nil && rs.index != rs.currentPart.GetResultSetIndex() {

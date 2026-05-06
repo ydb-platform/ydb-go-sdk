@@ -1,11 +1,11 @@
 package spans
 
 import (
-	"errors"
 	"io"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -292,7 +292,7 @@ func query(adapter Adapter) trace.Query {
 			return func(info trace.QuerySessionAttachDoneInfo) {
 				if info.Error == nil {
 					logToParentSpan(adapter, ctx, call)
-				} else if errors.Is(info.Error, io.EOF) {
+				} else if xerrors.Is(info.Error, io.EOF) {
 					logToParentSpan(adapter, ctx, call+" => io.EOF")
 				} else {
 					logToParentSpanError(adapter, ctx, info.Error)
@@ -435,7 +435,7 @@ func query(adapter Adapter) trace.Query {
 			return func(info trace.QueryResultNextPartDoneInfo) {
 				if info.Error == nil {
 					logToParentSpan(adapter, ctx, call)
-				} else if errors.Is(info.Error, io.EOF) {
+				} else if xerrors.Is(info.Error, io.EOF) {
 					logToParentSpan(adapter, ctx, call+" => io.EOF")
 				} else {
 					logToParentSpanError(adapter, ctx, info.Error)
@@ -454,7 +454,7 @@ func query(adapter Adapter) trace.Query {
 			return func(info trace.QueryResultNextResultSetDoneInfo) {
 				if info.Error == nil {
 					logToParentSpan(adapter, ctx, call)
-				} else if errors.Is(info.Error, io.EOF) {
+				} else if xerrors.Is(info.Error, io.EOF) {
 					logToParentSpan(adapter, ctx, call+" => io.EOF")
 				} else {
 					logToParentSpanError(adapter, ctx, info.Error)
