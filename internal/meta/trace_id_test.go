@@ -56,9 +56,9 @@ func TestTraceID(t *testing.T) {
 	})
 }
 
-// BenchmarkNewRandom/fastUUID-12         	604245960	         1.803 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkNewRandom/uuid.NewRandom()-12 	 5404700	       219.4 ns/op	      16 B/op	       1 allocs/op
-// BenchmarkNewRandom/uuid.NewUUID()-12   	30324279	        40.06 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkNewRandom/fastUUID-12         	594720858	         1.865 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkNewRandom/uuid.NewRandom()-12 	 5434495	       229.1 ns/op	      16 B/op	       1 allocs/op
+// BenchmarkNewRandom/uuid.NewUUID()-12   	30184470	        39.31 ns/op	       0 B/op	       0 allocs/op
 func BenchmarkNewRandom(b *testing.B) {
 	b.Run("fastUUID", func(b *testing.B) {
 		b.ReportAllocs()
