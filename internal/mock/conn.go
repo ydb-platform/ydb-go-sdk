@@ -32,7 +32,7 @@ func (c *Conn) Endpoint() endpoint.Endpoint {
 	}
 }
 
-func (c *Conn) LastUsage() time.Time {
+func (c *Conn) LastUsage() (*time.Time, error) {
 	panic("not implemented in mock")
 }
 

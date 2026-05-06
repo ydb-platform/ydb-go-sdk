@@ -7,13 +7,6 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
-var (
-	_ LastUsage = (*lastUsage)(nil)
-	_ LastUsage = dummyLastUsage{}
-
-	noopStopFunc = func() {}
-)
-
 type (
 	LastUsage interface {
 		Get() time.Time
@@ -24,20 +17,7 @@ type (
 		t     atomic.Pointer[time.Time]
 		clock clockwork.Clock
 	}
-	dummyLastUsage struct{}
 )
-
-func (dummyLastUsage) Get() (t time.Time) {
-	return t
-}
-
-func (dummyLastUsage) Start() (stop func()) {
-	return noopStopFunc
-}
-
-func NewDummyLastUsage() LastUsage {
-	return dummyLastUsage{}
-}
 
 func NewLastUsage() LastUsage {
 	lastUsage := &lastUsage{
