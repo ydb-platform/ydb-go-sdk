@@ -33,7 +33,7 @@ import (
 // go test -bench=. -benchtime=10s .
 //
 // BenchmarkDatabaseSQLMock/QueryService-12   1074030    11848 ns/op   23018 B/op   401 allocs/op
-// BenchmarkDatabaseSQLMock/TableService-12    1209729     9915 ns/op    18788 B/op   314 allocs/op
+// BenchmarkDatabaseSQLMock/TableService-12   1209729     9915 ns/op   18788 B/op   314 allocs/op
 
 // grpcMockYDB is a local in-process gRPC stack (Discovery + Table + Query) with fixed
 // "SELECT 42" style responses. It does not require a real YDB endpoint.
