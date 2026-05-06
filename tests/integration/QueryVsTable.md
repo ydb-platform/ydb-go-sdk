@@ -266,18 +266,198 @@ This is higher-risk due to protobuf ownership rules but could reduce GC pressure
 
 ---
 
-### Summary Table
+### Summary Table (Round 1 — initial analysis)
 
-| # | Location | Flat allocs | Cumulative allocs | Difficulty | Impact |
-|---|---|---|---|---|---|
-| 1 | `nextPart` / `NextResultSet`: don't wrap `io.EOF` | 895 K | 7.7 M | Low | High |
-| 2 | `CloseOnContextCancel`: register AfterFunc once per stream | 376 K | 938 K | Medium | Medium |
-| 3 | `rows.Next`: reuse scan value buffer | — | 4.5 MB | Low | Medium |
-| 4 | `lastUsage.Start`: avoid `sync.OnceFunc` closure | 884 K | — | Medium | Medium |
-| 5 | `updateColumns`: reuse column slices | 294 K | 753 K | Low | Low |
-| 6 | `executeQueryRequest`: pool proto request struct | 281 K | — | High | Low |
+| # | Location | Flat allocs | Cumulative allocs | Difficulty | Impact | Tested result |
+|---|---|---|---|---|---|---|
+| 1 | `nextPart` / `NextResultSet`: don't wrap `io.EOF` | 895 K | 7.7 M | Low | High | ✅ **−15% allocs, −6% latency** (PR #2123) |
+| 2 | `CloseOnContextCancel`: register AfterFunc once per stream | 376 K | 938 K | Medium | Medium | ❌ No improvement (PR #2125) |
+| 3 | `rows.Next`: reuse scan value buffer | — | 4.5 MB | Low | Medium | ❌ No improvement (PR #2127) |
+| 4 | `lastUsage.Start`: avoid `sync.OnceFunc` closure | 884 K | — | Medium | Medium | ❌ No improvement (PR #2129) |
+| 5 | `updateColumns`: reuse column slices | 294 K | 753 K | Low | Low | ❌ No improvement (PR #2131) |
+| 6 | `executeQueryRequest`: pool proto request struct | 281 K | — | High | Low | ❌ No improvement (PR #2133) |
 
-Fixing items 1–4 should close the majority of the ~47% allocation gap between QueryService and
-TableService. The remaining gap is largely structural: QueryService uses one HTTP/2 stream per
-query (for true server-side streaming) while TableService uses unary RPCs, which incurs less
-per-query gRPC bookkeeping.
+---
+
+## Round 2 — Deeper Analysis
+
+After applying fix #1, the remaining gap (after PR #2123) is approximately:
+- Latency: **+24%** vs TableService
+- Memory: **+25%** vs TableService
+- Allocations: **+30% (~98 allocs/op)** vs TableService
+
+### Root cause discovery: `xcontext.cancelCtx.cancel()` triggers expensive stack recording
+
+The key finding from a second pass over `mock-mem-query.prof` vs `mock-mem-table.prof` is a
+**causal chain** that is entirely absent from the TableService profile:
+
+```
+xcontext.cancelCtx.cancel()
+  └─ xcontext.errAt(context.Canceled, 1)       [349 K flat allocs]
+       └─ stack.Record(skipDepth + 1)
+            └─ stack.Call(depth+1)              [1,575 K flat allocs]
+                 └─ runtime.Caller(...)         (syscall — not counted separately)
+                 └─ stack.call.Record(...)      [830 K flat allocs]
+                      └─ stack.parseFunctionName [1,046 K flat allocs]
+                      └─ stack.buildRecordString  [131 K flat allocs]
+                      └─ strings.Split / genSplit  [983 K flat allocs]
+```
+
+Total: **~4.9 M allocs** from this chain — **100% absent from the TableService profile**.
+
+#### Why does it fire?
+
+`xcontext.cancelCtx` is the custom cancel context in `internal/xcontext/context_with_cancel.go`.
+Its `cancel()` method calls `errAt(context.Canceled, 1)` which captures the call site via
+`stack.Record()` (= `runtime.Caller` + `runtime.FuncForPC` + string parsing). This is excellent
+for debugging — when a context is cancelled you get an error like
+`'context canceled' at internal/query/execute_query.go:133` — but it fires on **every normal query
+completion**, not just on errors.
+
+The QueryService path creates **two `xcontext.cancelCtx` contexts per query**:
+
+1. **`internal/query/execute_query.go:125`**
+   ```go
+   executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+   ```
+   Cancelled in the `defer stop()` after every successful stream read.
+
+2. **`internal/conn/conn.go:485`** (via `CancelsGuard.WithCancel`)
+   ```go
+   ctx, cancel := c.childStreams.WithCancel(ctx)
+   ```
+   `CancelsGuard.WithCancel` calls `xcontext.WithCancel` internally. Cancelled when the stream
+   finishes (in `grpcClientStream.finish`).
+
+TableService uses **unary `cc.Invoke`**, which never calls `xcontext.WithCancel`, so the entire
+chain is absent.
+
+Additionally, creating each `xcontext.cancelCtx` allocates the custom struct plus an inner
+`context.WithCancel(parent)`:
+
+| Symbol | Flat allocs (query) | Flat allocs (table) |
+|---|---|---|
+| `xcontext.WithCancel` | 557 K | 0 |
+| `xcontext.CancelsGuard.WithCancel` | 262 K | 0 |
+| `xcontext.errAt` (cancel-time) | 349 K | 0 |
+| `stack.Call` (inside errAt) | 1,575 K | 0 |
+| `stack.call.Record` | 830 K | 0 |
+| `stack.parseFunctionName` | 1,046 K | 0 |
+| **Total** | **~4,619 K** | **0** |
+
+---
+
+### #7 — Replace `xcontext.WithCancel` with `context.WithCancel` in the streaming execute path
+
+**Location 1:** `internal/query/execute_query.go:125`
+
+```go
+// Before — allocates xcontext.cancelCtx + records stack on every cancel
+executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+
+// After — plain cancel context, no stack recording on cancel
+executeCtx, executeCancel := context.WithCancel(xcontext.ValueOnly(ctx))
+```
+
+**Location 2:** `internal/xcontext/cancels_quard.go:23` (used by `conn.NewStream`)
+
+```go
+// Before
+ctx, cancel := WithCancel(ctx)   // xcontext.WithCancel: custom cancelCtx + errAt on cancel
+
+// After
+ctx, cancel := context.WithCancel(ctx)  // standard cancel context: no errAt overhead
+```
+
+The custom stack-enriched error is only useful in the query/topic subsystem for surfacing WHERE
+a context was cancelled. For the stream execution hot path the error is immediately discarded —
+the caller checks `ctx.Err()` or `xerrors.IsContextError(err)` anyway.
+
+**Expected savings: ~50–70 allocs/op**, eliminating the entire `errAt → stack.Record` chain from
+the benchmark profile.
+
+**Risk:** Low for `execute_query.go` (cancel error value is immediately thrown away). Moderate for
+`CancelsGuard.WithCancel` (used across multiple subsystems — check callers before changing).
+
+---
+
+### #8 — `stack.FunctionID` interface boxing on every streaming recv/send
+
+**Location:** `internal/conn/grpc_client_stream.go` — `RecvMsg`, `SendMsg`, `CloseSend`, `finish`
+
+```go
+// Called on every RecvMsg (≥2× per query):
+onDone = trace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
+    stack.FunctionID("github.com/.../RecvMsg"),  // boxes functionID string as Caller interface — 1 alloc
+)
+```
+
+`stack.FunctionID(id string)` returns `functionID(id)` (a string type) as a `Caller` interface.
+Boxing a 16-byte string into an interface value requires a heap allocation because the value does
+not fit in a single pointer word.
+
+In TableService the equivalent `Invoke` call also boxes once, but `RecvMsg` fires **2+ times per
+query**, so QueryService boxes 4–5 extra interface values per query.
+
+Profile evidence: `stack.FunctionID` — 3.08 M flat allocs (query) vs 950 K (table), a **2.1 M
+extra allocations** difference.
+
+**Fix:** Pre-allocate the `Caller` interface values as package-level variables:
+
+```go
+// In grpc_client_stream.go — package level (boxed once at init):
+var (
+    _callerCloseSend = stack.FunctionID("github.com/.../CloseSend")
+    _callerSendMsg   = stack.FunctionID("github.com/.../SendMsg")
+    _callerRecvMsg   = stack.FunctionID("github.com/.../RecvMsg")
+    _callerFinish    = stack.FunctionID("github.com/.../finish")
+)
+
+// In RecvMsg:
+onDone = trace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx, _callerRecvMsg)
+```
+
+Passing a pre-boxed interface variable is just a 2-word copy — no new heap allocation.
+
+**Expected savings: ~5 allocs/op.** Modest but zero-risk change.
+
+---
+
+### #9 — `context.(*cancelCtx).propagateCancel` overhead from deep cancel chains
+
+**Location:** Go standard library — called whenever `context.WithCancel(parent)` is used with
+a cancellable parent.
+
+Profile: 1.24 M flat allocs (query) vs **0** (table).
+
+`propagateCancel` allocates to register the new child context in the parent's cancellation list.
+This is unavoidable for correct context propagation — but the QueryService creates **more cancel
+layers per request** than TableService:
+
+| Layer | Query path | Table path |
+|---|---|---|
+| Session-level cancel | `xcontext.WithDone(ctx, s.Done())` | none |
+| Execute-level cancel | `xcontext.WithCancel(ValueOnly(ctx))` | none |
+| Stream-level cancel | `c.childStreams.WithCancel(ctx)` | none |
+| AfterFunc (parent→execute) | `context.AfterFunc(ctx, executeCancel)` | none |
+
+Each `WithCancel` with a cancellable parent runs `propagateCancel`, allocating a tree node.
+
+**Fix direction:** Reduce the number of cancel layers by combining them where possible. For example,
+`execute_query.go` already has both `xcontext.WithCancel` and an explicit `context.AfterFunc(ctx,
+executeCancel)`. With standard `context.WithCancel(ValueOnly(ctx))` replacing `xcontext.WithCancel`
+(see #7), the `AfterFunc` still propagates parent cancellation without the extra `cancelCtx` struct.
+
+---
+
+### Round 2 Summary Table
+
+| # | Location | Flat allocs (query only) | Difficulty | Est. impact |
+|---|---|---|---|---|
+| 7 | Replace `xcontext.WithCancel` with `context.WithCancel` in `execute_query.go` and `CancelsGuard` | ~4,619 K | Low–Medium | **~50–70 allocs/op** |
+| 8 | Pre-allocate `stack.FunctionID` callers as package-level vars in `grpc_client_stream.go` | ~2,100 K extra | Very Low | ~5 allocs/op |
+| 9 | Reduce cancel-chain depth in the execute path | ~1,244 K | Medium | ~10 allocs/op |
+
+Item #7 is the highest-priority new candidate. It eliminates the entire `errAt → stack.Record`
+allocation chain that is **completely absent from the TableService profile** but fires on every
+normal query completion in QueryService.
