@@ -19,7 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -132,7 +131,6 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			cc:        xquery.New(ctx, s, c.QueryOpts...),
 			ctx:       ctx,
 			connector: c,
-			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		return conn, nil
@@ -151,7 +149,6 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			cc:        xtable.New(ctx, c.parent.Scripting(), s, c.TableOpts...),
 			ctx:       ctx,
 			connector: c,
-			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		return conn, nil

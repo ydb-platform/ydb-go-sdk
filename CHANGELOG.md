@@ -1,4 +1,6 @@
-* Optimized `lastUsage.Start()` to replace `sync.OnceFunc` with an `atomic.Bool`-based approach, reducing heap allocations per query start
+* The `trace.DatabaseSQLConnExecStartInfo.IdleTime` and `trace.DatabaseSQLConnQueryStartInfo.IdleTime` fields have been marked as deprecated and will always be zero from now.
+* Default connection last usage tracking has been changed to "no tracking", with real-time tracking enabled only if a connection's time-to-live (TTL) has been defined.
+* `lastUsage.Start()` has been optimized to replace the `sync.OnceFunc` approach with an atomic.Bool-based one, reducing heap allocations for each query start.
 
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections

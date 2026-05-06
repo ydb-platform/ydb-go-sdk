@@ -63,6 +63,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 
 	cc = newConn(endpoint, p,
 		withOnClose(p.remove),
+		withRealLastUsage(p.config.ConnectionTTL() > 0),
 	)
 
 	p.conns.Set(endpoint.Key(), cc)

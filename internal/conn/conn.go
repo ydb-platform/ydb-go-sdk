@@ -536,12 +536,22 @@ func withOnClose(onClose func(*conn)) option {
 	}
 }
 
+func withRealLastUsage(b bool) option {
+	if b {
+		return func(c *conn) {
+			c.lastUsage = xsync.NewLastUsage()
+		}
+	}
+
+	return nil
+}
+
 func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 	c := &conn{
 		endpoint:     e,
 		config:       config,
 		done:         make(chan struct{}),
-		lastUsage:    xsync.NewLastUsage(),
+		lastUsage:    xsync.NewDummyLastUsage(),
 		childStreams: xcontext.NewCancelsGuard(),
 		onClose: []func(*conn){
 			func(c *conn) {
