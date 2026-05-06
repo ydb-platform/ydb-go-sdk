@@ -69,7 +69,7 @@ func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.
 	}
 
 	// eof is retriable for topic
-	if errors.Is(checkErr, io.EOF) && xerrors.RetryableError(checkErr) == nil {
+	if xerrors.Is(checkErr, io.EOF) && xerrors.RetryableError(checkErr) == nil {
 		checkErr = xerrors.Retryable(checkErr, xerrors.WithName("TopicEOF"))
 	}
 
