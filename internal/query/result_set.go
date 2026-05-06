@@ -174,7 +174,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 						return nil, xerrors.WithStackTrace(xerrors.Wrap(errors.New(err.Error())))
 					}
 
-					if err == io.EOF {
+					if xerrors.Is(err, io.EOF) {
 						return nil, io.EOF
 					}
 

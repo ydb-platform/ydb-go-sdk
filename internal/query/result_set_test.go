@@ -810,6 +810,56 @@ func TestResultSetNext(t *testing.T) {
 				require.NotErrorIs(t, err, io.EOF)
 			}
 		})
+		// Regression test: when mustBeLastResultSet is false, errReadNextResultSet (which wraps
+		// io.EOF) must still cause nextRow to return io.EOF, not a real error. The current result
+		// set is exhausted; the caller is expected to advance to the next result set.
+		t.Run("NotMustBeLastResultSetWithErrReadNextResultSet", func(t *testing.T) {
+			recvErr := fmt.Errorf(
+				"result set (index=0) receive part (index=1) for next result set: %w (%w)",
+				io.EOF, errReadNextResultSet,
+			)
+			recv := &Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}},
+						},
+					},
+				},
+			}
+			rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+				return nil, recvErr
+			}, recv)
+			// mustBeLastResultSet = false (default)
+
+			// Read the first (and only) row — should succeed.
+			{
+				_, err := rs.nextRow(ctx)
+				require.NoError(t, err)
+			}
+			// After exhausting the rows, recv returns errReadNextResultSet (wrapping io.EOF).
+			// The error must be io.EOF — the current result set is simply done.
+			{
+				_, err := rs.nextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+			}
+		})
 		t.Run("WrongResultSetIndex", func(t *testing.T) {
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
