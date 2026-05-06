@@ -65,18 +65,6 @@ func newFakeParts(n int) []*Ydb_Query.ExecuteQueryResponsePart {
 
 // BenchmarkResultNextPart measures the cost of creating a stream result,
 // consuming all N parts, and closing it.
-//
-// Sub-benchmarks compare:
-//   - "new/one_afterfunc_per_stream" – current code: CloseOnContextCancel
-//     registered once in newResult; Close takes the fast path because the
-//     stream is already exhausted.
-//   - "old/one_afterfunc_per_recv" – simulates the previous code that called
-//     CloseOnContextCancel on every nextPart invocation (one AfterFunc per part).
-//
-// Sample results (100-part stream, linux/amd64):
-//
-//	BenchmarkResultNextPart/new/one_afterfunc_per_stream-4   310000   11800 ns/op    3417 B/op   133 allocs/op
-//	BenchmarkResultNextPart/old/one_afterfunc_per_recv-4     250000   14100 ns/op   16336 B/op   305 allocs/op
 func BenchmarkResultNextPart(b *testing.B) {
 	const numParts = 100
 
