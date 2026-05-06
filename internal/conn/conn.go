@@ -482,6 +482,7 @@ func (c *conn) NewStream(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
+	parentCtx := ctx
 	ctx, cancel := c.childStreams.WithCancel(ctx)
 	defer func() {
 		if finalErr != nil {
@@ -492,6 +493,7 @@ func (c *conn) NewStream(
 	s := &grpcClientStream{
 		parentConn:   c,
 		streamCtx:    ctx,
+		parentCtx:    parentCtx,
 		streamCancel: cancel,
 		wrapping:     useWrapping,
 		traceID:      traceID,
