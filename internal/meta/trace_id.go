@@ -17,7 +17,7 @@ type newTraceIDOpts struct {
 }
 
 var (
-	counter uint64
+	counter atomic.Uint64
 	seed    = func() (seed [16]byte) {
 		rand.Read(seed[:])
 
@@ -25,8 +25,8 @@ var (
 	}()
 )
 
-func fastUUID() (uuid uuid.UUID, _ error) {
-	x := atomic.AddUint64(&counter, 1)
+func fastUUID() (uuid uuid.UUID, _ error) { //nolint:unparam
+	x := counter.Add(1)
 	uuid = seed
 	binary.LittleEndian.PutUint64(uuid[:8], x)
 
