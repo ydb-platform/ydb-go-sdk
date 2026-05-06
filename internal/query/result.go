@@ -233,6 +233,13 @@ func (r *streamResult) nextPart(ctx context.Context) (
 			return nil, xerrors.WithStackTrace(err)
 		}
 
+		// After stream.Recv() returns, check whether ctx was cancelled while we
+		// were blocked. This matches the semantic of the original per-Recv
+		// CloseOnContextCancel without allocating an AfterFunc goroutine per part.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, xerrors.WithStackTrace(ctxErr)
+		}
+
 		if txMeta := part.GetTxMeta(); txMeta != nil {
 			for _, f := range r.onTxMeta {
 				f(txMeta)
