@@ -192,9 +192,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	case <-r.closer.Done():
 		if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
-		} else {
-			return nil, xerrors.WithStackTrace(err)
 		}
+
+		return nil, xerrors.WithStackTrace(err)
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
