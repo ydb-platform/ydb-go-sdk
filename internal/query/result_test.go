@@ -4474,29 +4474,29 @@ func TestMaterializedResultStats(t *testing.T) {
 // recvEntered when it has started blocking, allowing tests to inject ctx
 // cancellations at a precise point.
 type blockingStream struct {
-initial     *Ydb_Query.ExecuteQueryResponsePart // returned synchronously on the first Recv
-firstDone   bool
-parts       chan *Ydb_Query.ExecuteQueryResponsePart
-recvEntered chan struct{}
+	initial     *Ydb_Query.ExecuteQueryResponsePart // returned synchronously on the first Recv
+	firstDone   bool
+	parts       chan *Ydb_Query.ExecuteQueryResponsePart
+	recvEntered chan struct{}
 }
 
 func (s *blockingStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-if !s.firstDone {
-s.firstDone = true
+	if !s.firstDone {
+		s.firstDone = true
 
-return s.initial, nil
-}
-// Signal that we are now blocking, then wait for a part.
-select {
-case s.recvEntered <- struct{}{}:
-default:
-}
-part, ok := <-s.parts
-if !ok {
-return nil, io.EOF
-}
+		return s.initial, nil
+	}
+	// Signal that we are now blocking, then wait for a part.
+	select {
+	case s.recvEntered <- struct{}{}:
+	default:
+	}
+	part, ok := <-s.parts
+	if !ok {
+		return nil, io.EOF
+	}
 
-return part, nil
+	return part, nil
 }
 
 func (s *blockingStream) CloseSend() error             { return nil }
@@ -4514,61 +4514,61 @@ func (s *blockingStream) Trailer() metadata.MD         { return nil }
 // stream instead of one per Recv) accidentally removing per-call context
 // propagation.
 func TestNextPartPerCallCtxCancellation(t *testing.T) {
-streamCtx := xtest.Context(t)
+	streamCtx := xtest.Context(t)
 
-initial := &Ydb_Query.ExecuteQueryResponsePart{
-Status:         Ydb.StatusIds_SUCCESS,
-ResultSetIndex: 0,
-ResultSet: &Ydb.ResultSet{
-Columns: []*Ydb.Column{{
-Name: "a",
-Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
-}},
-Rows: []*Ydb.Value{{Items: []*Ydb.Value{{
-Value: &Ydb.Value_Uint64Value{Uint64Value: 0},
-}}}},
-},
-}
-secondPart := &Ydb_Query.ExecuteQueryResponsePart{
-Status:         Ydb.StatusIds_SUCCESS,
-ResultSetIndex: 0,
-ResultSet: &Ydb.ResultSet{
-Rows: []*Ydb.Value{{Items: []*Ydb.Value{{
-Value: &Ydb.Value_Uint64Value{Uint64Value: 1},
-}}}},
-},
-}
+	initial := &Ydb_Query.ExecuteQueryResponsePart{
+		Status:         Ydb.StatusIds_SUCCESS,
+		ResultSetIndex: 0,
+		ResultSet: &Ydb.ResultSet{
+			Columns: []*Ydb.Column{{
+				Name: "a",
+				Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
+			}},
+			Rows: []*Ydb.Value{{Items: []*Ydb.Value{{
+				Value: &Ydb.Value_Uint64Value{Uint64Value: 0},
+			}}}},
+		},
+	}
+	secondPart := &Ydb_Query.ExecuteQueryResponsePart{
+		Status:         Ydb.StatusIds_SUCCESS,
+		ResultSetIndex: 0,
+		ResultSet: &Ydb.ResultSet{
+			Rows: []*Ydb.Value{{Items: []*Ydb.Value{{
+				Value: &Ydb.Value_Uint64Value{Uint64Value: 1},
+			}}}},
+		},
+	}
 
-stream := &blockingStream{
-initial:     initial,
-parts:       make(chan *Ydb_Query.ExecuteQueryResponsePart, 1),
-recvEntered: make(chan struct{}, 1),
-}
+	stream := &blockingStream{
+		initial:     initial,
+		parts:       make(chan *Ydb_Query.ExecuteQueryResponsePart, 1),
+		recvEntered: make(chan struct{}, 1),
+	}
 
-r, err := newResult(streamCtx, stream)
-require.NoError(t, err)
+	r, err := newResult(streamCtx, stream)
+	require.NoError(t, err)
 
-// rowCtx is intentionally independent of streamCtx to exercise the
-// per-call context path.
-rowCtx, rowCancel := context.WithCancel(context.Background())
+	// rowCtx is intentionally independent of streamCtx to exercise the
+	// per-call context path.
+	rowCtx, rowCancel := context.WithCancel(context.Background())
 
-errCh := make(chan error, 1)
-go func() {
-_, nextErr := r.nextPart(rowCtx)
-errCh <- nextErr
-}()
+	errCh := make(chan error, 1)
+	go func() {
+		_, nextErr := r.nextPart(rowCtx)
+		errCh <- nextErr
+	}()
 
-// Wait until nextPart is blocked inside stream.Recv.
-<-stream.recvEntered
+	// Wait until nextPart is blocked inside stream.Recv.
+	<-stream.recvEntered
 
-// Cancel the per-call context while Recv is still blocking.
-rowCancel()
+	// Cancel the per-call context while Recv is still blocking.
+	rowCancel()
 
-// Unblock Recv by providing data.
-stream.parts <- secondPart
+	// Unblock Recv by providing data.
+	stream.parts <- secondPart
 
-// nextPart must return context.Canceled, not the data.
-got := <-errCh
-require.Error(t, got)
-require.ErrorIs(t, got, context.Canceled)
+	// nextPart must return context.Canceled, not the data.
+	got := <-errCh
+	require.Error(t, got)
+	require.ErrorIs(t, got, context.Canceled)
 }
