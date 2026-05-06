@@ -7,7 +7,6 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 
@@ -36,10 +35,6 @@ func (c *Conn) toYdb(sql string, args ...driver.NamedValue) (yql string, _ *para
 	}
 
 	return yql, &params, nil
-}
-
-func (c *Conn) LastUsage() time.Time {
-	return c.lastUsage.Get()
 }
 
 func (c *Conn) Engine() Engine {

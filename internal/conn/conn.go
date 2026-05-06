@@ -33,13 +33,18 @@ var (
 
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
+
+	// errNoTrackingLastUsage specified error when connection no track last usage
+	errNoTrackingLastUsage = xerrors.Wrap(fmt.Errorf("no tracking last usage"))
+
+	noopStopFunc = func() {}
 )
 
 type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-	LastUsage() time.Time
+	LastUsage() (*time.Time, error)
 	GetState() state.State
 	SetState(ctx context.Context, state state.State) state.State
 	Unban(ctx context.Context) state.State
@@ -69,17 +74,29 @@ type (
 		lastUsage    xsync.LastUsage
 		onClose      []func(*conn)
 	}
+	nopLastUsage struct{}
 )
+
+func (nopLastUsage) Get() (t time.Time) {
+	return t
+}
+
+func (nopLastUsage) Start() (stop func()) {
+	return noopStopFunc
+}
 
 func (c *conn) Address() string {
 	return c.endpoint.Address()
 }
 
-func (c *conn) LastUsage() time.Time {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
+func (c *conn) LastUsage() (*time.Time, error) {
+	if c.lastUsage == nil {
+		return nil, errNoTrackingLastUsage
+	}
 
-	return c.lastUsage.Get()
+	t := c.lastUsage.Get()
+
+	return &t, nil
 }
 
 func (c *conn) NodeID() uint32 {
@@ -536,12 +553,20 @@ func withOnClose(onClose func(*conn)) option {
 	}
 }
 
+func withTrackLastUsage(b bool) option {
+	return func(c *conn) {
+		if b {
+			c.lastUsage = xsync.NewLastUsage()
+		}
+	}
+}
+
 func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 	c := &conn{
 		endpoint:     e,
 		config:       config,
+		lastUsage:    nopLastUsage{},
 		done:         make(chan struct{}),
-		lastUsage:    xsync.NewLastUsage(),
 		childStreams: xcontext.NewCancelsGuard(),
 		onClose: []func(*conn){
 			func(c *conn) {

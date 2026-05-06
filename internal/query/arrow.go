@@ -51,11 +51,15 @@ func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
 
 	part, err := r.stream.Recv()
 	if err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
-		return nil, xerrors.WithStackTrace(io.EOF)
+		return nil, io.EOF
 	}
 	r.resultSetIndex = part.GetResultSetIndex()
 

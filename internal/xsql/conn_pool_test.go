@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -86,7 +85,6 @@ func (c *deadSessionXsqlConnector) Connect(ctx context.Context) (driver.Conn, er
 		cc:        c.cc,
 		ctx:       ctx,
 		connector: c.sharedConnCfg,
-		lastUsage: xsync.NewLastUsage(),
 	}, nil
 }
 
