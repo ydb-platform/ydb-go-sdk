@@ -16,14 +16,12 @@ type newTraceIDOpts struct {
 	newRandom func() (uuid.UUID, error)
 }
 
-var (
-	lo, hi = func() (seed, counter uint64) {
-		var buffer [16]byte
-		_, _ = rand.Read(buffer[:])
+var lo, hi = func() (seed, counter uint64) {
+	var buffer [16]byte
+	_, _ = rand.Read(buffer[:])
 
-		return binary.LittleEndian.Uint64(buffer[:8]), binary.LittleEndian.Uint64(buffer[8:])
-	}()
-)
+	return binary.LittleEndian.Uint64(buffer[:8]), binary.LittleEndian.Uint64(buffer[8:])
+}()
 
 func fastUUID() (uuid uuid.UUID, _ error) {
 	binary.LittleEndian.PutUint64(uuid[:8], lo)
