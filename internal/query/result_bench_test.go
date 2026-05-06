@@ -65,7 +65,7 @@ func newFakeParts(n int) []*Ydb_Query.ExecuteQueryResponsePart {
 
 // BenchmarkResultNextPart measures the cost of creating a stream result,
 // consuming all N parts, and closing it.
-// master      BenchmarkResultNextPart    658785   18237 ns/op   22551 B/op   509 allocs/op
+// master      BenchmarkResultNextPart    787542   15434 ns/op   20645 B/op   472 allocs/op
 // pr-branch   BenchmarkResultNextPart   2546917    4701 ns/op    3009 B/op   132 allocs/op
 func BenchmarkResultNextPart(b *testing.B) {
 	const numParts = 100
@@ -94,5 +94,4 @@ func BenchmarkResultNextPart(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-
 }
