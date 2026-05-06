@@ -111,6 +111,7 @@ func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryConten
 	}
 }
 
+//nolint:funlen
 func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
 	q string, settings executeSettings, opts ...resultOption,
@@ -137,7 +138,20 @@ func execute(
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		// If ctx was already cancelled (e.g. session death closed the
+		// session-merged ctx before or during ExecuteQuery), the balancer's
+		// nextConn returns context.Canceled without us even reaching the
+		// ctx.Done() select below. Apply the same retryable wrapping here so
+		// the pool can retry with a fresh session.
+		select {
+		case <-ctx.Done():
+			return nil, xerrors.WithStackTrace(xerrors.Retryable(
+				ctx.Err(),
+				xerrors.WithName("streamResultContext"),
+			))
+		default:
+			return nil, xerrors.WithStackTrace(err)
+		}
 	}
 
 	// If ctx was cancelled during ExecuteQuery, return a retryable error so the
@@ -166,6 +180,24 @@ func execute(
 		withStreamResultOnClose(executeCancel),
 	)...)
 	if err != nil {
+		// If context.Canceled is returned, executeCtx was cancelled before or
+		// during newResult's first Recv call. This happens in the race window
+		// between the ctx.Done() check above and newResult when the session dies
+		// or the parent context is cancelled. Wrap the actual cancellation as
+		// retryable so the pool can retry with a fresh session (same semantics
+		// as the select check above).
+		if xerrors.Is(err, context.Canceled) {
+			cancelErr := executeCtx.Err()
+			if cancelErr == nil {
+				cancelErr = err
+			}
+
+			return nil, xerrors.WithStackTrace(xerrors.Retryable(
+				cancelErr,
+				xerrors.WithName("streamResultContext"),
+			))
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 

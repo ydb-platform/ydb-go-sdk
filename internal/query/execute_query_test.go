@@ -460,8 +460,11 @@ func TestExecute(t *testing.T) {
 			// When execute() with context, cancelled in progress
 			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
 
-			// Then context cancellation error is returned
+			// Then a retryable context cancellation error is returned so the pool
+			// can retry with a fresh session (fix for the race between the
+			// ctx.Done() check and newResult's first Recv call).
 			require.ErrorIs(t, err, context.Canceled)
+			require.True(t, xerrors.IsRetryableError(err), "expected retryable error: %v", err)
 		})
 
 		t.Run("CancelAfterExecute", func(t *testing.T) {
@@ -536,6 +539,81 @@ func TestExecute(t *testing.T) {
 			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
 			require.Error(t, err)
 			require.True(t, xerrors.IsRetryableError(err), "expected retryable error, got: %v", err)
+		})
+
+		// Regression test for the race covered by the context.Canceled check in execute()
+		// after newResult returns.
+		//
+		// This test specifically covers the case where:
+		//   1. The parent ctx is alive (user has NOT cancelled)
+		//   2. The gRPC stream was opened successfully
+		//   3. The derived executeCtx is cancelled between the ctx.Done() check and
+		//      newResult's first Recv call (e.g. session death, which cancels the
+		//      session-merged ctx passed to execute() via xcontext.WithDone)
+		//   4. Recv returns context.Canceled because executeCtx is already done
+		//
+		// The key assertion: even though ctx.Err() is nil, the error returned by
+		// execute() must be retryable so the pool can retry with a fresh session.
+		// Previously the code wrapped ctx.Err() (nil) — this test would have panicked.
+		t.Run("SessionDiesBeforeFirstRecv_ParentCtxAlive", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			// Parent ctx is alive throughout — user did NOT cancel.
+			ctx := xtest.Context(t)
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			// Simulate executeCtx being cancelled before/during Recv
+			// (e.g. session death cancels the merged session ctx which fires
+			// executeCancel via AfterFunc). We cannot call executeCancel directly
+			// (it is internal), so we return context.Canceled directly to mimic
+			// what gRPC returns when the stream context is already cancelled.
+			stream.EXPECT().Recv().Return(nil, context.Canceled)
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+
+			// Parent ctx must still be alive — the cancellation came from the session.
+			require.NoError(t, ctx.Err(), "parent ctx must not be cancelled")
+			// The error must be retryable so the pool retries with a fresh session.
+			require.Error(t, err)
+			require.True(t, xerrors.IsRetryableError(err),
+				"expected retryable error when executeCtx cancelled but parent ctx is alive, got: %v", err)
+			require.ErrorIs(t, err, context.Canceled)
+		})
+
+		// Regression test for the CI failure in TestBasicExampleQuery/ExecuteDataQuery:
+		// context.Canceled returned from ExecuteQuery itself (not newResult) when the
+		// session-merged ctx is already cancelled before the gRPC call, causing the
+		// balancer's nextConn to return context.Canceled immediately.
+		//
+		// Session.execute merges user ctx with session lifetime via xcontext.WithDone,
+		// so when the session dies its Done channel is closed, canceling the merged ctx
+		// passed to execute(). AfterFunc then fires executeCancel immediately, and the
+		// balancer's nextConn finds executeCtx.Err() != nil before ExecuteQuery even runs.
+		//
+		// execute() must detect the parent ctx cancellation in the ExecuteQuery error
+		// path and return retryable, not propagate a non-retryable context.Canceled.
+		t.Run("SessionDiesBeforeExecuteQuery", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			ctx, cancel := context.WithCancel(xtest.Context(t))
+			// Cancel ctx before calling execute — simulates the session having died
+			// before session.execute hands ctx to execute().
+			cancel()
+
+			// ExecuteQuery must NOT be called (or if called, returns error).
+			// The balancer would fail immediately because executeCtx is already done.
+			// We simulate that: ExecuteQuery is called but returns context.Canceled
+			// (what happens when nextConn sees a cancelled ctx).
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).
+				Return(nil, context.Canceled).AnyTimes()
+
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			require.Error(t, err)
+			require.True(t, xerrors.IsRetryableError(err),
+				"expected retryable error when ctx cancelled before ExecuteQuery, got: %v", err)
+			require.ErrorIs(t, err, context.Canceled)
 		})
 	})
 }
