@@ -71,48 +71,26 @@ func BenchmarkResultNextPart(b *testing.B) {
 	parts := newFakeParts(numParts)
 	ctx := context.Background()
 
-	b.Run("new/one_afterfunc_per_stream", func(b *testing.B) {
-		b.ReportAllocs()
-		stream := &fakeStream{parts: parts}
+	b.ReportAllocs()
+	stream := &fakeStream{parts: parts}
 
-		for i := 0; i < b.N; i++ {
-			stream.reset()
+	for i := 0; i < b.N; i++ {
+		stream.reset()
 
-			r, err := newResult(ctx, stream)
-			require.NoError(b, err)
+		r, err := newResult(ctx, stream)
+		require.NoError(b, err)
 
-			for {
-				_, err := r.nextPart(ctx)
-				if err != nil {
-					break
-				}
-			}
-
-			// Close takes the fast path since the stream is already exhausted.
-			if err := r.Close(ctx); err != nil {
-				b.Fatal(err)
+		for {
+			_, err := r.nextPart(ctx)
+			if err != nil {
+				break
 			}
 		}
-	})
 
-	b.Run("old/one_afterfunc_per_recv", func(b *testing.B) {
-		b.ReportAllocs()
-		stream := &fakeStream{parts: parts}
-
-		for i := 0; i < b.N; i++ {
-			stream.reset()
-
-			// Simulate the previous pattern: one CloseOnContextCancel per Recv call.
-			closer := NewResultCloser()
-			for {
-				stop := closer.CloseOnContextCancel(ctx)
-				part, err := stream.Recv()
-				stop()
-				if err != nil {
-					break
-				}
-				_ = part
-			}
+		// Close takes the fast path since the stream is already exhausted.
+		if err := r.Close(ctx); err != nil {
+			b.Fatal(err)
 		}
-	})
+	}
+
 }
