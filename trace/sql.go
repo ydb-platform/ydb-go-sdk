@@ -190,8 +190,7 @@ type (
 		Mode       string
 		Idempotent bool
 
-		// Deprecated
-		// Will be removed after October 2026.
+		// Deprecated: will be removed after October 2026.
 		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 		IdleTime time.Duration
 	}
@@ -211,8 +210,7 @@ type (
 		Mode       string
 		Idempotent bool
 
-		// Deprecated
-		// Will be removed after October 2026.
+		// Deprecated: will be removed after October 2026.
 		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 		IdleTime time.Duration
 	}
