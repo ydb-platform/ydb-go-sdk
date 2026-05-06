@@ -7,32 +7,38 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
-  batch: {}
+  batch: { }
 
 exporters:
-  debug:
-    verbosity: detailed
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    resource_to_telemetry_conversion:
+      enabled: true
+
   otlp/tempo:
     endpoint: tempo:4317
     tls:
       insecure: true
-  prometheus:
-    endpoint: 0.0.0.0:9464
+
+  debug:
+    verbosity: detailed
 
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
+
   zpages:
     endpoint: 0.0.0.0:55679
 
 service:
-  extensions: [health_check, zpages]
+  extensions: [ health_check, zpages ]
   pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp/tempo, debug]
     metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [prometheus, debug]
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ prometheus, debug ]
+
+    traces:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ otlp/tempo, debug ]

@@ -1,106 +1,81 @@
 # End-to-end OpenTelemetry playground for ydb-go-sdk.
-# Mirrors examples/Ydb.Sdk.AdoNet.OpenTelemetry/compose-e2e.yaml from
-# the .NET SDK so the two stacks can be compared side-by-side.
 #
-# All services run with TZ=UTC and share /etc/localtime from the host so
-# spans from the Go application, the YDB server and the OTel collector
-# end up on a common timeline in Tempo/Grafana — running the demo program
-# on the host machine while everything else lives in Docker can produce
-# misleading span timelines because of timezone or NTP-offset drift.
+# Mirrors the working stack from the .NET SDK example
+# https://github.com/ydb-platform/ydb-dotnet-sdk/tree/main/examples/Ydb.Sdk.AdoNet.OpenTelemetry
+# 1-to-1 (Tempo / Prometheus / Grafana / OTel Collector + locally provisioned
+# YDB), with the .NET `app`/`load-generator` services replaced by a single
+# Go demo program built from this directory's Dockerfile.
 services:
-  ydb:
-    image: ydbplatform/local-ydb:latest
-    container_name: ydb
-    ports:
-      - "2135:2135"
-      - "2136:2136"
-      - "8765:8765"
-    volumes:
-      - ./ydb_config:/ydb_certs
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      - TZ=UTC
-      - YDB_USE_IN_MEMORY_PDISKS=true
-      - GRPC_TLS_PORT=2135
-      - GRPC_PORT=2136
-      - MON_PORT=8765
-    healthcheck:
-      test: ["CMD-SHELL", "/ydbd ping || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
-    container_name: otel-collector
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    environment:
-      - TZ=UTC
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "9464:9464"   # Prometheus exporter
-      - "13133:13133" # health check
-      - "55679:55679" # zPages
-
-  tempo:
-    image: grafana/tempo:latest
-    container_name: tempo
-    command: ["-config.file=/etc/tempo.yaml"]
-    environment:
-      - TZ=UTC
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml:ro
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "3200:3200"
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    environment:
-      - TZ=UTC
-    volumes:
-      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "9090:9090"
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    environment:
-      - TZ=UTC
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-    volumes:
-      - ./grafana:/etc/grafana/provisioning/datasources:ro
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "3000:3000"
-    depends_on:
-      - tempo
-      - prometheus
-
-  # The Go demo program runs inside the same compose network, on the same
-  # clock as YDB and the collector. This keeps span start/end timestamps
-  # from the application aligned with timestamps recorded server-side.
   app:
     build:
       context: ../..
       dockerfile: examples/opentelemetry/Dockerfile
-    container_name: ydb-otel-sample
     environment:
-      - TZ=UTC
-      - YDB_DSN=grpc://ydb:2136/local
-      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
+      YDB_DSN: "grpc://ydb:2136/local"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
     depends_on:
       ydb:
         condition: service_healthy
       otel-collector:
         condition: service_started
+    restart: on-failure
+
+  ydb:
+    image: ydbplatform/local-ydb:trunk
+    platform: linux/amd64
+    # Official-style config override: the image ENTRYPOINT is `/initialize_local_ydb`,
+    # and we pass `--config-path` as arguments to it.
+    command: ["--config-path", "/ydb_config/ydb-config.yaml"]
+    environment:
+      YDB_DEFAULT_LOG_LEVEL: NOTICE
+      GRPC_TLS_PORT: "2135"
+      GRPC_PORT: "2136"
+      MON_PORT: "8765"
+      YDB_USE_IN_MEMORY_PDISKS: "true"
+    ports:
+      - "2135:2135"
+      - "2136:2136"
+      - "8765:8765"
+    volumes:
+      - ./ydb_config:/ydb_config:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "9464:9464"
+      - "13133:13133"
+      - "55679:55679"
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on: [otel-collector]
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+    depends_on: [otel-collector]
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus, tempo]

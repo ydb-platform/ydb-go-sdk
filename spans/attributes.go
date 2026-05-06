@@ -27,6 +27,17 @@ const (
 
 	// SpanNameTry is the span name for one retry attempt.
 	SpanNameTry = "ydb.Try"
+
+	// SpanNameDriverInitialize is the span name for the very first
+	// cluster-discovery attempt that the driver runs at initialization.
+	// Subsequent periodic discovery refreshes from the driver's repeater
+	// do NOT produce this span.
+	SpanNameDriverInitialize = "ydb.Driver.Initialize"
+
+	// SpanNameGetSession is the span name for acquiring a session from the
+	// query-service pool. If the pool already has an idle session this span
+	// is short; if not, it parents a child ydb.CreateSession span.
+	SpanNameGetSession = "ydb.GetSession"
 )
 
 // OTel and YDB attribute keys.

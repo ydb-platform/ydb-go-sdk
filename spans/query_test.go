@@ -117,6 +117,32 @@ func TestQuerySpanNamesAreOTelCompliant(t *testing.T) {
 	})
 }
 
+func TestQueryNoisySpansAreSuppressed(t *testing.T) {
+	adapter := &recordingAdapter{}
+	q := query(adapter)
+
+	ctx := context.Background()
+	call := stack.FunctionID("test.caller")
+
+	// OnDo / OnDoTx / OnSessionBegin / OnPoolWith / OnPoolTry / OnPoolPut
+	// must NOT register handlers — they are intentionally suppressed so the
+	// span tree only shows ydb.* user-facing names.
+	require.Nil(t, q.OnDo)
+	require.Nil(t, q.OnDoTx)
+	require.Nil(t, q.OnSessionBegin)
+	require.Nil(t, q.OnSessionDelete)
+	require.Nil(t, q.OnPoolWith)
+	require.Nil(t, q.OnPoolTry)
+	require.Nil(t, q.OnPoolPut)
+
+	// OnPoolGet is wired and produces a single ydb.GetSession span.
+	c := ctx
+	done := q.OnPoolGet(trace.QueryPoolGetStartInfo{Context: &c, Call: call})
+	require.NotNil(t, done)
+	done(trace.QueryPoolGetDoneInfo{})
+	require.Len(t, adapter.byName(SpanNameGetSession), 1)
+}
+
 func TestQuerySpanFailureSetsExceptionAttrs(t *testing.T) {
 	adapter := &recordingAdapter{}
 	q := query(adapter)

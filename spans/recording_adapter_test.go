@@ -26,6 +26,10 @@ func (s *recordedSpan) TraceID() (string, bool) { return "", true }
 
 func (s *recordedSpan) Link(_ Span, _ ...KeyValue) {}
 
+func (s *recordedSpan) SetAttributes(attrs ...KeyValue) {
+	s.endAttr = append(s.endAttr, attrs...)
+}
+
 func (s *recordedSpan) Log(msg string, _ ...KeyValue) {
 	s.logs = append(s.logs, msg)
 }

@@ -829,6 +829,41 @@ func Compose(lhs *trace.Query, rhs *trace.Query, opts ...QueryComposeOption) *tr
 		}
 	}
 	{
+		h1 := lhs.OnSessionBeginTransaction
+		h2 := rhs.OnSessionBeginTransaction
+		ret.OnSessionBeginTransaction = func(q trace.QuerySessionBeginTransactionStartInfo) func(trace.QuerySessionBeginTransactionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(trace.QuerySessionBeginTransactionDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q trace.QuerySessionBeginTransactionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
 		h1 := lhs.OnTxCommit
 		h2 := rhs.OnTxCommit
 		ret.OnTxCommit = func(q trace.QueryTxCommitStartInfo) func(trace.QueryTxCommitDoneInfo) {
@@ -1517,6 +1552,21 @@ func onSessionBegin(t *trace.Query, q trace.QuerySessionBeginStartInfo) func(inf
 	}
 	return res
 }
+func onSessionBeginTransaction(t *trace.Query, q trace.QuerySessionBeginTransactionStartInfo) func(trace.QuerySessionBeginTransactionDoneInfo) {
+	fn := t.OnSessionBeginTransaction
+	if fn == nil {
+		return func(trace.QuerySessionBeginTransactionDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(trace.QuerySessionBeginTransactionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func onTxCommit(t *trace.Query, q trace.QueryTxCommitStartInfo) func(info trace.QueryTxCommitDoneInfo) {
 	fn := t.OnTxCommit
 	if fn == nil {
@@ -1970,6 +2020,20 @@ func QueryOnSessionBegin(t *trace.Query, c *context.Context, c1 trace.Call, sess
 		var p trace.QuerySessionBeginDoneInfo
 		p.Error = e
 		p.Tx = tx
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnSessionBeginTransaction(t *trace.Query, c *context.Context, c1 trace.Call, sessionID string) func(_ error, txID string) {
+	var p trace.QuerySessionBeginTransactionStartInfo
+	p.Context = c
+	p.Call = c1
+	p.SessionID = sessionID
+	res := onSessionBeginTransaction(t, p)
+	return func(e error, txID string) {
+		var p trace.QuerySessionBeginTransactionDoneInfo
+		p.Error = e
+		p.TxID = txID
 		res(p)
 	}
 }

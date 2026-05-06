@@ -20,6 +20,11 @@ type (
 
 		Link(link Span, attributes ...KeyValue)
 
+		// SetAttributes attaches attributes to the span without ending it.
+		// Used for late-bound enrichment such as network.peer.* coming from
+		// the gRPC layer after the user-facing span has already started.
+		SetAttributes(attributes ...KeyValue)
+
 		Log(msg string, attributes ...KeyValue)
 		Warn(err error, attributes ...KeyValue)
 		Error(err error, attributes ...KeyValue)

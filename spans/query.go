@@ -90,57 +90,9 @@ func query(adapter Adapter) trace.Query {
 				)
 			}
 		},
-		OnPoolTry: func(info trace.QueryPoolTryStartInfo) func(trace.QueryPoolTryDoneInfo) {
-			if adapter.Details()&trace.QueryPoolEvents == 0 {
-				return nil
-			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-			)
-
-			return func(info trace.QueryPoolTryDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
-		},
-		OnPoolWith: func(info trace.QueryPoolWithStartInfo) func(trace.QueryPoolWithDoneInfo) {
-			if adapter.Details()&trace.QueryPoolEvents == 0 {
-				return nil
-			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-			)
-
-			return func(info trace.QueryPoolWithDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
-		},
-		OnPoolPut: func(info trace.QueryPoolPutStartInfo) func(trace.QueryPoolPutDoneInfo) {
-			if adapter.Details()&trace.QueryPoolEvents == 0 {
-				return nil
-			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-			)
-
-			return func(info trace.QueryPoolPutDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
-		},
+		// OnPoolTry / OnPoolWith / OnPoolPut are intentionally not wired:
+		// they are pool-level bookkeeping that duplicate ydb.RunWithRetry
+		// and add no user-relevant detail to the span tree.
 		OnPoolGet: func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
 			if adapter.Details()&trace.QueryPoolEvents == 0 {
 				return nil
@@ -148,7 +100,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				SpanNameGetSession,
 			)
 
 			return func(info trace.QueryPoolGetDoneInfo) {
@@ -162,40 +114,9 @@ func query(adapter Adapter) trace.Query {
 				)
 			}
 		},
-		OnDo: func(info trace.QueryDoStartInfo) func(trace.QueryDoDoneInfo) {
-			if adapter.Details()&trace.QueryEvents == 0 {
-				return nil
-			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-			)
-
-			return func(info trace.QueryDoDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
-		},
-		OnDoTx: func(info trace.QueryDoTxStartInfo) func(trace.QueryDoTxDoneInfo) {
-			if adapter.Details()&trace.QueryEvents == 0 {
-				return nil
-			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-			)
-
-			return func(info trace.QueryDoTxDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
-		},
+		// OnDo / OnDoTx are intentionally not wired: the ydb.RunWithRetry
+		// span emitted by spans.Retry already covers the whole retry-driven
+		// operation (Do / DoTx run inside retry.Retry).
 		OnExec: func(info trace.QueryExecStartInfo) func(info trace.QueryExecDoneInfo) {
 			if adapter.Details()&trace.QueryEvents == 0 {
 				return nil
@@ -298,24 +219,9 @@ func query(adapter Adapter) trace.Query {
 				}
 			}
 		},
-		OnSessionDelete: func(info trace.QuerySessionDeleteStartInfo) func(info trace.QuerySessionDeleteDoneInfo) {
-			if adapter.Details()&trace.QuerySessionEvents == 0 {
-				return nil
-			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
-			)
-
-			return func(info trace.QuerySessionDeleteDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
-		},
+		// OnSessionDelete is not wired: session deletion is an
+		// implementation detail of the pool, not part of the user-facing
+		// ydb.* span surface.
 		OnSessionExec: func(info trace.QuerySessionExecStartInfo) func(info trace.QuerySessionExecDoneInfo) {
 			if adapter.Details()&trace.QuerySessionEvents == 0 {
 				return nil
@@ -390,24 +296,11 @@ func query(adapter Adapter) trace.Query {
 				)
 			}
 		},
-		OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(info trace.QuerySessionBeginDoneInfo) {
-			if adapter.Details()&trace.QuerySessionEvents == 0 {
-				return nil
-			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
-			)
-
-			return func(info trace.QuerySessionBeginDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
-		},
+		// OnSessionBegin is intentionally not wired: BeginTx is implicit
+		// inside the user's DoTx callback (no separate user span makes
+		// sense for it). For explicit `tx, err := s.Begin(ctx, ...)` the
+		// resulting tx has its own ydb.Commit / ydb.Rollback / ydb.ExecuteQuery
+		// child spans which is the level of detail the spec expects.
 		OnTxCommit: func(info trace.QueryTxCommitStartInfo) func(info trace.QueryTxCommitDoneInfo) {
 			if adapter.Details()&trace.QueryTransactionEvents == 0 {
 				return nil

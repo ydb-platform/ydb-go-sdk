@@ -7,10 +7,13 @@
 // retries, generating a span tree that looks like this:
 //
 //	ydb.RunWithRetry         (INTERNAL)
-//	└─ ydb.Try               (INTERNAL, ydb.retry.backoff_ms = 0)
+//	└─ ydb.Try               (INTERNAL)              // 1st attempt: no extra tags
 //	   ├─ ydb.ExecuteQuery   (CLIENT)
 //	   ├─ ydb.ExecuteQuery   (CLIENT)
 //	   └─ ydb.Commit         (CLIENT)
+//
+// On a retry, an additional sibling ydb.Try would carry
+// `ydb.retry.backoff_ms` equal to the actual sleep that preceded it.
 package main
 
 import (
@@ -23,10 +26,10 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -57,7 +60,14 @@ func main() {
 	}()
 	otel.SetTracerProvider(tp)
 
-	db, err := openDB(ctx, dsn)
+	// Give the cluster a generous window to come up: under arm64/Rosetta
+	// emulation `ydbplatform/local-ydb` may take 30-60s after the
+	// container's healthcheck flips to `healthy` before its discovery RPCs
+	// are actually responsive.
+	openCtx, cancelOpen := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancelOpen()
+
+	db, err := openDB(openCtx, dsn)
 	if err != nil {
 		log.Fatalf("failed to open YDB: %v", err)
 	}
@@ -85,9 +95,12 @@ func newTracerProvider(ctx context.Context, otlpAddr string) (*sdktrace.TracerPr
 	if err != nil {
 		return nil, fmt.Errorf("create otlp exporter: %w", err)
 	}
-	res, err := resource.Merge(resource.Default(), resource.NewWithAttributes(
-		semconv.SchemaURL,
-		semconv.ServiceName(serviceName),
+	// Use a schemaless resource for the service-specific attributes so the
+	// merge with resource.Default() (whose schema URL pins to a specific
+	// OTel semconv version) succeeds regardless of which semconv version
+	// this module was compiled against.
+	res, err := resource.Merge(resource.Default(), resource.NewSchemaless(
+		attribute.String("service.name", serviceName),
 	))
 	if err != nil {
 		return nil, fmt.Errorf("build resource: %w", err)
@@ -107,6 +120,12 @@ func openDB(ctx context.Context, dsn string) (*ydb.Driver, error) {
 
 	return ydb.Open(ctx, dsn,
 		ydb.WithApplicationName(serviceName),
+		// Bump dial timeout: the SDK default is 5s which is fine on a real
+		// cluster but tight when YDB is a freshly-booting `local-ydb`
+		// container (especially under Rosetta on arm64). The driver's
+		// internal cluster-discovery retry loop will retry a few times
+		// using this per-attempt timeout.
+		ydb.WithDialTimeout(30*time.Second),
 		spans.WithTraces(adapter),
 	)
 }

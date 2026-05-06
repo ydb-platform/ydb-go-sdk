@@ -93,7 +93,7 @@ func kindFor(name string) trace.SpanKind {
 		spans.SpanNameCommit,
 		spans.SpanNameRollback:
 		return trace.SpanKindClient
-	case spans.SpanNameRunWithRetry, spans.SpanNameTry:
+	case spans.SpanNameRunWithRetry, spans.SpanNameTry, spans.SpanNameDriverInitialize:
 		return trace.SpanKindInternal
 	default:
 		return trace.SpanKindInternal
@@ -121,6 +121,12 @@ func (s *otelSpan) TraceID() (string, bool) {
 	}
 
 	return id.String(), true
+}
+
+func (s *otelSpan) SetAttributes(attrs ...spans.KeyValue) {
+	if otelAttrs := toOtelAttributes(attrs); len(otelAttrs) > 0 {
+		s.span.SetAttributes(otelAttrs...)
+	}
 }
 
 func (s *otelSpan) Link(other spans.Span, attrs ...spans.KeyValue) {
