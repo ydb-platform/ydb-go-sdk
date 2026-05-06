@@ -17,18 +17,17 @@ type newTraceIDOpts struct {
 }
 
 var (
-	seed = func() (seed uuid.UUID) {
-		_, _ = rand.Read(seed[:])
+	lo, hi = func() (seed, counter uint64) {
+		var buffer [16]byte
+		_, _ = rand.Read(buffer[:])
 
-		return seed
+		return binary.LittleEndian.Uint64(buffer[:8]), binary.LittleEndian.Uint64(buffer[8:])
 	}()
-	counter = binary.LittleEndian.Uint64(seed[:8])
 )
 
-func fastUUID() (uuid.UUID, error) {
-	uuid := seed
-
-	binary.LittleEndian.PutUint64(uuid[:8], atomic.AddUint64(&counter, 1))
+func fastUUID() (uuid uuid.UUID, _ error) {
+	binary.LittleEndian.PutUint64(uuid[:8], lo)
+	binary.LittleEndian.PutUint64(uuid[8:], atomic.AddUint64(&hi, 1))
 
 	return uuid, nil
 }
