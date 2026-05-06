@@ -32,7 +32,6 @@ import (
 // cpu: Apple M3 Pro
 // go test -bench=. -benchtime=10s .
 //
-// BenchmarkDatabaseSQLMock/QueryService-12    900582    11288 ns/op   23524 B/op   408 allocs/op
 // BenchmarkDatabaseSQLMock/QueryService-12   892932  12489 ns/op   23029 B/op    389 allocs/op
 // BenchmarkDatabaseSQLMock/TableService-12  1222452   9547 ns/op   18603 B/op    307 allocs/op
 // Diff (query/table*100-100)                   -31%          23%          23%              26%
