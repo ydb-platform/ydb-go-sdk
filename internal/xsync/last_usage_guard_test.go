@@ -96,3 +96,13 @@ func TestLastUsageGuardLock(t *testing.T) {
 		require.Equal(t, start.Add(4*time.Hour), t5)
 	})
 }
+
+func BenchmarkLastUsageStart(b *testing.B) {
+	b.ReportAllocs()
+	lu := NewLastUsage()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		stop := lu.Start()
+		stop()
+	}
+}

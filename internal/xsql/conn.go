@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -21,7 +20,6 @@ type Conn struct {
 	ctx       context.Context //nolint:containedctx
 
 	connector *Connector
-	lastUsage xsync.LastUsage
 }
 
 func (c *Conn) ID() string {
@@ -165,14 +163,11 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 ) {
 	onDone := trace.DatabaseSQLOnConnQuery(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).QueryContext", stack.Package("database/sql")),
-		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), c.connector.clock.Since(c.lastUsage.Get()),
+		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), 0,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
-
-	done := c.lastUsage.Start()
-	defer done()
 
 	sql, params, err := c.toYdb(sql, args...)
 	if err != nil {
@@ -210,14 +205,11 @@ func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 ) {
 	onDone := trace.DatabaseSQLOnConnExec(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).ExecContext", stack.Package("database/sql")),
-		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), c.connector.clock.Since(c.lastUsage.Get()),
+		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), 0,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
-
-	done := c.lastUsage.Start()
-	defer done()
 
 	sql, params, err := c.toYdb(sql, args...)
 	if err != nil {
