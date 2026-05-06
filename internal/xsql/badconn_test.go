@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -116,8 +115,7 @@ func newErrConn(err error) *Conn {
 			clock:     clockwork.NewRealClock(),
 			processor: QUERY,
 		},
-		ctx:       context.Background(),
-		lastUsage: xsync.NewLastUsage(),
+		ctx: context.Background(),
 	}
 }
 
