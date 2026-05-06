@@ -1,3 +1,4 @@
+* Migrated example files (`ddl`, `pagination`, `ttl`, `decimal`, `serverless/url_shortener`, `serverless/healthcheck`, `topic/cdc-cache-bus-freeseats`, `topic/cdc-fill-and-read`, `opensource_night2024`) from Table API (`db.Table()`) to Query API (`db.Query()`)
 * The `trace.DatabaseSQLConnExecStartInfo.IdleTime` and `trace.DatabaseSQLConnQueryStartInfo.IdleTime` fields have been marked as deprecated and will always be zero from now.
 * Default connection last usage tracking has been changed to "no tracking", with real-time tracking enabled only if a connection's time-to-live (TTL) has been defined.
 * `lastUsage.Start()` has been optimized to replace the `sync.OnceFunc` approach with an atomic.Bool-based one, reducing heap allocations for each query start.
