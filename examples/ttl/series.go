@@ -132,7 +132,7 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, ti
 
 				return res.Err()
 			}
-			
+
 			for res.NextRow() {
 				empty = false
 				err = res.ScanNamed(

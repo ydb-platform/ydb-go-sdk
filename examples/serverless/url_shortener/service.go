@@ -294,21 +294,19 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 		_ = res.Close()
 	}()
 	var src string
-	for {
-		if err := res.NextResultSetErr(ctx); err != nil {
-			return src, err
-		}
-
-		for res.NextRow() {
-			err = res.ScanNamed(
-				named.OptionalWithDefault("src", &src),
-			)
-
-			return src, err
-		}
+	if err := res.NextResultSetErr(ctx); err != nil {
+		return src, err
 	}
 
-	return src, res.Err()
+	if !res.NextRow() {
+		return src, res.Err()
+	}
+
+	err = res.ScanNamed(
+		named.OptionalWithDefault("src", &src),
+	)
+
+	return src, err
 }
 
 func writeResponse(w http.ResponseWriter, statusCode int, body string) {
