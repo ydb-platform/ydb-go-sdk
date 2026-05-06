@@ -35,8 +35,8 @@ func (dummyLastUsage) Start() (stop func()) {
 	return noopStopFunc
 }
 
-func NewDummyLastUsage() (dummy dummyLastUsage) {
-	return dummy
+func NewDummyLastUsage() LastUsage {
+	return dummyLastUsage{}
 }
 
 func NewLastUsage() LastUsage {
