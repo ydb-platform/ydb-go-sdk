@@ -67,19 +67,21 @@ func selectPaging(
 			defer func() {
 				_ = res.Close()
 			}()
-			if !res.NextResultSet(ctx) || !res.HasNextRow() {
-				if err := ctx.Err(); err != nil {
-					return err
-				}
 
+			if err := res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+
+			if !res.HasNextRow() {
 				if err := res.Err(); err != nil {
 					return err
 				}
 
 				empty = true
 
-				return nil
+				return res.Err()
 			}
+
 			var addr string
 			for res.NextRow() {
 				err = res.ScanNamed(

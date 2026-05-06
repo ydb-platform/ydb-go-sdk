@@ -123,19 +123,16 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, ti
 				_ = res.Close()
 			}()
 
-			if !res.NextResultSet(ctx) || !res.HasNextRow() {
-				if err := ctx.Err(); err != nil {
-					return err
-				}
+			if err := res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
 
-				if err := res.Err(); err != nil {
-					return err
-				}
-
+			if !res.HasNextRow() {
 				empty = true
 
-				return nil
+				return res.Err()
 			}
+			
 			for res.NextRow() {
 				empty = false
 				err = res.ScanNamed(

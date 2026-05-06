@@ -294,7 +294,11 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 		_ = res.Close()
 	}()
 	var src string
-	for res.NextResultSet(ctx) {
+	for {
+		if err := res.NextResultSetErr(ctx); err != nil {
+			return src, err
+		}
+
 		for res.NextRow() {
 			err = res.ScanNamed(
 				named.OptionalWithDefault("src", &src),
@@ -304,15 +308,7 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 		}
 	}
 
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-
-	if err := res.Err(); err != nil {
-		return "", err
-	}
-
-	return "", fmt.Errorf("hash '%s' is not found", hash)
+	return src, res.Err()
 }
 
 func writeResponse(w http.ResponseWriter, statusCode int, body string) {
