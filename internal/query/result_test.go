@@ -4506,7 +4506,7 @@ func (s *blockingStream) RecvMsg(any) error            { return nil }
 func (s *blockingStream) SendMsg(any) error            { return nil }
 func (s *blockingStream) Trailer() metadata.MD         { return nil }
 
-// TestNextPartPerCallCtxCancellation verifies that cancelling the context
+// TestNextPartPerCallCtxCancellation verifies that canceling the context
 // passed to nextPart (which may differ from the newResult context) causes
 // nextPart to return context.Canceled even when stream.Recv returns data.
 //
