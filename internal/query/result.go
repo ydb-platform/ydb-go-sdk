@@ -190,7 +190,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 
 	select {
 	case <-r.closer.Done():
-		if err := r.closer.Err(); errors.Is(err, io.EOF) {
+		if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
 		} else {
 			return nil, xerrors.WithStackTrace(err)
@@ -221,7 +221,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 				callback(err)
 			}
 
-			if errors.Is(err, io.EOF) {
+			if xerrors.Is(err, io.EOF) {
 				return nil, io.EOF
 			}
 
@@ -247,7 +247,7 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 ) {
 	part, err = stream.Recv()
 	if err != nil {
-		if errors.Is(err, io.EOF) {
+		if xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
 		}
 
@@ -301,7 +301,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 	for {
 		select {
 		case <-r.closer.Done():
-			if err := r.closer.Err(); errors.Is(err, io.EOF) {
+			if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
 				return nil, io.EOF
 			} else {
 				return nil, xerrors.WithStackTrace(err)
@@ -319,7 +319,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 			}
 			part, err := r.nextPart(ctx)
 			if err != nil {
-				if errors.Is(err, io.EOF) {
+				if xerrors.Is(err, io.EOF) {
 					return nil, io.EOF
 				}
 
@@ -352,7 +352,7 @@ func (r *streamResult) nextPartFunc(
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		case <-r.closer.Done():
-			if err := r.closer.Err(); errors.Is(err, io.EOF) {
+			if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
 				return nil, io.EOF
 			} else {
 				return nil, xerrors.WithStackTrace(err)
@@ -363,7 +363,7 @@ func (r *streamResult) nextPartFunc(
 			}
 			part, err := r.nextPart(ctx)
 			if err != nil {
-				if errors.Is(err, io.EOF) {
+				if xerrors.Is(err, io.EOF) {
 					return nil, io.EOF
 				}
 
@@ -409,7 +409,7 @@ func exactlyOneRowFromResult(ctx context.Context, r result.Result) (row result.R
 	switch {
 	case err == nil:
 		return nil, xerrors.WithStackTrace(ErrMoreThanOneRow)
-	case errors.Is(err, io.EOF):
+	case xerrors.Is(err, io.EOF):
 		// pass
 	default:
 		return nil, xerrors.WithStackTrace(err)
@@ -419,7 +419,7 @@ func exactlyOneRowFromResult(ctx context.Context, r result.Result) (row result.R
 	switch {
 	case err == nil:
 		return nil, xerrors.WithStackTrace(ErrMoreThanOneRow)
-	case errors.Is(err, io.EOF):
+	case xerrors.Is(err, io.EOF):
 		// pass
 	default:
 		return nil, xerrors.WithStackTrace(err)
@@ -457,7 +457,7 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	switch {
 	case err == nil:
 		return nil, xerrors.WithStackTrace(ErrMoreThanOneResultSet)
-	case errors.Is(err, io.EOF):
+	case xerrors.Is(err, io.EOF):
 		// pass
 	default:
 		return nil, xerrors.WithStackTrace(err)
