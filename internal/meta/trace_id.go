@@ -2,10 +2,9 @@ package meta
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/binary"
-	rand2 "math/rand"
 	"sync/atomic"
-	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/metadata"
@@ -18,20 +17,18 @@ type newTraceIDOpts struct {
 }
 
 var (
-	counter atomic.Uint64
-	delta   = func() uint64 {
-		delta := rand2.NewSource(time.Now().Unix()).Int63()
-		if delta%2 == 0 {
-			return uint64(delta + 1)
-		}
+	seed = func() (seed uuid.UUID) {
+		_, _ = rand.Read(seed[:])
 
-		return uint64(delta)
+		return seed
 	}()
+	counter = binary.LittleEndian.Uint64(seed[:8])
 )
 
-func fastUUID() (uuid uuid.UUID, _ error) {
-	binary.LittleEndian.PutUint64(uuid[:8], counter.Load())
-	binary.LittleEndian.PutUint64(uuid[8:], counter.Add(delta))
+func fastUUID() (uuid.UUID, error) {
+	uuid := seed
+
+	binary.LittleEndian.PutUint64(uuid[:8], atomic.AddUint64(&counter, 1))
 
 	return uuid, nil
 }
