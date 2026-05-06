@@ -254,6 +254,24 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		r.closer.Close(finalErr)
 	}()
 
+	if r.trace != nil {
+		onDone := trace.QueryOnResultClose(r.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
+		)
+		defer func() {
+			onDone(finalErr)
+		}()
+	}
+
+	// Fast path: stream is already exhausted (the common case when all rows
+	// have been consumed before Close is called). Skip the drain loop and the
+	// associated context.AfterFunc registration entirely.
+	select {
+	case <-r.closer.Done():
+		return nil
+	default:
+	}
+
 	if r.closeTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, r.closeTimeout)
@@ -265,15 +283,6 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	// the drain loop is blocked inside stream.Recv().
 	stopOnCancel := r.closer.CloseOnContextCancel(ctx)
 	defer stopOnCancel()
-
-	if r.trace != nil {
-		onDone := trace.QueryOnResultClose(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
-		)
-		defer func() {
-			onDone(finalErr)
-		}()
-	}
 
 	for {
 		select {

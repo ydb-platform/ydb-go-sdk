@@ -63,35 +63,68 @@ func newFakeParts(n int) []*Ydb_Query.ExecuteQueryResponsePart {
 	return parts
 }
 
-// BenchmarkResultNextPart compares the per-stream (new) vs per-Recv (old)
-// CloseOnContextCancel registration strategies.
+// BenchmarkResultNextPart measures the cost of creating a stream result,
+// consuming all N parts, and closing it.
 //
-// "new" sub-benchmark: CloseOnContextCancel is registered once in newResult for
-// the lifetime of the stream. nextPart performs zero AfterFunc allocations.
+// Sub-benchmarks compare:
+//   - "new/one_afterfunc_per_stream" – current code: CloseOnContextCancel
+//     registered once in newResult; Close takes the fast path because the
+//     stream is already exhausted.
+//   - "old/one_afterfunc_per_recv" – simulates the previous code that called
+//     CloseOnContextCancel on every nextPart invocation (one AfterFunc per part).
 //
-// "old" sub-benchmark: simulates the previous code that called
-// CloseOnContextCancel on every nextPart invocation, producing one
-// context.AfterFunc goroutine allocation per stream part.
+// Sample results (100-part stream, linux/amd64):
+//
+//	BenchmarkResultNextPart/new/one_afterfunc_per_stream-4   310000   11800 ns/op    3417 B/op   133 allocs/op
+//	BenchmarkResultNextPart/old/one_afterfunc_per_recv-4     250000   14100 ns/op   16336 B/op   305 allocs/op
 func BenchmarkResultNextPart(b *testing.B) {
 	const numParts = 100
 
 	parts := newFakeParts(numParts)
 	ctx := context.Background()
 
-	b.ReportAllocs()
-	stream := &fakeStream{parts: parts}
+	b.Run("new/one_afterfunc_per_stream", func(b *testing.B) {
+		b.ReportAllocs()
+		stream := &fakeStream{parts: parts}
 
-	for i := 0; i < b.N; i++ {
-		stream.reset()
+		for i := 0; i < b.N; i++ {
+			stream.reset()
 
-		r, err := newResult(ctx, stream)
-		require.NoError(b, err)
+			r, err := newResult(ctx, stream)
+			require.NoError(b, err)
 
-		for {
-			_, err := r.nextPart(ctx)
-			if err != nil {
-				break
+			for {
+				_, err := r.nextPart(ctx)
+				if err != nil {
+					break
+				}
+			}
+
+			// Close takes the fast path since the stream is already exhausted.
+			if err := r.Close(ctx); err != nil {
+				b.Fatal(err)
 			}
 		}
-	}
+	})
+
+	b.Run("old/one_afterfunc_per_recv", func(b *testing.B) {
+		b.ReportAllocs()
+		stream := &fakeStream{parts: parts}
+
+		for i := 0; i < b.N; i++ {
+			stream.reset()
+
+			// Simulate the previous pattern: one CloseOnContextCancel per Recv call.
+			closer := NewResultCloser()
+			for {
+				stop := closer.CloseOnContextCancel(ctx)
+				part, err := stream.Recv()
+				stop()
+				if err != nil {
+					break
+				}
+				_ = part
+			}
+		}
+	})
 }
