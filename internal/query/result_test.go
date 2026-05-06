@@ -4470,11 +4470,12 @@ func TestMaterializedResultStats(t *testing.T) {
 }
 
 // blockingStream is a stream that blocks inside Recv until a part is pushed
-// to the parts channel, or the channel is closed (EOF). It signals on
-// recvEntered when it has started blocking, allowing tests to inject ctx
-// cancellations at a precise point.
+// to the parts channel, the channel is closed (EOF), or the stream context is
+// cancelled. It signals on recvEntered when it has started blocking, allowing
+// tests to inject ctx cancellations at a precise point.
 type blockingStream struct {
 	initial     *Ydb_Query.ExecuteQueryResponsePart // returned synchronously on the first Recv
+	ctx         context.Context                     // stream-level context; Recv returns when this is done
 	firstDone   bool
 	parts       chan *Ydb_Query.ExecuteQueryResponsePart
 	recvEntered chan struct{}
@@ -4486,35 +4487,49 @@ func (s *blockingStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 
 		return s.initial, nil
 	}
-	// Signal that we are now blocking, then wait for a part.
+	// Signal that we are now blocking.
 	select {
 	case s.recvEntered <- struct{}{}:
 	default:
 	}
-	part, ok := <-s.parts
-	if !ok {
-		return nil, io.EOF
-	}
+	// Wait for a part or stream context cancellation, just like a real gRPC stream.
+	select {
+	case part, ok := <-s.parts:
+		if !ok {
+			return nil, io.EOF
+		}
 
-	return part, nil
+		return part, nil
+	case <-s.ctx.Done():
+		return nil, s.ctx.Err()
+	}
 }
 
 func (s *blockingStream) CloseSend() error             { return nil }
-func (s *blockingStream) Context() context.Context     { return context.Background() }
+func (s *blockingStream) Context() context.Context     { return s.ctx }
 func (s *blockingStream) Header() (metadata.MD, error) { return metadata.MD{}, nil }
 func (s *blockingStream) RecvMsg(any) error            { return nil }
 func (s *blockingStream) SendMsg(any) error            { return nil }
 func (s *blockingStream) Trailer() metadata.MD         { return nil }
 
-// TestNextPartPerCallCtxCancellation verifies that canceling the context
+// TestNextPartPerCallCtxCancellation verifies that cancelling the context
 // passed to nextPart (which may differ from the newResult context) causes
-// nextPart to return context.Canceled even when stream.Recv returns data.
+// nextPart to return context.Canceled by aborting the underlying gRPC stream.
 //
-// This regression test guards against the optimisation (one AfterFunc per
-// stream instead of one per Recv) accidentally removing per-call context
-// propagation.
+// Production chain:
+//
+//	rowCtx cancelled
+//	  → CloseOnContextCancel(rowCtx) AfterFunc fires → closer.Close(ctx.Err())
+//	  → OnClose callback (streamCancel) cancels the stream context
+//	  → stream.Recv() returns context.Canceled
+//	  → nextPart returns context.Canceled
+//
+// The test simulates the production pattern (executeCtx / executeCancel) by
+// passing withStreamResultOnClose(streamCancel) to newResult, and by making
+// blockingStream.Recv() watch its stream context.
 func TestNextPartPerCallCtxCancellation(t *testing.T) {
-	streamCtx := xtest.Context(t)
+	streamCtx, streamCancel := context.WithCancel(xtest.Context(t))
+	defer streamCancel()
 
 	initial := &Ydb_Query.ExecuteQueryResponsePart{
 		Status:         Ydb.StatusIds_SUCCESS,
@@ -4529,28 +4544,24 @@ func TestNextPartPerCallCtxCancellation(t *testing.T) {
 			}}}},
 		},
 	}
-	secondPart := &Ydb_Query.ExecuteQueryResponsePart{
-		Status:         Ydb.StatusIds_SUCCESS,
-		ResultSetIndex: 0,
-		ResultSet: &Ydb.ResultSet{
-			Rows: []*Ydb.Value{{Items: []*Ydb.Value{{
-				Value: &Ydb.Value_Uint64Value{Uint64Value: 1},
-			}}}},
-		},
-	}
 
 	stream := &blockingStream{
 		initial:     initial,
+		ctx:         streamCtx,
 		parts:       make(chan *Ydb_Query.ExecuteQueryResponsePart, 1),
 		recvEntered: make(chan struct{}, 1),
 	}
 
-	r, err := newResult(streamCtx, stream)
+	// withStreamResultOnClose(streamCancel) mirrors withStreamResultOnClose(executeCancel)
+	// used in production: when the closer is closed it cancels the gRPC stream,
+	// which makes any blocked stream.Recv() return with an error.
+	r, err := newResult(streamCtx, stream, withStreamResultOnClose(streamCancel))
 	require.NoError(t, err)
 
 	// rowCtx is intentionally independent of streamCtx to exercise the
 	// per-call context path.
 	rowCtx, rowCancel := context.WithCancel(context.Background())
+	defer rowCancel()
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -4561,13 +4572,13 @@ func TestNextPartPerCallCtxCancellation(t *testing.T) {
 	// Wait until nextPart is blocked inside stream.Recv.
 	<-stream.recvEntered
 
-	// Cancel the per-call context while Recv is still blocking.
+	// Cancel the per-call context. This should trigger the chain:
+	// rowCtx cancelled → AfterFunc → closer.Close(rowCtx.Err()) →
+	// streamCancel() via OnClose → stream.Recv() returns context.Canceled.
+	// No secondPart needs to be sent.
 	rowCancel()
 
-	// Unblock Recv by providing data.
-	stream.parts <- secondPart
-
-	// nextPart must return context.Canceled, not the data.
+	// nextPart must return context.Canceled without needing any data to be sent.
 	got := <-errCh
 	require.Error(t, got)
 	require.ErrorIs(t, got, context.Canceled)

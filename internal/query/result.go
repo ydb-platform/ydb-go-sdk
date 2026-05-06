@@ -151,14 +151,6 @@ func newResult(
 		}
 	}
 
-	// Register AfterFunc once per stream (not once per Recv) to propagate context
-	// cancellation to the closer. The stop function is called via OnClose so it is
-	// cleaned up automatically when the stream finishes for any reason.
-	stopOnCancel := r.closer.CloseOnContextCancel(ctx)
-	r.closer.OnClose(func() {
-		stopOnCancel()
-	})
-
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNew(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.newResult"),
@@ -206,7 +198,10 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
+		stop := r.closer.CloseOnContextCancel(ctx)
 		defer func() {
+			stop()
+
 			if err != nil {
 				r.closer.Close(err)
 			}
