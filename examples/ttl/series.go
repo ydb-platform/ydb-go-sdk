@@ -133,6 +133,7 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, ti
 				}
 
 				empty = true
+
 				return nil
 			}
 			for res.NextRow() {

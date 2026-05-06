@@ -77,6 +77,7 @@ func selectPaging(
 				}
 
 				empty = true
+
 				return nil
 			}
 			var addr string
