@@ -359,7 +359,7 @@ executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 executeCtx, executeCancel := context.WithCancel(xcontext.ValueOnly(ctx))
 ```
 
-**Location 2:** `internal/xcontext/cancels_quard.go:23` (used by `conn.NewStream`)
+**Location 2:** `internal/xcontext/cancels_guard.go:23` (used by `conn.NewStream`)
 
 ```go
 // Before
