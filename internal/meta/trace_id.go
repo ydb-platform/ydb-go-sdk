@@ -29,7 +29,7 @@ var (
 	}()
 )
 
-func fastUUID() (uuid uuid.UUID, _ error) { //nolint:unparam
+func fastUUID() (uuid uuid.UUID, _ error) {
 	binary.LittleEndian.PutUint64(uuid[:8], counter.Load())
 	binary.LittleEndian.PutUint64(uuid[8:], counter.Add(delta))
 
