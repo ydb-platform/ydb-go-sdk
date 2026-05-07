@@ -41,7 +41,7 @@ func (s *Session) QueryResultSet(
 	}
 
 	onDone := trace.QueryOnSessionQueryResultSet(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryResultSet"), s, q)
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryResultSet"), s, q)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -89,7 +89,7 @@ func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execut
 	}
 
 	onDone := trace.QueryOnSessionQueryRow(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryRow"), s, q)
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryRow"), s, q)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -128,7 +128,7 @@ func (s *Session) Begin(
 	tx query.Transaction, finalErr error,
 ) {
 	onDone := trace.QueryOnSessionBegin(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
 	defer func() {
 		if finalErr != nil {
 			applyStatusByError(s, finalErr)
@@ -193,7 +193,7 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 	}
 
 	onDone := trace.QueryOnSessionExec(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"),
 		s,
 		q,
 		settings.Label(),
@@ -229,7 +229,7 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 	}
 
 	onDone := trace.QueryOnSessionQuery(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"),
 		s,
 		q,
 		settings.Label(),

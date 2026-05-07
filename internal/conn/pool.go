@@ -91,7 +91,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 
 	trace.DriverOnConnBan(
 		p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
 		cc.Endpoint().Copy(), cc.GetState(), cause,
 	)(cc.SetState(ctx, state.Banned))
 }
@@ -110,7 +110,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 
 	trace.DriverOnConnAllow(
 		p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Allow"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Allow"),
 		e, cc.GetState(),
 	)(cc.Unban(ctx))
 }
@@ -123,7 +123,7 @@ func (p *Pool) Take(context.Context) error {
 
 func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Release"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Release"),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -194,7 +194,7 @@ type poolOption func(p *Pool)
 
 func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.NewPool"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.NewPool"),
 	)
 	defer onDone()
 

@@ -164,7 +164,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 
 	var token string
 	done := trace.DriverOnGetCredentials(m.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/meta.(*Meta).meta"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/meta.(*Meta).meta"),
 	)
 	defer func() {
 		done(secret.Token(token), err)

@@ -221,7 +221,7 @@ func (c *Conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 func (c *Conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, finalErr error) {
 	tableName = c.normalizePath(tableName)
 	onDone := trace.DatabaseSQLOnConnGetIndexColumns(c.connector.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).GetIndexColumns"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).GetIndexColumns"),
 		tableName, indexName,
 	)
 	defer func() {
@@ -244,7 +244,7 @@ func (c *Conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 func (c *Conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
 	onDone := trace.DatabaseSQLOnConnIsColumnExists(c.connector.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).IsColumnExists"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).IsColumnExists"),
 		tableName, columnName,
 	)
 	defer func() {
@@ -267,7 +267,7 @@ func (c *Conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 func (c *Conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
 	onDone := trace.DatabaseSQLOnConnIsTableExists(c.connector.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).IsTableExists"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql.(*Conn).IsTableExists"),
 		tableName,
 	)
 	defer func() {

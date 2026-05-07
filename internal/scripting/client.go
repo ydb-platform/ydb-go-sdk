@@ -64,7 +64,7 @@ func (c *Client) Execute(ctx context.Context, sql string, parameters *params.Par
 func (c *Client) execute(ctx context.Context, sql string, parameters *params.Params) (r result.Result, err error) {
 	var (
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).execute"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).execute"),
 			sql, parameters,
 		)
 		request = &Ydb_Scripting.ExecuteYqlRequest{
@@ -145,7 +145,7 @@ func (c *Client) explain(ctx context.Context, sql string, mode scripting.Explain
 ) {
 	var (
 		onDone = trace.ScriptingOnExplain(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).explain"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).explain"),
 			sql,
 		)
 		request = &Ydb_Scripting.ExplainYqlRequest{
@@ -217,7 +217,7 @@ func (c *Client) streamExecute(ctx context.Context, sql string, parameters *para
 ) {
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).streamExecute"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).streamExecute"),
 			sql, parameters,
 		)
 		request = &Ydb_Scripting.ExecuteYqlRequest{
@@ -289,7 +289,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).Close"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).Close"),
 	)
 	defer func() {
 		onDone(err)

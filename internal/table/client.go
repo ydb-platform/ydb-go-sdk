@@ -32,7 +32,7 @@ type sessionBuilder func(ctx context.Context) (*Session, error)
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client { //nolint:funlen
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
 
 	return &Client{
@@ -226,7 +226,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 
 	var (
 		onDone = trace.TableOnCreateSession(c.config.Trace(), &ctx,
-			stack.FunctionID(
+			stack.FunctionIDType(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"),
 		)
 		attempts = 0
@@ -282,7 +282,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	close(c.done)
 
 	onDone := trace.TableOnClose(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Close"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Close"),
 	)
 	defer func() {
 		onDone(err)
@@ -308,7 +308,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	config := c.retryOptions(opts...)
 
 	attempts, onDone := 0, trace.TableOnDo(config.Trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Do"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Do"),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
@@ -339,7 +339,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 	config := c.retryOptions(opts...)
 
 	attempts, onDone := 0, trace.TableOnDoTx(config.Trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).DoTx"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).DoTx"),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
@@ -398,7 +398,7 @@ func (c *Client) BulkUpsert(
 	)
 
 	onDone := trace.TableOnBulkUpsert(config.Trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
 	)
 	defer func() {
 		onDone(finalErr, attempts+1)

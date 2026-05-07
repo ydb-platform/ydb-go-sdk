@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmd/gstack/utils"
@@ -12,7 +13,11 @@ import (
 
 const (
 	stackPackageName = "stack"
+	functionIDName   = "FunctionID"
+	functionTypeName = "FunctionIDType"
 )
+
+var packageCallRegexp = regexp.MustCompile(`stack\.Package\("([^"]+)"\)`)
 
 func processFile(src []byte, path string, fset *token.FileSet, file *ast.File, info os.FileInfo) error {
 	formatted, err := format(src, path, fset, file)
@@ -38,7 +43,7 @@ func format(src []byte, path string, fset *token.FileSet, file *ast.File) ([]byt
 			continue
 		}
 		listOfCalls = getListOfCallExpressionsFromBlockStmt(fn.Body)
-		listOfArgs = append(listOfArgs, getListOfArgsFromListOfCalls(listOfCalls, fn)...)
+		listOfArgs = append(listOfArgs, getListOfArgsFromListOfCalls(src, fset, listOfCalls, fn)...)
 	}
 	if len(listOfArgs) != 0 {
 		fixed, err := utils.FixSource(fset, path, src, listOfArgs)
@@ -52,22 +57,48 @@ func format(src []byte, path string, fset *token.FileSet, file *ast.File) ([]byt
 	return src, nil
 }
 
-func getListOfArgsFromListOfCalls(listOfCalls []*ast.CallExpr, fn *ast.FuncDecl) []utils.FunctionIDArg {
+func getListOfArgsFromListOfCalls(
+	src []byte,
+	fset *token.FileSet,
+	listOfCalls []*ast.CallExpr,
+	fn *ast.FuncDecl,
+) []utils.FunctionIDArg {
 	listOfArgs := make([]utils.FunctionIDArg, 0)
 
 	for _, call := range listOfCalls {
-		if function, ok := call.Fun.(*ast.SelectorExpr); ok && function.Sel.Name == "FunctionID" {
+		if function, ok := call.Fun.(*ast.SelectorExpr); ok &&
+			(function.Sel.Name == functionIDName || function.Sel.Name == functionTypeName) {
 			pack, ok := function.X.(*ast.Ident)
 			if !ok {
 				continue
 			}
 			if pack.Name == stackPackageName && len(call.Args) > 0 {
-				packagePath := parseFunctionIDArgs(call.Args[1:])
+				packagePath := ""
+				hasPackageOverrideComment := false
+				switch function.Sel.Name {
+				case functionIDName:
+					packagePath = parseFunctionIDArgs(call.Args[1:])
+					hasPackageOverrideComment = packagePath != ""
+				case functionTypeName:
+					packagePath = parseFunctionIDTypeArg(src, fset, call)
+					hasPackageOverrideComment = packagePath != ""
+				}
+				extraArgsEnd := token.NoPos
+				if len(call.Args) > 1 {
+					extraArgsEnd = call.Args[len(call.Args)-1].End()
+				}
+				if function.Sel.Name == functionTypeName && hasPackageOverrideComment {
+					extraArgsEnd = call.Rparen
+				}
 				listOfArgs = append(listOfArgs, utils.FunctionIDArg{
 					FuncDecl:      fn,
+					FunctionPos:   function.Sel.Pos(),
+					FunctionEnd:   function.Sel.End(),
 					ArgPos:        call.Args[0].Pos(),
 					ArgEnd:        call.Args[0].End(),
+					ExtraArgsEnd:  extraArgsEnd,
 					StackCallPath: packagePath,
+					HasPackageComment: hasPackageOverrideComment,
 				})
 			}
 		}
@@ -84,6 +115,26 @@ func parseFunctionIDArgs(args []ast.Expr) string {
 				return packagePath
 			}
 		}
+	}
+
+	return ""
+}
+
+func parseFunctionIDTypeArg(src []byte, fset *token.FileSet, call *ast.CallExpr) string {
+	if len(call.Args) == 0 {
+		return ""
+	}
+
+	argEndOffset := fset.Position(call.Args[0].End()).Offset
+	rparenOffset := fset.Position(call.Rparen).Offset
+	if argEndOffset < 0 || rparenOffset < 0 || argEndOffset > len(src) || rparenOffset > len(src) || argEndOffset >= rparenOffset {
+		return ""
+	}
+
+	trailing := string(src[argEndOffset:rparenOffset])
+	match := packageCallRegexp.FindStringSubmatch(trailing)
+	if len(match) == 2 {
+		return match[1]
 	}
 
 	return ""
@@ -185,6 +236,11 @@ func getCallExpressionsFromStmt(statement ast.Stmt) (listOfCallExpressions []*as
 			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(expr)...)
 		}
 	case *ast.CommClause:
+		stmts := stmt.Body
+		for _, stmt := range stmts {
+			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromStmt(stmt)...)
+		}
+	case *ast.CaseClause:
 		stmts := stmt.Body
 		for _, stmt := range stmts {
 			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromStmt(stmt)...)

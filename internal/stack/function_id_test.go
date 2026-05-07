@@ -77,3 +77,20 @@ func TestFunctionIDForGenericType(t *testing.T) {
 		)
 	})
 }
+
+// BenchmarkFunctionID/stack.FunctionID-12         	1000000000	         0.2575 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkFunctionID/stack.FunctionIDType-12     	99355225	        11.82 ns/op	      16 B/op	       1 allocs/op
+func BenchmarkFunctionID(b *testing.B) {
+	b.Run("stack.FunctionID", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			_ = FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query")
+		}
+	})
+	b.Run("stack.FunctionIDType", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			_ = FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query")
+		}
+	})
+}

@@ -143,7 +143,7 @@ func (r *repeater) wakeUp(e Event) (err error) {
 	ctx := WithEvent(context.Background(), e)
 
 	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater.(*repeater).wakeUp"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater.(*repeater).wakeUp"),
 		r.name, e,
 	)
 	defer func() {

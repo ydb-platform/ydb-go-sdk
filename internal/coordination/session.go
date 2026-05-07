@@ -154,7 +154,7 @@ func (s *session) newStream( //nolint:funlen
 				err           error
 			)
 			onDone := trace.CoordinationOnSessionNewStream(s.trace, &streamCtx,
-				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*session).newStream"),
+				stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*session).newStream"),
 			)
 			sessionClient, err = s.client.Session(streamCtx)
 			onDone(err)

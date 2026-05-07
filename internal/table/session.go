@@ -261,7 +261,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 	s *Session, finalErr error,
 ) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.newSession"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.newSession"),
 	)
 	defer func() {
 		onDone(s, finalErr)
@@ -432,7 +432,7 @@ func (s *Session) ID() string {
 
 func (s *Session) Close(ctx context.Context) (finalErr error) {
 	onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Close"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Close"),
 		s,
 	)
 	defer func() {
@@ -469,7 +469,7 @@ func (s *Session) KeepAlive(ctx context.Context) (err error) {
 		result Ydb_Table.KeepAliveResult
 		onDone = trace.TableOnSessionKeepAlive(
 			s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).KeepAlive"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).KeepAlive"),
 			s,
 		)
 	)
@@ -923,7 +923,7 @@ func (s *Session) Explain(ctx context.Context, sql string) (exp table.DataQueryE
 		response *Ydb_Table.ExplainDataQueryResponse
 		onDone   = trace.TableOnSessionQueryExplain(
 			s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Explain"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Explain"),
 			s, sql,
 		)
 	)
@@ -972,7 +972,7 @@ func (s *Session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 		result   Ydb_Table.PrepareQueryResult
 		onDone   = trace.TableOnSessionQueryPrepare(
 			s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Prepare"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Prepare"),
 			s, queryText,
 		)
 	)
@@ -1055,7 +1055,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 
 	onDone := trace.TableOnSessionQueryExecute(
 		s.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Execute"),
+		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Execute"),
 		s, q, params,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
@@ -1299,7 +1299,7 @@ func (s *Session) StreamReadTable(
 ) (_ result.StreamResult, err error) {
 	var (
 		onDone = trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).StreamReadTable"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).StreamReadTable"),
 			s,
 		)
 		request = Ydb_Table.ReadTableRequest{
@@ -1387,7 +1387,7 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, sql string, parame
 		q      = queryFromText(sql)
 		onDone = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).StreamExecuteScanQuery"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).StreamExecuteScanQuery"),
 			s, q, parameters,
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
@@ -1461,7 +1461,7 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	var (
 		callOptions []grpc.CallOption
 		onDone      = trace.TableOnSessionBulkUpsert(s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).BulkUpsert"), s,
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).BulkUpsert"), s,
 		)
 	)
 	defer func() {
@@ -1504,7 +1504,7 @@ func (s *Session) BeginTransaction(
 		response *Ydb_Table.BeginTransactionResponse
 		onDone   = trace.TableOnTxBegin(
 			s.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).BeginTransaction"),
+			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).BeginTransaction"),
 			s,
 		)
 	)
