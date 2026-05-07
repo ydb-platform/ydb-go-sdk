@@ -180,7 +180,9 @@ func runBatch(workDir string) error {
 		}
 		p := buildPackage(pkg, info, o.constrs, o.items)
 		if err := w.Write(p); err != nil {
-			f.Close()
+			if cerr := f.Close(); cerr != nil {
+				return fmt.Errorf("write failed: %w; close failed: %v", err, cerr)
+			}
 
 			return err
 		}
