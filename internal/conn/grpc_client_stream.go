@@ -97,10 +97,6 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 			return err
 		}
 
-		if xerrors.Is(err, io.EOF) {
-			return io.EOF
-		}
-
 		if s.sentMark.canRetry() {
 			return xerrors.WithStackTrace(xerrors.Retryable(
 				xerrors.Join(
