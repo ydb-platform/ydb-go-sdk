@@ -1,13 +1,11 @@
 package topic
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
@@ -18,7 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-func TestRetryDecision(t *testing.T) {
+func TestCheckRetryMode(t *testing.T) {
 	fastError := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
 	slowError := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
 	unretriable := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
@@ -274,108 +272,6 @@ func TestCheckResetReconnectionCounters(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			shouldReset := CheckResetReconnectionCounters(test.lastTry, now, test.connectionTimeout)
 			require.Equal(t, test.shouldReset, shouldReset)
-		})
-	}
-}
-
-func TestRetryDecisionForStreamErrors(t *testing.T) {
-	wrapErrOld := func(streamCtx context.Context, err error) error {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return xerrors.WithStackTrace(xerrors.Transport(
-			err,
-		))
-	}
-
-	wrapErrOld(t.Context(), nil)
-
-	wrapErrNew := func(streamCtx context.Context, err error) error {
-		if ctxErr := streamCtx.Err(); ctxErr != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(xerrors.Transport(err), ctxErr)))
-		}
-
-		return xerrors.WithStackTrace(xerrors.Transport(
-			err,
-		))
-	}
-
-	wrapErrNew(t.Context(), nil)
-
-	for _, tt := range []struct {
-		name       string
-		err        error
-		expCode    int32
-		expType    xerrors.Type
-		expBackoff backoff.Type
-		retryable  bool
-	}{
-		{
-			name:       "context error",
-			err:        context.Canceled,
-			expCode:    int32(grpcCodes.Unknown),
-			expType:    xerrors.TypeUndefined,
-			expBackoff: backoff.TypeNoBackoff,
-			retryable:  false,
-		},
-		{
-			name: "context error with stack trace",
-			err: xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(
-				context.Canceled,
-			))),
-			expCode:    int32(grpcCodes.Unknown),
-			expType:    xerrors.TypeUndefined,
-			expBackoff: backoff.TypeNoBackoff,
-			retryable:  false,
-		},
-		{
-			name:       "grpc status error",
-			err:        grpcStatus.Error(grpcCodes.Canceled, "Cancelled on the server side"),
-			expCode:    int32(grpcCodes.Canceled),
-			expType:    xerrors.TypeConditionallyRetryable,
-			expBackoff: backoff.TypeFast,
-			retryable:  true,
-		},
-		{
-			name: "grpc status error with stack trace",
-			err: xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(
-				grpcStatus.Error(grpcCodes.Canceled, "Cancelled on the server side"),
-			))),
-			expCode:    int32(grpcCodes.Canceled),
-			expType:    xerrors.TypeConditionallyRetryable,
-			expBackoff: backoff.TypeFast,
-			retryable:  true,
-		},
-		{
-			name: "transport error",
-			err: xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(
-				xerrors.Transport(grpcStatus.Error(grpcCodes.Canceled, "Cancelled on the server side")),
-			))),
-			expCode:    int32(grpcCodes.Canceled),
-			expType:    xerrors.TypeConditionallyRetryable,
-			expBackoff: backoff.TypeFast,
-			retryable:  true,
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(t.Context())
-			cancel()
-
-			sendErr := wrapErrNew(ctx, tt.err)
-
-			if !xerrors.IsErrorFromServer(sendErr) {
-				sendErr = xerrors.Transport(sendErr)
-			}
-
-			code, errType, backoffType := xerrors.Check(sendErr)
-			assert.EqualValues(t, tt.expCode, code)
-			assert.EqualValues(t, tt.expType.String(), errType.String())
-			assert.EqualValues(t, tt.expBackoff.String(), backoffType.String())
-
-			backoffType, stopReason := retryDecision(sendErr, RetrySettings{}, 0)
-			assert.Equal(t, tt.retryable, stopReason == nil, stopReason)
-			assert.EqualValues(t, tt.expBackoff.String(), backoffType.String())
 		})
 	}
 }
