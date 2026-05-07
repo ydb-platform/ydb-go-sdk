@@ -2,10 +2,6 @@ package trace
 
 import "context"
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 type (
 	// Discovery specified trace of discovery client activity.
 	// gtrace:gen

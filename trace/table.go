@@ -4,10 +4,6 @@ import (
 	"context"
 )
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 type (
 	// Table specified trace of table client activity.
 	// gtrace:gen
