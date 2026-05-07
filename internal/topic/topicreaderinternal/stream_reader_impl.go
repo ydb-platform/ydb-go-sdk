@@ -77,6 +77,7 @@ type topicStreamReaderConfig struct {
 	ReadSelectors                   []*topicreadercommon.PublicReadSelector
 	Trace                           *trace.Topic
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
+	OnStopPartitionSession          PublicOnStopPartitionSessionFunc
 	CommitMode                      topicreadercommon.PublicCommitMode
 	Decoders                        *topicreadercommon.MultiDecoder
 	EnableSplitMergeSupport         bool
@@ -473,6 +474,16 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	defer func() {
 		onDone(err)
 	}()
+
+	if r.cfg.OnStopPartitionSession != nil {
+		r.cfg.OnStopPartitionSession(PublicStopPartitionSessionRequest{
+			Topic:              session.Topic,
+			PartitionID:        session.PartitionID,
+			PartitionSessionID: session.StreamPartitionSessionID.ToInt64(),
+			CommittedOffset:    msg.CommittedOffset.ToInt64(),
+			Graceful:           msg.Graceful,
+		})
+	}
 
 	if msg.Graceful {
 		session.Close()

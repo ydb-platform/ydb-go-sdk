@@ -1,3 +1,5 @@
+* Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a reader partition session
+
 ## v3.135.11
 * The `trace.DatabaseSQLConnExecStartInfo.IdleTime` and `trace.DatabaseSQLConnQueryStartInfo.IdleTime` fields have been marked as deprecated and will always be zero from now.
 * Default connection last usage tracking has been changed to "no tracking", with real-time tracking enabled only if a connection's time-to-live (TTL) has been defined.

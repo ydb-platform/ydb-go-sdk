@@ -224,6 +224,15 @@ type (
 
 	// GetPartitionStartOffsetResponse optional set offset for start reade messages for the partition
 	GetPartitionStartOffsetResponse = topicreaderinternal.PublicGetPartitionStartOffsetResponse
+
+	// OnStopPartitionSessionFunc is the type of the callback registered via
+	// WithReaderOnStopPartitionSession.
+	OnStopPartitionSessionFunc = topicreaderinternal.PublicOnStopPartitionSessionFunc
+
+	// StopPartitionSessionRequest describes the partition session the server
+	// is going to stop on the reader. It is passed to the OnStopPartitionSessionFunc
+	// callback.
+	StopPartitionSessionRequest = topicreaderinternal.PublicStopPartitionSessionRequest
 )
 
 // WithGetPartitionStartOffset
@@ -296,5 +305,20 @@ func WithReaderSupportSplitMergePartitions(enableSupport bool) ReaderOption {
 func WithReaderLogContext(ctx context.Context) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.BaseContext = ctx
+	}
+}
+
+// WithReaderOnStopPartitionSession registers a user callback invoked when the
+// server requests a partition session stop on the reader.
+//
+// The callback receives a StopPartitionSessionRequest with the topic path,
+// partition ID, partition session ID, server-reported committed offset and
+// the graceful flag. It is called synchronously from the reader event loop,
+// so it must return quickly. To commit messages from the callback in a way
+// that is guaranteed to reach the server before StopPartitionSessionResponse,
+// use WithReaderCommitMode(CommitModeSync).
+func WithReaderOnStopPartitionSession(f OnStopPartitionSessionFunc) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.OnStopPartitionSession = f
 	}
 }
