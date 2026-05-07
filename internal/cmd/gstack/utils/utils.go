@@ -66,7 +66,7 @@ func FixSource(fset *token.FileSet, path string, src []byte, listOfArgs []Functi
 		}
 
 		fixedSource = append(fixedSource, src[previousArgEnd:functionPosOffset]...)
-		fixedSource = append(fixedSource, "FunctionIDType"...)
+		fixedSource = append(fixedSource, "FunctionID"...)
 		previousArgEnd = functionEndOffset
 
 		formattedArg := fmt.Sprintf("%q", argument)

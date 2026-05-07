@@ -79,7 +79,7 @@ func (tx *Transaction) QueryResultSet(
 	}
 
 	onDone := trace.QueryOnTxQueryResultSet(tx.s.trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"),
 		tx, q, txSettings.Label(),
 	)
 	defer func() {
@@ -133,7 +133,7 @@ func (tx *Transaction) QueryRow(
 	}
 
 	onDone := trace.QueryOnTxQueryRow(tx.s.trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryRow"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryRow"),
 		tx, q, txSettings.Label(),
 	)
 	defer func() {
@@ -202,7 +202,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 	}
 
 	onDone := trace.QueryOnTxExec(tx.s.trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Exec"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Exec"),
 		tx.s, tx, q, txSettings.Label(),
 	)
 	defer func() {
@@ -296,7 +296,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	}
 
 	onDone := trace.QueryOnTxQuery(tx.s.trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"),
 		tx.s, tx, q, txSettings.Label(),
 	)
 	defer func() {
@@ -350,7 +350,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 
 func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 	onDone := trace.QueryOnTxCommit(tx.s.trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).CommitTx"), tx.s, tx)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).CommitTx"), tx.s, tx)
 	defer func() {
 		if finalErr != nil {
 			applyStatusByError(tx.s, finalErr)
@@ -407,7 +407,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 	}
 
 	onDone := trace.QueryOnTxRollback(tx.s.trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Rollback"), tx.s, tx)
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Rollback"), tx.s, tx)
 	defer func() {
 		if finalErr != nil {
 			applyStatusByError(tx.s, finalErr)

@@ -1,5 +1,5 @@
-* Updated `gstack` rewrite logic: it now validates existing `stack.FunctionIDType("...")` values and regenerates stale function names from AST; `stack.Package("...")` overrides are preserved as a single inline comment (`/*stack.Package("...")*/`) without duplication on repeated runs.
-* Added public `stack.FunctionIDType` alias for precomputed call identifiers, so generated call sites can avoid `stack.FunctionID` runtime-path handling.
+* Renamed `stack.FunctionID` to `stack.RuntimeFunctionID` for runtime call-site resolution; renamed the precomputed identifier type to `stack.FunctionID` (still implements `stack.Caller`).
+* Updated `gstack` to rewrite `stack.RuntimeFunctionID(...)` (and validate `stack.FunctionID("...")` conversions) into stable `stack.FunctionID("...")` literals; `stack.Package("...")` overrides remain in a single trailing `/*stack.Package("...")*/` comment.
 
 ## v3.135.12
 * Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header

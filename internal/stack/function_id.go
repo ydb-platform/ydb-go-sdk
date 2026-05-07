@@ -4,17 +4,17 @@ type Caller interface {
 	String() string
 }
 
-var _ Caller = FunctionIDType("")
+var _ Caller = FunctionID("")
 
-type FunctionIDType string
+type FunctionID string
 
-func (id FunctionIDType) String() string {
+func (id FunctionID) String() string {
 	return string(id)
 }
 
-func FunctionID(id string, opts ...recordOption) Caller {
+func RuntimeFunctionID(id string, opts ...recordOption) Caller {
 	if id != "" {
-		return FunctionIDType(id)
+		return FunctionID(id)
 	}
 
 	return Call(1, opts...)

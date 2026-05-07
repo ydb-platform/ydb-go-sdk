@@ -242,7 +242,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 	var (
 		settings = options.ParseDoOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDo(settings.Trace(), &ctx,
-			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Do"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Do"),
 			settings.Label(),
 		)
 		attempts = 0
@@ -347,7 +347,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 	settings := options.ExecuteSettings(opts...)
 
 	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
 		q, settings.Label(),
 	)
 	defer func() {
@@ -402,7 +402,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnExec(c.config.Trace(), &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
 		q,
 		settings.Label(),
 	)
@@ -457,7 +457,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
 		q, settings.Label(),
 	)
 	defer func() {
@@ -516,7 +516,7 @@ func (c *Client) QueryResultSet(
 	)
 
 	onDone := trace.QueryOnQueryResultSet(c.config.Trace(), &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryResultSet"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryResultSet"),
 		q, settings.Label(),
 	)
 	defer func() {
@@ -552,7 +552,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	var (
 		settings = options.ParseDoTxOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDoTx(settings.Trace(), &ctx,
-			stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).DoTx"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).DoTx"),
 			settings.Label(),
 		)
 		attempts = 0
@@ -621,7 +621,7 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
 	defer onDone()
 

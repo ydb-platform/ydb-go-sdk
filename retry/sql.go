@@ -66,7 +66,7 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 		zeroValue T
 		options   = doOptions{
 			retryOptions: []Option{
-				withCaller(stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/retry.DoWithResult")),
+				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/retry.DoWithResult")),
 			},
 		}
 		attempts = 0
@@ -202,7 +202,7 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 		zeroValue T
 		options   = doTxOptions{
 			retryOptions: []Option{
-				withCaller(stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/retry.DoTxWithResult")),
+				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/retry.DoTxWithResult")),
 			},
 			txOptions: &sql.TxOptions{
 				Isolation: sql.LevelDefault,

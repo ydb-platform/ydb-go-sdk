@@ -148,7 +148,7 @@ func Open(
 	}
 
 	onDone := trace.QueryOnSessionCreate(core.Trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Open"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Open"),
 	)
 	defer func() {
 		if finalErr == nil {
@@ -190,7 +190,7 @@ func Open(
 
 func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 	onDone := trace.QueryOnSessionAttach(core.Trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach"),
 		core,
 	)
 	defer func() {
@@ -247,7 +247,7 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 
 func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
 	onDone := trace.QueryOnSessionDelete(core.Trace, &ctx,
-		stack.FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).deleteSession"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).deleteSession"),
 		core,
 	)
 	defer func() {

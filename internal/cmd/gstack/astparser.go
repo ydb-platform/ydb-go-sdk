@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	stackPackageName = "stack"
-	functionIDName   = "FunctionID"
-	functionTypeName = "FunctionIDType"
+	stackPackageName         = "stack"
+	runtimeFunctionIDName    = "RuntimeFunctionID"
+	functionIDConversionName = "FunctionID" // type conversion stack.FunctionID("...")
 )
 
 var packageCallRegexp = regexp.MustCompile(`stack\.Package\("([^"]+)"\)`)
@@ -67,7 +67,7 @@ func getListOfArgsFromListOfCalls(
 
 	for _, call := range listOfCalls {
 		if function, ok := call.Fun.(*ast.SelectorExpr); ok && //nolint:nestif
-			(function.Sel.Name == functionIDName || function.Sel.Name == functionTypeName) {
+			(function.Sel.Name == runtimeFunctionIDName || function.Sel.Name == functionIDConversionName) {
 			pack, ok := function.X.(*ast.Ident)
 			if !ok {
 				continue
@@ -76,18 +76,18 @@ func getListOfArgsFromListOfCalls(
 				packagePath := ""
 				hasPackageOverrideComment := false
 				switch function.Sel.Name {
-				case functionIDName:
+				case runtimeFunctionIDName:
 					packagePath = parseFunctionIDArgs(call.Args[1:])
 					hasPackageOverrideComment = packagePath != ""
-				case functionTypeName:
-					packagePath = parseFunctionIDTypeArg(src, fset, call)
+				case functionIDConversionName:
+					packagePath = parseFunctionIDPackageComment(src, fset, call)
 					hasPackageOverrideComment = packagePath != ""
 				}
 				extraArgsEnd := token.NoPos
 				if len(call.Args) > 1 {
 					extraArgsEnd = call.Args[len(call.Args)-1].End()
 				}
-				if function.Sel.Name == functionTypeName && hasPackageOverrideComment {
+				if function.Sel.Name == functionIDConversionName && hasPackageOverrideComment {
 					extraArgsEnd = call.Rparen
 				}
 				listOfArgs = append(listOfArgs, utils.FunctionIDArg{
@@ -120,7 +120,7 @@ func parseFunctionIDArgs(args []ast.Expr) string {
 	return ""
 }
 
-func parseFunctionIDTypeArg(src []byte, fset *token.FileSet, call *ast.CallExpr) string {
+func parseFunctionIDPackageComment(src []byte, fset *token.FileSet, call *ast.CallExpr) string {
 	if len(call.Args) == 0 {
 		return ""
 	}

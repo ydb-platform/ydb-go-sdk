@@ -13,15 +13,15 @@ type genericType[T any] struct{}
 type starType struct{}
 
 func (t genericType[T]) Call() string {
-	return FunctionID("").String()
+	return RuntimeFunctionID("").String()
 }
 
 func staticCall() string {
-	return FunctionID("").String()
+	return RuntimeFunctionID("").String()
 }
 
 func (e *starType) starredCall() string {
-	return FunctionID("").String()
+	return RuntimeFunctionID("").String()
 }
 
 func anonymousFunctionCall() string {
@@ -30,7 +30,7 @@ func anonymousFunctionCall() string {
 	go func() {
 		mu.Lock()
 		defer mu.Unlock()
-		result = FunctionID("").String()
+		result = RuntimeFunctionID("").String()
 	}()
 	time.Sleep(time.Second)
 
@@ -41,7 +41,7 @@ func anonymousFunctionCall() string {
 }
 
 func callWithPackageDefinition() string {
-	return FunctionID("", Package("database/sql")).String()
+	return RuntimeFunctionID("", Package("database/sql")).String()
 }
 
 func TestFunctionIDForGenericType(t *testing.T) {
@@ -78,19 +78,19 @@ func TestFunctionIDForGenericType(t *testing.T) {
 	})
 }
 
-// BenchmarkFunctionID/stack.FunctionIDType-12  1000000000	 0.2716 ns/op	 0 B/op		0 allocs/op
-// BenchmarkFunctionID/stack.FunctionID-12        93567856	  11.72 ns/op	16 B/op		1 allocs/op
+// BenchmarkFunctionID/stack.FunctionID_literal-12     ~0 ns/op  0 B/op  0 allocs/op
+// BenchmarkFunctionID/stack.RuntimeFunctionID-12  ~11 ns/op 16 B/op  1 alloc/op (non-empty delegates to literal)
 func BenchmarkFunctionID(b *testing.B) {
-	b.Run("stack.FunctionIDType", func(b *testing.B) {
-		b.ReportAllocs()
-		for range b.N {
-			_ = FunctionIDType("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query")
-		}
-	})
-	b.Run("stack.FunctionID", func(b *testing.B) {
+	b.Run("stack.FunctionID.literal", func(b *testing.B) {
 		b.ReportAllocs()
 		for range b.N {
 			_ = FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query")
+		}
+	})
+	b.Run("stack.RuntimeFunctionID", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			_ = RuntimeFunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query")
 		}
 	})
 }
