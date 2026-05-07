@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -650,6 +649,10 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 				ctx, cancel := context.WithCancel(t.Context())
 				cancel()
 
+				// Cleaner existing pattern:
+				mark := &modificationMark{}
+				mark.markDirty()
+
 				s := &grpcClientStream{
 					parentConn: &conn{
 						config:    &mockConfig{},
@@ -659,14 +662,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 					stream:    mockStream,
 					streamCtx: ctx,
 					wrapping:  true,
-					sentMark: &modificationMark{
-						dirty: *func() *atomic.Bool {
-							b := &atomic.Bool{}
-							b.Store(true)
-
-							return b
-						}(),
-					},
+					sentMark:  mark,
 				}
 
 				err := s.RecvMsg(msg)
