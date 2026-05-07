@@ -610,7 +610,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 				mockStream := mock.NewMockClientStream(ctrl)
 
 				msg := &Ydb_Query.ExecuteQueryResponsePart{}
-				mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, context.Canceled.Error()))
+				mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, "Cancelled on the server side"))
 				mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 				ctx, cancel := context.WithCancel(t.Context())
