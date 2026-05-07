@@ -30,7 +30,7 @@ var (
 
 func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtQuery(stmt.conn.connector.Trace(), &ctx,
-		stack.FunctionID("database/sql.(*Stmt).QueryContext", stack.Package("database/sql")),
+		stack.FunctionID("database/sql.(*Stmt).QueryContext" /*stack.Package("database/sql")*/),
 		stmt.ctx, stmt.sql,
 	)
 	defer func() {
@@ -60,7 +60,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtExec(stmt.conn.connector.Trace(), &ctx,
-		stack.FunctionID("database/sql.(*Stmt).ExecContext", stack.Package("database/sql")),
+		stack.FunctionID("database/sql.(*Stmt).ExecContext" /*stack.Package("database/sql")*/),
 		stmt.ctx, stmt.sql,
 	)
 	defer func() {
@@ -96,7 +96,7 @@ func (stmt *Stmt) Close() (finalErr error) {
 	var (
 		ctx    = stmt.ctx
 		onDone = trace.DatabaseSQLOnStmtClose(stmt.conn.connector.Trace(), &ctx,
-			stack.FunctionID("database/sql.(*Stmt).Close", stack.Package("database/sql")),
+			stack.FunctionID("database/sql.(*Stmt).Close" /*stack.Package("database/sql")*/),
 		)
 	)
 	defer func() {

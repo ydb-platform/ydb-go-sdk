@@ -1,3 +1,6 @@
+## v3.135.13
+* Optimized the `internal/stack.FunctionID` for decreased allocations and CPU usage
+
 ## v3.135.12
 * Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header
 
