@@ -64,10 +64,6 @@ func (s *grpcClientStream) CloseSend() (err error) {
 			return err
 		}
 
-		if xerrors.Is(err, io.EOF) {
-			return io.EOF
-		}
-
 		return xerrors.WithStackTrace(xerrors.Join(
 			s.streamCtx.Err(),
 			xerrors.Transport(err,
