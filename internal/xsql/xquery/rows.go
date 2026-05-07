@@ -156,7 +156,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	}
 
 	// Reuse the pre-allocated scan buffer to avoid heap allocations per call.
-	// valueBuf and scanBuf are initialised once in updateColumns.
+	// valueBuf and scanBuf are initialized once in updateColumns.
 	if err = nextRow.Scan(r.scanBuf...); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
