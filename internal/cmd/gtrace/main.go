@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -23,7 +24,7 @@ import (
 
 var batch = flag.Bool("batch", false, "regenerate all *_gtrace.go files in the package directory (single typecheck)")
 
-//nolint:gocyclo,funlen
+//nolint:funlen
 func main() {
 	flag.Parse()
 
@@ -72,7 +73,7 @@ func main() {
 
 	srcFilePath := filepath.Join(workDir, gofile)
 
-	fset, bctx, _, paths, astFiles, err := loadTracePackageAST(workDir)
+	fset, bctx, paths, astFiles, err := loadTracePackageAST(workDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -131,7 +132,7 @@ func main() {
 }
 
 func runBatch(workDir string) error {
-	fset, bctx, _, paths, astFiles, err := loadTracePackageAST(workDir)
+	fset, bctx, paths, astFiles, err := loadTracePackageAST(workDir)
 	if err != nil {
 		return err
 	}
@@ -194,18 +195,17 @@ func runBatch(workDir string) error {
 func loadTracePackageAST(workDir string) (
 	fset *token.FileSet,
 	bctx build.Context,
-	bpkg *build.Package,
 	paths []string,
 	astFiles []*ast.File,
 	err error,
 ) {
 	bctx = build.Default
-	bpkg, err = bctx.ImportDir(workDir, build.IgnoreVendor)
+	bp, err := bctx.ImportDir(workDir, build.IgnoreVendor)
 	if err != nil {
-		return nil, build.Context{}, nil, nil, nil, err
+		return nil, build.Context{}, nil, nil, err
 	}
 	fset = token.NewFileSet()
-	for _, name := range bpkg.GoFiles {
+	for _, name := range bp.GoFiles {
 		base := strings.TrimSuffix(name, filepath.Ext(name))
 		if isGenerated(base, "_gtrace") {
 			continue
@@ -214,13 +214,13 @@ func loadTracePackageAST(workDir string) (
 		var astFile *ast.File
 		astFile, err = parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
-			return nil, build.Context{}, nil, nil, nil, fmt.Errorf("parse %q: %w", path, err)
+			return nil, build.Context{}, nil, nil, fmt.Errorf("parse %q: %w", path, err)
 		}
 		paths = append(paths, path)
 		astFiles = append(astFiles, astFile)
 	}
 
-	return fset, bctx, bpkg, paths, astFiles, nil
+	return fset, bctx, paths, astFiles, nil
 }
 
 func typecheckPackage(fset *token.FileSet, astFiles []*ast.File) (*types.Info, *types.Package, error) {
@@ -251,7 +251,10 @@ func typecheckPackage(fset *token.FileSet, astFiles []*ast.File) (*types.Info, *
 	}
 	pkg, err2 := conf.Check(".", fset, astFiles, info)
 	if err2 != nil {
-		return nil, nil, fmt.Errorf("gc importer: %v; source importer: %w", err, err2)
+		return nil, nil, fmt.Errorf(
+			"typecheck (gc importer then source importer): %w",
+			errors.Join(err, err2),
+		)
 	}
 
 	return info, pkg, nil

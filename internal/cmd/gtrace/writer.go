@@ -277,7 +277,15 @@ func (w *Writer) ensureStdLibMapping() {
 	}
 	root := filepath.Clean(w.Context.GOROOT)
 	if v, ok := stdRootsByGOROOT.Load(root); ok {
-		w.std = v.(map[string]bool)
+		m, typeOK := v.(map[string]bool)
+		if !typeOK {
+			panic(fmt.Sprintf(
+				"gtrace internal: unexpected type %T for GOROOT %q cache entry",
+				v,
+				root,
+			))
+		}
+		w.std = m
 
 		return
 	}
