@@ -78,8 +78,8 @@ func TestFunctionIDForGenericType(t *testing.T) {
 	})
 }
 
-// BenchmarkFunctionID/stack.FunctionID-12         	1000000000	         0.2575 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkFunctionID/stack.FunctionIDType-12     	99355225	        11.82 ns/op	      16 B/op	       1 allocs/op
+// BenchmarkFunctionID/stack.FunctionIDType-12  1000000000	 0.2716 ns/op	0 B/op	0 allocs/op
+// BenchmarkFunctionID/stack.FunctionID-12        93567856	11.72 ns/op	16 B/op	1 allocs/op
 func BenchmarkFunctionID(b *testing.B) {
 	b.Run("stack.FunctionIDType", func(b *testing.B) {
 		b.ReportAllocs()
