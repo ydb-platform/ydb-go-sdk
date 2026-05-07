@@ -1,5 +1,4 @@
-* Renamed `stack.FunctionID` to `stack.RuntimeFunctionID` for runtime call-site resolution; renamed the precomputed identifier type to `stack.FunctionID` (still implements `stack.Caller`).
-* Updated `gstack` to rewrite `stack.RuntimeFunctionID(...)` (and validate `stack.FunctionID("...")` conversions) into stable `stack.FunctionID("...")` literals; `stack.Package("...")` overrides remain in a single trailing `/*stack.Package("...")*/` comment.
+* Optimized the `internal/stack.FunctionID` for decreased allocations and CPU usage
 
 ## v3.135.12
 * Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header
