@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -604,35 +605,76 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 			require.True(t, xerrors.IsRetryableError(err))
 		})
 		t.Run("Cancelled", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			mockStream := mock.NewMockClientStream(ctrl)
+			t.Run("sentMark.canRetry()==false", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				mockStream := mock.NewMockClientStream(ctrl)
 
-			msg := &Ydb_Query.ExecuteQueryResponsePart{}
-			mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, context.Canceled.Error()))
-			mockStream.EXPECT().Trailer().Return(metadata.MD{})
+				msg := &Ydb_Query.ExecuteQueryResponsePart{}
+				mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, context.Canceled.Error()))
+				mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
-			ctx, cancel := context.WithCancel(t.Context())
-			cancel()
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
 
-			s := &grpcClientStream{
-				parentConn: &conn{
-					config:    &mockConfig{},
-					lastUsage: nopLastUsage{},
-				},
-				stream:    mockStream,
-				streamCtx: ctx,
-				wrapping:  true,
-				sentMark:  &modificationMark{},
-			}
+				s := &grpcClientStream{
+					parentConn: &conn{
+						config:    &mockConfig{},
+						endpoint:  endpoint.New("test-endpoint:2135"),
+						lastUsage: nopLastUsage{},
+					},
+					stream:    mockStream,
+					streamCtx: ctx,
+					wrapping:  true,
+					sentMark: &modificationMark{
+						dirty: func() (b atomic.Bool) {
+							b.Store(true)
 
-			err := s.RecvMsg(msg)
-			require.Error(t, err)
+							return b
+						}(),
+					},
+				}
 
-			check := retry.Check(err)
-			require.EqualValues(t, grpcCodes.Canceled, check.StatusCode())
-			require.EqualValues(t, backoff.TypeFast, check.BackoffType())
-			require.True(t, check.MustRetry(true))
-			require.True(t, check.MustRetry(false))
+				err := s.RecvMsg(msg)
+				require.Error(t, err)
+
+				check := retry.Check(err)
+				require.EqualValues(t, grpcCodes.Canceled, check.StatusCode())
+				require.EqualValues(t, backoff.TypeFast, check.BackoffType())
+				require.True(t, check.MustRetry(true))
+				require.False(t, check.MustRetry(false))
+			})
+			t.Run("sentMark.canRetry()==true", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				mockStream := mock.NewMockClientStream(ctrl)
+
+				msg := &Ydb_Query.ExecuteQueryResponsePart{}
+				mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, context.Canceled.Error()))
+				mockStream.EXPECT().Trailer().Return(metadata.MD{})
+
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+
+				s := &grpcClientStream{
+					parentConn: &conn{
+						config:    &mockConfig{},
+						endpoint:  endpoint.New("test-endpoint:2135"),
+						lastUsage: nopLastUsage{},
+					},
+					stream:    mockStream,
+					streamCtx: ctx,
+					wrapping:  true,
+					sentMark:  &modificationMark{},
+				}
+
+				err := s.RecvMsg(msg)
+				require.Error(t, err)
+
+				check := retry.Check(err)
+				require.EqualValues(t, grpcCodes.Canceled, check.StatusCode())
+				require.EqualValues(t, backoff.TypeFast, check.BackoffType())
+				require.True(t, check.MustRetry(true))
+				require.True(t, check.MustRetry(false))
+			})
 		})
 	})
 
