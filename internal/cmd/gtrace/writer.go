@@ -268,7 +268,9 @@ func (w *Writer) isStdLib(pkg string) bool {
 	return w.std[s]
 }
 
-// stdRootsByGOROOT caches top-level dirs under $GOROOT/src across gtrace invocations (avoids ReadDir each run).
+// stdRootsByGOROOT caches top-level dirs under $GOROOT/src across Writer instances
+// and repeated calls within a single gtrace run (for example, in batch mode),
+// avoiding repeated ReadDir calls for the same GOROOT.
 var stdRootsByGOROOT sync.Map // string /* GOROOT */ -> map[string]bool
 
 func (w *Writer) ensureStdLibMapping() {
