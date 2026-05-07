@@ -63,9 +63,25 @@ func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.
 	_ backoff.Backoff,
 	stopRetryReason error,
 ) {
+	backoffType, stopRetryReason := retryDecision(checkErr, settings, retriesDuration)
+	
+	switch backoffType {
+	case backoff.TypeFast:
+		return backoff.Fast, stopRetryReason
+	case backoff.TypeSlow:
+		return backoff.Slow, stopRetryReason
+	default:
+		return nil, stopRetryReason
+	}
+}
+
+func retryDecision(checkErr error, settings RetrySettings, retriesDuration time.Duration) (
+	_ backoff.Type,
+	stopRetryReason error,
+) {
 	// nil is not error and doesn't need retry it.
 	if checkErr == nil {
-		return nil, xerrors.WithStackTrace(errNil)
+		return backoff.TypeNoBackoff, xerrors.WithStackTrace(errNil)
 	}
 
 	// eof is retriable for topic
@@ -74,7 +90,7 @@ func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.
 	}
 
 	if retriesDuration > settings.StartTimeout {
-		return nil, fmt.Errorf("ydb: topic reader reconnection timeout, last error: %w", xerrors.Unretryable(checkErr))
+		return backoff.TypeNoBackoff, fmt.Errorf("ydb: topic reader reconnection timeout, last error: %w", xerrors.Unretryable(checkErr))
 	}
 
 	mode := retry.Check(checkErr)
@@ -88,12 +104,12 @@ func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.
 	case PublicRetryDecisionDefault:
 		isRetriable := mode.MustRetry(true)
 		if !isRetriable {
-			return nil, fmt.Errorf("ydb: topic reader unretriable error: %w", xerrors.Unretryable(checkErr))
+			return backoff.TypeNoBackoff, fmt.Errorf("ydb: topic reader unretriable error: %w", xerrors.Unretryable(checkErr))
 		}
 	case PublicRetryDecisionRetry:
 		// pass
 	case PublicRetryDecisionStop:
-		return nil, fmt.Errorf(
+		return backoff.TypeNoBackoff, fmt.Errorf(
 			"ydb: topic reader unretriable error by check error callback: %w",
 			xerrors.Unretryable(checkErr),
 		)
@@ -105,8 +121,8 @@ func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.
 
 	switch mode.BackoffType() {
 	case backoff.TypeFast:
-		return backoff.Fast, nil
+		return backoff.TypeFast, nil
 	default:
-		return backoff.Slow, nil
+		return backoff.TypeSlow, nil
 	}
 }

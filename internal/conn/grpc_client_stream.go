@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -61,19 +60,21 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 	err = s.stream.CloseSend()
 	if err != nil {
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
-		}
-
 		if !s.wrapping {
 			return err
 		}
 
-		return xerrors.WithStackTrace(xerrors.Transport(
-			err,
-			xerrors.WithAddress(s.parentConn.Address()),
-			xerrors.WithNodeID(s.parentConn.NodeID()),
-			xerrors.WithTraceID(s.traceID),
+		if xerrors.Is(err, io.EOF) {
+			return io.EOF
+		}
+
+		return xerrors.WithStackTrace(xerrors.Join(
+			s.streamCtx.Err(),
+			xerrors.Transport(err,
+				xerrors.WithAddress(s.parentConn.Address()),
+				xerrors.WithNodeID(s.parentConn.NodeID()),
+				xerrors.WithTraceID(s.traceID),
+			),
 		))
 	}
 
@@ -96,25 +97,31 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 
 	err = s.stream.SendMsg(m)
 	if err != nil {
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
-		}
-
 		if !s.wrapping {
 			return err
 		}
 
+		if xerrors.Is(err, io.EOF) {
+			return io.EOF
+		}
+
 		if s.sentMark.canRetry() {
 			return xerrors.WithStackTrace(xerrors.Retryable(
-				xerrors.Transport(err, xerrors.WithTraceID(s.traceID)),
+				xerrors.Join(
+					s.streamCtx.Err(),
+					xerrors.Transport(err, xerrors.WithTraceID(s.traceID)),
+				),
 				xerrors.WithName("SendMsg"),
 			))
 		}
 
-		return xerrors.WithStackTrace(xerrors.Transport(err,
-			xerrors.WithAddress(s.parentConn.Address()),
-			xerrors.WithNodeID(s.parentConn.NodeID()),
-			xerrors.WithTraceID(s.traceID),
+		return xerrors.WithStackTrace(xerrors.Join(
+			s.streamCtx.Err(),
+			xerrors.Transport(err,
+				xerrors.WithAddress(s.parentConn.Address()),
+				xerrors.WithNodeID(s.parentConn.NodeID()),
+				xerrors.WithTraceID(s.traceID),
+			),
 		))
 	}
 
@@ -151,26 +158,27 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 			return io.EOF
 		}
 
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
-		}
-
 		if !s.wrapping {
 			return err
 		}
 
 		if s.sentMark.canRetry() {
 			return xerrors.WithStackTrace(xerrors.Retryable(
-				xerrors.Transport(err,
-					xerrors.WithTraceID(s.traceID),
+				xerrors.Join(
+					s.streamCtx.Err(),
+					xerrors.Transport(err, xerrors.WithTraceID(s.traceID)),
 				),
 				xerrors.WithName("RecvMsg"),
 			))
 		}
 
-		return xerrors.WithStackTrace(xerrors.Transport(err,
-			xerrors.WithAddress(s.parentConn.Address()),
-			xerrors.WithNodeID(s.parentConn.NodeID()),
+		return xerrors.WithStackTrace(xerrors.Join(
+			s.streamCtx.Err(),
+			xerrors.Transport(err,
+				xerrors.WithAddress(s.parentConn.Address()),
+				xerrors.WithNodeID(s.parentConn.NodeID()),
+				xerrors.WithTraceID(s.traceID),
+			),
 		))
 	}
 
