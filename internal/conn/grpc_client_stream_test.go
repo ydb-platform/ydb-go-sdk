@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"go.uber.org/mock/gomock"
 	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -572,33 +574,66 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 	})
 
 	t.Run("TransportErrorRetryable", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		mockStream := mock.NewMockClientStream(ctrl)
+		t.Run("Unavailable", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStream := mock.NewMockClientStream(ctrl)
 
-		msg := &Ydb_Query.ExecuteQueryResponsePart{}
-		mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
-		mockStream.EXPECT().Trailer().Return(metadata.MD{})
+			msg := &Ydb_Query.ExecuteQueryResponsePart{}
+			mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
+			mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		e := endpoint.New("test-endpoint:2135")
-		parentConn := newConn(e, config)
+			config := &mockConfig{
+				dialTimeout:   5 * time.Second,
+				connectionTTL: 0,
+			}
+			e := endpoint.New("test-endpoint:2135")
+			parentConn := newConn(e, config)
 
-		s := &grpcClientStream{
-			parentConn: parentConn,
-			stream:     mockStream,
-			streamCtx:  context.Background(),
-			wrapping:   true,
-			traceID:    "test-trace-id",
-			sentMark:   &modificationMark{},
-		}
+			s := &grpcClientStream{
+				parentConn: parentConn,
+				stream:     mockStream,
+				streamCtx:  context.Background(),
+				wrapping:   true,
+				traceID:    "test-trace-id",
+				sentMark:   &modificationMark{},
+			}
 
-		err := s.RecvMsg(msg)
-		require.Error(t, err)
-		require.True(t, xerrors.IsTransportError(err))
-		require.True(t, xerrors.IsRetryableError(err))
+			err := s.RecvMsg(msg)
+			require.Error(t, err)
+			require.True(t, xerrors.IsTransportError(err))
+			require.True(t, xerrors.IsRetryableError(err))
+		})
+		t.Run("Cancelled", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStream := mock.NewMockClientStream(ctrl)
+
+			msg := &Ydb_Query.ExecuteQueryResponsePart{}
+			mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, context.Canceled.Error()))
+			mockStream.EXPECT().Trailer().Return(metadata.MD{})
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			s := &grpcClientStream{
+				parentConn: &conn{
+					config:    &mockConfig{},
+					lastUsage: nopLastUsage{},
+				},
+				stream:    mockStream,
+				streamCtx: ctx,
+				wrapping:  true,
+				sentMark:  &modificationMark{},
+			}
+
+			err := s.RecvMsg(msg)
+			require.Error(t, err)
+
+			check := retry.Check(err)
+			require.EqualValues(t, grpcCodes.Canceled, check.StatusCode())
+			require.EqualValues(t, backoff.TypeFast, check.BackoffType())
+			require.True(t, check.MustRetry(true))
+			require.True(t, check.MustRetry(false))
+		})
 	})
 
 	t.Run("TransportErrorNonRetryable", func(t *testing.T) {
