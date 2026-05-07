@@ -1,3 +1,5 @@
+* Adjusted gRPC client-stream error wrapping to improve topic writer reconnect behavior, ensuring stream teardown races don’t cause server-side gRPC cancellations to be misclassified as purely local context cancellations.
+
 ## v3.135.13
 * Optimized the `internal/stack.FunctionID` for decreased allocations and CPU usage
 
