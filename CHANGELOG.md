@@ -1,3 +1,4 @@
+## v3.135.12
 * Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header
 
 ## v3.135.11
