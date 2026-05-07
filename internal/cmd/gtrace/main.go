@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -15,23 +16,43 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-//nolint:gocyclo,funlen
-func main() {
-	var (
-		// Reports whether we were called from go:generate.
-		isGoGenerate bool
+var batch = flag.Bool("batch", false, "regenerate all *_gtrace.go files in the package directory (single typecheck)")
 
-		gofile  string
-		workDir string
-		err     error
+//nolint:funlen
+func main() {
+	flag.Parse()
+
+	if *batch {
+		args := flag.Args()
+		if len(args) != 1 {
+			log.Fatal("batch mode: expected exactly one argument (package directory path)")
+		}
+		dir, err := filepath.Abs(args[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.SetPrefix("[" + filepath.Base(dir) + " -batch] ")
+		if err := runBatch(dir); err != nil {
+			log.Fatal(err)
+		}
+		log.Println("OK")
+
+		return
+	}
+
+	var (
+		isGoGenerate bool
+		gofile       string
+		workDir      string
+		err          error
 	)
 	if gofile = os.Getenv("GOFILE"); gofile != "" {
-		// NOTE: GOFILE is always a filename without path.
 		isGoGenerate = true
 		workDir, err = os.Getwd()
 		if err != nil {
@@ -49,21 +70,18 @@ func main() {
 		prefix := filepath.Join(filepath.Base(workDir), gofile)
 		log.SetPrefix("[" + prefix + "] ")
 	}
-	buildCtx := build.Default
-	buildPkg, err := buildCtx.ImportDir(workDir, build.IgnoreVendor)
+
+	srcFilePath := filepath.Join(workDir, gofile)
+
+	fset, bctx, paths, astFiles, err := loadTracePackageAST(workDir)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	srcFilePath := filepath.Join(workDir, gofile)
 
 	var writers []*Writer
 	if isGoGenerate {
 		openFile := func(name string) (*os.File, func()) {
 			var f *os.File
-			//nolint:gofumpt
-			//nolint:nolintlint
-			//nolint:gosec
 			f, err = os.OpenFile(
 				filepath.Join(workDir, filepath.Clean(name)),
 				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
@@ -76,58 +94,138 @@ func main() {
 			return f, func() { f.Close() }
 		}
 		ext := filepath.Ext(gofile)
-		name := strings.TrimSuffix(gofile, ext)
-		f, clean := openFile(name + "_gtrace" + ext)
+		baseName := strings.TrimSuffix(gofile, ext)
+		f, clean := openFile(baseName + "_gtrace" + ext)
 		defer clean()
 		writers = append(writers, &Writer{
-			Context: buildCtx,
+			Context: bctx,
 			Output:  f,
 		})
 	} else {
 		writers = append(writers, &Writer{
-			Context: buildCtx,
+			Context: bctx,
 			Output:  os.Stdout,
 		})
 	}
 
-	var (
-		pkgFiles = make([]*os.File, 0, len(buildPkg.GoFiles))
-		astFiles = make([]*ast.File, 0, len(buildPkg.GoFiles))
+	buildConstraints, err := buildConstraintsForFile(srcFilePath)
+	if err != nil {
+		panic(err)
+	}
 
-		buildConstraints []string
-	)
-	fset := token.NewFileSet()
-	for _, name := range buildPkg.GoFiles {
+	items := extractGenItemsForFile(astFiles, paths, srcFilePath)
+
+	info, pkg, err := typecheckPackage(fset, astFiles)
+	if err != nil {
+		panic(fmt.Sprintf("type error: %v", err))
+	}
+
+	p := buildPackage(pkg, info, buildConstraints, items)
+
+	for _, w := range writers {
+		if err := w.Write(p); err != nil {
+			panic(err)
+		}
+	}
+
+	log.Println("OK")
+}
+
+func runBatch(workDir string) error {
+	fset, bctx, paths, astFiles, err := loadTracePackageAST(workDir)
+	if err != nil {
+		return err
+	}
+	info, pkg, err := typecheckPackage(fset, astFiles)
+	if err != nil {
+		return fmt.Errorf("type error: %w", err)
+	}
+
+	type outRec struct {
+		path    string
+		items   []*GenItem
+		constrs []string
+	}
+	var outs []outRec
+	for i, astFile := range astFiles {
+		srcPath := paths[i]
+		items := extractGenItems(astFile)
+		if len(items) == 0 {
+			continue
+		}
+		constrs, err := buildConstraintsForFile(srcPath)
+		if err != nil {
+			return err
+		}
+		outs = append(outs, outRec{
+			path:    srcPath,
+			items:   items,
+			constrs: constrs,
+		})
+	}
+	sort.Slice(outs, func(i, j int) bool {
+		return outs[i].path < outs[j].path
+	})
+
+	for _, o := range outs {
+		base := strings.TrimSuffix(filepath.Base(o.path), filepath.Ext(o.path))
+		outPath := filepath.Join(workDir, base+"_gtrace.go")
+		f, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:gosec,mnd
+		if err != nil {
+			return err
+		}
+		w := &Writer{
+			Context: bctx,
+			Output:  f,
+		}
+		p := buildPackage(pkg, info, o.constrs, o.items)
+		if err := w.Write(p); err != nil {
+			if cerr := f.Close(); cerr != nil {
+				return fmt.Errorf("write failed: %w; close failed: %w", err, cerr)
+			}
+
+			return err
+		}
+		if err := f.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func loadTracePackageAST(workDir string) (
+	fset *token.FileSet,
+	bctx build.Context,
+	paths []string,
+	astFiles []*ast.File,
+	err error,
+) {
+	bctx = build.Default
+	bp, err := bctx.ImportDir(workDir, build.IgnoreVendor)
+	if err != nil {
+		return nil, build.Context{}, nil, nil, err
+	}
+	fset = token.NewFileSet()
+	for _, name := range bp.GoFiles {
 		base := strings.TrimSuffix(name, filepath.Ext(name))
 		if isGenerated(base, "_gtrace") {
 			continue
 		}
-		var file *os.File
-		file, err = os.Open(filepath.Join(workDir, name))
+		path := filepath.Join(workDir, name)
+		var astFile *ast.File
+		astFile, err = parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
-			panic(err)
+			return nil, build.Context{}, nil, nil, fmt.Errorf("parse %q: %w", path, err)
 		}
-		defer file.Close() //nolint:gocritic
-
-		var ast *ast.File
-		ast, err = parser.ParseFile(fset, file.Name(), file, parser.ParseComments)
-		if err != nil {
-			panic(fmt.Sprintf("parse %q error: %v", file.Name(), err))
-		}
-
-		pkgFiles = append(pkgFiles, file)
-		astFiles = append(astFiles, ast)
-
-		if name == gofile {
-			if _, err = file.Seek(0, io.SeekStart); err != nil {
-				panic(err)
-			}
-			buildConstraints, err = scanBuildConstraints(file)
-			if err != nil {
-				panic(err)
-			}
-		}
+		paths = append(paths, path)
+		astFiles = append(astFiles, astFile)
 	}
+
+	return fset, bctx, paths, astFiles, nil
+}
+
+func typecheckPackage(fset *token.FileSet, astFiles []*ast.File) (*types.Info, *types.Package, error) {
 	info := &types.Info{
 		Types: make(map[ast.Expr]types.TypeAndValue),
 		Defs:  make(map[*ast.Ident]types.Object),
@@ -136,69 +234,112 @@ func main() {
 	conf := types.Config{
 		IgnoreFuncBodies:         true,
 		DisableUnusedImportCheck: true,
-		Importer:                 importer.ForCompiler(fset, "source", nil),
+		Importer:                 importer.ForCompiler(fset, "gc", nil),
 	}
 	pkg, err := conf.Check(".", fset, astFiles, info)
-	if err != nil {
-		panic(fmt.Sprintf("type error: %v", err))
+	if err == nil {
+		return info, pkg, nil
 	}
-	var items []*GenItem
-	for i, astFile := range astFiles {
-		if pkgFiles[i].Name() != srcFilePath {
-			continue
-		}
-		var (
-			depth int
-			item  *GenItem
+
+	info = &types.Info{
+		Types: make(map[ast.Expr]types.TypeAndValue),
+		Defs:  make(map[*ast.Ident]types.Object),
+		Uses:  make(map[*ast.Ident]types.Object),
+	}
+	conf = types.Config{
+		IgnoreFuncBodies:         true,
+		DisableUnusedImportCheck: true,
+		Importer:                 importer.ForCompiler(fset, "source", nil),
+	}
+	pkg, err2 := conf.Check(".", fset, astFiles, info)
+	if err2 != nil {
+		return nil, nil, fmt.Errorf(
+			"typecheck (gc importer then source importer): %w",
+			errors.Join(err, err2),
 		)
-		ast.Inspect(astFile, func(n ast.Node) (next bool) {
-			if n == nil {
-				item = nil
-				depth--
+	}
 
-				return true
-			}
-			defer func() {
-				if next {
-					depth++
-				}
-			}()
+	return info, pkg, nil
+}
 
-			switch v := n.(type) {
-			case *ast.FuncDecl, *ast.ValueSpec:
-				return false
+func buildConstraintsForFile(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-			case *ast.Ident:
-				if item != nil {
-					item.Ident = v
-				}
+	return scanBuildConstraints(f)
+}
 
-				return false
+func extractGenItemsForFile(astFiles []*ast.File, paths []string, wantPath string) []*GenItem {
+	for i := range astFiles {
+		if paths[i] == wantPath {
+			return extractGenItems(astFiles[i])
+		}
+	}
 
-			case *ast.CommentGroup:
-				for _, c := range v.List {
-					if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
-						if item == nil {
-							item = &GenItem{}
-						}
-					}
-				}
+	panic(fmt.Sprintf("gtrace: source %q was not parsed", wantPath))
+}
 
-				return false
-
-			case *ast.StructType:
-				if item != nil {
-					item.StructType = v
-					items = append(items, item)
-					item = nil
-				}
-
-				return false
-			}
+func extractGenItems(astFile *ast.File) []*GenItem {
+	var items []*GenItem
+	var (
+		depth int
+		item  *GenItem
+	)
+	ast.Inspect(astFile, func(n ast.Node) (next bool) {
+		if n == nil {
+			item = nil
+			depth--
 
 			return true
-		})
-	}
+		}
+		defer func() {
+			if next {
+				depth++
+			}
+		}()
+
+		switch v := n.(type) {
+		case *ast.FuncDecl, *ast.ValueSpec:
+			return false
+
+		case *ast.Ident:
+			if item != nil {
+				item.Ident = v
+			}
+
+			return false
+
+		case *ast.CommentGroup:
+			for _, c := range v.List {
+				if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
+					if item == nil {
+						item = &GenItem{}
+					}
+				}
+			}
+
+			return false
+
+		case *ast.StructType:
+			if item != nil {
+				item.StructType = v
+				items = append(items, item)
+				item = nil
+			}
+
+			return false
+		}
+
+		return true
+	})
+
+	return items
+}
+
+func buildPackage(pkg *types.Package, info *types.Info, buildConstraints []string, items []*GenItem) Package {
 	p := Package{
 		Package:          pkg,
 		BuildConstraints: buildConstraints,
@@ -237,13 +378,8 @@ func main() {
 			})
 		}
 	}
-	for _, w := range writers {
-		if err := w.Write(p); err != nil {
-			panic(err)
-		}
-	}
 
-	log.Println("OK")
+	return p
 }
 
 func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {
@@ -262,7 +398,6 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 			names = append(names, name)
 		}
 		if len(names) == 0 {
-			// Case where arg is not named.
 			names = []string{""}
 		}
 		for _, name := range names {

@@ -268,13 +268,32 @@ func (w *Writer) isStdLib(pkg string) bool {
 	return w.std[s]
 }
 
+// stdRootsByGOROOT caches top-level dirs under $GOROOT/src across Writer instances
+// and repeated calls within a single gtrace run (for example, in batch mode),
+// avoiding repeated ReadDir calls for the same GOROOT.
+var stdRootsByGOROOT sync.Map // string /* GOROOT */ -> map[string]bool
+
 func (w *Writer) ensureStdLibMapping() {
 	if w.std != nil {
 		return
 	}
-	w.std = make(map[string]bool)
+	root := filepath.Clean(w.Context.GOROOT)
+	if v, ok := stdRootsByGOROOT.Load(root); ok {
+		m, typeOK := v.(map[string]bool)
+		if !typeOK {
+			panic(fmt.Sprintf(
+				"gtrace internal: unexpected type %T for GOROOT %q cache entry",
+				v,
+				root,
+			))
+		}
+		w.std = m
 
-	src := filepath.Join(w.Context.GOROOT, "src")
+		return
+	}
+
+	m := make(map[string]bool)
+	src := filepath.Join(root, "src")
 	files, err := os.ReadDir(src)
 	if err != nil {
 		panic(fmt.Sprintf("can't list GOROOT's src: %v", err))
@@ -286,12 +305,13 @@ func (w *Writer) ensureStdLibMapping() {
 		name := filepath.Base(file.Name())
 		switch name {
 		case "cmd", "internal":
-			// Ignored.
 
 		default:
-			w.std[name] = true
+			m[name] = true
 		}
 	}
+	stdRootsByGOROOT.Store(root, m)
+	w.std = m
 }
 
 func (w *Writer) call(args []string) {

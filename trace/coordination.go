@@ -7,10 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
 )
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 type (
 	// Coordination specified trace of coordination client activity.
 	// gtrace:gen

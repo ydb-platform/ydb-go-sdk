@@ -1,7 +1,5 @@
 package trace
 
-//go:generate gtrace
-
 import (
 	"context"
 	"database/sql/driver"
