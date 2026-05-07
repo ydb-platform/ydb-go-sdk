@@ -1,3 +1,5 @@
+* Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header
+
 ## v3.135.11
 * The `trace.DatabaseSQLConnExecStartInfo.IdleTime` and `trace.DatabaseSQLConnQueryStartInfo.IdleTime` fields have been marked as deprecated and will always be zero from now.
 * Default connection last usage tracking has been changed to "no tracking", with real-time tracking enabled only if a connection's time-to-live (TTL) has been defined.
