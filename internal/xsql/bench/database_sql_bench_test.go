@@ -32,10 +32,10 @@ import (
 // cpu: Apple M3 Pro
 // go test -bench=. -benchtime=10s .
 //
-// BenchmarkDatabaseSQLMock/QueryService-12   892932  12489 ns/op   23029 B/op    389 allocs/op
-// BenchmarkDatabaseSQLMock/TableService-12  1222452   9547 ns/op   18603 B/op    307 allocs/op
-// Diff (query/table*100-100)                   -31%          23%          23%              26%
-
+// BenchmarkDatabaseSQLMock/QueryService-12    857882  13517 ns/op   22739 B/op    371 allocs/op
+// BenchmarkDatabaseSQLMock/TableService-12  1298796   9059 ns/op   18473 B/op    299 allocs/op
+// Diff (query/table*100-100)                   -34%          49%          23%              24%
+//
 // grpcMockYDB is a local in-process gRPC stack (Discovery + Table + Query) with fixed
 // "SELECT 42" style responses. It does not require a real YDB endpoint.
 type grpcMockYDB struct {

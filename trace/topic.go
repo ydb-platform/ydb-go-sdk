@@ -6,10 +6,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 )
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 type (
 	// Topic specified trace of topic reader client activity.
 	// gtrace:gen
