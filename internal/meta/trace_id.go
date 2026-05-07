@@ -26,6 +26,8 @@ var lo, hi = func() (uint64, uint64) {
 func fastUUID() (uuid uuid.UUID, _ error) {
 	binary.LittleEndian.PutUint64(uuid[:8], lo)
 	binary.LittleEndian.PutUint64(uuid[8:], atomic.AddUint64(&hi, 1))
+	uuid[6] = (uuid[6] & 0x0f) | 0x40 // version 4
+	uuid[8] = (uuid[8] & 0x3f) | 0x80 // variant RFC 4122
 
 	return uuid, nil
 }

@@ -1,4 +1,4 @@
-* Optimized `internal/meta.TraceID` generation of UUID
+* Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header
 
 ## v3.135.11
 * The `trace.DatabaseSQLConnExecStartInfo.IdleTime` and `trace.DatabaseSQLConnQueryStartInfo.IdleTime` fields have been marked as deprecated and will always be zero from now.
