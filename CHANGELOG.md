@@ -1,3 +1,4 @@
+## v3.135.13
 * Optimized the `internal/stack.FunctionID` for decreased allocations and CPU usage
 
 ## v3.135.12
