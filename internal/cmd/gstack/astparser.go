@@ -66,7 +66,7 @@ func getListOfArgsFromListOfCalls(
 	listOfArgs := make([]utils.FunctionIDArg, 0)
 
 	for _, call := range listOfCalls {
-		if function, ok := call.Fun.(*ast.SelectorExpr); ok &&
+		if function, ok := call.Fun.(*ast.SelectorExpr); ok && //nolint:nestif
 			(function.Sel.Name == functionIDName || function.Sel.Name == functionTypeName) {
 			pack, ok := function.X.(*ast.Ident)
 			if !ok {
@@ -91,13 +91,13 @@ func getListOfArgsFromListOfCalls(
 					extraArgsEnd = call.Rparen
 				}
 				listOfArgs = append(listOfArgs, utils.FunctionIDArg{
-					FuncDecl:      fn,
-					FunctionPos:   function.Sel.Pos(),
-					FunctionEnd:   function.Sel.End(),
-					ArgPos:        call.Args[0].Pos(),
-					ArgEnd:        call.Args[0].End(),
-					ExtraArgsEnd:  extraArgsEnd,
-					StackCallPath: packagePath,
+					FuncDecl:          fn,
+					FunctionPos:       function.Sel.Pos(),
+					FunctionEnd:       function.Sel.End(),
+					ArgPos:            call.Args[0].Pos(),
+					ArgEnd:            call.Args[0].End(),
+					ExtraArgsEnd:      extraArgsEnd,
+					StackCallPath:     packagePath,
 					HasPackageComment: hasPackageOverrideComment,
 				})
 			}
@@ -127,7 +127,7 @@ func parseFunctionIDTypeArg(src []byte, fset *token.FileSet, call *ast.CallExpr)
 
 	argEndOffset := fset.Position(call.Args[0].End()).Offset
 	rparenOffset := fset.Position(call.Rparen).Offset
-	if argEndOffset < 0 || rparenOffset < 0 || argEndOffset > len(src) || rparenOffset > len(src) || argEndOffset >= rparenOffset {
+	if argEndOffset < 0 || rparenOffset < 0 || argEndOffset > len(src) || rparenOffset > len(src) || argEndOffset >= rparenOffset { //nolint:lll
 		return ""
 	}
 

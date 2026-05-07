@@ -14,13 +14,13 @@ import (
 )
 
 type FunctionIDArg struct {
-	FuncDecl      *ast.FuncDecl
-	FunctionPos   token.Pos
-	FunctionEnd   token.Pos
-	ArgPos        token.Pos
-	ArgEnd        token.Pos
-	ExtraArgsEnd  token.Pos
-	StackCallPath string
+	FuncDecl          *ast.FuncDecl
+	FunctionPos       token.Pos
+	FunctionEnd       token.Pos
+	ArgPos            token.Pos
+	ArgEnd            token.Pos
+	ExtraArgsEnd      token.Pos
+	StackCallPath     string
 	HasPackageComment bool
 }
 
