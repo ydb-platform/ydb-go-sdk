@@ -1,3 +1,4 @@
+* Improved database/sql over QueryService performance: cached trace call IDs (stack.FunctionID), eliminated per-query allocations for empty parameters, replaced resultSet done-channel with atomic.Bool, pre-cached default execute settings, and removed redundant context.AfterFunc in stream result nextPart
 ## v3.135.12
 * Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header
 

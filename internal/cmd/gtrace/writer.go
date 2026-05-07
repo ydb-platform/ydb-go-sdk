@@ -678,6 +678,19 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 		w.shortcutFuncResultsFlags(hook.Func, docs)
 		w.line(` {`)
 		w.block(func() {
+			// Emit an early nil-check for the callback field. When no callback is
+			// registered, this avoids constructing the start-info struct and the
+			// closure that wraps the done-callback, saving two heap allocations per
+			// call on the hot path.
+			if hook.Func.HasResult() {
+				if _, ok := hook.Func.Result[0].(*Func); ok {
+					w.line(`if `, t, `.`, hook.Name, ` == nil {`)
+					w.block(func() {
+						w.shortcutZeroReturn(hook.Func)
+					})
+					w.line(`}`)
+				}
+			}
 			for _, name := range names {
 				w.capture(name)
 			}
@@ -770,6 +783,32 @@ func (w *Writer) zeroReturn(fn *Func) {
 		w.line(` {`)
 		w.block(func() {
 			w.zeroReturn(x)
+		})
+		w.line(`}`)
+	case *Trace:
+		w.line(x.Name, `{}`)
+	default:
+		panic("unexpected result type")
+	}
+}
+
+// shortcutZeroReturn generates a zero-allocation return for shortcut functions.
+// Unlike zeroReturn, it uses the flattened shortcut function signature (matching
+// the shortcutFuncSignFlags/shortcutFuncResults pattern) so the emitted function
+// literal is type-compatible with the shortcut's declared return type.
+func (w *Writer) shortcutZeroReturn(fn *Func) {
+	if !fn.HasResult() {
+		w.line(`return`)
+
+		return
+	}
+	w.code(`return `)
+	switch x := fn.Result[0].(type) {
+	case *Func:
+		w.shortcutFuncSignFlags(x, 0)
+		w.line(` {`)
+		w.block(func() {
+			w.shortcutZeroReturn(x)
 		})
 		w.line(`}`)
 	case *Trace:

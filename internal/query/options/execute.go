@@ -161,12 +161,20 @@ func defaultExecuteSettings() executeSettings {
 		execMode:  ExecModeExecute,
 		statsMode: StatsModeNone,
 		txControl: tx.DefaultTxControl(),
-		params:    &params.Params{},
 		label:     "undefined",
 	}
 }
 
+// _defaultExecuteSettings is a pre-allocated, read-only default settings object
+// returned by ExecuteSettings when no options are provided, saving one allocation
+// per option-less query.
+var _defaultExecuteSettings = defaultExecuteSettings() //nolint:gochecknoglobals
+
 func ExecuteSettings(opts ...Execute) *executeSettings {
+	if len(opts) == 0 {
+		return &_defaultExecuteSettings
+	}
+
 	settings := defaultExecuteSettings()
 
 	for _, opt := range opts {
@@ -202,7 +210,16 @@ func (s *executeSettings) ResourcePool() string {
 	return s.resourcePool
 }
 
+// _emptyParams is a pre-allocated, read-only empty parameters object returned by
+// executeSettings.Params() when no parameters have been set, avoiding a per-call
+// allocation while still returning a valid params.Parameters interface value.
+var _emptyParams params.Params //nolint:gochecknoglobals
+
 func (s *executeSettings) Params() params.Parameters {
+	if s.params == nil {
+		return &_emptyParams
+	}
+
 	return s.params
 }
 

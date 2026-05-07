@@ -1120,6 +1120,11 @@ func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxInt
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context, call call) func(session sessionInfo, _ error) {
+	if t.OnConnectorConnect == nil {
+		return func(sessionInfo, error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnectorConnectStartInfo
 	p.Context = c
 	p.Call = call
@@ -1133,6 +1138,11 @@ func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context, call call
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context, call call) func(error) {
+	if t.OnConnPing == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnPingStartInfo
 	p.Context = c
 	p.Call = call
@@ -1145,6 +1155,11 @@ func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context, call call) func(e
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, call call, query string) func(error) {
+	if t.OnConnPrepare == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnPrepareStartInfo
 	p.Context = c
 	p.Call = call
@@ -1158,6 +1173,11 @@ func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, call call, que
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnClose(t *DatabaseSQL, c *context.Context, call call) func(error) {
+	if t.OnConnClose == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnCloseStartInfo
 	p.Context = c
 	p.Call = call
@@ -1170,6 +1190,11 @@ func DatabaseSQLOnConnClose(t *DatabaseSQL, c *context.Context, call call) func(
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context, call call) func(tx txInfo, _ error) {
+	if t.OnConnBegin == nil {
+		return func(txInfo, error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnBeginStartInfo
 	p.Context = c
 	p.Call = call
@@ -1183,6 +1208,11 @@ func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context, call call) func(
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnBeginTx(t *DatabaseSQL, c *context.Context, call call) func(tx txInfo, _ error) {
+	if t.OnConnBeginTx == nil {
+		return func(txInfo, error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnBeginTxStartInfo
 	p.Context = c
 	p.Call = call
@@ -1196,6 +1226,11 @@ func DatabaseSQLOnConnBeginTx(t *DatabaseSQL, c *context.Context, call call) fun
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnCheckNamedValue(t *DatabaseSQL, c *context.Context, call call, value *driver.NamedValue) func(error) {
+	if t.OnConnCheckNamedValue == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnCheckNamedValueStartInfo
 	p.Context = c
 	p.Call = call
@@ -1209,6 +1244,11 @@ func DatabaseSQLOnConnCheckNamedValue(t *DatabaseSQL, c *context.Context, call c
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
+	if t.OnConnQuery == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1225,6 +1265,11 @@ func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
+	if t.OnConnExec == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnExecStartInfo
 	p.Context = c
 	p.Call = call
@@ -1241,6 +1286,11 @@ func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, call call, query 
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call call, tableName string) func(exists bool, _ error) {
+	if t.OnConnIsTableExists == nil {
+		return func(bool, error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnIsTableExistsStartInfo
 	p.Context = c
 	p.Call = call
@@ -1255,6 +1305,11 @@ func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call cal
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnIsColumnExists(t *DatabaseSQL, c *context.Context, call call, tableName string, columnName string) func(exists bool, _ error) {
+	if t.OnConnIsColumnExists == nil {
+		return func(bool, error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnIsColumnExistsStartInfo
 	p.Context = c
 	p.Call = call
@@ -1270,6 +1325,11 @@ func DatabaseSQLOnConnIsColumnExists(t *DatabaseSQL, c *context.Context, call ca
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnGetIndexColumns(t *DatabaseSQL, c *context.Context, call call, tableName string, indexName string) func(columns []string, _ error) {
+	if t.OnConnGetIndexColumns == nil {
+		return func([]string, error) {
+			return
+		}
+	}
 	var p DatabaseSQLConnGetIndexColumnsStartInfo
 	p.Context = c
 	p.Call = call
@@ -1285,6 +1345,11 @@ func DatabaseSQLOnConnGetIndexColumns(t *DatabaseSQL, c *context.Context, call c
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx txInfo, query string) func(error) {
+	if t.OnTxQuery == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLTxQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1300,6 +1365,11 @@ func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txConte
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx txInfo, query string) func(error) {
+	if t.OnTxExec == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLTxExecStartInfo
 	p.Context = c
 	p.Call = call
@@ -1315,6 +1385,11 @@ func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContex
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx txInfo, query string) func(error) {
+	if t.OnTxPrepare == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLTxPrepareStartInfo
 	p.Context = c
 	p.Call = call
@@ -1330,6 +1405,11 @@ func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txCon
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxCommit(t *DatabaseSQL, c *context.Context, call call, tx txInfo) func(error) {
+	if t.OnTxCommit == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLTxCommitStartInfo
 	p.Context = c
 	p.Call = call
@@ -1343,6 +1423,11 @@ func DatabaseSQLOnTxCommit(t *DatabaseSQL, c *context.Context, call call, tx txI
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxRollback(t *DatabaseSQL, c *context.Context, call call, tx txInfo) func(error) {
+	if t.OnTxRollback == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLTxRollbackStartInfo
 	p.Context = c
 	p.Call = call
@@ -1356,6 +1441,11 @@ func DatabaseSQLOnTxRollback(t *DatabaseSQL, c *context.Context, call call, tx t
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtContext context.Context, query string) func(error) {
+	if t.OnStmtQuery == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLStmtQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1370,6 +1460,11 @@ func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtC
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, call call, stmtContext context.Context, query string) func(error) {
+	if t.OnStmtExec == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLStmtExecStartInfo
 	p.Context = c
 	p.Call = call
@@ -1384,6 +1479,11 @@ func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, call call, stmtCo
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtClose(t *DatabaseSQL, stmtContext *context.Context, call call) func(error) {
+	if t.OnStmtClose == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DatabaseSQLStmtCloseStartInfo
 	p.StmtContext = stmtContext
 	p.Call = call
@@ -1396,6 +1496,13 @@ func DatabaseSQLOnStmtClose(t *DatabaseSQL, stmtContext *context.Context, call c
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnDoTx(t *DatabaseSQL, c *context.Context, call call, iD string, idempotent bool) func(error) func(attempts int, _ error) {
+	if t.OnDoTx == nil {
+		return func(error) func(int, error) {
+			return func(int, error) {
+				return
+			}
+		}
+	}
 	var p DatabaseSQLDoTxStartInfo
 	p.Context = c
 	p.Call = call

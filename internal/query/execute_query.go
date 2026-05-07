@@ -79,7 +79,7 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 	[]grpc.CallOption,
 	error,
 ) {
-	params, err := cfg.Params().ToYDB()
+	ydbParams, err := cfg.Params().ToYDB()
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -94,7 +94,7 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 				Text:   q,
 			},
 		},
-		Parameters:             params,
+		Parameters:             ydbParams,
 		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
 		ConcurrentResultSets:   cfg.ConcurrentResultSets(),
 		PoolId:                 cfg.ResourcePool(),

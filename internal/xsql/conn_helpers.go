@@ -29,12 +29,16 @@ func (c *Conn) toYdb(sql string, args ...driver.NamedValue) (yql string, _ *para
 		queryArgs[i] = args[i]
 	}
 
-	yql, params, err := c.connector.Bindings().ToYdb(sql, queryArgs...)
+	yql, pp, err := c.connector.Bindings().ToYdb(sql, queryArgs...)
 	if err != nil {
 		return "", nil, xerrors.WithStackTrace(err)
 	}
 
-	return yql, &params, nil
+	if len(pp) == 0 {
+		return yql, nil, nil
+	}
+
+	return yql, &pp, nil
 }
 
 func (c *Conn) Engine() Engine {

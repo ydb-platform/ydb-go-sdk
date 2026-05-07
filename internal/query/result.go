@@ -26,6 +26,16 @@ import (
 
 var errReadNextResultSet = xerrors.Wrap(errors.New("ydb: stop read the result set because see part of next result set"))
 
+// Cached trace call identifiers. Boxing a stack.FunctionID into the trace.call
+// interface allocates once per call; caching them as package-level variables
+// turns the per-call boxing into a one-time init cost.
+var (
+	_resultNewCall           = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.newResult")
+	_resultNextPartCall      = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart")
+	_resultCloseCall         = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close")
+	_resultNextResultSetCall = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).NextResultSet")
+)
+
 var (
 	_ result.Result = (*streamResult)(nil)
 	_ result.Result = (*materializedResult)(nil)
@@ -153,7 +163,7 @@ func newResult(
 
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNew(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.newResult"),
+			_resultNewCall,
 		)
 		defer func() {
 			onDone(finalErr)
@@ -181,7 +191,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 ) {
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart"),
+			_resultNextPartCall,
 		)
 		defer func() {
 			onDone(part.GetExecStats(), err)
@@ -198,10 +208,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
-		stop := r.closer.CloseOnContextCancel(ctx)
 		defer func() {
-			stop()
-
 			if err != nil {
 				r.closer.Close(err)
 			}
@@ -270,7 +277,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 
 	if r.trace != nil {
 		onDone := trace.QueryOnResultClose(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
+			_resultCloseCall,
 		)
 		defer func() {
 			onDone(finalErr)
@@ -385,7 +392,7 @@ func (r *streamResult) nextPartFunc(
 func (r *streamResult) NextResultSet(ctx context.Context) (_ result.Set, err error) {
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).NextResultSet"),
+			_resultNextResultSetCall,
 		)
 		defer func() {
 			onDone(err)

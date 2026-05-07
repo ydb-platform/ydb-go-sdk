@@ -33,3 +33,15 @@ f := stack.FunctionID("database/sql.(*Conn).QueryContext", stack.Package("databa
 _ = f
 }
 }
+
+var _cachedCallID = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query")
+
+func BenchmarkTraceQueryCachedCall(b *testing.B) {
+t := &trace.Query{}
+ctx := context.Background()
+b.ReportAllocs()
+for range b.N {
+onDone := trace.QueryOnSessionQuery(t, &ctx, _cachedCallID, nil, "SELECT 42", "")
+onDone(nil)
+}
+}

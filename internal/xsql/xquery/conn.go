@@ -48,8 +48,10 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 		))
 	}
 
-	opts := []options.Execute{
-		options.WithParameters(params),
+	var opts []options.Execute
+
+	if params != nil && len(*params) > 0 {
+		opts = append(opts, options.WithParameters(params))
 	}
 
 	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {
@@ -82,8 +84,10 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 		))
 	}
 
-	opts := []options.Execute{
-		options.WithParameters(params),
+	var opts []options.Execute
+
+	if params != nil && len(*params) > 0 {
+		opts = append(opts, options.WithParameters(params))
 	}
 
 	if txControl := tx.ControlFromContext(ctx, nil); txControl != nil {

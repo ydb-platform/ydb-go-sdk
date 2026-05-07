@@ -290,6 +290,11 @@ func (t *Scheme) onModifyPermissions(s SchemeModifyPermissionsStartInfo) func(Sc
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnListDirectory(t *Scheme, c *context.Context, call call) func(error) {
+	if t.OnListDirectory == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p SchemeListDirectoryStartInfo
 	p.Context = c
 	p.Call = call
@@ -302,6 +307,11 @@ func SchemeOnListDirectory(t *Scheme, c *context.Context, call call) func(error)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnDescribePath(t *Scheme, c *context.Context, call call, path string) func(entryType string, _ error) {
+	if t.OnDescribePath == nil {
+		return func(string, error) {
+			return
+		}
+	}
 	var p SchemeDescribePathStartInfo
 	p.Context = c
 	p.Call = call
@@ -316,6 +326,11 @@ func SchemeOnDescribePath(t *Scheme, c *context.Context, call call, path string)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnMakeDirectory(t *Scheme, c *context.Context, call call, path string) func(error) {
+	if t.OnMakeDirectory == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p SchemeMakeDirectoryStartInfo
 	p.Context = c
 	p.Call = call
@@ -329,6 +344,11 @@ func SchemeOnMakeDirectory(t *Scheme, c *context.Context, call call, path string
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnRemoveDirectory(t *Scheme, c *context.Context, call call, path string) func(error) {
+	if t.OnRemoveDirectory == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p SchemeRemoveDirectoryStartInfo
 	p.Context = c
 	p.Call = call
@@ -342,6 +362,11 @@ func SchemeOnRemoveDirectory(t *Scheme, c *context.Context, call call, path stri
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnModifyPermissions(t *Scheme, c *context.Context, call call, path string) func(error) {
+	if t.OnModifyPermissions == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p SchemeModifyPermissionsStartInfo
 	p.Context = c
 	p.Call = call

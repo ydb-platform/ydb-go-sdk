@@ -12,6 +12,20 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// Cached trace call identifiers. Boxing a stack.FunctionID into the trace.call
+// interface allocates once per call; caching them as package-level variables
+// turns the per-call boxing into a one-time init cost.
+var (
+	_connPingCall          = stack.FunctionID("database/sql.(*Conn).Ping", stack.Package("database/sql"))
+	_connCheckNamedCall    = stack.FunctionID("database/sql.(*Conn).CheckNamedValue", stack.Package("database/sql"))
+	_connBeginTxCall       = stack.FunctionID("database/sql.(*Conn).BeginTx", stack.Package("database/sql"))
+	_connCloseCall         = stack.FunctionID("database/sql.(*Conn).Close", stack.Package("database/sql"))
+	_connBeginCall         = stack.FunctionID("database/sql.(*Conn).Begin", stack.Package("database/sql"))
+	_connPrepareContextCall = stack.FunctionID("database/sql.(*Conn).PrepareContext", stack.Package("database/sql"))
+	_connQueryContextCall  = stack.FunctionID("database/sql.(*Conn).QueryContext", stack.Package("database/sql"))
+	_connExecContextCall   = stack.FunctionID("database/sql.(*Conn).ExecContext", stack.Package("database/sql"))
+)
+
 type Conn struct {
 	processor Engine
 
@@ -32,7 +46,7 @@ func (c *Conn) NodeID() uint32 {
 
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	onDone := trace.DatabaseSQLOnConnPing(c.connector.trace, &c.ctx,
-		stack.FunctionID("database/sql.(*Conn).Ping", stack.Package("database/sql")),
+		_connPingCall,
 	)
 	defer func() {
 		onDone(finalErr)
@@ -47,7 +61,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 
 func (c *Conn) CheckNamedValue(value *driver.NamedValue) (finalErr error) {
 	onDone := trace.DatabaseSQLOnConnCheckNamedValue(c.connector.trace, &c.ctx,
-		stack.FunctionID("database/sql.(*Conn).CheckNamedValue", stack.Package("database/sql")),
+		_connCheckNamedCall,
 		value,
 	)
 	defer func() {
@@ -60,7 +74,7 @@ func (c *Conn) CheckNamedValue(value *driver.NamedValue) (finalErr error) {
 
 func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnBeginTx(c.connector.trace, &ctx,
-		stack.FunctionID("database/sql.(*Conn).BeginTx", stack.Package("database/sql")),
+		_connBeginTxCall,
 	)
 	defer func() {
 		if c.currentTx != nil {
@@ -90,7 +104,7 @@ func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx,
 
 func (c *Conn) Close() (finalErr error) {
 	onDone := trace.DatabaseSQLOnConnClose(c.connector.Trace(), &c.ctx,
-		stack.FunctionID("database/sql.(*Conn).Close", stack.Package("database/sql")),
+		_connCloseCall,
 	)
 	defer func() {
 		onDone(finalErr)
@@ -113,7 +127,7 @@ func (c *Conn) IsValid() bool {
 
 func (c *Conn) Begin() (_ driver.Tx, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnBegin(c.connector.trace, &c.ctx,
-		stack.FunctionID("database/sql.(*Conn).Begin", stack.Package("database/sql")),
+		_connBeginCall,
 	)
 	defer func() {
 		if c.currentTx != nil {
@@ -136,7 +150,7 @@ func (c *Conn) Prepare(string) (driver.Stmt, error) {
 
 func (c *Conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnConnPrepare(c.connector.Trace(), &ctx,
-		stack.FunctionID("database/sql.(*Conn).PrepareContext", stack.Package("database/sql")),
+		_connPrepareContextCall,
 		sql,
 	)
 	defer func() {
@@ -162,7 +176,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnConnQuery(c.connector.Trace(), &ctx,
-		stack.FunctionID("database/sql.(*Conn).QueryContext", stack.Package("database/sql")),
+		_connQueryContextCall,
 		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), 0,
 	)
 	defer func() {
@@ -204,7 +218,7 @@ func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnConnExec(c.connector.Trace(), &ctx,
-		stack.FunctionID("database/sql.(*Conn).ExecContext", stack.Package("database/sql")),
+		_connExecContextCall,
 		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), 0,
 	)
 	defer func() {

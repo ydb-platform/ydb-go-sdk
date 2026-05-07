@@ -853,6 +853,11 @@ func (t *Coordination) onSessionSend(c CoordinationSessionSendStartInfo) func(Co
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnNew(t *Coordination, c *context.Context, call call) func() {
+	if t.OnNew == nil {
+		return func() {
+			return
+		}
+	}
 	var p CoordinationNewStartInfo
 	p.Context = c
 	p.Call = call
@@ -864,6 +869,11 @@ func CoordinationOnNew(t *Coordination, c *context.Context, call call) func() {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnCreateNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	if t.OnCreateNode == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationCreateNodeStartInfo
 	p.Context = c
 	p.Call = call
@@ -877,6 +887,11 @@ func CoordinationOnCreateNode(t *Coordination, c *context.Context, call call, pa
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnAlterNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	if t.OnAlterNode == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationAlterNodeStartInfo
 	p.Context = c
 	p.Call = call
@@ -890,6 +905,11 @@ func CoordinationOnAlterNode(t *Coordination, c *context.Context, call call, pat
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnDropNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	if t.OnDropNode == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationDropNodeStartInfo
 	p.Context = c
 	p.Call = call
@@ -903,6 +923,11 @@ func CoordinationOnDropNode(t *Coordination, c *context.Context, call call, path
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnDescribeNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	if t.OnDescribeNode == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationDescribeNodeStartInfo
 	p.Context = c
 	p.Call = call
@@ -916,6 +941,11 @@ func CoordinationOnDescribeNode(t *Coordination, c *context.Context, call call, 
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSession(t *Coordination, c *context.Context, call call, path string) func(error) {
+	if t.OnSession == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationSessionStartInfo
 	p.Context = c
 	p.Call = call
@@ -929,6 +959,11 @@ func CoordinationOnSession(t *Coordination, c *context.Context, call call, path 
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnClose(t *Coordination, c *context.Context, call call) func(error) {
+	if t.OnClose == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationCloseStartInfo
 	p.Context = c
 	p.Call = call
@@ -941,6 +976,11 @@ func CoordinationOnClose(t *Coordination, c *context.Context, call call) func(er
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionNewStream(t *Coordination, c *context.Context, call call) func(error) {
+	if t.OnSessionNewStream == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationSessionNewStreamStartInfo
 	p.Context = c
 	p.Call = call
@@ -1005,6 +1045,11 @@ func CoordinationOnSessionServerError(t *Coordination, failure *Ydb_Coordination
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionReceive(t *Coordination) func(response *Ydb_Coordination.SessionResponse, _ error) {
+	if t.OnSessionReceive == nil {
+		return func(*Ydb_Coordination.SessionResponse, error) {
+			return
+		}
+	}
 	var p CoordinationSessionReceiveStartInfo
 	res := t.onSessionReceive(p)
 	return func(response *Ydb_Coordination.SessionResponse, e error) {
@@ -1028,6 +1073,11 @@ func CoordinationOnSessionStop(t *Coordination, sessionID uint64) {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionStart(t *Coordination) func(error) {
+	if t.OnSessionStart == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationSessionStartStartInfo
 	res := t.onSessionStart(p)
 	return func(e error) {
@@ -1038,6 +1088,11 @@ func CoordinationOnSessionStart(t *Coordination) func(error) {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionSend(t *Coordination, request *Ydb_Coordination.SessionRequest) func(error) {
+	if t.OnSessionSend == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p CoordinationSessionSendStartInfo
 	p.Request = request
 	res := t.onSessionSend(p)

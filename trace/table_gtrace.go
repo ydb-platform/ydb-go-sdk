@@ -1318,6 +1318,11 @@ func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnInit(t *Table, c *context.Context, call call) func(limit int) {
+	if t.OnInit == nil {
+		return func(int) {
+			return
+		}
+	}
 	var p TableInitStartInfo
 	p.Context = c
 	p.Call = call
@@ -1330,6 +1335,11 @@ func TableOnInit(t *Table, c *context.Context, call call) func(limit int) {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnClose(t *Table, c *context.Context, call call) func(error) {
+	if t.OnClose == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TableCloseStartInfo
 	p.Context = c
 	p.Call = call
@@ -1342,6 +1352,11 @@ func TableOnClose(t *Table, c *context.Context, call call) func(error) {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnDo(t *Table, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
+	if t.OnDo == nil {
+		return func(int, error) {
+			return
+		}
+	}
 	var p TableDoStartInfo
 	p.Context = c
 	p.Call = call
@@ -1358,6 +1373,11 @@ func TableOnDo(t *Table, c *context.Context, call call, label string, idempotent
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnDoTx(t *Table, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
+	if t.OnDoTx == nil {
+		return func(int, error) {
+			return
+		}
+	}
 	var p TableDoTxStartInfo
 	p.Context = c
 	p.Call = call
@@ -1374,6 +1394,11 @@ func TableOnDoTx(t *Table, c *context.Context, call call, label string, idempote
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnBulkUpsert(t *Table, c *context.Context, call call) func(_ error, attempts int) {
+	if t.OnBulkUpsert == nil {
+		return func(error, int) {
+			return
+		}
+	}
 	var p TableBulkUpsertStartInfo
 	p.Context = c
 	p.Call = call
@@ -1387,6 +1412,11 @@ func TableOnBulkUpsert(t *Table, c *context.Context, call call) func(_ error, at
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnCreateSession(t *Table, c *context.Context, call call) func(session sessionInfo, attempts int, _ error) {
+	if t.OnCreateSession == nil {
+		return func(sessionInfo, int, error) {
+			return
+		}
+	}
 	var p TableCreateSessionStartInfo
 	p.Context = c
 	p.Call = call
@@ -1401,6 +1431,11 @@ func TableOnCreateSession(t *Table, c *context.Context, call call) func(session 
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionNew(t *Table, c *context.Context, call call) func(session sessionInfo, _ error) {
+	if t.OnSessionNew == nil {
+		return func(sessionInfo, error) {
+			return
+		}
+	}
 	var p TableSessionNewStartInfo
 	p.Context = c
 	p.Call = call
@@ -1414,6 +1449,11 @@ func TableOnSessionNew(t *Table, c *context.Context, call call) func(session ses
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionDelete(t *Table, c *context.Context, call call, session sessionInfo) func(error) {
+	if t.OnSessionDelete == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TableSessionDeleteStartInfo
 	p.Context = c
 	p.Call = call
@@ -1427,6 +1467,11 @@ func TableOnSessionDelete(t *Table, c *context.Context, call call, session sessi
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionKeepAlive(t *Table, c *context.Context, call call, session sessionInfo) func(error) {
+	if t.OnSessionKeepAlive == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TableKeepAliveStartInfo
 	p.Context = c
 	p.Call = call
@@ -1440,6 +1485,11 @@ func TableOnSessionKeepAlive(t *Table, c *context.Context, call call, session se
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call, session sessionInfo) func(error) {
+	if t.OnSessionBulkUpsert == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TableSessionBulkUpsertStartInfo
 	p.Context = c
 	p.Call = call
@@ -1453,6 +1503,11 @@ func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call, session s
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryPrepare(t *Table, c *context.Context, call call, session sessionInfo, query string) func(result tableDataQuery, _ error) {
+	if t.OnSessionQueryPrepare == nil {
+		return func(tableDataQuery, error) {
+			return
+		}
+	}
 	var p TablePrepareDataQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1468,6 +1523,11 @@ func TableOnSessionQueryPrepare(t *Table, c *context.Context, call call, session
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryExecute(t *Table, c *context.Context, call call, session sessionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(tx txInfo, prepared bool, result tableResult, _ error) {
+	if t.OnSessionQueryExecute == nil {
+		return func(txInfo, bool, tableResult, error) {
+			return
+		}
+	}
 	var p TableExecuteDataQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1487,6 +1547,11 @@ func TableOnSessionQueryExecute(t *Table, c *context.Context, call call, session
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryExplain(t *Table, c *context.Context, call call, session sessionInfo, query string) func(aST string, plan string, _ error) {
+	if t.OnSessionQueryExplain == nil {
+		return func(string, string, error) {
+			return
+		}
+	}
 	var p TableExplainQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1503,6 +1568,11 @@ func TableOnSessionQueryExplain(t *Table, c *context.Context, call call, session
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, call call, session sessionInfo, query tableDataQuery, parameters tableQueryParameters) func(error) {
+	if t.OnSessionQueryStreamExecute == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TableSessionQueryStreamExecuteStartInfo
 	p.Context = c
 	p.Call = call
@@ -1518,6 +1588,11 @@ func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, call call, s
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryStreamRead(t *Table, c *context.Context, call call, session sessionInfo) func(error) {
+	if t.OnSessionQueryStreamRead == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TableSessionQueryStreamReadStartInfo
 	p.Context = c
 	p.Call = call
@@ -1531,6 +1606,11 @@ func TableOnSessionQueryStreamRead(t *Table, c *context.Context, call call, sess
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxBegin(t *Table, c *context.Context, call call, session sessionInfo) func(tx txInfo, _ error) {
+	if t.OnTxBegin == nil {
+		return func(txInfo, error) {
+			return
+		}
+	}
 	var p TableTxBeginStartInfo
 	p.Context = c
 	p.Call = call
@@ -1545,6 +1625,11 @@ func TableOnTxBegin(t *Table, c *context.Context, call call, session sessionInfo
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxExecute(t *Table, c *context.Context, call call, session sessionInfo, tx txInfo, query tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
+	if t.OnTxExecute == nil {
+		return func(tableResult, error) {
+			return
+		}
+	}
 	var p TableTransactionExecuteStartInfo
 	p.Context = c
 	p.Call = call
@@ -1562,6 +1647,11 @@ func TableOnTxExecute(t *Table, c *context.Context, call call, session sessionIn
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxExecuteStatement(t *Table, c *context.Context, call call, session sessionInfo, tx txInfo, statementQuery tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
+	if t.OnTxExecuteStatement == nil {
+		return func(tableResult, error) {
+			return
+		}
+	}
 	var p TableTransactionExecuteStatementStartInfo
 	p.Context = c
 	p.Call = call
@@ -1579,6 +1669,11 @@ func TableOnTxExecuteStatement(t *Table, c *context.Context, call call, session 
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxCommit(t *Table, c *context.Context, call call, session sessionInfo, tx txInfo) func(error) {
+	if t.OnTxCommit == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TableTxCommitStartInfo
 	p.Context = c
 	p.Call = call
@@ -1593,6 +1688,11 @@ func TableOnTxCommit(t *Table, c *context.Context, call call, session sessionInf
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxRollback(t *Table, c *context.Context, call call, session sessionInfo, tx txInfo) func(error) {
+	if t.OnTxRollback == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TableTxRollbackStartInfo
 	p.Context = c
 	p.Call = call
@@ -1607,6 +1707,11 @@ func TableOnTxRollback(t *Table, c *context.Context, call call, session sessionI
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolPut(t *Table, c *context.Context, call call, session sessionInfo) func(error) {
+	if t.OnPoolPut == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p TablePoolPutStartInfo
 	p.Context = c
 	p.Call = call
@@ -1620,6 +1725,11 @@ func TableOnPoolPut(t *Table, c *context.Context, call call, session sessionInfo
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolGet(t *Table, c *context.Context, call call) func(session sessionInfo, attempts int, _ *NodeHintInfo, _ error) {
+	if t.OnPoolGet == nil {
+		return func(sessionInfo, int, *NodeHintInfo, error) {
+			return
+		}
+	}
 	var p TablePoolGetStartInfo
 	p.Context = c
 	p.Call = call
@@ -1635,6 +1745,11 @@ func TableOnPoolGet(t *Table, c *context.Context, call call) func(session sessio
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolWith(t *Table, c *context.Context, call call) func(attempts int, _ error) {
+	if t.OnPoolWith == nil {
+		return func(int, error) {
+			return
+		}
+	}
 	var p TablePoolWithStartInfo
 	p.Context = c
 	p.Call = call
@@ -1671,6 +1786,11 @@ func TableOnPoolSessionRemove(t *Table, session sessionInfo) {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolWait(t *Table, c *context.Context, call call) func(session sessionInfo, _ error) {
+	if t.OnPoolWait == nil {
+		return func(sessionInfo, error) {
+			return
+		}
+	}
 	var p TablePoolWaitStartInfo
 	p.Context = c
 	p.Call = call

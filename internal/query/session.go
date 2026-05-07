@@ -18,7 +18,16 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var _ query.Session = (*Session)(nil)
+// Cached trace call identifiers. Boxing a stack.FunctionID into the trace.call
+// interface allocates once per call; caching them as package-level variables
+// turns the per-call boxing into a one-time init cost.
+var (
+	_sessionQueryResultSetCall = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryResultSet")
+	_sessionQueryRowCall       = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryRow")
+	_sessionBeginCall          = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin")
+	_sessionExecCall           = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec")
+	_sessionQueryCall          = stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query")
+)
 
 type (
 	Session struct {
@@ -41,7 +50,7 @@ func (s *Session) QueryResultSet(
 	}
 
 	onDone := trace.QueryOnSessionQueryResultSet(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryResultSet"), s, q)
+		_sessionQueryResultSetCall, s, q)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -89,7 +98,7 @@ func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execut
 	}
 
 	onDone := trace.QueryOnSessionQueryRow(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryRow"), s, q)
+		_sessionQueryRowCall, s, q)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -128,7 +137,7 @@ func (s *Session) Begin(
 	tx query.Transaction, finalErr error,
 ) {
 	onDone := trace.QueryOnSessionBegin(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
+		_sessionBeginCall, s)
 	defer func() {
 		if finalErr != nil {
 			applyStatusByError(s, finalErr)
@@ -193,7 +202,7 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 	}
 
 	onDone := trace.QueryOnSessionExec(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"),
+		_sessionExecCall,
 		s,
 		q,
 		settings.Label(),
@@ -229,7 +238,7 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 	}
 
 	onDone := trace.QueryOnSessionQuery(s.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"),
+		_sessionQueryCall,
 		s,
 		q,
 		settings.Label(),

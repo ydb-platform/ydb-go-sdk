@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
 var (
@@ -37,13 +36,21 @@ type rows struct {
 	allColumns, columns []string
 	columnsType         []types.Type
 	discarded           []bool
+
+	// valueBuf and scanBuf are pre-allocated once in updateColumns and reused
+	// across every Next call to avoid per-row heap allocations.
+	// scanBuf[i] holds &valueBuf[i] so that nextRow.Scan can write directly into
+	// valueBuf without creating temporary pointers on each call.
+	valueBuf []value.Value
+	scanBuf  []any
 }
 
 func (r *rows) updateColumns() {
 	if r.nextErr == nil {
 		r.allColumns = r.nextSet.Columns()
-		r.columns = make([]string, 0, len(r.allColumns))
-		r.discarded = make([]bool, len(r.allColumns))
+		n := len(r.allColumns)
+		r.columns = make([]string, 0, n)
+		r.discarded = make([]bool, n)
 		for i, v := range r.allColumns {
 			r.discarded[i] = strings.HasPrefix(v, ignoreColumnPrefixName)
 			if !r.discarded[i] {
@@ -52,6 +59,13 @@ func (r *rows) updateColumns() {
 		}
 		r.columnsType = r.nextSet.ColumnTypes()
 		r.columnsFetchError = r.nextErr
+
+		// Pre-allocate scan buffers once so that each Next call can reuse them.
+		r.valueBuf = make([]value.Value, n)
+		r.scanBuf = make([]any, n)
+		for i := range r.valueBuf {
+			r.scanBuf[i] = &r.valueBuf[i]
+		}
 	}
 }
 
@@ -141,16 +155,17 @@ func (r *rows) Next(dst []driver.Value) error {
 		return xerrors.WithStackTrace(err)
 	}
 
-	values := xslices.Transform(make([]value.Value, len(r.allColumns)), func(v value.Value) any { return &v })
-	if err = nextRow.Scan(values...); err != nil {
+	// Reuse the pre-allocated scan buffer to avoid heap allocations per call.
+	// valueBuf and scanBuf are initialised once in updateColumns.
+	if err = nextRow.Scan(r.scanBuf...); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	dstI := 0
-	for i := range values {
+	for i := range r.valueBuf {
 		if !r.discarded[i] {
-			if v := values[i]; v != nil {
-				dst[dstI], err = value.Any(*(v.(*value.Value))) //nolint:forcetypeassert
+			if v := r.valueBuf[i]; v != nil {
+				dst[dstI], err = value.Any(v)
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}

@@ -140,6 +140,11 @@ func (t *Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDon
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DiscoveryOnDiscover(t *Discovery, c *context.Context, call call, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
+	if t.OnDiscover == nil {
+		return func(string, []EndpointInfo, error) {
+			return
+		}
+	}
 	var p DiscoveryDiscoverStartInfo
 	p.Context = c
 	p.Call = call
@@ -156,6 +161,11 @@ func DiscoveryOnDiscover(t *Discovery, c *context.Context, call call, address st
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DiscoveryOnWhoAmI(t *Discovery, c *context.Context, call call) func(user string, groups []string, _ error) {
+	if t.OnWhoAmI == nil {
+		return func(string, []string, error) {
+			return
+		}
+	}
 	var p DiscoveryWhoAmIStartInfo
 	p.Context = c
 	p.Call = call

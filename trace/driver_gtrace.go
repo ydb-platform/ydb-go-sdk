@@ -1266,6 +1266,11 @@ func (t *Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGe
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnInit(t *Driver, c *context.Context, call call, endpoint string, database string, secure bool) func(error) {
+	if t.OnInit == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverInitStartInfo
 	p.Context = c
 	p.Call = call
@@ -1281,6 +1286,11 @@ func DriverOnInit(t *Driver, c *context.Context, call call, endpoint string, dat
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnWith(t *Driver, c *context.Context, call call, endpoint string, database string, secure bool) func(error) {
+	if t.OnWith == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverWithStartInfo
 	p.Context = c
 	p.Call = call
@@ -1296,6 +1306,11 @@ func DriverOnWith(t *Driver, c *context.Context, call call, endpoint string, dat
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnClose(t *Driver, c *context.Context, call call) func(error) {
+	if t.OnClose == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverCloseStartInfo
 	p.Context = c
 	p.Call = call
@@ -1308,6 +1323,11 @@ func DriverOnClose(t *Driver, c *context.Context, call call) func(error) {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnPoolNew(t *Driver, c *context.Context, call call) func() {
+	if t.OnPoolNew == nil {
+		return func() {
+			return
+		}
+	}
 	var p DriverConnPoolNewStartInfo
 	p.Context = c
 	p.Call = call
@@ -1319,6 +1339,11 @@ func DriverOnPoolNew(t *Driver, c *context.Context, call call) func() {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnPoolRelease(t *Driver, c *context.Context, call call) func(error) {
+	if t.OnPoolRelease == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverConnPoolReleaseStartInfo
 	p.Context = c
 	p.Call = call
@@ -1331,6 +1356,11 @@ func DriverOnPoolRelease(t *Driver, c *context.Context, call call) func(error) {
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnResolve(t *Driver, call call, target string, resolved []string) func(error) {
+	if t.OnResolve == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverResolveStartInfo
 	p.Call = call
 	p.Target = target
@@ -1344,6 +1374,11 @@ func DriverOnResolve(t *Driver, call call, target string, resolved []string) fun
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStateChange(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+	if t.OnConnStateChange == nil {
+		return func(ConnState) {
+			return
+		}
+	}
 	var p DriverConnStateChangeStartInfo
 	p.Context = c
 	p.Call = call
@@ -1358,6 +1393,11 @@ func DriverOnConnStateChange(t *Driver, c *context.Context, call call, endpoint 
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnInvoke(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState, metadata map[string][]string) {
+	if t.OnConnInvoke == nil {
+		return func(error, []Issue, string, ConnState, map[string][]string) {
+			return
+		}
+	}
 	var p DriverConnInvokeStartInfo
 	p.Context = c
 	p.Call = call
@@ -1376,6 +1416,11 @@ func DriverOnConnInvoke(t *Driver, c *context.Context, call call, endpoint Endpo
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnNewStream(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(_ error, state ConnState) {
+	if t.OnConnNewStream == nil {
+		return func(error, ConnState) {
+			return
+		}
+	}
 	var p DriverConnNewStreamStartInfo
 	p.Context = c
 	p.Call = call
@@ -1391,6 +1436,11 @@ func DriverOnConnNewStream(t *Driver, c *context.Context, call call, endpoint En
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamRecvMsg(t *Driver, c *context.Context, call call) func(error) {
+	if t.OnConnStreamRecvMsg == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverConnStreamRecvMsgStartInfo
 	p.Context = c
 	p.Call = call
@@ -1403,6 +1453,11 @@ func DriverOnConnStreamRecvMsg(t *Driver, c *context.Context, call call) func(er
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamSendMsg(t *Driver, c *context.Context, call call) func(error) {
+	if t.OnConnStreamSendMsg == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverConnStreamSendMsgStartInfo
 	p.Context = c
 	p.Call = call
@@ -1415,6 +1470,11 @@ func DriverOnConnStreamSendMsg(t *Driver, c *context.Context, call call) func(er
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamCloseSend(t *Driver, c *context.Context, call call) func(error) {
+	if t.OnConnStreamCloseSend == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverConnStreamCloseSendStartInfo
 	p.Context = c
 	p.Call = call
@@ -1435,6 +1495,11 @@ func DriverOnConnStreamFinish(t *Driver, c context.Context, call call, e error) 
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnDial(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
+	if t.OnConnDial == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverConnDialStartInfo
 	p.Context = c
 	p.Call = call
@@ -1448,6 +1513,11 @@ func DriverOnConnDial(t *Driver, c *context.Context, call call, endpoint Endpoin
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnBan(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
+	if t.OnConnBan == nil {
+		return func(ConnState) {
+			return
+		}
+	}
 	var p DriverConnBanStartInfo
 	p.Context = c
 	p.Call = call
@@ -1463,6 +1533,11 @@ func DriverOnConnBan(t *Driver, c *context.Context, call call, endpoint Endpoint
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnAllow(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+	if t.OnConnAllow == nil {
+		return func(ConnState) {
+			return
+		}
+	}
 	var p DriverConnAllowStartInfo
 	p.Context = c
 	p.Call = call
@@ -1477,6 +1552,11 @@ func DriverOnConnAllow(t *Driver, c *context.Context, call call, endpoint Endpoi
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnPark(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
+	if t.OnConnPark == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverConnParkStartInfo
 	p.Context = c
 	p.Call = call
@@ -1490,6 +1570,11 @@ func DriverOnConnPark(t *Driver, c *context.Context, call call, endpoint Endpoin
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnClose(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
+	if t.OnConnClose == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverConnCloseStartInfo
 	p.Context = c
 	p.Call = call
@@ -1503,6 +1588,11 @@ func DriverOnConnClose(t *Driver, c *context.Context, call call, endpoint Endpoi
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnRepeaterWakeUp(t *Driver, c *context.Context, call call, name string, event string) func(error) {
+	if t.OnRepeaterWakeUp == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverRepeaterWakeUpStartInfo
 	p.Context = c
 	p.Call = call
@@ -1517,6 +1607,11 @@ func DriverOnRepeaterWakeUp(t *Driver, c *context.Context, call call, name strin
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerInit(t *Driver, c *context.Context, call call, name string) func(error) {
+	if t.OnBalancerInit == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverBalancerInitStartInfo
 	p.Context = c
 	p.Call = call
@@ -1530,6 +1625,11 @@ func DriverOnBalancerInit(t *Driver, c *context.Context, call call, name string)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerClose(t *Driver, c *context.Context, call call) func(error) {
+	if t.OnBalancerClose == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverBalancerCloseStartInfo
 	p.Context = c
 	p.Call = call
@@ -1542,6 +1642,11 @@ func DriverOnBalancerClose(t *Driver, c *context.Context, call call) func(error)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerChooseEndpoint(t *Driver, c *context.Context, call call) func(endpoint EndpointInfo, _ error) {
+	if t.OnBalancerChooseEndpoint == nil {
+		return func(EndpointInfo, error) {
+			return
+		}
+	}
 	var p DriverBalancerChooseEndpointStartInfo
 	p.Context = c
 	p.Call = call
@@ -1555,6 +1660,11 @@ func DriverOnBalancerChooseEndpoint(t *Driver, c *context.Context, call call) fu
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call call, address string, database string) func(error) {
+	if t.OnBalancerClusterDiscoveryAttempt == nil {
+		return func(error) {
+			return
+		}
+	}
 	var p DriverBalancerClusterDiscoveryAttemptStartInfo
 	p.Context = c
 	p.Call = call
@@ -1569,6 +1679,11 @@ func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalDC bool, database string) func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string) {
+	if t.OnBalancerUpdate == nil {
+		return func([]EndpointInfo, []EndpointInfo, []EndpointInfo, string) {
+			return
+		}
+	}
 	var p DriverBalancerUpdateStartInfo
 	p.Context = c
 	p.Call = call
@@ -1586,6 +1701,11 @@ func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalD
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnGetCredentials(t *Driver, c *context.Context, call call) func(token string, _ error) {
+	if t.OnGetCredentials == nil {
+		return func(string, error) {
+			return
+		}
+	}
 	var p DriverGetCredentialsStartInfo
 	p.Context = c
 	p.Call = call
