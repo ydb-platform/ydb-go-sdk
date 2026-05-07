@@ -81,7 +81,7 @@ func TestFunctionIDForGenericType(t *testing.T) {
 // BenchmarkFunctionID/stack.FunctionID.literal-12		0.2677 ns/op	0 B/op	0 allocs/op
 // BenchmarkFunctionID/stack.RuntimeFunctionID-12		11.51 ns/op		16 B/op	1 allocs/op
 func BenchmarkFunctionID(b *testing.B) {
-	b.Run("stack.FunctionID.literal", func(b *testing.B) {
+	b.Run("stack.FunctionID", func(b *testing.B) {
 		b.ReportAllocs()
 		for range b.N {
 			_ = FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query")
