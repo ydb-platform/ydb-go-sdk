@@ -80,6 +80,26 @@ func (r *ResultCloser) Closed() bool {
 	return r.closed.Load()
 }
 
+// doneErr reports whether the closer has finished and returns its reason.
+// err is never nil when done is true (nil reason is mapped to io.EOF).
+// Prefer this over separate Closed()+Err() calls: those can observe a transient
+// closed flag before reason is visible and yield err == nil.
+func (r *ResultCloser) doneErr() (done bool, err error) {
+	if !r.closed.Load() {
+		return false, nil
+	}
+
+	r.mu.Lock()
+	err = r.reason
+	r.mu.Unlock()
+
+	if err == nil {
+		return true, errResultCloserNilReason
+	}
+
+	return true, err
+}
+
 // CloseOnContextCancel registers a callback function that closes the ResultCloser
 // when the provided context is cancelled.
 // It returns a function that can be used to stop the callback.

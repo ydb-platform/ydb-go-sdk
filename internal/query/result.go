@@ -188,12 +188,12 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 	}
 
-	if r.closer.Closed() {
-		if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
+	if done, errClose := r.closer.doneErr(); done {
+		if xerrors.Is(errClose, io.EOF) {
 			return nil, io.EOF
 		}
 
-		return nil, xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(errClose)
 	}
 
 	select {
@@ -280,7 +280,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	}
 
 	for {
-		if r.closer.Closed() {
+		if done, _ := r.closer.doneErr(); done {
 			return nil
 		}
 
@@ -303,12 +303,12 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
-		if r.closer.Closed() {
-			if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
+		if done, errClose := r.closer.doneErr(); done {
+			if xerrors.Is(errClose, io.EOF) {
 				return nil, io.EOF
 			}
 
-			return nil, xerrors.WithStackTrace(err)
+			return nil, xerrors.WithStackTrace(errClose)
 		}
 
 		select {
@@ -354,12 +354,12 @@ func (r *streamResult) nextPartFunc(
 	nextResultSetIndex int64,
 ) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
-		if r.closer.Closed() {
-			if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
+		if done, errClose := r.closer.doneErr(); done {
+			if xerrors.Is(errClose, io.EOF) {
 				return nil, io.EOF
 			}
 
-			return nil, xerrors.WithStackTrace(err)
+			return nil, xerrors.WithStackTrace(errClose)
 		}
 
 		select {

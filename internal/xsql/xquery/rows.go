@@ -40,7 +40,7 @@ type rows struct {
 }
 
 func (r *rows) updateColumns() {
-	if r.nextErr == nil {
+	if r.nextErr == nil && r.nextSet != nil {
 		r.allColumns = r.nextSet.Columns()
 		r.columns = make([]string, 0, len(r.allColumns))
 		r.discarded = make([]bool, len(r.allColumns))
