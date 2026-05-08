@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 	parallelism     = 100
 )
 
-func benchmarkDatabaseSQLSelect42(b *testing.B, ctx context.Context, nativeDriver *ydb.Driver, useQueryService bool) {
+func benchmarkDatabaseSQLSelect42(b *testing.B, nativeDriver *ydb.Driver, useQueryService bool) {
 	b.Helper()
 
 	connector, err := ydb.Connector(nativeDriver,
@@ -37,7 +37,7 @@ func benchmarkDatabaseSQLSelect42(b *testing.B, ctx context.Context, nativeDrive
 
 	db.SetMaxOpenConns(sessionPoolSize)
 
-	warmUpMock(ctx, b, db)
+	warmUpMock(b.Context(), b, db)
 
 	b.SetParallelism(parallelism)
 	b.ResetTimer()
@@ -51,7 +51,7 @@ func benchmarkDatabaseSQLSelect42(b *testing.B, ctx context.Context, nativeDrive
 
 		for pb.Next() {
 			func() {
-				rows, err = db.QueryContext(ctx, `SELECT 42`)
+				rows, err = db.QueryContext(b.Context(), `SELECT 42`)
 				if !assert.NoError(b, err) {
 					return
 				}
@@ -110,7 +110,7 @@ func BenchmarkDatabaseSQL(b *testing.B) {
 		},
 	} {
 		b.Run(engine.name, func(b *testing.B) {
-			benchmarkDatabaseSQLSelect42(b, ctx, nativeDriver, engine.useQueryService)
+			benchmarkDatabaseSQLSelect42(b, nativeDriver, engine.useQueryService)
 		})
 	}
 }
