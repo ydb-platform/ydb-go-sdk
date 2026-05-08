@@ -30,7 +30,7 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 		}, nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 		var (
-			corePtr        *sessionCore
+			corePtr        atomic.Pointer[sessionCore]
 			startRecv      = make(chan struct{}, 1)
 			stopRecv       = make(chan struct{}, 1)
 			recvMsgCounter atomic.Uint32
@@ -38,7 +38,7 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			startRecv <- struct{}{}
 			recvMsgCounter.Add(1)
-			if corePtr != nil && corePtr.closed.Load() {
+			if c := corePtr.Load(); c != nil && c.closed.Load() {
 				return nil, errSessionClosed
 			}
 			stopRecv <- struct{}{}
@@ -53,7 +53,7 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 		core, err := Open(ctx, client)
 		require.NoError(t, err)
 		require.NotNil(t, core)
-		corePtr = core
+		corePtr.Store(core)
 		<-stopRecv
 		require.Equal(t, uint32(1), recvMsgCounter.Load())
 		<-startRecv
@@ -107,7 +107,7 @@ func TestSessionCoreClose(t *testing.T) {
 		}, nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 		var (
-			corePtr        *sessionCore
+			corePtr        atomic.Pointer[sessionCore]
 			startRecv      = make(chan struct{}, 1)
 			stopRecv       = make(chan struct{}, 1)
 			unblock        atomic.Bool
@@ -122,7 +122,7 @@ func TestSessionCoreClose(t *testing.T) {
 				return nil, t.Context().Err()
 			}
 
-			if corePtr != nil && corePtr.closed.Load() {
+			if c := corePtr.Load(); c != nil && c.closed.Load() {
 				return nil, errSessionClosed
 			}
 
@@ -155,7 +155,7 @@ func TestSessionCoreClose(t *testing.T) {
 		core, err := Open(ctx, client)
 		require.NoError(t, err)
 		require.NotNil(t, core)
-		corePtr = core
+		corePtr.Store(core)
 		<-stopRecv
 
 		var wg sync.WaitGroup
