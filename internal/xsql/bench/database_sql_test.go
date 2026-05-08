@@ -36,6 +36,7 @@ func benchmarkDatabaseSQLSelect42(b *testing.B, nativeDriver *ydb.Driver, useQue
 	}()
 
 	db.SetMaxOpenConns(sessionPoolSize)
+	db.SetMaxIdleConns(sessionPoolSize)
 
 	warmUpMock(b.Context(), b, db)
 
