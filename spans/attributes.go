@@ -4,8 +4,9 @@ package spans
 //
 // Adapter implementations are expected to map these names to the appropriate
 // OpenTelemetry SpanKind:
-//   - SpanNameCreateSession, SpanNameExecuteQuery, SpanNameCommit, SpanNameRollback
-//     are emitted as CLIENT spans (gRPC calls to YDB QueryService).
+//   - SpanNameCreateSession, SpanNameExecuteQuery, SpanNameBeginTransaction,
+//     SpanNameCommit, SpanNameRollback are emitted as CLIENT spans (gRPC calls
+//     to YDB QueryService).
 //   - SpanNameRunWithRetry, SpanNameTry are emitted as INTERNAL spans (retry loop).
 const (
 	// SpanNameCreateSession is the span name for QueryService session creation
@@ -15,6 +16,14 @@ const (
 	// SpanNameExecuteQuery is the span name for QueryService ExecuteQuery RPC
 	// (covers reading the response stream from start to end).
 	SpanNameExecuteQuery = "ydb.ExecuteQuery"
+
+	// SpanNameBeginTransaction is the span name for an explicit
+	// QueryService.BeginTransaction RPC. It is emitted only when an actual
+	// gRPC call is made — i.e. for eager transactions (`s.Begin(ctx, ...)`
+	// without lazy mode) and for `Tx.UnLazy(ctx)`. Lazy transactions started
+	// via DoTx do not produce this span because they fuse the begin into the
+	// first ExecuteQuery RPC.
+	SpanNameBeginTransaction = "ydb.BeginTransaction"
 
 	// SpanNameCommit is the span name for QueryService CommitTransaction RPC.
 	SpanNameCommit = "ydb.Commit"

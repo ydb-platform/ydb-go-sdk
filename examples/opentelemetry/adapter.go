@@ -90,6 +90,7 @@ func kindFor(name string) trace.SpanKind {
 	switch name {
 	case spans.SpanNameCreateSession,
 		spans.SpanNameExecuteQuery,
+		spans.SpanNameBeginTransaction,
 		spans.SpanNameCommit,
 		spans.SpanNameRollback:
 		return trace.SpanKindClient

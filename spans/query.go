@@ -11,12 +11,14 @@ import (
 // query produces the QueryService spans following OTel semantic conventions.
 //
 // User-facing span names:
-//   - ydb.CreateSession (CLIENT) — QueryService session creation
+//   - ydb.CreateSession    (CLIENT) — QueryService session creation
 //     (CreateSession + first AttachStream message)
-//   - ydb.ExecuteQuery  (CLIENT) — single ExecuteQuery RPC, including reading
+//   - ydb.ExecuteQuery     (CLIENT) — single ExecuteQuery RPC, including reading
 //     the response stream from start to end
-//   - ydb.Commit        (CLIENT) — CommitTransaction RPC
-//   - ydb.Rollback      (CLIENT) — RollbackTransaction RPC
+//   - ydb.BeginTransaction (CLIENT) — explicit BeginTransaction RPC (eager
+//     `s.Begin` and `Tx.UnLazy`); lazy DoTx never emits it
+//   - ydb.Commit           (CLIENT) — CommitTransaction RPC
+//   - ydb.Rollback         (CLIENT) — RollbackTransaction RPC
 //
 // All client-kind spans are augmented with the OTel database semantic
 // attributes (db.system.name, db.namespace, server.address, server.port,
@@ -296,11 +298,30 @@ func query(adapter Adapter) trace.Query {
 				)
 			}
 		},
-		// OnSessionBegin is intentionally not wired: BeginTx is implicit
-		// inside the user's DoTx callback (no separate user span makes
-		// sense for it). For explicit `tx, err := s.Begin(ctx, ...)` the
-		// resulting tx has its own ydb.Commit / ydb.Rollback / ydb.ExecuteQuery
-		// child spans which is the level of detail the spec expects.
+		// OnSessionBegin is intentionally not wired: it fires for every
+		// `s.Begin(ctx, ...)` call, including lazy transactions where no
+		// gRPC RPC happens — emitting a span for those would produce a
+		// CLIENT span without a network call. The actual BeginTransaction
+		// RPC is covered by OnSessionBeginTransaction below.
+		OnSessionBeginTransaction: func(
+			info trace.QuerySessionBeginTransactionStartInfo,
+		) func(info trace.QuerySessionBeginTransactionDoneInfo) {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
+				return nil
+			}
+			start := childSpanWithReplaceCtx(
+				adapter,
+				info.Context,
+				SpanNameBeginTransaction,
+			)
+
+			return func(info trace.QuerySessionBeginTransactionDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		},
 		OnTxCommit: func(info trace.QueryTxCommitStartInfo) func(info trace.QueryTxCommitDoneInfo) {
 			if adapter.Details()&trace.QueryTransactionEvents == 0 {
 				return nil

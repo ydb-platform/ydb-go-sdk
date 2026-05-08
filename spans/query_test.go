@@ -84,6 +84,22 @@ func TestQuerySpanNamesAreOTelCompliant(t *testing.T) {
 		require.Equal(t, int64(42), s.attr(AttrYDBNodeID))
 	})
 
+	t.Run("ydb.BeginTransaction emitted for actual gRPC begin", func(t *testing.T) {
+		c := ctx
+		done := q.OnSessionBeginTransaction(trace.QuerySessionBeginTransactionStartInfo{
+			Context:   &c,
+			Call:      call,
+			SessionID: session.ID(),
+		})
+		require.NotNil(t, done)
+		done(trace.QuerySessionBeginTransactionDoneInfo{TxID: tx.ID()})
+
+		spans := adapter.byName(SpanNameBeginTransaction)
+		require.Len(t, spans, 1)
+		require.True(t, spans[0].ended)
+		require.Nil(t, spans[0].err)
+	})
+
 	t.Run("ydb.Commit", func(t *testing.T) {
 		c := ctx
 		done := q.OnTxCommit(trace.QueryTxCommitStartInfo{
@@ -135,6 +151,11 @@ func TestQueryNoisySpansAreSuppressed(t *testing.T) {
 	require.Nil(t, q.OnPoolTry)
 	require.Nil(t, q.OnPoolPut)
 
+	// OnSessionBeginTransaction IS wired: it fires only for an actual
+	// BeginTransaction gRPC call and produces a single ydb.BeginTransaction
+	// CLIENT span.
+	require.NotNil(t, q.OnSessionBeginTransaction)
+
 	// OnPoolGet is wired and produces a single ydb.GetSession span.
 	c := ctx
 	done := q.OnPoolGet(trace.QueryPoolGetStartInfo{Context: &c, Call: call})
@@ -162,6 +183,25 @@ func TestQuerySpanFailureSetsExceptionAttrs(t *testing.T) {
 		done(trace.QueryTxCommitDoneInfo{Error: ydbErr})
 
 		spans := adapter.byName(SpanNameCommit)
+		require.Len(t, spans, 1)
+		s := spans[0]
+		require.NotNil(t, s.err)
+		require.Equal(t, ErrorTypeYDB, s.attr(AttrErrorType))
+		require.Equal(t, int(Ydb.StatusIds_BAD_SESSION), s.attr(AttrDBResponseStatusCode))
+	})
+
+	t.Run("ydb.BeginTransaction failure sets error.type", func(t *testing.T) {
+		c := ctx
+		done := q.OnSessionBeginTransaction(trace.QuerySessionBeginTransactionStartInfo{
+			Context:   &c,
+			Call:      call,
+			SessionID: "s",
+		})
+		require.NotNil(t, done)
+		ydbErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+		done(trace.QuerySessionBeginTransactionDoneInfo{Error: ydbErr})
+
+		spans := adapter.byName(SpanNameBeginTransaction)
 		require.Len(t, spans, 1)
 		s := spans[0]
 		require.NotNil(t, s.err)

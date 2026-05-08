@@ -90,6 +90,7 @@ exporter is enabled).
 | `ydb.GetSession`        | Internal | Acquire a session from the query-service pool; parents `ydb.CreateSession` on a pool miss                     |
 | `ydb.CreateSession`     | Client   | QueryService `CreateSession` + first message of `AttachStream`                                                |
 | `ydb.ExecuteQuery`      | Client   | Individual YQL query execution (single ExecuteQuery RPC, full stream read)                                    |
+| `ydb.BeginTransaction`  | Client   | Explicit BeginTransaction RPC (eager `s.Begin` and `Tx.UnLazy`); lazy DoTx fuses begin into ExecuteQuery      |
 | `ydb.Commit`            | Client   | Transaction commit                                                                                            |
 | `ydb.Rollback`          | Client   | Transaction rollback                                                                                          |
 
