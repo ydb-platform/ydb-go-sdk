@@ -229,11 +229,6 @@ type (
 	// WithReaderOnStopPartitionSession.
 	OnStopPartitionSessionFunc = topicreaderinternal.PublicOnStopPartitionSessionFunc
 
-	// OnGracefulStopPartitionSessionFunc is a backward-compatible alias.
-	//
-	// Deprecated: use OnStopPartitionSessionFunc.
-	OnGracefulStopPartitionSessionFunc = OnStopPartitionSessionFunc
-
 	// StopPartitionSessionRequest describes the partition session the server
 	// is going to stop on the reader. It is passed to the OnStopPartitionSessionFunc
 	// callback. When Graceful is false, the session must not be used for commits
@@ -324,18 +319,8 @@ func WithReaderLogContext(ctx context.Context) ReaderOption {
 //
 // The callback is called synchronously from the reader event loop, so it must
 // return quickly.
-// To commit messages from the callback in a way that is guaranteed to reach
-// the server before StopPartitionSessionResponse for graceful stops, use
-// WithReaderCommitMode(CommitModeSync).
 func WithReaderOnStopPartitionSession(f OnStopPartitionSessionFunc) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.OnStopPartitionSession = f
 	}
-}
-
-// WithReaderOnGracefulStopPartitionSession is a backward-compatible alias.
-//
-// Deprecated: use WithReaderOnStopPartitionSession.
-func WithReaderOnGracefulStopPartitionSession(f OnGracefulStopPartitionSessionFunc) ReaderOption {
-	return WithReaderOnStopPartitionSession(f)
 }

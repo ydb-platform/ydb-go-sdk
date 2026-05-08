@@ -136,6 +136,7 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 		})
 
 		if commits.Len() == 0 && c.backgroundWorker.Context().Err() != nil {
+			// committer closed with empty buffer - target close state
 			return
 		}
 
