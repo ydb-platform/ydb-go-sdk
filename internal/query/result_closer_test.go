@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestNewResultCloser(t *testing.T) {
@@ -75,13 +76,9 @@ func TestResultCloser_CloseOnContextCancel(t *testing.T) {
 		closer.CloseOnContextCancel(ctx)
 		cancel()
 
-		deadline := time.Now().Add(time.Second)
-		for !closer.Closed() {
-			if time.Now().After(deadline) {
-				t.Fatal("closer should be closed")
-			}
-			time.Sleep(time.Millisecond)
-		}
+		xtest.SpinWaitConditionWithTimeout(t, nil, time.Second, func() bool {
+			return closer.Closed()
+		})
 		assert.ErrorIs(t, closer.Err(), context.Canceled)
 	})
 
