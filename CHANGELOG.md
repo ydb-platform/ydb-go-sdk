@@ -1,6 +1,6 @@
 * Replaced internal query-client "done" signal channels with `atomic.Bool` to improve performance:
-  * it reduces allocations per query and decreases latency for each query.
-  * this change disables the feature of cascading cancellation of all child operations, such as canceling a query on session close or query-client close — YDB server is supposed to cancel query executions on closing sessions.
+  * Reduced allocations per query and decreased latency for each query.
+  * Disabled cascading cancellation of all child operations, such as canceling a query on session close or query-client close — YDB server is supposed to cancel query executions on closing sessions.
 
 ## v3.135.14
 * Adjusted gRPC client-stream error wrapping to improve topic writer reconnect behavior, ensuring stream teardown races don’t cause server-side gRPC cancellations to be misclassified as purely local context cancellations.
