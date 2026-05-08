@@ -195,6 +195,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	select {
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
@@ -282,6 +283,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		if r.closer.Closed() {
 			return nil
 		}
+
 		select {
 		case <-ctx.Done():
 			return xerrors.WithStackTrace(ctx.Err())
@@ -308,6 +310,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		select {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
@@ -358,6 +361,7 @@ func (r *streamResult) nextPartFunc(
 
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		select {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())

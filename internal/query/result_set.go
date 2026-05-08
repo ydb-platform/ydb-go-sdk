@@ -158,6 +158,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 		if rs.ended.Load() {
 			return nil, io.EOF
 		}
+
 		select {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())

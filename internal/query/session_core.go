@@ -278,9 +278,11 @@ func (core *sessionCore) releaseSession() {
 	if !core.closed.CompareAndSwap(false, true) {
 		return
 	}
+
 	if core.cancelAttach != nil {
 		core.cancelAttach()
 	}
+
 	core.SetStatus(StatusClosed)
 }
 
