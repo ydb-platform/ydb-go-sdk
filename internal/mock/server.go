@@ -1,17 +1,16 @@
-package bench
+// Package mock provides an in-process YDB gRPC stack (Discovery + Table + Query) with fixed
+// "SELECT 42" responses for benchmarks and tests. It does not require a real YDB endpoint.
+package mock
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -25,20 +24,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
-// cpu: Apple M3 Pro
-// go test -bench=. -benchtime=10s .
-//
-// BenchmarkDatabaseSQLMock/QueryService-12    857882  13517 ns/op   22739 B/op    371 allocs/op
-// BenchmarkDatabaseSQLMock/TableService-12  1298796   9059 ns/op   18473 B/op    299 allocs/op
-// Diff (query/table*100-100)                   -34%          49%          23%              24%
-//
-// grpcMockYDB is a local in-process gRPC stack (Discovery + Table + Query) with fixed
-// "SELECT 42" style responses. It does not require a real YDB endpoint.
-type grpcMockYDB struct {
+// server is a local gRPC mock (Discovery + Table + Query).
+type server struct {
 	listener   net.Listener
 	grpcServer *grpc.Server
 
@@ -46,19 +35,21 @@ type grpcMockYDB struct {
 	tableSessionID atomic.Uint64
 }
 
-func (m *grpcMockYDB) nextQuerySession() string {
+func (m *server) nextQuerySession() string {
 	return fmt.Sprintf("q-%d", m.querySessionID.Add(1))
 }
 
-func (m *grpcMockYDB) nextTableSession() string {
+func (m *server) nextTableSession() string {
 	return fmt.Sprintf("t-%d", m.tableSessionID.Add(1))
 }
 
-func (m *grpcMockYDB) connString() string {
+// ConnString returns a grpc:// DSN for ydb.Open pointing at this mock.
+func (m *server) ConnString() string {
 	return fmt.Sprintf("grpc://%s/local", m.listener.Addr().String())
 }
 
-func (m *grpcMockYDB) Close() {
+// Close stops the gRPC server and closes the listener.
+func (m *server) Close() {
 	m.grpcServer.Stop()
 
 	_ = m.listener.Close()
@@ -82,14 +73,14 @@ func operationOK(msg proto.Message) *Ydb_Operations.Operation {
 	}
 }
 
-type mockDiscovery struct {
+type discoverySrv struct {
 	Ydb_Discovery_V1.UnimplementedDiscoveryServiceServer
 
 	host string
 	port uint32
 }
 
-func (m *mockDiscovery) ListEndpoints(
+func (m *discoverySrv) ListEndpoints(
 	_ context.Context,
 	_ *Ydb_Discovery.ListEndpointsRequest,
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
@@ -114,7 +105,7 @@ func (m *mockDiscovery) ListEndpoints(
 	}, nil
 }
 
-func (m *mockDiscovery) WhoAmI(
+func (m *discoverySrv) WhoAmI(
 	_ context.Context,
 	_ *Ydb_Discovery.WhoAmIRequest,
 ) (*Ydb_Discovery.WhoAmIResponse, error) {
@@ -123,13 +114,13 @@ func (m *mockDiscovery) WhoAmI(
 	}, nil
 }
 
-type mockTable struct {
+type tableSrv struct {
 	Ydb_Table_V1.UnimplementedTableServiceServer
 
-	mock *grpcMockYDB
+	mock *server
 }
 
-func (m *mockTable) CreateSession(
+func (m *tableSrv) CreateSession(
 	_ context.Context,
 	_ *Ydb_Table.CreateSessionRequest,
 ) (*Ydb_Table.CreateSessionResponse, error) {
@@ -140,14 +131,14 @@ func (m *mockTable) CreateSession(
 	}, nil
 }
 
-func (m *mockTable) DeleteSession(
+func (m *tableSrv) DeleteSession(
 	_ context.Context,
 	_ *Ydb_Table.DeleteSessionRequest,
 ) (*Ydb_Table.DeleteSessionResponse, error) {
 	return &Ydb_Table.DeleteSessionResponse{}, nil
 }
 
-func (m *mockTable) KeepAlive(
+func (m *tableSrv) KeepAlive(
 	_ context.Context,
 	_ *Ydb_Table.KeepAliveRequest,
 ) (*Ydb_Table.KeepAliveResponse, error) {
@@ -158,7 +149,7 @@ func (m *mockTable) KeepAlive(
 	}, nil
 }
 
-func (m *mockTable) ExecuteDataQuery(
+func (m *tableSrv) ExecuteDataQuery(
 	_ context.Context,
 	_ *Ydb_Table.ExecuteDataQueryRequest,
 ) (*Ydb_Table.ExecuteDataQueryResponse, error) {
@@ -171,13 +162,13 @@ func (m *mockTable) ExecuteDataQuery(
 	}, nil
 }
 
-type mockQuery struct {
+type querySrv struct {
 	Ydb_Query_V1.UnimplementedQueryServiceServer
 
-	mock *grpcMockYDB
+	mock *server
 }
 
-func (m *mockQuery) CreateSession(
+func (m *querySrv) CreateSession(
 	_ context.Context,
 	_ *Ydb_Query.CreateSessionRequest,
 ) (*Ydb_Query.CreateSessionResponse, error) {
@@ -188,7 +179,7 @@ func (m *mockQuery) CreateSession(
 	}, nil
 }
 
-func (m *mockQuery) DeleteSession(
+func (m *querySrv) DeleteSession(
 	_ context.Context,
 	_ *Ydb_Query.DeleteSessionRequest,
 ) (*Ydb_Query.DeleteSessionResponse, error) {
@@ -197,7 +188,7 @@ func (m *mockQuery) DeleteSession(
 	}, nil
 }
 
-func (m *mockQuery) AttachSession(
+func (m *querySrv) AttachSession(
 	_ *Ydb_Query.AttachSessionRequest,
 	stream Ydb_Query_V1.QueryService_AttachSessionServer,
 ) error {
@@ -213,7 +204,7 @@ func (m *mockQuery) AttachSession(
 	return nil
 }
 
-func (m *mockQuery) ExecuteQuery(
+func (m *querySrv) ExecuteQuery(
 	_ *Ydb_Query.ExecuteQueryRequest,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryServer,
 ) error {
@@ -252,7 +243,8 @@ func select42ResultSet() *Ydb.ResultSet {
 	}
 }
 
-func startMockYDBServer(tb testing.TB) *grpcMockYDB {
+// Server binds a random TCP port, registers Discovery + Table + Query mocks, and serves until Close or tb cleanup.
+func Server(tb testing.TB) *server {
 	tb.Helper()
 
 	lc := net.ListenConfig{}
@@ -266,17 +258,17 @@ func startMockYDBServer(tb testing.TB) *grpcMockYDB {
 	port, err := strconv.ParseUint(portStr, 10, 32)
 	require.NoError(tb, err)
 
-	m := &grpcMockYDB{
+	m := &server{
 		listener:   lis,
 		grpcServer: grpc.NewServer(),
 	}
 
-	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(m.grpcServer, &mockDiscovery{
+	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(m.grpcServer, &discoverySrv{
 		host: host,
 		port: uint32(port),
 	})
-	Ydb_Table_V1.RegisterTableServiceServer(m.grpcServer, &mockTable{mock: m})
-	Ydb_Query_V1.RegisterQueryServiceServer(m.grpcServer, &mockQuery{mock: m})
+	Ydb_Table_V1.RegisterTableServiceServer(m.grpcServer, &tableSrv{mock: m})
+	Ydb_Query_V1.RegisterQueryServiceServer(m.grpcServer, &querySrv{mock: m})
 
 	go func() {
 		_ = m.grpcServer.Serve(lis)
@@ -295,124 +287,4 @@ func startMockYDBServer(tb testing.TB) *grpcMockYDB {
 	}
 
 	return m
-}
-
-const benchmarkDatabaseSQLMockSessionPoolSize = 600
-
-func BenchmarkDatabaseSQLMock(b *testing.B) {
-	ctx := b.Context()
-	parallelism := 100
-
-	mockSrv := startMockYDBServer(b)
-
-	nativeDriver, err := ydb.Open(ctx, mockSrv.connString(),
-		ydb.WithAnonymousCredentials(),
-		ydb.WithSessionPoolSizeLimit(benchmarkDatabaseSQLMockSessionPoolSize),
-	)
-	require.NoError(b, err)
-
-	defer func() {
-		_ = nativeDriver.Close(ctx)
-	}()
-
-	for _, engine := range []struct {
-		name            string
-		useQueryService bool
-	}{
-		{
-			name:            "QueryService",
-			useQueryService: true,
-		},
-		{
-			name:            "TableService",
-			useQueryService: false,
-		},
-	} {
-		b.Run(engine.name, func(b *testing.B) {
-			connector, err := ydb.Connector(nativeDriver,
-				ydb.WithQueryService(engine.useQueryService),
-			)
-			require.NoError(b, err)
-
-			defer func() {
-				_ = connector.Close()
-			}()
-
-			db := sql.OpenDB(connector)
-			defer func() {
-				_ = db.Close()
-			}()
-
-			db.SetMaxOpenConns(benchmarkDatabaseSQLMockSessionPoolSize)
-
-			warmUpMock(ctx, b, db)
-
-			b.SetParallelism(parallelism)
-			b.ResetTimer()
-			b.ReportAllocs()
-			b.RunParallel(func(pb *testing.PB) {
-				var (
-					v    int
-					rows *sql.Rows
-					err  error
-				)
-
-				for pb.Next() {
-					func() {
-						rows, err = db.QueryContext(ctx, `SELECT 42`)
-						if !assert.NoError(b, err) {
-							return
-						}
-						defer func() {
-							assert.NoError(b, rows.Close())
-						}()
-
-						for rows.Next() {
-							if !assert.NoError(b, rows.Scan(&v)) {
-								return
-							}
-							if !assert.Equal(b, 42, v) {
-								return
-							}
-							v = 0
-						}
-
-						assert.NoError(b, rows.Err())
-					}()
-				}
-			})
-		})
-	}
-}
-
-func warmUpMock(ctx context.Context, t testing.TB, db *sql.DB) {
-	t.Helper()
-
-	wg := sync.WaitGroup{}
-	wg.Add(benchmarkDatabaseSQLMockSessionPoolSize)
-
-	for range benchmarkDatabaseSQLMockSessionPoolSize {
-		go func() {
-			defer wg.Done()
-			rows, err := db.QueryContext(ctx, `SELECT 42`)
-			if !assert.NoError(t, err) {
-				return
-			}
-			defer func() {
-				assert.NoError(t, rows.Close())
-			}()
-
-			var v int
-
-			for rows.Next() {
-				if !assert.NoError(t, rows.Scan(&v)) {
-					return
-				}
-			}
-
-			assert.NoError(t, rows.Err())
-		}()
-	}
-
-	wg.Wait()
 }
