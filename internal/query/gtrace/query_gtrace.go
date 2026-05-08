@@ -2024,11 +2024,11 @@ func QueryOnSessionBegin(t *trace.Query, c *context.Context, c1 trace.Call, sess
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnSessionBeginTransaction(t *trace.Query, c *context.Context, c1 trace.Call, sessionID string) func(_ error, txID string) {
+func QueryOnSessionBeginTransaction(t *trace.Query, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(_ error, txID string) {
 	var p trace.QuerySessionBeginTransactionStartInfo
 	p.Context = c
 	p.Call = c1
-	p.SessionID = sessionID
+	p.Session = session
 	res := onSessionBeginTransaction(t, p)
 	return func(e error, txID string) {
 		var p trace.QuerySessionBeginTransactionDoneInfo

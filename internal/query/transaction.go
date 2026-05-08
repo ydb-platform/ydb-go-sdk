@@ -38,22 +38,20 @@ type (
 
 func begin(
 	ctx context.Context,
-	client Ydb_Query_V1.QueryServiceClient,
-	sessionID string,
+	s *Session,
 	txSettings query.TransactionSettings,
-	t *trace.Query,
 ) (txID string, finalErr error) {
-	onDone := trace.QueryOnSessionBeginTransaction(t, &ctx,
+	onDone := trace.QueryOnSessionBeginTransaction(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.begin"),
-		sessionID,
+		s,
 	)
 	defer func() {
 		onDone(finalErr, txID)
 	}()
 
-	response, err := client.BeginTransaction(ctx,
+	response, err := s.client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
-			SessionId:  sessionID,
+			SessionId:  s.ID(),
 			TxSettings: txSettings.ToYdbQuerySettings(),
 		},
 	)
@@ -69,7 +67,7 @@ func (tx *Transaction) UnLazy(ctx context.Context) error {
 		return nil
 	}
 
-	txID, err := begin(ctx, tx.s.client, tx.s.ID(), tx.txSettings, tx.s.trace)
+	txID, err := begin(ctx, tx.s, tx.txSettings)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

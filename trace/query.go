@@ -446,7 +446,7 @@ type (
 		Context *context.Context
 		Call    Call
 
-		SessionID string
+		Session SessionInfo
 	}
 	// QuerySessionBeginTransactionDoneInfo carries the outcome of an actual
 	// QueryService.BeginTransaction RPC.

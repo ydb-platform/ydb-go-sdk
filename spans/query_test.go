@@ -87,9 +87,9 @@ func TestQuerySpanNamesAreOTelCompliant(t *testing.T) {
 	t.Run("ydb.BeginTransaction emitted for actual gRPC begin", func(t *testing.T) {
 		c := ctx
 		done := q.OnSessionBeginTransaction(trace.QuerySessionBeginTransactionStartInfo{
-			Context:   &c,
-			Call:      call,
-			SessionID: session.ID(),
+			Context: &c,
+			Call:    call,
+			Session: session,
 		})
 		require.NotNil(t, done)
 		done(trace.QuerySessionBeginTransactionDoneInfo{TxID: tx.ID()})
@@ -98,6 +98,7 @@ func TestQuerySpanNamesAreOTelCompliant(t *testing.T) {
 		require.Len(t, spans, 1)
 		require.True(t, spans[0].ended)
 		require.Nil(t, spans[0].err)
+		require.Equal(t, int64(42), spans[0].attr(AttrYDBNodeID))
 	})
 
 	t.Run("ydb.Commit", func(t *testing.T) {
@@ -193,9 +194,9 @@ func TestQuerySpanFailureSetsExceptionAttrs(t *testing.T) {
 	t.Run("ydb.BeginTransaction failure sets error.type", func(t *testing.T) {
 		c := ctx
 		done := q.OnSessionBeginTransaction(trace.QuerySessionBeginTransactionStartInfo{
-			Context:   &c,
-			Call:      call,
-			SessionID: "s",
+			Context: &c,
+			Call:    call,
+			Session: &fakeSession{id: "s"},
 		})
 		require.NotNil(t, done)
 		ydbErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))

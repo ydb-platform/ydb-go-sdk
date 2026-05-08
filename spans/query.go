@@ -313,6 +313,7 @@ func query(adapter Adapter) trace.Query {
 				adapter,
 				info.Context,
 				SpanNameBeginTransaction,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 			)
 
 			return func(info trace.QuerySessionBeginTransactionDoneInfo) {
