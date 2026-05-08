@@ -10,8 +10,12 @@ import (
 var errResultCloserNilReason = io.EOF
 
 // ResultCloser provides a mechanism to close query results and handle cleanup operations.
-// It tracks the reason for closing, exposes a closed flag for synchronization,
-// and allows registering cleanup functions to be called on close.
+// It records the close reason, exposes a flag for fast “close started” checks, and runs
+// registered onClose callbacks on the first successful Close.
+//
+// The closed flag is set together with the reason before onClose callbacks run, so
+// [ResultCloser.Closed] and [ResultCloser.doneErr] can return true while callbacks are
+// still executing. They mean the terminal reason is fixed, not that cleanup finished.
 type ResultCloser struct {
 	reason  error
 	closed  atomic.Bool
@@ -27,15 +31,16 @@ func NewResultCloser() *ResultCloser {
 // Close closes the ResultCloser with the specified reason error.
 // If the ResultCloser is already closed, this method does nothing.
 // If reason is nil, it will be set to io.EOF.
-// All registered onClose functions will be called in LIFO order.
-// After calling Close, Closed returns true to signal completion.
+// All registered onClose functions will be called in LIFO order on this goroutine,
+// after the close reason and [ResultCloser.Closed] flag are published.
 func (r *ResultCloser) Close(reason error) {
 	if r.doneWithReason(reason) { // only first [r.Close] invoke runs callbacks
 		r.runOnCloseCallbacks()
 	}
 }
 
-// doneWithReason sets the closure reason and signals completion.
+// doneWithReason sets the closure reason and publishes the closed flag before onClose
+// callbacks run.
 // The method is idempotent - subsequent calls after the first successful call are no-ops.
 // If reason is nil, it defaults to errResultCloserNilReason.
 // The method uses mutex synchronization to ensure safe concurrent access.
@@ -75,13 +80,17 @@ func (r *ResultCloser) Err() error {
 	return r.reason
 }
 
-// Closed reports whether Close has completed (including a concurrent first Close).
+// Closed reports whether the first Close has committed a terminal reason: the flag
+// becomes true as soon as that reason is stored, before registered onClose callbacks
+// run. It does not mean onClose hooks have returned. For “fully idle after Close”, wait
+// on the same goroutine that called Close after it returns, or coordinate out of band.
 func (r *ResultCloser) Closed() bool {
 	return r.closed.Load()
 }
 
-// doneErr reports whether the closer has finished and returns its reason.
+// doneErr reports whether the closer has committed a terminal reason and returns it.
 // err is never nil when done is true (nil reason is mapped to io.EOF).
+// Like [ResultCloser.Closed], done may be true while onClose callbacks are still running.
 // Prefer this over separate Closed()+Err() calls: those can observe a transient
 // closed flag before reason is visible and yield err == nil.
 func (r *ResultCloser) doneErr() (done bool, err error) {
