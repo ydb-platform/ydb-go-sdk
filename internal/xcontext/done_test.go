@@ -50,9 +50,9 @@ func TestWithDone(t *testing.T) {
 	})
 }
 
-// BenchmarkWithDone/AlreadyClosed-12         	223980346	         5.312 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkWithDone/Open_CancelImmediately-12         	 3038546	       393.3 ns/op	     424 B/op	       8 allocs/op
-// BenchmarkWithDone/Open_CloseDoneThenCancel-12       	 1294370	       926.2 ns/op	     648 B/op	      10 allocs/op
+// BenchmarkWithDone/AlreadyClosed-12         	 70565923	16.49 ns/op	   16 B/op	1 allocs/op
+// BenchmarkWithDone/Open_CancelImmediately-12    4965481	250.3 ns/op	  256 B/op	4 allocs/op
+// BenchmarkWithDone/Open_CloseDoneThenCancel-12  2363917	510.6 ns/op	  368 B/op	5 allocs/op
 func BenchmarkWithDone(b *testing.B) {
 	parent := context.Background()
 
