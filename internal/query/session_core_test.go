@@ -116,11 +116,21 @@ func TestSessionCoreClose(t *testing.T) {
 		unblock.Store(false)
 		sessionDeletes.Store(0)
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
-			startRecv <- struct{}{}
+			select {
+			case startRecv <- struct{}{}:
+			case <-t.Context().Done():
+				return nil, t.Context().Err()
+			}
+
 			if corePtr != nil && corePtr.closed.Load() {
 				return nil, errSessionClosed
 			}
-			stopRecv <- struct{}{}
+
+			select {
+			case stopRecv <- struct{}{}:
+			case <-t.Context().Done():
+				return nil, t.Context().Err()
+			}
 
 			return &Ydb_Query.SessionState{
 				Status: Ydb.StatusIds_SUCCESS,
