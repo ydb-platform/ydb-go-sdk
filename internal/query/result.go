@@ -188,13 +188,14 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 	}
 
-	select {
-	case <-r.closer.Done():
+	if r.closer.Closed() {
 		if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
 		}
 
 		return nil, xerrors.WithStackTrace(err)
+	}
+	select {
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
@@ -278,11 +279,12 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	}
 
 	for {
+		if r.closer.Closed() {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
 			return xerrors.WithStackTrace(ctx.Err())
-		case <-r.closer.Done():
-			return nil
 		default:
 			_, err := r.nextPart(ctx)
 			if err != nil {
@@ -299,13 +301,14 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
-		select {
-		case <-r.closer.Done():
+		if r.closer.Closed() {
 			if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
 				return nil, io.EOF
-			} else {
-				return nil, xerrors.WithStackTrace(err)
 			}
+
+			return nil, xerrors.WithStackTrace(err)
+		}
+		select {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
@@ -348,15 +351,16 @@ func (r *streamResult) nextPartFunc(
 	nextResultSetIndex int64,
 ) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
+		if r.closer.Closed() {
+			if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
+				return nil, io.EOF
+			}
+
+			return nil, xerrors.WithStackTrace(err)
+		}
 		select {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
-		case <-r.closer.Done():
-			if err := r.closer.Err(); xerrors.Is(err, io.EOF) {
-				return nil, io.EOF
-			} else {
-				return nil, xerrors.WithStackTrace(err)
-			}
 		default:
 			if r.stream == nil {
 				return nil, io.EOF

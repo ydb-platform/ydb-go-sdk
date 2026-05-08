@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -35,7 +36,7 @@ type (
 		columns             []*Ydb.Column
 		currentPart         *Ydb_Query.ExecuteQueryResponsePart
 		rowIndex            int
-		done                chan struct{}
+		ended               atomic.Bool
 		mustBeLastResultSet bool
 	}
 	resultSetWithClose struct {
@@ -148,16 +149,16 @@ func newResultSet(
 		currentPart: part,
 		rowIndex:    -1,
 		columns:     part.GetResultSet().GetColumns(),
-		done:        make(chan struct{}),
 	}
 }
 
 func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 	rs.rowIndex++
 	for {
-		select {
-		case <-rs.done:
+		if rs.ended.Load() {
 			return nil, io.EOF
+		}
+		select {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
@@ -166,7 +167,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 				part, err := rs.recv()
 				if err != nil {
 					if xerrors.Is(err, io.EOF) {
-						close(rs.done)
+						rs.ended.Store(true)
 					}
 
 					if rs.mustBeLastResultSet && errors.Is(err, errReadNextResultSet) {
@@ -183,13 +184,13 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 				rs.rowIndex = 0
 				rs.currentPart = part
 				if part == nil {
-					close(rs.done)
+					rs.ended.Store(true)
 
 					return nil, io.EOF
 				}
 			}
 			if rs.currentPart.GetResultSet() != nil && rs.index != rs.currentPart.GetResultSetIndex() {
-				close(rs.done)
+				rs.ended.Store(true)
 
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"received part with result set index = %d, current result set index = %d: %w",

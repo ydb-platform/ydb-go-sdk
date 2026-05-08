@@ -4,39 +4,38 @@ import (
 	"context"
 	"io"
 	"sync"
+	"sync/atomic"
 )
 
 var errResultCloserNilReason = io.EOF
 
 // ResultCloser provides a mechanism to close query results and handle cleanup operations.
-// It tracks the reason for closing, provides a done channel for synchronization,
+// It tracks the reason for closing, exposes a closed flag for synchronization,
 // and allows registering cleanup functions to be called on close.
 type ResultCloser struct {
 	reason  error
-	done    chan struct{}
+	closed  atomic.Bool
 	mu      sync.Mutex
 	onClose []func()
 }
 
 // NewResultCloser creates and returns a new ResultCloser instance.
 func NewResultCloser() *ResultCloser {
-	return &ResultCloser{
-		done: make(chan struct{}),
-	}
+	return &ResultCloser{}
 }
 
 // Close closes the ResultCloser with the specified reason error.
 // If the ResultCloser is already closed, this method does nothing.
 // If reason is nil, it will be set to io.EOF.
 // All registered onClose functions will be called in LIFO order.
-// After calling Close, the done channel will be closed to signal completion.
+// After calling Close, Closed returns true to signal completion.
 func (r *ResultCloser) Close(reason error) {
 	if r.doneWithReason(reason) { // only first [r.Close] invoke runs callbacks
 		r.runOnCloseCallbacks()
 	}
 }
 
-// doneWithReason sets the closure reason and signals completion by closing the done channel.
+// doneWithReason sets the closure reason and signals completion.
 // The method is idempotent - subsequent calls after the first successful call are no-ops.
 // If reason is nil, it defaults to errResultCloserNilReason.
 // The method uses mutex synchronization to ensure safe concurrent access.
@@ -54,8 +53,7 @@ func (r *ResultCloser) doneWithReason(reason error) (realClose bool) {
 	}
 
 	r.reason = reason
-
-	close(r.done)
+	r.closed.Store(true)
 
 	return true
 }
@@ -77,10 +75,9 @@ func (r *ResultCloser) Err() error {
 	return r.reason
 }
 
-// Done returns a channel that will be closed when the ResultCloser is closed.
-// This channel can be used to wait for the ResultCloser to be closed.
-func (r *ResultCloser) Done() <-chan struct{} {
-	return r.done
+// Closed reports whether Close has completed (including a concurrent first Close).
+func (r *ResultCloser) Closed() bool {
+	return r.closed.Load()
 }
 
 // CloseOnContextCancel registers a callback function that closes the ResultCloser

@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -49,7 +50,7 @@ type (
 		// i.e. fake sessions created without CreateSession/AttachSession requests.
 		implicitSessionPool sessionPool
 
-		done chan struct{}
+		closed atomic.Bool
 	}
 )
 
@@ -197,7 +198,9 @@ func (c *Client) Close(ctx context.Context) error {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	close(c.done)
+	if !c.closed.CompareAndSwap(false, true) {
+		return nil
+	}
 
 	if err := c.explicitSessionPool.Close(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
@@ -236,9 +239,6 @@ func do(
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
-
 	var (
 		settings = options.ParseDoOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDo(settings.Trace(), &ctx,
@@ -341,9 +341,6 @@ func clientQueryRow(
 
 // QueryRow is a helper which read only one row from first result set in result
 func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute) (_ query.Row, finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
-
 	settings := options.ExecuteSettings(opts...)
 
 	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
@@ -397,9 +394,6 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 }
 
 func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
-
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnExec(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
@@ -452,9 +446,6 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 }
 
 func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (r query.Result, err error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
-
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
@@ -506,9 +497,6 @@ func clientQueryResultSet(
 func (c *Client) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
 ) (rs result.ClosableResultSet, finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
-
 	var (
 		settings  = options.ExecuteSettings(opts...)
 		rowsCount int
@@ -546,9 +534,6 @@ func (c *Client) pool() sessionPool {
 }
 
 func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, c.done)
-	defer cancel()
-
 	var (
 		settings = options.ParseDoTxOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDoTx(settings.Trace(), &ctx,
@@ -638,7 +623,6 @@ func newWithQueryServiceClient(ctx context.Context,
 	return &Client{
 		config:              cfg,
 		client:              client,
-		done:                make(chan struct{}),
 		implicitSessionPool: createImplicitSessionPool(ctx, cfg, client, cc),
 		explicitSessionPool: pool.New(ctx,
 			pool.WithLimit[*Session](cfg.PoolLimit()),
@@ -757,7 +741,6 @@ func createImplicitSessionPool(ctx context.Context,
 					cc:     cc,
 					Client: c,
 					Trace:  cfg.Trace(),
-					done:   make(chan struct{}),
 				},
 			}
 

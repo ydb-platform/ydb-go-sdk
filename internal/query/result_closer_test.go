@@ -22,15 +22,11 @@ func TestNewResultCloser(t *testing.T) {
 	})
 }
 
-func TestResultCloser_Done(t *testing.T) {
-	t.Run("empty closer Done() blocks", func(t *testing.T) {
+func TestResultCloser_Closed(t *testing.T) {
+	t.Run("empty closer is not closed", func(t *testing.T) {
 		closer := query.NewResultCloser()
 
-		select {
-		case <-closer.Done():
-			t.Fatal("done channel should not be closed")
-		default:
-		}
+		assert.False(t, closer.Closed())
 	})
 }
 
@@ -62,16 +58,12 @@ func TestResultCloser_Close(t *testing.T) {
 		assert.ErrorIs(t, closer.Err(), someError)
 	})
 
-	t.Run("closer Done() channel should be closed after Close()", func(t *testing.T) {
+	t.Run("closer Closed is true after Close()", func(t *testing.T) {
 		closer := query.NewResultCloser()
 
 		closer.Close(nil)
 
-		select {
-		case <-closer.Done():
-		default:
-			t.Fatal("done channel should be closed")
-		}
+		assert.True(t, closer.Closed())
 	})
 }
 
@@ -83,12 +75,14 @@ func TestResultCloser_CloseOnContextCancel(t *testing.T) {
 		closer.CloseOnContextCancel(ctx)
 		cancel()
 
-		select {
-		case <-closer.Done():
-			assert.ErrorIs(t, closer.Err(), context.Canceled)
-		case <-time.After(time.Second):
-			t.Fatal("done channel should be closed")
+		deadline := time.Now().Add(time.Second)
+		for !closer.Closed() {
+			if time.Now().After(deadline) {
+				t.Fatal("closer should be closed")
+			}
+			time.Sleep(time.Millisecond)
 		}
+		assert.ErrorIs(t, closer.Err(), context.Canceled)
 	})
 
 	t.Run("closer should not close after CloseOnContextCancel() stop() method invoked", func(t *testing.T) {
@@ -100,11 +94,7 @@ func TestResultCloser_CloseOnContextCancel(t *testing.T) {
 
 		cancel()
 
-		select {
-		case <-closer.Done():
-			t.Fatal("done channel should not be closed")
-		case <-time.After(1 * time.Microsecond):
-		}
+		assert.False(t, closer.Closed())
 	})
 }
 

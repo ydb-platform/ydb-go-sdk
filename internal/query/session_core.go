@@ -37,27 +37,23 @@ type (
 		closer.Closer
 		pool.Item
 
-		Done() <-chan struct{}
 		SetStatus(code Status)
 	}
 	sessionCore struct {
 		cc     grpc.ClientConnInterface
 		Client Ydb_Query_V1.QueryServiceClient
 		Trace  *trace.Query
-		done   chan struct{}
+		closed atomic.Bool
 
 		deleteTimeout  time.Duration
 		id             string
 		nodeID         uint32
 		status         atomic.Uint32
 		onChangeStatus []func(status Status)
-		closeOnce      func()
+		cancelAttach   context.CancelFunc
+		closeMu        sync.Mutex
 	}
 )
-
-func (core *sessionCore) Done() <-chan struct{} {
-	return core.done
-}
 
 func (core *sessionCore) ID() string {
 	return core.id
@@ -85,12 +81,11 @@ func (core *sessionCore) SetStatus(status Status) {
 }
 
 func (core *sessionCore) Status() string {
-	select {
-	case <-core.done:
+	if core.closed.Load() {
 		return StatusClosed.String()
-	default:
-		return core.statusCode().String()
 	}
+
+	return core.statusCode().String()
 }
 
 func (core *sessionCore) checkCloseHint(md metadata.MD) {
@@ -138,7 +133,6 @@ func Open(
 	core := &sessionCore{
 		Client: client,
 		Trace:  &trace.Query{},
-		done:   make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -197,7 +191,7 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	attachCtx, cancelAttach := xcontext.WithDone(xcontext.ValueOnly(ctx), core.done)
+	attachCtx, cancelAttach := context.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
 		if finalErr != nil {
 			cancelAttach()
@@ -216,11 +210,7 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	core.closeOnce = sync.OnceFunc(func() {
-		defer close(core.done)
-		defer cancelAttach()
-		core.SetStatus(StatusClosed)
-	})
+	core.cancelAttach = cancelAttach
 
 	if markGoroutineWithLabelNodeIDForAttachStream {
 		pprof.Do(ctx, pprof.Labels(
@@ -238,7 +228,7 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryService_AttachSessionClient) {
 	for core.IsAlive() {
 		if _, recvErr := attachStream.Recv(); recvErr != nil {
-			core.closeOnce()
+			core.releaseSession()
 
 			return
 		}
@@ -277,31 +267,41 @@ func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
 }
 
 func (core *sessionCore) IsAlive() bool {
-	select {
-	case <-core.done:
+	if core.closed.Load() {
 		return false
-	default:
-		return IsAlive(Status(core.status.Load()))
 	}
+
+	return IsAlive(Status(core.status.Load()))
+}
+
+func (core *sessionCore) releaseSession() {
+	if !core.closed.CompareAndSwap(false, true) {
+		return
+	}
+	if core.cancelAttach != nil {
+		core.cancelAttach()
+	}
+	core.SetStatus(StatusClosed)
 }
 
 func (core *sessionCore) Close(ctx context.Context) (err error) {
-	if core.closeOnce != nil {
-		defer core.closeOnce()
-	}
+	core.closeMu.Lock()
+	defer core.closeMu.Unlock()
 
-	select {
-	case <-core.done:
+	if core.closed.Load() {
 		return nil
-	default:
-		core.SetStatus(StatusClosing)
-
-		if err = core.deleteSession(ctx); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
 	}
 
-	return nil
+	core.SetStatus(StatusClosing)
+
+	err = core.deleteSession(ctx)
+	if err != nil {
+		err = xerrors.WithStackTrace(err)
+	}
+
+	core.releaseSession()
+
+	return err
 }
 
 func StatusFromErr(err error) Status {

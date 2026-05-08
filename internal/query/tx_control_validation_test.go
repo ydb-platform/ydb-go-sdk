@@ -167,7 +167,6 @@ func testClient(t *testing.T, client *MockQueryServiceClient) *Client {
 	return &Client{
 		config: config.New(),
 		client: client,
-		done:   make(chan struct{}),
 		explicitSessionPool: &mockSessionPool{
 			withFunc: func(ctx context.Context, f func(ctx context.Context, s *Session) error) error {
 				return f(ctx, &Session{})

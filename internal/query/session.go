@@ -166,16 +166,13 @@ func (s *Session) Begin(
 func (s *Session) execute(
 	ctx context.Context, q string, settings executeSettings, opts ...resultOption,
 ) (_ *streamResult, finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, s.Done())
 	defer func() {
 		if finalErr != nil {
-			cancel()
 			applyStatusByError(s, finalErr)
 		}
 	}()
 
 	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts,
-		withStreamResultOnClose(cancel),
 		withStreamResultCloseTimeout(s.streamResultCloseTimeout),
 	)...)
 	if err != nil {
@@ -258,10 +255,8 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (_ arrow.Result, finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 
-	ctx, cancel := xcontext.WithDone(ctx, s.Done())
 	defer func() {
 		if finalErr != nil {
-			cancel()
 			applyStatusByError(s, finalErr)
 		}
 	}()
