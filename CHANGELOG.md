@@ -1,4 +1,4 @@
-* Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a reader partition session
+* Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a partition session on the reader
 
 ## v3.135.13
 * Optimized the `internal/stack.FunctionID` for decreased allocations and CPU usage

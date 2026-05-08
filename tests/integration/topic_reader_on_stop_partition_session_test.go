@@ -5,6 +5,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -25,8 +26,9 @@ const checkStepTimeout = time.Second
 
 // TestTopicReaderOnStopPartitionSessionAfterReaderRebalance checks that
 // WithReaderOnStopPartitionSession is invoked when the server stops a partition
-// session after a rebalance between readers, and that a Commit done from the
-// callback reaches the server before the corresponding StopPartitionSessionResponse.
+// session after a rebalance between readers, and that commits from the callback
+// reach the server. Two messages are read from two partitions and both are
+// committed inside the callback.
 func TestTopicReaderOnStopPartitionSessionAfterReaderRebalance(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
@@ -34,28 +36,31 @@ func TestTopicReaderOnStopPartitionSessionAfterReaderRebalance(t *testing.T) {
 
 	h.createTopicWithPartitions(2)
 
-	var readMessage *topicreader.Message
+	var msg0, msg1 *topicreader.Message
 
-	h.createFirstReader(
-		// Sync commit mode so that Commit(ctx, msg) inside the callback waits
-		// for the server ack before returning. This guarantees the commit is
-		// delivered before the SDK sends StopPartitionSessionResponse without
-		// any extra flushing on the SDK side.
-		topicoptions.WithReaderCommitMode(topicoptions.CommitModeSync),
+	h.createReader(
 		topicoptions.WithReaderOnStopPartitionSession(func(req topicoptions.StopPartitionSessionRequest) {
-			h.scope.Require.NotNil(readMessage, "first reader did not read the message before stop partition callback")
-			h.scope.Require.Equal(readMessage.PartitionID(), req.PartitionID)
-			h.scope.Require.Greater(req.PartitionSessionID, int64(0))
-			h.scope.Require.NoError(h.firstReader.commit(ctx, readMessage))
-			h.onStopCalledOnce.Do(func() { close(h.onStopCalled) })
+			defer h.onStopCalledOnce.Do(func() { close(h.onStopCalled) })
+
+			if !req.Graceful {
+				return
+			}
+
+			h.scope.Require.NotNil(msg0)
+			h.scope.Require.NotNil(msg1)
+			h.scope.Require.NoError(h.firstReader.commit(ctx, msg0))
+			h.scope.Require.NoError(h.firstReader.commit(ctx, msg1))
 		}),
 	)
 	h.firstReader.waitGotAllPartitions(ctx)
 
-	h.writeMessage(ctx)
-	readMessage = h.firstReader.readMessage(ctx)
+	h.writeMessageToPartition(ctx, 0)
+	h.writeMessageToPartition(ctx, 1)
 
-	h.createSecondReader()
+	msg0 = h.firstReader.readMessage(ctx)
+	msg1 = h.firstReader.readMessage(ctx)
+
+	h.triggerStopPartitionGraceful()
 
 	// Write a message and start a background ReadMessage on the first reader
 	// so the SDK drains the queued StopPartitionSessionRequest from the
@@ -66,11 +71,43 @@ func TestTopicReaderOnStopPartitionSessionAfterReaderRebalance(t *testing.T) {
 	h.firstReader.readInBackground(ctx)
 
 	h.requireOnStopPartitionSessionCalled(ctx)
-	h.requireReadMessageCommitted(ctx, readMessage)
+	h.requireReadMessageCommitted(ctx, msg0)
+	h.requireReadMessageCommitted(ctx, msg1)
 }
 
-// onStopPartitionSessionScenario drives the rebalance scenario for the
-// WithReaderOnStopPartitionSession test step by step.
+// TestTopicReaderOnStopPartitionSessionNonGracefulWhenChangefeedDropped checks that
+// dropping a changefeed emits StopPartitionSession with graceful=false and invokes
+// WithReaderOnStopPartitionSession with Graceful set to false.
+func TestTopicReaderOnStopPartitionSessionNonGracefulWhenChangefeedDropped(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	h := newOnStopPartitionSessionScenario(scope)
+
+	h.createChangefeedTopic()
+	h.createReader(
+		topicoptions.WithReaderOnStopPartitionSession(func(req topicoptions.StopPartitionSessionRequest) {
+			h.scope.Require.False(req.Graceful,
+				"StopPartitionSession after changefeed drop must be non-graceful, got graceful=%v", req.Graceful)
+			h.onStopCalledOnce.Do(func() { close(h.onStopCalled) })
+		}),
+	)
+	h.firstReader.waitGotAllPartitions(ctx)
+
+	h.upsertOneRow(ctx)
+
+	readMessage := h.firstReader.readMessage(ctx)
+	h.scope.Require.NotNil(readMessage)
+
+	h.triggerStopPartitionNotGraceful(ctx)
+
+	// Drain the batcher so StopPartitionSessionRequest is processed and the callback runs.
+	h.firstReader.readInBackground(ctx)
+
+	h.requireOnStopPartitionSessionCalled(ctx)
+}
+
+// onStopPartitionSessionScenario drives the stop-partition integration tests step by step
+// (reader rebalance and changefeed drop).
 type onStopPartitionSessionScenario struct {
 	scope *scopeT
 
@@ -116,11 +153,30 @@ func (h *onStopPartitionSessionScenario) writeMessage(ctx context.Context) {
 	))
 }
 
-// createFirstReader starts the first reader.
+// writeMessageToPartition writes one message to an explicit partition using a dedicated writer.
+func (h *onStopPartitionSessionScenario) writeMessageToPartition(ctx context.Context, partitionID int64) {
+	h.scope.t.Helper()
+
+	writer, err := h.scope.Driver().Topic().StartWriter(
+		h.topicPath,
+		topicoptions.WithWriterPartitionID(partitionID),
+		topicoptions.WithWriterProducerID(fmt.Sprintf("stop-partition-test-p%d", partitionID)),
+		topicoptions.WithWriterWaitServerAck(true),
+	)
+	h.scope.Require.NoError(err)
+	defer func() { _ = writer.Close(ctx) }()
+
+	err = writer.Write(ctx, topicwriter.Message{
+		Data: strings.NewReader(fmt.Sprintf("message-%d", partitionID)),
+	})
+	h.scope.Require.NoError(err)
+}
+
+// createReader starts the primary reader for topicPath (regular topic or CDC).
 //
 // The opts are merged with internal infrastructure options (partition-tracking
 // trace) and passed to StartReader.
-func (h *onStopPartitionSessionScenario) createFirstReader(opts ...topicoptions.ReaderOption) {
+func (h *onStopPartitionSessionScenario) createReader(opts ...topicoptions.ReaderOption) {
 	h.scope.t.Helper()
 
 	r := &scenarioReader{
@@ -151,6 +207,15 @@ func (h *onStopPartitionSessionScenario) createFirstReader(opts ...topicoptions.
 	h.firstReader = r
 }
 
+// triggerStopPartitionGraceful starts a second reader on the same consumer so the
+// server takes one partition away from the first reader and sends a graceful
+// StopPartitionSession for that partition.
+func (h *onStopPartitionSessionScenario) triggerStopPartitionGraceful() {
+	h.scope.t.Helper()
+
+	h.createSecondReader()
+}
+
 // createSecondReader starts a second reader on the same consumer so the
 // server takes one partition away from the first reader.
 func (h *onStopPartitionSessionScenario) createSecondReader() {
@@ -176,7 +241,7 @@ func (h *onStopPartitionSessionScenario) requireOnStopPartitionSessionCalled(ctx
 	select {
 	case <-h.onStopCalled:
 	case <-ctx.Done():
-		h.scope.Require.NoError(ctx.Err(), "WithReaderOnStopPartitionSession was not invoked after reader rebalance")
+		h.scope.Require.NoError(ctx.Err(), "WithReaderOnStopPartitionSession was not invoked in time")
 	}
 }
 
@@ -188,7 +253,7 @@ func (h *onStopPartitionSessionScenario) requireReadMessageCommitted(
 ) {
 	h.scope.t.Helper()
 
-	h.scope.Require.NotNil(msg, "first reader did not read the message")
+	h.scope.Require.NotNil(msg, "reader did not provide the message to check committed offset")
 	if msg == nil {
 		return
 	}
@@ -226,8 +291,48 @@ func (h *onStopPartitionSessionScenario) requireReadMessageCommitted(
 	}
 }
 
+// createChangefeedTopic registers a CDC changefeed on the scope table and sets topicPath
+// to the CDC topic (single partition).
+func (h *onStopPartitionSessionScenario) createChangefeedTopic() {
+	h.scope.t.Helper()
+
+	h.partitionCount = 1
+	h.topicPath = h.scope.ChangefeedTopicPath()
+}
+
+func (h *onStopPartitionSessionScenario) upsertOneRow(ctx context.Context) {
+	h.scope.t.Helper()
+
+	prefix := fmt.Sprintf(`PRAGMA TablePathPrefix("%s");`, h.scope.Folder())
+	err := h.scope.execQueryContext(ctx, prefix+fmt.Sprintf(
+		`UPSERT INTO %s (id, val) VALUES (1, "x");`,
+		h.scope.TableName(),
+	))
+	h.scope.Require.NoError(err)
+}
+
+func (h *onStopPartitionSessionScenario) dropChangefeed(ctx context.Context) {
+	h.scope.t.Helper()
+
+	prefix := fmt.Sprintf(`PRAGMA TablePathPrefix("%s");`, h.scope.Folder())
+	q := prefix + fmt.Sprintf(
+		`ALTER TABLE %s DROP CHANGEFEED cdc;`,
+		h.scope.TableName(),
+	)
+	err := h.scope.execQueryContext(ctx, q)
+	h.scope.Require.NoError(err)
+}
+
+// triggerStopPartitionNotGraceful drops the CDC changefeed so the server sends
+// StopPartitionSession with graceful=false.
+func (h *onStopPartitionSessionScenario) triggerStopPartitionNotGraceful(ctx context.Context) {
+	h.scope.t.Helper()
+
+	h.dropChangefeed(ctx)
+}
+
 // scenarioReader wraps a topic reader together with state needed by the
-// rebalance scenario (partition session tracking).
+// scenario (partition session tracking).
 type scenarioReader struct {
 	t testing.TB
 

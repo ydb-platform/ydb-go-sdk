@@ -36,6 +36,13 @@ type PublicGetPartitionStartOffsetFunc func(
 // PublicStopPartitionSessionRequest describes the partition session the server
 // is going to stop on the reader. It is passed to the user callback registered
 // via topicoptions.WithReaderOnStopPartitionSession.
+//
+// For graceful stops the user can flush local state and perform final commit
+// attempts before the SDK sends StopPartitionSessionResponse to the server.
+//
+// When Graceful is false, the partition session is no longer valid on the
+// client for operations tied to that session: do not commit messages or
+// otherwise rely on this session—the server has already revoked it.
 type PublicStopPartitionSessionRequest struct {
 	// Topic is the path of the topic of the partition session.
 	Topic string
@@ -51,8 +58,9 @@ type PublicStopPartitionSessionRequest struct {
 	CommittedOffset int64
 
 	// Graceful is true when the server asks for a graceful stop and waits for
-	// the SDK to acknowledge it; false means the session has been torn down
-	// on the server side already and the user must stop using it immediately.
+	// the SDK to acknowledge it. When false, the session has already been torn
+	// down on the server side; you must not commit messages or perform other
+	// session-scoped work for this partition session.
 	Graceful bool
 }
 

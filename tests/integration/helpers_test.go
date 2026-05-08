@@ -267,6 +267,83 @@ func (scope *scopeT) TopicPath(opts ...topicoptions.CreateOption) string {
 	return fixenv.CacheResult(scope.Env, f)
 }
 
+type changefeedPathParams struct {
+	feedName string
+}
+
+// withChangefeedName sets the changefeed name (default in ChangefeedTopicPath is "cdc").
+func withChangefeedName(name string) func(*changefeedPathParams) {
+	return func(p *changefeedPathParams) {
+		p.feedName = name
+	}
+}
+
+// execQuery runs YQL (including DDL) through the Query service client using scope.Ctx.
+func (scope *scopeT) execQuery(yql string) error {
+	return scope.execQueryContext(scope.Ctx, yql)
+}
+
+// execQueryContext runs YQL through the Query client with an explicit context.
+func (scope *scopeT) execQueryContext(ctx context.Context, yql string) error {
+	return scope.Driver().Query().Exec(ctx, yql)
+}
+
+// ChangefeedTopicPath creates a CDC changefeed on the scope test table (via TablePath),
+// registers TopicConsumerName on the implicit CDC topic, and returns the full topic path
+// for StartReader. Cleanup drops the changefeed before the table is removed.
+func (scope *scopeT) ChangefeedTopicPath(opts ...func(*changefeedPathParams)) string {
+	params := changefeedPathParams{feedName: "cdc"}
+	for _, o := range opts {
+		if o != nil {
+			o(&params)
+		}
+	}
+
+	f := func() (*fixenv.GenericResult[string], error) {
+		tablePath := scope.TablePath()
+		table := scope.TableName()
+		prefix := fmt.Sprintf(`PRAGMA TablePathPrefix("%s");`, scope.Folder())
+
+		addFeed := prefix + fmt.Sprintf(`
+ALTER TABLE %s
+ADD CHANGEFEED %s WITH (
+	FORMAT = 'JSON',
+	MODE = 'UPDATES'
+);
+`, table, params.feedName)
+
+		if err := scope.execQuery(addFeed); err != nil {
+			return nil, err
+		}
+
+		topicLocalPath := path.Join(table, params.feedName)
+		addConsumer := prefix + fmt.Sprintf(`
+ALTER TOPIC %s
+ADD CONSUMER %s;
+`, "`"+topicLocalPath+"`", "`"+scope.TopicConsumerName()+"`")
+
+		if err := scope.execQuery(addConsumer); err != nil {
+			return nil, err
+		}
+
+		cdcTopicPath := path.Join(tablePath, params.feedName)
+
+		cleanup := func() {
+			if scope.Failed() {
+				return
+			}
+			dropFeed := prefix + fmt.Sprintf(`
+ALTER TABLE %s DROP CHANGEFEED %s;
+`, table, params.feedName)
+			_ = scope.execQuery(dropFeed)
+		}
+
+		return fixenv.NewGenericResultWithCleanup(cdcTopicPath, cleanup), nil
+	}
+
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: params.feedName})
+}
+
 func (scope *scopeT) TopicReader() *topicreader.Reader {
 	return scope.TopicReaderNamed("default-reader")
 }

@@ -437,7 +437,7 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 				return
 			}
 		case *rawtopicreader.StopPartitionSessionRequest:
-			if err := r.onStopPartitionSessionRequestFromBuffer(m); err != nil {
+			if err := r.onStopPartitionSessionRequestFromBuffer(ctx, m); err != nil {
 				_ = r.CloseWithError(ctx, xerrors.WithStackTrace(
 					fmt.Errorf("ydb: unexpected error on stop partition handler: %w", err),
 				))
@@ -455,6 +455,7 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 }
 
 func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
+	ctx context.Context,
 	msg *rawtopicreader.StopPartitionSessionRequest,
 ) (err error) {
 	session, err := r.sessionController.Get(msg.PartitionSessionID)
@@ -486,6 +487,12 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	}
 
 	if msg.Graceful {
+		if err = r.committer.Flush(ctx); err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"ydb: flush buffered commits on graceful stop partition session: %w",
+				err,
+			))
+		}
 		session.Close()
 		resp := &rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: session.StreamPartitionSessionID,

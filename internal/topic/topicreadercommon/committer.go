@@ -3,6 +3,7 @@ package topicreadercommon
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -49,6 +50,7 @@ type Committer struct {
 	tracer           *trace.Topic
 
 	m       xsync.Mutex
+	sendMu  sync.Mutex // serializes swap+send so concurrent Flush calls and pushCommitsLoop never overlap sends
 	waiters []commitWaiter
 	commits CommitRanges
 }
@@ -131,33 +133,52 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 		var commits CommitRanges
 		c.m.WithLock(func() {
 			commits = c.commits
-			c.commits = NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:mnd
 		})
 
 		if commits.Len() == 0 && c.backgroundWorker.Context().Err() != nil {
-			// committer closed with empty buffer - target close state
 			return
 		}
 
-		// all ranges already committed of prev iteration
-		if commits.Len() == 0 {
-			continue
-		}
-
-		commits.Optimize()
-
-		onDone := trace.TopicOnReaderSendCommitMessage(
-			c.tracer,
-			&ctx,
-			&commits,
-		)
-		err := c.send(commits.ToRawMessage())
-		onDone(err)
-
-		if err != nil {
+		if err := c.Flush(ctx); err != nil {
 			_ = c.backgroundWorker.Close(ctx, err)
+
+			return
 		}
 	}
+}
+
+// Flush swaps the buffer under c.m, then Optimize and send while holding sendMu
+// so only one sender runs at a time. Caller must not hold c.m or sendMu.
+func (c *Committer) Flush(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+
+	var commits CommitRanges
+
+	c.m.WithLock(func() {
+		commits = c.commits
+		c.commits = NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:mnd
+	})
+
+	if commits.Len() == 0 {
+		return nil
+	}
+
+	commits.Optimize()
+
+	onDone := trace.TopicOnReaderSendCommitMessage(
+		c.tracer,
+		&ctx,
+		&commits,
+	)
+	err := c.send(commits.ToRawMessage())
+	onDone(err)
+
+	return err
 }
 
 func (c *Committer) waitSendTrigger(ctx context.Context) {
