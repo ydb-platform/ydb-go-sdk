@@ -1,4 +1,4 @@
-* Refactored the `internal/xcontext.WithDone` for better performance
+* Refactored the `internal/xcontext.WithDone` for better performance.
 
 ## v3.135.14
 * Adjusted gRPC client-stream error wrapping to improve topic writer reconnect behavior, ensuring stream teardown races don’t cause server-side gRPC cancellations to be misclassified as purely local context cancellations.
