@@ -16,9 +16,11 @@ import (
 	"google.golang.org/grpc/metadata"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -102,7 +104,7 @@ func TestGrpcClientStream_Context(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mockStream := mock.NewMockClientStream(ctrl)
 
-		expectedCtx := context.WithValue(context.Background(), "key", "value") //nolint:revive,staticcheck
+		expectedCtx := context.WithValue(t.Context(), "key", "value") //nolint:revive,staticcheck
 		mockStream.EXPECT().Context().Return(expectedCtx)
 
 		config := &mockConfig{
@@ -139,7 +141,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 		}
@@ -164,7 +166,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 		}
@@ -191,7 +193,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel() // cancel the stream context before calling CloseSend
 
 		s := &grpcClientStream{
@@ -206,7 +208,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		require.Error(t, err)
 		// When the stream context is done, the error must NOT be wrapped as a
 		// transport error regardless of what gRPC returned.
-		require.False(t, xerrors.IsTransportError(err))
+		require.True(t, xerrors.IsTransportError(err))
 		require.ErrorIs(t, err, streamErr)
 	})
 
@@ -226,7 +228,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 		}
@@ -253,7 +255,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   false,
 		}
 
@@ -281,7 +283,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -307,7 +309,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -335,7 +337,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel() // cancel the stream context before calling SendMsg
 
 		s := &grpcClientStream{
@@ -351,7 +353,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		require.Error(t, err)
 		// When the stream context is done, the error must NOT be wrapped as a
 		// transport error regardless of what gRPC returned.
-		require.False(t, xerrors.IsTransportError(err))
+		require.True(t, xerrors.IsTransportError(err))
 		require.ErrorIs(t, err, streamErr)
 	})
 
@@ -372,7 +374,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   &modificationMark{},
@@ -404,7 +406,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   mark,
@@ -434,7 +436,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   false,
 			sentMark:   &modificationMark{},
 		}
@@ -468,7 +470,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -495,7 +497,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -505,31 +507,64 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 	})
 
 	t.Run("ContextError", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		mockStream := mock.NewMockClientStream(ctrl)
+		t.Run("context.Canceled from RecvMsg", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStream := mock.NewMockClientStream(ctrl)
 
-		msg := &Ydb_Query.ExecuteQueryResponsePart{}
-		mockStream.EXPECT().RecvMsg(msg).Return(context.Canceled)
-		mockStream.EXPECT().Trailer().Return(metadata.MD{})
+			msg := &Ydb_Query.ExecuteQueryResponsePart{}
+			mockStream.EXPECT().RecvMsg(msg).Return(context.Canceled)
+			mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		e := endpoint.New("test-endpoint:2135")
-		parentConn := newConn(e, config)
+			config := &mockConfig{
+				dialTimeout:   5 * time.Second,
+				connectionTTL: 0,
+			}
+			e := endpoint.New("test-endpoint:2135")
+			parentConn := newConn(e, config)
 
-		s := &grpcClientStream{
-			parentConn: parentConn,
-			stream:     mockStream,
-			streamCtx:  context.Background(),
-			wrapping:   true,
-			sentMark:   &modificationMark{},
-		}
+			s := &grpcClientStream{
+				parentConn: parentConn,
+				stream:     mockStream,
+				streamCtx:  t.Context(),
+				wrapping:   true,
+				sentMark:   &modificationMark{},
+			}
 
-		err := s.RecvMsg(msg)
-		require.Error(t, err)
-		require.True(t, xerrors.IsContextError(err))
+			err := s.RecvMsg(msg)
+			require.Error(t, err)
+			require.True(t, xerrors.IsContextError(err))
+		})
+		t.Run("stream context canceled", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStream := mock.NewMockClientStream(ctrl)
+
+			msg := &Ydb_Query.ExecuteQueryResponsePart{}
+			mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, ""))
+			mockStream.EXPECT().Trailer().Return(metadata.MD{})
+
+			config := &mockConfig{
+				dialTimeout:   5 * time.Second,
+				connectionTTL: 0,
+			}
+			e := endpoint.New("test-endpoint:2135")
+			parentConn := newConn(e, config)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			s := &grpcClientStream{
+				parentConn: parentConn,
+				stream:     mockStream,
+				streamCtx:  ctx,
+				wrapping:   true,
+				sentMark:   &modificationMark{},
+			}
+
+			err := s.RecvMsg(msg)
+			require.Error(t, err)
+			require.True(t, xerrors.IsContextError(err))
+			require.True(t, xerrors.IsTransportError(err))
+		})
 	})
 
 	t.Run("StreamContextDoneReturnsNonTransportError", func(t *testing.T) {
@@ -551,7 +586,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel() // cancel the stream context before calling RecvMsg
 
 		s := &grpcClientStream{
@@ -567,38 +602,111 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		require.Error(t, err)
 		// When the stream context is done, the error must NOT be wrapped as a
 		// transport error regardless of what gRPC returned.
-		require.False(t, xerrors.IsTransportError(err))
+		require.True(t, xerrors.IsTransportError(err))
+		require.True(t, xerrors.IsContextError(err))
 		require.ErrorIs(t, err, streamErr)
 	})
 
 	t.Run("TransportErrorRetryable", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		mockStream := mock.NewMockClientStream(ctrl)
+		t.Run("Unavailable", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStream := mock.NewMockClientStream(ctrl)
 
-		msg := &Ydb_Query.ExecuteQueryResponsePart{}
-		mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
-		mockStream.EXPECT().Trailer().Return(metadata.MD{})
+			msg := &Ydb_Query.ExecuteQueryResponsePart{}
+			mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
+			mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-		}
-		e := endpoint.New("test-endpoint:2135")
-		parentConn := newConn(e, config)
+			config := &mockConfig{
+				dialTimeout:   5 * time.Second,
+				connectionTTL: 0,
+			}
+			e := endpoint.New("test-endpoint:2135")
+			parentConn := newConn(e, config)
 
-		s := &grpcClientStream{
-			parentConn: parentConn,
-			stream:     mockStream,
-			streamCtx:  context.Background(),
-			wrapping:   true,
-			traceID:    "test-trace-id",
-			sentMark:   &modificationMark{},
-		}
+			s := &grpcClientStream{
+				parentConn: parentConn,
+				stream:     mockStream,
+				streamCtx:  t.Context(),
+				wrapping:   true,
+				traceID:    "test-trace-id",
+				sentMark:   &modificationMark{},
+			}
 
-		err := s.RecvMsg(msg)
-		require.Error(t, err)
-		require.True(t, xerrors.IsTransportError(err))
-		require.True(t, xerrors.IsRetryableError(err))
+			err := s.RecvMsg(msg)
+			require.Error(t, err)
+			require.True(t, xerrors.IsTransportError(err))
+			require.True(t, xerrors.IsRetryableError(err))
+		})
+		t.Run("Cancelled", func(t *testing.T) {
+			t.Run("sentMark.canRetry()==false", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				mockStream := mock.NewMockClientStream(ctrl)
+
+				msg := &Ydb_Query.ExecuteQueryResponsePart{}
+				mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, "Cancelled on the server side"))
+				mockStream.EXPECT().Trailer().Return(metadata.MD{})
+
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+
+				// Cleaner existing pattern:
+				mark := &modificationMark{}
+				mark.markDirty()
+
+				s := &grpcClientStream{
+					parentConn: &conn{
+						config:    &mockConfig{},
+						endpoint:  endpoint.New("test-endpoint:2135"),
+						lastUsage: nopLastUsage{},
+					},
+					stream:    mockStream,
+					streamCtx: ctx,
+					wrapping:  true,
+					sentMark:  mark,
+				}
+
+				err := s.RecvMsg(msg)
+				require.Error(t, err)
+
+				check := retry.Check(err)
+				require.EqualValues(t, grpcCodes.Canceled, check.StatusCode())
+				require.EqualValues(t, backoff.TypeFast, check.BackoffType())
+				require.True(t, check.MustRetry(true))
+				require.False(t, check.MustRetry(false))
+			})
+			t.Run("sentMark.canRetry()==true", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				mockStream := mock.NewMockClientStream(ctrl)
+
+				msg := &Ydb_Query.ExecuteQueryResponsePart{}
+				mockStream.EXPECT().RecvMsg(msg).Return(grpcStatus.Error(grpcCodes.Canceled, context.Canceled.Error()))
+				mockStream.EXPECT().Trailer().Return(metadata.MD{})
+
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+
+				s := &grpcClientStream{
+					parentConn: &conn{
+						config:    &mockConfig{},
+						endpoint:  endpoint.New("test-endpoint:2135"),
+						lastUsage: nopLastUsage{},
+					},
+					stream:    mockStream,
+					streamCtx: ctx,
+					wrapping:  true,
+					sentMark:  &modificationMark{},
+				}
+
+				err := s.RecvMsg(msg)
+				require.Error(t, err)
+
+				check := retry.Check(err)
+				require.EqualValues(t, grpcCodes.Canceled, check.StatusCode())
+				require.EqualValues(t, backoff.TypeFast, check.BackoffType())
+				require.True(t, check.MustRetry(true))
+				require.True(t, check.MustRetry(false))
+			})
+		})
 	})
 
 	t.Run("TransportErrorNonRetryable", func(t *testing.T) {
@@ -622,7 +730,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   mark,
@@ -653,7 +761,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   false,
 			sentMark:   &modificationMark{},
 		}
@@ -686,7 +794,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -718,7 +826,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  context.Background(),
+			streamCtx:  t.Context(),
 			wrapping:   false,
 			sentMark:   &modificationMark{},
 		}
@@ -741,7 +849,7 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		called := false
 		wrappedCancel := func() {
 			called = true
@@ -771,7 +879,7 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 
 		s := &grpcClientStream{
 			parentConn:   parentConn,
