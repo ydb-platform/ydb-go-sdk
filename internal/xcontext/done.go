@@ -12,7 +12,7 @@ var (
 		close(ch)
 
 		return ch
-	}
+	}()
 )
 
 // doneAlreadySignaledCtx is used when done is readable at WithDone entry so we
@@ -26,7 +26,7 @@ func (c *doneAlreadySignaledCtx) Deadline() (deadline time.Time, ok bool) {
 }
 
 func (c *doneAlreadySignaledCtx) Done() <-chan struct{} {
-	return closedDoneChan()
+	return closedDoneChan
 }
 
 func (c *doneAlreadySignaledCtx) Err() error {
