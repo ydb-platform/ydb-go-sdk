@@ -28,23 +28,22 @@ func (done doneCtx) Value(key any) any {
 	return nil
 }
 
-func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(parent)
+var noopCancel = func() {}
 
+func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
 	select {
 	case <-done:
-		cancel()
-
-		return ctx, cancel
+		return parent, noopCancel
 	default:
-	}
+		ctx, cancel := context.WithCancel(parent)
 
-	stop := context.AfterFunc(doneCtx(done), func() {
-		cancel()
-	})
+		stop := context.AfterFunc(doneCtx(done), func() {
+			cancel()
+		})
 
-	return ctx, func() {
-		stop()
-		cancel()
+		return ctx, func() {
+			stop()
+			cancel()
+		}
 	}
 }

@@ -49,3 +49,46 @@ func TestWithDone(t *testing.T) {
 		require.Error(t, ctx.Err())
 	})
 }
+
+// BenchmarkWithDone/AlreadyClosed-12         	17312102	        63.98 ns/op	      96 B/op	       2 allocs/op
+// BenchmarkWithDone/Open_CancelImmediately-12         	 3280508	       380.2 ns/op	     424 B/op	       8 allocs/op
+// BenchmarkWithDone/Open_CloseDoneThenCancel-12       	 1347684	       887.1 ns/op	     647 B/op	       9 allocs/op
+func BenchmarkWithDone(b *testing.B) {
+	parent := context.Background()
+
+	b.Run("AlreadyClosed", func(b *testing.B) {
+		done := make(chan struct{})
+		close(done)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for b.Loop() {
+			ctx, cancel := WithDone(parent, done)
+			cancel()
+			_ = ctx
+		}
+	})
+
+	b.Run("Open_CancelImmediately", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for b.Loop() {
+			done := make(chan struct{})
+			ctx, cancel := WithDone(parent, done)
+			cancel()
+			_ = ctx
+			_ = done
+		}
+	})
+
+	b.Run("Open_CloseDoneThenCancel", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for b.Loop() {
+			done := make(chan struct{})
+			ctx, cancel := WithDone(parent, done)
+			close(done)
+			<-ctx.Done()
+			cancel()
+		}
+	})
+}
