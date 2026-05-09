@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type singleRow struct {
@@ -79,7 +80,7 @@ type Rows struct {
 	inner    common.Rows
 }
 
-const utf8DatabaseTypeName = "Utf8"
+var utf8DatabaseTypeName = types.TypeText.String()
 
 var (
 	_ driver.RowsNextResultSet              = (*Rows)(nil)
