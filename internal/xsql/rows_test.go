@@ -1,7 +1,6 @@
 package xsql
 
 import (
-	"context"
 	"database/sql"
 	"database/sql/driver"
 	"io"
