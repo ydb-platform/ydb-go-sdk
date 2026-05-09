@@ -71,7 +71,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
-	result common.Rows, finalErr error,
+	_ common.Rows, finalErr error,
 ) {
 	if !c.isReady() {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
@@ -96,14 +96,17 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 		opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
 	}
 
-	res, err := c.session.Query(ctx, sql, opts...)
+	result, err := c.session.Query(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return &rows{
-		result: res,
-	}, nil
+	rows, err := newRows(ctx, result)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rows, nil
 }
 
 func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast string, plan string, _ error) {
