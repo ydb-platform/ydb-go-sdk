@@ -239,6 +239,9 @@ func do(
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	var (
 		settings = options.ParseDoOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDo(settings.Trace(), &ctx,
@@ -341,6 +344,9 @@ func clientQueryRow(
 
 // QueryRow is a helper which read only one row from first result set in result
 func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute) (_ query.Row, finalErr error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	settings := options.ExecuteSettings(opts...)
 
 	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
@@ -394,6 +400,9 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 }
 
 func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnExec(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
@@ -446,6 +455,9 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 }
 
 func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (r query.Result, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
@@ -497,6 +509,9 @@ func clientQueryResultSet(
 func (c *Client) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
 ) (rs result.ClosableResultSet, finalErr error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	var (
 		settings  = options.ExecuteSettings(opts...)
 		rowsCount int
@@ -549,6 +564,9 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	if lazyTx := settings.LazyTx(); lazyTx != nil {
 		ctx = tx.WithLazyTx(ctx, *lazyTx)
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	err := doTx(ctx, c.explicitSessionPool, op,
 		settings.TxSettings(),
