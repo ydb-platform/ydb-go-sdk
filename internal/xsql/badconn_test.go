@@ -282,7 +282,7 @@ func TestRows_BadConnMapping(t *testing.T) {
 	for _, ydbErr := range errYdbErrors {
 		wantBadConn := xerrors.MustDeleteTableOrQuerySession(ydbErr)
 		t.Run(ydbErr.Error(), func(t *testing.T) {
-			rows := newRows(context.Background(), &mockErrRows{err: ydbErr})
+			rows := newRows(t.Context(), &mockErrRows{err: ydbErr})
 
 			t.Run("Next", func(t *testing.T) {
 				err := rows.Next(nil)
@@ -290,13 +290,13 @@ func TestRows_BadConnMapping(t *testing.T) {
 			})
 
 			t.Run("NextResultSet", func(t *testing.T) {
-				rows := newRows(context.Background(), &mockErrRows{err: ydbErr})
+				rows := newRows(t.Context(), &mockErrRows{err: ydbErr})
 				err := rows.(interface{ NextResultSet() error }).NextResultSet()
 				require.Equal(t, wantBadConn, xerrors.Is(err, driver.ErrBadConn))
 			})
 
 			t.Run("Close", func(t *testing.T) {
-				rows := newRows(context.Background(), &mockErrRows{err: ydbErr})
+				rows := newRows(t.Context(), &mockErrRows{err: ydbErr})
 				err := rows.Close()
 				require.Equal(t, wantBadConn, xerrors.Is(err, driver.ErrBadConn))
 			})
@@ -305,11 +305,11 @@ func TestRows_BadConnMapping(t *testing.T) {
 }
 
 func TestRows_IOEOFPreserved(t *testing.T) {
-	rows := newRows(context.Background(), &mockErrRows{err: io.EOF})
+	rows := newRows(t.Context(), &mockErrRows{err: io.EOF})
 	err := rows.Next(nil)
 	require.Equal(t, io.EOF, err)
 
-	rows = newRows(context.Background(), &mockErrRows{err: io.EOF})
+	rows = newRows(t.Context(), &mockErrRows{err: io.EOF})
 	err = rows.(interface{ NextResultSet() error }).NextResultSet()
 	require.Equal(t, io.EOF, err)
 }
