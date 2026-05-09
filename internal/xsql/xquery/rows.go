@@ -129,12 +129,6 @@ func (r *rows) HasNextResultSet(ctx context.Context) bool {
 }
 
 func (r *rows) Next(ctx context.Context, dst []driver.Value) (finalErr error) {
-	defer func() {
-		if finalErr != nil {
-			r.lastErr = finalErr
-		}
-	}()
-
 	nextRow, err := r.next.set.NextRow(ctx)
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
