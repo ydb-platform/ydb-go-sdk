@@ -5,7 +5,6 @@ import (
 	"os"
 	"runtime/pprof"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -51,7 +50,6 @@ type (
 		status         atomic.Uint32
 		onChangeStatus []func(status Status)
 		cancelAttach   context.CancelFunc
-		closeMu        sync.Mutex
 	}
 )
 
@@ -235,6 +233,32 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 	}
 }
 
+type deleteSessionClient interface {
+	DeleteSession(
+		ctx context.Context, in *Ydb_Query.DeleteSessionRequest, opts ...grpc.CallOption,
+	) (*Ydb_Query.DeleteSessionResponse, error)
+}
+
+func deleteSession(ctx context.Context, client deleteSessionClient, sessionId string, deleteTimeout time.Duration) (finalErr error) {
+	if d := deleteTimeout; d > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = xcontext.WithTimeout(ctx, d)
+		defer cancel()
+	}
+
+	_, err := client.DeleteSession(ctx,
+		&Ydb_Query.DeleteSessionRequest{
+			SessionId: sessionId,
+		},
+	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+
+}
+
 func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
 	onDone := trace.QueryOnSessionDelete(core.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).deleteSession"),
@@ -244,22 +268,15 @@ func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	if d := core.deleteTimeout; d > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = xcontext.WithTimeout(ctx, d)
-		defer cancel()
-	}
-
 	if err := ctx.Err(); err != nil {
-		return xerrors.WithStackTrace(err)
+		go func() {
+			_ = deleteSession(xcontext.ValueOnly(ctx), core.Client, core.id, core.deleteTimeout)
+		}()
+
+		return nil
 	}
 
-	_, err := core.Client.DeleteSession(ctx,
-		&Ydb_Query.DeleteSessionRequest{
-			SessionId: core.id,
-		},
-	)
-	if err != nil {
+	if err := deleteSession(ctx, core.Client, core.id, core.deleteTimeout); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -275,10 +292,6 @@ func (core *sessionCore) IsAlive() bool {
 }
 
 func (core *sessionCore) releaseSession() {
-	if !core.closed.CompareAndSwap(false, true) {
-		return
-	}
-
 	if core.cancelAttach != nil {
 		core.cancelAttach()
 	}
@@ -287,10 +300,7 @@ func (core *sessionCore) releaseSession() {
 }
 
 func (core *sessionCore) Close(ctx context.Context) (err error) {
-	core.closeMu.Lock()
-	defer core.closeMu.Unlock()
-
-	if core.closed.Load() {
+	if !core.closed.CompareAndSwap(false, true) {
 		return nil
 	}
 
