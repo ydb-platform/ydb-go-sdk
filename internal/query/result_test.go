@@ -444,11 +444,11 @@ func TestResultNextResultSet(t *testing.T) {
 		}
 		{
 			t.Log("close result")
-			r.Close(context.Background())
+			r.Close(t.Context())
 		}
 		{
 			t.Log("nextResultSet")
-			rs, err := r.nextResultSet(context.Background())
+			rs, err := r.nextResultSet(t.Context())
 			require.ErrorIs(t, err, io.EOF)
 			require.Nil(t, rs)
 			require.Equal(t, -1, rs.Index())
@@ -518,6 +518,7 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			},
 		}, nil)
+		stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_CANCELLED)))
 		r, err := newResult(ctx, stream, nil)
 		require.NoError(t, err)
 		defer r.Close(ctx)
@@ -538,24 +539,24 @@ func TestResultNextResultSet(t *testing.T) {
 				require.NoError(t, err)
 				require.EqualValues(t, 1, rs.rowIndex)
 			}
-			t.Log("explicit interrupt stream")
-			r.shutdownClose(nil)
 			{
 				t.Log("next (row=3)")
-				_, err := rs.nextRow(context.Background())
+				_, err := rs.nextRow(t.Context())
 				require.NoError(t, err)
 				require.EqualValues(t, 2, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=4)")
-				_, err := rs.nextRow(context.Background())
-				require.ErrorIs(t, err, io.EOF)
+				_, err := rs.nextRow(t.Context())
+				require.Error(t, err)
+				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_CANCELLED))
 			}
 		}
 		{
 			t.Log("nextResultSet")
-			_, err := r.nextResultSet(context.Background())
-			require.ErrorIs(t, err, io.EOF)
+			_, err := r.nextResultSet(t.Context())
+			require.Error(t, err)
+			require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_CANCELLED))
 		}
 	})
 	t.Run("WrongResultSetIndex", func(t *testing.T) {

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -32,11 +31,6 @@ var (
 	_ result.Result = (*materializedResult)(nil)
 )
 
-// streamTerminal is immutable after first publish via shutdownTryCommit (CAS on streamResult.terminal).
-type streamTerminal struct {
-	err error // always non-nil (io.EOF for normal close(nil))
-}
-
 type (
 	materializedResult struct {
 		resultSets []result.Set
@@ -44,7 +38,7 @@ type (
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-		terminal       atomic.Pointer[streamTerminal]
+		lastErr        error
 		shutdownHooks  []func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
@@ -141,63 +135,6 @@ func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	}
 }
 
-// shutdownTryCommit records the terminal error for the stream (nil → io.EOF). Returns true
-// only on the winning first close.
-func (r *streamResult) shutdownTryCommit(reason error) bool {
-	if reason == nil {
-		reason = io.EOF
-	}
-
-	next := &streamTerminal{err: reason}
-
-	for {
-		old := r.terminal.Load()
-		if old != nil {
-			return false
-		}
-
-		if r.terminal.CompareAndSwap(old, next) {
-			return true
-		}
-	}
-}
-
-func (r *streamResult) shutdownCommitted() (terminal bool, err error) {
-	st := r.terminal.Load()
-	if st == nil {
-		return false, nil
-	}
-
-	return true, st.err
-}
-
-func (r *streamResult) shutdownErr() error {
-	st := r.terminal.Load()
-	if st == nil {
-		return nil
-	}
-
-	return st.err
-}
-
-func (r *streamResult) runShutdownHooks() {
-	for _, f := range r.shutdownHooks {
-		f()
-	}
-}
-
-func (r *streamResult) shutdownClose(reason error) {
-	if r.shutdownTryCommit(reason) {
-		r.runShutdownHooks()
-	}
-}
-
-func (r *streamResult) shutdownAttachContextDone(ctx context.Context) func() bool {
-	return context.AfterFunc(ctx, func() {
-		r.shutdownClose(ctx.Err())
-	})
-}
-
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
@@ -229,6 +166,10 @@ func newResult(
 
 	part, err := r.nextPart(ctx)
 	if err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -237,16 +178,21 @@ func newResult(
 	return &r, nil
 }
 
-//nolint:funlen
 func (r *streamResult) nextPart(ctx context.Context) (
-	part *Ydb_Query.ExecuteQueryResponsePart, err error,
+	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
 ) {
+	defer func() {
+		if finishErr != nil {
+			r.lastErr = finishErr
+		}
+	}()
+
 	if r.trace != nil {
 		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart"),
 		)
 		defer func() {
-			onDone(part.GetExecStats(), err)
+			onDone(part.GetExecStats(), finishErr)
 		}()
 	}
 
@@ -254,26 +200,11 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if done, errClose := r.shutdownCommitted(); done {
-		if xerrors.Is(errClose, io.EOF) {
-			return nil, io.EOF
-		}
-
-		return nil, xerrors.WithStackTrace(errClose)
+	if r.lastErr != nil {
+		return nil, r.lastErr
 	}
 
-	stop := r.shutdownAttachContextDone(ctx)
-	defer func() {
-		stop()
-
-		if err != nil {
-			r.shutdownClose(err)
-		}
-
-		err = r.shutdownErr()
-	}()
-
-	part, err = nextPart(r.stream)
+	part, err := nextPart(r.stream)
 	if part != nil {
 		issues := part.GetIssues()
 		if r.issuesCallback != nil && len(issues) > 0 {
@@ -322,7 +253,9 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer func() {
-		r.shutdownClose(finalErr)
+		for _, f := range r.shutdownHooks {
+			f()
+		}
 	}()
 
 	if r.closeTimeout > 0 {
@@ -345,10 +278,6 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 			return xerrors.WithStackTrace(err)
 		}
 
-		if done, _ := r.shutdownCommitted(); done {
-			return nil
-		}
-
 		_, err := r.nextPart(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
@@ -360,19 +289,17 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	}
 }
 
-func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
+func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishErr error) {
+	defer func() {
+		if finishErr != nil {
+			r.lastErr = finishErr
+		}
+	}()
+
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, xerrors.WithStackTrace(err)
-		}
-
-		if done, errClose := r.shutdownCommitted(); done {
-			if xerrors.Is(errClose, io.EOF) {
-				return nil, io.EOF
-			}
-
-			return nil, xerrors.WithStackTrace(errClose)
 		}
 
 		if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
@@ -392,8 +319,6 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 			return nil, xerrors.WithStackTrace(err)
 		}
 		if part.GetResultSetIndex() < r.resultSetIndex {
-			r.shutdownClose(nil)
-
 			if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
 				return nil, io.EOF
 			}
@@ -415,14 +340,6 @@ func (r *streamResult) nextPartFunc(
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 		if err := ctx.Err(); err != nil {
 			return nil, xerrors.WithStackTrace(err)
-		}
-
-		if done, errClose := r.shutdownCommitted(); done {
-			if xerrors.Is(errClose, io.EOF) {
-				return nil, io.EOF
-			}
-
-			return nil, xerrors.WithStackTrace(errClose)
 		}
 
 		if r.stream == nil {

@@ -89,7 +89,7 @@ func BenchmarkDatabaseSQL(b *testing.B) {
 
 	nativeDriver, err := ydb.Open(ctx, mockSrv.ConnString(),
 		ydb.WithAnonymousCredentials(),
-		ydb.WithSessionPoolSizeLimit(sessionPoolSize),
+		ydb.WithSessionPoolSizeLimit(sessionPoolSize*2),
 	)
 	require.NoError(b, err)
 
