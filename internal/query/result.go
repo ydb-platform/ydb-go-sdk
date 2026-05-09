@@ -119,7 +119,7 @@ func withStreamResultStatsCallback(callback func(queryStats stats.QueryStats)) r
 
 func withStreamResultOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
-		s.registerShutdownHook(onClose)
+		s.shutdownHooks = append(s.shutdownHooks, onClose)
 	}
 }
 
@@ -139,10 +139,6 @@ func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	return func(s *streamResult) {
 		s.closeTimeout = timeout
 	}
-}
-
-func (r *streamResult) registerShutdownHook(f func()) {
-	r.shutdownHooks = append(r.shutdownHooks, f)
 }
 
 // shutdownTryCommit records the terminal error for the stream (nil → io.EOF). Returns true
