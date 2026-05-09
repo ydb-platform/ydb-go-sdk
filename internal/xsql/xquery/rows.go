@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"io"
 	"strings"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -32,7 +31,7 @@ type (
 		result result.Result
 		next   *resultSet
 
-		firstNextResultSetCalled atomic.Bool
+		firstNextResultSetCalled bool
 	}
 )
 
@@ -93,7 +92,9 @@ func (r *rows) ColumnTypeNullable(ctx context.Context, index int) (nullable, ok 
 }
 
 func (r *rows) NextResultSet(ctx context.Context) error {
-	if r.firstNextResultSetCalled.CompareAndSwap(false, true) {
+	if !r.firstNextResultSetCalled {
+		r.firstNextResultSetCalled = true
+
 		return nil
 	}
 
