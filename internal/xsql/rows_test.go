@@ -32,7 +32,7 @@ func TestRowByAstPlan(t *testing.T) {
 
 func TestSingleRow_Columns(t *testing.T) {
 	row := rowByAstPlan("ast", "plan")
-	columns := row.Columns(context.Background())
+	columns := row.Columns(t.Context())
 
 	require.Len(t, columns, 2)
 	require.Equal(t, "Ast", columns[0])
@@ -46,7 +46,7 @@ func TestSingleRow_Close(t *testing.T) {
 }
 
 func TestSingleRow_Next(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("FirstRead", func(t *testing.T) {
 		ast := "test ast"
