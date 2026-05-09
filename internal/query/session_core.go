@@ -239,7 +239,9 @@ type deleteSessionClient interface {
 	) (*Ydb_Query.DeleteSessionResponse, error)
 }
 
-func deleteSession(ctx context.Context, client deleteSessionClient, sessionId string, deleteTimeout time.Duration) (finalErr error) {
+func deleteSession(ctx context.Context,
+	client deleteSessionClient, sessionID string, deleteTimeout time.Duration,
+) (finalErr error) {
 	if d := deleteTimeout; d > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = xcontext.WithTimeout(ctx, d)
@@ -248,7 +250,7 @@ func deleteSession(ctx context.Context, client deleteSessionClient, sessionId st
 
 	_, err := client.DeleteSession(ctx,
 		&Ydb_Query.DeleteSessionRequest{
-			SessionId: sessionId,
+			SessionId: sessionID,
 		},
 	)
 	if err != nil {
@@ -256,7 +258,6 @@ func deleteSession(ctx context.Context, client deleteSessionClient, sessionId st
 	}
 
 	return nil
-
 }
 
 func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
