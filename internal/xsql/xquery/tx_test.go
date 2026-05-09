@@ -77,7 +77,7 @@ func TestTransactionRollbackReturnsErrBadConnWhenSessionInvalid(t *testing.T) {
 		status: internalQuery.StatusClosed, // session is invalid after BAD_SESSION
 	}
 	session := &internalQuery.Session{Core: core}
-	conn := New(ctx, session)
+	conn := New(session)
 
 	tx := &transaction{
 		conn: conn,

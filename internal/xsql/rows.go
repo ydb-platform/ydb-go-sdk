@@ -40,7 +40,7 @@ func (r *singleRow) Columns(_ context.Context) (columns []string) {
 	return columns
 }
 
-func (r *singleRow) Close() error {
+func (r *singleRow) Close(context.Context) error {
 	return nil
 }
 
@@ -140,7 +140,7 @@ func (r *Rows) NextResultSet() error {
 }
 
 func (r *Rows) Close() error {
-	if err := r.inner.Close(); err != nil {
+	if err := r.inner.Close(r.queryCtx); err != nil {
 		return xerrors.WithStackTrace(badconn.Map(err))
 	}
 

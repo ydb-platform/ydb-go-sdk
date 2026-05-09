@@ -23,5 +23,5 @@ type Rows interface {
 
 	HasNextResultSet(ctx context.Context) bool
 
-	Close() error
+	Close(ctx context.Context) error
 }

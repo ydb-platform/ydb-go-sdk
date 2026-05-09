@@ -10,7 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
@@ -22,7 +21,6 @@ var (
 )
 
 type rows struct {
-	conn   *Conn
 	result result.Result
 
 	firstNextSet sync.Once
@@ -111,13 +109,7 @@ func (r *rows) NextResultSet(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-func (r *rows) Close() error {
-	ctx := context.Background()
-
-	if r.conn != nil && r.conn.ctx != nil {
-		ctx = xcontext.ValueOnly(r.conn.ctx)
-	}
-
+func (r *rows) Close(ctx context.Context) error {
 	return r.result.Close(ctx)
 }
 

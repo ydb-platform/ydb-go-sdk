@@ -96,7 +96,7 @@ func (c *Conn) Close() (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	err := c.cc.Close()
+	err := c.cc.Close(c.ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(badconn.Map(err))
 	}

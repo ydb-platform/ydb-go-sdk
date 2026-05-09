@@ -136,6 +136,6 @@ func (r *rows) Next(ctx context.Context, dst []driver.Value) error {
 	return nil
 }
 
-func (r *rows) Close() error {
+func (r *rows) Close(_ context.Context) error {
 	return r.result.Close()
 }

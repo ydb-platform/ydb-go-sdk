@@ -46,7 +46,7 @@ func (m *mockErrConn) BeginTx(_ context.Context, _ driver.TxOptions) (common.Tx,
 	return nil, m.err
 }
 
-func (m *mockErrConn) Close() error { return m.err }
+func (m *mockErrConn) Close(context.Context) error { return m.err }
 
 func (m *mockErrConn) Query(
 	_ context.Context, _ string, _ *params.Params,
@@ -269,7 +269,7 @@ func (m *mockErrRows) ColumnTypeNullable(_ context.Context, _ int) (nullable, ok
 	return false, false
 }
 func (m *mockErrRows) Columns(context.Context) []string { return nil }
-func (m *mockErrRows) Close() error                     { return m.err }
+func (m *mockErrRows) Close(context.Context) error      { return m.err }
 func (m *mockErrRows) HasNextResultSet(context.Context) bool {
 	return false
 }

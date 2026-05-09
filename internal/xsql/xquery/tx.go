@@ -79,7 +79,6 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 	}
 
 	return &rows{
-		conn:   t.conn,
 		result: res,
 	}, nil
 }

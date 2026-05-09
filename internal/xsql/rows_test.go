@@ -40,7 +40,7 @@ func TestSingleRow_Columns(t *testing.T) {
 
 func TestSingleRow_Close(t *testing.T) {
 	row := rowByAstPlan("ast", "plan")
-	err := row.Close()
+	err := row.Close(t.Context())
 	require.NoError(t, err)
 }
 

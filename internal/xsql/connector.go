@@ -128,7 +128,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		conn := &Conn{
 			processor: QUERY,
-			cc:        xquery.New(ctx, s, c.QueryOpts...),
+			cc:        xquery.New(s, c.QueryOpts...),
 			ctx:       ctx,
 			connector: c,
 		}
@@ -146,7 +146,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		conn := &Conn{
 			processor: TABLE,
-			cc:        xtable.New(ctx, c.parent.Scripting(), s, c.TableOpts...),
+			cc:        xtable.New(c.parent.Scripting(), s, c.TableOpts...),
 			ctx:       ctx,
 			connector: c,
 		}

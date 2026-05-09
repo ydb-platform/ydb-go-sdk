@@ -20,7 +20,6 @@ type Parent interface {
 }
 
 type Conn struct {
-	ctx     context.Context //nolint:containedctx
 	session *query.Session
 	onClose []func()
 	closed  atomic.Bool
@@ -104,7 +103,6 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	}
 
 	return &rows{
-		conn:   c,
 		result: res,
 	}, nil
 }
@@ -125,9 +123,8 @@ func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast s
 	return ast, plan, nil
 }
 
-func New(ctx context.Context, s *query.Session, opts ...Option) *Conn {
+func New(s *query.Session, opts ...Option) *Conn {
 	cc := &Conn{
-		ctx:     ctx,
 		session: s,
 	}
 
@@ -194,7 +191,7 @@ func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (common.
 	return tx, nil
 }
 
-func (c *Conn) Close() (finalErr error) {
+func (c *Conn) Close(ctx context.Context) (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
 		return xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
 			xerrors.Invalid(c),
@@ -208,7 +205,7 @@ func (c *Conn) Close() (finalErr error) {
 		}
 	}()
 
-	err := c.session.Close(xcontext.ValueOnly(c.ctx))
+	err := c.session.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
