@@ -159,49 +159,48 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 			return nil, io.EOF
 		}
 
-		select {
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		default:
-			//nolint:nestif
-			if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
-				part, err := rs.recv()
-				if err != nil {
-					if xerrors.Is(err, io.EOF) {
-						rs.ended.Store(true)
-					}
+		if err := ctx.Err(); err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 
-					if rs.mustBeLastResultSet && errors.Is(err, errReadNextResultSet) {
-						// prevent detect io.EOF in the error
-						return nil, xerrors.WithStackTrace(xerrors.Wrap(errors.New(err.Error())))
-					}
-
-					if xerrors.Is(err, io.EOF) {
-						return nil, io.EOF
-					}
-
-					return nil, xerrors.WithStackTrace(err)
-				}
-				rs.rowIndex = 0
-				rs.currentPart = part
-				if part == nil {
+		//nolint:nestif
+		if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
+			part, err := rs.recv()
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
 					rs.ended.Store(true)
+				}
 
+				if rs.mustBeLastResultSet && errors.Is(err, errReadNextResultSet) {
+					// prevent detect io.EOF in the error
+					return nil, xerrors.WithStackTrace(xerrors.Wrap(errors.New(err.Error())))
+				}
+
+				if xerrors.Is(err, io.EOF) {
 					return nil, io.EOF
 				}
+
+				return nil, xerrors.WithStackTrace(err)
 			}
-			if rs.currentPart.GetResultSet() != nil && rs.index != rs.currentPart.GetResultSetIndex() {
+			rs.rowIndex = 0
+			rs.currentPart = part
+			if part == nil {
 				rs.ended.Store(true)
 
-				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"received part with result set index = %d, current result set index = %d: %w",
-					rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
-				))
+				return nil, io.EOF
 			}
+		}
+		if rs.currentPart.GetResultSet() != nil && rs.index != rs.currentPart.GetResultSetIndex() {
+			rs.ended.Store(true)
 
-			if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
-				return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex]), nil
-			}
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"received part with result set index = %d, current result set index = %d: %w",
+				rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
+			))
+		}
+
+		if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
+			return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex]), nil
 		}
 	}
 }

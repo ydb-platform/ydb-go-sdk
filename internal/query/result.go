@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -31,6 +33,11 @@ var (
 	_ result.Result = (*materializedResult)(nil)
 )
 
+// streamTerminal is immutable after first publish via shutdownTryCommit (CAS on streamResult.terminal).
+type streamTerminal struct {
+	err error // always non-nil (io.EOF for normal close(nil))
+}
+
 type (
 	materializedResult struct {
 		resultSets []result.Set
@@ -38,7 +45,9 @@ type (
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-		closer         *ResultCloser
+		terminal       atomic.Pointer[streamTerminal]
+		shutdownMu     sync.Mutex
+		shutdownHooks  []func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
 		trace          *trace.Query
@@ -112,7 +121,7 @@ func withStreamResultStatsCallback(callback func(queryStats stats.QueryStats)) r
 
 func withStreamResultOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
-		s.closer.OnClose(onClose)
+		s.registerShutdownHook(onClose)
 	}
 }
 
@@ -134,6 +143,75 @@ func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	}
 }
 
+func (r *streamResult) registerShutdownHook(f func()) {
+	r.shutdownMu.Lock()
+	defer r.shutdownMu.Unlock()
+
+	r.shutdownHooks = append(r.shutdownHooks, f)
+}
+
+// shutdownTryCommit records the terminal error for the stream (nil → io.EOF). Returns true
+// only on the winning first close.
+func (r *streamResult) shutdownTryCommit(reason error) bool {
+	if reason == nil {
+		reason = io.EOF
+	}
+
+	next := &streamTerminal{err: reason}
+
+	for {
+		old := r.terminal.Load()
+		if old != nil {
+			return false
+		}
+
+		if r.terminal.CompareAndSwap(old, next) {
+			return true
+		}
+	}
+}
+
+func (r *streamResult) shutdownCommitted() (terminal bool, err error) {
+	st := r.terminal.Load()
+	if st == nil {
+		return false, nil
+	}
+
+	return true, st.err
+}
+
+func (r *streamResult) shutdownErr() error {
+	st := r.terminal.Load()
+	if st == nil {
+		return nil
+	}
+
+	return st.err
+}
+
+func (r *streamResult) runShutdownHooks() {
+	r.shutdownMu.Lock()
+	cbs := make([]func(), len(r.shutdownHooks))
+	copy(cbs, r.shutdownHooks)
+	r.shutdownMu.Unlock()
+
+	for i := range cbs {
+		cbs[len(cbs)-1-i]()
+	}
+}
+
+func (r *streamResult) shutdownClose(reason error) {
+	if r.shutdownTryCommit(reason) {
+		r.runShutdownHooks()
+	}
+}
+
+func (r *streamResult) shutdownAttachContextDone(ctx context.Context) func() bool {
+	return context.AfterFunc(ctx, func() {
+		r.shutdownClose(ctx.Err())
+	})
+}
+
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
@@ -141,7 +219,6 @@ func newResult(
 ) (_ *streamResult, finalErr error) {
 	r := streamResult{
 		stream:         stream,
-		closer:         NewResultCloser(),
 		resultSetIndex: -1,
 	}
 
@@ -160,19 +237,18 @@ func newResult(
 		}()
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
-	default:
-		part, err := r.nextPart(ctx)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		r.lastPart = part
-
-		return &r, nil
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
 	}
+
+	part, err := r.nextPart(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	r.lastPart = part
+
+	return &r, nil
 }
 
 //nolint:funlen
@@ -188,7 +264,11 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 	}
 
-	if done, errClose := r.closer.doneErr(); done {
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if done, errClose := r.shutdownCommitted(); done {
 		if xerrors.Is(errClose, io.EOF) {
 			return nil, io.EOF
 		}
@@ -196,52 +276,47 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		return nil, xerrors.WithStackTrace(errClose)
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
-	default:
-		stop := r.closer.CloseOnContextCancel(ctx)
-		defer func() {
-			stop()
+	stop := r.shutdownAttachContextDone(ctx)
+	defer func() {
+		stop()
 
-			if err != nil {
-				r.closer.Close(err)
-			}
-
-			err = r.closer.Err()
-		}()
-
-		part, err = nextPart(r.stream)
-		if part != nil {
-			issues := part.GetIssues()
-			if r.issuesCallback != nil && len(issues) > 0 {
-				r.issuesCallback(issues)
-			}
-		}
 		if err != nil {
-			for _, callback := range r.onNextPartErr {
-				callback(err)
-			}
-
-			if xerrors.Is(err, io.EOF) {
-				return nil, io.EOF
-			}
-
-			return nil, xerrors.WithStackTrace(err)
+			r.shutdownClose(err)
 		}
 
-		if txMeta := part.GetTxMeta(); txMeta != nil {
-			for _, f := range r.onTxMeta {
-				f(txMeta)
-			}
-		}
+		err = r.shutdownErr()
+	}()
 
-		if part.GetExecStats() != nil && r.statsCallback != nil {
-			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
+	part, err = nextPart(r.stream)
+	if part != nil {
+		issues := part.GetIssues()
+		if r.issuesCallback != nil && len(issues) > 0 {
+			r.issuesCallback(issues)
 		}
-
-		return part, nil
 	}
+	if err != nil {
+		for _, callback := range r.onNextPartErr {
+			callback(err)
+		}
+
+		if xerrors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if txMeta := part.GetTxMeta(); txMeta != nil {
+		for _, f := range r.onTxMeta {
+			f(txMeta)
+		}
+	}
+
+	if part.GetExecStats() != nil && r.statsCallback != nil {
+		r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
+	}
+
+	return part, nil
 }
 
 func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
@@ -261,7 +336,7 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer func() {
-		r.closer.Close(finalErr)
+		r.shutdownClose(finalErr)
 	}()
 
 	if r.closeTimeout > 0 {
@@ -280,22 +355,21 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	}
 
 	for {
-		if done, _ := r.closer.doneErr(); done {
+		if err := ctx.Err(); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		if done, _ := r.shutdownCommitted(); done {
 			return nil
 		}
 
-		select {
-		case <-ctx.Done():
-			return xerrors.WithStackTrace(ctx.Err())
-		default:
-			_, err := r.nextPart(ctx)
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					return nil
-				}
-
-				return xerrors.WithStackTrace(err)
+		_, err := r.nextPart(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return nil
 			}
+
+			return xerrors.WithStackTrace(err)
 		}
 	}
 }
@@ -303,7 +377,11 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
-		if done, errClose := r.closer.doneErr(); done {
+		if err := ctx.Err(); err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		if done, errClose := r.shutdownCommitted(); done {
 			if xerrors.Is(errClose, io.EOF) {
 				return nil, io.EOF
 			}
@@ -311,41 +389,36 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err err
 			return nil, xerrors.WithStackTrace(errClose)
 		}
 
-		select {
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		default:
-			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
-				r.resultSetIndex = resultSetIndex
+		if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
+			r.resultSetIndex = resultSetIndex
 
-				return newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart), nil
-			}
-			if r.stream == nil {
+			return newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart), nil
+		}
+		if r.stream == nil {
+			return nil, io.EOF
+		}
+		part, err := r.nextPart(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
 				return nil, io.EOF
 			}
-			part, err := r.nextPart(ctx)
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					return nil, io.EOF
-				}
 
-				return nil, xerrors.WithStackTrace(err)
-			}
-			if part.GetResultSetIndex() < r.resultSetIndex {
-				r.closer.Close(nil)
-
-				if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
-					return nil, io.EOF
-				}
-
-				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"next result set rowIndex %d less than last result set index %d: %w",
-					part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
-				))
-			}
-			r.lastPart = part
-			r.resultSetIndex = part.GetResultSetIndex()
+			return nil, xerrors.WithStackTrace(err)
 		}
+		if part.GetResultSetIndex() < r.resultSetIndex {
+			r.shutdownClose(nil)
+
+			if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
+				return nil, io.EOF
+			}
+
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"next result set rowIndex %d less than last result set index %d: %w",
+				part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
+			))
+		}
+		r.lastPart = part
+		r.resultSetIndex = part.GetResultSetIndex()
 	}
 }
 
@@ -354,7 +427,11 @@ func (r *streamResult) nextPartFunc(
 	nextResultSetIndex int64,
 ) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
-		if done, errClose := r.closer.doneErr(); done {
+		if err := ctx.Err(); err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		if done, errClose := r.shutdownCommitted(); done {
 			if xerrors.Is(errClose, io.EOF) {
 				return nil, io.EOF
 			}
@@ -362,31 +439,26 @@ func (r *streamResult) nextPartFunc(
 			return nil, xerrors.WithStackTrace(errClose)
 		}
 
-		select {
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		default:
-			if r.stream == nil {
+		if r.stream == nil {
+			return nil, io.EOF
+		}
+		part, err := r.nextPart(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
 				return nil, io.EOF
 			}
-			part, err := r.nextPart(ctx)
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					return nil, io.EOF
-				}
 
-				return nil, xerrors.WithStackTrace(err)
-			}
-			r.lastPart = part
-			if part.GetResultSetIndex() > nextResultSetIndex {
-				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"result set (index=%d) receive part (index=%d) for next result set: %w (%w)",
-					nextResultSetIndex, part.GetResultSetIndex(), io.EOF, errReadNextResultSet,
-				))
-			}
-
-			return part, nil
+			return nil, xerrors.WithStackTrace(err)
 		}
+		r.lastPart = part
+		if part.GetResultSetIndex() > nextResultSetIndex {
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"result set (index=%d) receive part (index=%d) for next result set: %w (%w)",
+				nextResultSetIndex, part.GetResultSetIndex(), io.EOF, errReadNextResultSet,
+			))
+		}
+
+		return part, nil
 	}
 }
 

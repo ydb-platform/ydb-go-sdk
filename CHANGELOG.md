@@ -259,7 +259,7 @@ distinguish between hits and misses
 * Added support for `PartitionBy` in `DescribeTable` results
 
 ## v3.115.6
-* Fixed context cancellation issues in the `QueryService` stream results
+* Ensured expired query contexts surface when iterating `QueryService` stream results and when scanning `database/sql` rows (`database/sql.Rows` / `Rows.Err`), instead of iterating with `context.Background()` inside the sql driver adapter
 
 ## v3.115.5
 * Fixed error logging in `topic.UpdateOffsetsInTransaction`

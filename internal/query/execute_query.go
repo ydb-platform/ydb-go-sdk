@@ -146,17 +146,13 @@ func execute(
 	// was cancelled only due to session death the user context is still alive and
 	// a retry is warranted; if the user cancelled their own context the retry loop
 	// will see its own ctx.Done() and stop without retrying.
-	// The check is non-blocking (ctx.Done() is a closed channel once cancelled),
-	// so it does not affect the "cancel during Recv" path: when ctx is cancelled
-	// only after ExecuteQuery returns, the AfterFunc remains active and will
-	// propagate the cancellation to executeCtx during the blocking Recv call.
-	select {
-	case <-ctx.Done():
+	// Check ctx.Err() (not select+default against ctx.Done) so a cancelled parent
+	// is always observed reliably before constructing the stream result.
+	if err := ctx.Err(); err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(
-			ctx.Err(),
+			err,
 			xerrors.WithName("streamResultContext"),
 		))
-	default:
 	}
 
 	// newResult must use executeCtx, not the parent ctx: parent ctx may already

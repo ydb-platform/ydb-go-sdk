@@ -17,12 +17,8 @@ import (
 )
 
 var (
-	_ driver.Rows                           = &rows{}
-	_ common.Rows                           = &rows{}
-	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
-	_ driver.RowsColumnTypeNullable         = &rows{}
-
-	ignoreColumnPrefixName = "__discard_column_"
+	_                      common.Rows = (*rows)(nil)
+	ignoreColumnPrefixName             = "__discard_column_"
 )
 
 type rows struct {
@@ -55,19 +51,17 @@ func (r *rows) updateColumns() {
 	}
 }
 
-func (r *rows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
-func (r *rows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
-
-func (r *rows) loadFirstNextSet() {
-	ctx := context.Background()
+func (r *rows) loadFirstNextSet(ctx context.Context) {
 	res, err := r.result.NextResultSet(ctx)
 	r.nextErr = err
 	r.nextSet = res
 	r.updateColumns()
 }
 
-func (r *rows) Columns() []string {
-	r.firstNextSet.Do(r.loadFirstNextSet)
+func (r *rows) Columns(ctx context.Context) []string {
+	r.firstNextSet.Do(func() {
+		r.loadFirstNextSet(ctx)
+	})
 	if r.columnsFetchError != nil {
 		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
@@ -75,8 +69,10 @@ func (r *rows) Columns() []string {
 	return r.columns
 }
 
-func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
-	r.firstNextSet.Do(r.loadFirstNextSet)
+func (r *rows) ColumnTypeDatabaseTypeName(ctx context.Context, index int) string {
+	r.firstNextSet.Do(func() {
+		r.loadFirstNextSet(ctx)
+	})
 	if r.columnsFetchError != nil {
 		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
@@ -84,8 +80,10 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	return r.columnsType[index].Yql()
 }
 
-func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
-	r.firstNextSet.Do(r.loadFirstNextSet)
+func (r *rows) ColumnTypeNullable(ctx context.Context, index int) (nullable, ok bool) {
+	r.firstNextSet.Do(func() {
+		r.loadFirstNextSet(ctx)
+	})
 	if r.columnsFetchError != nil {
 		panic(xerrors.WithStackTrace(r.columnsFetchError))
 	}
@@ -94,10 +92,9 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return castResult, true
 }
 
-func (r *rows) NextResultSet() (finalErr error) {
+func (r *rows) NextResultSet(ctx context.Context) (finalErr error) {
 	r.firstNextSet.Do(func() {})
 
-	ctx := context.Background()
 	res, err := r.result.NextResultSet(ctx)
 	r.nextErr = err
 	r.nextSet = res
@@ -114,15 +111,28 @@ func (r *rows) NextResultSet() (finalErr error) {
 	return nil
 }
 
-func (r *rows) HasNextResultSet() bool {
-	r.firstNextSet.Do(r.loadFirstNextSet)
+func (r *rows) Close() error {
+	ctx := context.Background()
+
+	if r.conn != nil && r.conn.ctx != nil {
+		ctx = xcontext.ValueOnly(r.conn.ctx)
+	}
+
+	return r.result.Close(ctx)
+}
+
+func (r *rows) HasNextResultSet(ctx context.Context) bool {
+	r.firstNextSet.Do(func() {
+		r.loadFirstNextSet(ctx)
+	})
 
 	return r.nextErr == nil
 }
 
-func (r *rows) Next(dst []driver.Value) error {
-	r.firstNextSet.Do(r.loadFirstNextSet)
-	ctx := context.Background()
+func (r *rows) Next(ctx context.Context, dst []driver.Value) error {
+	r.firstNextSet.Do(func() {
+		r.loadFirstNextSet(ctx)
+	})
 
 	if r.nextErr != nil {
 		if xerrors.Is(r.nextErr, io.EOF) {
@@ -162,14 +172,4 @@ func (r *rows) Next(dst []driver.Value) error {
 	}
 
 	return nil
-}
-
-func (r *rows) Close() error {
-	ctx := context.Background()
-
-	if r.conn != nil && r.conn.ctx != nil {
-		ctx = xcontext.ValueOnly(r.conn.ctx)
-	}
-
-	return r.result.Close(ctx)
 }

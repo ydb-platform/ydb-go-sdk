@@ -1,13 +1,18 @@
 package xsql
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
+
+var _ common.Rows = (*singleRow)(nil)
 
 func TestRowByAstPlan(t *testing.T) {
 	t.Run("CreateRow", func(t *testing.T) {
@@ -27,7 +32,7 @@ func TestRowByAstPlan(t *testing.T) {
 
 func TestSingleRow_Columns(t *testing.T) {
 	row := rowByAstPlan("ast", "plan")
-	columns := row.Columns()
+	columns := row.Columns(context.Background())
 
 	require.Len(t, columns, 2)
 	require.Equal(t, "Ast", columns[0])
@@ -41,13 +46,15 @@ func TestSingleRow_Close(t *testing.T) {
 }
 
 func TestSingleRow_Next(t *testing.T) {
+	ctx := context.Background()
+
 	t.Run("FirstRead", func(t *testing.T) {
 		ast := "test ast"
 		plan := "test plan"
 		row := rowByAstPlan(ast, plan)
 
 		dst := make([]driver.Value, 2)
-		err := row.Next(dst)
+		err := row.Next(ctx, dst)
 
 		require.NoError(t, err)
 		require.Equal(t, ast, dst[0])
@@ -59,10 +66,10 @@ func TestSingleRow_Next(t *testing.T) {
 		row := rowByAstPlan("ast", "plan")
 
 		dst := make([]driver.Value, 2)
-		err := row.Next(dst)
+		err := row.Next(ctx, dst)
 		require.NoError(t, err)
 
-		err = row.Next(dst)
+		err = row.Next(ctx, dst)
 		require.ErrorIs(t, err, io.EOF)
 	})
 
@@ -73,7 +80,7 @@ func TestSingleRow_Next(t *testing.T) {
 		}
 
 		dst := make([]driver.Value, 2)
-		err := row.Next(dst)
+		err := row.Next(ctx, dst)
 		require.ErrorIs(t, err, io.EOF)
 	})
 
@@ -84,7 +91,7 @@ func TestSingleRow_Next(t *testing.T) {
 		}
 
 		dst := make([]driver.Value, 0)
-		err := row.Next(dst)
+		err := row.Next(ctx, dst)
 		require.NoError(t, err)
 		require.True(t, row.readAll)
 	})

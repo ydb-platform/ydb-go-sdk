@@ -180,7 +180,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 			return nil, xerrors.WithStackTrace(badconn.Map(err))
 		}
 
-		return rowByAstPlan(ast, plan), nil
+		return newRows(ctx, rowByAstPlan(ast, plan)), nil
 	}
 
 	if c.currentTx != nil {
@@ -189,7 +189,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 			return nil, xerrors.WithStackTrace(badconn.Map(err))
 		}
 
-		return newRows(rows), nil
+		return newRows(ctx, rows), nil
 	}
 
 	result, err := c.cc.Query(ctx, sql, params)
@@ -197,7 +197,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
-	return newRows(result), nil
+	return newRows(ctx, result), nil
 }
 
 func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (

@@ -17,31 +17,25 @@ import (
 )
 
 var (
-	_ driver.Rows                           = &rows{}
-	_ common.Rows                           = &rows{}
-	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
-	_ driver.RowsColumnTypeNullable         = &rows{}
-
+	_ common.Rows     = &rows{}
 	_ scanner.Scanner = &valuer{}
 
 	ignoreColumnPrefixName = "__discard_column_"
 )
 
 type rows struct {
-	conn   *Conn
+	conn *Conn // reserved for callers that construct rows; currently unused during iteration.
+
 	result result.BaseResult
 
-	// nextSet once need for get first result set as default.
-	// Iterate over many result sets must be with rows.NextResultSet()
+	// nextSet ensures the first NextResultSet is applied consistently for Columns,
+	// Next, and downstream NextResultSet calls.
 	nextSet sync.Once
 }
 
-func (r *rows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
-func (r *rows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
-
-func (r *rows) Columns() []string {
+func (r *rows) Columns(ctx context.Context) []string {
 	r.nextSet.Do(func() {
-		r.result.NextResultSet(context.Background())
+		r.result.NextResultSet(ctx)
 	})
 	cs := make([]string, 0, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
@@ -56,9 +50,9 @@ func (r *rows) Columns() []string {
 // TODO: Need to store column types to internal rows cache.
 //
 //nolint:godox
-func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
+func (r *rows) ColumnTypeDatabaseTypeName(ctx context.Context, index int) string {
 	r.nextSet.Do(func() {
-		r.result.NextResultSet(context.Background())
+		r.result.NextResultSet(ctx)
 	})
 
 	var i int
@@ -74,9 +68,9 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 // TODO: Need to store column nullables to internal rows cache.
 //
 //nolint:godox
-func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
+func (r *rows) ColumnTypeNullable(ctx context.Context, index int) (nullable, ok bool) {
 	r.nextSet.Do(func() {
-		r.result.NextResultSet(context.Background())
+		r.result.NextResultSet(ctx)
 	})
 
 	var i int
@@ -91,9 +85,10 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return nullables[index], true
 }
 
-func (r *rows) NextResultSet() (finalErr error) {
+func (r *rows) NextResultSet(ctx context.Context) (finalErr error) {
 	r.nextSet.Do(func() {})
-	err := r.result.NextResultSetErr(context.Background())
+
+	err := r.result.NextResultSetErr(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -101,14 +96,14 @@ func (r *rows) NextResultSet() (finalErr error) {
 	return nil
 }
 
-func (r *rows) HasNextResultSet() bool {
+func (r *rows) HasNextResultSet(context.Context) bool {
 	return r.result.HasNextResultSet()
 }
 
-func (r *rows) Next(dst []driver.Value) error {
+func (r *rows) Next(ctx context.Context, dst []driver.Value) error {
 	var err error
 	r.nextSet.Do(func() {
-		err = r.result.NextResultSetErr(context.Background())
+		err = r.result.NextResultSetErr(ctx)
 	})
 	if err != nil {
 		return xerrors.WithStackTrace(err)
