@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -46,7 +45,6 @@ type (
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		terminal       atomic.Pointer[streamTerminal]
-		shutdownMu     sync.Mutex
 		shutdownHooks  []func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
@@ -144,9 +142,6 @@ func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 }
 
 func (r *streamResult) registerShutdownHook(f func()) {
-	r.shutdownMu.Lock()
-	defer r.shutdownMu.Unlock()
-
 	r.shutdownHooks = append(r.shutdownHooks, f)
 }
 
@@ -190,13 +185,8 @@ func (r *streamResult) shutdownErr() error {
 }
 
 func (r *streamResult) runShutdownHooks() {
-	r.shutdownMu.Lock()
-	cbs := make([]func(), len(r.shutdownHooks))
-	copy(cbs, r.shutdownHooks)
-	r.shutdownMu.Unlock()
-
-	for i := range cbs {
-		cbs[len(cbs)-1-i]()
+	for _, f := range r.shutdownHooks {
+		f()
 	}
 }
 
