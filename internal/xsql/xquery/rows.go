@@ -28,8 +28,9 @@ type (
 		discarded    []bool
 	}
 	rows struct {
-		result result.Result
-		next   *resultSet
+		result  result.Result
+		next    *resultSet
+		lastErr error
 
 		firstNextResultSetCalled bool
 	}
@@ -47,7 +48,13 @@ func newRows(ctx context.Context, result result.Result) (*rows, error) {
 	return r, nil
 }
 
-func (r *rows) nextResultSet(ctx context.Context) error {
+func (r *rows) nextResultSet(ctx context.Context) (finalErr error) {
+	defer func() {
+		if finalErr != nil {
+			r.lastErr = finalErr
+		}
+	}()
+
 	rs, err := r.result.NextResultSet(ctx)
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
@@ -91,7 +98,7 @@ func (r *rows) ColumnTypeNullable(ctx context.Context, index int) (nullable, ok 
 	return castResult, true
 }
 
-func (r *rows) NextResultSet(ctx context.Context) error {
+func (r *rows) NextResultSet(ctx context.Context) (finalErr error) {
 	if !r.firstNextResultSetCalled {
 		r.firstNextResultSetCalled = true
 
@@ -110,18 +117,24 @@ func (r *rows) NextResultSet(ctx context.Context) error {
 }
 
 func (r *rows) Close(ctx context.Context) error {
+	defer func() {
+		r.lastErr = io.EOF
+	}()
+
 	return r.result.Close(ctx)
 }
 
 func (r *rows) HasNextResultSet(ctx context.Context) bool {
-	if err := r.NextResultSet(ctx); err != nil {
-		return false
-	}
-
-	return true
+	return r.lastErr == nil
 }
 
-func (r *rows) Next(ctx context.Context, dst []driver.Value) error {
+func (r *rows) Next(ctx context.Context, dst []driver.Value) (finalErr error) {
+	defer func() {
+		if finalErr != nil {
+			r.lastErr = finalErr
+		}
+	}()
+
 	nextRow, err := r.next.set.NextRow(ctx)
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
