@@ -90,7 +90,7 @@ func TestSessionCoreAttachError(t *testing.T) {
 			SessionId: "123",
 		}).Return(attachStream, nil)
 		core, err := Open(ctx, client)
-		require.Error(t, err)
+		require.ErrorIs(t, err, errSessionClosed)
 		require.Nil(t, core)
 	}, xtest.StopAfter(time.Second))
 }
