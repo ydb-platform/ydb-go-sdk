@@ -97,23 +97,25 @@ func BenchmarkDatabaseSQL(b *testing.B) {
 		_ = nativeDriver.Close(ctx)
 	}()
 
-	for _, engine := range []struct {
-		name            string
-		useQueryService bool
-	}{
-		{
-			name:            "overQueryService",
-			useQueryService: true,
-		},
-		{
-			name:            "overTableService",
-			useQueryService: false,
-		},
-	} {
-		b.Run(engine.name, func(b *testing.B) {
-			benchmarkDatabaseSQLSelect42(b, nativeDriver, engine.useQueryService)
-		})
-	}
+	b.Run("over", func(b *testing.B) {
+		for _, engine := range []struct {
+			name            string
+			useQueryService bool
+		}{
+			{
+				name:            "QueryService",
+				useQueryService: true,
+			},
+			{
+				name:            "TableService",
+				useQueryService: false,
+			},
+		} {
+			b.Run(engine.name, func(b *testing.B) {
+				benchmarkDatabaseSQLSelect42(b, nativeDriver, engine.useQueryService)
+			})
+		}
+	})
 }
 
 func warmUpMock(ctx context.Context, t testing.TB, db *sql.DB) {

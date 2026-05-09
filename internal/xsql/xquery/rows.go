@@ -36,6 +36,7 @@ type rows struct {
 }
 
 func (r *rows) updateColumns() {
+	r.columnsFetchError = r.nextErr
 	if r.nextErr == nil && r.nextSet != nil {
 		r.allColumns = r.nextSet.Columns()
 		r.columns = make([]string, 0, len(r.allColumns))
@@ -47,7 +48,12 @@ func (r *rows) updateColumns() {
 			}
 		}
 		r.columnsType = r.nextSet.ColumnTypes()
-		r.columnsFetchError = r.nextErr
+	}
+}
+
+func (r *rows) panicIfColumnsFetchFailed() {
+	if err := r.columnsFetchError; err != nil && !xerrors.Is(err, io.EOF) {
+		panic(xerrors.WithStackTrace(err))
 	}
 }
 
@@ -62,9 +68,7 @@ func (r *rows) Columns(ctx context.Context) []string {
 	r.firstNextSet.Do(func() {
 		r.loadFirstNextSet(ctx)
 	})
-	if r.columnsFetchError != nil {
-		panic(xerrors.WithStackTrace(r.columnsFetchError))
-	}
+	r.panicIfColumnsFetchFailed()
 
 	return r.columns
 }
@@ -73,9 +77,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(ctx context.Context, index int) string
 	r.firstNextSet.Do(func() {
 		r.loadFirstNextSet(ctx)
 	})
-	if r.columnsFetchError != nil {
-		panic(xerrors.WithStackTrace(r.columnsFetchError))
-	}
+	r.panicIfColumnsFetchFailed()
 
 	return r.columnsType[index].Yql()
 }
@@ -84,9 +86,7 @@ func (r *rows) ColumnTypeNullable(ctx context.Context, index int) (nullable, ok 
 	r.firstNextSet.Do(func() {
 		r.loadFirstNextSet(ctx)
 	})
-	if r.columnsFetchError != nil {
-		panic(xerrors.WithStackTrace(r.columnsFetchError))
-	}
+	r.panicIfColumnsFetchFailed()
 	_, castResult := r.nextSet.ColumnTypes()[index].(interface{ IsOptional() })
 
 	return castResult, true
@@ -98,6 +98,7 @@ func (r *rows) NextResultSet(ctx context.Context) (finalErr error) {
 	res, err := r.result.NextResultSet(ctx)
 	r.nextErr = err
 	r.nextSet = res
+	r.updateColumns()
 
 	if xerrors.Is(r.nextErr, io.EOF) {
 		return io.EOF
@@ -106,7 +107,6 @@ func (r *rows) NextResultSet(ctx context.Context) (finalErr error) {
 	if r.nextErr != nil {
 		return xerrors.WithStackTrace(r.nextErr)
 	}
-	r.updateColumns()
 
 	return nil
 }
