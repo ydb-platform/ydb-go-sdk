@@ -581,6 +581,64 @@ func TestExecute(t *testing.T) {
 				require.ErrorIs(t, err, context.Canceled)
 			})
 		})
+
+		// Verifies that cancelling the ctx passed to nextPart unblocks a Recv
+		// that is already waiting on the wire. Without the per-call
+		// context.AfterFunc(ctx, streamCancel) installed by nextPart, Recv
+		// would block indefinitely until the server sends or ends the stream
+		// because executeCtx is decoupled from the caller's ctx after
+		// execute() returns (see CancelAfterExecute for the decoupling
+		// contract).
+		t.Run("CancelCallCtxUnblocksBlockedRecv", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			recvStarted := make(chan struct{})
+			var streamCtx context.Context
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			// First Recv() satisfies newResult() inside execute().
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+				ResultSetIndex: 0,
+				ResultSet:      &Ydb.ResultSet{},
+			}, nil)
+			// Second Recv() simulates a slow server: it blocks until the gRPC
+			// stream's ctx is cancelled and only then surfaces the cancellation,
+			// matching real gRPC behaviour where Recv unblocks on stream ctx
+			// cancellation.
+			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+				close(recvStarted)
+				<-streamCtx.Done()
+
+				return nil, streamCtx.Err()
+			})
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(ctx context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+				) {
+					streamCtx = ctx
+
+					return stream, nil
+				})
+
+			r, err := execute(xtest.Context(t), "123", client, "", options.ExecuteSettings())
+			require.NoError(t, err)
+			defer func() {
+				_ = r.Close(context.Background())
+			}()
+
+			callCtx, callCancel := context.WithCancel(context.Background())
+			go func() {
+				<-recvStarted
+				callCancel()
+			}()
+
+			_, err = r.nextPart(callCtx)
+			require.ErrorIs(t, err, context.Canceled)
+		})
 	})
 }
 
