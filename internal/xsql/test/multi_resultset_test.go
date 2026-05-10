@@ -20,7 +20,7 @@ import (
 // rows.NextResultSet call.
 const twoStatementsSQL = `SELECT 42 AS id; SELECT "hello"u AS hello, "world" AS world`
 
-// TesTwoStatementsTwoResultSets verifies that a YQL query with
+// TestTwoStatementsTwoResultSets verifies that a YQL query with
 // two SELECT statements produces two distinct result sets readable through
 // database/sql.Rows.NextResultSet for both engine modes. Each result set has
 // its own column layout, so the test scans them independently.
