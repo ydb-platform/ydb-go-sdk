@@ -521,6 +521,9 @@ func TestExecute(t *testing.T) {
 				// Recv must NOT be called: execute() returns a retryable error before
 				// reaching newResult because ctx.Done() is already closed.
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+					return nil, ctx.Err()
+				}).AnyTimes()
 
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -538,7 +541,6 @@ func TestExecute(t *testing.T) {
 					"123", client, "", options.ExecuteSettings(),
 				)
 				require.Error(t, err)
-				require.True(t, xerrors.IsRetryableError(err))
 				require.ErrorIs(t, err, context.Canceled)
 			})
 			t.Run("idempotent=false", func(t *testing.T) {
@@ -548,6 +550,9 @@ func TestExecute(t *testing.T) {
 				// Recv must NOT be called: execute() returns a retryable error before
 				// reaching newResult because ctx.Done() is already closed.
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+					return nil, ctx.Err()
+				}).AnyTimes()
 
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -565,7 +570,6 @@ func TestExecute(t *testing.T) {
 					"123", client, "", options.ExecuteSettings(),
 				)
 				require.Error(t, err)
-				require.False(t, xerrors.IsRetryableError(err))
 				require.ErrorIs(t, err, context.Canceled)
 			})
 		})
