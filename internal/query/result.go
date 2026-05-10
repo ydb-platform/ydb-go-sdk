@@ -212,6 +212,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	}
 
 	if err := ctx.Err(); err != nil {
+		if r.streamCancel != nil {
+			r.streamCancel()
+		}
 		return nil, xerrors.WithStackTrace(err)
 	}
 
