@@ -24,7 +24,7 @@ import (
 // The test uses the in-process mock server's per-method call counters to assert
 // the exact dispatch path. The result payload is identical for both paths (the
 // mock interprets `SELECT 42` the same way over either service), so the test
-// also verifies that the materialised `result.Result` is observably the same to
+// also verifies that the materialized `result.Result` is observably the same to
 // the caller regardless of which executor handled the query.
 func TestTableSessionExecuteDataQuery(t *testing.T) {
 	for _, tc := range []struct {
