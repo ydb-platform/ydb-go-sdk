@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 
@@ -25,10 +24,10 @@ const twoStatementsSQL = `SELECT 42 AS id; SELECT "hello"u AS hello, "world" AS 
 // two SELECT statements produces two distinct result sets readable through
 // database/sql.Rows.NextResultSet for both engine modes. Each result set has
 // its own column layout, so the test scans them independently.
-func TesTwoStatementsTwoResultSets(t *testing.T) {
+func TestTwoStatementsTwoResultSets(t *testing.T) {
 	mockSrv := mock.Server(t)
 
-	openCtx := context.Background()
+	openCtx := t.Context()
 
 	nativeDriver, err := ydb.Open(openCtx, mockSrv.ConnString(),
 		ydb.WithAnonymousCredentials(),
@@ -64,49 +63,98 @@ func TesTwoStatementsTwoResultSets(t *testing.T) {
 					_ = db.Close()
 				})
 
-				ctx := context.Background()
+				t.Run("ExplicitFirstCallNextResultSet", func(t *testing.T) {
+					ctx := t.Context()
 
-				sqlRows, err := db.QueryContext(ctx, twoStatementsSQL)
-				require.NoError(t, err)
+					sqlRows, err := db.QueryContext(ctx, twoStatementsSQL)
+					require.NoError(t, err)
 
-				t.Cleanup(func() {
-					_ = sqlRows.Close()
+					t.Cleanup(func() {
+						_ = sqlRows.Close()
+					})
+
+					// First result set: SELECT 42 AS id
+					require.True(t, sqlRows.NextResultSet())
+
+					firstCols, err := sqlRows.Columns()
+					require.NoError(t, err)
+					require.Equal(t, []string{"id"}, firstCols)
+
+					require.True(t, sqlRows.Next())
+					var id int32
+					require.NoError(t, sqlRows.Scan(&id))
+					require.Equal(t, int32(42), id)
+					require.False(t, sqlRows.Next())
+
+					// Second result set: SELECT "hello"u AS hello, "world" AS world.
+					// Column layout differs from the first set, so the test explicitly
+					// switches via NextResultSet and re-reads Columns before Scan.
+					require.True(t, sqlRows.NextResultSet())
+
+					secondCols, err := sqlRows.Columns()
+					require.NoError(t, err)
+					require.Equal(t, []string{"hello", "world"}, secondCols)
+
+					require.True(t, sqlRows.Next())
+					var (
+						hello string
+						world []byte
+					)
+					require.NoError(t, sqlRows.Scan(&hello, &world))
+					require.Equal(t, "hello", hello)
+					require.Equal(t, []byte("world"), world)
+					require.False(t, sqlRows.Next())
+
+					require.False(t, sqlRows.NextResultSet())
+					require.NoError(t, sqlRows.Err())
 				})
 
-				// First result set: SELECT 42 AS id
-				require.True(t, sqlRows.NextResultSet())
+				t.Run("ImplicitFirstCallNextResultSet", func(t *testing.T) {
+					ctx := t.Context()
 
-				firstCols, err := sqlRows.Columns()
-				require.NoError(t, err)
-				require.Equal(t, []string{"id"}, firstCols)
+					sqlRows, err := db.QueryContext(ctx, twoStatementsSQL)
+					require.NoError(t, err)
 
-				require.True(t, sqlRows.Next())
-				var id int32
-				require.NoError(t, sqlRows.Scan(&id))
-				require.Equal(t, int32(42), id)
-				require.False(t, sqlRows.Next())
+					t.Cleanup(func() {
+						_ = sqlRows.Close()
+					})
 
-				// Second result set: SELECT "hello"u AS hello, "world" AS world.
-				// Column layout differs from the first set, so the test explicitly
-				// switches via NextResultSet and re-reads Columns before Scan.
-				require.True(t, sqlRows.NextResultSet())
+					// First result set: SELECT 42 AS id
+					// No explicit call sqlRows.NextResultSet()
+					// require.True(t, sqlRows.NextResultSet())
 
-				secondCols, err := sqlRows.Columns()
-				require.NoError(t, err)
-				require.Equal(t, []string{"hello", "world"}, secondCols)
+					firstCols, err := sqlRows.Columns()
+					require.NoError(t, err)
+					require.Equal(t, []string{"id"}, firstCols)
 
-				require.True(t, sqlRows.Next())
-				var (
-					hello string
-					world []byte
-				)
-				require.NoError(t, sqlRows.Scan(&hello, &world))
-				require.Equal(t, "hello", hello)
-				require.Equal(t, []byte("world"), world)
-				require.False(t, sqlRows.Next())
+					require.True(t, sqlRows.Next())
+					var id int32
+					require.NoError(t, sqlRows.Scan(&id))
+					require.Equal(t, int32(42), id)
+					require.False(t, sqlRows.Next())
 
-				require.False(t, sqlRows.NextResultSet())
-				require.NoError(t, sqlRows.Err())
+					// Second result set: SELECT "hello"u AS hello, "world" AS world.
+					// Column layout differs from the first set, so the test explicitly
+					// switches via NextResultSet and re-reads Columns before Scan.
+					require.True(t, sqlRows.NextResultSet())
+
+					secondCols, err := sqlRows.Columns()
+					require.NoError(t, err)
+					require.Equal(t, []string{"hello", "world"}, secondCols)
+
+					require.True(t, sqlRows.Next())
+					var (
+						hello string
+						world []byte
+					)
+					require.NoError(t, sqlRows.Scan(&hello, &world))
+					require.Equal(t, "hello", hello)
+					require.Equal(t, []byte("world"), world)
+					require.False(t, sqlRows.Next())
+
+					require.False(t, sqlRows.NextResultSet())
+					require.NoError(t, sqlRows.Err())
+				})
 			})
 		}
 	})
