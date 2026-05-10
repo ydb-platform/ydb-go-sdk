@@ -6,7 +6,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -151,13 +153,11 @@ func (m *tableSrv) KeepAlive(
 
 func (m *tableSrv) ExecuteDataQuery(
 	_ context.Context,
-	_ *Ydb_Table.ExecuteDataQueryRequest,
+	req *Ydb_Table.ExecuteDataQueryRequest,
 ) (*Ydb_Table.ExecuteDataQueryResponse, error) {
-	rs := select42ResultSet()
-
 	return &Ydb_Table.ExecuteDataQueryResponse{
 		Operation: operationOK(&Ydb_Table.ExecuteQueryResult{
-			ResultSets: []*Ydb.ResultSet{rs},
+			ResultSets: resultSetsForQuery(req.GetQuery().GetYqlText()),
 		}),
 	}, nil
 }
@@ -205,41 +205,140 @@ func (m *querySrv) AttachSession(
 }
 
 func (m *querySrv) ExecuteQuery(
-	_ *Ydb_Query.ExecuteQueryRequest,
+	req *Ydb_Query.ExecuteQueryRequest,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryServer,
 ) error {
-	rs := select42ResultSet()
+	resultSets := resultSetsForQuery(req.GetQueryContent().GetText())
 
-	return stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
-		Status:         Ydb.StatusIds_SUCCESS,
-		ResultSetIndex: 0,
-		ResultSet:      rs,
-	})
+	for i, rs := range resultSets {
+		err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: int64(i),
+			ResultSet:      rs,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// projectionRegex matches a single SELECT projection of the form
+// <literal> [AS <name>], where <literal> is an integer, a Utf8 string
+// ("text"u) or a String/bytes literal ("text"). Multiple projections per
+// statement are supported by FindAllStringSubmatch.
+var projectionRegex = regexp.MustCompile(`(?i)("[^"]*"u|"[^"]*"|-?\d+)(?:\s+AS\s+(\w+))?`)
+
+// resultSetsForQuery converts a (possibly multi-statement) SQL string into one
+// result set per non-empty statement. Each statement may contain multiple
+// projections separated by ',' producing one column per projection.
+// Unknown shapes fall back to select42ResultSet so existing "SELECT 42"
+// tests keep working.
+func resultSetsForQuery(query string) []*Ydb.ResultSet {
+	statements := splitStatements(query)
+	if len(statements) == 0 {
+		return []*Ydb.ResultSet{select42ResultSet()}
+	}
+
+	resultSets := make([]*Ydb.ResultSet, 0, len(statements))
+	for _, stmt := range statements {
+		resultSets = append(resultSets, resultSetForStatement(stmt))
+	}
+
+	return resultSets
+}
+
+// splitStatements splits sql by ';', dropping empty / whitespace-only fragments.
+// It is intentionally simplistic: the mock does not need a real SQL parser, only
+// enough to model multi-statements such as
+// `SELECT 42 AS id; SELECT "hello"u AS hello, "world" AS world`.
+func splitStatements(query string) []string {
+	parts := strings.Split(query, ";")
+	statements := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			statements = append(statements, p)
+		}
+	}
+
+	return statements
+}
+
+// resultSetForStatement builds a result set with one column per projection
+// found in stmt. Recognised literals: integer, Utf8 string ("text"u) and
+// bytes string ("text"). If no projection matches, select42ResultSet is used
+// as a fallback for backward compatibility with simple "SELECT 42" tests.
+func resultSetForStatement(stmt string) *Ydb.ResultSet {
+	matches := projectionRegex.FindAllStringSubmatch(stmt, -1)
+	if len(matches) == 0 {
+		return select42ResultSet()
+	}
+
+	columns := make([]*Ydb.Column, 0, len(matches))
+	items := make([]*Ydb.Value, 0, len(matches))
+	for _, m := range matches {
+		col, val := projectionColumn(m[1], m[2])
+		columns = append(columns, col)
+		items = append(items, val)
+	}
+
+	return &Ydb.ResultSet{
+		Columns: columns,
+		Rows: []*Ydb.Value{
+			{Items: items},
+		},
+	}
+}
+
+// projectionColumn maps a parsed (literal, name) pair to an Ydb column
+// descriptor and the matching row item.
+func projectionColumn(literal, name string) (*Ydb.Column, *Ydb.Value) {
+	switch {
+	case strings.HasPrefix(literal, `"`) && strings.HasSuffix(strings.ToLower(literal), `"u`):
+		return utf8Column(name, literal[1:len(literal)-2])
+	case strings.HasPrefix(literal, `"`) && strings.HasSuffix(literal, `"`):
+		return bytesColumn(name, []byte(literal[1:len(literal)-1]))
+	default:
+		n, _ := strconv.ParseInt(literal, 10, 32)
+
+		return int32Column(name, int32(n))
+	}
+}
+
+func int32Column(name string, value int32) (*Ydb.Column, *Ydb.Value) {
+	return &Ydb.Column{
+			Name: name,
+			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
+		}, &Ydb.Value{
+			Value: &Ydb.Value_Int32Value{Int32Value: value},
+		}
+}
+
+func utf8Column(name, value string) (*Ydb.Column, *Ydb.Value) {
+	return &Ydb.Column{
+			Name: name,
+			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
+		}, &Ydb.Value{
+			Value: &Ydb.Value_TextValue{TextValue: value},
+		}
+}
+
+func bytesColumn(name string, value []byte) (*Ydb.Column, *Ydb.Value) {
+	return &Ydb.Column{
+			Name: name,
+			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
+		}, &Ydb.Value{
+			Value: &Ydb.Value_BytesValue{BytesValue: value},
+		}
 }
 
 func select42ResultSet() *Ydb.ResultSet {
+	col, val := int32Column("", 42)
+
 	return &Ydb.ResultSet{
-		Columns: []*Ydb.Column{
-			{
-				Name: "",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_INT32,
-					},
-				},
-			},
-		},
-		Rows: []*Ydb.Value{
-			{
-				Items: []*Ydb.Value{
-					{
-						Value: &Ydb.Value_Int32Value{
-							Int32Value: 42,
-						},
-					},
-				},
-			},
-		},
+		Columns: []*Ydb.Column{col},
+		Rows:    []*Ydb.Value{{Items: []*Ydb.Value{val}}},
 	}
 }
 

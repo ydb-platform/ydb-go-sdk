@@ -140,22 +140,6 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	// If ctx was cancelled during ExecuteQuery, return a retryable error so the
-	// pool can retry with a fresh session. This is safe regardless of idempotency
-	// because the retry loop operates on the caller's (user's) context: if ctx
-	// was cancelled only due to session death the user context is still alive and
-	// a retry is warranted; if the user cancelled their own context the retry loop
-	// will see its own ctx.Done() and stop without retrying.
-	// Check ctx.Err() (not select+default against ctx.Done) so a cancelled parent
-	// is always observed reliably before constructing the stream result.
-	if err := ctx.Err(); err != nil {
-		if xcontext.IsIdempotent(ctx) {
-			return nil, xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithName("streamExecuteQuery")))
-		}
-
-		return nil, xerrors.WithStackTrace(err)
-	}
-
 	// newResult must use executeCtx, not the parent ctx: parent ctx may already
 	// be done (e.g. session death) while the gRPC stream is still readable.
 	r, err := newResult(executeCtx, stream, append(opts,
