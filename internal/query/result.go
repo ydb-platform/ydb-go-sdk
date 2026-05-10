@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -53,6 +54,7 @@ type (
 		// invoked on demand from nextPart so that a Recv blocked on the wire
 		// can be unblocked when the caller's ctx is cancelled mid-flight.
 		streamCancel context.CancelFunc
+		closed       atomic.Bool
 	}
 	resultOption func(s *streamResult)
 )
@@ -283,6 +285,10 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
+	if !r.closed.CompareAndSwap(false, true) {
+		return nil
+	}
+
 	defer func() {
 		for _, f := range r.shutdownHooks {
 			f()
