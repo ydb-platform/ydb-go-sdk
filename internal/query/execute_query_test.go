@@ -514,28 +514,60 @@ func TestExecute(t *testing.T) {
 		// GREEN after fix: ctx.Done() is already closed when execute() checks it, so it
 		// returns a retryable error without calling Recv() at all.
 		t.Run("CancelParentContextAfterStreamOpen", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			t.Run("idempotent=true", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				ctx, cancel := context.WithCancel(xtest.Context(t))
 
-			// Recv must NOT be called: execute() returns a retryable error before
-			// reaching newResult because ctx.Done() is already closed.
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				// Recv must NOT be called: execute() returns a retryable error before
+				// reaching newResult because ctx.Done() is already closed.
+				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 
-			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
-					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
-				) {
-					// Simulate session expiry: canceling ctx closes ctx.Done() so that
-					// the non-blocking check in execute() fires after ExecuteQuery returns.
-					cancel()
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+						Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+					) {
+						// Simulate session expiry: canceling ctx closes ctx.Done() so that
+						// the non-blocking check in execute() fires after ExecuteQuery returns.
+						cancel()
 
-					return stream, nil
-				})
+						return stream, nil
+					})
 
-			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
-			require.Error(t, err)
-			require.True(t, xerrors.IsRetryableError(err), "expected retryable error, got: %v", err)
+				_, err := execute(xcontext.WithIdempotent(ctx, true),
+					"123", client, "", options.ExecuteSettings(),
+				)
+				require.Error(t, err)
+				require.True(t, xerrors.IsRetryableError(err))
+				require.ErrorIs(t, err, context.Canceled)
+			})
+			t.Run("idempotent=false", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				ctx, cancel := context.WithCancel(xtest.Context(t))
+
+				// Recv must NOT be called: execute() returns a retryable error before
+				// reaching newResult because ctx.Done() is already closed.
+				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+						Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+					) {
+						// Simulate session expiry: canceling ctx closes ctx.Done() so that
+						// the non-blocking check in execute() fires after ExecuteQuery returns.
+						cancel()
+
+						return stream, nil
+					})
+
+				_, err := execute(ctx, // xcontext.WithIdempotent(ctx, false),
+					"123", client, "", options.ExecuteSettings(),
+				)
+				require.Error(t, err)
+				require.False(t, xerrors.IsRetryableError(err))
+				require.ErrorIs(t, err, context.Canceled)
+			})
 		})
 	})
 }

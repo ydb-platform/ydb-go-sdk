@@ -149,10 +149,11 @@ func execute(
 	// Check ctx.Err() (not select+default against ctx.Done) so a cancelled parent
 	// is always observed reliably before constructing the stream result.
 	if err := ctx.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(xerrors.Retryable(
-			err,
-			xerrors.WithName("streamResultContext"),
-		))
+		if xcontext.IsIdempotent(ctx) {
+			return nil, xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithName("streamExecuteQuery")))
+		}
+
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	// newResult must use executeCtx, not the parent ctx: parent ctx may already
