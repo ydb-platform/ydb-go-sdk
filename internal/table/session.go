@@ -151,10 +151,7 @@ func (e queryClientExecutor) execute(
 	request.StatsMode = statsModeToStatsMode(executeDataQueryRequest.GetCollectStats())
 	request.ConcurrentResultSets = false
 
-	execCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	stream, err := e.client.ExecuteQuery(execCtx, request, callOptions...)
+	stream, err := e.client.ExecuteQuery(ctx, request, callOptions...)
 	if err != nil {
 		if status := query.StatusFromErr(err); status != query.StatusUnknown {
 			e.core.SetStatus(status)
@@ -822,10 +819,10 @@ func copyTables(
 	operationTimeout time.Duration,
 	operationCancelAfter time.Duration,
 	service interface {
-		CopyTables(
-			ctx context.Context, in *Ydb_Table.CopyTablesRequest, opts ...grpc.CallOption,
-		) (*Ydb_Table.CopyTablesResponse, error)
-	},
+	CopyTables(
+		ctx context.Context, in *Ydb_Table.CopyTablesRequest, opts ...grpc.CallOption,
+	) (*Ydb_Table.CopyTablesResponse, error)
+},
 	opts ...options.CopyTablesOption,
 ) (err error) {
 	request := Ydb_Table.CopyTablesRequest{
@@ -872,10 +869,10 @@ func renameTables(
 	operationTimeout time.Duration,
 	operationCancelAfter time.Duration,
 	service interface {
-		RenameTables(
-			ctx context.Context, in *Ydb_Table.RenameTablesRequest, opts ...grpc.CallOption,
-		) (*Ydb_Table.RenameTablesResponse, error)
-	},
+	RenameTables(
+		ctx context.Context, in *Ydb_Table.RenameTablesRequest, opts ...grpc.CallOption,
+	) (*Ydb_Table.RenameTablesResponse, error)
+},
 	opts ...options.RenameTablesOption,
 ) (err error) {
 	request := Ydb_Table.RenameTablesRequest{
