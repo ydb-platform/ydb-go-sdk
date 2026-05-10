@@ -125,6 +125,9 @@ func (r *rows) Close(ctx context.Context) error {
 }
 
 func (r *rows) HasNextResultSet(ctx context.Context) bool {
+	// no any information about the next result set in stream except lastErr
+	// TODO: add buffer to next result set to recognize the next result set will
+
 	return r.lastErr == nil
 }
 
