@@ -1,4 +1,4 @@
-package bench
+package test
 
 import (
 	"context"
@@ -69,52 +69,63 @@ func BenchmarkTable(b *testing.B) {
 
 	mockSrv := mock.Server(b)
 
-	driver, err := ydb.Open(ctx, mockSrv.ConnString(),
-		ydb.WithAnonymousCredentials(),
-		ydb.WithSessionPoolSizeLimit(sessionPoolSize),
-	)
-	require.NoError(b, err)
+	for _, tc := range []struct {
+		name            string
+		overQueryClient bool
+	}{
+		{name: "over query-client", overQueryClient: true},
+		{name: "original table-client", overQueryClient: false},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			driver, err := ydb.Open(ctx, mockSrv.ConnString(),
+				ydb.WithAnonymousCredentials(),
+				ydb.WithSessionPoolSizeLimit(sessionPoolSize),
+				ydb.WithExecuteDataQueryOverQueryClient(tc.overQueryClient),
+			)
+			require.NoError(b, err)
 
-	defer func() {
-		_ = driver.Close(ctx)
-	}()
-
-	warmUp(ctx, b, driver)
-
-	b.SetParallelism(benchParallelism)
-	b.ResetTimer()
-	b.ReportAllocs()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			func() {
-				err := driver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-					_, res, err := s.Execute(ctx, table.DefaultTxControl(), `SELECT 42`, nil)
-					if err != nil {
-						return err
-					}
-					defer func() {
-						_ = res.Close()
-					}()
-
-					if err = res.NextResultSetErr(ctx); err != nil {
-						return err
-					}
-
-					var v int32
-
-					for res.NextRow() {
-						if err = res.Scan(indexed.Required(&v)); err != nil {
-							return err
-						}
-						if v != 42 {
-							return fmt.Errorf("unexpected value %d", v)
-						}
-					}
-
-					return res.Err()
-				}, table.WithIdempotent())
-				assert.NoError(b, err)
+			defer func() {
+				_ = driver.Close(ctx)
 			}()
-		}
-	})
+
+			warmUp(ctx, b, driver)
+
+			b.SetParallelism(benchParallelism)
+			b.ResetTimer()
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					func() {
+						err := driver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+							_, res, err := s.Execute(ctx, table.DefaultTxControl(), `SELECT 42`, nil)
+							if err != nil {
+								return err
+							}
+							defer func() {
+								_ = res.Close()
+							}()
+
+							if err = res.NextResultSetErr(ctx); err != nil {
+								return err
+							}
+
+							var v int32
+
+							for res.NextRow() {
+								if err = res.Scan(indexed.Required(&v)); err != nil {
+									return err
+								}
+								if v != 42 {
+									return fmt.Errorf("unexpected value %d", v)
+								}
+							}
+
+							return res.Err()
+						}, table.WithIdempotent())
+						assert.NoError(b, err)
+					}()
+				}
+			})
+		})
+	}
 }

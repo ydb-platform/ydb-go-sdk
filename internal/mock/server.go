@@ -35,6 +35,13 @@ type server struct {
 
 	querySessionID atomic.Uint64
 	tableSessionID atomic.Uint64
+
+	// executeQueryCalls counts QueryService.ExecuteQuery invocations.
+	// executeDataQueryCalls counts TableService.ExecuteDataQuery invocations.
+	// Both are used by integration tests to assert which gRPC method was
+	// dispatched to (e.g. when toggling WithExecuteDataQueryOverQueryClient).
+	executeQueryCalls     atomic.Uint64
+	executeDataQueryCalls atomic.Uint64
 }
 
 func (m *server) nextQuerySession() string {
@@ -43,6 +50,18 @@ func (m *server) nextQuerySession() string {
 
 func (m *server) nextTableSession() string {
 	return fmt.Sprintf("t-%d", m.tableSessionID.Add(1))
+}
+
+// ExecuteQueryCalls returns the number of times QueryService.ExecuteQuery
+// has been invoked on this mock since it was started.
+func (m *server) ExecuteQueryCalls() uint64 {
+	return m.executeQueryCalls.Load()
+}
+
+// ExecuteDataQueryCalls returns the number of times TableService.ExecuteDataQuery
+// has been invoked on this mock since it was started.
+func (m *server) ExecuteDataQueryCalls() uint64 {
+	return m.executeDataQueryCalls.Load()
 }
 
 // ConnString returns a grpc:// DSN for ydb.Open pointing at this mock.
@@ -155,6 +174,8 @@ func (m *tableSrv) ExecuteDataQuery(
 	_ context.Context,
 	req *Ydb_Table.ExecuteDataQueryRequest,
 ) (*Ydb_Table.ExecuteDataQueryResponse, error) {
+	m.mock.executeDataQueryCalls.Add(1)
+
 	return &Ydb_Table.ExecuteDataQueryResponse{
 		Operation: operationOK(&Ydb_Table.ExecuteQueryResult{
 			ResultSets: resultSetsForQuery(req.GetQuery().GetYqlText()),
@@ -208,6 +229,8 @@ func (m *querySrv) ExecuteQuery(
 	req *Ydb_Query.ExecuteQueryRequest,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryServer,
 ) error {
+	m.mock.executeQueryCalls.Add(1)
+
 	resultSets := resultSetsForQuery(req.GetQueryContent().GetText())
 
 	for i, rs := range resultSets {
