@@ -48,6 +48,11 @@ type (
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
+		// streamCancel cancels the gRPC context that backs stream.Recv(). It
+		// is wired up by execute() to point at the executeCtx CancelFunc and
+		// invoked on demand from nextPart so that a Recv blocked on the wire
+		// can be unblocked when the caller's ctx is cancelled mid-flight.
+		streamCancel context.CancelFunc
 	}
 	resultOption func(s *streamResult)
 )
@@ -135,6 +140,16 @@ func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	}
 }
 
+// withStreamCancel wires a CancelFunc that nextPart invokes via
+// context.AfterFunc to unblock stream.Recv() when the caller's ctx is
+// cancelled. Typically this is the same CancelFunc that controls the gRPC
+// context the stream was opened with.
+func withStreamCancel(cancel context.CancelFunc) resultOption {
+	return func(s *streamResult) {
+		s.streamCancel = cancel
+	}
+}
+
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
@@ -202,6 +217,19 @@ func (r *streamResult) nextPart(ctx context.Context) (
 
 	if r.lastErr != nil {
 		return nil, r.lastErr
+	}
+
+	// Forward ctx cancellation to the gRPC stream context so a Recv blocked
+	// waiting for the next server message unblocks if the caller cancels.
+	// AfterFunc only spawns a goroutine when ctx is actually done, so on the
+	// happy path this costs a single register+stop pair (no goroutine, no
+	// extra allocations beyond the AfterFunc node itself). The forwarding is
+	// strictly per-call: the streamResult intentionally stays decoupled from
+	// the original execute() ctx after execute returns, which keeps callers
+	// free to iterate the result with a fresh ctx (see CancelAfterExecute).
+	if r.streamCancel != nil {
+		stop := context.AfterFunc(ctx, r.streamCancel)
+		defer stop()
 	}
 
 	part, err := nextPart(r.stream)

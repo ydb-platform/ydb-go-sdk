@@ -142,9 +142,15 @@ func execute(
 
 	// newResult must use executeCtx, not the parent ctx: parent ctx may already
 	// be done (e.g. session death) while the gRPC stream is still readable.
+	//
+	// withStreamCancel exposes executeCancel to nextPart so a Recv blocked
+	// waiting for the server can be unblocked from the caller's ctx via a
+	// per-call context.AfterFunc; withStreamResultOnClose ensures the same
+	// CancelFunc fires once when the user closes the streamResult.
 	r, err := newResult(executeCtx, stream, append(opts,
 		withStreamResultStatsCallback(settings.StatsCallback()),
 		withStreamResultOnClose(executeCancel),
+		withStreamCancel(executeCancel),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

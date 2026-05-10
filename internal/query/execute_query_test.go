@@ -502,24 +502,30 @@ func TestExecute(t *testing.T) {
 
 		// Regression test for https://github.com/ydb-platform/ydb-go-sdk/issues/2081.
 		//
-		// When the parent ctx is cancelled inside ExecuteQuery (simulating session expiry
-		// while the gRPC stream is still open), ctx.Done() is already closed by the time
-		// execute() checks it after ExecuteQuery returns. execute() must detect this via
-		// the non-blocking ctx.Done() select and return a retryable error so the pool
-		// can retry with a new session — regardless of whether the operation is idempotent.
+		// When the parent ctx is cancelled inside ExecuteQuery (simulating session
+		// expiry while the gRPC stream is still open), execute() must surface that
+		// cancellation as context.Canceled to the caller, regardless of whether the
+		// stream's Recv() is reached.
 		//
-		// RED before fix: the old code (no ctx.Done() check before newResult) proceeded
-		// to newResult, which called Recv() on the mock — but no Recv() expectation is
-		// registered, causing a gomock "unexpected call" failure.
-		// GREEN after fix: ctx.Done() is already closed when execute() checks it, so it
-		// returns a retryable error without calling Recv() at all.
+		// Two paths can lead to context.Canceled, depending on how the
+		// context.AfterFunc that forwards the parent ctx to executeCtx races with
+		// execute() proceeding into newResult:
+		//   - the AfterFunc has already cancelled executeCtx by the time
+		//     nextPart() runs, so the ctx.Err() check at the top of nextPart()
+		//     returns context.Canceled without invoking Recv();
+		//   - the AfterFunc has not fired yet, nextPart() proceeds to Recv() and
+		//     the mock returns ctx.Err() (parent ctx is already cancelled).
+		// Either way the final error must be context.Canceled. The mock therefore
+		// allows Recv() any number of times - including zero - so the test stays
+		// deterministic across both paths.
 		t.Run("CancelParentContextAfterStreamOpen", func(t *testing.T) {
 			t.Run("idempotent=true", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				ctx, cancel := context.WithCancel(xtest.Context(t))
 
-				// Recv must NOT be called: execute() returns a retryable error before
-				// reaching newResult because ctx.Done() is already closed.
+				// Recv() may or may not be reached depending on the AfterFunc race
+				// described above; on either path it returns the parent ctx's
+				// cancellation error.
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 					return nil, ctx.Err()
@@ -547,8 +553,10 @@ func TestExecute(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				ctx, cancel := context.WithCancel(xtest.Context(t))
 
-				// Recv must NOT be called: execute() returns a retryable error before
-				// reaching newResult because ctx.Done() is already closed.
+				// Same race-tolerant expectation as the idempotent=true case:
+				// Recv() may be invoked zero or more times depending on whether
+				// the AfterFunc forwarding parent ctx → executeCtx fires before
+				// nextPart()'s ctx.Err() check.
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 					return nil, ctx.Err()

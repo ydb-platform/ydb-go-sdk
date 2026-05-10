@@ -32,6 +32,15 @@ type (
 		next    *resultSet
 		lastErr error
 
+		// firstNextResultSetCalled tracks whether the caller has already
+		// observed the first result set, either explicitly via NextResultSet
+		// or implicitly via Next. The first result set is eagerly fetched by
+		// newRows, so the very first NextResultSet call has nothing to advance
+		// to and only flips this flag. The flag is also set on the first
+		// Next() so that, in the standard database/sql pattern
+		// (`for rows.Next() {} ; for rows.NextResultSet() { for rows.Next() {} }`),
+		// the explicit NextResultSet immediately advances to the second set
+		// instead of being absorbed as the implicit "first-set ack".
 		firstNextResultSetCalled bool
 	}
 )
@@ -99,6 +108,11 @@ func (r *rows) ColumnTypeNullable(ctx context.Context, index int) (nullable, ok 
 }
 
 func (r *rows) NextResultSet(ctx context.Context) (finalErr error) {
+	// newRows eagerly loaded the first result set, so the first NextResultSet
+	// call only needs to acknowledge that fact and must not advance further.
+	// firstNextResultSetCalled disambiguates this implicit first-set state
+	// (see its comment on the rows struct) and ensures every subsequent
+	// NextResultSet call drains the next part from the stream.
 	if !r.firstNextResultSetCalled {
 		r.firstNextResultSetCalled = true
 
@@ -125,9 +139,14 @@ func (r *rows) Close(ctx context.Context) error {
 }
 
 func (r *rows) HasNextResultSet(ctx context.Context) bool {
-	// no any information about the next result set in stream except lastErr
-	// TODO: add buffer to next result set to recognize the next result set will
-
+	// The query stream delivers result sets lazily through stream.Recv(): we
+	// cannot know whether another result set exists without actually pulling
+	// the next part. lastErr is the only piece of state available without
+	// pre-fetching - it is set to io.EOF when the stream ends and to a fatal
+	// error if iteration broke. While it is still nil we have to assume more
+	// data may be coming and report true. A pre-fetch buffer could give an
+	// exact answer but would also force eager I/O on every NextResultSet
+	// caller, which is intentionally avoided here.
 	return r.lastErr == nil
 }
 
