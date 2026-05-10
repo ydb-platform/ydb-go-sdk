@@ -582,7 +582,7 @@ func TestExecute(t *testing.T) {
 			})
 		})
 
-		// Verifies that cancelling the ctx passed to nextPart unblocks a Recv
+		// Verifies that canceling the ctx passed to nextPart unblocks a Recv
 		// that is already waiting on the wire. Without the per-call
 		// context.AfterFunc(ctx, streamCancel) installed by nextPart, Recv
 		// would block indefinitely until the server sends or ends the stream
@@ -605,7 +605,7 @@ func TestExecute(t *testing.T) {
 			}, nil)
 			// Second Recv() simulates a slow server: it blocks until the gRPC
 			// stream's ctx is cancelled and only then surfaces the cancellation,
-			// matching real gRPC behaviour where Recv unblocks on stream ctx
+			// matching real gRPC behavior where Recv unblocks on stream ctx
 			// cancellation.
 			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 				close(recvStarted)
