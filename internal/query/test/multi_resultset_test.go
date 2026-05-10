@@ -85,6 +85,7 @@ func TestTwoStatementsScanStruct(t *testing.T) {
 			return err
 		}
 
+		_, err = result.NextResultSet(ctx)
 		if err != nil && errors.Is(err, io.EOF) {
 			return nil
 		}
@@ -156,7 +157,7 @@ func TestTwoStatementsScanNamed(t *testing.T) {
 		); err != nil {
 			return err
 		}
-		row, err = rs.NextRow(ctx)
+		_, err = result.NextResultSet(ctx)
 		if err != nil && errors.Is(err, io.EOF) {
 			return nil
 		}

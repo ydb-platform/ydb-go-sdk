@@ -266,7 +266,7 @@ func splitStatements(query string) []string {
 }
 
 // resultSetForStatement builds a result set with one column per projection
-// found in stmt. Recognised literals: integer, Utf8 string ("text"u) and
+// found in stmt. Recognized literals: integer, Utf8 string ("text"u) and
 // bytes string ("text"). If no projection matches, select42ResultSet is used
 // as a fallback for backward compatibility with simple "SELECT 42" tests.
 func resultSetForStatement(stmt string) *Ydb.ResultSet {
