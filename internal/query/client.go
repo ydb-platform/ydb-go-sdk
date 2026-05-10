@@ -239,9 +239,6 @@ func do(
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	var (
 		settings = options.ParseDoOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDo(settings.Trace(), &ctx,
