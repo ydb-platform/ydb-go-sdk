@@ -195,6 +195,7 @@ func newResult(
 	return &r, nil
 }
 
+//nolint:funlen
 func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
 ) {
@@ -217,6 +218,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		if r.streamCancel != nil {
 			r.streamCancel()
 		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
