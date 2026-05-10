@@ -64,6 +64,9 @@ func warmUp(ctx context.Context, t testing.TB, driver *ydb.Driver) {
 }
 
 // BenchmarkTable measures table.Client (driver.Table()) against the in-process xsql mock: Session.Execute("SELECT 42").
+//
+// BenchmarkTable/over_query-client-12      106933    11630 ns/op    21816 B/op   366 allocs/op
+// BenchmarkTable/original_table-client-12  113724    10572 ns/op    20736 B/op   348 allocs/op
 func BenchmarkTable(b *testing.B) {
 	ctx := b.Context()
 

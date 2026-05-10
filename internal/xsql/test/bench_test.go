@@ -79,9 +79,9 @@ func benchmarkDatabaseSQLSelect42(b *testing.B, nativeDriver *ydb.Driver, useQue
 // cpu: Apple M3 Pro
 // go test -bench=. -benchtime=10s .
 //
-// BenchmarkDatabaseSQL/over/QueryService-12		1182007		10129 ns/op		21637 B/op		357 allocs/op
-// BenchmarkDatabaseSQL/over/TableService-12		1293651		9213 ns/op		18439 B/op		298 allocs/op
-// Diff (query/table*100-100)						-8%			10%				17%				19%
+// BenchmarkDatabaseSQL/over/QueryService-12		1095177		10512 ns/op		22321 B/op		368 allocs/op
+// BenchmarkDatabaseSQL/over/TableService-12		1112953		8788 ns/op		18834 B/op		303 allocs/op
+// Diff (query/table*100-100)						-1%			19%				18%				21%
 func BenchmarkDatabaseSQL(b *testing.B) {
 	ctx := b.Context()
 
