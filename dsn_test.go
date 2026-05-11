@@ -27,10 +27,10 @@ func TestParse(t *testing.T) {
 		return c
 	}
 	newLegacyConn := func(opts ...xtable.Option) *xtable.Conn {
-		return xtable.New(context.Background(), nil, nil, opts...)
+		return xtable.New(nil, nil, opts...)
 	}
 	newQueryConn := func(opts ...xquery.Option) *xquery.Conn {
-		return xquery.New(context.Background(), nil, opts...)
+		return xquery.New(nil, opts...)
 	}
 	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {
 		require.Equal(t, lhs.Secure(), rhs.Secure())

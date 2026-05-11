@@ -1,3 +1,10 @@
+* `database/sql` driver (no public API changes): `QueryContext` / `Stmt.QueryContext` / `Tx.QueryContext` cancellation propagated through row iteration consistently—the SQL `Rows` adapter retained that context for every `Next`, `NextResultSet`, and column-metadata call, and both Query Service and Table Service backends received it where supported.
+* When using **QueryService** (`ydb.WithQueryService(true)`, default), canceling the query context after starting to read a result set surfaced `context.Canceled` from `(*sql.Rows).Err()` after `Next` stopped, matching typical `database/sql` expectations for context-aware queries.
+* When using **TableService** (`ydb.WithQueryService(false)`), row iteration continued to rely on the table client read path; `Rows.Err()` after cancel could be empty or `io.EOF` once rows were exhausted, rather than the cancellation error.
+* Replaced internal query-client "done" signal channels with `atomic.Bool` to improve performance:
+  * Reduced allocations per query and decreased latency for each query.
+  * Disabled cascading cancellation of all child operations, such as canceling a query on session close or query-client close — YDB server is supposed to cancel query executions on closing sessions.
+
 ## v3.135.14
 * Adjusted gRPC client-stream error wrapping to improve topic writer reconnect behavior, ensuring stream teardown races don’t cause server-side gRPC cancellations to be misclassified as purely local context cancellations.
 

@@ -28,8 +28,6 @@ type (
 		Scripting() scripting.Client
 	}
 	Conn struct {
-		ctx context.Context //nolint:containedctx
-
 		scriptingClient scripting.Client
 		session         table.ClosableSession // Immutable and r/o usage.
 
@@ -119,9 +117,8 @@ type resultNoRows struct{}
 func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
-func New(ctx context.Context, scriptingClient scripting.Client, s table.ClosableSession, opts ...Option) *Conn {
+func New(scriptingClient scripting.Client, s table.ClosableSession, opts ...Option) *Conn {
 	cc := &Conn{
-		ctx:              ctx,
 		scriptingClient:  scriptingClient,
 		session:          s,
 		defaultQueryMode: DataQueryMode,
@@ -296,7 +293,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-func (c *Conn) Close() (finalErr error) {
+func (c *Conn) Close(ctx context.Context) (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
 		return xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
 			xerrors.Invalid(c),
@@ -310,7 +307,7 @@ func (c *Conn) Close() (finalErr error) {
 		}
 	}()
 
-	err := c.session.Close(xcontext.ValueOnly(c.ctx))
+	err := c.session.Close(xcontext.ValueOnly(ctx))
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

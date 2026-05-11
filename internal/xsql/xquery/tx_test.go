@@ -17,7 +17,6 @@ import (
 type txFakeCore struct {
 	id     string
 	status internalQuery.Status
-	done   chan struct{}
 }
 
 func (f *txFakeCore) NodeID() uint32 { return 0 }
@@ -29,8 +28,6 @@ func (f *txFakeCore) Status() string { return f.status.String() }
 func (f *txFakeCore) Close(_ context.Context) error { return nil }
 
 func (f *txFakeCore) IsAlive() bool { return internalQuery.IsAlive(f.status) }
-
-func (f *txFakeCore) Done() <-chan struct{} { return f.done }
 
 func (f *txFakeCore) SetStatus(s internalQuery.Status) { f.status = s }
 
@@ -78,10 +75,9 @@ func TestTransactionRollbackReturnsErrBadConnWhenSessionInvalid(t *testing.T) {
 	core := &txFakeCore{
 		id:     "dead-session",
 		status: internalQuery.StatusClosed, // session is invalid after BAD_SESSION
-		done:   make(chan struct{}),
 	}
 	session := &internalQuery.Session{Core: core}
-	conn := New(ctx, session)
+	conn := New(session)
 
 	tx := &transaction{
 		conn: conn,

@@ -166,7 +166,7 @@ func (s *Session) Begin(
 func (s *Session) execute(
 	ctx context.Context, q string, settings executeSettings, opts ...resultOption,
 ) (_ *streamResult, finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, s.Done())
+	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if finalErr != nil {
 			cancel()
@@ -175,8 +175,8 @@ func (s *Session) execute(
 	}()
 
 	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts,
-		withStreamResultOnClose(cancel),
 		withStreamResultCloseTimeout(s.streamResultCloseTimeout),
+		withStreamResultOnClose(cancel),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -258,10 +258,8 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (_ arrow.Result, finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 
-	ctx, cancel := xcontext.WithDone(ctx, s.Done())
 	defer func() {
 		if finalErr != nil {
-			cancel()
 			applyStatusByError(s, finalErr)
 		}
 	}()
@@ -273,7 +271,7 @@ func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Exec
 
 	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
 
-	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	executeCtx, executeCancel := context.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
 		if finalErr != nil {
 			executeCancel()

@@ -151,9 +151,6 @@ func (e queryClientExecutor) execute(
 	request.StatsMode = statsModeToStatsMode(executeDataQueryRequest.GetCollectStats())
 	request.ConcurrentResultSets = false
 
-	ctx, cancel := xcontext.WithDone(xcontext.ValueOnly(ctx), e.core.Done())
-	defer cancel()
-
 	stream, err := e.client.ExecuteQuery(ctx, request, callOptions...)
 	if err != nil {
 		if status := query.StatusFromErr(err); status != query.StatusUnknown {

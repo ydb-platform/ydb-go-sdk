@@ -28,7 +28,6 @@ func TestSessionBeginLazyTxDeadSession(t *testing.T) {
 	deadCore := &sessionControllerMock{
 		id:     "dead-session",
 		status: StatusError,
-		done:   make(chan struct{}),
 	}
 	s := &Session{
 		Core:   deadCore,

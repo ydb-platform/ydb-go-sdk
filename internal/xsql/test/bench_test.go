@@ -1,4 +1,4 @@
-package bench
+package test
 
 import (
 	"context"
@@ -79,9 +79,9 @@ func benchmarkDatabaseSQLSelect42(b *testing.B, nativeDriver *ydb.Driver, useQue
 // cpu: Apple M3 Pro
 // go test -bench=. -benchtime=10s .
 //
-// BenchmarkDatabaseSQL/overQueryService-12		89910		11521 ns/op		23488 B/op		382 allocs/op
-// BenchmarkDatabaseSQL/overTableService-12		111398		9504 ns/op		18985 B/op		307 allocs/op
-// Diff (query/table*100-100)					-19%		21%				23%				24%
+// BenchmarkDatabaseSQL/over/QueryService-12		1095177		10512 ns/op		22321 B/op		368 allocs/op
+// BenchmarkDatabaseSQL/over/TableService-12		1112953		8788 ns/op		18834 B/op		303 allocs/op
+// Diff (query/table*100-100)						-1%			19%				18%				21%
 func BenchmarkDatabaseSQL(b *testing.B) {
 	ctx := b.Context()
 
@@ -97,23 +97,25 @@ func BenchmarkDatabaseSQL(b *testing.B) {
 		_ = nativeDriver.Close(ctx)
 	}()
 
-	for _, engine := range []struct {
-		name            string
-		useQueryService bool
-	}{
-		{
-			name:            "overQueryService",
-			useQueryService: true,
-		},
-		{
-			name:            "overTableService",
-			useQueryService: false,
-		},
-	} {
-		b.Run(engine.name, func(b *testing.B) {
-			benchmarkDatabaseSQLSelect42(b, nativeDriver, engine.useQueryService)
-		})
-	}
+	b.Run("over", func(b *testing.B) {
+		for _, engine := range []struct {
+			name            string
+			useQueryService bool
+		}{
+			{
+				name:            "QueryService",
+				useQueryService: true,
+			},
+			{
+				name:            "TableService",
+				useQueryService: false,
+			},
+		} {
+			b.Run(engine.name, func(b *testing.B) {
+				benchmarkDatabaseSQLSelect42(b, nativeDriver, engine.useQueryService)
+			})
+		}
+	})
 }
 
 func warmUpMock(ctx context.Context, t testing.TB, db *sql.DB) {

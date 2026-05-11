@@ -13,6 +13,11 @@ func TestErrors(t *testing.T) {
 		require.Contains(t, errNilClient.Error(), "table client is not initialized")
 	})
 
+	t.Run("errClosedClient", func(t *testing.T) {
+		require.NotNil(t, errClosedClient)
+		require.Contains(t, errClosedClient.Error(), "query client closed early")
+	})
+
 	t.Run("ErrTransactionRollingBack", func(t *testing.T) {
 		require.NotNil(t, ErrTransactionRollingBack)
 		require.Contains(t, ErrTransactionRollingBack.Error(), "the transaction is rolling back")
@@ -65,7 +70,8 @@ func TestErrors(t *testing.T) {
 
 	t.Run("ErrorsAreUnique", func(t *testing.T) {
 		// Verify that error variables are distinct
-		require.False(t, errors.Is(errNilClient, ErrTransactionRollingBack))
+		require.False(t, errors.Is(errNilClient, errClosedClient))
+		require.False(t, errors.Is(errClosedClient, ErrTransactionRollingBack))
 		require.False(t, errors.Is(errWrongNextResultSetIndex, errWrongResultSetIndex))
 		require.False(t, errors.Is(ErrMoreThanOneRow, ErrMoreThanOneResultSet))
 		require.False(t, errors.Is(ErrNoResultSets, errNilOption))

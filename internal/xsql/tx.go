@@ -100,7 +100,7 @@ func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedV
 			return nil, xerrors.WithStackTrace(badconn.Map(err))
 		}
 
-		return rowByAstPlan(ast, plan), nil
+		return newRows(ctx, rowByAstPlan(ast, plan)), nil
 	}
 
 	rows, err := tx.tx.Query(ctx, sql, params)
@@ -108,7 +108,7 @@ func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedV
 		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
-	return newRows(rows), nil
+	return newRows(ctx, rows), nil
 }
 
 func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
