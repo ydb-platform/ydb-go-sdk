@@ -98,6 +98,8 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 
 	result, err := c.session.Query(ctx, sql, opts...)
 	if err != nil {
+		_ = result.Close(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
