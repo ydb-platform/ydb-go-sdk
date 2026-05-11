@@ -300,7 +300,7 @@ func (c *Client) registerCloseCancel(cancel context.CancelFunc) func() {
 		id = new.nextCancelID
 		new.cancels[id] = cancel
 
-		return old
+		return &new
 	})
 	if id == 0 {
 		cancel()
