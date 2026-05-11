@@ -80,6 +80,8 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 
 	rows, err := newRows(ctx, result)
 	if err != nil {
+		_ = result.Close(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
