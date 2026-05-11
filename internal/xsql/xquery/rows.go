@@ -25,6 +25,7 @@ type (
 		allColumns   []string
 		columns      []string
 		columnsTypes []types.Type
+		visibleTypes []int
 		discarded    []bool
 	}
 	rows struct {
@@ -80,6 +81,7 @@ func (r *rows) nextResultSet(ctx context.Context) (finalErr error) {
 		allColumns:   allColumns,
 		columns:      make([]string, 0, len(allColumns)),
 		columnsTypes: rs.ColumnTypes(),
+		visibleTypes: make([]int, 0, len(allColumns)),
 		discarded:    make([]bool, len(allColumns)),
 	}
 
@@ -87,6 +89,7 @@ func (r *rows) nextResultSet(ctx context.Context) (finalErr error) {
 		r.next.discarded[i] = strings.HasPrefix(v, ignoreColumnPrefixName)
 		if !r.next.discarded[i] {
 			r.next.columns = append(r.next.columns, v)
+			r.next.visibleTypes = append(r.next.visibleTypes, i)
 		}
 	}
 
@@ -98,11 +101,11 @@ func (r *rows) Columns(ctx context.Context) []string {
 }
 
 func (r *rows) ColumnTypeDatabaseTypeName(ctx context.Context, index int) string {
-	return r.next.columnsTypes[index].Yql()
+	return r.next.columnsTypes[r.next.visibleTypes[index]].Yql()
 }
 
 func (r *rows) ColumnTypeNullable(ctx context.Context, index int) (nullable, ok bool) {
-	_, castResult := r.next.columnsTypes[index].(interface{ IsOptional() })
+	_, castResult := r.next.columnsTypes[r.next.visibleTypes[index]].(interface{ IsOptional() })
 
 	return castResult, true
 }
