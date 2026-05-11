@@ -50,6 +50,8 @@ type (
 		status         atomic.Uint32
 		onChangeStatus []func(status Status)
 		cancelAttach   context.CancelFunc
+
+		registerCloseCancel func(context.CancelFunc) func()
 	}
 )
 
@@ -122,6 +124,12 @@ func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 func WithTrace(t *trace.Query) Option {
 	return func(c *sessionCore) {
 		c.Trace = c.Trace.Compose(t)
+	}
+}
+
+func WithRegisterCloseCancel(register func(context.CancelFunc) func()) Option {
+	return func(c *sessionCore) {
+		c.registerCloseCancel = register
 	}
 }
 
@@ -270,9 +278,18 @@ func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
 	}()
 
 	if err := ctx.Err(); err != nil {
-		go func() {
-			_ = deleteSession(xcontext.ValueOnly(ctx), core.Client, core.id, core.deleteTimeout)
-		}()
+		if core.registerCloseCancel != nil {
+			deleteCtx, cancelDelete := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+			unregister := core.registerCloseCancel(cancelDelete)
+			go func() {
+				defer func() {
+					cancelDelete()
+					unregister()
+				}()
+
+				_ = deleteSession(deleteCtx, core.Client, core.id, core.deleteTimeout)
+			}()
+		}
 
 		return nil
 	}

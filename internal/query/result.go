@@ -338,6 +338,19 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
 		if err := ctx.Err(); err != nil {
+			// Mirror nextPart: cancel the gRPC stream context on per-call ctx
+			// error so the underlying stream is torn down consistently with
+			// lastErr being poisoned by the deferred func above. Without this,
+			// nextResultSet would leave the stream half-alive: lastErr is set
+			// (so subsequent nextPart/Close(freshCtx) bail out at the lastErr
+			// check before ever calling Recv), while the gRPC stream itself
+			// keeps holding resources until the server eventually ends it.
+			// streamCancel is idempotent, so calling it here is safe even if
+			// nextPart later cancels it again.
+			if r.streamCancel != nil {
+				r.streamCancel()
+			}
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 

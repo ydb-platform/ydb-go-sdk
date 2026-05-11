@@ -2,7 +2,6 @@ package query
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -22,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -41,6 +41,11 @@ type (
 		Stats() pool.Stats
 		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
 	}
+	closeState struct {
+		closed       bool
+		nextCancelID uint64
+		cancels      map[uint64]context.CancelFunc
+	}
 	Client struct {
 		config              *config.Config
 		client              Ydb_Query_V1.QueryServiceClient
@@ -50,7 +55,7 @@ type (
 		// i.e. fake sessions created without CreateSession/AttachSession requests.
 		implicitSessionPool sessionPool
 
-		closed atomic.Bool
+		closed xsync.Value[closeState]
 	}
 )
 
@@ -108,6 +113,12 @@ func fetchScriptResults(ctx context.Context,
 func (c *Client) FetchScriptResults(ctx context.Context,
 	opID string, opts ...options.FetchScriptOption,
 ) (*options.FetchScriptResult, error) {
+	ctx, leave, err := c.enter(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer leave()
+
 	r, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.FetchScriptResult, error) {
 		r, err := fetchScriptResults(ctx, c.client, opID,
 			append(opts, func(request *options.FetchScriptResultsRequest) {
@@ -169,6 +180,12 @@ func (c *Client) ExecuteScript(
 ) (
 	op *options.ExecuteScriptOperation, err error,
 ) {
+	ctx, leave, err := c.enter(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer leave()
+
 	settings := &executeScriptSettings{
 		executeSettings: options.ExecuteSettings(opts...),
 		ttl:             ttl,
@@ -198,8 +215,27 @@ func (c *Client) Close(ctx context.Context) error {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	if !c.closed.CompareAndSwap(false, true) {
+	var cancels []context.CancelFunc
+	c.closed.Change(func(old closeState) closeState {
+		if old.closed {
+			return old
+		}
+
+		old.closed = true
+		cancels = make([]context.CancelFunc, 0, len(old.cancels))
+		for _, cancel := range old.cancels {
+			cancels = append(cancels, cancel)
+		}
+		old.cancels = nil
+
+		return old
+	})
+	if cancels == nil {
 		return nil
+	}
+
+	for _, cancel := range cancels {
+		cancel()
 	}
 
 	if err := c.explicitSessionPool.Close(ctx); err != nil {
@@ -211,6 +247,80 @@ func (c *Client) Close(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (c *Client) enter(ctx context.Context) (context.Context, context.CancelFunc, error) {
+	if c == nil {
+		return nil, nil, xerrors.WithStackTrace(errNilClient)
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	var (
+		id     uint64
+		closed bool
+	)
+	c.closed.Change(func(old closeState) closeState {
+		if old.closed {
+			closed = true
+
+			return old
+		}
+
+		old.nextCancelID++
+		id = old.nextCancelID
+		if old.cancels == nil {
+			old.cancels = make(map[uint64]context.CancelFunc, 1)
+		}
+		old.cancels[id] = cancel
+
+		return old
+	})
+	if closed {
+		cancel()
+
+		return nil, nil, xerrors.WithStackTrace(errClosedClient)
+	}
+
+	return ctx, func() {
+		c.unregisterCloseCancel(id)
+		cancel()
+	}, nil
+}
+
+func (c *Client) registerCloseCancel(cancel context.CancelFunc) func() {
+	var id uint64
+	c.closed.Change(func(old closeState) closeState {
+		if old.closed {
+			return old
+		}
+
+		old.nextCancelID++
+		id = old.nextCancelID
+		if old.cancels == nil {
+			old.cancels = make(map[uint64]context.CancelFunc, 1)
+		}
+		old.cancels[id] = cancel
+
+		return old
+	})
+	if id == 0 {
+		cancel()
+
+		return func() {}
+	}
+
+	return func() {
+		c.unregisterCloseCancel(id)
+	}
+}
+
+func (c *Client) unregisterCloseCancel(id uint64) {
+	c.closed.Change(func(old closeState) closeState {
+		delete(old.cancels, id)
+
+		return old
+	})
 }
 
 func do(
@@ -239,6 +349,12 @@ func do(
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
+	ctx, leave, err := c.enter(ctx)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	defer leave()
+
 	var (
 		settings = options.ParseDoOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDo(settings.Trace(), &ctx,
@@ -251,7 +367,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 		onDone(attempts, finalErr)
 	}()
 
-	err := do(ctx, c.explicitSessionPool,
+	err = do(ctx, c.explicitSessionPool,
 		func(ctx context.Context, s *Session) error {
 			return op(ctx, s)
 		},
@@ -341,8 +457,11 @@ func clientQueryRow(
 
 // QueryRow is a helper which read only one row from first result set in result
 func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute) (_ query.Row, finalErr error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, leave, err := c.enter(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer leave()
 
 	settings := options.ExecuteSettings(opts...)
 
@@ -397,8 +516,11 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 }
 
 func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, leave, err := c.enter(ctx)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	defer leave()
 
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnExec(c.config.Trace(), &ctx,
@@ -410,7 +532,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 		onDone(finalErr)
 	}()
 
-	err := clientExec(ctx, c.pool(), q, opts...)
+	err = clientExec(ctx, c.pool(), q, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -452,8 +574,11 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 }
 
 func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (r query.Result, err error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, leave, err := c.enter(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer leave()
 
 	settings := options.ExecuteSettings(opts...)
 	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
@@ -506,13 +631,15 @@ func clientQueryResultSet(
 func (c *Client) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
 ) (rs result.ClosableResultSet, finalErr error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, leave, err := c.enter(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer leave()
 
 	var (
 		settings  = options.ExecuteSettings(opts...)
 		rowsCount int
-		err       error
 	)
 
 	onDone := trace.QueryOnQueryResultSet(c.config.Trace(), &ctx,
@@ -546,6 +673,12 @@ func (c *Client) pool() sessionPool {
 }
 
 func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (finalErr error) {
+	ctx, leave, err := c.enter(ctx)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	defer leave()
+
 	var (
 		settings = options.ParseDoTxOpts(c.config.Trace(), opts...)
 		onDone   = trace.QueryOnDoTx(settings.Trace(), &ctx,
@@ -562,10 +695,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 		ctx = tx.WithLazyTx(ctx, *lazyTx)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	err := doTx(ctx, c.explicitSessionPool, op,
+	err = doTx(ctx, c.explicitSessionPool, op,
 		settings.TxSettings(),
 		append(
 			[]retry.Option{
@@ -635,56 +765,59 @@ func newWithQueryServiceClient(ctx context.Context,
 	cc grpc.ClientConnInterface,
 	cfg *config.Config,
 ) *Client {
-	return &Client{
-		config:              cfg,
-		client:              client,
-		implicitSessionPool: createImplicitSessionPool(ctx, cfg, client, cc),
-		explicitSessionPool: pool.New(ctx,
-			pool.WithLimit[*Session](cfg.PoolLimit()),
-			pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
-			pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
-			pool.WithTrace[*Session](poolTrace(cfg.Trace())),
-			pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
-			pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
-			pool.WithMustDeleteItemFunc(func(s *Session, err error) bool {
-				if !s.IsAlive() {
-					return true
-				}
-
-				return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-			}),
-			pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
-			pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
-				var (
-					createCtx    context.Context
-					cancelCreate context.CancelFunc
-				)
-				if d := cfg.SessionCreateTimeout(); d > 0 {
-					createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
-				} else {
-					createCtx, cancelCreate = xcontext.WithCancel(ctx)
-				}
-				defer cancelCreate()
-
-				if !cfg.DisableSessionBalancer() {
-					createCtx = meta.WithAllowFeatures(createCtx, meta.HintSessionBalancer)
-				}
-
-				s, err := createSession(createCtx, client,
-					WithConn(cc),
-					WithDeleteTimeout(cfg.SessionDeleteTimeout()),
-					WithTrace(cfg.Trace()),
-				)
-				if err != nil {
-					return nil, xerrors.WithStackTrace(err)
-				}
-
-				s.lazyTx = cfg.LazyTx()
-
-				return s, nil
-			}),
-		),
+	c := &Client{
+		config: cfg,
+		client: client,
 	}
+	c.implicitSessionPool = createImplicitSessionPool(ctx, cfg, client, cc)
+	c.explicitSessionPool = pool.New(ctx,
+		pool.WithLimit[*Session](cfg.PoolLimit()),
+		pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
+		pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
+		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
+		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
+		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
+		pool.WithMustDeleteItemFunc(func(s *Session, err error) bool {
+			if !s.IsAlive() {
+				return true
+			}
+
+			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
+		}),
+		pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
+		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
+			var (
+				createCtx    context.Context
+				cancelCreate context.CancelFunc
+			)
+			if d := cfg.SessionCreateTimeout(); d > 0 {
+				createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
+			} else {
+				createCtx, cancelCreate = xcontext.WithCancel(ctx)
+			}
+			defer cancelCreate()
+
+			if !cfg.DisableSessionBalancer() {
+				createCtx = meta.WithAllowFeatures(createCtx, meta.HintSessionBalancer)
+			}
+
+			s, err := createSession(createCtx, client,
+				WithConn(cc),
+				WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+				WithRegisterCloseCancel(c.registerCloseCancel),
+				WithTrace(cfg.Trace()),
+			)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+
+			s.lazyTx = cfg.LazyTx()
+
+			return s, nil
+		}),
+	)
+
+	return c
 }
 
 func poolTrace(t *trace.Query) *pool.Trace {

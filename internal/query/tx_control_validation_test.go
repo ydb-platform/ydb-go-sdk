@@ -163,18 +163,18 @@ func TestClientQueryRowWithInvalidTxControl(t *testing.T) {
 	require.ErrorIs(t, err, query.ErrTxControlWithoutCommit)
 }
 
-func testClient(t *testing.T, client *MockQueryServiceClient) *Client {
+func testClient(_ *testing.T, client *MockQueryServiceClient) *Client {
 	return &Client{
 		config: config.New(),
 		client: client,
 		explicitSessionPool: &mockSessionPool{
 			withFunc: func(ctx context.Context, f func(ctx context.Context, s *Session) error) error {
-				return f(ctx, &Session{})
+				return f(ctx, newTestSession("s-1"))
 			},
 		},
 		implicitSessionPool: &mockSessionPool{
 			withFunc: func(ctx context.Context, f func(ctx context.Context, s *Session) error) error {
-				return f(ctx, &Session{})
+				return f(ctx, newTestSession("s-2"))
 			},
 		},
 	}
