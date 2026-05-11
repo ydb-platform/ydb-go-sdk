@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -69,6 +70,9 @@ func TestClientCloseCancelsInflightDo(t *testing.T) {
 					return f(ctx, newTestSession("s-2"))
 				},
 			},
+			closed: xsync.NewValue(&closeState{
+				cancels: make(map[uint64]context.CancelFunc),
+			}),
 		}
 
 		doDone := make(chan error, 1)
@@ -137,6 +141,9 @@ func TestClientCloseCancelsInflightDoTx(t *testing.T) {
 					return f(ctx, newTestSessionWithClient("s-2", queryService, false))
 				},
 			},
+			closed: xsync.NewValue(&closeState{
+				cancels: make(map[uint64]context.CancelFunc),
+			}),
 		}
 
 		doDone := make(chan error, 1)
@@ -182,6 +189,9 @@ func TestClientCallUnregistersCloseCancel(t *testing.T) {
 					return f(ctx, newTestSession("s-2"))
 				},
 			},
+			closed: xsync.NewValue(&closeState{
+				cancels: make(map[uint64]context.CancelFunc),
+			}),
 		}
 
 		require.NoError(t, c.Do(ctx, func(context.Context, query.Session) error {
@@ -224,6 +234,9 @@ func TestClientCloseCancelsRegisteredCloseGoroutine(t *testing.T) {
 					return f(ctx, newTestSession("s-2"))
 				},
 			},
+			closed: xsync.NewValue(&closeState{
+				cancels: make(map[uint64]context.CancelFunc),
+			}),
 		}
 		core := &sessionCore{
 			Client:              queryService,

@@ -55,7 +55,7 @@ type (
 		// i.e. fake sessions created without CreateSession/AttachSession requests.
 		implicitSessionPool sessionPool
 
-		closed xsync.Value[closeState]
+		closed *xsync.Value[*closeState]
 	}
 )
 
@@ -216,7 +216,7 @@ func (c *Client) Close(ctx context.Context) error {
 	}
 
 	var cancels []context.CancelFunc
-	c.closed.Change(func(old closeState) closeState {
+	c.closed.Change(func(old *closeState) *closeState {
 		if old.closed {
 			return old
 		}
@@ -260,21 +260,20 @@ func (c *Client) enter(ctx context.Context) (context.Context, context.CancelFunc
 		id     uint64
 		closed bool
 	)
-	c.closed.Change(func(old closeState) closeState {
+	c.closed.Change(func(old *closeState) *closeState {
 		if old.closed {
 			closed = true
 
 			return old
 		}
 
-		old.nextCancelID++
-		id = old.nextCancelID
-		if old.cancels == nil {
-			old.cancels = make(map[uint64]context.CancelFunc, 1)
-		}
-		old.cancels[id] = cancel
+		new := *old
 
-		return old
+		new.nextCancelID++
+		id = new.nextCancelID
+		new.cancels[id] = cancel
+
+		return &new
 	})
 	if closed {
 		cancel()
@@ -290,17 +289,16 @@ func (c *Client) enter(ctx context.Context) (context.Context, context.CancelFunc
 
 func (c *Client) registerCloseCancel(cancel context.CancelFunc) func() {
 	var id uint64
-	c.closed.Change(func(old closeState) closeState {
+	c.closed.Change(func(old *closeState) *closeState {
 		if old.closed {
 			return old
 		}
 
-		old.nextCancelID++
-		id = old.nextCancelID
-		if old.cancels == nil {
-			old.cancels = make(map[uint64]context.CancelFunc, 1)
-		}
-		old.cancels[id] = cancel
+		new := *old
+
+		new.nextCancelID++
+		id = new.nextCancelID
+		new.cancels[id] = cancel
 
 		return old
 	})
@@ -316,7 +314,7 @@ func (c *Client) registerCloseCancel(cancel context.CancelFunc) func() {
 }
 
 func (c *Client) unregisterCloseCancel(id uint64) {
-	c.closed.Change(func(old closeState) closeState {
+	c.closed.Change(func(old *closeState) *closeState {
 		delete(old.cancels, id)
 
 		return old
@@ -768,6 +766,9 @@ func newWithQueryServiceClient(ctx context.Context,
 	c := &Client{
 		config: cfg,
 		client: client,
+		closed: xsync.NewValue(&closeState{
+			cancels: make(map[uint64]context.CancelFunc),
+		}),
 	}
 	c.implicitSessionPool = createImplicitSessionPool(ctx, cfg, client, cc)
 	c.explicitSessionPool = pool.New(ctx,

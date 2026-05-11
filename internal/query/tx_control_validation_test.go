@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -177,6 +178,9 @@ func testClient(_ *testing.T, client *MockQueryServiceClient) *Client {
 				return f(ctx, newTestSession("s-2"))
 			},
 		},
+		closed: xsync.NewValue(&closeState{
+			cancels: make(map[uint64]context.CancelFunc),
+		}),
 	}
 }
 
