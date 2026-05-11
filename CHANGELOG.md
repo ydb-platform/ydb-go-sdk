@@ -1,3 +1,4 @@
+## v3.135.15
 * `database/sql` driver (no public API changes): `QueryContext` / `Stmt.QueryContext` / `Tx.QueryContext` cancellation propagated through row iteration consistently—the SQL `Rows` adapter retained that context for every `Next`, `NextResultSet`, and column-metadata call, and both Query Service and Table Service backends received it where supported.
 * When using **QueryService** (`ydb.WithQueryService(true)`, default), canceling the query context after starting to read a result set surfaced `context.Canceled` from `(*sql.Rows).Err()` after `Next` stopped, matching typical `database/sql` expectations for context-aware queries.
 * When using **TableService** (`ydb.WithQueryService(false)`), row iteration continued to rely on the table client read path; `Rows.Err()` after cancel could be empty or `io.EOF` once rows were exhausted, rather than the cancellation error.
