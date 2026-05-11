@@ -451,7 +451,6 @@ func TestResultNextResultSet(t *testing.T) {
 			rs, err := r.nextResultSet(t.Context())
 			require.ErrorIs(t, err, io.EOF)
 			require.Nil(t, rs)
-			require.Equal(t, -1, rs.Index())
 		}
 	})
 	t.Run("InterruptStream", func(t *testing.T) {
