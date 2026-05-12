@@ -23,6 +23,7 @@ type executeQueryPartRecv struct {
 // work between consumer Recv calls.
 type prefetchExecuteQueryStream struct {
 	Ydb_Query_V1.QueryService_ExecuteQueryClient
+
 	ch       chan executeQueryPartRecv
 	pumpOnce sync.Once
 }
@@ -44,6 +45,7 @@ func wrapExecuteQueryStreamWithPrefetch(
 	if prefetch <= 0 {
 		return stream
 	}
+
 	return newPrefetchExecuteQueryStream(stream, prefetch)
 }
 

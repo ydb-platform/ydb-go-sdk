@@ -17,7 +17,7 @@ import (
 
 // testExecuteQueryStream is a minimal [Ydb_Query_V1.QueryService_ExecuteQueryClient] for tests.
 type testExecuteQueryStream struct {
-	ctx context.Context
+	ctx context.Context //nolint:containedctx
 
 	recv func() (*Ydb_Query.ExecuteQueryResponsePart, error)
 }
@@ -27,7 +27,7 @@ func (s *testExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, er
 }
 
 func (s *testExecuteQueryStream) Header() (metadata.MD, error) {
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
 func (s *testExecuteQueryStream) Trailer() metadata.MD {
