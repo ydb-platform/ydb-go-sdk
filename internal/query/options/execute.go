@@ -276,6 +276,9 @@ func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
 // an internal buffer and a background reader so that gRPC Recv can overlap with
 // work between consumer reads. Zero disables prefetch (the default).
 func WithResponsePartPrefetch(parts int) responsePartPrefetch {
+	if parts <= 0 {
+		parts = 0
+	}
 	return responsePartPrefetch(parts)
 }
 
