@@ -178,7 +178,7 @@ func TestResponsePartLimitSizeBytes(t *testing.T) {
 
 func TestResponsePartPrefetch(t *testing.T) {
 	def := ExecuteSettings(WithTxControl(tx.NewControl(tx.WithTxID(""))))
-	require.Equal(t, 2, def.ResponsePartPrefetch())
+	require.Equal(t, 0, def.ResponsePartPrefetch())
 
 	off := ExecuteSettings(
 		WithTxControl(tx.NewControl(tx.WithTxID(""))),

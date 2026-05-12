@@ -34,7 +34,8 @@ func newPrefetchExecuteQueryStream(
 ) *prefetchExecuteQueryStream {
 	return &prefetchExecuteQueryStream{
 		QueryService_ExecuteQueryClient: inner,
-		ch:                              make(chan executeQueryPartRecv, prefetch),
+
+		ch: make(chan executeQueryPartRecv, prefetch),
 	}
 }
 

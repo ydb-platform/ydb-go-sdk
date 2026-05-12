@@ -166,9 +166,13 @@ func TestPrefetchOverlapsWorkBetweenRecv(t *testing.T) {
 
 	wrapped := wrapExecuteQueryStreamWithPrefetch(inner, 2)
 
-	// Let the first inner recv complete so the first outer Recv gets part 0.
-	<-started[0]
-	close(allow[0])
+	// The pump starts only on the first wrapped.Recv. Unblock the first inner
+	// Recv from another goroutine, otherwise we deadlock waiting for started[0]
+	// before Recv ever starts the pump.
+	go func() {
+		<-started[0]
+		close(allow[0])
+	}()
 
 	part, err := wrapped.Recv()
 	require.NoError(t, err)

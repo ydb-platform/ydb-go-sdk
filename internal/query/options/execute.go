@@ -50,7 +50,7 @@ type (
 		label                  string
 		concurrentResultSets   bool
 		// responsePartPrefetch is how many stream parts to read ahead of the
-		// consumer (0 disables prefetch). Default matches OLTP single-statement tuning.
+		// consumer (0 disables prefetch and is the default).
 		responsePartPrefetch int
 	}
 
@@ -177,10 +177,6 @@ func defaultExecuteSettings() executeSettings {
 		txControl: tx.DefaultTxControl(),
 		params:    &params.Params{},
 		label:     "undefined",
-		// Disable response-part prefetch by default so ExecuteQuery does not
-		// implicitly spawn a background goroutine or buffer result parts unless
-		// the caller explicitly opts in.
-		responsePartPrefetch: 0,
 	}
 }
 
@@ -283,7 +279,7 @@ func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
 // WithResponsePartPrefetch sets how many ExecuteQuery response parts the client
 // reads ahead of the application on the wire. Values greater than zero enable
 // an internal buffer and a background reader so that gRPC Recv can overlap with
-// work between consumer reads. Zero disables prefetch. The default is 2.
+// work between consumer reads. Zero disables prefetch (the default).
 func WithResponsePartPrefetch(parts int) responsePartPrefetch {
 	return responsePartPrefetch(parts)
 }
