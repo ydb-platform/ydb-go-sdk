@@ -11,11 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 // testExecuteQueryStream is a minimal [Ydb_Query_V1.QueryService_ExecuteQueryClient] for tests.
@@ -140,7 +141,9 @@ func TestWrapExecuteQueryStreamWithPrefetchZeroPassthrough(t *testing.T) {
 	require.Equal(t, inner, same)
 }
 
-func benchmarkRecvDrainLoop(b *testing.B, wrap func(Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient) {
+func benchmarkRecvDrainLoop(b *testing.B,
+	wrap func(Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient,
+) {
 	const (
 		parts       = 8
 		netDelay    = 200 * time.Microsecond
@@ -223,7 +226,9 @@ func (m *executeQueryOneSlotAheadMiddleware) RecvMsg(msg any) error {
 // bufferNextPartMiddleware returns a stream that always keeps one extra part read
 // from inner (when the last delivered part had no error). Stacking this middleware
 // prefetch times yields a synchronous read-ahead depth of prefetch.
-func bufferNextPartMiddleware(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
+func bufferNextPartMiddleware(
+	inner Ydb_Query_V1.QueryService_ExecuteQueryClient,
+) Ydb_Query_V1.QueryService_ExecuteQueryClient {
 	return &executeQueryOneSlotAheadMiddleware{
 		QueryService_ExecuteQueryClient: inner,
 	}
@@ -246,20 +251,22 @@ func wrapExecuteQueryStreamWithPrefetch(
 // BenchmarkExecuteQueryStreamPrefetchCompare runs the same workload: baseline
 // (no prefetch), synchronous stacked one-slot middleware, and async channel prefetch.
 //
-// BenchmarkExecuteQueryStreamPrefetchCompare/baseline_no_prefetch-12         	     244	   4918889 ns/op	     944 B/op	      11 allocs/op
-// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_1-12              	     237	   4983030 ns/op	     992 B/op	      12 allocs/op
-// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_2-12              	     229	   5234604 ns/op	    1040 B/op	      13 allocs/op
-// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_4-12              	     236	   5079231 ns/op	    1136 B/op	      15 allocs/op
-// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_8-12              	     242	   4927544 ns/op	    1328 B/op	      19 allocs/op
-// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_1-12           	     428	   2785861 ns/op	    1234 B/op	      16 allocs/op
-// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_2-12           	     426	   2817006 ns/op	    1241 B/op	      16 allocs/op
-// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_4-12           	     423	   2821469 ns/op	    1291 B/op	      16 allocs/op
-// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_8-12           	     424	   2823053 ns/op	    1393 B/op	      16 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/baseline_no_prefetch-12     244	   4918889 ns/op	 944 B/op	 11 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_1-12          237	   4983030 ns/op	 992 B/op	 12 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_2-12          229	   5234604 ns/op	1040 B/op	 13 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_4-12          236	   5079231 ns/op	1136 B/op	 15 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_8-12          242	   4927544 ns/op	1328 B/op	 19 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_1-12       428	   2785861 ns/op	1234 B/op	 16 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_2-12       426	   2817006 ns/op	1241 B/op	 16 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_4-12       423	   2821469 ns/op	1291 B/op	 16 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_8-12       424	   2823053 ns/op	1393 B/op	 16 allocs/op
 func BenchmarkExecuteQueryStreamPrefetchCompare(b *testing.B) {
 	b.Run("baseline_no_prefetch", func(b *testing.B) {
-		benchmarkRecvDrainLoop(b, func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
-			return inner
-		})
+		benchmarkRecvDrainLoop(b,
+			func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
+				return inner
+			},
+		)
 	})
 
 	prefetchParts := []int{1, 2, 4, 8}
@@ -267,18 +274,21 @@ func BenchmarkExecuteQueryStreamPrefetchCompare(b *testing.B) {
 	for _, depth := range prefetchParts {
 		b.Run(fmt.Sprintf("sync_mw_depth_%d", depth), func(b *testing.B) {
 			d := depth
-			benchmarkRecvDrainLoop(b, func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
-				return wrapExecuteQueryStreamWithPrefetch(inner, d)
-			})
+			benchmarkRecvDrainLoop(b,
+				func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient { //nolint:lll
+					return wrapExecuteQueryStreamWithPrefetch(inner, d)
+				},
+			)
 		})
 	}
 	for _, depth := range prefetchParts {
 		b.Run(fmt.Sprintf("async_chan_depth_%d", depth), func(b *testing.B) {
 			d := depth
-			benchmarkRecvDrainLoop(b, func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
-				return wrapExecuteQueryStreamWithAsyncPrefetch(inner, d)
-			})
+			benchmarkRecvDrainLoop(b,
+				func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient { //nolint:lll
+					return wrapExecuteQueryStreamWithAsyncPrefetch(inner, d)
+				},
+			)
 		})
 	}
-
 }
