@@ -139,43 +139,62 @@ func TestWrapExecuteQueryStreamWithPrefetchZeroPassthrough(t *testing.T) {
 func TestPrefetchOverlapsWorkBetweenRecv(t *testing.T) {
 	t.Parallel()
 
-	const (
-		parts       = 6
-		netDelay    = 2 * time.Millisecond
-		workBetween = 3 * time.Millisecond
-	)
+	const parts = 3
 
-	var innerRecv, outerRecv int
+	started := make([]chan struct{}, parts+1) // last slot is the EOF recv
+	allow := make([]chan struct{}, parts+1)
+	for i := range started {
+		started[i] = make(chan struct{})
+		allow[i] = make(chan struct{})
+	}
+
+	var innerRecv int
 	inner := &testExecuteQueryStream{
 		recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-			time.Sleep(netDelay)
+			idx := innerRecv
 			innerRecv++
-			if innerRecv > parts {
+			close(started[idx])
+			<-allow[idx]
+
+			if idx >= parts {
 				return nil, io.EOF
 			}
 
-			return partWithIndex(int64(innerRecv - 1)), nil
+			return partWithIndex(int64(idx)), nil
 		},
 	}
 
 	wrapped := wrapExecuteQueryStreamWithPrefetch(inner, 2)
-	start := time.Now()
-	for {
-		_, err := wrapped.Recv()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		require.NoError(t, err)
-		outerRecv++
-		time.Sleep(workBetween)
-	}
-	elapsed := time.Since(start)
 
-	// Without overlap, each outer iteration would wait netDelay inside Recv after workBetween,
-	// lower bound ~ parts*(netDelay+workBetween). Prefetch hides part of netDelay behind workBetween.
-	noPrefetchFloor := time.Duration(parts) * (netDelay + workBetween)
-	require.Less(t, elapsed, noPrefetchFloor*92/100,
-		"expected prefetch to finish measurably faster than fully sequential Recv+work schedule")
+	// Let the first inner recv complete so the first outer Recv gets part 0.
+	<-started[0]
+	close(allow[0])
+
+	part, err := wrapped.Recv()
+	require.NoError(t, err)
+	require.Equal(t, partWithIndex(0), part)
+
+	// The prefetcher should fetch the next part while the caller is doing work between Recv calls.
+	<-started[1]
+	close(allow[1])
+
+	type recvResult struct {
+		part *Ydb_Query.ExecuteQueryResponsePart
+		err  error
+	}
+	done := make(chan recvResult, 1)
+	go func() {
+		part, err := wrapped.Recv()
+		done <- recvResult{part: part, err: err}
+	}()
+
+	select {
+	case got := <-done:
+		require.NoError(t, got.err)
+		require.Equal(t, partWithIndex(1), got.part)
+	case <-time.After(time.Second):
+		t.Fatal("second Recv blocked even though the next part had already been prefetched")
+	}
 }
 
 func BenchmarkExecuteQueryRecvWithPrefetch(b *testing.B) {
