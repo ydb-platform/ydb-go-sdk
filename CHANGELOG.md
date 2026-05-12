@@ -1,4 +1,9 @@
-* Added the `query.WithResponsePartPrefetch(n)` option to enable prefetching of query result parts. Default behavior is to disable prefetching.
+* The `query.WithResponsePartPrefetch(n)` method has been added to enable the prefetching of parts of query results. 
+  By default, this feature is disabled. Prefetching produces the following effects:
+  - One additional goroutine per query.
+  - Approximately 5 allocations per query.
+  - Approximately 200–300 additional bytes per query. 
+  However, each query also reduces the execution time by approximately 2 milliseconds.
 
 ## v3.135.15
 * `database/sql` driver (no public API changes): `QueryContext` / `Stmt.QueryContext` / `Tx.QueryContext` cancellation propagated through row iteration consistently—the SQL `Rows` adapter retained that context for every `Next`, `NextResultSet`, and column-metadata call, and both Query Service and Table Service backends received it where supported.
