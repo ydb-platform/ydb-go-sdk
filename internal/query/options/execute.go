@@ -147,11 +147,6 @@ func (opt concurrentResultSets) applyExecuteOption(s *executeSettings) {
 }
 
 func (n responsePartPrefetch) applyExecuteOption(s *executeSettings) {
-	if n < 0 {
-		s.responsePartPrefetch = 0
-
-		return
-	}
 	s.responsePartPrefetch = int(n)
 }
 

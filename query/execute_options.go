@@ -74,7 +74,7 @@ func WithResponsePartLimitSizeBytes(size int64) ExecuteOption {
 // client reads ahead of application consumption on streamed response-part
 // readers that support prefetching. Values above zero enable a small buffer
 // and a background reader so gRPC Recv can overlap with CPU work between
-// reads. Zero disables prefetch. The default is 0.
+// reads. Zero disables prefetch. The default is 0 (no prefetch).
 //
 // Note: this option is not applied uniformly by every ExecuteQuery-based API.
 // It affects only response consumers that use the response-part streaming path
