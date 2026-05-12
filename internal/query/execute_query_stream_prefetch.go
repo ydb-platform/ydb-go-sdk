@@ -17,42 +17,30 @@ type executeQueryPartRecv struct {
 	err  error
 }
 
-// prefetchExecuteQueryStream reads the inner stream in a background goroutine and
-// buffers up to cap(chan) parts so that network I/O can overlap with application
-// work between consumer Recv calls.
-type prefetchExecuteQueryStream struct {
+type asyncPrefetchExecuteQueryStream struct {
 	Ydb_Query_V1.QueryService_ExecuteQueryClient
 
 	ch chan executeQueryPartRecv
 }
 
-func newPrefetchExecuteQueryStream(
-	inner Ydb_Query_V1.QueryService_ExecuteQueryClient,
-	prefetch int,
-) *prefetchExecuteQueryStream {
-	stream := &prefetchExecuteQueryStream{
-		QueryService_ExecuteQueryClient: inner,
-
-		ch: make(chan executeQueryPartRecv, prefetch),
-	}
-
-	go stream.pump()
-
-	return stream
-}
-
-func wrapExecuteQueryStreamWithPrefetch(
+func wrapExecuteQueryStreamWithAsyncPrefetch(
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	prefetch int,
 ) Ydb_Query_V1.QueryService_ExecuteQueryClient {
 	if prefetch <= 0 {
 		return stream
 	}
+	s := &asyncPrefetchExecuteQueryStream{
+		QueryService_ExecuteQueryClient: stream,
+		ch:                              make(chan executeQueryPartRecv, prefetch),
+	}
 
-	return newPrefetchExecuteQueryStream(stream, prefetch)
+	go s.pump()
+
+	return s
 }
 
-func (p *prefetchExecuteQueryStream) pump() {
+func (p *asyncPrefetchExecuteQueryStream) pump() {
 	defer close(p.ch)
 	ctx := p.QueryService_ExecuteQueryClient.Context()
 	for {
@@ -71,7 +59,7 @@ func (p *prefetchExecuteQueryStream) pump() {
 	}
 }
 
-func (p *prefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+func (p *asyncPrefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 	item, ok := <-p.ch
 	if !ok {
 		return nil, io.EOF
@@ -80,7 +68,7 @@ func (p *prefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart
 	return item.part, item.err
 }
 
-func (p *prefetchExecuteQueryStream) RecvMsg(m any) error {
+func (p *asyncPrefetchExecuteQueryStream) RecvMsg(m any) error {
 	part, err := p.Recv()
 	if err != nil {
 		return err

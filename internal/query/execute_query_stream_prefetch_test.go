@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -10,9 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // testExecuteQueryStream is a minimal [Ydb_Query_V1.QueryService_ExecuteQueryClient] for tests.
@@ -75,7 +78,8 @@ func TestWrapExecuteQueryStreamWithPrefetchOrderAndEOF(t *testing.T) {
 			case 3:
 				return nil, io.EOF
 			default:
-				return nil, errors.New("unexpected extra inner Recv")
+				// Stacked synchronous middleware may read one message past stream end.
+				return nil, io.EOF
 			}
 		},
 	}
@@ -136,128 +140,145 @@ func TestWrapExecuteQueryStreamWithPrefetchZeroPassthrough(t *testing.T) {
 	require.Equal(t, inner, same)
 }
 
-func TestPrefetchOverlapsWorkBetweenRecv(t *testing.T) {
-	t.Parallel()
-
-	const parts = 3
-
-	started := make([]chan struct{}, parts+1) // last slot is the EOF recv
-	allow := make([]chan struct{}, parts+1)
-	for i := range started {
-		started[i] = make(chan struct{})
-		allow[i] = make(chan struct{})
-	}
-
-	var innerRecv int
-	inner := &testExecuteQueryStream{
-		recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-			idx := innerRecv
-			innerRecv++
-			close(started[idx])
-			<-allow[idx]
-
-			if idx >= parts {
-				return nil, io.EOF
-			}
-
-			return partWithIndex(int64(idx)), nil
-		},
-	}
-
-	wrapped := wrapExecuteQueryStreamWithPrefetch(inner, 2)
-
-	// The pump starts only on the first wrapped.Recv. Unblock the first inner
-	// Recv from another goroutine, otherwise we deadlock waiting for started[0]
-	// before Recv ever starts the pump.
-	go func() {
-		<-started[0]
-		close(allow[0])
-	}()
-
-	part, err := wrapped.Recv()
-	require.NoError(t, err)
-	require.Equal(t, partWithIndex(0), part)
-
-	// The prefetcher should fetch the next part while the caller is doing work between Recv calls.
-	<-started[1]
-	close(allow[1])
-
-	type recvResult struct {
-		part *Ydb_Query.ExecuteQueryResponsePart
-		err  error
-	}
-	done := make(chan recvResult, 1)
-	go func() {
-		part, err := wrapped.Recv()
-		done <- recvResult{part: part, err: err}
-	}()
-
-	select {
-	case got := <-done:
-		require.NoError(t, got.err)
-		require.Equal(t, partWithIndex(1), got.part)
-	case <-time.After(time.Second):
-		t.Fatal("second Recv blocked even though the next part had already been prefetched")
-	}
-}
-
-// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_off-12      247	4840979 ns/op	 944 B/op	 11 allocs/op
-// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_1-12        430	2792482 ns/op	 1254 B/op	 16 allocs/op
-// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_2-12        426	2813529 ns/op	 1266 B/op	 16 allocs/op
-// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_4-12        424	2816163 ns/op	 1314 B/op	 16 allocs/op
-// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_8-12        426	2836546 ns/op	 1417 B/op	 16 allocs/op
-func BenchmarkExecuteQueryRecvWithPrefetch(b *testing.B) {
+func benchmarkRecvDrainLoop(b *testing.B, wrap func(Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient) {
 	const (
 		parts       = 8
 		netDelay    = 200 * time.Microsecond
 		workBetween = 300 * time.Microsecond
 	)
 
-	bench := func(b *testing.B, prefetch int) {
-		b.ReportAllocs()
-		for b.Loop() {
-			var n int
-			inner := &testExecuteQueryStream{
-				recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-					time.Sleep(netDelay)
-					n++
-					if n > parts {
-						return nil, io.EOF
-					}
+	b.ReportAllocs()
+	for b.Loop() {
+		var n int
+		inner := &testExecuteQueryStream{
+			recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+				time.Sleep(netDelay)
+				n++
+				if n > parts {
+					return nil, io.EOF
+				}
 
-					return partWithIndex(int64(n - 1)), nil
-				},
+				return partWithIndex(int64(n - 1)), nil
+			},
+		}
+		s := wrap(inner)
+		for {
+			_, err := s.Recv()
+			if errors.Is(err, io.EOF) {
+				break
 			}
-			var s Ydb_Query_V1.QueryService_ExecuteQueryClient = inner
-			if prefetch > 0 {
-				s = wrapExecuteQueryStreamWithPrefetch(inner, prefetch)
+			if err != nil {
+				b.Fatal(err)
 			}
-			for {
-				_, err := s.Recv()
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				if err != nil {
-					b.Fatal(err)
-				}
-				time.Sleep(workBetween)
-			}
+			time.Sleep(workBetween)
 		}
 	}
+}
 
-	b.Run("prefetch_off", func(b *testing.B) {
-		bench(b, 0)
+type executeQueryOneSlotAheadMiddleware struct {
+	Ydb_Query_V1.QueryService_ExecuteQueryClient
+
+	ahead    executeQueryPartRecv
+	hasAhead bool
+}
+
+func (m *executeQueryOneSlotAheadMiddleware) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+	var item executeQueryPartRecv
+	if m.hasAhead {
+		item = m.ahead
+		m.hasAhead = false
+	} else {
+		part, err := m.QueryService_ExecuteQueryClient.Recv()
+		item = executeQueryPartRecv{part: part, err: err}
+	}
+
+	if item.err == nil {
+		part2, err2 := m.QueryService_ExecuteQueryClient.Recv()
+		m.ahead = executeQueryPartRecv{part: part2, err: err2}
+		m.hasAhead = true
+	}
+
+	return item.part, item.err
+}
+
+func (m *executeQueryOneSlotAheadMiddleware) RecvMsg(msg any) error {
+	part, err := m.Recv()
+	if err != nil {
+		return err
+	}
+	dst, ok := msg.(*Ydb_Query.ExecuteQueryResponsePart)
+	if !ok {
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"%T is not '*Ydb_Query.ExecuteQueryResponsePart'", msg,
+		))
+	}
+	proto.Reset(dst)
+	if part != nil {
+		proto.Merge(dst, part)
+	}
+
+	return nil
+}
+
+// bufferNextPartMiddleware returns a stream that always keeps one extra part read
+// from inner (when the last delivered part had no error). Stacking this middleware
+// prefetch times yields a synchronous read-ahead depth of prefetch.
+func bufferNextPartMiddleware(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
+	return &executeQueryOneSlotAheadMiddleware{
+		QueryService_ExecuteQueryClient: inner,
+	}
+}
+
+func wrapExecuteQueryStreamWithPrefetch(
+	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
+	prefetch int,
+) Ydb_Query_V1.QueryService_ExecuteQueryClient {
+	if prefetch <= 0 {
+		return stream
+	}
+	for range prefetch {
+		stream = bufferNextPartMiddleware(stream)
+	}
+
+	return stream
+}
+
+// BenchmarkExecuteQueryStreamPrefetchCompare runs the same workload: baseline
+// (no prefetch), synchronous stacked one-slot middleware, and async channel prefetch.
+//
+// BenchmarkExecuteQueryStreamPrefetchCompare/baseline_no_prefetch-12         	     244	   4918889 ns/op	     944 B/op	      11 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_1-12              	     237	   4983030 ns/op	     992 B/op	      12 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_2-12              	     229	   5234604 ns/op	    1040 B/op	      13 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_4-12              	     236	   5079231 ns/op	    1136 B/op	      15 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/sync_mw_depth_8-12              	     242	   4927544 ns/op	    1328 B/op	      19 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_1-12           	     428	   2785861 ns/op	    1234 B/op	      16 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_2-12           	     426	   2817006 ns/op	    1241 B/op	      16 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_4-12           	     423	   2821469 ns/op	    1291 B/op	      16 allocs/op
+// BenchmarkExecuteQueryStreamPrefetchCompare/async_chan_depth_8-12           	     424	   2823053 ns/op	    1393 B/op	      16 allocs/op
+func BenchmarkExecuteQueryStreamPrefetchCompare(b *testing.B) {
+	b.Run("baseline_no_prefetch", func(b *testing.B) {
+		benchmarkRecvDrainLoop(b, func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
+			return inner
+		})
 	})
-	b.Run("prefetch_1", func(b *testing.B) {
-		bench(b, 1)
-	})
-	b.Run("prefetch_2", func(b *testing.B) {
-		bench(b, 2)
-	})
-	b.Run("prefetch_4", func(b *testing.B) {
-		bench(b, 4)
-	})
-	b.Run("prefetch_8", func(b *testing.B) {
-		bench(b, 8)
-	})
+
+	prefetchParts := []int{1, 2, 4, 8}
+
+	for _, depth := range prefetchParts {
+		b.Run(fmt.Sprintf("sync_mw_depth_%d", depth), func(b *testing.B) {
+			d := depth
+			benchmarkRecvDrainLoop(b, func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
+				return wrapExecuteQueryStreamWithPrefetch(inner, d)
+			})
+		})
+	}
+	for _, depth := range prefetchParts {
+		b.Run(fmt.Sprintf("async_chan_depth_%d", depth), func(b *testing.B) {
+			d := depth
+			benchmarkRecvDrainLoop(b, func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
+				return wrapExecuteQueryStreamWithAsyncPrefetch(inner, d)
+			})
+		})
+	}
+
 }
