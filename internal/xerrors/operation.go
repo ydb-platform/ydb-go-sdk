@@ -219,7 +219,7 @@ func (e *operationError) BackoffType() backoff.Type {
 		return backoff.TypeFast
 	case Ydb.StatusIds_ABORTED:
 		if e.hasIssueCodes(IssueCodeDatashardProgramSizeLimitExceeded) {
-			return backoff.TypeNoBackoff
+			return backoff.TypeInstant
 		}
 
 		return backoff.TypeFast
@@ -228,9 +228,9 @@ func (e *operationError) BackoffType() backoff.Type {
 			return backoff.TypeSlow
 		}
 
-		return backoff.TypeNoBackoff
+		return backoff.TypeInstant
 	default:
-		return backoff.TypeNoBackoff
+		return backoff.TypeInstant
 	}
 }
 
