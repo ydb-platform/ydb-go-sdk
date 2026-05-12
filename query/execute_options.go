@@ -70,6 +70,14 @@ func WithResponsePartLimitSizeBytes(size int64) ExecuteOption {
 	return options.WithResponsePartLimitSizeBytes(size)
 }
 
+// WithResponsePartPrefetch configures how many ExecuteQuery response parts the
+// client reads ahead of application consumption. Values above zero enable a
+// small buffer and a background reader so gRPC Recv can overlap with CPU work
+// between reads. Zero disables prefetch. The default is 2.
+func WithResponsePartPrefetch(parts int) ExecuteOption {
+	return options.WithResponsePartPrefetch(parts)
+}
+
 // WithConcurrentResultSets enables concurrent computation of result sets. It is useful when a single query executes
 // multiple independent SELECT statements.
 //
