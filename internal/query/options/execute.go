@@ -19,6 +19,7 @@ var (
 	_ Execute = syntaxOption(0)
 	_ Execute = statsModeOption{}
 	_ Execute = execModeOption(0)
+	_ Execute = responsePartPrefetch(0)
 )
 
 type (
@@ -48,6 +49,9 @@ type (
 		responsePartLimitBytes int64
 		label                  string
 		concurrentResultSets   bool
+		// responsePartPrefetch is how many stream parts to read ahead of the
+		// consumer (0 disables prefetch). Default matches OLTP single-statement tuning.
+		responsePartPrefetch int
 	}
 
 	// Execute is an interface for execute method options
@@ -79,6 +83,7 @@ type (
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
 	concurrentResultSets bool
+	responsePartPrefetch int
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -141,6 +146,15 @@ func (opt concurrentResultSets) applyExecuteOption(s *executeSettings) {
 	s.concurrentResultSets = bool(opt)
 }
 
+func (n responsePartPrefetch) applyExecuteOption(s *executeSettings) {
+	if n < 0 {
+		s.responsePartPrefetch = 0
+
+		return
+	}
+	s.responsePartPrefetch = int(n)
+}
+
 const (
 	ExecModeParse    = ExecMode(Ydb_Query.ExecMode_EXEC_MODE_PARSE)
 	ExecModeValidate = ExecMode(Ydb_Query.ExecMode_EXEC_MODE_VALIDATE)
@@ -163,6 +177,9 @@ func defaultExecuteSettings() executeSettings {
 		txControl: tx.DefaultTxControl(),
 		params:    &params.Params{},
 		label:     "undefined",
+		// Two parts ahead overlaps gRPC Recv with client work between parts for
+		// typical single-statement OLTP flows (metadata + rows + completion).
+		responsePartPrefetch: 2,
 	}
 }
 
@@ -218,6 +235,10 @@ func (s *executeSettings) ConcurrentResultSets() bool {
 	return s.concurrentResultSets
 }
 
+func (s *executeSettings) ResponsePartPrefetch() int {
+	return s.responsePartPrefetch
+}
+
 func (s *executeSettings) UserProvidedTxControl() bool {
 	return s.userProvidedTxControl
 }
@@ -256,6 +277,14 @@ func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 
 func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
 	return concurrentResultSets(isEnabled)
+}
+
+// WithResponsePartPrefetch sets how many ExecuteQuery response parts the client
+// reads ahead of the application on the wire. Values greater than zero enable
+// an internal buffer and a background reader so that gRPC Recv can overlap with
+// work between consumer reads. Zero disables prefetch. The default is 2.
+func WithResponsePartPrefetch(parts int) responsePartPrefetch {
+	return responsePartPrefetch(parts)
 }
 
 func (size responsePartLimitBytes) applyExecuteOption(s *executeSettings) {

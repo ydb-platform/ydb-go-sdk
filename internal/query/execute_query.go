@@ -36,6 +36,9 @@ type executeSettings interface {
 	ConcurrentResultSets() bool
 	UserProvidedTxControl() bool
 	IssuesOpts() func([]*Ydb_Issue.IssueMessage)
+	// ResponsePartPrefetch is how many ExecuteQuery stream parts to read ahead
+	// asynchronously (0 disables). See wrapExecuteQueryStreamWithPrefetch.
+	ResponsePartPrefetch() int
 }
 
 type executeScriptConfig interface {
@@ -139,6 +142,8 @@ func execute(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
+	stream = wrapExecuteQueryStreamWithPrefetch(stream, settings.ResponsePartPrefetch())
 
 	// newResult must use executeCtx, not the parent ctx: parent ctx may already
 	// be done (e.g. session death) while the gRPC stream is still readable.
