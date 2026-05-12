@@ -17,17 +17,17 @@ func TestDelay(t *testing.T) {
 	}{
 		{
 			name: xtest.CurrentFileLine(),
-			act:  Delay(TypeNoBackoff, 0),
+			act:  Delay(TypeInstant, 0),
 			exp:  0,
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			act:  Delay(TypeNoBackoff, 1),
+			act:  Delay(TypeInstant, 1),
 			exp:  0,
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			act:  Delay(TypeNoBackoff, 2),
+			act:  Delay(TypeInstant, 2),
 			exp:  0,
 		},
 		{

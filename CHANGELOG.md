@@ -1,3 +1,6 @@
+* Changed the retry behavior for operation error `TIMEOUT` from non-retryable to conditionally retryable
+* Added public `retry.TypeInstant` enum alias to `retry.TypeNoBackoff`
+
 ## v3.136.0
 * The `query.WithResponsePartPrefetch(n)` method has been added to enable the prefetching of parts of query results.
   By default, this feature is disabled. Prefetching produces the following effects:
