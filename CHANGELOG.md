@@ -1,3 +1,4 @@
+## v3.136.1
 * Changed the retry behavior for operation error `TIMEOUT` from non-retryable to conditionally retryable
 * Added public `retry.TypeInstant` enum alias to `retry.TypeNoBackoff`
 
