@@ -361,7 +361,7 @@ var errsToCheck = []struct {
 		),
 		backoff: backoff.TypeNoBackoff,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},

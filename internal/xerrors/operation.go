@@ -173,7 +173,8 @@ func (e *operationError) Type() Type {
 		return TypeRetryable
 	case
 		Ydb.StatusIds_UNDETERMINED,
-		Ydb.StatusIds_SESSION_EXPIRED:
+		Ydb.StatusIds_SESSION_EXPIRED,
+		Ydb.StatusIds_TIMEOUT:
 		return TypeConditionallyRetryable
 	case Ydb.StatusIds_UNAUTHORIZED:
 		return TypeNonRetryable
