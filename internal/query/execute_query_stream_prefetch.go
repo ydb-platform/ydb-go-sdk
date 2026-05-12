@@ -3,7 +3,6 @@ package query
 import (
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -24,19 +23,22 @@ type executeQueryPartRecv struct {
 type prefetchExecuteQueryStream struct {
 	Ydb_Query_V1.QueryService_ExecuteQueryClient
 
-	ch       chan executeQueryPartRecv
-	pumpOnce sync.Once
+	ch chan executeQueryPartRecv
 }
 
 func newPrefetchExecuteQueryStream(
 	inner Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	prefetch int,
 ) *prefetchExecuteQueryStream {
-	return &prefetchExecuteQueryStream{
+	stream := &prefetchExecuteQueryStream{
 		QueryService_ExecuteQueryClient: inner,
 
 		ch: make(chan executeQueryPartRecv, prefetch),
 	}
+
+	go stream.pump()
+
+	return stream
 }
 
 func wrapExecuteQueryStreamWithPrefetch(
@@ -48,12 +50,6 @@ func wrapExecuteQueryStreamWithPrefetch(
 	}
 
 	return newPrefetchExecuteQueryStream(stream, prefetch)
-}
-
-func (p *prefetchExecuteQueryStream) startPump() {
-	p.pumpOnce.Do(func() {
-		go p.pump()
-	})
 }
 
 func (p *prefetchExecuteQueryStream) pump() {
@@ -76,7 +72,6 @@ func (p *prefetchExecuteQueryStream) pump() {
 }
 
 func (p *prefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-	p.startPump()
 	item, ok := <-p.ch
 	if !ok {
 		return nil, io.EOF
@@ -93,7 +88,7 @@ func (p *prefetchExecuteQueryStream) RecvMsg(m any) error {
 	dst, ok := m.(*Ydb_Query.ExecuteQueryResponsePart)
 	if !ok {
 		return xerrors.WithStackTrace(fmt.Errorf(
-			"ydb/query: prefetch stream RecvMsg expects *Ydb_Query.ExecuteQueryResponsePart, got %T", m,
+			"%T is not '*Ydb_Query.ExecuteQueryResponsePart'", m,
 		))
 	}
 	proto.Reset(dst)
