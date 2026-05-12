@@ -177,9 +177,10 @@ func defaultExecuteSettings() executeSettings {
 		txControl: tx.DefaultTxControl(),
 		params:    &params.Params{},
 		label:     "undefined",
-		// Two parts ahead overlaps gRPC Recv with client work between parts for
-		// typical single-statement OLTP flows (metadata + rows + completion).
-		responsePartPrefetch: 2,
+		// Disable response-part prefetch by default so ExecuteQuery does not
+		// implicitly spawn a background goroutine or buffer result parts unless
+		// the caller explicitly opts in.
+		responsePartPrefetch: 0,
 	}
 }
 
