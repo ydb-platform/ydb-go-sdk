@@ -76,6 +76,10 @@ func (w *MultiWriterWithTransaction) Write(
 	ctx context.Context,
 	messages []topicwriterinternal.PublicMessage,
 ) error {
+	for i := range messages {
+		messages[i].Tx = w.tx
+	}
+
 	return w.multiWriter.Write(ctx, messages)
 }
 

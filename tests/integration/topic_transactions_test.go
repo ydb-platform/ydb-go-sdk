@@ -334,3 +334,118 @@ func TestWriteInTransaction(t *testing.T) {
 		t.Logf("transactions count: %v", transactionsCount)
 	})
 }
+
+func TestWriteInTransactionMultiWriter(t *testing.T) {
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
+		t.Skip("require enables transactions for topics")
+	}
+
+	// Single stable key routes all messages to one partition so read order matches TestWriteInTransaction.
+	const stablePartitionKey = "stable-partition-key-for-tx-order"
+
+	t.Run("OK", func(t *testing.T) {
+		scope := newScope(t)
+		reader := scope.TopicReader()
+
+		driver := scope.DriverWithGRPCLogging()
+
+		const writeTime = time.Second
+		protectCtx, cancel := context.WithTimeout(scope.Ctx, writeTime*10)
+		defer cancel()
+
+		deadline := time.Now().Add(writeTime)
+		transactionsCount := 0
+		for {
+			err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+				writer, err := driver.Topic().StartTransactionalWriter(
+					tx,
+					scope.TopicPath(),
+					topicoptions.WithWriterSetAutoSeqNo(true),
+					topicoptions.WithWriteToManyPartitions(
+						topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+						topicoptions.WithProducerIDPrefix("tx-multiwriter-ok"),
+					),
+				)
+				if err != nil {
+					return err
+				}
+
+				if err := writer.WaitInit(ctx); err != nil {
+					return err
+				}
+
+				return writer.Write(ctx, topicwriter.Message{
+					Data: strings.NewReader(strconv.Itoa(transactionsCount)),
+					Key:  stablePartitionKey,
+				})
+			})
+			require.NoError(t, err)
+			transactionsCount++
+			if time.Now().After(deadline) {
+				break
+			}
+		}
+
+		for i := 0; i < transactionsCount; i++ {
+			mess, err := reader.ReadMessage(protectCtx)
+			require.NoError(t, err)
+
+			contentBytes, _ := io.ReadAll(mess)
+			content := string(contentBytes)
+			require.Equal(t, strconv.Itoa(i), content)
+		}
+		t.Logf("transactions count: %v", transactionsCount)
+	})
+
+	t.Run("Rollback", func(t *testing.T) {
+		scope := newScope(t)
+		reader := scope.TopicReader()
+
+		driver := scope.Driver()
+
+		const writeTime = time.Second
+		protectCtx, cancel := context.WithTimeout(scope.Ctx, writeTime*10)
+		defer cancel()
+
+		deadline := time.Now().Add(writeTime)
+		transactionsCount := 0
+		testErr := errors.New("test")
+		for {
+			err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+				writer, err := driver.Topic().StartTransactionalWriter(
+					tx,
+					scope.TopicPath(),
+					topicoptions.WithWriterSetAutoSeqNo(true),
+					topicoptions.WithWriteToManyPartitions(
+						topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+						topicoptions.WithProducerIDPrefix("tx-multiwriter-rollback"),
+					),
+				)
+				if err != nil {
+					return err
+				}
+
+				require.NoError(t, writer.WaitInit(ctx))
+
+				require.NoError(t, writer.Write(ctx, topicwriter.Message{
+					Data: strings.NewReader(strconv.Itoa(transactionsCount)),
+					Key:  stablePartitionKey,
+				}))
+				return testErr
+			})
+			require.ErrorIs(t, err, testErr)
+			transactionsCount++
+			if time.Now().After(deadline) {
+				break
+			}
+		}
+
+		protectCtx, cancel = context.WithTimeout(scope.Ctx, time.Millisecond*10)
+		defer cancel()
+
+		mess, err := reader.ReadMessage(protectCtx)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		_ = mess
+		t.Logf("transactions count: %v", transactionsCount)
+	})
+}
