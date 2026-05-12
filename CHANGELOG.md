@@ -1,4 +1,4 @@
-* Added the `query.WithResponsePartPrefetch(n)` option to enable prefetching of query result parts. Default behavior is to disable prefetching. 
+* Added the `query.WithResponsePartPrefetch(n)` option to enable prefetching of query result parts. Default behavior is to disable prefetching.
 
 ## v3.135.15
 * `database/sql` driver (no public API changes): `QueryContext` / `Stmt.QueryContext` / `Tx.QueryContext` cancellation propagated through row iteration consistently—the SQL `Rows` adapter retained that context for every `Next`, `NextResultSet`, and column-metadata call, and both Query Service and Table Service backends received it where supported.
