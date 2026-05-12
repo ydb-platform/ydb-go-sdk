@@ -197,6 +197,11 @@ func TestPrefetchOverlapsWorkBetweenRecv(t *testing.T) {
 	}
 }
 
+// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_off-12      247	4840979 ns/op	 944 B/op	 11 allocs/op
+// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_1-12        430	2792482 ns/op	 1254 B/op	 16 allocs/op
+// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_2-12        426	2813529 ns/op	 1266 B/op	 16 allocs/op
+// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_4-12        424	2816163 ns/op	 1314 B/op	 16 allocs/op
+// BenchmarkExecuteQueryRecvWithPrefetch/prefetch_8-12        426	2836546 ns/op	 1417 B/op	 16 allocs/op
 func BenchmarkExecuteQueryRecvWithPrefetch(b *testing.B) {
 	const (
 		parts       = 8
@@ -238,6 +243,9 @@ func BenchmarkExecuteQueryRecvWithPrefetch(b *testing.B) {
 
 	b.Run("prefetch_off", func(b *testing.B) {
 		bench(b, 0)
+	})
+	b.Run("prefetch_1", func(b *testing.B) {
+		bench(b, 1)
 	})
 	b.Run("prefetch_2", func(b *testing.B) {
 		bench(b, 2)
