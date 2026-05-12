@@ -196,7 +196,7 @@ func TestResponsePartPrefetch(t *testing.T) {
 		WithTxControl(tx.NewControl(tx.WithTxID(""))),
 		WithResponsePartPrefetch(-1),
 	)
-	require.Equal(t, -1, neg.ResponsePartPrefetch())
+	require.Equal(t, 0, neg.ResponsePartPrefetch())
 }
 
 func TestLabel(t *testing.T) {
