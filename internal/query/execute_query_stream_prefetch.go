@@ -55,9 +55,17 @@ func (p *prefetchExecuteQueryStream) startPump() {
 
 func (p *prefetchExecuteQueryStream) pump() {
 	defer close(p.ch)
+	ctx := p.QueryService_ExecuteQueryClient.Context()
 	for {
 		part, err := p.QueryService_ExecuteQueryClient.Recv()
-		p.ch <- executeQueryPartRecv{part: part, err: err}
+		item := executeQueryPartRecv{part: part, err: err}
+
+		select {
+		case p.ch <- item:
+		case <-ctx.Done():
+			return
+		}
+
 		if err != nil {
 			return
 		}
