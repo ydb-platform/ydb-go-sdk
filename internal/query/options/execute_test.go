@@ -176,6 +176,29 @@ func TestResponsePartLimitSizeBytes(t *testing.T) {
 	require.Equal(t, int64(1024), settings.ResponsePartLimitSizeBytes())
 }
 
+func TestResponsePartPrefetch(t *testing.T) {
+	def := ExecuteSettings(WithTxControl(tx.NewControl(tx.WithTxID(""))))
+	require.Equal(t, 0, def.ResponsePartPrefetch())
+
+	off := ExecuteSettings(
+		WithTxControl(tx.NewControl(tx.WithTxID(""))),
+		WithResponsePartPrefetch(0),
+	)
+	require.Equal(t, 0, off.ResponsePartPrefetch())
+
+	custom := ExecuteSettings(
+		WithTxControl(tx.NewControl(tx.WithTxID(""))),
+		WithResponsePartPrefetch(5),
+	)
+	require.Equal(t, 5, custom.ResponsePartPrefetch())
+
+	neg := ExecuteSettings(
+		WithTxControl(tx.NewControl(tx.WithTxID(""))),
+		WithResponsePartPrefetch(-1),
+	)
+	require.Equal(t, 0, neg.ResponsePartPrefetch())
+}
+
 func TestLabel(t *testing.T) {
 	settings := defaultExecuteSettings()
 	require.Equal(t, "undefined", settings.Label())
