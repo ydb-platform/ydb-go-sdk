@@ -241,7 +241,7 @@ func wrapExecuteQueryStreamWithPrefetch(
 	if prefetch <= 0 {
 		return stream
 	}
-	for i := 0; i < prefetch; i++ {
+	for range prefetch {
 		stream = bufferNextPartMiddleware(stream)
 	}
 

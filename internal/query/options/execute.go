@@ -279,6 +279,7 @@ func WithResponsePartPrefetch(parts int) responsePartPrefetch {
 	if parts <= 0 {
 		parts = 0
 	}
+
 	return responsePartPrefetch(parts)
 }
 
