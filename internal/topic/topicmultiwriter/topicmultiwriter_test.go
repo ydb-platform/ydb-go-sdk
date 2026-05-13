@@ -283,6 +283,120 @@ func newTestMultiWriterWithCustomWritersFactory(
 	return writer
 }
 
+type failingAddPartitionChooser struct {
+	delegate PartitionChooser
+	addCalls int
+	err      error
+}
+
+func (c *failingAddPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error) {
+	return c.delegate.ChoosePartition(msg)
+}
+
+func (c *failingAddPartitionChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
+	c.addCalls++
+	if c.addCalls > 1 {
+		return c.err
+	}
+
+	return c.delegate.AddNewPartitions(partitions...)
+}
+
+func (c *failingAddPartitionChooser) RemovePartition(partitionID int64) {
+	c.delegate.RemovePartition(partitionID)
+}
+
+func newTestMultiWriterWithPartitionChooser(
+	t testing.TB,
+	describer TopicDescriber,
+	partitionChooser PartitionChooser,
+) *MultiWriter {
+	t.Helper()
+
+	cfg := MultiWriterConfig{}
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByKey(partitionChooser)(&cfg)
+
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	require.NoError(t, err)
+
+	return writer
+}
+
+func TestInflightBuffer_AcquireMessageAfterStopReturnsClosedError(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	bufCtx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	buf := newInflightBuffer(
+		bufCtx,
+		&xsync.Mutex{},
+		&topicwriterinternal.WriterReconnectorConfig{},
+		func() error { return nil },
+	)
+
+	require.ErrorIs(t, buf.acquireMessage(ctx), ErrAlreadyClosed)
+}
+
+func TestMultiWriter_WriteAfterClose(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	require.NoError(t, multiWriter.Close(ctx))
+
+	err := multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data:  bytes.NewReader([]byte("hello")),
+		SeqNo: 1,
+		Key:   "partition-key-1",
+	}})
+	require.ErrorIs(t, err, ErrAlreadyClosed)
+}
+
+func TestMultiWriter_OnPartitionSplitReturnsAddPartitionsError(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	baseDesc := stubs.DefaultStubTopicDescription(t)
+	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6)
+	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
+	addPartitionsErr := errors.New("add child partitions failed")
+	partitionChooser := &failingAddPartitionChooser{
+		delegate: partitionchooser.NewBoundPartitionChooser(),
+		err:      addPartitionsErr,
+	}
+	multiWriter := newTestMultiWriterWithPartitionChooser(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		partitionChooser,
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	state.RecordSplit(1)
+
+	err := multiWriter.orchestrator.onPartitionSplit(1)
+	require.ErrorIs(t, err, addPartitionsErr)
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
 func TestMultiWriter_ErrAlreadyClosed(t *testing.T) {
 	t.Parallel()
 

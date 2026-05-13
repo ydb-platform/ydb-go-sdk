@@ -148,6 +148,26 @@ func TestPartitionWriterPool_CloseAllClosesAllWriters(t *testing.T) {
 	require.True(t, factory.writers[1].closed.Load())
 }
 
+func TestPartitionWriterPool_CloseAllClosesIdleWriters(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+
+	_, err := pool.get(1, true)
+	require.NoError(t, err)
+	require.Len(t, factory.writers, 1)
+
+	pool.evict(1)
+	require.Equal(t, 1, pool.idle.getWritersCount())
+
+	err = pool.close(xtest.Context(t))
+	require.NoError(t, err)
+	require.True(t, factory.writers[0].closed.Load())
+	require.Equal(t, 0, pool.idle.getWritersCount())
+}
+
 func TestPartitionWriterPool_GetProducerIDFormat(t *testing.T) {
 	t.Parallel()
 

@@ -63,6 +63,10 @@ func NewMultiWriter(
 }
 
 func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
+	if p.closed.Load() {
+		return ErrAlreadyClosed
+	}
+
 	// Same idea as WriterReconnector.waitFirstInitResponse: do not process writes until
 	// orchestrator init() finished (describe topic, seq baseline, partition chooser).
 	if err := p.orchestrator.waitInitDone(ctx); err != nil {

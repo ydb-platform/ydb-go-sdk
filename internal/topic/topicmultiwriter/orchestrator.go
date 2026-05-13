@@ -580,6 +580,11 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
+		if partition == nil {
+			resultErr = fmt.Errorf("partition not found: %d", partitionID)
+
+			return
+		}
 		if partition.Splitted() {
 			isAlreadySplitted = true
 
@@ -593,8 +598,8 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		o.partitionChooser.RemovePartition(partitionID)
 	})
 
-	if err != nil || isAlreadySplitted {
-		return err
+	if resultErr != nil || isAlreadySplitted {
+		return resultErr
 	}
 
 	ancestors := o.getSplittedPartitionAncestors(&describeResult, partitionID)
@@ -604,6 +609,12 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	}
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
+		if partition == nil {
+			resultErr = fmt.Errorf("partition not found: %d", partitionID)
+
+			return
+		}
+
 		err = o.scheduleResendMessages(partitionID, maxSeqNo)
 		if err != nil {
 			resultErr = err
@@ -621,7 +632,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		}
 	})
 
-	return nil
+	return resultErr
 }
 
 func (o *orchestrator) getResultErr() error {

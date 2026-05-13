@@ -95,7 +95,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			if wr.err != nil && isOperationErrorOverloaded(wr.err) {
+			if err := wr.getInitErr(); err != nil && isOperationErrorOverloaded(err) {
 				s.partitionSplitReceiver.push(partitionID)
 
 				break
