@@ -231,10 +231,6 @@ func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
 			return fmt.Errorf("start transactional writer: %w", err)
 		}
 
-		if err := writer.WaitInit(ctx); err != nil {
-			return fmt.Errorf("wait init: %w", err)
-		}
-
 		err = writer.Write(ctx, topicwriter.Message{
 			Data: strings.NewReader(payload),
 			Key:  "abc",
@@ -374,10 +370,6 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 					return err
 				}
 
-				if err := writer.WaitInit(ctx); err != nil {
-					return err
-				}
-
 				return writer.Write(ctx, topicwriter.Message{
 					Data: strings.NewReader(strconv.Itoa(transactionsCount)),
 					Key:  stablePartitionKey,
@@ -435,6 +427,7 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 					Data: strings.NewReader(strconv.Itoa(transactionsCount)),
 					Key:  stablePartitionKey,
 				}))
+				time.Sleep(time.Second * 3)
 				return testErr
 			})
 			require.ErrorIs(t, err, testErr)
