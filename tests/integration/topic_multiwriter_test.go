@@ -871,6 +871,16 @@ func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
 }
 
 func TestTopicMultiWriter_PerformanceWithPartitionIDVsManualWriters(t *testing.T) {
+	runTopicMultiWriterPerformanceWithPartitionIDVsManualWriters(t, false)
+}
+
+func TestTopicMultiWriter_PerformanceWithPartitionIDVsManualWritersWaitServerAck(t *testing.T) {
+	runTopicMultiWriterPerformanceWithPartitionIDVsManualWriters(t, true)
+}
+
+func runTopicMultiWriterPerformanceWithPartitionIDVsManualWriters(t *testing.T, waitServerAck bool) {
+	t.Helper()
+
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -914,13 +924,20 @@ func TestTopicMultiWriter_PerformanceWithPartitionIDVsManualWriters(t *testing.T
 	payload := bytes.Repeat([]byte("x"), messagePayloadSize)
 
 	t.Run("write_to_many_partitions_by_message_partition_id", func(t *testing.T) {
+		writerOptions := []topicoptions.WriterOption{
+			topicoptions.WithWriterSetAutoSeqNo(true),
+		}
+		if waitServerAck {
+			writerOptions = append(writerOptions, topicoptions.WithWriterWaitServerAck(true))
+		}
+		writerOptions = append(writerOptions, topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByPartitionID(),
+			topicoptions.WithProducerIDPrefix(fmt.Sprintf("perf-partition-id-ack-%t", waitServerAck)),
+		))
+
 		writer, err := topicClient.StartWriter(
 			topicPath,
-			topicoptions.WithWriterSetAutoSeqNo(true),
-			topicoptions.WithWriteToManyPartitions(
-				topicoptions.WithWriterPartitionByPartitionID(),
-				topicoptions.WithProducerIDPrefix("perf-partition-id"),
-			),
+			writerOptions...,
 		)
 		require.NoError(t, err)
 		require.NoError(t, writer.WaitInit(ctx))
@@ -937,10 +954,12 @@ func TestTopicMultiWriter_PerformanceWithPartitionIDVsManualWriters(t *testing.T
 		elapsed := time.Since(start)
 
 		t.Logf(
-			"write-to-many-partitions by Message.PartitionID: messages=%d payload_bytes=%d partitions=%d elapsed=%s",
+			"write-to-many-partitions by Message.PartitionID: messages=%d payload_bytes=%d "+
+				"partitions=%d wait_server_ack=%t elapsed=%s",
 			messageCount,
 			messagePayloadSize,
 			len(partitionIDs),
+			waitServerAck,
 			elapsed,
 		)
 	})
@@ -948,12 +967,18 @@ func TestTopicMultiWriter_PerformanceWithPartitionIDVsManualWriters(t *testing.T
 	t.Run("manual_writer_selection_by_partition_id", func(t *testing.T) {
 		writers := make(map[int64]*topicwriter.Writer, len(partitionIDs))
 		for _, partitionID := range partitionIDs {
-			writer, err := topicClient.StartWriter(
-				topicPath,
+			writerOptions := []topicoptions.WriterOption{
 				topicoptions.WithWriterSetAutoSeqNo(true),
 				topicoptions.WithWriterPartitionID(partitionID),
-				topicoptions.WithWriterProducerID(fmt.Sprintf("perf-manual-partition-%d", partitionID)),
-			)
+				topicoptions.WithWriterProducerID(
+					fmt.Sprintf("perf-manual-partition-%d-ack-%t", partitionID, waitServerAck),
+				),
+			}
+			if waitServerAck {
+				writerOptions = append(writerOptions, topicoptions.WithWriterWaitServerAck(true))
+			}
+
+			writer, err := topicClient.StartWriter(topicPath, writerOptions...)
 			require.NoError(t, err)
 			require.NoError(t, writer.WaitInit(ctx))
 			writers[partitionID] = writer
@@ -972,10 +997,12 @@ func TestTopicMultiWriter_PerformanceWithPartitionIDVsManualWriters(t *testing.T
 		elapsed := time.Since(start)
 
 		t.Logf(
-			"manual writer selection by partitionID: messages=%d payload_bytes=%d partitions=%d elapsed=%s",
+			"manual writer selection by partitionID: messages=%d payload_bytes=%d partitions=%d "+
+				"wait_server_ack=%t elapsed=%s",
 			messageCount,
 			messagePayloadSize,
 			len(partitionIDs),
+			waitServerAck,
 			elapsed,
 		)
 	})
