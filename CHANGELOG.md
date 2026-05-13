@@ -1,5 +1,3 @@
-* Added example for `topicmultiwriter` with documentation
-
 ## v3.136.2
 * Fixed `MultiWriterWithTransaction.Write` to materialize lazy query transactions via `tx.UnLazy` before writing (same as single-partition transactional writer)
 * Fixed `MultiWriterWithTransaction`: pass transaction to each incoming message
