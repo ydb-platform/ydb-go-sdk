@@ -2,8 +2,9 @@
 //
 // Behavior that matters for applications:
 //
-// Ordering: The server preserves message order for the same partitioning key within the target partition—paired with
-// sequential sequence numbers under a stable producer identity; retries do not reorder visible delivery.
+// Ordering on read is per partitioning key: consumers see producer send order, including after splits relocate the same
+// logical key onto another partition than earlier publishes. Stable producer IDs and monotonic sequence numbers mean
+// retries do not visibly reorder deliveries.
 //
 // Exactly-once: YDB persists each message under a logical producer identifier and sequence number pair; duplicates with
 // the same pair are suppressed. Prefix all writers with WithProducerIDPrefix (or configure producer IDs explicitly) and
