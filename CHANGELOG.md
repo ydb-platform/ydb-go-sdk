@@ -1,3 +1,6 @@
+* Fixed `MultiWriterWithTransaction.Write` to materialize lazy query transactions via `tx.UnLazy` before writing (same as single-partition transactional writer)
+* Fixed `MultiWriterWithTransaction`: pass transaction to each incoming message
+
 ## v3.136.1
 * Changed the retry behavior for operation error `TIMEOUT` from non-retryable to conditionally retryable
 * Added public `retry.TypeInstant` enum alias to `retry.TypeNoBackoff`
