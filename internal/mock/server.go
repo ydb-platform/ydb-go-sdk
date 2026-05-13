@@ -1,10 +1,13 @@
-// Package mock provides an in-process YDB gRPC stack (Discovery + Table + Query) with fixed
-// "SELECT 42" responses for benchmarks and tests. It does not require a real YDB endpoint.
+// Package mock provides an in-process YDB gRPC stack (Discovery + Table + Query + Topic)
+// with fixed "SELECT 42" responses and Topic stubs for benchmarks and tests. It does not
+// require a real YDB endpoint.
 package mock
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"regexp"
 	"strconv"
@@ -17,11 +20,14 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -187,6 +193,12 @@ type querySrv struct {
 	Ydb_Query_V1.UnimplementedQueryServiceServer
 
 	mock *server
+
+	queryTxID atomic.Uint64
+}
+
+func (m *querySrv) nextTxID() string {
+	return fmt.Sprintf("tx-%d", m.queryTxID.Add(1))
 }
 
 func (m *querySrv) CreateSession(
@@ -205,6 +217,34 @@ func (m *querySrv) DeleteSession(
 	_ *Ydb_Query.DeleteSessionRequest,
 ) (*Ydb_Query.DeleteSessionResponse, error) {
 	return &Ydb_Query.DeleteSessionResponse{
+		Status: Ydb.StatusIds_SUCCESS,
+	}, nil
+}
+
+func (m *querySrv) BeginTransaction(
+	_ context.Context,
+	_ *Ydb_Query.BeginTransactionRequest,
+) (*Ydb_Query.BeginTransactionResponse, error) {
+	return &Ydb_Query.BeginTransactionResponse{
+		Status: Ydb.StatusIds_SUCCESS,
+		TxMeta: &Ydb_Query.TransactionMeta{Id: m.nextTxID()},
+	}, nil
+}
+
+func (m *querySrv) CommitTransaction(
+	_ context.Context,
+	_ *Ydb_Query.CommitTransactionRequest,
+) (*Ydb_Query.CommitTransactionResponse, error) {
+	return &Ydb_Query.CommitTransactionResponse{
+		Status: Ydb.StatusIds_SUCCESS,
+	}, nil
+}
+
+func (m *querySrv) RollbackTransaction(
+	_ context.Context,
+	_ *Ydb_Query.RollbackTransactionRequest,
+) (*Ydb_Query.RollbackTransactionResponse, error) {
+	return &Ydb_Query.RollbackTransactionResponse{
 		Status: Ydb.StatusIds_SUCCESS,
 	}, nil
 }
@@ -243,6 +283,207 @@ func (m *querySrv) ExecuteQuery(
 			return err
 		}
 	}
+
+	return nil
+}
+
+type topicSrv struct {
+	Ydb_Topic_V1.UnimplementedTopicServiceServer
+
+	mock *server
+}
+
+func (m *topicSrv) CreateTopic(
+	_ context.Context,
+	_ *Ydb_Topic.CreateTopicRequest,
+) (*Ydb_Topic.CreateTopicResponse, error) {
+	return &Ydb_Topic.CreateTopicResponse{
+		Operation: operationOK(&Ydb_Topic.CreateTopicResult{}),
+	}, nil
+}
+
+func (m *topicSrv) AlterTopic(
+	_ context.Context,
+	_ *Ydb_Topic.AlterTopicRequest,
+) (*Ydb_Topic.AlterTopicResponse, error) {
+	return &Ydb_Topic.AlterTopicResponse{
+		Operation: operationOK(&Ydb_Topic.AlterTopicResult{}),
+	}, nil
+}
+
+func (m *topicSrv) DropTopic(
+	_ context.Context,
+	_ *Ydb_Topic.DropTopicRequest,
+) (*Ydb_Topic.DropTopicResponse, error) {
+	return &Ydb_Topic.DropTopicResponse{
+		Operation: operationOK(&Ydb_Topic.DropTopicResult{}),
+	}, nil
+}
+
+func (m *topicSrv) CommitOffset(
+	_ context.Context,
+	_ *Ydb_Topic.CommitOffsetRequest,
+) (*Ydb_Topic.CommitOffsetResponse, error) {
+	return &Ydb_Topic.CommitOffsetResponse{
+		Operation: operationOK(&Ydb_Topic.CommitOffsetResult{}),
+	}, nil
+}
+
+func (m *topicSrv) UpdateOffsetsInTransaction(
+	_ context.Context,
+	_ *Ydb_Topic.UpdateOffsetsInTransactionRequest,
+) (*Ydb_Topic.UpdateOffsetsInTransactionResponse, error) {
+	return &Ydb_Topic.UpdateOffsetsInTransactionResponse{
+		Operation: operationOK(&Ydb_Topic.UpdateOffsetsInTransactionResult{}),
+	}, nil
+}
+
+func (m *topicSrv) DescribeTopic(
+	_ context.Context,
+	req *Ydb_Topic.DescribeTopicRequest,
+) (*Ydb_Topic.DescribeTopicResponse, error) {
+	return &Ydb_Topic.DescribeTopicResponse{
+		Operation: operationOK(&Ydb_Topic.DescribeTopicResult{
+			Self: &Ydb_Scheme.Entry{
+				Name: req.GetPath(),
+				Type: Ydb_Scheme.Entry_TOPIC,
+			},
+			PartitioningSettings: &Ydb_Topic.PartitioningSettings{
+				MinActivePartitions:      1,
+				AutoPartitioningSettings: &Ydb_Topic.AutoPartitioningSettings{},
+			},
+			Partitions: []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
+				{PartitionId: 0, Active: true},
+			},
+		}),
+	}, nil
+}
+
+func (m *topicSrv) DescribeConsumer(
+	_ context.Context,
+	req *Ydb_Topic.DescribeConsumerRequest,
+) (*Ydb_Topic.DescribeConsumerResponse, error) {
+	return &Ydb_Topic.DescribeConsumerResponse{
+		Operation: operationOK(&Ydb_Topic.DescribeConsumerResult{
+			Self: &Ydb_Scheme.Entry{
+				Name: req.GetPath(),
+				Type: Ydb_Scheme.Entry_TOPIC,
+			},
+			Consumer: &Ydb_Topic.Consumer{
+				Name: req.GetConsumer(),
+			},
+			Partitions: []*Ydb_Topic.DescribeConsumerResult_PartitionInfo{
+				{PartitionId: 0, Active: true},
+			},
+		}),
+	}, nil
+}
+
+// StreamWrite performs the writer handshake, then loops acking every message
+// it receives with status Written. The ack loop is necessary because real
+// writer clients block on WaitAcks/Flush until the server confirms — without
+// it the client hangs on shutdown.
+func (m *topicSrv) StreamWrite(stream Ydb_Topic_V1.TopicService_StreamWriteServer) error {
+	initMsg, err := stream.Recv()
+	if err != nil {
+		return fmt.Errorf("failed to read topic writer init request: %w", err)
+	}
+	if initMsg.GetInitRequest() == nil {
+		return errors.New("first topic writer message must be InitRequest")
+	}
+
+	if err = stream.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
+		Status: Ydb.StatusIds_SUCCESS,
+		ServerMessage: &Ydb_Topic.StreamWriteMessage_FromServer_InitResponse{
+			InitResponse: &Ydb_Topic.StreamWriteMessage_InitResponse{
+				SessionId:   "mock-write-session",
+				PartitionId: 0,
+			},
+		},
+	}); err != nil {
+		return err
+	}
+
+	var offset int64
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+
+			return err
+		}
+
+		wr := msg.GetWriteRequest()
+		if wr == nil {
+			continue
+		}
+
+		resp := writeAckResponse(wr.GetMessages(), &offset)
+		if err = stream.Send(resp); err != nil {
+			return err
+		}
+	}
+}
+
+// writeAckResponse builds a FromServer WriteResponse that acks every message
+// in msgs as Written, assigning consecutive offsets starting at *offset and
+// advancing it past the last ack.
+func writeAckResponse(
+	msgs []*Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData,
+	offset *int64,
+) *Ydb_Topic.StreamWriteMessage_FromServer {
+	acks := make([]*Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck, 0, len(msgs))
+	for _, data := range msgs {
+		acks = append(acks, &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck{
+			SeqNo: data.GetSeqNo(),
+			MessageWriteStatus: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_{
+				Written: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written{
+					Offset: *offset,
+				},
+			},
+		})
+		*offset++
+	}
+
+	return &Ydb_Topic.StreamWriteMessage_FromServer{
+		Status: Ydb.StatusIds_SUCCESS,
+		ServerMessage: &Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse{
+			WriteResponse: &Ydb_Topic.StreamWriteMessage_WriteResponse{
+				Acks:            acks,
+				PartitionId:     0,
+				WriteStatistics: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteStatistics{},
+			},
+		},
+	}
+}
+
+// StreamRead performs the reader handshake, then holds the stream open until
+// the client cancels the context. The mock never produces partition sessions
+// or data messages — readers waiting for messages will simply block, mirroring
+// querySrv.AttachSession.
+func (m *topicSrv) StreamRead(stream Ydb_Topic_V1.TopicService_StreamReadServer) error {
+	initMsg, err := stream.Recv()
+	if err != nil {
+		return fmt.Errorf("failed to read topic reader init request: %w", err)
+	}
+	if initMsg.GetInitRequest() == nil {
+		return errors.New("first topic reader message must be InitRequest")
+	}
+
+	if err = stream.Send(&Ydb_Topic.StreamReadMessage_FromServer{
+		Status: Ydb.StatusIds_SUCCESS,
+		ServerMessage: &Ydb_Topic.StreamReadMessage_FromServer_InitResponse{
+			InitResponse: &Ydb_Topic.StreamReadMessage_InitResponse{
+				SessionId: "mock-read-session",
+			},
+		},
+	}); err != nil {
+		return err
+	}
+
+	<-stream.Context().Done()
 
 	return nil
 }
@@ -391,6 +632,7 @@ func Server(tb testing.TB) *server {
 	})
 	Ydb_Table_V1.RegisterTableServiceServer(m.grpcServer, &tableSrv{mock: m})
 	Ydb_Query_V1.RegisterQueryServiceServer(m.grpcServer, &querySrv{mock: m})
+	Ydb_Topic_V1.RegisterTopicServiceServer(m.grpcServer, &topicSrv{mock: m})
 
 	go func() {
 		_ = m.grpcServer.Serve(lis)

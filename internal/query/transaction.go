@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -31,6 +32,9 @@ type (
 
 		completed bool
 
+		unlazyOnce  sync.Once
+		unlazyError error
+
 		onBeforeCommit xsync.Set[*baseTx.OnTransactionBeforeCommit]
 		onCompleted    xsync.Set[*baseTx.OnTransactionCompletedFunc]
 	}
@@ -56,18 +60,20 @@ func begin(
 }
 
 func (tx *Transaction) UnLazy(ctx context.Context) error {
-	if tx.ID() != baseTx.LazyTxID {
-		return nil
-	}
+	tx.unlazyOnce.Do(func() {
+		if tx.ID() != baseTx.LazyTxID {
+			return
+		}
 
-	txID, err := begin(ctx, tx.s.client, tx.s.ID(), tx.txSettings)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
+		txID, err := begin(ctx, tx.s.client, tx.s.ID(), tx.txSettings)
+		if err != nil {
+			tx.unlazyError = xerrors.WithStackTrace(err)
+		}
 
-	tx.SetTxID(txID)
+		tx.SetTxID(txID)
+	})
 
-	return nil
+	return tx.unlazyError
 }
 
 func (tx *Transaction) QueryResultSet(
