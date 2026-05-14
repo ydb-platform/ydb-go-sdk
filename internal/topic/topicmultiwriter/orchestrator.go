@@ -319,7 +319,7 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	}
 
 	o.buf.sweep()
-	if len(o.buf.pendingMessagesIndex) > 0 || partition == nil || partition.PendingResend == 0 {
+	if len(o.buf.pendingMessagesIndex) > 0 || (partition != nil && partition.PendingResend == 0) {
 		o.sender.wakeup()
 	}
 }

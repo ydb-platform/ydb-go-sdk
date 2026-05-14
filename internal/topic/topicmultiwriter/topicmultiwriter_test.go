@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
@@ -464,6 +464,7 @@ func TestOrchestratorOnAckReceivedIgnoresMissingPartition(t *testing.T) {
 				},
 			},
 		})
+		delete(multiWriter.orchestrator.buf.pendingMessagesIndex, 1)
 		delete(multiWriter.orchestrator.partitions, 1)
 		require.NotPanics(t, func() {
 			multiWriter.orchestrator.onAckReceivedNeedLock(1, 1)
