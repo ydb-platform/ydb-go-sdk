@@ -143,8 +143,9 @@ func (f *choosePartitionKeyCheckWritersFactory) Create(
 }
 
 type orderedSeqWriter struct {
-	lastSeqNo int64
-	writes    chan int64
+	lastSeqNo             int64
+	writes                chan int64
+	onAckReceivedCallback func(seqNo int64)
 }
 
 func (w *orderedSeqWriter) Close(ctx context.Context) error {
@@ -165,6 +166,11 @@ func (w *orderedSeqWriter) WriteInternal(
 		}
 		w.lastSeqNo = msg.SeqNo
 		w.writes <- msg.SeqNo
+		if w.onAckReceivedCallback != nil {
+			// Notify multiwriter the message was accepted so flush() in Close()
+			// can complete; mirror what real subwriter does after a server ack.
+			go w.onAckReceivedCallback(msg.SeqNo)
+		}
 	}
 
 	return nil
@@ -177,8 +183,13 @@ type orderedSeqWriterFactory struct {
 func (f orderedSeqWriterFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	partitionID, _ := cfg.PartitionID()
 	if partitionID != 1 {
-		return &orderedSeqWriter{writes: make(chan int64, 1)}, nil
+		return &orderedSeqWriter{
+			writes:                make(chan int64, 1),
+			onAckReceivedCallback: cfg.OnAckReceivedCallback,
+		}, nil
 	}
+
+	f.writer.onAckReceivedCallback = cfg.OnAckReceivedCallback
 
 	return f.writer, nil
 }
