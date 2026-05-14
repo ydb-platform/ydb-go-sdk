@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -139,6 +140,65 @@ func (f *choosePartitionKeyCheckWritersFactory) Create(
 		0,
 		stubs.WithRequireChoosePartitionKeyMetadata(f.t),
 	), nil
+}
+
+type orderedSeqWriter struct {
+	lastSeqNo int64
+	writes    chan int64
+}
+
+func (w *orderedSeqWriter) Close(ctx context.Context) error {
+	return nil
+}
+
+func (w *orderedSeqWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	return topicwriterinternal.InitialInfo{}, nil
+}
+
+func (w *orderedSeqWriter) WriteInternal(
+	ctx context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
+	for _, msg := range messages {
+		if msg.SeqNo <= w.lastSeqNo {
+			return fmt.Errorf("unordered seq no: %d <= %d", msg.SeqNo, w.lastSeqNo)
+		}
+		w.lastSeqNo = msg.SeqNo
+		w.writes <- msg.SeqNo
+	}
+
+	return nil
+}
+
+type orderedSeqWriterFactory struct {
+	writer *orderedSeqWriter
+}
+
+func (f orderedSeqWriterFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	partitionID, _ := cfg.PartitionID()
+	if partitionID != 1 {
+		return &orderedSeqWriter{writes: make(chan int64, 1)}, nil
+	}
+
+	return f.writer, nil
+}
+
+type blockingReader struct {
+	started chan struct{}
+	release chan struct{}
+	data    []byte
+	done    bool
+}
+
+func (r *blockingReader) Read(p []byte) (int, error) {
+	if r.done {
+		return 0, io.EOF
+	}
+	close(r.started)
+	<-r.release
+	r.done = true
+
+	return copy(p, r.data), nil
 }
 
 func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
@@ -908,6 +968,67 @@ func TestMultiWriter_Write_ErrUnorderedSeqNo(t *testing.T) {
 		},
 	})
 	require.ErrorIs(t, err, ErrUnorderedSeqNo)
+
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestMultiWriter_Write_AutoSeqNoFollowsQueueOrder(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	orderedWriter := &orderedSeqWriter{
+		writes: make(chan int64, 2),
+	}
+	cfg := MultiWriterConfig{}
+	withWritersFactory(orderedSeqWriterFactory{writer: orderedWriter})(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByPartitionID()(&cfg)
+
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
+
+	multiWriter, err := NewMultiWriter(
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		writerCfg,
+		&cfg,
+	)
+	require.NoError(t, err)
+	require.NoError(t, multiWriter.WaitInit(ctx))
+
+	reader := &blockingReader{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		data:    []byte("slow"),
+	}
+	firstWriteDone := make(chan error, 1)
+	go func() {
+		firstWriteDone <- multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+			{
+				Data:        reader,
+				PartitionID: 1,
+			},
+		})
+	}()
+
+	<-reader.started
+	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:        bytes.NewReader([]byte("fast")),
+			PartitionID: 1,
+		},
+	}))
+	require.Equal(t, int64(1), <-orderedWriter.writes)
+
+	close(reader.release)
+	require.NoError(t, <-firstWriteDone)
+	require.Equal(t, int64(2), <-orderedWriter.writes)
 
 	require.NoError(t, multiWriter.Close(ctx))
 }

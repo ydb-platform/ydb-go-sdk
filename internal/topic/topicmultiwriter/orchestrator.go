@@ -219,11 +219,6 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		return ErrNoSeqNo
 	case autoSetSeqNo && msg.SeqNo != 0:
 		return topicwriterinternal.ErrNonZeroSeqNo
-	case autoSetSeqNo && msg.SeqNo == 0:
-		o.mu.WithLock(func() {
-			o.currentSeqNo++
-			msg.SeqNo = o.currentSeqNo
-		})
 	}
 
 	if err := o.buf.acquireMessage(ctx); err != nil {
@@ -255,7 +250,10 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		return err
 	}
 	o.mu.WithLock(func() {
-		if !autoSetSeqNo {
+		if autoSetSeqNo {
+			o.currentSeqNo++
+			msg.SeqNo = o.currentSeqNo
+		} else {
 			err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
 			if err != nil {
 				return
@@ -398,12 +396,13 @@ func (o *orchestrator) reserveSeqNoNeedLock(partitionID, seqNo int64) error {
 	if partition == nil {
 		return fmt.Errorf("partition not found: %d", partitionID)
 	}
-	if seqNo <= partition.LastQueuedSeqNo {
+	lastSeqNo := max(partition.CachedMaxSeqNo, partition.LastQueuedSeqNo)
+	if seqNo <= lastSeqNo {
 		return fmt.Errorf(
 			"%w: seqNo %d <= last seqNo %d for partition %d",
 			ErrUnorderedSeqNo,
 			seqNo,
-			partition.LastQueuedSeqNo,
+			lastSeqNo,
 			partitionID,
 		)
 	}
