@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -41,11 +42,11 @@ func (c *testCloser) Close(ctx context.Context) error {
 	return c.closeErr
 }
 
-func TestOnceValue(t *testing.T) {
+func TestOnceCloserValue(t *testing.T) {
 	ctx := xtest.Context(t)
 	t.Run("Race", func(t *testing.T) {
 		counter := 0
-		once := OnceValue(func() (*testCloser, error) {
+		once := OnceCloserValue(func() (*testCloser, error) {
 			counter++
 
 			return &testCloser{value: counter}, nil
@@ -64,7 +65,7 @@ func TestOnceValue(t *testing.T) {
 	})
 	t.Run("GetBeforeClose", func(t *testing.T) {
 		constCloseErr := errors.New("")
-		once := OnceValue(func() (*testCloser, error) {
+		once := OnceCloserValue(func() (*testCloser, error) {
 			return &testCloser{
 				inited:   true,
 				closeErr: constCloseErr,
@@ -82,7 +83,7 @@ func TestOnceValue(t *testing.T) {
 	})
 	t.Run("CloseBeforeGet", func(t *testing.T) {
 		constCloseErr := errors.New("")
-		once := OnceValue(func() (*testCloser, error) {
+		once := OnceCloserValue(func() (*testCloser, error) {
 			return &testCloser{
 				inited:   true,
 				closeErr: constCloseErr,
@@ -93,5 +94,113 @@ func TestOnceValue(t *testing.T) {
 		v, err := once.Get()
 		require.NoError(t, err)
 		require.Nil(t, v)
+	})
+}
+
+func TestOnce(t *testing.T) {
+	t.Run("FirstCallReturnsValue", func(t *testing.T) {
+		var once Once[int]
+		v, err := once.Do(func() (int, error) {
+			return 42, nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, 42, v)
+	})
+
+	t.Run("SubsequentCallsReturnCached", func(t *testing.T) {
+		var (
+			once  Once[int]
+			calls int
+		)
+		v1, err := once.Do(func() (int, error) {
+			calls++
+
+			return 7, nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, 7, v1)
+
+		v2, err := once.Do(func() (int, error) {
+			calls++
+
+			return 99, nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, 7, v2)
+		require.Equal(t, 1, calls)
+	})
+
+	t.Run("ErrorIsCached", func(t *testing.T) {
+		var (
+			once    Once[int]
+			calls   int
+			testErr = errors.New("boom")
+		)
+		v1, err := once.Do(func() (int, error) {
+			calls++
+
+			return 0, testErr
+		})
+		require.ErrorIs(t, err, testErr)
+		require.Equal(t, 0, v1)
+
+		v2, err := once.Do(func() (int, error) {
+			calls++
+
+			return 123, nil
+		})
+		require.ErrorIs(t, err, testErr)
+		require.Equal(t, 0, v2)
+		require.Equal(t, 1, calls)
+	})
+
+	t.Run("ValueAndErrorTogether", func(t *testing.T) {
+		var (
+			once    Once[int]
+			testErr = errors.New("partial")
+		)
+		v1, err := once.Do(func() (int, error) {
+			return 5, testErr
+		})
+		require.ErrorIs(t, err, testErr)
+		require.Equal(t, 5, v1)
+
+		v2, err := once.Do(func() (int, error) {
+			return 0, nil
+		})
+		require.ErrorIs(t, err, testErr)
+		require.Equal(t, 5, v2)
+	})
+
+	t.Run("Race", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			var (
+				once  Once[int]
+				calls atomic.Int64
+			)
+			const goroutines = 1000
+
+			var (
+				wg    sync.WaitGroup
+				start = make(chan struct{})
+			)
+			wg.Add(goroutines)
+			for range make([]struct{}, goroutines) {
+				go func() {
+					defer wg.Done()
+					<-start
+					v, err := once.Do(func() (int, error) {
+						calls.Add(1)
+
+						return 17, nil
+					})
+					require.NoError(t, err)
+					require.Equal(t, 17, v)
+				}()
+			}
+			close(start)
+			wg.Wait()
+			require.Equal(t, int64(1), calls.Load())
+		})
 	})
 }

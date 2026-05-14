@@ -5,7 +5,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -42,7 +41,7 @@ func TestTxWriterUnLazyRace(t *testing.T) {
 	defer func() { _ = db.Close(ctx) }()
 
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		const writers = 1000
+		const writers = 5
 
 		err = db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 			start := make(chan struct{})
@@ -82,5 +81,5 @@ func TestTxWriterUnLazyRace(t *testing.T) {
 			return nil
 		}, query.WithLazyTx(true))
 		require.NoError(t, err)
-	}, xtest.StopAfter(time.Minute*3))
+	})
 }

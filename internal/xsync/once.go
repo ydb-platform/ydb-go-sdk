@@ -7,6 +7,21 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 )
 
+type Once[T any] struct {
+	once sync.Once
+
+	value T
+	err   error
+}
+
+func (c *Once[T]) Do(f func() (res T, err error)) (T, error) {
+	c.once.Do(func() {
+		c.value, c.err = f()
+	})
+
+	return c.value, c.err
+}
+
 func OnceFunc(f func(ctx context.Context) error) func(ctx context.Context) error {
 	var once sync.Once
 
@@ -19,7 +34,7 @@ func OnceFunc(f func(ctx context.Context) error) func(ctx context.Context) error
 	}
 }
 
-type Once[T closer.Closer] struct {
+type OnceCloser[T closer.Closer] struct {
 	f     func() (T, error)
 	once  sync.Once
 	mutex sync.RWMutex
@@ -27,11 +42,11 @@ type Once[T closer.Closer] struct {
 	err   error
 }
 
-func OnceValue[T closer.Closer](f func() (T, error)) *Once[T] {
-	return &Once[T]{f: f}
+func OnceCloserValue[T closer.Closer](f func() (T, error)) *OnceCloser[T] {
+	return &OnceCloser[T]{f: f}
 }
 
-func (v *Once[T]) Close(ctx context.Context) (err error) {
+func (v *OnceCloser[T]) Close(ctx context.Context) (err error) {
 	has := true
 	v.once.Do(func() {
 		has = false
@@ -47,7 +62,7 @@ func (v *Once[T]) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func (v *Once[T]) Get() (T, error) {
+func (v *OnceCloser[T]) Get() (T, error) {
 	v.once.Do(func() {
 		v.mutex.Lock()
 		defer v.mutex.Unlock()
@@ -61,7 +76,7 @@ func (v *Once[T]) Get() (T, error) {
 	return v.t, v.err
 }
 
-func (v *Once[T]) Must() T {
+func (v *OnceCloser[T]) Must() T {
 	t, err := v.Get()
 	if err != nil {
 		panic(err)
