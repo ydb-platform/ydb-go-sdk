@@ -215,10 +215,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		}
 	}()
 
-	var autoSetSeqNo bool
-	o.mu.WithLock(func() {
-		autoSetSeqNo = o.writerCfg.AutoSetSeqNo
-	})
+	autoSetSeqNo := o.writerCfg.AutoSetSeqNo
 
 	switch {
 	case !autoSetSeqNo && msg.SeqNo == 0:
