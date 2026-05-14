@@ -1,4 +1,5 @@
 * Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) error handling and shutdown: writes after close now fail, partition-split errors are propagated, sub-writer init errors are race-free, and idle sub-writers are closed correctly
+* Changed `topicoptions.KeyHasher` for bound topic multiwriter partitioning to return `[]byte` instead of `string`, avoiding extra string conversion and byte-copy allocations per message
 
 ## v3.136.3
 * Fixed passing wait server ack to sub-writers in topicmultiwriter

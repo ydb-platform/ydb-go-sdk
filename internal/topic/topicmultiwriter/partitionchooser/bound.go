@@ -1,18 +1,20 @@
 package partitionchooser
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xhash"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-type KeyHasher func(key string) string
+// KeyHasher returns the partition key bytes used for bound-based partition selection.
+// The returned slice is stored in message metadata, so it must not be modified after return.
+type KeyHasher func(key string) []byte
 
 type BoundPartitionChooserOption func(cfg *BoundPartitionChooser)
 
@@ -22,20 +24,20 @@ func WithKeyHasher(keyHasher KeyHasher) BoundPartitionChooserOption {
 	}
 }
 
-func defaultKeyHasher(key string) string {
+func defaultKeyHasher(key string) []byte {
 	// Same as C++ TProducerSettings::DefaultPartitioningKeyHasher:
 	// MurmurHash64 with seed 0, result as 8 bytes in big-endian (network byte order)
 	lo := xhash.Murmur2Hash64A([]byte(key), 0)
 	out := make([]byte, 8)
 	binary.BigEndian.PutUint64(out, lo)
 
-	return string(out)
+	return out
 }
 
 type partitionShortInfo struct {
 	ID        int64
-	FromBound string
-	ToBound   string
+	FromBound []byte
+	ToBound   []byte
 }
 
 type BoundPartitionChooser struct {
@@ -61,19 +63,21 @@ func (c *BoundPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMe
 		return 0, fmt.Errorf("no partitions configured")
 	}
 
-	hashedKey := msg.Key
+	var hashedKey []byte
 	if c.keyHasher != nil {
 		hashedKey = c.keyHasher(msg.Key)
+	} else {
+		hashedKey = []byte(msg.Key)
 	}
 
 	if msg.Metadata != nil {
-		msg.Metadata[PartitionKeyMetadataKey] = []byte(hashedKey)
+		msg.Metadata[PartitionKeyMetadataKey] = hashedKey
 	}
 
 	// Find first partition whose lower bound is strictly greater than hashedKey.
 	// Then take the previous one as the partition for this key.
 	idx := sort.Search(len(c.partitions), func(i int) bool {
-		return strings.Compare(c.partitions[i].FromBound, hashedKey) > 0
+		return bytes.Compare(c.partitions[i].FromBound, hashedKey) > 0
 	})
 
 	// If idx == 0, all FromBound > key. This should be impossible in normal server behavior,
@@ -101,13 +105,13 @@ func (c *BoundPartitionChooser) AddNewPartitions(partitions ...topictypes.Partit
 
 		c.partitions = append(c.partitions, partitionShortInfo{
 			ID:        partition.PartitionID,
-			FromBound: string(partition.FromBound),
-			ToBound:   string(partition.ToBound),
+			FromBound: bytes.Clone(partition.FromBound),
+			ToBound:   bytes.Clone(partition.ToBound),
 		})
 	}
 
 	sort.Slice(c.partitions, func(i, j int) bool {
-		return strings.Compare(c.partitions[i].FromBound, c.partitions[j].FromBound) < 0
+		return bytes.Compare(c.partitions[i].FromBound, c.partitions[j].FromBound) < 0
 	})
 
 	return nil

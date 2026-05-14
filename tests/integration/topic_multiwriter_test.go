@@ -326,12 +326,12 @@ func createMultiWriterForAutoPartitioning(
 		topicoptions.WithWriterPartitionByKey(
 			topicoptions.BoundPartitionChooser(
 				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(
-					func(key string) string {
+					func(key string) []byte {
 						if key == firstPartitionKey {
-							return ""
+							return []byte{}
 						}
 
-						return key
+						return []byte(key)
 					},
 				),
 			),
