@@ -538,6 +538,7 @@ func (o *orchestrator) initSeqNo() error {
 	return nil
 }
 
+//nolint:funlen
 func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err error) {
 	var errGroup errgroup.Group
 	errGroup.SetLimit(10)
