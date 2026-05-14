@@ -397,13 +397,12 @@ func (o *orchestrator) reserveSeqNoNeedLock(partitionID, seqNo int64) error {
 	if partition == nil {
 		return fmt.Errorf("partition not found: %d", partitionID)
 	}
-	lastSeqNo := max(partition.CachedMaxSeqNo, partition.LastQueuedSeqNo)
-	if seqNo <= lastSeqNo {
+	if seqNo <= partition.LastQueuedSeqNo {
 		return fmt.Errorf(
 			"%w: seqNo %d <= last seqNo %d for partition %d",
 			ErrUnorderedSeqNo,
 			seqNo,
-			lastSeqNo,
+			partition.LastQueuedSeqNo,
 			partitionID,
 		)
 	}
