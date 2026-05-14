@@ -131,6 +131,34 @@ func storeFirstError(firstErr *atomic.Value, err error) {
 	firstErr.CompareAndSwap(nil, err)
 }
 
+func writeToPartitionID(ctx context.Context, db *ydb.Driver, topicPath string, partitionID int64) error {
+	writer, err := db.Topic().StartWriter(
+		topicPath,
+		topicoptions.WithWriteToManyPartitions(
+			// Writing to an explicit partition ID is rarely needed. Prefer partitioning
+			// by key unless the application has a strong reason to choose partitions itself.
+			//
+			// Explicit partition IDs are harder to handle when the topic is split: writing
+			// to a closed partition stops the whole writer, so the application must detect
+			// the new partition layout and recreate the writer with a valid partition ID.
+			topicoptions.WithWriterPartitionByPartitionID(),
+			// ProducerIDPrefix works like a regular producer ID: the server uses it for deduplication.
+			// Do not run two writers with the same prefix at the same time. If their partitions
+			// overlap, the server returns an error and one of the writers stops.
+			topicoptions.WithProducerIDPrefix("docs-example-partition-id"),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("StartWriter: %w", err)
+	}
+	defer func() { _ = writer.Close(context.Background()) }()
+
+	return writer.Write(ctx, topicwriter.Message{
+		Data:        bytes.NewReader([]byte("message")),
+		PartitionID: partitionID,
+	})
+}
+
 func runWriter(
 	ctx context.Context,
 	topicClient topic.Client,
@@ -146,7 +174,13 @@ func runWriter(
 		topicoptions.WithWriterSetAutoSeqNo(true),
 		topicoptions.WithWriteToManyPartitions(
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser()),
+			// ProducerIDPrefix works like a regular producer ID: the server uses it for deduplication.
+			// Do not run two writers with the same prefix at the same time. If their partitions
+			// overlap, the server returns an error and one of the writers stops.
 			topicoptions.WithProducerIDPrefix(producerPrefix),
+			// Keep idle partition writers alive longer so sparse writes to the same
+			// partition can reuse the existing internal writer instead of recreating it.
+			topicoptions.WithWriterIdleTimeout(45*time.Minute),
 		),
 	)
 	if err != nil {
