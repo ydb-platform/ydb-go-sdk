@@ -46,21 +46,21 @@ func StartWriterAcrossPartitionsBoundedKey(
 ) (*topicwriter.Writer, error) {
 	return db.Topic().StartWriter(topicPath,
 		topicoptions.WithWriteToManyPartitions(
-			// WithProducerIDPrefix defines the prefix for internally generated producer IDs; it participates in persistence
-			// keys and contributes to duplicate suppression together with sequence numbers chosen per outbound stream.
-			topicoptions.WithProducerIDPrefix("docs-example-bounded"),
-
-			// WithWriterIdleTimeout shuts down dormant per-partition sessions after silence to release resources when traffic
-			// is intermittent; short values increase churn, larger values reuse streams longer.
-			topicoptions.WithWriterIdleTimeout(30*time.Minute),
-
 			// BoundPartitionChooser places messages by comparing a hashed partitioning key against ordered partition bounds.
 			// It is compatible with Topic auto partitioning that grows partition count over time—the client refreshes bounds.
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser(
-				// Optional: customize how raw Message.Key becomes the string matched against boundaries.
+				// Optional: customize how raw Message.Key becomes the bytes matched against boundaries.
 				// The default hashes like legacy C++/Go producers; override only to align routing with upstream systems.
-				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) string { return key }),
+				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) []byte { return []byte(key) }),
 			)),
+
+			// ProducerIDPrefix works like a regular producer ID: the server uses it for deduplication.
+			// Do not run two writers with the same prefix at the same time. If their partitions
+			// overlap, the server returns an error and one of the writers stops.
+			topicoptions.WithProducerIDPrefix("docs-example-bounded"),
+			// Keep idle partition writers alive longer so sparse writes to the same
+			// partition can reuse the existing internal writer instead of recreating it.
+			topicoptions.WithWriterIdleTimeout(45*time.Minute),
 		),
 		// WithWriterWaitServerAck enforces acknowledgement before Write returns—a common choice for transactional safety.
 		topicoptions.WithWriterWaitServerAck(true),
@@ -119,7 +119,7 @@ func StartTransactionalWriterAcrossPartitions(
 			topicoptions.WithWriterIdleTimeout(30*time.Minute),
 
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser(
-				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) string { return key }),
+				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) []byte { return []byte(key) }),
 			)),
 		),
 		topicoptions.WithWriterWaitServerAck(true),

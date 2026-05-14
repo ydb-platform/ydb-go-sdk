@@ -146,13 +146,7 @@ func runWriter(
 		topicoptions.WithWriterSetAutoSeqNo(true),
 		topicoptions.WithWriteToManyPartitions(
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser()),
-			// ProducerIDPrefix works like a regular producer ID: the server uses it for deduplication.
-			// Do not run two writers with the same prefix at the same time. If their partitions
-			// overlap, the server returns an error and one of the writers stops.
 			topicoptions.WithProducerIDPrefix(producerPrefix),
-			// Keep idle partition writers alive longer so sparse writes to the same
-			// partition can reuse the existing internal writer instead of recreating it.
-			topicoptions.WithWriterIdleTimeout(45*time.Minute),
 		),
 	)
 	if err != nil {
