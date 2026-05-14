@@ -36,22 +36,6 @@ type receivedTopicMessage struct {
 	metadata    map[string][]byte
 }
 
-type blockingMessageReader struct {
-	started     chan struct{}
-	release     chan struct{}
-	reader      *bytes.Reader
-	startedOnce sync.Once
-}
-
-func (r *blockingMessageReader) Read(p []byte) (int, error) {
-	r.startedOnce.Do(func() {
-		close(r.started)
-		<-r.release
-	})
-
-	return r.reader.Read(p)
-}
-
 const (
 	defaultMessageCount  = 1000
 	defaultReadTimeout   = 20 * time.Second
@@ -836,6 +820,12 @@ func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 }
 
 func TestTopicMultiWriter_ConcurrentWriteAutoSeqNo(t *testing.T) {
+	const (
+		goroutines          = 50
+		messagesPerRoutine  = 5
+		concurrentWriteKeys = 10
+	)
+
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -860,34 +850,32 @@ func TestTopicMultiWriter_ConcurrentWriteAutoSeqNo(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, multiWriter.WaitInit(ctx))
 
-	const key = "same-partition-key"
 	payload := bytes.Repeat([]byte("payload"), 1024)
-	blockingReader := &blockingMessageReader{
-		started: make(chan struct{}),
-		release: make(chan struct{}),
-		reader:  bytes.NewReader(payload),
+	var wg sync.WaitGroup
+	writeErrs := make(chan error, goroutines*messagesPerRoutine)
+	start := make(chan struct{})
+
+	for goroutineID := range goroutines {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			for messageID := range messagesPerRoutine {
+				writeErrs <- multiWriter.Write(ctx, topicwriter.Message{
+					Data: bytes.NewReader(payload),
+					Key:  fmt.Sprintf("concurrent-key-%d", (goroutineID+messageID)%concurrentWriteKeys),
+				})
+			}
+		}()
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	firstWriteErr := make(chan error, 1)
-	go func() {
-		defer wg.Done()
-		firstWriteErr <- multiWriter.Write(ctx, topicwriter.Message{
-			Data: blockingReader,
-			Key:  key,
-		})
-	}()
-
-	<-blockingReader.started
-	require.NoError(t, multiWriter.Write(ctx, topicwriter.Message{
-		Data: bytes.NewReader(payload),
-		Key:  key,
-	}))
-
-	close(blockingReader.release)
+	close(start)
 	wg.Wait()
-	require.NoError(t, <-firstWriteErr)
+	close(writeErrs)
+
+	for err := range writeErrs {
+		require.NoError(t, err)
+	}
 
 	require.NoError(t, multiWriter.Close(ctx))
 	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
@@ -895,7 +883,7 @@ func TestTopicMultiWriter_ConcurrentWriteAutoSeqNo(t *testing.T) {
 		topicClient,
 		topicPath,
 		consumerName,
-		2,
+		goroutines*messagesPerRoutine,
 		defaultReadTimeout,
 		payload,
 	))
