@@ -154,11 +154,13 @@ func (o *orchestrator) init() (err error) {
 		return err
 	}
 
-	for _, partition := range describeResult.Partitions {
-		o.partitions[partition.PartitionID] = &PartitionInfo{
-			PartitionInfo: partition,
+	o.mu.WithLock(func() {
+		for _, partition := range describeResult.Partitions {
+			o.partitions[partition.PartitionID] = &PartitionInfo{
+				PartitionInfo: partition,
+			}
 		}
-	}
+	})
 
 	if err := o.initSeqNo(); err != nil {
 		o.stopWithError(err)
@@ -166,20 +168,23 @@ func (o *orchestrator) init() (err error) {
 		return err
 	}
 
-	if o.partitionChooser == nil {
-		o.partitionChooser = partitionchooser.NewByPartitionIDPartitionChooser()
-	}
-
-	partitionsToAdd := make([]topictypes.PartitionInfo, 0, len(o.partitions))
-	for _, partition := range o.partitions {
-		if partition.Splitted() || !partition.Active {
-			continue
+	o.mu.WithLock(func() {
+		if o.partitionChooser == nil {
+			o.partitionChooser = partitionchooser.NewByPartitionIDPartitionChooser()
 		}
 
-		partitionsToAdd = append(partitionsToAdd, partition.PartitionInfo)
-	}
+		partitionsToAdd := make([]topictypes.PartitionInfo, 0, len(o.partitions))
+		for _, partition := range o.partitions {
+			if partition.Splitted() || !partition.Active {
+				continue
+			}
 
-	if err := o.partitionChooser.AddNewPartitions(partitionsToAdd...); err != nil {
+			partitionsToAdd = append(partitionsToAdd, partition.PartitionInfo)
+		}
+
+		err = o.partitionChooser.AddNewPartitions(partitionsToAdd...)
+	})
+	if err != nil {
 		o.stopWithError(err)
 
 		return err
@@ -303,6 +308,10 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	}
 
 	message := indexChain.Front()
+	if message == nil {
+		return
+	}
+
 	if message.Value.Value.SeqNo != 0 && message.Value.Value.SeqNo != seqNo {
 		panic(fmt.Sprintf("seqNo mismatch, expected: %d, got: %d", message.Value.Value.SeqNo, seqNo))
 	}
@@ -535,19 +544,29 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 
 	for _, partition := range partitions {
 		errGroup.Go(func() (resultErr error) {
-			partitionInfo := o.partitions[partition]
-
-			var seqNoAlreadyCached bool
+			var (
+				partitionInfo      *PartitionInfo
+				seqNoAlreadyCached bool
+				splitted           bool
+			)
 			o.mu.WithLock(func() {
+				partitionInfo = o.partitions[partition]
+				if partitionInfo == nil {
+					return
+				}
 				seqNoAlreadyCached = partitionInfo.CachedMaxSeqNo != 0
 				maxSeqNo = max(maxSeqNo, partitionInfo.CachedMaxSeqNo)
+				splitted = partitionInfo.Splitted()
 			})
+			if partitionInfo == nil {
+				return fmt.Errorf("partition not found: %d", partition)
+			}
 			if seqNoAlreadyCached {
 				return nil
 			}
 
 			var writer *writerWrapper
-			if partitionInfo.Splitted() {
+			if splitted {
 				writer, resultErr = o.writerPool.get(partition, false)
 				if resultErr != nil {
 					return resultErr
