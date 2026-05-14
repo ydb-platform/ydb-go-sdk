@@ -255,6 +255,12 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		return err
 	}
 	o.mu.WithLock(func() {
+		if !autoSetSeqNo {
+			err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
+			if err != nil {
+				return
+			}
+		}
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
 		acquired = false
@@ -387,6 +393,26 @@ func (o *orchestrator) rechoosePartition(msg *message) (err error) {
 	return err
 }
 
+func (o *orchestrator) reserveSeqNoNeedLock(partitionID, seqNo int64) error {
+	partition := o.partitions[partitionID]
+	if partition == nil {
+		return fmt.Errorf("partition not found: %d", partitionID)
+	}
+	if seqNo <= partition.LastQueuedSeqNo {
+		return fmt.Errorf(
+			"%w: seqNo %d <= last seqNo %d for partition %d",
+			ErrUnorderedSeqNo,
+			seqNo,
+			partition.LastQueuedSeqNo,
+			partitionID,
+		)
+	}
+
+	partition.LastQueuedSeqNo = seqNo
+
+	return nil
+}
+
 //nolint:funlen
 func (o *orchestrator) scheduleResendMessages(
 	partitionID,
@@ -424,6 +450,9 @@ func (o *orchestrator) scheduleResendMessages(
 		}
 
 		iter.Value.Value.PartitionID = msg.PartitionID
+		if partition := o.partitions[msg.PartitionID]; partition != nil {
+			partition.LastQueuedSeqNo = max(partition.LastQueuedSeqNo, msg.SeqNo)
+		}
 		inFlightMessagesToAdd = append(inFlightMessagesToAdd, iter.Value)
 		iter.Value.Value.sent = false
 		messagesToResendToAdd = append(messagesToResendToAdd, iter.Value)

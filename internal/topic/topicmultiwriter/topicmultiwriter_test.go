@@ -859,6 +859,59 @@ func TestMultiWriter_Write_ErrNoSeqNo(t *testing.T) {
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
+func TestMultiWriter_Write_ErrUnorderedSeqNo(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	cfg := MultiWriterConfig{}
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByPartitionID()(&cfg)
+
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+
+	multiWriter, err := NewMultiWriter(
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		writerCfg,
+		&cfg,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:        bytes.NewReader([]byte("hello")),
+			SeqNo:       2,
+			PartitionID: 1,
+		},
+	}))
+	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:        bytes.NewReader([]byte("hello")),
+			SeqNo:       2,
+			PartitionID: 2,
+		},
+	}))
+
+	err = multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:        bytes.NewReader([]byte("hello")),
+			SeqNo:       2,
+			PartitionID: 1,
+		},
+	})
+	require.ErrorIs(t, err, ErrUnorderedSeqNo)
+
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
 func TestMultiWriter_WaitInitInfo_Unimplemented(t *testing.T) {
 	t.Parallel()
 

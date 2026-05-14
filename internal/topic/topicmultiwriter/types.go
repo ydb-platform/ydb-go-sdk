@@ -16,9 +16,10 @@ type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDesc
 type PartitionInfo struct {
 	topictypes.PartitionInfo
 
-	Locked         bool
-	PendingResend  int
-	CachedMaxSeqNo int64
+	Locked          bool
+	PendingResend   int
+	CachedMaxSeqNo  int64
+	LastQueuedSeqNo int64
 }
 
 func (p *PartitionInfo) Splitted() bool {

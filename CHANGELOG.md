@@ -1,3 +1,5 @@
+* Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) to return a clear error when manual message sequence numbers are not strictly increasing for a target partition
+* Changed `topicoptions.KeyHasher` for bound topic multiwriter partitioning to return `[]byte` instead of `string`, avoiding extra string conversion and byte-copy allocations per message
 * Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) error handling and shutdown: writes after close now fail, partition-split errors are propagated, sub-writer init errors are race-free, and idle sub-writers are closed correctly
 * Changed `topicoptions.KeyHasher` for bound topic multiwriter partitioning to return `[]byte` instead of `string`, avoiding extra string conversion and byte-copy allocations per message
 
