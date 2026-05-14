@@ -6,8 +6,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -67,6 +67,7 @@ func (tx *Transaction) UnLazy(ctx context.Context) error {
 		txID, err := begin(ctx, tx.s.client, tx.s.ID(), tx.txSettings)
 		err = xerrors.WithStackTrace(err)
 		tx.SetTxID(txID)
+
 		return empty.Struct{}, err
 	})
 
