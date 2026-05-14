@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,6 +34,22 @@ type receivedTopicMessage struct {
 	seqNo       int64
 	payload     []byte
 	metadata    map[string][]byte
+}
+
+type blockingMessageReader struct {
+	started     chan struct{}
+	release     chan struct{}
+	reader      *bytes.Reader
+	startedOnce sync.Once
+}
+
+func (r *blockingMessageReader) Read(p []byte) (int, error) {
+	r.startedOnce.Do(func() {
+		close(r.started)
+		<-r.release
+	})
+
+	return r.reader.Read(p)
 }
 
 const (
@@ -816,6 +833,72 @@ func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 			}
 		},
 	)
+}
+
+func TestTopicMultiWriter_ConcurrentWriteAutoSeqNo(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	multiWriter, err := topicClient.StartWriter(
+		topicPath,
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithProducerIDPrefix("concurrent-auto-seq-"+uuid.NewString()),
+			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+		),
+	)
+	require.NoError(t, err)
+	require.NoError(t, multiWriter.WaitInit(ctx))
+
+	const key = "same-partition-key"
+	payload := bytes.Repeat([]byte("payload"), 1024)
+	blockingReader := &blockingMessageReader{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		reader:  bytes.NewReader(payload),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	firstWriteErr := make(chan error, 1)
+	go func() {
+		defer wg.Done()
+		firstWriteErr <- multiWriter.Write(ctx, topicwriter.Message{
+			Data: blockingReader,
+			Key:  key,
+		})
+	}()
+
+	<-blockingReader.started
+	require.NoError(t, multiWriter.Write(ctx, topicwriter.Message{
+		Data: bytes.NewReader(payload),
+		Key:  key,
+	}))
+
+	close(blockingReader.release)
+	wg.Wait()
+	require.NoError(t, <-firstWriteErr)
+
+	require.NoError(t, multiWriter.Close(ctx))
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
+		ctx,
+		topicClient,
+		topicPath,
+		consumerName,
+		2,
+		defaultReadTimeout,
+		payload,
+	))
 }
 
 func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {
