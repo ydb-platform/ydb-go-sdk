@@ -11,9 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -96,6 +100,29 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 	default:
 		return nil, errors.New("invalid stub writer type")
 	}
+}
+
+type overloadedInitWriter struct{}
+
+func (w *overloadedInitWriter) Close(ctx context.Context) error {
+	return nil
+}
+
+func (w *overloadedInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	return topicwriterinternal.InitialInfo{}, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+}
+
+func (w *overloadedInitWriter) WriteInternal(
+	ctx context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
+	return nil
+}
+
+type overloadedInitWritersFactory struct{}
+
+func (f *overloadedInitWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	return &overloadedInitWriter{}, nil
 }
 
 type choosePartitionKeyCheckWritersFactory struct {
@@ -306,6 +333,21 @@ func (c *failingAddPartitionChooser) RemovePartition(partitionID int64) {
 	c.delegate.RemovePartition(partitionID)
 }
 
+type errorPartitionChooser struct {
+	err error
+}
+
+func (c *errorPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error) {
+	return 0, c.err
+}
+
+func (c *errorPartitionChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
+	return nil
+}
+
+func (c *errorPartitionChooser) RemovePartition(partitionID int64) {
+}
+
 func newTestMultiWriterWithPartitionChooser(
 	t testing.TB,
 	describer TopicDescriber,
@@ -369,6 +411,69 @@ func TestMultiWriter_WriteAfterClose(t *testing.T) {
 	require.ErrorIs(t, err, ErrAlreadyClosed)
 }
 
+func TestMultiWriter_WriteReturnsChoosePartitionError(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	choosePartitionErr := errors.New("choose partition failed")
+	multiWriter := newTestMultiWriterWithPartitionChooser(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		&errorPartitionChooser{err: choosePartitionErr},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+
+	err := multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data:  bytes.NewReader([]byte("hello")),
+		SeqNo: 1,
+		Key:   "partition-key-1",
+	}})
+	require.ErrorIs(t, err, choosePartitionErr)
+
+	multiWriter.orchestrator.mu.WithLock(func() {
+		require.Equal(t, 0, multiWriter.orchestrator.buf.inFlightMessages.Len())
+		require.Len(t, multiWriter.orchestrator.buf.messagesSema, 0)
+	})
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestOrchestratorOnAckReceivedIgnoresMissingPartition(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	multiWriter.orchestrator.mu.WithLock(func() {
+		multiWriter.orchestrator.buf.messagesSema <- struct{}{}
+		multiWriter.orchestrator.buf.pushNeedLock(message{
+			MessageWithDataContent: topicwritercommon.MessageWithDataContent{
+				PublicMessage: topicwritercommon.PublicMessage{
+					SeqNo:       1,
+					PartitionID: 1,
+				},
+			},
+		})
+		delete(multiWriter.orchestrator.partitions, 1)
+		require.NotPanics(t, func() {
+			multiWriter.orchestrator.onAckReceivedNeedLock(1, 1)
+		})
+		require.Equal(t, 0, multiWriter.orchestrator.buf.inFlightMessages.Len())
+		require.Len(t, multiWriter.orchestrator.buf.messagesSema, 0)
+	})
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
 func TestMultiWriter_OnPartitionSplitReturnsAddPartitionsError(t *testing.T) {
 	t.Parallel()
 
@@ -427,6 +532,54 @@ func TestMultiWriter_WaitInit_Success(t *testing.T) {
 
 	err = multiWriter.Close(ctx)
 	require.NoError(t, err)
+}
+
+func TestMultiWriter_CloseCancelsInitSeqNoRetrySleep(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithCustomWritersFactory(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		&overloadedInitWritersFactory{},
+	)
+
+	closeCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	startedAt := time.Now()
+	require.NoError(t, multiWriter.Close(closeCtx))
+	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
+}
+
+func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	bg := background.NewWorker(ctx, "describe-retry-test")
+	describeResult := stubs.DefaultStubTopicDescription(t)
+	o := newOrchestrator(
+		ctx,
+		cancel,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return describeResult, nil
+		},
+		bg,
+		&topicwriterinternal.WriterReconnectorConfig{},
+		&MultiWriterConfig{},
+	)
+	cancel()
+	defer func() {
+		_ = bg.Close(xtest.Context(t), nil)
+	}()
+
+	startedAt := time.Now()
+	_, err := o.describeTopicWithRetries(describeResult.Partitions[0].PartitionID)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
 }
 
 func TestMultiWriter_WaitInit_ContextCanceled(t *testing.T) {
@@ -668,6 +821,14 @@ func TestMultiWriter_Write_CloseTimeout(t *testing.T) {
 	defer cancel()
 
 	require.ErrorIs(t, multiWriter.Close(ctxTimeout), context.DeadlineExceeded)
+	require.Eventually(t, func() bool {
+		select {
+		case <-multiWriter.background.Done():
+			return true
+		default:
+			return false
+		}
+	}, time.Second, time.Millisecond*10)
 }
 
 func TestMultiWriter_Write_ErrNoSeqNo(t *testing.T) {

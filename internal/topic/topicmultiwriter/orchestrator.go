@@ -132,6 +132,18 @@ func isOperationErrorOverloaded(err error) bool {
 	return xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED)
 }
 
+func (o *orchestrator) sleepOrDone(delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-o.ctx.Done():
+		return o.ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 
@@ -234,10 +246,10 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	}
 	o.mu.WithLock(func() {
 		msg.PartitionID, err = o.choosePartition(msg)
-		if err != nil {
-			return
-		}
 	})
+	if err != nil {
+		return err
+	}
 
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
@@ -299,7 +311,7 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	}
 
 	partition := o.partitions[partitionID]
-	if partition.PendingResend > 0 {
+	if partition != nil && partition.PendingResend > 0 {
 		partition.PendingResend--
 		if partition.PendingResend == 0 {
 			partition.Locked = false
@@ -307,7 +319,7 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	}
 
 	o.buf.sweep()
-	if len(o.buf.pendingMessagesIndex) > 0 || partition.PendingResend == 0 {
+	if len(o.buf.pendingMessagesIndex) > 0 || partition == nil || partition.PendingResend == 0 {
 		o.sender.wakeup()
 	}
 }
@@ -473,7 +485,9 @@ func (o *orchestrator) initSeqNo() error {
 		for _, partitionID := range partitions {
 			o.writerPool.forceEvict(partitionID)
 		}
-		time.Sleep(retryDelay)
+		if err := o.sleepOrDone(retryDelay); err != nil {
+			return err
+		}
 	}
 
 	o.mu.WithLock(func() {
@@ -564,7 +578,9 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 			}
 		}
 
-		time.Sleep(retryDelay)
+		if err := o.sleepOrDone(retryDelay); err != nil {
+			return topictypes.TopicDescription{}, err
+		}
 	}
 
 	return topictypes.TopicDescription{}, errors.New("failed to describe topic")

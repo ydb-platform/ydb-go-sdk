@@ -97,13 +97,16 @@ func (p *MultiWriter) Close(ctx context.Context) error {
 		_ = p.orchestrator.writerPool.close(ctx)
 	}()
 
-	if err := p.orchestrator.flush(ctx); err != nil {
-		return err
-	}
+	flushErr := p.orchestrator.flush(ctx)
 
 	p.orchestrator.stop()
-	if err := p.background.Close(ctx, nil); err != nil {
-		return err
+	backgroundErr := p.background.Close(ctx, nil)
+
+	if flushErr != nil {
+		return flushErr
+	}
+	if backgroundErr != nil {
+		return backgroundErr
 	}
 
 	return p.orchestrator.getResultErr()

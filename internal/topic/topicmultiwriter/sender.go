@@ -95,10 +95,14 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			if err := wr.getInitErr(); err != nil && isOperationErrorOverloaded(err) {
-				s.partitionSplitReceiver.push(partitionID)
+			if err := wr.getInitErr(); err != nil {
+				if isOperationErrorOverloaded(err) {
+					s.partitionSplitReceiver.push(partitionID)
 
-				break
+					break
+				}
+
+				return fmt.Errorf("writer init failed for partition %d: %w", msg.PartitionID, err)
 			}
 
 			if err = wr.WriteInternal(
