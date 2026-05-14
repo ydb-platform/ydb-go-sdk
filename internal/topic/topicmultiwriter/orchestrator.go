@@ -570,6 +570,7 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 	return topictypes.TopicDescription{}, errors.New("failed to describe topic")
 }
 
+//nolint:funlen
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	var isAlreadySplitted bool
 
