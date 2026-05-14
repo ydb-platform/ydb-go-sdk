@@ -1,4 +1,5 @@
 * Fixed a data race when starting multiple writers within a transaction
+* Fixed passing wait server ack to sub-writers in topicmultiwriter
 
 ## v3.136.2
 * Fixed `MultiWriterWithTransaction.Write` to materialize lazy query transactions via `tx.UnLazy` before writing (same as single-partition transactional writer)
