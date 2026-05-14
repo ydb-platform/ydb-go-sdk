@@ -49,9 +49,9 @@ func StartWriterAcrossPartitionsBoundedKey(
 			// BoundPartitionChooser places messages by comparing a hashed partitioning key against ordered partition bounds.
 			// It is compatible with Topic auto partitioning that grows partition count over time—the client refreshes bounds.
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser(
-				// Optional: customize how raw Message.Key becomes the bytes matched against boundaries.
+				// Optional: customize how raw Message.Key becomes the string matched against boundaries.
 				// The default hashes like legacy C++/Go producers; override only to align routing with upstream systems.
-				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) []byte { return []byte(key) }),
+				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) string { return key }),
 			)),
 
 			// ProducerIDPrefix works like a regular producer ID: the server uses it for deduplication.
@@ -119,7 +119,7 @@ func StartTransactionalWriterAcrossPartitions(
 			topicoptions.WithWriterIdleTimeout(30*time.Minute),
 
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser(
-				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) []byte { return []byte(key) }),
+				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) string { return key }),
 			)),
 		),
 		topicoptions.WithWriterWaitServerAck(true),
@@ -177,7 +177,7 @@ func WriteToPartitionID(ctx context.Context, db *ydb.Driver, topicPath string, p
 		),
 	)
 	if err != nil {
-		return fmt.Errorf("StartWriter: %w", err)
+		return err
 	}
 	defer func() { _ = writer.Close(context.Background()) }()
 
