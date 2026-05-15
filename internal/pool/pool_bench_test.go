@@ -93,19 +93,19 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	}()
 
 	var ops atomic.Uint64
-	work := func() {
-		if err := p.With(ctx, func(context.Context, *testItem) error {
+	work := func() error {
+		return p.With(ctx, func(context.Context, *testItem) error {
 			return benchPoolWithWork(&ops)
-		}, benchRetryOpts...); err != nil {
-			b.Fatalf("pool.With: %v", err)
-		}
+		}, benchRetryOpts...)
 	}
 
 	if goroutines == 1 {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for range b.N {
-			work()
+			if err := work(); err != nil {
+				b.Fatalf("pool.With: %v", err)
+			}
 		}
 
 		return
@@ -114,7 +114,11 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	perWorker := b.N / goroutines
 	extra := b.N % goroutines
 
-	var wg sync.WaitGroup
+	var (
+		wg       sync.WaitGroup
+		firstErr error
+		errOnce  sync.Once
+	)
 	wg.Add(goroutines)
 	start := make(chan struct{})
 
@@ -127,7 +131,11 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 			defer wg.Done()
 			<-start
 			for range iterations {
-				work()
+				if err := work(); err != nil {
+					errOnce.Do(func() { firstErr = err })
+
+					return
+				}
 			}
 		}()
 	}
@@ -136,6 +144,9 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	b.ReportAllocs()
 	close(start)
 	wg.Wait()
+	if firstErr != nil {
+		b.Fatalf("pool.With: %v", firstErr)
+	}
 }
 
 // BenchmarkPoolWith/concurrency=1-12         	 1000000	      1303 ns/op	    1067 B/op	      21 allocs/op
