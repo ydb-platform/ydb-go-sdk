@@ -9,12 +9,12 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/node"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -512,7 +512,7 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 	return res
 }
 
-func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], finalErr error) { //nolint:funlen
+func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], finalErr error) {
 	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
 	if onGet := p.config.trace.OnGet; onGet != nil {

@@ -1412,7 +1412,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				for range 2 {
 					go func() {
 						started.Done()
-						p.With(t.Context(), func(ctx context.Context, item *testItem) error {
+						_ = p.With(t.Context(), func(ctx context.Context, item *testItem) error {
 							defer finished.Done()
 
 							<-wait

@@ -55,10 +55,10 @@ func BenchmarkContainers(b *testing.B) {
 			for b.Loop() {
 				info, err := container.PopAny()
 				require.NoError(b, err)
-				container.Put(info)
+				require.NoError(b, container.Put(info))
 				info, err = container.PopByNodeID(i % containerLen)
 				require.NoError(b, err)
-				container.Put(info)
+				require.NoError(b, container.Put(info))
 			}
 
 			require.Equal(b, containerLen, container.Len())
