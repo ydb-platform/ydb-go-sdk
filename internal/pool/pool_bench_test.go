@@ -43,24 +43,14 @@ func newBenchPool(ctx context.Context) *Pool[*testItem, testItem] {
 }
 
 func prefillBenchPool(ctx context.Context, p *Pool[*testItem, testItem], count int) error {
-	items := make([]*testItem, 0, count)
 	for range count {
-		item, err := p.getItem(ctx)
+		info, err := p.getItem(ctx)
 		if err != nil {
-			for _, acquired := range items {
-				p.closeItem(ctx, acquired,
-					closeItemWithLock(),
-					closeItemWithDeleteFromPool(),
-				)
-			}
-
-			return err
+			return xerrors.WithStackTrace(err)
 		}
-		items = append(items, item)
-	}
-	for _, item := range items {
-		if err := p.putItem(ctx, item); err != nil {
-			return err
+		
+		if err := p.putItem(ctx, info); err != nil {
+			return xerrors.WithStackTrace(err)
 		}
 	}
 

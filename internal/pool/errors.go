@@ -11,6 +11,7 @@ import (
 
 var (
 	errClosedPool     = errors.New("closed pool")
+	errNilItem        = xerrors.Retryable(errors.New("nil item"))
 	errItemIsNotAlive = errors.New("item is not alive")
 	errPoolIsOverflow = errors.New("pool is overflow")
 	errNoProgress     = errors.New("no progress")

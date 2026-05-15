@@ -5,17 +5,17 @@ import (
 	"time"
 )
 
-type doneCtx <-chan struct{}
+type Done <-chan struct{}
 
-func (done doneCtx) Deadline() (deadline time.Time, ok bool) {
+func (done Done) Deadline() (deadline time.Time, ok bool) {
 	return
 }
 
-func (done doneCtx) Done() <-chan struct{} {
+func (done Done) Done() <-chan struct{} {
 	return done
 }
 
-func (done doneCtx) Err() error {
+func (done Done) Err() error {
 	select {
 	case <-done:
 		return context.Canceled
@@ -24,7 +24,7 @@ func (done doneCtx) Err() error {
 	}
 }
 
-func (done doneCtx) Value(key any) any {
+func (done Done) Value(key any) any {
 	return nil
 }
 
@@ -39,7 +39,7 @@ func WithDone(parent context.Context, done <-chan struct{}) (context.Context, co
 	default:
 	}
 
-	stop := context.AfterFunc(doneCtx(done), func() {
+	stop := context.AfterFunc(Done(done), func() {
 		cancel()
 	})
 
