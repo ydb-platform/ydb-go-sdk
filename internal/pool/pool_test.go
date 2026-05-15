@@ -84,29 +84,6 @@ var defaultTrace = &Trace{
 	},
 }
 
-//func (p *testWaitChPool) GetOrNew() *chan *testItem {
-//	if p.testHookGetWaitCh != nil {
-//		p.testHookGetWaitCh()
-//	}
-//
-//	return p.Pool.GetOrNew()
-//}
-//
-//func (p *testWaitChPool) whenWantWaitCh() <-chan struct{} {
-//	var (
-//		prev = p.testHookGetWaitCh
-//		ch   = make(chan struct{})
-//	)
-//	p.testHookGetWaitCh = func() {
-//		p.testHookGetWaitCh = prev
-//		close(ch)
-//	}
-//
-//	return ch
-//}
-//
-//func (p *testWaitChPool) Put(ch *chan *testItem) {}
-
 func (t *testItem) IsAlive() bool {
 	if t.closed {
 		return false
@@ -453,7 +430,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				_ = p.Close(t.Context())
 			}()
 
-			require.Zero(t, p.idle.Size())
+			require.Zero(t, p.idle.Len())
 
 			var (
 				s1 = mustGetItem(t, p)
@@ -461,16 +438,16 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				s3 = mustGetItem(t, p)
 			)
 
-			require.Zero(t, p.idle.Size())
+			require.Zero(t, p.idle.Len())
 
 			mustPutItem(t, p, s1)
 			mustPutItem(t, p, s2)
 
-			require.Equal(t, 2, p.idle.Size())
+			require.Equal(t, 2, p.idle.Len())
 
 			mustClose(t, p)
 
-			require.Zero(t, p.idle.Size())
+			require.Zero(t, p.idle.Len())
 
 			require.True(t, closed[0])  // idle info in pool
 			require.True(t, closed[1])  // idle info in pool
@@ -512,7 +489,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				mustPutItem(t, p, info1)
 				mustPutItem(t, p, info2)
 
-				require.Equal(t, 2, p.idle.Size())
+				require.Equal(t, 2, p.idle.Len())
 
 				// Close the pool with an already-cancelled context.
 				cancelCtx, cancel := context.WithCancel(t.Context())
@@ -653,7 +630,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				mustPutItem(t, p, info1)
 				mustPutItem(t, p, info2)
 
-				require.Equal(t, 2, p.idle.Size())
+				require.Equal(t, 2, p.idle.Len())
 
 				// Move clock to longer than idleTimeToLive
 				fakeClock.Advance(idleThreshold + time.Nanosecond)
@@ -678,15 +655,15 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// Total time since last updating lastUsage timestampe is more than idleTimeToLive
 				fakeClock.Advance(idleThreshold/2 + time.Nanosecond)
 
-				require.Equal(t, 1, p.idle.Size())
+				require.Equal(t, 1, p.idle.Len())
 
 				info4 := mustGetItem(t, p)
-				require.Equal(t, 0, p.idle.Size())
+				require.Equal(t, 0, p.idle.Len())
 				mustPutItem(t, p, info4)
 
 				_ = p.Close(t.Context())
 
-				require.Equal(t, 0, p.idle.Size())
+				require.Equal(t, 0, p.idle.Len())
 			}, xtest.StopAfter(3*time.Second))
 		})
 	})
@@ -1104,25 +1081,25 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			mustPutItem(t, p, info1)
 			assertClosed(0)
 			assertCreated(1)
-			require.Equal(t, 1, p.idle.Size())
+			require.Equal(t, 1, p.idle.Len())
 
 			info2, err := p.getItem(t.Context())
 			require.NoError(t, err)
 			assertCreated(1)
 			assertClosed(0)
-			require.Equal(t, 0, p.idle.Size())
+			require.Equal(t, 0, p.idle.Len())
 
 			_, err = p.getItem(t.Context())
 			require.NoError(t, err)
 			assertCreated(2)
 			assertClosed(0)
-			require.Equal(t, 0, p.idle.Size())
+			require.Equal(t, 0, p.idle.Len())
 
 			require.NoError(t, p.Close(t.Context()))
 			assertCreated(2)
 			assertClosed(0)
 
-			require.Equal(t, 0, p.idle.Size())
+			require.Equal(t, 0, p.idle.Len())
 
 			require.ErrorIs(t, p.putItem(t.Context(), info2), errClosedPool)
 			assertClosed(1)
@@ -1130,7 +1107,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.True(t, info2.item.closed)
 			require.False(t, info2.item.IsAlive())
 
-			require.Equal(t, 0, p.idle.Size())
+			require.Equal(t, 0, p.idle.Len())
 		})
 		t.Run("ExplicitItemClose", func(t *testing.T) {
 			var (

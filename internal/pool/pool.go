@@ -51,6 +51,16 @@ type (
 		lastUsage  time.Time
 		useCounter uint64
 	}
+	idleItems[PT ItemConstraint[T], T any] interface {
+		Len() int
+		Put(info *itemInfo[PT, T]) error
+		PopAny() (*itemInfo[PT, T], error)
+		PopByNodeID(nodeID uint32) (*itemInfo[PT, T], error)
+		PopAll() []*itemInfo[PT, T]
+	}
+	idleItemsSyncSet[PT ItemConstraint[T], T any] struct {
+		data xsync.Set[*itemInfo[PT, T]]
+	}
 	Pool[PT ItemConstraint[T], T any] struct {
 		config *Config[PT, T]
 
@@ -58,7 +68,7 @@ type (
 		createInProgress xsync.Value[int]
 
 		sema chan struct{}
-		idle xsync.Set[*itemInfo[PT, T]]
+		idle idleItems[PT, T]
 
 		concurrency atomic.Int64
 
@@ -66,6 +76,63 @@ type (
 	}
 	Option[PT ItemConstraint[T], T any] func(c *Config[PT, T])
 )
+
+func (container *idleItemsSyncSet[PT, T]) PopAll() (data []*itemInfo[PT, T]) {
+	container.data.Range(func(idle *itemInfo[PT, T]) bool {
+		data = append(data, idle)
+		container.data.Remove(idle)
+
+		return true
+	})
+
+	return data
+}
+
+func (container *idleItemsSyncSet[PT, T]) Len() int {
+	return container.data.Size()
+}
+
+func (container *idleItemsSyncSet[PT, T]) Put(info *itemInfo[PT, T]) error {
+	if !container.data.Add(info) {
+		return errItemAlreadyExists
+	}
+
+	return nil
+}
+
+func (container *idleItemsSyncSet[PT, T]) PopAny() (info *itemInfo[PT, T], _ error) {
+	container.data.Range(func(idle *itemInfo[PT, T]) bool {
+		info = idle
+		container.data.Remove(idle)
+
+		return false
+	})
+
+	if info == nil {
+		return nil, errNothingIdleItems
+	}
+
+	return info, nil
+}
+
+func (container *idleItemsSyncSet[PT, T]) PopByNodeID(nodeID uint32) (info *itemInfo[PT, T], _ error) {
+	container.data.Range(func(idle *itemInfo[PT, T]) bool {
+		if idle.item.NodeID() == nodeID {
+			info = idle
+			container.data.Remove(idle)
+
+			return false
+		}
+
+		return true
+	})
+
+	if info == nil {
+		return nil, errNothingIdleItems
+	}
+
+	return info, nil
+}
 
 func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(ctx context.Context) (PT, error)) Option[PT, T] {
 	return func(c *Config[PT, T]) {
@@ -150,6 +217,7 @@ func New[PT ItemConstraint[T], T any](
 				return !item.IsAlive()
 			},
 		},
+		idle: &idleItemsSyncSet[PT, T]{},
 		done: make(chan struct{}),
 	}
 
@@ -188,7 +256,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	return func(ctx context.Context) (PT, error) {
 		var haveSlot bool
 		p.createInProgress.Change(func(old int) int {
-			if p.idle.Size()+old > p.config.limit {
+			if p.idle.Len()+old > p.config.limit {
 				return old
 			}
 
@@ -229,12 +297,14 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 
 			select {
 			case <-ctx.Done():
-				p.idle.Add(&itemInfo[PT, T]{
+				if err := p.idle.Put(&itemInfo[PT, T]{
 					item:       item,
 					created:    p.config.clock.Now(),
 					lastUsage:  p.config.clock.Now(),
 					useCounter: 0,
-				})
+				}); err != nil {
+					p.config.closeItemFunc(ctx, item)
+				}
 			case <-p.done:
 				p.config.closeItemFunc(ctx, item)
 			case ch <- item:
@@ -243,15 +313,15 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 
 		select {
 		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
+			return nil, ctx.Err()
 		case <-p.done:
-			return nil, xerrors.WithStackTrace(errClosedPool)
+			return nil, errClosedPool
 		case item, has := <-ch:
 			if !has {
-				return nil, xerrors.WithStackTrace(errNoProgress)
+				return nil, errNoProgress
 			}
 			if item == nil {
-				return nil, xerrors.WithStackTrace(errNilItem)
+				return nil, errNilItem
 			}
 
 			return item, nil
@@ -262,7 +332,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 func (p *Pool[PT, T]) Stats() Stats {
 	return Stats{
 		Limit:            p.config.limit,
-		Idle:             p.idle.Size(),
+		Idle:             p.idle.Len(),
 		Concurrency:      int(p.concurrency.Load()),
 		CreateInProgress: p.createInProgress.Get(),
 	}
@@ -417,24 +487,27 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	default:
 		close(p.done)
 
-		var wg sync.WaitGroup
-		wg.Add(p.config.limit)
+		var waitLocks sync.WaitGroup
+		waitLocks.Add(p.config.limit)
 		for range p.config.limit {
 			go func() {
-				defer wg.Done()
+				defer waitLocks.Done()
 				<-p.sema
 			}()
 		}
-		wg.Wait()
+		waitLocks.Wait()
 		close(p.sema)
 
-		p.idle.Range(func(info *itemInfo[PT, T]) bool {
-			p.config.closeItemFunc(ctx, info.item)
-
-			p.idle.Remove(info)
-
-			return true
-		})
+		var waitCloses sync.WaitGroup
+		data := p.idle.PopAll()
+		waitCloses.Add(len(data))
+		for _, info := range data {
+			go func() {
+				defer waitCloses.Done()
+				p.config.closeItemFunc(ctx, info.item)
+			}()
+		}
+		waitCloses.Wait()
 
 		return nil
 	}
@@ -521,28 +594,21 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 	}
 
 	for range 2 {
-		var found bool
-		p.idle.Range(func(idle *itemInfo[PT, T]) bool {
-			if !hasPreferredNodeID {
-				found = true
-				info = idle
-				p.idle.Remove(idle)
-
-				return false
+		var info *itemInfo[PT, T]
+		if hasPreferredNodeID {
+			var err error
+			info, err = p.idle.PopByNodeID(preferredNodeID)
+			if err != nil {
+				continue
 			}
-
-			if idle.item.NodeID() == preferredNodeID {
-				found = true
-				info = idle
-				p.idle.Remove(idle)
-
-				return false
+		} else {
+			var err error
+			info, err = p.idle.PopAny()
+			if err != nil {
+				continue
 			}
-
-			return true
-		})
-
-		if found {
+		}
+		if info != nil {
 			switch {
 			case needCloseItem(p.config, info), !info.item.IsAlive():
 				p.config.closeItemFunc(ctx, info.item)
@@ -552,20 +618,13 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 		}
 	}
 
-	item, err := retry.RetryWithResult(ctx, func(ctx context.Context) (PT, error) {
-		item, err := p.createItemFunc(ctx)
-		if err != nil && isRetriable(err) {
-			return nil, xerrors.WithStackTrace(xerrors.Retryable(err))
-		}
+	item, err := p.createItemFunc(ctx)
+	if err != nil && isRetriable(err) {
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(err))
+	}
 
-		if item == nil {
-			return nil, xerrors.WithStackTrace(errNilItem)
-		}
-
-		return item, nil
-	}, retry.WithIdempotent(true))
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+	if item == nil {
+		return nil, xerrors.WithStackTrace(errNilItem)
 	}
 
 	return &itemInfo[PT, T]{
@@ -596,8 +655,10 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (final
 
 		return xerrors.WithStackTrace(errClosedPool)
 	default:
-		if !p.idle.Add(info) {
-			return xerrors.WithStackTrace(fmt.Errorf("item %v already in pool", info))
+		if err := p.idle.Put(info); err != nil {
+			p.config.closeItemFunc(ctx, info.item)
+
+			return err
 		}
 
 		return nil

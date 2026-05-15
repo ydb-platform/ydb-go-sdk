@@ -48,7 +48,7 @@ func prefillBenchPool(ctx context.Context, p *Pool[*testItem, testItem], count i
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		
+
 		if err := p.putItem(ctx, info); err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -144,7 +144,7 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 // BenchmarkPoolWith/concurrency=500-12       	  770821	      1307 ns/op	    1068 B/op	      21 allocs/op
 // BenchmarkPoolWith/concurrency=1000-12      	  779068	      2282 ns/op	    1623 B/op	      29 allocs/op
 func BenchmarkPoolWith(b *testing.B) {
-	for _, goroutines := range []int{1, 250, 500, 1000} {
+	for _, goroutines := range []int{1, 250, 490, 500, 510, 1000} {
 		b.Run(fmt.Sprintf("concurrency=%d", goroutines), func(b *testing.B) {
 			benchmarkPoolWithConcurrency(b, goroutines)
 		})
