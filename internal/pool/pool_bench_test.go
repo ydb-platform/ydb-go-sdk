@@ -83,7 +83,7 @@ func benchPoolWithWork(ops *atomic.Uint64) error {
 func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	b.Helper()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	p := newBenchPool(ctx)
 	if err := prefillBenchPool(ctx, p, benchPrefillItems); err != nil {
 		b.Fatalf("prefill pool: %v", err)
