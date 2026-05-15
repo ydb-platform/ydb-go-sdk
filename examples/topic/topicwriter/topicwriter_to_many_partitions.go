@@ -62,10 +62,6 @@ func StartWriterAcrossPartitionsBoundedKey(
 			// partition can reuse the existing internal writer instead of recreating it.
 			topicoptions.WithWriterIdleTimeout(45*time.Minute),
 		),
-		// WithWriterWaitServerAck enforces acknowledgement before Write returns—a common choice for transactional safety.
-		topicoptions.WithWriterWaitServerAck(true),
-		// WithWriterSetAutoSeqNo assigns strictly increasing sequence numbers per producer/stream automatically.
-		topicoptions.WithWriterSetAutoSeqNo(true),
 	)
 }
 
@@ -98,8 +94,6 @@ func StartWriterAcrossPartitionsExplicitID(
 			// Routes using Message.PartitionID; keyed metadata is irrelevant.
 			topicoptions.WithWriterPartitionByPartitionID(),
 		),
-		topicoptions.WithWriterWaitServerAck(true),
-		topicoptions.WithWriterSetAutoSeqNo(true),
 	)
 }
 
@@ -122,8 +116,6 @@ func StartTransactionalWriterAcrossPartitions(
 				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) string { return key }),
 			)),
 		),
-		topicoptions.WithWriterWaitServerAck(true),
-		topicoptions.WithWriterSetAutoSeqNo(true),
 	)
 	if err != nil {
 		return nil, err
