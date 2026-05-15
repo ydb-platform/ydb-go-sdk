@@ -51,16 +51,6 @@ type (
 		lastUsage  time.Time
 		useCounter uint64
 	}
-	idleItems[PT ItemConstraint[T], T any] interface {
-		Len() int
-		Put(info *itemInfo[PT, T]) error
-		PopAny() (*itemInfo[PT, T], error)
-		PopByNodeID(nodeID uint32) (*itemInfo[PT, T], error)
-		PopAll() []*itemInfo[PT, T]
-	}
-	idleItemsSyncSet[PT ItemConstraint[T], T any] struct {
-		data xsync.Set[*itemInfo[PT, T]]
-	}
 	Pool[PT ItemConstraint[T], T any] struct {
 		config *Config[PT, T]
 
@@ -68,7 +58,7 @@ type (
 		createInProgress xsync.Value[int]
 
 		sema chan struct{}
-		idle idleItems[PT, T]
+		idle container[PT, T]
 
 		concurrency atomic.Int64
 
@@ -76,63 +66,6 @@ type (
 	}
 	Option[PT ItemConstraint[T], T any] func(c *Config[PT, T])
 )
-
-func (container *idleItemsSyncSet[PT, T]) PopAll() (data []*itemInfo[PT, T]) {
-	container.data.Range(func(idle *itemInfo[PT, T]) bool {
-		data = append(data, idle)
-		container.data.Remove(idle)
-
-		return true
-	})
-
-	return data
-}
-
-func (container *idleItemsSyncSet[PT, T]) Len() int {
-	return container.data.Size()
-}
-
-func (container *idleItemsSyncSet[PT, T]) Put(info *itemInfo[PT, T]) error {
-	if !container.data.Add(info) {
-		return errItemAlreadyExists
-	}
-
-	return nil
-}
-
-func (container *idleItemsSyncSet[PT, T]) PopAny() (info *itemInfo[PT, T], _ error) {
-	container.data.Range(func(idle *itemInfo[PT, T]) bool {
-		info = idle
-		container.data.Remove(idle)
-
-		return false
-	})
-
-	if info == nil {
-		return nil, errNothingIdleItems
-	}
-
-	return info, nil
-}
-
-func (container *idleItemsSyncSet[PT, T]) PopByNodeID(nodeID uint32) (info *itemInfo[PT, T], _ error) {
-	container.data.Range(func(idle *itemInfo[PT, T]) bool {
-		if idle.item.NodeID() == nodeID {
-			info = idle
-			container.data.Remove(idle)
-
-			return false
-		}
-
-		return true
-	})
-
-	if info == nil {
-		return nil, errNothingIdleItems
-	}
-
-	return info, nil
-}
 
 func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(ctx context.Context) (PT, error)) Option[PT, T] {
 	return func(c *Config[PT, T]) {
@@ -217,7 +150,7 @@ func New[PT ItemConstraint[T], T any](
 				return !item.IsAlive()
 			},
 		},
-		idle: &idleItemsSyncSet[PT, T]{},
+		idle: &sliceContainer[PT, T]{},
 		done: make(chan struct{}),
 	}
 

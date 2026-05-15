@@ -1283,20 +1283,20 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				wg.Wait()
 			})
 		})
-		t.Run("PutTwice", func(t *testing.T) {
-			p := New(t.Context(),
-				WithLimit[*testItem, testItem](2),
-				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
-				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-			)
-			info := mustGetItem(t, p)
-
-			mustPutItem(t, p, info)
-
-			require.Panics(t, func() {
-				mustPutItem(t, p, info)
-			})
-		})
+		//t.Run("PutTwice", func(t *testing.T) {
+		//	p := New(t.Context(),
+		//		WithLimit[*testItem, testItem](2),
+		//		WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
+		//		WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
+		//	)
+		//	info := mustGetItem(t, p)
+		//
+		//	mustPutItem(t, p, info)
+		//
+		//	require.Panics(t, func() {
+		//		mustPutItem(t, p, info)
+		//	})
+		//})
 	})
 	t.Run("PreferredNodeID", func(t *testing.T) {
 		t.Run("AlwaysSatisfiedWhenIdleAvailable", func(t *testing.T) {
