@@ -342,6 +342,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			info, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
 			require.NoError(t, err)
+			require.NotNil(t, info)
+			require.NotNil(t, info.item)
 			require.EqualValues(t, 32, info.item.NodeID())
 			require.EqualValues(t, true, info.item.IsAlive())
 			mustPutItem(t, p, info)

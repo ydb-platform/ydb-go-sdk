@@ -55,12 +55,12 @@ type (
 		config *Config[PT, T]
 
 		createItemFunc   func(ctx context.Context) (PT, error)
-		createInProgress atomic.Int64
+		createInProgress xsync.Value[int]
 
 		sema chan struct{}
 		idle xsync.Set[*itemInfo[PT, T]]
 
-		used atomic.Int64
+		concurrency atomic.Int64
 
 		done chan struct{}
 	}
@@ -186,32 +186,57 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	p *Pool[PT, T],
 ) func(ctx context.Context) (PT, error) {
 	return func(ctx context.Context) (PT, error) {
-		p.createInProgress.Add(1)
+		var haveSlot bool
+		p.createInProgress.Change(func(old int) int {
+			if p.idle.Size()+old > p.config.limit {
+				return old
+			}
+
+			haveSlot = true
+
+			return old + 1
+		})
+
+		if !haveSlot {
+			return nil, xerrors.WithStackTrace(errPoolIsOverflow)
+		}
 
 		ch := make(chan PT)
 
 		go func() {
-			defer func() {
+			defer p.createInProgress.Change(func(old int) int {
 				close(ch)
-				p.createInProgress.Add(-1)
-			}()
 
-			createCtx := xcontext.Done(p.done)
+				return old - 1
+			})
+
+			createCtx, cancel := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
+			defer cancel()
 
 			if d := p.config.createTimeout; d > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(createCtx, d)
+				createCtx, cancel = context.WithTimeout(createCtx, d)
 				defer cancel()
 			}
 
-			item, err := retry.RetryWithResult(createCtx, p.config.createItemFunc, retry.WithIdempotent(true))
+			item, err := p.config.createItemFunc(createCtx)
 			if err != nil {
+				return
+			}
+
+			if item == nil {
 				return
 			}
 
 			select {
 			case <-ctx.Done():
+				p.idle.Add(&itemInfo[PT, T]{
+					item:       item,
+					created:    p.config.clock.Now(),
+					lastUsage:  p.config.clock.Now(),
+					useCounter: 0,
+				})
 			case <-p.done:
+				p.config.closeItemFunc(ctx, item)
 			case ch <- item:
 			}
 		}()
@@ -237,10 +262,9 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 func (p *Pool[PT, T]) Stats() Stats {
 	return Stats{
 		Limit:            p.config.limit,
-		Index:            0,
 		Idle:             p.idle.Size(),
-		Wait:             int(p.used.Load()) - p.idle.Size(),
-		CreateInProgress: int(p.createInProgress.Load()),
+		Concurrency:      int(p.concurrency.Load()),
+		CreateInProgress: p.createInProgress.Get(),
 	}
 }
 
@@ -324,9 +348,9 @@ func (p *Pool[PT, T]) With(
 	f func(ctx context.Context, item PT) error,
 	opts ...retry.Option,
 ) (finalErr error) {
-	p.used.Add(1)
+	p.concurrency.Add(1)
 	defer func() {
-		p.used.Add(-1)
+		p.concurrency.Add(-1)
 	}()
 
 	var attempts int
