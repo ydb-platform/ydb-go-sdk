@@ -161,108 +161,135 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NoError(t, err)
 		})
 		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
-			hintTrace := defaultTrace
-			var preferredID uint32
-			hintTrace.OnGet = func(ctx *context.Context, call stack.Caller) func(
-				info any,
-				attempts int,
-				nodeHintInfo *trace.NodeHintInfo,
-				err error,
-			) {
-				return func(info any, attempts int, nodeHintInfo *trace.NodeHintInfo, err error) {
-					if nodeHintInfo != nil {
-						preferredID = nodeHintInfo.PreferredNodeID
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				hintTrace := defaultTrace
+				var preferredID uint32
+				hintTrace.OnGet = func(ctx *context.Context, call stack.Caller) func(
+					info any,
+					attempts int,
+					nodeHintInfo *trace.NodeHintInfo,
+					err error,
+				) {
+					return func(info any, attempts int, nodeHintInfo *trace.NodeHintInfo, err error) {
+						if nodeHintInfo != nil {
+							preferredID = nodeHintInfo.PreferredNodeID
+						}
 					}
 				}
-			}
-			var newItemCalled uint32
-			p := New[*testItem, testItem](t.Context(),
-				WithTrace[*testItem, testItem](defaultTrace),
-				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
-					newItemCalled++
-					v := testItem{
-						v: 0,
-						onNodeID: func() uint32 {
-							nodeID, has := endpoint.ContextNodeID(ctx)
-							if has {
-								return nodeID
-							}
+				var newItemCalled uint32
+				p := New[*testItem, testItem](t.Context(),
+					WithTrace[*testItem, testItem](defaultTrace),
+					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+						newItemCalled++
+						v := testItem{
+							v: int32(newItemCalled),
+							onNodeID: func() uint32 {
+								nodeID, has := endpoint.ContextNodeID(ctx)
+								if has {
+									return nodeID
+								}
 
-							return 0
-						},
-					}
+								return 0
+							},
+						}
 
-					return &v, nil
-				}),
-				WithLimit[*testItem, testItem](3),
-			)
+						return &v, nil
+					}),
+					WithLimit[*testItem, testItem](3),
+				)
 
-			info := mustGetItem(t, p)
-			require.EqualValues(t, 0, info.item.NodeID())
-			require.EqualValues(t, true, info.item.IsAlive())
-			mustPutItem(t, p, info)
+				info := mustGetItem(t, p)
+				require.EqualValues(t, 0, int(info.item.NodeID()))
+				require.EqualValues(t, true, info.item.IsAlive())
+				mustPutItem(t, p, info)
+				require.Equal(t, 1, p.idle.Len())
 
-			info, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			require.NoError(t, err)
-			require.EqualValues(t, 32, info.item.NodeID())
-			mustPutItem(t, p, info)
+				info, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				require.NoError(t, err)
+				require.EqualValues(t, 32, int(info.item.NodeID()))
+				mustPutItem(t, p, info)
+				require.Equal(t, 2, p.idle.Len())
 
-			info, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
-			require.NoError(t, err)
-			require.EqualValues(t, 33, info.item.NodeID())
-			mustPutItem(t, p, info)
+				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
+				require.NoError(t, err)
+				require.EqualValues(t, 33, int(info.item.NodeID()))
+				mustPutItem(t, p, info)
+				require.Equal(t, 3, p.idle.Len())
 
-			info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			require.NoError(t, err)
-			require.EqualValues(t, 32, info.item.NodeID())
-			mustPutItem(t, p, info)
+				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				require.NoError(t, err)
+				require.EqualValues(t, 32, int(info.item.NodeID()))
+				require.Equal(t, 2, p.idle.Len())
+				mustPutItem(t, p, info)
+				require.Equal(t, 3, p.idle.Len())
 
-			info, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
-			require.NoError(t, err)
-			require.EqualValues(t, 33, info.item.NodeID())
-			mustPutItem(t, p, info)
+				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
+				require.NoError(t, err)
+				require.EqualValues(t, 33, int(info.item.NodeID()))
+				require.Equal(t, 2, p.idle.Len())
+				mustPutItem(t, p, info)
+				require.Equal(t, 3, p.idle.Len())
 
-			info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			require.NoError(t, err)
-			info2, err := p.getItem(endpoint.WithNodeID(t.Context(), 33))
-			require.NoError(t, err)
-			require.EqualValues(t, 32, info.item.NodeID())
-			require.EqualValues(t, 33, info2.item.NodeID())
-			mustPutItem(t, p, info2)
-			mustPutItem(t, p, info)
+				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				require.NoError(t, err)
+				require.EqualValues(t, 32, int(info.item.NodeID()))
+				require.Equal(t, 2, p.idle.Len())
+				info2, err := p.getItem(endpoint.WithNodeID(t.Context(), 33))
+				require.NoError(t, err)
+				require.EqualValues(t, 33, info2.item.NodeID())
+				require.Equal(t, 1, p.idle.Len())
+				mustPutItem(t, p, info2)
+				require.Equal(t, 2, p.idle.Len())
+				mustPutItem(t, p, info)
+				require.Equal(t, 3, p.idle.Len())
 
-			info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			require.NoError(t, err)
-			info2, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
-			require.NoError(t, err)
-			require.EqualValues(t, 32, info.item.NodeID())
-			require.EqualValues(t, 33, info2.item.NodeID())
-			mustPutItem(t, p, info)
-			mustPutItem(t, p, info2)
+				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				require.NoError(t, err)
+				require.EqualValues(t, 32, int(info.item.NodeID()))
+				require.Equal(t, 2, p.idle.Len())
+				info2, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
+				require.NoError(t, err)
+				require.EqualValues(t, 33, info2.item.NodeID())
+				require.Equal(t, 1, p.idle.Len())
+				mustPutItem(t, p, info)
+				require.Equal(t, 2, p.idle.Len())
+				mustPutItem(t, p, info2)
+				require.Equal(t, 3, p.idle.Len())
 
-			info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			require.NoError(t, err)
-			info2, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
-			require.NoError(t, err)
-			info3, err := p.getItem(t.Context())
-			require.NoError(t, err)
-			require.EqualValues(t, 32, info.item.NodeID())
-			require.EqualValues(t, 33, info2.item.NodeID())
-			require.EqualValues(t, 0, info3.item.NodeID())
-			mustPutItem(t, p, info)
-			mustPutItem(t, p, info2)
-			mustPutItem(t, p, info3)
-			info, err = p.getItem(endpoint.WithNodeID(t.Context(), 100))
-			require.NoError(t, err)
-			require.EqualValues(t, 100, preferredID)
-			require.EqualValues(t, 100, info.item.NodeID())
-			require.EqualValues(t, 4, newItemCalled)
-			_, _ = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			_, _ = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
-			defer cancel()
-			// should not panic
-			_, _ = p.getItem(endpoint.WithNodeID(ctx, 32))
+				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				require.NoError(t, err)
+				require.EqualValues(t, 32, int(info.item.NodeID()))
+				require.Equal(t, 2, p.idle.Len())
+				info2, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
+				require.NoError(t, err)
+				require.EqualValues(t, 33, int(info2.item.NodeID()))
+				require.Equal(t, 1, p.idle.Len())
+				info3, err := p.getItem(t.Context())
+				require.NoError(t, err)
+				require.EqualValues(t, 0, info3.item.NodeID())
+				require.Equal(t, 0, p.idle.Len())
+				mustPutItem(t, p, info)
+				require.Equal(t, 1, p.idle.Len())
+				mustPutItem(t, p, info2)
+				require.Equal(t, 2, p.idle.Len())
+				mustPutItem(t, p, info3)
+				require.Equal(t, 3, p.idle.Len())
+				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 100))
+				require.NoError(t, err)
+				require.EqualValues(t, 100, preferredID)
+				require.EqualValues(t, 100, int(info.item.NodeID()))
+				require.Equal(t, 2, p.idle.Len())
+				require.EqualValues(t, 4, int(newItemCalled))
+				_, _ = p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				require.Equal(t, 1, p.idle.Len())
+				_, _ = p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				require.Equal(t, 1, p.idle.Len())
+				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+				defer cancel()
+				// should not panic
+				_, _ = p.getItem(endpoint.WithNodeID(ctx, 32))
+				require.Equal(t, 1, p.idle.Len())
+			})
 		})
 		t.Run("PreferredNodeTakenAndPoolFull", func(t *testing.T) {
 			p := New[*testItem, testItem](t.Context(),
@@ -321,12 +348,12 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NoError(t, err)
 			require.NotNil(t, info)
 			require.NotNil(t, info.item)
-			require.EqualValues(t, 32, info.item.NodeID())
+			require.EqualValues(t, 32, int(info.item.NodeID()))
 			require.EqualValues(t, true, info.item.IsAlive())
 			mustPutItem(t, p, info)
 
 			info = mustGetItem(t, p)
-			require.EqualValues(t, 32, info.item.NodeID())
+			require.EqualValues(t, 32, int(info.item.NodeID()))
 			mustPutItem(t, p, info)
 
 			require.EqualValues(t, 1, newItemCalled)
@@ -504,95 +531,262 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				_ = info3 // info3 is still "in use" and not in the idle list
 			})
 		})
-		//t.Run("WhenWaiting", func(t *testing.T) {
-		//	for _, test := range []struct {
-		//		name string
-		//		racy bool
-		//	}{
-		//		{
-		//			name: "normal",
-		//			racy: false,
-		//		},
-		//		{
-		//			name: "racy",
-		//			racy: true,
-		//		},
-		//	} {
-		//		t.Run(test.name, func(t *testing.T) {
-		//			var (
-		//				get  = make(chan struct{})
-		//				wait = make(chan struct{})
-		//				got  = make(chan error)
-		//			)
-		//			p := New[*testItem, testItem](t.Context(),
-		//				WithLimit[*testItem, testItem](1),
-		//				WithTrace[*testItem, testItem](&Trace{
-		//					onWait: func() func(info any, err error) {
-		//						wait <- struct{}{}
-		//
-		//						return nil
-		//					},
-		//				}),
-		//			)
-		//			defer func() {
-		//				_ = p.Close(t.Context())
-		//			}()
-		//
-		//			// first call getItem creates an info and store in index
-		//			// second call getItem from pool with limit === 1 will skip
-		//			// create info step (because pool have not enough space for
-		//			// creating new infos) and will freeze until wait free info from pool
-		//			mustGetItem(t, p)
-		//
-		//			go func() {
-		//				p.config.trace.OnGet = func(ctx *context.Context, call stack.Caller) func(
-		//					info any,
-		//					attempts int,
-		//					_ *trace.NodeHintInfo,
-		//					err error,
-		//				) {
-		//					get <- struct{}{}
-		//
-		//					return nil
-		//				}
-		//
-		//				_, err := p.getItem(t.Context())
-		//				got <- err
-		//			}()
-		//
-		//			<-get // Await for getter blocked on awaiting info.
-		//
-		//			if test.racy {
-		//				// We are testing the case, when info consumer registered
-		//				// himself in the wait queue, but not ready to receive the
-		//				// info when info arrives (that is, stuck between
-		//				// pushing channel in the list and reading from the channel).
-		//				_ = p.Close(t.Context())
-		//				<-wait
-		//			} else {
-		//				// We are testing the normal case, when info consumer registered
-		//				// himself in the wait queue and successfully blocked on
-		//				// reading from signaling channel.
-		//				<-wait
-		//				// Let the waiting goroutine to block on reading from channel.
-		//				_ = p.Close(t.Context())
-		//			}
-		//
-		//			const timeout = time.Second
-		//			select {
-		//			case err := <-got:
-		//				if !xerrors.Is(err, errClosedPool) {
-		//					t.Fatalf(
-		//						"unexpected error: %q; want %q'",
-		//						err, errClosedPool,
-		//					)
-		//				}
-		//			case <-p.config.clock.After(timeout):
-		//				t.Fatalf("no result after %s", timeout)
-		//			}
-		//		})
-		//	}
-		//})
+		t.Run("WhenWaiting", func(t *testing.T) {
+			const timeout = time.Second
+
+			waitPoolClosed := func(t *testing.T, ch <-chan error) {
+				t.Helper()
+				select {
+				case err := <-ch:
+					require.NoError(t, err)
+				case <-time.After(timeout):
+					t.Fatalf("pool.Close did not finish within %s", timeout)
+				}
+			}
+
+			waitWithClosed := func(t *testing.T, ch <-chan error) {
+				t.Helper()
+				select {
+				case err := <-ch:
+					require.ErrorIs(t, err, errClosedPool)
+				case <-time.After(timeout):
+					t.Fatalf("pool.With did not finish within %s", timeout)
+				}
+			}
+
+			holdInWith := func(
+				ctx context.Context,
+				p *Pool[*testItem, testItem],
+				ready chan<- struct{},
+				release <-chan struct{},
+			) error {
+				return p.With(ctx, func(context.Context, *testItem) error {
+					close(ready)
+					<-release
+
+					return nil
+				})
+			}
+
+			t.Run("WithBlockedOnSemaphore", func(t *testing.T) {
+				// All semaphore slots are taken inside active pool.With callbacks;
+				// another pool.With blocks on acquiring a slot until pool.Close.
+				ctx := t.Context()
+				p := New[*testItem, testItem](ctx,
+					WithLimit[*testItem, testItem](2),
+					WithTrace[*testItem, testItem](defaultTrace),
+				)
+
+				release1 := make(chan struct{})
+				release2 := make(chan struct{})
+				ready1 := make(chan struct{})
+				ready2 := make(chan struct{})
+
+				go func() { _ = holdInWith(ctx, p, ready1, release1) }()
+				go func() { _ = holdInWith(ctx, p, ready2, release2) }()
+				<-ready1
+				<-ready2
+
+				waiting := make(chan error, 1)
+				go func() {
+					waiting <- p.With(ctx, func(context.Context, *testItem) error {
+						return nil
+					})
+				}()
+
+				closed := make(chan error, 1)
+				go func() {
+					closed <- p.Close(ctx)
+				}()
+
+				waitWithClosed(t, waiting)
+
+				close(release1)
+				close(release2)
+				waitPoolClosed(t, closed)
+			})
+
+			t.Run("CloseAfterClose", func(t *testing.T) {
+				ctx := t.Context()
+				p := New[*testItem, testItem](ctx,
+					WithLimit[*testItem, testItem](1),
+					WithTrace[*testItem, testItem](defaultTrace),
+				)
+
+				require.NoError(t, p.Close(ctx))
+
+				err := p.With(ctx, func(context.Context, *testItem) error {
+					return nil
+				})
+				require.ErrorIs(t, err, errClosedPool)
+			})
+
+			t.Run("CloseWhileTryBeforeSemaphoreAcquire", func(t *testing.T) {
+				// pool.With entered try (OnTry fired) but has not taken a semaphore slot yet;
+				// analogue of the old "racy" wait-queue registration case.
+				ctx := t.Context()
+				tryStarted := make(chan struct{})
+				trace := *defaultTrace
+				trace.OnTry = func(ctx *context.Context, call stack.Caller) func(err error) {
+					select {
+					case tryStarted <- struct{}{}:
+					default:
+					}
+
+					return func(err error) {}
+				}
+
+				p := New[*testItem, testItem](ctx,
+					WithLimit[*testItem, testItem](2),
+					WithTrace[*testItem, testItem](&trace),
+				)
+
+				release1 := make(chan struct{})
+				release2 := make(chan struct{})
+				ready1 := make(chan struct{})
+				ready2 := make(chan struct{})
+
+				go func() { _ = holdInWith(ctx, p, ready1, release1) }()
+				go func() { _ = holdInWith(ctx, p, ready2, release2) }()
+				<-ready1
+				<-ready2
+
+				waiting := make(chan error, 1)
+				go func() {
+					waiting <- p.With(ctx, func(context.Context, *testItem) error {
+						return nil
+					})
+				}()
+				<-tryStarted
+
+				closed := make(chan error, 1)
+				go func() {
+					closed <- p.Close(ctx)
+				}()
+
+				waitWithClosed(t, waiting)
+
+				close(release1)
+				close(release2)
+				waitPoolClosed(t, closed)
+			})
+			t.Run("CloseWhileWithInCallback", func(t *testing.T) {
+				// pool.Close waits until an in-flight pool.With releases its slot.
+				ctx := t.Context()
+				p := New[*testItem, testItem](ctx,
+					WithLimit[*testItem, testItem](1),
+					WithTrace[*testItem, testItem](defaultTrace),
+				)
+
+				release := make(chan struct{})
+				ready := make(chan struct{})
+				closed := make(chan error, 1)
+
+				go func() {
+					_ = holdInWith(ctx, p, ready, release)
+				}()
+				<-ready
+
+				go func() {
+					closed <- p.Close(ctx)
+				}()
+
+				select {
+				case <-closed:
+					t.Fatal("pool.Close returned before active pool.With released its slot")
+				case <-time.After(50 * time.Millisecond):
+				}
+
+				close(release)
+				waitPoolClosed(t, closed)
+			})
+
+			t.Run("NoSendOnClosedSemaphore", func(t *testing.T) {
+				// A semaphore slot is acquired only in pool.try (<-p.sema with ok == true)
+				// and drained in pool.Close. pool.Close closes p.sema only after all slots
+				// are returned, so the release in try's defer must never send on a closed channel.
+				xtest.TestManyTimes(t, func(t testing.TB) {
+					const limit = 4
+
+					ctx := t.Context()
+					p := New[*testItem, testItem](ctx,
+						WithLimit[*testItem, testItem](limit),
+						WithTrace[*testItem, testItem](defaultTrace),
+					)
+
+					panics := make(chan any, 1)
+					goWithPanicGuard := func(wg *sync.WaitGroup, fn func()) {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							defer func() {
+								if v := recover(); v != nil {
+									select {
+									case panics <- v:
+									default:
+									}
+								}
+							}()
+							fn()
+						}()
+					}
+
+					var wg sync.WaitGroup
+
+					release := make(chan struct{})
+					holdersReady := make(chan struct{}, limit)
+
+					for range limit {
+						goWithPanicGuard(&wg, func() {
+							_ = p.With(ctx, func(context.Context, *testItem) error {
+								holdersReady <- struct{}{}
+								<-release
+
+								return nil
+							})
+						})
+					}
+
+					for range limit {
+						<-holdersReady
+					}
+
+					goWithPanicGuard(&wg, func() {
+						_ = p.Close(ctx)
+					})
+
+					for range limit * 4 {
+						goWithPanicGuard(&wg, func() {
+							_ = p.With(ctx, func(context.Context, *testItem) error {
+								return nil
+							})
+						})
+					}
+
+					close(release)
+
+					done := make(chan struct{})
+					go func() {
+						wg.Wait()
+						close(done)
+					}()
+
+					select {
+					case v := <-panics:
+						t.Fatalf("panic: %v (possible send on closed semaphore)", v)
+					case <-done:
+					case <-time.After(timeout):
+						t.Fatalf("test timed out after %s", timeout)
+					}
+
+					select {
+					case v := <-panics:
+						t.Fatalf("panic: %v (possible send on closed semaphore)", v)
+					default:
+					}
+				})
+			})
+		})
 		t.Run("IdleItems", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var (
@@ -625,8 +819,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				info1 := mustGetItem(t, p)
 				info2 := mustGetItem(t, p)
 
-				// Put both infos at the absolutely same time.
-				// That is, both infos must be updated their lastUsage timestamp.
+				// Put both items at the absolutely same time.
+				// That is, both items must be updated their lastUsage timestamp.
 				mustPutItem(t, p, info1)
 				mustPutItem(t, p, info2)
 
@@ -664,7 +858,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				_ = p.Close(t.Context())
 
 				require.Equal(t, 0, p.idle.Len())
-			}, xtest.StopAfter(3*time.Second))
+			})
 		})
 	})
 	t.Run("Retry", func(t *testing.T) {
@@ -775,7 +969,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							time.Duration(r.Int64(int64(time.Second))),
 						)
 						defer childCancel()
-						s, err := p.createItemFunc(childCtx)
+						s, err := p.createItem(childCtx)
 						if s == nil && err == nil {
 							errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
 						}
@@ -829,7 +1023,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
 				fmt.Errorf("wrap op error: %w", xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
 			} {
-				t.Run("", func(t *testing.T) {
+				t.Run(testErr.Error(), func(t *testing.T) {
 					backoff := make(chan chan time.Time)
 					ctx, cancel := xcontext.WithCancel(t.Context())
 					p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
@@ -946,7 +1140,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				err = p.Close(t.Context())
 				require.NoError(t, err)
 				require.EqualValues(t, newItems.Load(), deleteItems.Load())
-			}, xtest.StopAfter(3*time.Second))
+			})
 		})
 	})
 	t.Run("With", func(t *testing.T) {
@@ -1211,46 +1405,46 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				})
 
 				require.NoError(t, err)
-			}, xtest.StopAfter(5*time.Second))
+			})
 		})
-		//t.Run("Racy", func(t *testing.T) {
-		//	xtest.TestManyTimes(t, func(t testing.TB) {
-		//		trace := &Trace{
-		//			OnChange: func(stats Stats) {
-		//				require.GreaterOrEqual(t, stats.Limit, stats.Idle)
-		//			},
-		//		}
-		//		p := New[*testItem, testItem](t.Context(),
-		//			WithTrace[*testItem, testItem](trace),
-		//		)
-		//		r := xrand.New(xrand.WithLock())
-		//		var wg sync.WaitGroup
-		//		wg.Add(DefaultLimit*2 + 1)
-		//		for range make([]struct{}, DefaultLimit*2) {
-		//			go func() {
-		//				defer wg.Done()
-		//				childCtx, childCancel := xcontext.WithTimeout(
-		//					t.Context(),
-		//					time.Duration(r.Int64(int64(time.Second))),
-		//				)
-		//				defer childCancel()
-		//				err := p.With(childCtx, func(ctx context.Context, testItem *testItem) error {
-		//					return nil
-		//				})
-		//				if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
-		//					t.Failed()
-		//				}
-		//			}()
-		//		}
-		//		go func() {
-		//			defer wg.Done()
-		//			time.Sleep(time.Millisecond)
-		//			err := p.Close(t.Context())
-		//			require.NoError(t, err)
-		//		}()
-		//		wg.Wait()
-		//	})
-		//})
+		t.Run("Racy", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				trace := &Trace{
+					OnChange: func(stats Stats) {
+						require.GreaterOrEqual(t, stats.Limit, stats.Idle)
+					},
+				}
+				p := New[*testItem, testItem](t.Context(),
+					WithTrace[*testItem, testItem](trace),
+				)
+				r := xrand.New(xrand.WithLock())
+				var wg sync.WaitGroup
+				wg.Add(DefaultLimit*2 + 1)
+				for range make([]struct{}, DefaultLimit*2) {
+					go func() {
+						defer wg.Done()
+						childCtx, childCancel := xcontext.WithTimeout(
+							t.Context(),
+							time.Duration(r.Int64(int64(time.Second))),
+						)
+						defer childCancel()
+						err := p.With(childCtx, func(ctx context.Context, testItem *testItem) error {
+							return nil
+						})
+						if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
+							t.Failed()
+						}
+					}()
+				}
+				go func() {
+					defer wg.Done()
+					time.Sleep(time.Millisecond)
+					err := p.Close(t.Context())
+					require.NoError(t, err)
+				}()
+				wg.Wait()
+			})
+		})
 		t.Run("ParallelCreation", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				trace := &Trace{
@@ -1283,20 +1477,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				wg.Wait()
 			})
 		})
-		//t.Run("PutTwice", func(t *testing.T) {
-		//	p := New(t.Context(),
-		//		WithLimit[*testItem, testItem](2),
-		//		WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
-		//		WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
-		//	)
-		//	info := mustGetItem(t, p)
-		//
-		//	mustPutItem(t, p, info)
-		//
-		//	require.Panics(t, func() {
-		//		mustPutItem(t, p, info)
-		//	})
-		//})
 	})
 	t.Run("PreferredNodeID", func(t *testing.T) {
 		t.Run("AlwaysSatisfiedWhenIdleAvailable", func(t *testing.T) {

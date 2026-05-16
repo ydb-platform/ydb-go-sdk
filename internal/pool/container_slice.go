@@ -36,7 +36,7 @@ func (container *sliceContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
 	return nil
 }
 
-func (container *sliceContainer[PT, T]) PopAny() (info *itemInfo[PT, T], _ error) {
+func (container *sliceContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 	container.mu.Lock()
 	defer container.mu.Unlock()
 
@@ -44,7 +44,7 @@ func (container *sliceContainer[PT, T]) PopAny() (info *itemInfo[PT, T], _ error
 		return nil, errNothingIdleItems
 	}
 
-	info, container.data = container.data[0], container.data[1:]
+	info, container.data = container.data[len(container.data)-1], container.data[:len(container.data)-1]
 
 	return info, nil
 }

@@ -6,6 +6,6 @@ import (
 
 const (
 	DefaultLimit         = 50
-	defaultCreateTimeout = 5 * time.Second
-	defaultCloseTimeout  = time.Second
+	defaultCreateTimeout = 500 * time.Millisecond
+	defaultCloseTimeout  = 500 * time.Millisecond
 )

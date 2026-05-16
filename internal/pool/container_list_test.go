@@ -52,7 +52,7 @@ func (container *listContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
 	return nil
 }
 
-func (container *listContainer[PT, T]) PopAny() (info *itemInfo[PT, T], _ error) {
+func (container *listContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 	container.mu.Lock()
 	defer container.mu.Unlock()
 

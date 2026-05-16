@@ -24,7 +24,7 @@ const (
 
 var errBenchDeleteItem = errors.New("bench: delete pool item")
 
-func newBenchPool(ctx context.Context, idleContainer container[*testItem, testItem]) *Pool[*testItem, testItem] {
+func newBenchPool(ctx context.Context) *Pool[*testItem, testItem] {
 	var created atomic.Uint64
 
 	p := New[*testItem, testItem](ctx,
@@ -40,8 +40,6 @@ func newBenchPool(ctx context.Context, idleContainer container[*testItem, testIt
 			return errors.Is(err, errBenchDeleteItem)
 		}),
 	)
-
-	p.idle = idleContainer
 
 	return p
 }
@@ -74,11 +72,11 @@ func benchPoolWithWork(ops *atomic.Uint64) error {
 	return nil
 }
 
-func benchmarkPoolWithConcurrency(b *testing.B, idleContainer container[*testItem, testItem], goroutines int) {
+func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	b.Helper()
 
 	ctx := b.Context()
-	p := newBenchPool(ctx, idleContainer)
+	p := newBenchPool(ctx)
 	if err := prefillBenchPool(ctx, p, benchPrefillItems); err != nil {
 		b.Fatalf("prefill pool: %v", err)
 	}
@@ -148,34 +146,9 @@ func benchmarkPoolWithConcurrency(b *testing.B, idleContainer container[*testIte
 // BenchmarkPoolWith/concurrency=500-12       	  770821	      1307 ns/op	    1068 B/op	      21 allocs/op
 // BenchmarkPoolWith/concurrency=1000-12      	  779068	      2282 ns/op	    1623 B/op	      29 allocs/op
 func BenchmarkPoolWith(b *testing.B) {
-	for _, tt := range []struct {
-		name      string
-		container container[*testItem, testItem]
-	}{
-		{
-			name:      "xsync.Set",
-			container: &xsyncSetContainer[*testItem, testItem]{},
-		},
-		{
-			name:      "slice",
-			container: &sliceContainer[*testItem, testItem]{},
-		},
-		{
-			name:      "map",
-			container: &mapContainer[*testItem, testItem]{},
-		},
-		{
-			name:      "xlist.List",
-			container: &listContainer[*testItem, testItem]{},
-		},
-	} {
-		b.Run(tt.name, func(b *testing.B) {
-			container := tt.container
-			for _, goroutines := range []int{1, 250, 490, 500, 510, 1000} {
-				b.Run(fmt.Sprintf("concurrency=%d", goroutines), func(b *testing.B) {
-					benchmarkPoolWithConcurrency(b, container, goroutines)
-				})
-			}
+	for _, goroutines := range []int{1, 250, 500, 1000} {
+		b.Run(fmt.Sprintf("concurrency=%d", goroutines), func(b *testing.B) {
+			benchmarkPoolWithConcurrency(b, goroutines)
 		})
 	}
 }

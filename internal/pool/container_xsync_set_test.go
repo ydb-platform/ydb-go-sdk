@@ -29,7 +29,7 @@ func (container *xsyncSetContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
 	return nil
 }
 
-func (container *xsyncSetContainer[PT, T]) PopAny() (info *itemInfo[PT, T], _ error) {
+func (container *xsyncSetContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 	container.data.Range(func(idle *itemInfo[PT, T]) bool {
 		info = idle
 		container.data.Remove(idle)

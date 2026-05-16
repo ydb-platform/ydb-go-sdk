@@ -44,7 +44,7 @@ func (container *mapContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
 	return nil
 }
 
-func (container *mapContainer[PT, T]) PopAny() (info *itemInfo[PT, T], _ error) {
+func (container *mapContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 	container.mu.Lock()
 	defer container.mu.Unlock()
 
