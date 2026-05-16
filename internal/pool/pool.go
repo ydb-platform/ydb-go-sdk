@@ -521,7 +521,11 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 		)
 		if onDone != nil {
 			defer func() {
-				onDone(info.item, 0, getNodeHintInfo(info.item, preferredNodeID, hasPreferredNodeID, finalErr), finalErr)
+				var item PT
+				if info != nil {
+					item = info.item
+				}
+				onDone(item, 0, getNodeHintInfo(item, preferredNodeID, hasPreferredNodeID, finalErr), finalErr)
 			}()
 		}
 	}
