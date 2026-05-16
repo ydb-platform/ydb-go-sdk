@@ -189,7 +189,7 @@ func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
 	return func(ctx context.Context) (PT, error) {
 		var haveSlot bool
 		p.createInProgress.Change(func(old int) int {
-			if p.idle.Len()+old > p.config.limit {
+			if p.idle.Len()+old >= p.config.limit {
 				return old
 			}
 
