@@ -379,10 +379,10 @@ func (p *Pool[PT, T]) With(
 			return xerrors.WithStackTrace(errClosedPool)
 		}
 		defer func() {
-			select {
-			case <-p.done:
-			case p.sema <- struct{}{}:
-			}
+			defer func() {
+				_ = recover()
+			}()
+			p.sema <- struct{}{}
 		}()
 	}
 
