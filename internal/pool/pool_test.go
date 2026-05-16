@@ -675,7 +675,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					err  error
 				}{
 					{
-						name: "Cnacelled",
+						name: "Canceled",
 						err:  context.Canceled,
 					},
 					{
