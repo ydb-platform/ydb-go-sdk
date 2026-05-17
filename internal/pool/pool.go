@@ -571,7 +571,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 			return nil, err
 		}
 
-		return nil, errNilItem
+		return nil, err
 	}
 
 	if item == nil {
