@@ -946,6 +946,31 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, counter.Load(), int64(10))
 			})
+			t.Run("OnUnauthorized", func(t *testing.T) {
+				unauthorized := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
+
+				var createAttempts atomic.Int64
+				p := New[*testItem, testItem](t.Context(),
+					WithLimit[*testItem, testItem](1),
+					WithCreateItemFunc(func(context.Context) (*testItem, error) {
+						createAttempts.Add(1)
+
+						return nil, unauthorized
+					}),
+				)
+
+				var callbackRuns int
+				err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
+					callbackRuns++
+
+					return nil
+				})
+				require.Error(t, err)
+				require.Equal(t, 0, callbackRuns)
+				require.Equal(t, int64(1), createAttempts.Load())
+				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED))
+				require.Nil(t, xerrors.RetryableError(err))
+			})
 			t.Run("NilNil", func(t *testing.T) {
 				xtest.TestManyTimes(t, func(t testing.TB) {
 					limit := 100
@@ -1142,6 +1167,101 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 	})
 	t.Run("With", func(t *testing.T) {
+		t.Run("ItemUsageLimit", func(t *testing.T) {
+			const usageLimit uint64 = 3
+
+			ctx := t.Context()
+			var (
+				created atomic.Int32
+				closed  atomic.Int32
+			)
+
+			p := New[*testItem, testItem](ctx,
+				WithLimit[*testItem, testItem](1),
+				WithItemUsageLimit[*testItem, testItem](usageLimit),
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					id := created.Add(1)
+
+					return &testItem{
+						v: id,
+						onClose: func() error {
+							closed.Add(1)
+
+							return nil
+						},
+					}, nil
+				}),
+			)
+			defer func() {
+				_ = p.Close(ctx)
+			}()
+
+			for range usageLimit {
+				err := p.With(ctx, func(context.Context, *testItem) error {
+					return nil
+				})
+				require.NoError(t, err)
+			}
+			require.Equal(t, int32(1), created.Load())
+			require.Equal(t, int32(0), closed.Load())
+
+			err := p.With(ctx, func(_ context.Context, item *testItem) error {
+				require.Equal(t, int32(2), item.v, "item must be recreated after usage limit is reached")
+
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(2), created.Load())
+			require.Equal(t, int32(1), closed.Load())
+		})
+		t.Run("ItemUsageTTL", func(t *testing.T) {
+			const usageTTL = time.Hour
+
+			ctx := t.Context()
+			var (
+				created     atomic.Int32
+				closed      atomic.Int32
+				fakeClock   = clockwork.NewFakeClock()
+			)
+
+			p := New[*testItem, testItem](ctx,
+				WithLimit[*testItem, testItem](1),
+				WithItemUsageTTL[*testItem, testItem](usageTTL),
+				WithClock[*testItem, testItem](fakeClock),
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					id := created.Add(1)
+
+					return &testItem{
+						v: id,
+						onClose: func() error {
+							closed.Add(1)
+
+							return nil
+						},
+					}, nil
+				}),
+			)
+			defer func() {
+				_ = p.Close(ctx)
+			}()
+
+			err := p.With(ctx, func(context.Context, *testItem) error {
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(1), created.Load())
+
+			fakeClock.Advance(usageTTL + time.Nanosecond)
+
+			err = p.With(ctx, func(_ context.Context, item *testItem) error {
+				require.Equal(t, int32(2), item.v, "item must be recreated after item usage TTL")
+
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(2), created.Load())
+			require.Equal(t, int32(1), closed.Load())
+		})
 		t.Run("SpoiledIdleItems", func(t *testing.T) {
 			// Models query sessions that become !IsAlive() while sitting in idle
 			// (e.g. attach stream Recv error in listenAttachStream).

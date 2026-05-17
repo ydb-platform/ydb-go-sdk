@@ -516,8 +516,15 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 	p.createInProgress.Add(1)
 	item, err := p.createItem(ctx)
 	p.createInProgress.Add(-1)
-	if err != nil && isRetriable(err) {
-		return nil, xerrors.Retryable(err)
+	if err != nil {
+		if isRetriable(err) {
+			return nil, xerrors.Retryable(err)
+		}
+		if xerrors.IsYdb(err) {
+			return nil, err
+		}
+
+		return nil, errNilItem
 	}
 
 	if item == nil {
