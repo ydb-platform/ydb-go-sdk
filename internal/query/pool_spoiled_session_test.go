@@ -145,7 +145,7 @@ func testExplicitSessionPool(
 		config.WithSessionDeleteTimeout(time.Second),
 	)
 
-	return pool.New[*Session, Session](ctx,
+	p, err := pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
 		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
 		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
@@ -167,4 +167,9 @@ func testExplicitSessionPool(
 			return s, nil
 		}),
 	)
+	if err != nil {
+		panic(err)
+	}
+
+	return p
 }

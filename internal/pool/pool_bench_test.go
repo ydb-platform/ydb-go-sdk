@@ -24,10 +24,10 @@ const (
 
 var errBenchDeleteItem = errors.New("bench: delete pool item")
 
-func newBenchPool(ctx context.Context) *Pool[*testItem, testItem] {
+func newBenchPool(ctx context.Context) (*Pool[*testItem, testItem], error) {
 	var created atomic.Uint64
 
-	p := New[*testItem, testItem](ctx,
+	p, err := New[*testItem, testItem](ctx,
 		WithLimit[*testItem, testItem](benchPoolLimit),
 		WithCreateItemTimeout[*testItem, testItem](benchCreateItemTimeout),
 		WithCloseItemTimeout[*testItem, testItem](benchCloseItemTimeout),
@@ -40,8 +40,11 @@ func newBenchPool(ctx context.Context) *Pool[*testItem, testItem] {
 			return errors.Is(err, errBenchDeleteItem)
 		}),
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return p
+	return p, nil
 }
 
 func prefillBenchPool(ctx context.Context, p *Pool[*testItem, testItem], count int) error {
@@ -76,7 +79,10 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	b.Helper()
 
 	ctx := b.Context()
-	p := newBenchPool(ctx)
+	p, err := newBenchPool(ctx)
+	if err != nil {
+		b.Fatalf("new pool: %v", err)
+	}
 	if err := prefillBenchPool(ctx, p, benchPrefillItems); err != nil {
 		b.Fatalf("prefill pool: %v", err)
 	}

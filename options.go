@@ -625,9 +625,15 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
+// WithSessionPoolKeepAliveMinSize sets the number of sessions to pre-create in session pools at driver initialization.
+// If keepAliveMinSize is less than or equal to zero, pool warm-up is disabled.
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(ctx context.Context, d *Driver) error { return nil }
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithKeepAliveMinSize(keepAliveMinSize))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolKeepAliveMinSize(keepAliveMinSize))
+
+		return nil
+	}
 }
 
 // WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client

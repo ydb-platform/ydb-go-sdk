@@ -30,10 +30,77 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*Session, error)
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client { //nolint:funlen
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) { //nolint:funlen
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
+
+	sessionPool, err := pool.New[*Session, Session](ctx,
+		pool.WithLimit[*Session, Session](config.SizeLimit()),
+		pool.WithKeepAliveMinSize[*Session, Session](config.KeepAliveMinSize()),
+		pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
+		pool.WithItemUsageTTL[*Session, Session](config.SessionUsageTTL()),
+		pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
+		pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
+		pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
+		pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
+			if !s.IsAlive() {
+				return true
+			}
+
+			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
+		}),
+		pool.WithClock[*Session, Session](config.Clock()),
+		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
+			if !config.DisableSessionBalancer() {
+				ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
+			}
+
+			return newSession(ctx, cc, config)
+		}),
+		pool.WithTrace[*Session, Session](&pool.Trace{
+			OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
+				return func(limit int) {
+					onDone(limit)
+				}
+			},
+			OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
+				onDone := trace.TableOnPoolPut( //nolint:forcetypeassert
+					config.Trace(), ctx, call, item.(*Session),
+				)
+
+				return func(err error) {
+					onDone(err)
+				}
+			},
+			OnGet: func(ctx *context.Context, call stack.Caller) func(
+				item any,
+				hintInfo *trace.NodeHintInfo,
+				err error,
+			) {
+				onDone := trace.TableOnPoolGet(config.Trace(), ctx, call)
+
+				return func(item any, hintInfo *trace.NodeHintInfo, err error) {
+					onDone(item.(*Session), hintInfo, err) //nolint:forcetypeassert
+				}
+			},
+			OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
+				onDone := trace.TableOnPoolWith(config.Trace(), ctx, call)
+
+				return func(attempts int, err error) {
+					onDone(attempts, err)
+				}
+			},
+			OnChange: func(stats pool.Stats) {
+				trace.TableOnPoolStateChange(config.Trace(),
+					stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency,
+				)
+			},
+		}),
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	return &Client{
 		clock:  config.Clock(),
@@ -42,70 +109,9 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		build: func(ctx context.Context) (s *Session, err error) {
 			return newSession(ctx, cc, config)
 		},
-		pool: pool.New[*Session, Session](ctx,
-			pool.WithLimit[*Session, Session](config.SizeLimit()),
-			pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
-			pool.WithItemUsageTTL[*Session, Session](config.SessionUsageTTL()),
-			pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
-			pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
-			pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
-			pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
-				if !s.IsAlive() {
-					return true
-				}
-
-				return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-			}),
-			pool.WithClock[*Session, Session](config.Clock()),
-			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-				if !config.DisableSessionBalancer() {
-					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-				}
-
-				return newSession(ctx, cc, config)
-			}),
-			pool.WithTrace[*Session, Session](&pool.Trace{
-				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
-					return func(limit int) {
-						onDone(limit)
-					}
-				},
-				OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
-					onDone := trace.TableOnPoolPut( //nolint:forcetypeassert
-						config.Trace(), ctx, call, item.(*Session),
-					)
-
-					return func(err error) {
-						onDone(err)
-					}
-				},
-				OnGet: func(ctx *context.Context, call stack.Caller) func(
-					item any,
-					hintInfo *trace.NodeHintInfo,
-					err error,
-				) {
-					onDone := trace.TableOnPoolGet(config.Trace(), ctx, call)
-
-					return func(item any, hintInfo *trace.NodeHintInfo, err error) {
-						onDone(item.(*Session), hintInfo, err) //nolint:forcetypeassert
-					}
-				},
-				OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
-					onDone := trace.TableOnPoolWith(config.Trace(), ctx, call)
-
-					return func(attempts int, err error) {
-						onDone(attempts, err)
-					}
-				},
-				OnChange: func(stats pool.Stats) {
-					trace.TableOnPoolStateChange(config.Trace(),
-						stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency,
-					)
-				},
-			}),
-		),
+		pool: sessionPool,
 		done: make(chan struct{}),
-	}
+	}, nil
 }
 
 // Client is a set of session instances that may be reused.

@@ -43,6 +43,7 @@ type (
 		idleTimeToLive     time.Duration
 		itemUsageLimit     uint64
 		itemUsageTTL       time.Duration
+		keepAliveMinSize   int
 	}
 	itemInfo[PT ItemConstraint[T], T any] struct {
 		item       PT
@@ -125,10 +126,18 @@ func WithClock[PT ItemConstraint[T], T any](clock clockwork.Clock) Option[PT, T]
 	}
 }
 
+func WithKeepAliveMinSize[PT ItemConstraint[T], T any](size int) Option[PT, T] {
+	return func(c *Config[PT, T]) {
+		if size > 0 {
+			c.keepAliveMinSize = size
+		}
+	}
+}
+
 func New[PT ItemConstraint[T], T any](
 	ctx context.Context,
 	opts ...Option[PT, T],
-) *Pool[PT, T] {
+) (_ *Pool[PT, T], err error) {
 	p := &Pool[PT, T]{
 		config: &Config[PT, T]{
 			trace: &Trace{},
@@ -175,7 +184,45 @@ func New[PT ItemConstraint[T], T any](
 		p.sema <- struct{}{}
 	}
 
-	return p
+	if err = p.warmUp(ctx); err != nil {
+		_ = p.Close(ctx)
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return p, nil
+}
+
+func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
+	n := p.config.keepAliveMinSize
+	if n <= 0 {
+		return nil
+	}
+	if n > p.config.limit {
+		n = p.config.limit
+	}
+
+	for range n {
+		if err := ctx.Err(); err != nil {
+			return xerrors.WithStackTrace(ctx.Err())
+		}
+
+		item, err := p.createItem(ctx)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		if err = p.putItem(ctx, &itemInfo[PT, T]{
+			item:    item,
+			created: p.config.clock.Now(),
+		}); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+	}
+
+	p.changeState()
+
+	return nil
 }
 
 // createItem wraps the Config.createItemFunc function with timeout handling

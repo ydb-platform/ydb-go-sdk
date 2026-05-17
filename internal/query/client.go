@@ -747,7 +747,7 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 	return s, nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (*Client, error) {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
@@ -758,11 +758,12 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) *
 	return newWithQueryServiceClient(ctx, client, cc, cfg)
 }
 
+//nolint:funlen
 func newWithQueryServiceClient(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	cc grpc.ClientConnInterface,
 	cfg *config.Config,
-) *Client {
+) (*Client, error) {
 	c := &Client{
 		config: cfg,
 		client: client,
@@ -770,9 +771,9 @@ func newWithQueryServiceClient(ctx context.Context,
 			cancels: make(map[uint64]context.CancelFunc),
 		}),
 	}
-	c.implicitSessionPool = createImplicitSessionPool(ctx, cfg, client, cc)
-	c.explicitSessionPool = pool.New(ctx,
+	explicitSessionPool, err := pool.New(ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
+		pool.WithKeepAliveMinSize[*Session](cfg.PoolWarmUpSize()),
 		pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
 		pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
 		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
@@ -817,8 +818,22 @@ func newWithQueryServiceClient(ctx context.Context,
 			return s, nil
 		}),
 	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
-	return c
+	c.explicitSessionPool = explicitSessionPool
+
+	implicitSessionPool, err := createImplicitSessionPool(ctx, cfg, client, cc)
+	if err != nil {
+		_ = c.explicitSessionPool.Close(ctx)
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	c.implicitSessionPool = implicitSessionPool
+
+	return c, nil
 }
 
 func poolTrace(t *trace.Query) *pool.Trace {
@@ -879,7 +894,7 @@ func createImplicitSessionPool(ctx context.Context,
 	cfg *config.Config,
 	c Ydb_Query_V1.QueryServiceClient,
 	cc grpc.ClientConnInterface,
-) sessionPool {
+) (sessionPool, error) {
 	return pool.New(ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
 		pool.WithTrace[*Session](poolTrace(cfg.Trace())),

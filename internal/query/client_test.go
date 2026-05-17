@@ -1816,7 +1816,10 @@ func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client
 
 	cfg := config.New(config.AllowImplicitSessions())
 
-	return newWithQueryServiceClient(ctx, queryService, nil, cfg)
+	c, err := newWithQueryServiceClient(ctx, queryService, nil, cfg)
+	require.NoError(t, err)
+
+	return c
 }
 
 type sessionControllerMock struct {
@@ -1872,10 +1875,15 @@ func testPool(
 	ctx context.Context,
 	createSession func(ctx context.Context) (*Session, error),
 ) *pool.Pool[*Session, Session] {
-	return pool.New[*Session, Session](ctx,
+	p, err := pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session, Session](1),
 		pool.WithCreateItemFunc(createSession),
 	)
+	if err != nil {
+		panic(err)
+	}
+
+	return p
 }
 
 func TestQueryScript(t *testing.T) {

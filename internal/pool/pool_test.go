@@ -140,6 +140,18 @@ func mustPutItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T], info
 	}
 }
 
+func mustNewPool[PT ItemConstraint[T], T any](
+	t testing.TB,
+	opts ...Option[PT, T],
+) *Pool[PT, T] {
+	t.Helper()
+
+	p, err := New(t.Context(), opts...)
+	require.NoError(t, err)
+
+	return p
+}
+
 func mustClose(t testing.TB, pool closer.Closer) {
 	if err := pool.Close(t.Context()); err != nil {
 		panic(err)
@@ -149,7 +161,7 @@ func mustClose(t testing.TB, pool closer.Closer) {
 func TestPool(t *testing.T) { //nolint:gocyclo
 	t.Run("New", func(t *testing.T) {
 		t.Run("Default", func(t *testing.T) {
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
 			err := p.With(t.Context(), func(ctx context.Context, testItem *testItem) error {
@@ -175,7 +187,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					}
 				}
 				var newItemCalled uint32
-				p := New[*testItem, testItem](t.Context(),
+				p := mustNewPool[*testItem, testItem](t,
 					WithTrace[*testItem, testItem](defaultTrace),
 					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 						newItemCalled++
@@ -290,7 +302,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			})
 		})
 		t.Run("PreferredNodeTakenAndPoolFull", func(t *testing.T) {
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithTrace[*testItem, testItem](defaultTrace),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					v := testItem{
@@ -325,7 +337,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
 			var newItemCalled uint32
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithTrace[*testItem, testItem](defaultTrace),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					newItemCalled++
@@ -357,7 +369,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.EqualValues(t, 1, newItemCalled)
 		})
 		t.Run("WithLimit", func(t *testing.T) {
-			p := New[*testItem, testItem](t.Context(), WithLimit[*testItem, testItem](1),
+			p := mustNewPool[*testItem, testItem](t, WithLimit[*testItem, testItem](1),
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
 			require.EqualValues(t, 1, p.config.limit)
@@ -367,7 +379,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				newCounter        int64
 				errMustDeleteItem = xerrors.Retryable(errors.New("test"))
 			)
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](1),
 				WithItemUsageLimit[*testItem, testItem](5),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
@@ -397,7 +409,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 		t.Run("WithCreateItemFunc", func(t *testing.T) {
 			var newCounter atomic.Int64
-			p := New(t.Context(),
+			p := mustNewPool(t,
 				WithLimit[*testItem, testItem](1),
 				WithCreateItemFunc(func(context.Context) (*testItem, error) {
 					newCounter.Add(1)
@@ -429,7 +441,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				closed  = [...]bool{false, false, false}
 			)
 
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](3),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
@@ -488,7 +500,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var closedCount atomic.Int32
 
-				p := New[*testItem, testItem](t.Context(),
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](3),
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
@@ -570,7 +582,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// All semaphore slots are taken inside active pool.With callbacks;
 				// another pool.With blocks on acquiring a slot until pool.Close.
 				ctx := t.Context()
-				p := New[*testItem, testItem](ctx,
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](2),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
@@ -606,7 +618,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			t.Run("CloseAfterClose", func(t *testing.T) {
 				ctx := t.Context()
-				p := New[*testItem, testItem](ctx,
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](1),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
@@ -634,7 +646,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					return func(err error) {}
 				}
 
-				p := New[*testItem, testItem](ctx,
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](2),
 					WithTrace[*testItem, testItem](&trace),
 				)
@@ -671,7 +683,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			t.Run("CloseWhileWithInCallback", func(t *testing.T) {
 				// pool.Close waits until an in-flight pool.With releases its slot.
 				ctx := t.Context()
-				p := New[*testItem, testItem](ctx,
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](1),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
@@ -707,7 +719,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					const limit = 4
 
 					ctx := t.Context()
-					p := New[*testItem, testItem](ctx,
+					p := mustNewPool[*testItem, testItem](t,
 						WithLimit[*testItem, testItem](limit),
 						WithTrace[*testItem, testItem](defaultTrace),
 					)
@@ -793,7 +805,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					closedCount   atomic.Int64
 					fakeClock     = clockwork.NewFakeClock()
 				)
-				p := New[*testItem, testItem](t.Context(),
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](2),
 					WithCreateItemTimeout[*testItem, testItem](0),
 					WithCreateItemFunc[*testItem, testItem](func(ctx context.Context) (*testItem, error) {
@@ -877,7 +889,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				} {
 					t.Run(tt.name, func(t *testing.T) {
 						var counter atomic.Int64
-						p := New(t.Context(),
+						p := mustNewPool(t,
 							WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 							WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 							WithCreateItemFunc(func(context.Context) (*testItem, error) {
@@ -902,7 +914,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			})
 			t.Run("OnTransportError", func(t *testing.T) {
 				var counter atomic.Int64
-				p := New(t.Context(),
+				p := mustNewPool(t,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
@@ -925,7 +937,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			})
 			t.Run("OnOperationError", func(t *testing.T) {
 				var counter atomic.Int64
-				p := New(t.Context(),
+				p := mustNewPool(t,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
@@ -950,7 +962,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				unauthorized := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
 
 				var createAttempts atomic.Int64
-				p := New[*testItem, testItem](t.Context(),
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](1),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
 						createAttempts.Add(1)
@@ -979,7 +991,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						55*time.Second,
 					)
 					defer cancel()
-					p := New[*testItem, testItem](t.Context())
+					p := mustNewPool[*testItem, testItem](t)
 					defer func() {
 						_ = p.Close(t.Context())
 					}()
@@ -1017,8 +1029,9 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				t.Run("Canceled", func(t *testing.T) {
 					ctx, cancel := context.WithCancel(t.Context())
 					cancel()
-					p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
-					err := p.With(ctx, func(ctx context.Context, testItem *testItem) error {
+					p, err := New(ctx, WithLimit[*testItem, testItem](1))
+					require.NoError(t, err)
+					err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 						return nil
 					})
 					require.ErrorIs(t, err, context.Canceled)
@@ -1026,8 +1039,9 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				t.Run("DeadlineExceeded", func(t *testing.T) {
 					ctx, cancel := context.WithTimeout(t.Context(), 0)
 					cancel()
-					p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
-					err := p.With(ctx, func(ctx context.Context, testItem *testItem) error {
+					p, err := New(ctx, WithLimit[*testItem, testItem](1))
+					require.NoError(t, err)
+					err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 						return nil
 					})
 					require.ErrorIs(t, err, context.DeadlineExceeded)
@@ -1049,7 +1063,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				t.Run(testErr.Error(), func(t *testing.T) {
 					backoff := make(chan chan time.Time)
 					ctx, cancel := xcontext.WithCancel(t.Context())
-					p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
+					p, err := New(ctx, WithLimit[*testItem, testItem](1))
+					require.NoError(t, err)
 
 					results := make(chan error)
 					go func() {
@@ -1096,7 +1111,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					createCounter atomic.Int64
 					closeCounter  atomic.Int64
 				)
-				p := New(t.Context(),
+				p := mustNewPool(t,
 					WithLimit[*testItem, testItem](1),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
 						createCounter.Add(1)
@@ -1129,7 +1144,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					deleteItems atomic.Int64
 					expErr      = errors.New("expected error")
 				)
-				p := New(t.Context(),
+				p := mustNewPool(t,
 					WithLimit[*testItem, testItem](1),
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
@@ -1176,7 +1191,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				closed  atomic.Int32
 			)
 
-			p := New[*testItem, testItem](ctx,
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](1),
 				WithItemUsageLimit[*testItem, testItem](usageLimit),
 				WithCreateItemFunc(func(context.Context) (*testItem, error) {
@@ -1219,12 +1234,12 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			ctx := t.Context()
 			var (
-				created     atomic.Int32
-				closed      atomic.Int32
-				fakeClock   = clockwork.NewFakeClock()
+				created   atomic.Int32
+				closed    atomic.Int32
+				fakeClock = clockwork.NewFakeClock()
 			)
 
-			p := New[*testItem, testItem](ctx,
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](1),
 				WithItemUsageTTL[*testItem, testItem](usageTTL),
 				WithClock[*testItem, testItem](fakeClock),
@@ -1273,7 +1288,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				spoiled sync.Map // item id -> struct{}
 			)
 
-			p := New[*testItem, testItem](ctx,
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](2),
 				WithCreateItemFunc(func(context.Context) (*testItem, error) {
 					id := created.Add(1)
@@ -1356,7 +1371,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					)
 				}
 			}
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](1),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
@@ -1442,7 +1457,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					)
 				}
 			}
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](1),
 				WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 				WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
@@ -1486,7 +1501,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					created           atomic.Int32
 					errMustDeleteItem = errors.New("info must be deleted")
 				)
-				p := New[*testItem, testItem](t.Context(),
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](1),
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
@@ -1532,7 +1547,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						require.GreaterOrEqual(t, stats.Limit, stats.Idle)
 					},
 				}
-				p := New[*testItem, testItem](t.Context(),
+				p := mustNewPool[*testItem, testItem](t,
 					WithTrace[*testItem, testItem](trace),
 				)
 				r := xrand.New(xrand.WithLock())
@@ -1571,7 +1586,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						require.LessOrEqual(t, stats.Idle, DefaultLimit)
 					},
 				}
-				p := New[*testItem, testItem](t.Context(),
+				p := mustNewPool[*testItem, testItem](t,
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithTrace[*testItem, testItem](trace),
@@ -1600,7 +1615,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("AlwaysSatisfiedWhenIdleAvailable", func(t *testing.T) {
 			var createdCount atomic.Int32
 
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](3),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					idx := createdCount.Add(1) - 1
@@ -1641,7 +1656,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 
 		t.Run("RemovesIdleToMakeSpace", func(t *testing.T) {
-			p := New[*testItem, testItem](t.Context(),
+			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](2),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					nodeID, has := endpoint.ContextNodeID(ctx)
@@ -1682,7 +1697,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("PreferredNodeIDAllBusy", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var idx atomic.Uint32
-				p := New[*testItem, testItem](t.Context(),
+				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](2),
 					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 						nodeID, has := endpoint.ContextNodeID(ctx)

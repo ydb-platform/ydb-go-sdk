@@ -22,6 +22,7 @@ func TestNew(t *testing.T) {
 		require.Equal(t, time.Duration(0), cfg.PoolSessionUsageTTL())
 		require.Equal(t, time.Duration(0), cfg.SessionIdleTimeToLive())
 		require.False(t, cfg.LazyTx())
+		require.Equal(t, 0, cfg.PoolWarmUpSize())
 	})
 
 	t.Run("WithPoolLimit", func(t *testing.T) {
@@ -120,6 +121,23 @@ func TestNew(t *testing.T) {
 	})
 }
 
+func TestWithSessionPoolKeepAliveMinSize(t *testing.T) {
+	t.Run("explicit value", func(t *testing.T) {
+		cfg := New(WithSessionPoolKeepAliveMinSize(20))
+		require.Equal(t, 20, cfg.PoolWarmUpSize())
+	})
+
+	t.Run("zero disables warm-up", func(t *testing.T) {
+		cfg := New(WithSessionPoolKeepAliveMinSize(0))
+		require.Equal(t, 0, cfg.PoolWarmUpSize())
+	})
+
+	t.Run("negative disables warm-up", func(t *testing.T) {
+		cfg := New(WithSessionPoolKeepAliveMinSize(-1))
+		require.Equal(t, 0, cfg.PoolWarmUpSize())
+	})
+}
+
 func TestDefaults(t *testing.T) {
 	cfg := defaults()
 	require.NotNil(t, cfg)
@@ -127,4 +145,5 @@ func TestDefaults(t *testing.T) {
 	require.Equal(t, DefaultSessionCreateTimeout, cfg.sessionCreateTimeout)
 	require.Equal(t, DefaultSessionDeleteTimeout, cfg.sessionDeleteTimeout)
 	require.NotNil(t, cfg.trace)
+	require.Equal(t, 0, cfg.poolWarmUpSize)
 }

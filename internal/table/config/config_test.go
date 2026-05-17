@@ -63,10 +63,24 @@ func TestWithSessionPoolSessionUsageLimit(t *testing.T) {
 }
 
 func TestWithKeepAliveMinSize(t *testing.T) {
-	t.Run("deprecated function", func(t *testing.T) {
+	t.Run("explicit value", func(t *testing.T) {
 		c := New(WithKeepAliveMinSize(20))
-		// This function is deprecated and does nothing
-		require.Equal(t, DefaultKeepAliveMinSize, c.KeepAliveMinSize())
+		require.Equal(t, 20, c.KeepAliveMinSize())
+	})
+
+	t.Run("zero disables warm-up", func(t *testing.T) {
+		c := New(WithKeepAliveMinSize(0))
+		require.Equal(t, 0, c.KeepAliveMinSize())
+	})
+
+	t.Run("negative disables warm-up", func(t *testing.T) {
+		c := New(WithKeepAliveMinSize(-1))
+		require.Equal(t, 0, c.KeepAliveMinSize())
+	})
+
+	t.Run("default disables warm-up", func(t *testing.T) {
+		c := New()
+		require.Equal(t, 0, c.KeepAliveMinSize())
 	})
 }
 

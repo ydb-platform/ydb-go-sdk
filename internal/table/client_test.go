@@ -52,7 +52,7 @@ func TestRaceWgClosed(t *testing.T) {
 		defer cancel()
 
 		wg := sync.WaitGroup{}
-		p := New(ctx,
+		p, err := New(ctx,
 			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(any) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
@@ -62,6 +62,7 @@ func TestRaceWgClosed(t *testing.T) {
 			})),
 			config.New(config.WithSizeLimit(limit)),
 		)
+		require.NoError(t, err)
 		for j := 0; j < limit*10; j++ {
 			wg.Add(1)
 			go func() {
