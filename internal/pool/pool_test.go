@@ -1612,7 +1612,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				close(wait)
 				finished.Wait()
 				mustClose(t, p)
-			}, xtest.StopAfter(time.Minute))
+			})
 		})
 	})
 }

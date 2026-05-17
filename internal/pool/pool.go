@@ -53,7 +53,6 @@ type (
 	Pool[PT ItemConstraint[T], T any] struct {
 		config *Config[PT, T]
 
-		createItem       func(ctx context.Context) (PT, error)
 		createInProgress atomic.Int32
 
 		sema chan struct{}
@@ -176,17 +175,13 @@ func New[PT ItemConstraint[T], T any](
 		p.sema <- struct{}{}
 	}
 
-	p.createItem = func(ctx context.Context) (PT, error) {
-		return createItem(ctx, p)
-	}
-
 	return p
 }
 
 // createItem wraps the Config.createItemFunc function with timeout handling
 //
 // Given context restrictions (timeout, cancel) ignored
-func createItem[PT ItemConstraint[T], T any](ctx context.Context, p *Pool[PT, T]) (PT, error) {
+func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
 	createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
 	defer cancelCreate()
 
@@ -205,6 +200,19 @@ func createItem[PT ItemConstraint[T], T any](ctx context.Context, p *Pool[PT, T]
 	}
 
 	return item, nil
+}
+
+// closeItem wraps the Config.closeItemFunc function with timeout handling
+func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) {
+	closeCtx, cancelClose := xcontext.WithDone(ctx, p.done)
+	defer cancelClose()
+
+	if d := p.config.closeTimeout; d > 0 {
+		closeCtx, cancelClose = context.WithTimeout(closeCtx, d)
+		defer cancelClose()
+	}
+
+	p.config.closeItemFunc(closeCtx, item)
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
@@ -289,7 +297,7 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 
 	defer func() {
 		if err := p.checkItemAndError(info.item, finalErr); err != nil {
-			p.config.closeItemFunc(ctx, info.item)
+			p.closeItem(ctx, info.item)
 
 			return
 		}
@@ -379,7 +387,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 		for _, info := range data {
 			go func() {
 				defer waitCloses.Done()
-				p.config.closeItemFunc(ctx, info.item)
+				p.closeItem(ctx, info.item)
 			}()
 		}
 		waitCloses.Wait()
@@ -492,7 +500,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 			if info.item.IsAlive() && !needCloseItem(p.config, info) {
 				return info, nil
 			}
-			p.config.closeItemFunc(ctx, info.item)
+			p.closeItem(ctx, info.item)
 		}
 	}
 
@@ -500,7 +508,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 		// clear one slot in p.idle for create item with predefined nodeID latter
 		info, err := p.idle.Pop()
 		if err == nil {
-			p.config.closeItemFunc(ctx, info.item)
+			p.closeItem(ctx, info.item)
 		}
 	}
 
@@ -539,7 +547,7 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (final
 
 	select {
 	case <-p.done:
-		p.config.closeItemFunc(ctx, info.item)
+		p.closeItem(ctx, info.item)
 
 		return xerrors.WithStackTrace(errClosedPool)
 	default:
@@ -547,7 +555,7 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (final
 		info.lastUsage = p.config.clock.Now()
 
 		if err := p.idle.Put(info); err != nil {
-			p.config.closeItemFunc(ctx, info.item)
+			p.closeItem(ctx, info.item)
 
 			return err
 		}
