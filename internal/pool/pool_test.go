@@ -1561,15 +1561,16 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 		t.Run("PreferredNodeIDAllBusy", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
-				var idx uint32
+				var idx atomic.Uint32
 				p := New[*testItem, testItem](t.Context(),
 					WithLimit[*testItem, testItem](2),
 					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 						nodeID, has := endpoint.ContextNodeID(ctx)
 						if !has {
-							nodeID = idx
+							nodeID = idx.Add(1) - 1
+						} else {
+							idx.Add(1)
 						}
-						idx = idx + 1
 
 						return &testItem{
 							onNodeID: func() uint32 {
