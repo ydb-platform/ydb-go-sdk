@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -30,6 +31,8 @@ type (
 		txSettings query.TransactionSettings
 
 		completed bool
+
+		unlazyOnce xsync.Once[empty.Struct]
 
 		onBeforeCommit xsync.Set[*baseTx.OnTransactionBeforeCommit]
 		onCompleted    xsync.Set[*baseTx.OnTransactionCompletedFunc]
@@ -56,18 +59,19 @@ func begin(
 }
 
 func (tx *Transaction) UnLazy(ctx context.Context) error {
-	if tx.ID() != baseTx.LazyTxID {
-		return nil
-	}
+	_, err := tx.unlazyOnce.Do(func() (empty.Struct, error) {
+		if tx.ID() != baseTx.LazyTxID {
+			return empty.Struct{}, nil
+		}
 
-	txID, err := begin(ctx, tx.s.client, tx.s.ID(), tx.txSettings)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
+		txID, err := begin(ctx, tx.s.client, tx.s.ID(), tx.txSettings)
+		err = xerrors.WithStackTrace(err)
+		tx.SetTxID(txID)
 
-	tx.SetTxID(txID)
+		return empty.Struct{}, err
+	})
 
-	return nil
+	return err
 }
 
 func (tx *Transaction) QueryResultSet(

@@ -71,30 +71,30 @@ type (
 		config  *config.Config
 		options []config.Option
 
-		discovery        *xsync.Once[*internalDiscovery.Client]
+		discovery        *xsync.OnceCloser[*internalDiscovery.Client]
 		discoveryOptions []discoveryConfig.Option
 
-		operation *xsync.Once[*operation.Client]
+		operation *xsync.OnceCloser[*operation.Client]
 
-		table        *xsync.Once[*internalTable.Client]
+		table        *xsync.OnceCloser[*internalTable.Client]
 		tableOptions []tableConfig.Option
 
-		query        *xsync.Once[*internalQuery.Client]
+		query        *xsync.OnceCloser[*internalQuery.Client]
 		queryOptions []queryConfig.Option
 
-		scripting        *xsync.Once[*internalScripting.Client]
+		scripting        *xsync.OnceCloser[*internalScripting.Client]
 		scriptingOptions []scriptingConfig.Option
 
-		scheme        *xsync.Once[*internalScheme.Client]
+		scheme        *xsync.OnceCloser[*internalScheme.Client]
 		schemeOptions []schemeConfig.Option
 
-		coordination        *xsync.Once[*internalCoordination.Client]
+		coordination        *xsync.OnceCloser[*internalCoordination.Client]
 		coordinationOptions []coordinationConfig.Option
 
-		ratelimiter        *xsync.Once[*internalRatelimiter.Client]
+		ratelimiter        *xsync.OnceCloser[*internalRatelimiter.Client]
 		ratelimiterOptions []ratelimiterConfig.Option
 
-		topic        *xsync.Once[*topicclientinternal.Client]
+		topic        *xsync.OnceCloser[*topicclientinternal.Client]
 		topicOptions []topicoptions.TopicOption
 
 		databaseSQLOptions []xsql.Option
@@ -471,7 +471,7 @@ func (d *Driver) connect(ctx context.Context) error {
 	}
 	d.metaBalancer.meta = d.config.Meta()
 
-	d.table = xsync.OnceValue(func() (*internalTable.Client, error) {
+	d.table = xsync.OnceCloserValue(func() (*internalTable.Client, error) {
 		return internalTable.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			tableConfig.New(
@@ -488,7 +488,7 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.query = xsync.OnceValue(func() (*internalQuery.Client, error) {
+	d.query = xsync.OnceCloserValue(func() (*internalQuery.Client, error) {
 		return internalQuery.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			queryConfig.New(
@@ -503,7 +503,7 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.scheme = xsync.OnceValue(func() (*internalScheme.Client, error) {
+	d.scheme = xsync.OnceCloserValue(func() (*internalScheme.Client, error) {
 		return internalScheme.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			schemeConfig.New(
@@ -519,7 +519,7 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.coordination = xsync.OnceValue(func() (*internalCoordination.Client, error) {
+	d.coordination = xsync.OnceCloserValue(func() (*internalCoordination.Client, error) {
 		return internalCoordination.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			coordinationConfig.New(
@@ -534,7 +534,7 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.ratelimiter = xsync.OnceValue(func() (*internalRatelimiter.Client, error) {
+	d.ratelimiter = xsync.OnceCloserValue(func() (*internalRatelimiter.Client, error) {
 		return internalRatelimiter.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			ratelimiterConfig.New(
@@ -549,7 +549,7 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.discovery = xsync.OnceValue(func() (*internalDiscovery.Client, error) {
+	d.discovery = xsync.OnceCloserValue(func() (*internalDiscovery.Client, error) {
 		return internalDiscovery.New(xcontext.ValueOnly(ctx),
 			d.pool.Get(endpoint.New(d.config.Endpoint())),
 			discoveryConfig.New(
@@ -568,13 +568,13 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.operation = xsync.OnceValue(func() (*operation.Client, error) {
+	d.operation = xsync.OnceCloserValue(func() (*operation.Client, error) {
 		return operation.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 		), nil
 	})
 
-	d.scripting = xsync.OnceValue(func() (*internalScripting.Client, error) {
+	d.scripting = xsync.OnceCloserValue(func() (*internalScripting.Client, error) {
 		return internalScripting.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			scriptingConfig.New(
@@ -589,7 +589,7 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.topic = xsync.OnceValue(func() (*topicclientinternal.Client, error) {
+	d.topic = xsync.OnceCloserValue(func() (*topicclientinternal.Client, error) {
 		return topicclientinternal.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			d.config.Credentials(),

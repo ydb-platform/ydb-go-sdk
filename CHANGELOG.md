@@ -1,3 +1,4 @@
+* Fixed a data race when starting multiple writers within a transaction
 * Fixed passing wait server ack to sub-writers in topicmultiwriter
 
 ## v3.136.2
