@@ -27,103 +27,105 @@ import (
 // attach stream (see session_core.listenAttachStream) are removed from the idle container
 // on the next pool.With and replaced with a newly created session.
 func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
-	ctx := xtest.Context(t)
-	ctrl := gomock.NewController(t)
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
 
-	var (
-		sessionSeq     atomic.Int32
-		createSessions atomic.Int32
-		deleteSessions atomic.Int32
-	)
+		var (
+			sessionSeq     atomic.Int32
+			createSessions atomic.Int32
+			deleteSessions atomic.Int32
+		)
 
-	breakAttach := make(chan struct{})
-	attachBroken := make(chan struct{})
-	var attachBrokenOnce sync.Once
+		breakAttach := make(chan struct{})
+		attachBroken := make(chan struct{})
+		var attachBrokenOnce sync.Once
 
-	client := NewMockQueryServiceClient(ctrl)
-	client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(context.Context, *Ydb_Query.CreateSessionRequest, ...grpc.CallOption) (*Ydb_Query.CreateSessionResponse, error) {
-			createSessions.Add(1)
-			id := sessionSeq.Add(1)
+		client := NewMockQueryServiceClient(ctrl)
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(context.Context, *Ydb_Query.CreateSessionRequest, ...grpc.CallOption) (*Ydb_Query.CreateSessionResponse, error) {
+				createSessions.Add(1)
+				id := sessionSeq.Add(1)
 
-			return &Ydb_Query.CreateSessionResponse{
-				Status:    Ydb.StatusIds_SUCCESS,
-				SessionId: fmt.Sprintf("sess-%d", id),
-			}, nil
-		}).AnyTimes()
-	var attachSessions atomic.Int32
-	client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, _ *Ydb_Query.AttachSessionRequest, _ ...grpc.CallOption) (
-			Ydb_Query_V1.QueryService_AttachSessionClient, error,
-		) {
-			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-			var firstRecv atomic.Bool
-			breakableAttach := attachSessions.Add(1) == 1
-			attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
-				if !firstRecv.Swap(true) {
-					return &Ydb_Query.SessionState{
-						Status: Ydb.StatusIds_SUCCESS,
-					}, nil
-				}
+				return &Ydb_Query.CreateSessionResponse{
+					Status:    Ydb.StatusIds_SUCCESS,
+					SessionId: fmt.Sprintf("sess-%d", id),
+				}, nil
+			}).AnyTimes()
+		var attachSessions atomic.Int32
+		client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, _ *Ydb_Query.AttachSessionRequest, _ ...grpc.CallOption) (
+				Ydb_Query_V1.QueryService_AttachSessionClient, error,
+			) {
+				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+				var firstRecv atomic.Bool
+				breakableAttach := attachSessions.Add(1) == 1
+				attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
+					if !firstRecv.Swap(true) {
+						return &Ydb_Query.SessionState{
+							Status: Ydb.StatusIds_SUCCESS,
+						}, nil
+					}
 
-				if !breakableAttach {
-					return &Ydb_Query.SessionState{
-						Status: Ydb.StatusIds_SUCCESS,
-					}, nil
-				}
+					if !breakableAttach {
+						return &Ydb_Query.SessionState{
+							Status: Ydb.StatusIds_SUCCESS,
+						}, nil
+					}
 
-				<-breakAttach
-				attachBrokenOnce.Do(func() {
-					close(attachBroken)
-				})
+					<-breakAttach
+					attachBrokenOnce.Do(func() {
+						close(attachBroken)
+					})
 
-				return nil, grpcStatus.Error(grpcCodes.Unavailable, "attach stream broken")
+					return nil, grpcStatus.Error(grpcCodes.Unavailable, "attach stream broken")
+				}).AnyTimes()
+
+				return attachStream, nil
+			}).AnyTimes()
+		client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(context.Context, *Ydb_Query.DeleteSessionRequest, ...grpc.CallOption) (*Ydb_Query.DeleteSessionResponse, error) {
+				deleteSessions.Add(1)
+
+				return &Ydb_Query.DeleteSessionResponse{
+					Status: Ydb.StatusIds_SUCCESS,
+				}, nil
 			}).AnyTimes()
 
-			return attachStream, nil
-		}).AnyTimes()
-	client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(context.Context, *Ydb_Query.DeleteSessionRequest, ...grpc.CallOption) (*Ydb_Query.DeleteSessionResponse, error) {
-			deleteSessions.Add(1)
+		p := testExplicitSessionPool(ctx, client)
 
-			return &Ydb_Query.DeleteSessionResponse{
-				Status: Ydb.StatusIds_SUCCESS,
-			}, nil
-		}).AnyTimes()
+		var firstSessionID string
+		err := do(ctx, p, func(ctx context.Context, s *Session) error {
+			firstSessionID = s.ID()
+			require.True(t, s.IsAlive())
 
-	p := testExplicitSessionPool(ctx, client)
+			return nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, int32(1), createSessions.Load())
+		require.Equal(t, int32(0), deleteSessions.Load())
+		require.Equal(t, 1, p.Stats().Idle)
 
-	var firstSessionID string
-	err := do(ctx, p, func(ctx context.Context, s *Session) error {
-		firstSessionID = s.ID()
-		require.True(t, s.IsAlive())
+		close(breakAttach)
 
-		return nil
+		select {
+		case <-attachBroken:
+		case <-time.After(time.Second):
+			t.Fatal("attach stream did not break in time")
+		}
+
+		err = do(ctx, p, func(ctx context.Context, s *Session) error {
+			require.NotEqual(t, firstSessionID, s.ID())
+			require.True(t, s.IsAlive())
+
+			return nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, int32(2), createSessions.Load())
+		require.Equal(t, int32(1), deleteSessions.Load(),
+			"spoiled idle session must be closed when taken from the pool",
+		)
 	})
-	require.NoError(t, err)
-	require.Equal(t, int32(1), createSessions.Load())
-	require.Equal(t, int32(0), deleteSessions.Load())
-	require.Equal(t, 1, p.Stats().Idle)
-
-	close(breakAttach)
-
-	select {
-	case <-attachBroken:
-	case <-time.After(time.Second):
-		t.Fatal("attach stream did not break in time")
-	}
-
-	err = do(ctx, p, func(ctx context.Context, s *Session) error {
-		require.NotEqual(t, firstSessionID, s.ID())
-		require.True(t, s.IsAlive())
-
-		return nil
-	})
-	require.NoError(t, err)
-	require.Equal(t, int32(2), createSessions.Load())
-	require.Equal(t, int32(1), deleteSessions.Load(),
-		"spoiled idle session must be closed when taken from the pool",
-	)
 }
 
 func testExplicitSessionPool(
