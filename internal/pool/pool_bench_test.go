@@ -147,10 +147,10 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	}
 }
 
-// BenchmarkPoolWith/concurrency=1-12         12723211       1012 ns/op     976 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=250-12       14077390       940.0 ns/op    975 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=500-12       14017958       946.7 ns/op    975 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=1000-12      8518287        1223 ns/op     974 B/op     19 allocs/op
+// BenchmarkPoolWith/concurrency=1-12         11756128       996.1 ns/op    976 B/op     19 allocs/op
+// BenchmarkPoolWith/concurrency=250-12       14696725       881.6 ns/op    976 B/op     19 allocs/op
+// BenchmarkPoolWith/concurrency=500-12       14672084       821.6 ns/op    975 B/op     19 allocs/op
+// BenchmarkPoolWith/concurrency=1000-12      13292019       1629 ns/op     975 B/op     19 allocs/op
 func BenchmarkPoolWith(b *testing.B) {
 	for _, goroutines := range []int{1, 250, 500, 1000} {
 		b.Run(fmt.Sprintf("concurrency=%d", goroutines), func(b *testing.B) {
