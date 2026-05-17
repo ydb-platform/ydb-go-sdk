@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -42,7 +42,7 @@ type (
 		idleTimeToLive     time.Duration
 		itemUsageLimit     uint64
 		itemUsageTTL       time.Duration
-		keepAliveMinSize   int
+		warmUpItems        int
 	}
 	itemInfo[PT ItemConstraint[T], T any] struct {
 		item       PT
@@ -53,12 +53,10 @@ type (
 	Pool[PT ItemConstraint[T], T any] struct {
 		config *Config[PT, T]
 
-		createInProgress atomic.Int32
+		stats *xsync.Value[Stats]
 
 		sema chan struct{}
 		idle container[PT, T]
-
-		concurrency atomic.Int64
 
 		done chan struct{}
 	}
@@ -125,10 +123,10 @@ func WithClock[PT ItemConstraint[T], T any](clock clockwork.Clock) Option[PT, T]
 	}
 }
 
-func WithKeepAliveMinSize[PT ItemConstraint[T], T any](size int) Option[PT, T] {
+func WithWarmUpItems[PT ItemConstraint[T], T any](size int) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		if size > 0 {
-			c.keepAliveMinSize = size
+			c.warmUpItems = size
 		}
 	}
 }
@@ -166,6 +164,10 @@ func New[PT ItemConstraint[T], T any](
 		}
 	}
 
+	p.stats = xsync.NewValue(Stats{
+		Limit: p.config.limit,
+	})
+
 	if onNew := p.config.trace.OnNew; onNew != nil {
 		onDone := onNew(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.New"),
@@ -193,7 +195,7 @@ func New[PT ItemConstraint[T], T any](
 }
 
 func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
-	n := p.config.keepAliveMinSize
+	n := p.config.warmUpItems
 	if n <= 0 {
 		return nil
 	}
@@ -221,7 +223,13 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
 		}
 	}
 
-	p.changeState()
+	p.changeStats(func(old Stats) Stats {
+		old.Size = n
+		old.Idle = n
+		old.WarmUp = n
+
+		return old
+	})
 
 	return nil
 }
@@ -230,6 +238,19 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
 //
 // Given context restrictions (timeout, cancel) ignored
 func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
+	p.changeStats(func(old Stats) (new Stats) {
+		old.CreateInProgress++
+
+		return old
+	})
+	defer func() {
+		p.changeStats(func(old Stats) (new Stats) {
+			old.CreateInProgress--
+
+			return old
+		})
+	}()
+
 	createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
 	defer cancelCreate()
 
@@ -247,11 +268,25 @@ func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
 		return nil, errNilItem
 	}
 
+	p.changeStats(func(old Stats) (new Stats) {
+		old.Size++
+
+		return old
+	})
+
 	return item, nil
 }
 
 // closeItem wraps the Config.closeItemFunc function with timeout handling
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) {
+	defer func() {
+		p.changeStats(func(old Stats) (new Stats) {
+			old.Size--
+
+			return old
+		})
+	}()
+
 	closeCtx, cancelClose := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
 	defer cancelClose()
 
@@ -264,21 +299,22 @@ func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) {
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
-	return Stats{
-		Limit:            p.config.limit,
-		Idle:             p.idle.Len(),
-		Concurrency:      int(p.concurrency.Load()),
-		CreateInProgress: int(p.createInProgress.Load()),
-	}
+	return p.stats.Get()
 }
 
-func (p *Pool[PT, T]) changeState() {
+func (p *Pool[PT, T]) changeStats(f func(old Stats) Stats) {
 	onChange := p.config.trace.OnChange
-	if onChange == nil {
-		return
-	}
 
-	onChange(p.Stats())
+	var new Stats
+	p.stats.Change(func(old Stats) Stats {
+		new = f(old)
+
+		return new
+	})
+
+	if onChange != nil {
+		onChange(new)
+	}
 }
 
 func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
@@ -322,10 +358,9 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		if !ok {
 			return xerrors.WithStackTrace(errClosedPool)
 		}
-		p.changeState()
+
 		defer func() {
 			p.sema <- struct{}{}
-			p.changeState()
 		}()
 	}
 
@@ -342,7 +377,19 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		return xerrors.WithStackTrace(err)
 	}
 
+	p.changeStats(func(old Stats) Stats {
+		old.InUse++
+
+		return old
+	})
+
 	defer func() {
+		p.changeStats(func(old Stats) Stats {
+			old.InUse--
+
+			return old
+		})
+
 		if err := p.checkItemAndError(info.item, finalErr); err != nil {
 			p.closeItem(ctx, info.item)
 
@@ -365,9 +412,17 @@ func (p *Pool[PT, T]) With(
 	f func(ctx context.Context, item PT) error,
 	opts ...retry.Option,
 ) (finalErr error) {
-	p.concurrency.Add(1)
+	p.changeStats(func(old Stats) Stats {
+		old.Concurrency++
+
+		return old
+	})
 	defer func() {
-		p.concurrency.Add(-1)
+		p.changeStats(func(old Stats) Stats {
+			old.Concurrency--
+
+			return old
+		})
 	}()
 
 	var attempts int
@@ -510,7 +565,17 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 	return res
 }
 
-func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool) (*itemInfo[PT, T], error) {
+func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool) (info *itemInfo[PT, T], _ error) {
+	defer func() {
+		if info != nil {
+			p.changeStats(func(old Stats) Stats {
+				old.Idle--
+
+				return old
+			})
+		}
+	}()
+
 	if useNodeID {
 		return p.idle.PopByNodeID(nodeID)
 	}
@@ -560,9 +625,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 	}
 
 	// create item after two fails
-	p.createInProgress.Add(1)
 	item, err := p.createItem(ctx)
-	p.createInProgress.Add(-1)
 	if err != nil {
 		if isRetriable(err) {
 			return nil, xerrors.Retryable(err)
@@ -611,6 +674,14 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (final
 			p.closeItem(ctx, info.item)
 
 			return err
+		}
+
+		if info != nil {
+			p.changeStats(func(old Stats) Stats {
+				old.Idle++
+
+				return old
+			})
 		}
 
 		return nil

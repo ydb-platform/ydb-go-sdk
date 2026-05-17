@@ -773,7 +773,7 @@ func newWithQueryServiceClient(ctx context.Context,
 	}
 	explicitSessionPool, err := pool.New(ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
-		pool.WithKeepAliveMinSize[*Session](cfg.PoolWarmUpSize()),
+		pool.WithWarmUpItems[*Session](cfg.PoolWarmUpSize()),
 		pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
 		pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
 		pool.WithTrace[*Session](poolTrace(cfg.Trace())),

@@ -35,7 +35,7 @@ func TestWarmUp(t *testing.T) {
 
 		p := mustNewPool[*testItem, testItem](t,
 			WithLimit[*testItem, testItem](10),
-			WithKeepAliveMinSize[*testItem, testItem](warmUpSize),
+			WithWarmUpItems[*testItem, testItem](warmUpSize),
 			WithCreateItemFunc(func(context.Context) (*testItem, error) {
 				created.Add(1)
 
@@ -57,7 +57,7 @@ func TestWarmUp(t *testing.T) {
 
 		p := mustNewPool[*testItem, testItem](t,
 			WithLimit[*testItem, testItem](limit),
-			WithKeepAliveMinSize[*testItem, testItem](warmUpSize),
+			WithWarmUpItems[*testItem, testItem](warmUpSize),
 			WithCreateItemFunc(func(context.Context) (*testItem, error) {
 				created.Add(1)
 
@@ -73,7 +73,7 @@ func TestWarmUp(t *testing.T) {
 		createErr := errors.New("warm-up create failed")
 
 		_, err := New[*testItem, testItem](t.Context(),
-			WithKeepAliveMinSize[*testItem, testItem](2),
+			WithWarmUpItems[*testItem, testItem](2),
 			WithCreateItemFunc(func(context.Context) (*testItem, error) {
 				return nil, createErr
 			}),
@@ -85,7 +85,7 @@ func TestWarmUp(t *testing.T) {
 		ydbErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 
 		_, err := New[*testItem, testItem](t.Context(),
-			WithKeepAliveMinSize[*testItem, testItem](1),
+			WithWarmUpItems[*testItem, testItem](1),
 			WithCreateItemFunc(func(context.Context) (*testItem, error) {
 				return nil, ydbErr
 			}),
@@ -100,7 +100,7 @@ func TestWarmUp(t *testing.T) {
 		var created atomic.Int32
 
 		_, err := New[*testItem, testItem](ctx,
-			WithKeepAliveMinSize[*testItem, testItem](1),
+			WithWarmUpItems[*testItem, testItem](1),
 			WithCreateItemFunc(func(context.Context) (*testItem, error) {
 				created.Add(1)
 
