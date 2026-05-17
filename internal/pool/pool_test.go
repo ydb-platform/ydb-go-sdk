@@ -69,11 +69,10 @@ var defaultTrace = &Trace{
 	},
 	OnGet: func(ctx *context.Context, call stack.Caller) func(
 		info any,
-		attempts int,
 		nodeHintInfo *trace.NodeHintInfo,
 		err error,
 	) {
-		return func(info any, attempts int, nodeHintInfo *trace.NodeHintInfo, err error) {
+		return func(info any, nodeHintInfo *trace.NodeHintInfo, err error) {
 		}
 	},
 	onWait: func() func(info any, err error) {
@@ -166,11 +165,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				var preferredID uint32
 				hintTrace.OnGet = func(ctx *context.Context, call stack.Caller) func(
 					info any,
-					attempts int,
 					nodeHintInfo *trace.NodeHintInfo,
 					err error,
 				) {
-					return func(info any, attempts int, nodeHintInfo *trace.NodeHintInfo, err error) {
+					return func(info any, nodeHintInfo *trace.NodeHintInfo, err error) {
 						if nodeHintInfo != nil {
 							preferredID = nodeHintInfo.PreferredNodeID
 						}
@@ -623,7 +621,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			t.Run("CloseWhileTryBeforeSemaphoreAcquire", func(t *testing.T) {
 				// pool.With entered try (OnTry fired) but has not taken a semaphore slot yet;
-				// analogue of the old "racy" wait-queue registration case.
+				// analog of the old "racy" wait-queue registration case.
 				ctx := t.Context()
 				tryStarted := make(chan struct{})
 				trace := *defaultTrace
@@ -1519,7 +1517,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			// Pool should still be within limit
 			stats := p.Stats()
 			require.Equal(t, 3, stats.Limit)
-			require.LessOrEqual(t, stats.Index, 3)
+			require.LessOrEqual(t, stats.Idle, 3)
 		})
 
 		t.Run("RemovesIdleToMakeSpace", func(t *testing.T) {
@@ -1558,7 +1556,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			// Pool should not exceed limit
 			stats := p.Stats()
-			require.LessOrEqual(t, stats.Index, 2)
+			require.LessOrEqual(t, stats.Idle, 2)
 		})
 
 		t.Run("PreferredNodeIDAllBusy", func(t *testing.T) {

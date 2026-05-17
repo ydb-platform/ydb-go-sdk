@@ -486,7 +486,7 @@ func (s *singleSession) Close(ctx context.Context) error {
 func (s *singleSession) Stats() pool.Stats {
 	return pool.Stats{
 		Limit: 1,
-		Index: 1,
+		Idle:  1,
 	}
 }
 

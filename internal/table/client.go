@@ -81,14 +81,13 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				},
 				OnGet: func(ctx *context.Context, call stack.Caller) func(
 					item any,
-					attempts int,
 					hintInfo *trace.NodeHintInfo,
 					err error,
 				) {
 					onDone := trace.TableOnPoolGet(config.Trace(), ctx, call)
 
-					return func(item any, attempts int, hintInfo *trace.NodeHintInfo, err error) {
-						onDone(item.(*Session), attempts, hintInfo, err) //nolint:forcetypeassert
+					return func(item any, hintInfo *trace.NodeHintInfo, err error) {
+						onDone(item.(*Session), hintInfo, err) //nolint:forcetypeassert
 					}
 				},
 				OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
@@ -100,7 +99,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				},
 				OnChange: func(stats pool.Stats) {
 					trace.TableOnPoolStateChange(config.Trace(),
-						stats.Limit, stats.Index, stats.Idle, stats.Wait, stats.CreateInProgress, stats.Index,
+						stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency,
 					)
 				},
 			}),

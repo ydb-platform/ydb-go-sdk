@@ -5,7 +5,4 @@ type Stats struct {
 	Idle             int
 	CreateInProgress int
 	Concurrency      int
-
-	Index int // Deprecated
-	Wait  int // Deprecated
 }

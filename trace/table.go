@@ -355,15 +355,9 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolStateChangeInfo struct {
 		Limit            int
-		Index            int
 		Idle             int
-		Wait             int
 		CreateInProgress int
-
-		// Deprecated: use Index field instead.
-		// Will be removed after March 2025.
-		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-		Size int
+		Concurrency      int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewStartInfo struct {
@@ -391,7 +385,6 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolGetDoneInfo struct {
 		Session      sessionInfo
-		Attempts     int
 		NodeHintInfo *NodeHintInfo
 		Error        error
 	}

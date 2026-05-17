@@ -217,8 +217,9 @@ func (p *Pool[PT, T]) Stats() Stats {
 	}
 }
 
-func (p *Pool[PT, T]) changeState(changeState func() Stats) {
-	if stats, onChange := changeState(), p.config.trace.OnChange; onChange != nil {
+func (p *Pool[PT, T]) changeState() {
+	stats := p.Stats()
+	if onChange := p.config.trace.OnChange; onChange != nil {
 		onChange(stats)
 	}
 }
@@ -264,8 +265,10 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		if !ok {
 			return xerrors.WithStackTrace(errClosedPool)
 		}
+		p.changeState()
 		defer func() {
 			p.sema <- struct{}{}
+			p.changeState()
 		}()
 	}
 
@@ -475,7 +478,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 				if info != nil {
 					item = info.item
 				}
-				onDone(item, 0, getNodeHintInfo(item, nodeID, hasPreferredNodeID, finalErr), finalErr)
+				onDone(item, getNodeHintInfo(item, nodeID, hasPreferredNodeID, finalErr), finalErr)
 			}()
 		}
 	}

@@ -16,7 +16,6 @@ type (
 		OnPut   func(ctx *context.Context, call stack.Caller, item any) func(err error)
 		OnGet   func(ctx *context.Context, call stack.Caller) func(
 			item any,
-			attempts int,
 			nodeHintInfo *trace.NodeHintInfo,
 			err error,
 		)

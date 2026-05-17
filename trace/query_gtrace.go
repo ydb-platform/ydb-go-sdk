@@ -1752,28 +1752,26 @@ func QueryOnPoolPut(t *Query, c *context.Context, call call, session sessionInfo
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnPoolGet(t *Query, c *context.Context, call call) func(session sessionInfo, attempts int, _ *NodeHintInfo, _ error) {
+func QueryOnPoolGet(t *Query, c *context.Context, call call) func(session sessionInfo, _ *NodeHintInfo, _ error) {
 	var p QueryPoolGetStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onPoolGet(p)
-	return func(session sessionInfo, attempts int, n *NodeHintInfo, e error) {
+	return func(session sessionInfo, n *NodeHintInfo, e error) {
 		var p QueryPoolGetDoneInfo
 		p.Session = session
-		p.Attempts = attempts
 		p.NodeHintInfo = n
 		p.Error = e
 		res(p)
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnPoolChange(t *Query, limit int, index int, idle int, wait int, createInProgress int) {
+func QueryOnPoolChange(t *Query, limit int, idle int, createInProgress int, concurrency int) {
 	var p QueryPoolChange
 	p.Limit = limit
-	p.Index = index
 	p.Idle = idle
-	p.Wait = wait
 	p.CreateInProgress = createInProgress
+	p.Concurrency = concurrency
 	t.onPoolChange(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

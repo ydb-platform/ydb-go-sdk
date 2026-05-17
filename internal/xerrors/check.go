@@ -1,8 +1,6 @@
 package xerrors
 
 import (
-	"context"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 )
 
@@ -22,14 +20,7 @@ func Check(err error) (
 		return int64(e.Code()), e.Type(), e.BackoffType()
 	}
 
-	switch {
-	case Is(err, context.Canceled, context.DeadlineExceeded):
-		return -1,
-			TypeConditionallyRetryable,
-			backoff.TypeInstant
-	default:
-		return -1,
-			TypeNonRetryable, // unknown errors are not retryable
-			backoff.TypeInstant
-	}
+	return -1,
+		TypeNonRetryable, // unknown errors are not retryable
+		backoff.TypeInstant
 }
