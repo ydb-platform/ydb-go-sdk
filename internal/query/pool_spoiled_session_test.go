@@ -37,6 +37,8 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 		)
 
 		breakAttach := make(chan struct{})
+		// Blocks listenAttachStream for healthy sessions until the test iteration ends.
+		holdHealthyAttach := make(chan struct{})
 
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -66,15 +68,18 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 						}, nil
 					}
 
-					if !breakableAttach {
-						return &Ydb_Query.SessionState{
-							Status: Ydb.StatusIds_SUCCESS,
-						}, nil
+					if breakableAttach {
+						select {
+						case <-breakAttach:
+							return nil, grpcStatus.Error(grpcCodes.Unavailable, "attach stream broken")
+						case <-holdHealthyAttach:
+							return nil, grpcStatus.Error(grpcCodes.Canceled, "attach stream closed")
+						}
 					}
 
-					<-breakAttach
+					<-holdHealthyAttach
 
-					return nil, grpcStatus.Error(grpcCodes.Unavailable, "attach stream broken")
+					return nil, grpcStatus.Error(grpcCodes.Canceled, "attach stream closed")
 				}).AnyTimes()
 
 				return attachStream, nil
@@ -91,6 +96,10 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 			}).AnyTimes()
 
 		p := testExplicitSessionPool(ctx, client)
+		t.Cleanup(func() {
+			close(holdHealthyAttach)
+			_ = p.Close(ctx)
+		})
 
 		var firstSession *Session
 		err := do(ctx, p, func(ctx context.Context, s *Session) error {
