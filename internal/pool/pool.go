@@ -272,10 +272,12 @@ func (p *Pool[PT, T]) Stats() Stats {
 }
 
 func (p *Pool[PT, T]) changeState() {
-	stats := p.Stats()
-	if onChange := p.config.trace.OnChange; onChange != nil {
-		onChange(stats)
+	onChange := p.config.trace.OnChange
+	if onChange == nil {
+		return
 	}
+
+	onChange(p.Stats())
 }
 
 func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
