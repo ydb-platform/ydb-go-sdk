@@ -3,7 +3,6 @@ package query
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -38,8 +37,6 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 		)
 
 		breakAttach := make(chan struct{})
-		attachBroken := make(chan struct{})
-		var attachBrokenOnce sync.Once
 
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -74,9 +71,6 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 					}
 
 					<-breakAttach
-					attachBrokenOnce.Do(func() {
-						close(attachBroken)
-					})
 
 					return nil, grpcStatus.Error(grpcCodes.Unavailable, "attach stream broken")
 				}).AnyTimes()
@@ -94,9 +88,9 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 
 		p := testExplicitSessionPool(ctx, client)
 
-		var firstSessionID string
+		var firstSession *Session
 		err := do(ctx, p, func(ctx context.Context, s *Session) error {
-			firstSessionID = s.ID()
+			firstSession = s
 			require.True(t, s.IsAlive())
 
 			return nil
@@ -108,14 +102,14 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 
 		close(breakAttach)
 
-		select {
-		case <-attachBroken:
-		case <-time.After(time.Second):
-			t.Fatal("attach stream did not break in time")
-		}
+		require.Eventually(t, func() bool {
+			return firstSession != nil && !firstSession.IsAlive()
+		}, time.Second, time.Millisecond,
+			"attach stream break must invalidate the idle session before pool re-acquires it",
+		)
 
 		err = do(ctx, p, func(ctx context.Context, s *Session) error {
-			require.NotEqual(t, firstSessionID, s.ID())
+			require.NotEqual(t, firstSession.ID(), s.ID())
 			require.True(t, s.IsAlive())
 
 			return nil
