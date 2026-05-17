@@ -1,3 +1,7 @@
+* Reworked the internal table/query session pool (semaphore-based concurrency limit instead of a wait queue) for lower overhead under load ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163))
+* Implemented `WithSessionPoolKeepAliveMinSize`: at driver initialization, pre-creates up to N sessions in the table client pool and the query explicit session pool (`N > 0`; `N <= 0` disables warm-up, default is no warm-up). Driver initialization fails if warm-up session creation fails
+* Session pool no longer retries `UNAUTHORIZED` errors returned while creating a session
+* **Trace/metrics (breaking for custom handlers):** pool state events now expose `Concurrency` instead of `Index`/`Wait` (`TablePoolStateChangeInfo`, `QueryPoolChange`); table pool metrics gauge `concurrency` replaces `index` and `wait`, query pool metrics gauge `concurrency` replaces `index`, `waiters_queue`, and derived `in_use`; `Attempts` removed from `TablePoolGetDoneInfo` and `QueryPoolGetDoneInfo`
 * Fixed passing wait server ack to sub-writers in topicmultiwriter
 
 ## v3.136.2
