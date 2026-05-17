@@ -40,7 +40,9 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(context.Context, *Ydb_Query.CreateSessionRequest, ...grpc.CallOption) (*Ydb_Query.CreateSessionResponse, error) {
+			func(context.Context, *Ydb_Query.CreateSessionRequest, ...grpc.CallOption) (
+				*Ydb_Query.CreateSessionResponse, error,
+			) {
 				createSessions.Add(1)
 				id := sessionSeq.Add(1)
 
@@ -78,7 +80,9 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 				return attachStream, nil
 			}).AnyTimes()
 		client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(context.Context, *Ydb_Query.DeleteSessionRequest, ...grpc.CallOption) (*Ydb_Query.DeleteSessionResponse, error) {
+			func(context.Context, *Ydb_Query.DeleteSessionRequest, ...grpc.CallOption) (
+				*Ydb_Query.DeleteSessionResponse, error,
+			) {
 				deleteSessions.Add(1)
 
 				return &Ydb_Query.DeleteSessionResponse{
