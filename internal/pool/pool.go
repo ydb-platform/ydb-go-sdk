@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -55,7 +54,7 @@ type (
 		config *Config[PT, T]
 
 		createItem       func(ctx context.Context) (PT, error)
-		createInProgress xsync.Value[int]
+		createInProgress atomic.Int32
 
 		sema chan struct{}
 		idle container[PT, T]
@@ -213,7 +212,7 @@ func (p *Pool[PT, T]) Stats() Stats {
 		Limit:            p.config.limit,
 		Idle:             p.idle.Len(),
 		Concurrency:      int(p.concurrency.Load()),
-		CreateInProgress: p.createInProgress.Get(),
+		CreateInProgress: int(p.createInProgress.Load()),
 	}
 }
 
@@ -506,7 +505,9 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 	}
 
 	// create item after two fails
+	p.createInProgress.Add(1)
 	item, err := p.createItem(ctx)
+	p.createInProgress.Add(-1)
 	if err != nil && isRetriable(err) {
 		return nil, xerrors.Retryable(err)
 	}
