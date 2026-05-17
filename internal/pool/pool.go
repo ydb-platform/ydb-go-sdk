@@ -211,10 +211,12 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
 			return xerrors.WithStackTrace(err)
 		}
 
-		if err = p.putItem(ctx, &itemInfo[PT, T]{
+		if err := p.idle.Put(&itemInfo[PT, T]{
 			item:    item,
 			created: p.config.clock.Now(),
 		}); err != nil {
+			p.closeItem(ctx, item)
+
 			return xerrors.WithStackTrace(err)
 		}
 	}
@@ -250,7 +252,7 @@ func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
 
 // closeItem wraps the Config.closeItemFunc function with timeout handling
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) {
-	closeCtx, cancelClose := xcontext.WithDone(ctx, p.done)
+	closeCtx, cancelClose := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
 	defer cancelClose()
 
 	if d := p.config.closeTimeout; d > 0 {
@@ -550,7 +552,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 	}
 
 	if hasPreferredNodeID && p.idle.Len() >= p.config.limit { // race between Len and Pop
-		// clear one slot in p.idle for create item with predefined nodeID latter
+		// clear one slot in p.idle for create item with predefined nodeID later
 		info, err := p.idle.Pop()
 		if err == nil {
 			p.closeItem(ctx, info.item)
@@ -583,7 +585,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 	}, nil
 }
 
-// p.mu must be free.
 func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (finalErr error) {
 	if onPut := p.config.trace.OnPut; onPut != nil {
 		onDone := onPut(&ctx,

@@ -57,7 +57,8 @@ func (container *sliceContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT
 		return nil, errNothingIdleItems
 	}
 
-	for i, info := range container.data {
+	for i := len(container.data) - 1; i >= 0; i-- {
+		info := container.data[i]
 		if info.item.NodeID() == nodeID {
 			container.data = append(container.data[:i], container.data[i+1:]...)
 
