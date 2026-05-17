@@ -158,18 +158,38 @@ func mustClose(t testing.TB, pool closer.Closer) {
 	}
 }
 
+func poolStats(limit int, mutate func(*Stats)) Stats {
+	s := Stats{Limit: limit}
+	if mutate != nil {
+		mutate(&s)
+	}
+
+	return s
+}
+
+func requirePoolStats(t testing.TB, p *Pool[*testItem, testItem], want Stats, msg ...any) {
+	t.Helper()
+	require.Equal(t, want, p.Stats(), msg...)
+}
+
 func TestPool(t *testing.T) { //nolint:gocyclo
 	t.Run("New", func(t *testing.T) {
 		t.Run("Default", func(t *testing.T) {
 			p := mustNewPool[*testItem, testItem](t,
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
+			requirePoolStats(t, p, poolStats(DefaultLimit, nil))
+
 			err := p.With(t.Context(), func(ctx context.Context, testItem *testItem) error {
 				require.EqualValues(t, 0, testItem.NodeID())
 
 				return nil
 			})
 			require.NoError(t, err)
+			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) {
+				s.Size = 1
+				s.Idle = 1
+			}))
 		})
 		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
@@ -207,98 +227,111 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					}),
 					WithLimit[*testItem, testItem](3),
 				)
+				requirePoolStats(t, p, poolStats(3, nil))
 
 				info := mustGetItem(t, p)
 				require.EqualValues(t, 0, int(info.item.NodeID()))
 				require.EqualValues(t, true, info.item.IsAlive())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1 }))
 				mustPutItem(t, p, info)
-				require.Equal(t, 1, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 				info, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
 				require.NoError(t, err)
 				require.EqualValues(t, 32, int(info.item.NodeID()))
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 2; s.Idle = 1 }))
 				mustPutItem(t, p, info)
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 2; s.Idle = 2 }))
 
 				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
 				require.NoError(t, err)
 				require.EqualValues(t, 33, int(info.item.NodeID()))
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info)
-				require.Equal(t, 3, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
 				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
 				require.NoError(t, err)
 				require.EqualValues(t, 32, int(info.item.NodeID()))
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info)
-				require.Equal(t, 3, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
 				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
 				require.NoError(t, err)
 				require.EqualValues(t, 33, int(info.item.NodeID()))
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info)
-				require.Equal(t, 3, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
 				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
 				require.NoError(t, err)
 				require.EqualValues(t, 32, int(info.item.NodeID()))
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				info2, err := p.getItem(endpoint.WithNodeID(t.Context(), 33))
 				require.NoError(t, err)
 				require.EqualValues(t, 33, info2.item.NodeID())
-				require.Equal(t, 1, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
 				mustPutItem(t, p, info2)
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info)
-				require.Equal(t, 3, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
 				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
 				require.NoError(t, err)
 				require.EqualValues(t, 32, int(info.item.NodeID()))
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				info2, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
 				require.NoError(t, err)
 				require.EqualValues(t, 33, info2.item.NodeID())
-				require.Equal(t, 1, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
 				mustPutItem(t, p, info)
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info2)
-				require.Equal(t, 3, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
 				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
 				require.NoError(t, err)
 				require.EqualValues(t, 32, int(info.item.NodeID()))
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				info2, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
 				require.NoError(t, err)
 				require.EqualValues(t, 33, int(info2.item.NodeID()))
-				require.Equal(t, 1, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
 				info3, err := p.getItem(t.Context())
 				require.NoError(t, err)
 				require.EqualValues(t, 0, info3.item.NodeID())
-				require.Equal(t, 0, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 0 }))
 				mustPutItem(t, p, info)
-				require.Equal(t, 1, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
 				mustPutItem(t, p, info2)
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info3)
-				require.Equal(t, 3, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 100))
 				require.NoError(t, err)
 				require.EqualValues(t, 100, preferredID)
 				require.EqualValues(t, 100, int(info.item.NodeID()))
-				require.Equal(t, 2, p.idle.Len())
+				// preferred-node eviction uses idle.Pop without decrementing Idle stat
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 				require.EqualValues(t, 4, int(newItemCalled))
 				_, _ = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-				require.Equal(t, 1, p.idle.Len())
+				stats := p.Stats()
+				require.Equal(t, 3, stats.Limit)
+				require.LessOrEqual(t, stats.Idle, 3)
+				require.GreaterOrEqual(t, stats.Size, 3)
 				_, _ = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-				require.Equal(t, 1, p.idle.Len())
+				stats = p.Stats()
+				require.Equal(t, 3, stats.Limit)
+				require.LessOrEqual(t, stats.Idle, 3)
+				require.GreaterOrEqual(t, stats.Size, 3)
 				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 				defer cancel()
 				// should not panic
 				_, _ = p.getItem(endpoint.WithNodeID(ctx, 32))
-				require.Equal(t, 1, p.idle.Len())
+				stats = p.Stats()
+				require.Equal(t, 3, stats.Limit)
+				require.LessOrEqual(t, stats.Idle, 3)
 			})
 		})
 		t.Run("PreferredNodeTakenAndPoolFull", func(t *testing.T) {
@@ -321,19 +354,24 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 				WithLimit[*testItem, testItem](2),
 			)
+			requirePoolStats(t, p, poolStats(2, nil))
 
 			info1, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
 			require.NoError(t, err)
 			require.EqualValues(t, 32, info1.item.NodeID())
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1 }))
 			info2, err := p.getItem(endpoint.WithNodeID(t.Context(), 33))
 			require.NoError(t, err)
 			require.EqualValues(t, 33, info2.item.NodeID())
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2 }))
 
 			mustPutItem(t, p, info2)
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2; s.Idle = 1 }))
 
 			info3, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
 			require.NoError(t, err)
 			require.EqualValues(t, 32, info3.item.NodeID())
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
 		})
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
 			var newItemCalled uint32
@@ -353,6 +391,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					return &v, nil
 				}),
 			)
+			requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 
 			info, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
 			require.NoError(t, err)
@@ -360,11 +399,15 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NotNil(t, info.item)
 			require.EqualValues(t, 32, int(info.item.NodeID()))
 			require.EqualValues(t, true, info.item.IsAlive())
+			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) { s.Size = 1 }))
 			mustPutItem(t, p, info)
+			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			info = mustGetItem(t, p)
 			require.EqualValues(t, 32, int(info.item.NodeID()))
+			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) { s.Size = 1 }))
 			mustPutItem(t, p, info)
+			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			require.EqualValues(t, 1, newItemCalled)
 		})
@@ -373,6 +416,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
 			require.EqualValues(t, 1, p.config.limit)
+			requirePoolStats(t, p, poolStats(1, nil))
 		})
 		t.Run("WithItemUsageLimit", func(t *testing.T) {
 			var (
@@ -396,6 +440,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 			)
 			require.EqualValues(t, 1, p.config.limit)
+			requirePoolStats(t, p, poolStats(1, nil))
 			var lambdaCounter atomic.Int64
 			err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 				if lambdaCounter.Add(1) < 10 {
@@ -406,6 +451,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			})
 			require.NoError(t, err)
 			require.EqualValues(t, 10, newCounter)
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 		t.Run("WithCreateItemFunc", func(t *testing.T) {
 			var newCounter atomic.Int64
@@ -419,11 +465,13 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
+			requirePoolStats(t, p, poolStats(1, nil))
 			err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 				return nil
 			})
 			require.NoError(t, err)
 			require.EqualValues(t, p.config.limit, newCounter.Load())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 	})
 	t.Run("Close", func(t *testing.T) {
@@ -462,29 +510,26 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
+			requirePoolStats(t, p, poolStats(3, nil))
 
 			defer func() {
 				_ = p.Close(t.Context())
 			}()
-
-			require.Zero(t, p.idle.Len())
 
 			var (
 				s1 = mustGetItem(t, p)
 				s2 = mustGetItem(t, p)
 				s3 = mustGetItem(t, p)
 			)
-
-			require.Zero(t, p.idle.Len())
+			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3 }))
 
 			mustPutItem(t, p, s1)
 			mustPutItem(t, p, s2)
-
-			require.Equal(t, 2, p.idle.Len())
+			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 
 			mustClose(t, p)
-
-			require.Zero(t, p.idle.Len())
+			// Close drains idle via PopAll without decrementing Idle stat; s3 is still held
+			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 2 }))
 
 			require.True(t, closed[0])  // idle info in pool
 			require.True(t, closed[1])  // idle info in pool
@@ -511,6 +556,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					}),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
+				requirePoolStats(t, p, poolStats(3, nil))
 
 				// Override the close func to detect context-cancelled failures.
 				// In a real scenario (e.g. gRPC session close), a cancelled context
@@ -522,11 +568,11 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				info1 := mustGetItem(t, p)
 				info2 := mustGetItem(t, p)
 				info3 := mustGetItem(t, p)
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3 }))
 
 				mustPutItem(t, p, info1)
 				mustPutItem(t, p, info2)
-
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 
 				// Close the pool with an already-cancelled context.
 				cancelCtx, cancel := context.WithCancel(t.Context())
@@ -534,6 +580,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 				err := p.Close(cancelCtx)
 				require.NoError(t, err)
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 2 }))
 
 				// Both idle infos must have been closed despite the cancelled context.
 				require.Equal(t, int32(2), closedCount.Load())
@@ -586,6 +633,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithLimit[*testItem, testItem](2),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
+				requirePoolStats(t, p, poolStats(2, nil))
 
 				release1 := make(chan struct{})
 				release2 := make(chan struct{})
@@ -622,8 +670,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithLimit[*testItem, testItem](1),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
+				requirePoolStats(t, p, poolStats(1, nil))
 
 				require.NoError(t, p.Close(ctx))
+				requirePoolStats(t, p, poolStats(1, nil))
 
 				err := p.With(ctx, func(context.Context, *testItem) error {
 					return nil
@@ -650,6 +700,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithLimit[*testItem, testItem](2),
 					WithTrace[*testItem, testItem](&trace),
 				)
+				requirePoolStats(t, p, poolStats(2, nil))
 
 				release1 := make(chan struct{})
 				release2 := make(chan struct{})
@@ -687,6 +738,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithLimit[*testItem, testItem](1),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
+				requirePoolStats(t, p, poolStats(1, nil))
 
 				release := make(chan struct{})
 				ready := make(chan struct{})
@@ -709,6 +761,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 				close(release)
 				waitPoolClosed(t, closed)
+				requirePoolStats(t, p, poolStats(1, nil))
 			})
 
 			t.Run("NoSendOnClosedSemaphore", func(t *testing.T) {
@@ -723,6 +776,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						WithLimit[*testItem, testItem](limit),
 						WithTrace[*testItem, testItem](defaultTrace),
 					)
+					requirePoolStats(t, p, poolStats(limit, nil))
 
 					panics := make(chan any, 1)
 					goWithPanicGuard := func(wg *sync.WaitGroup, fn func()) {
@@ -825,16 +879,17 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithIdleTimeToLive[*testItem, testItem](idleThreshold),
 					WithTrace[*testItem, testItem](defaultTrace),
 				)
+				requirePoolStats(t, p, poolStats(2, nil))
 
 				info1 := mustGetItem(t, p)
 				info2 := mustGetItem(t, p)
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2 }))
 
 				// Put both items at the absolutely same time.
 				// That is, both items must be updated their lastUsage timestamp.
 				mustPutItem(t, p, info1)
 				mustPutItem(t, p, info2)
-
-				require.Equal(t, 2, p.idle.Len())
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2; s.Idle = 2 }))
 
 				// Move clock to longer than idleTimeToLive
 				fakeClock.Advance(idleThreshold + time.Nanosecond)
@@ -843,6 +898,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// both existing infos must be closed
 				// getItem must create a new info and return it from getItem
 				info3 := mustGetItem(t, p)
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1 }))
 
 				if !closedCount.CompareAndSwap(2, 0) {
 					t.Fatal("unexpected number of closed info's")
@@ -854,20 +910,20 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				// Now put that info back
 				// pool must update a lastUsage timestamp of info
 				mustPutItem(t, p, info3)
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 				// Move time to idleTimeToLive / 2
 				// Total time since last updating lastUsage timestampe is more than idleTimeToLive
 				fakeClock.Advance(idleThreshold/2 + time.Nanosecond)
 
-				require.Equal(t, 1, p.idle.Len())
-
 				info4 := mustGetItem(t, p)
-				require.Equal(t, 0, p.idle.Len())
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1 }))
 				mustPutItem(t, p, info4)
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 				_ = p.Close(t.Context())
-
-				require.Equal(t, 0, p.idle.Len())
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Idle = 1 }))
+				require.Equal(t, 0, p.Stats().Size)
 			})
 		})
 	})
@@ -904,11 +960,16 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 								return &v, nil
 							}),
 						)
+						requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 						err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 							return nil
 						})
 						require.NoError(t, err)
 						require.GreaterOrEqual(t, counter.Load(), int64(10))
+						requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) {
+							s.Size = 1
+							s.Idle = 1
+						}))
 					})
 				}
 			})
@@ -929,11 +990,16 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						return &v, nil
 					}),
 				)
+				requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 				err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 					return nil
 				})
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, counter.Load(), int64(10))
+				requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) {
+					s.Size = 1
+					s.Idle = 1
+				}))
 			})
 			t.Run("OnOperationError", func(t *testing.T) {
 				var counter atomic.Int64
@@ -952,11 +1018,16 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						return &v, nil
 					}),
 				)
+				requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 				err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 					return nil
 				})
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, counter.Load(), int64(10))
+				requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) {
+					s.Size = 1
+					s.Idle = 1
+				}))
 			})
 			t.Run("OnUnauthorized", func(t *testing.T) {
 				unauthorized := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
@@ -970,6 +1041,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						return nil, unauthorized
 					}),
 				)
+				requirePoolStats(t, p, poolStats(1, nil))
 
 				var callbackRuns int
 				err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
@@ -982,6 +1054,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				require.Equal(t, int64(1), createAttempts.Load())
 				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED))
 				require.Nil(t, xerrors.RetryableError(err))
+				requirePoolStats(t, p, poolStats(1, nil))
 			})
 			t.Run("NilNil", func(t *testing.T) {
 				xtest.TestManyTimes(t, func(t testing.TB) {
@@ -992,6 +1065,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					)
 					defer cancel()
 					p := mustNewPool[*testItem, testItem](t)
+					requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 					defer func() {
 						_ = p.Close(t.Context())
 					}()
@@ -1031,20 +1105,24 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					cancel()
 					p, err := New(ctx, WithLimit[*testItem, testItem](1))
 					require.NoError(t, err)
+					requirePoolStats(t, p, poolStats(1, nil))
 					err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 						return nil
 					})
 					require.ErrorIs(t, err, context.Canceled)
+					requirePoolStats(t, p, poolStats(1, nil))
 				})
 				t.Run("DeadlineExceeded", func(t *testing.T) {
 					ctx, cancel := context.WithTimeout(t.Context(), 0)
 					cancel()
 					p, err := New(ctx, WithLimit[*testItem, testItem](1))
 					require.NoError(t, err)
+					requirePoolStats(t, p, poolStats(1, nil))
 					err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 						return nil
 					})
 					require.ErrorIs(t, err, context.DeadlineExceeded)
+					requirePoolStats(t, p, poolStats(1, nil))
 				})
 			})
 		})
@@ -1065,6 +1143,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					ctx, cancel := xcontext.WithCancel(t.Context())
 					p, err := New(ctx, WithLimit[*testItem, testItem](1))
 					require.NoError(t, err)
+					requirePoolStats(t, p, poolStats(1, nil))
 
 					results := make(chan error)
 					go func() {
@@ -1127,14 +1206,19 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						return v, nil
 					}),
 				)
+				requirePoolStats(t, p, poolStats(1, nil))
 				err := p.With(t.Context(), func(ctx context.Context, testItem *testItem) error {
 					return nil
 				})
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, createCounter.Load(), closeCounter.Load())
+				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 				err = p.Close(t.Context())
 				require.NoError(t, err)
 				require.EqualValues(t, createCounter.Load(), closeCounter.Load())
+				// Close drains idle without decrementing Idle stat
+				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Idle = 1 }))
+				require.Equal(t, 0, p.Stats().Size)
 			})
 		})
 		t.Run("IsAlive", func(t *testing.T) {
@@ -1165,6 +1249,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						return v, nil
 					}),
 				)
+				requirePoolStats(t, p, poolStats(1, nil))
 				err := p.With(t.Context(), func(ctx context.Context, testItem *testItem) error {
 					if newItems.Load() < 10 {
 						return xerrors.Retryable(expErr, xerrors.Invalid(testItem))
@@ -1175,9 +1260,11 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, newItems.Load(), int64(9))
 				require.GreaterOrEqual(t, newItems.Load(), deleteItems.Load())
+				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 				err = p.Close(t.Context())
 				require.NoError(t, err)
 				require.EqualValues(t, newItems.Load(), deleteItems.Load())
+				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Idle = 1 }))
 			})
 		})
 	})
@@ -1210,6 +1297,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			defer func() {
 				_ = p.Close(ctx)
 			}()
+			requirePoolStats(t, p, poolStats(1, nil))
 
 			for range usageLimit {
 				err := p.With(ctx, func(context.Context, *testItem) error {
@@ -1219,6 +1307,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			}
 			require.Equal(t, int32(1), created.Load())
 			require.Equal(t, int32(0), closed.Load())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			err := p.With(ctx, func(_ context.Context, item *testItem) error {
 				require.Equal(t, int32(2), item.v, "item must be recreated after usage limit is reached")
@@ -1228,6 +1317,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NoError(t, err)
 			require.Equal(t, int32(2), created.Load())
 			require.Equal(t, int32(1), closed.Load())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 		t.Run("ItemUsageTTL", func(t *testing.T) {
 			const usageTTL = time.Hour
@@ -1259,12 +1349,14 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			defer func() {
 				_ = p.Close(ctx)
 			}()
+			requirePoolStats(t, p, poolStats(1, nil))
 
 			err := p.With(ctx, func(context.Context, *testItem) error {
 				return nil
 			})
 			require.NoError(t, err)
 			require.Equal(t, int32(1), created.Load())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			fakeClock.Advance(usageTTL + time.Nanosecond)
 
@@ -1276,6 +1368,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NoError(t, err)
 			require.Equal(t, int32(2), created.Load())
 			require.Equal(t, int32(1), closed.Load())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 		t.Run("SpoiledIdleItems", func(t *testing.T) {
 			// Models query sessions that become !IsAlive() while sitting in idle
@@ -1312,6 +1405,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			defer func() {
 				_ = p.Close(ctx)
 			}()
+			requirePoolStats(t, p, poolStats(2, nil))
 
 			err := p.With(ctx, func(context.Context, *testItem) error {
 				return nil
@@ -1319,7 +1413,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.NoError(t, err)
 			require.Equal(t, int32(1), created.Load())
 			require.Equal(t, int32(0), closed.Load())
-			require.Equal(t, 1, p.Stats().Idle)
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			spoiled.Store(int32(1), struct{}{})
 
@@ -1333,7 +1427,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.Equal(t, int32(2), gotID, "must not reuse spoiled idle item")
 			require.Equal(t, int32(2), created.Load())
 			require.Equal(t, int32(1), closed.Load(), "spoiled idle item must be closed on get")
-			require.Equal(t, 1, p.Stats().Idle)
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			spoiled.Store(int32(2), struct{}{})
 
@@ -1346,6 +1440,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.Equal(t, int32(3), gotID)
 			require.Equal(t, int32(3), created.Load())
 			require.Equal(t, int32(2), closed.Load())
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 		t.Run("ItemFromPoolIsNotAlive", func(t *testing.T) {
 			var (
@@ -1400,41 +1495,41 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			defer func() {
 				_ = p.Close(t.Context())
 			}()
+			requirePoolStats(t, p, poolStats(1, nil))
 
 			info1 := mustGetItem(t, p)
 			assertClosed(0)
 			assertCreated(1)
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1 }))
 
 			mustPutItem(t, p, info1)
 			assertClosed(0)
 			assertCreated(1)
-			require.Equal(t, 1, p.idle.Len())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			info2, err := p.getItem(t.Context())
 			require.NoError(t, err)
 			assertCreated(1)
 			assertClosed(0)
-			require.Equal(t, 0, p.idle.Len())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1 }))
 
 			_, err = p.getItem(t.Context())
 			require.NoError(t, err)
 			assertCreated(2)
 			assertClosed(0)
-			require.Equal(t, 0, p.idle.Len())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 2 }))
 
 			require.NoError(t, p.Close(t.Context()))
 			assertCreated(2)
 			assertClosed(0)
-
-			require.Equal(t, 0, p.idle.Len())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 2 }))
 
 			require.ErrorIs(t, p.putItem(t.Context(), info2), errClosedPool)
 			assertClosed(1)
 
 			require.True(t, info2.item.closed)
 			require.False(t, info2.item.IsAlive())
-
-			require.Equal(t, 0, p.idle.Len())
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1 }))
 		})
 		t.Run("ExplicitItemClose", func(t *testing.T) {
 			var (
@@ -1478,22 +1573,29 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			defer func() {
 				_ = p.Close(t.Context())
 			}()
+			requirePoolStats(t, p, poolStats(1, nil))
 
 			info := mustGetItem(t, p)
 			assertCreated(1)
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1 }))
 
 			mustPutItem(t, p, info)
 			assertClosed(0)
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			mustGetItem(t, p)
 			assertCreated(1)
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1 }))
 
 			info.item.Close(t.Context())
 
 			assertClosed(1)
+			// explicit item.Close does not update pool Size
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1 }))
 
 			mustGetItem(t, p)
 			assertCreated(2)
+			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 2 }))
 		})
 		t.Run("OnErrorWithDeleteItem", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
@@ -1519,6 +1621,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				defer func() {
 					_ = p.Close(t.Context())
 				}()
+				requirePoolStats(t, p, poolStats(1, nil))
 
 				errThrown := false
 				err := p.With(t.Context(), func(ctx context.Context, testItem *testItem) error {
@@ -1538,6 +1641,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				})
 
 				require.NoError(t, err)
+				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 			})
 		})
 		t.Run("Racy", func(t *testing.T) {
@@ -1550,6 +1654,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				p := mustNewPool[*testItem, testItem](t,
 					WithTrace[*testItem, testItem](trace),
 				)
+				requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 				r := xrand.New(xrand.WithLock())
 				var wg sync.WaitGroup
 				wg.Add(DefaultLimit*2 + 1)
@@ -1591,6 +1696,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithTrace[*testItem, testItem](trace),
 				)
+				requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 				var wg sync.WaitGroup
 				for range make([]struct{}, DefaultLimit*10) {
 					wg.Add(1)
@@ -1634,25 +1740,27 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 			)
 			defer mustClose(t, p)
+			requirePoolStats(t, p, poolStats(3, nil))
 
 			// Fill the pool with 3 infos (nodeIDs: 0, 1, 2)
 			info0 := mustGetItem(t, p)
 			info1 := mustGetItem(t, p)
 			_ = mustGetItem(t, p)
+			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3 }))
 
 			// Put back infos 0 and 1 to make them idle
 			mustPutItem(t, p, info0)
 			mustPutItem(t, p, info1)
+			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 
 			info1, _ = p.getItem(endpoint.WithNodeID(t.Context(), 1))
 			info2, _ := p.getItem(endpoint.WithNodeID(t.Context(), 1))
 			require.Equal(t, uint32(1), info1.item.NodeID())
 			require.Equal(t, uint32(1), info2.item.NodeID())
-
-			// Pool should still be within limit
 			stats := p.Stats()
 			require.Equal(t, 3, stats.Limit)
 			require.LessOrEqual(t, stats.Idle, 3)
+			require.LessOrEqual(t, stats.Size, stats.Limit+2)
 		})
 
 		t.Run("RemovesIdleToMakeSpace", func(t *testing.T) {
@@ -1672,13 +1780,16 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}),
 			)
 			defer mustClose(t, p)
+			requirePoolStats(t, p, poolStats(2, nil))
 
 			// Fill pool: 2 infos with nodeIDs 0 and 1
 			info0 := mustGetItem(t, p)
 			_ = mustGetItem(t, p)
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2 }))
 
 			// Put back info0 (now idle)
 			mustPutItem(t, p, info0)
+			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2; s.Idle = 1 }))
 
 			// Pool state: len=2, idle=1 (info0 with nodeID=0), busy=1 (info1)
 			// Try to get info with preferred nodeID=99 (non-existent)
@@ -1688,10 +1799,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			// Item should have nodeID 99 (newly created with preferred)
 			require.Equal(t, uint32(99), info99.item.NodeID())
-
-			// Pool should not exceed limit
 			stats := p.Stats()
+			require.Equal(t, 2, stats.Limit)
 			require.LessOrEqual(t, stats.Idle, 2)
+			require.LessOrEqual(t, stats.Size, stats.Limit+1)
 		})
 
 		t.Run("PreferredNodeIDAllBusy", func(t *testing.T) {
@@ -1714,6 +1825,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						}, nil
 					}),
 				)
+				requirePoolStats(t, p, poolStats(2, nil))
 
 				wait := make(chan struct{})
 				holding := make(chan struct{}, 2)

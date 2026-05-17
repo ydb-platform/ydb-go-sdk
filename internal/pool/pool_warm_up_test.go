@@ -24,7 +24,7 @@ func TestWarmUp(t *testing.T) {
 			}),
 		)
 
-		require.Equal(t, 0, p.Stats().Idle)
+		requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 		require.Equal(t, int32(0), created.Load())
 	})
 
@@ -43,7 +43,11 @@ func TestWarmUp(t *testing.T) {
 			}),
 		)
 
-		require.Equal(t, warmUpSize, p.Stats().Idle)
+		requirePoolStats(t, p, poolStats(10, func(s *Stats) {
+			s.WarmUp = warmUpSize
+			s.Size = warmUpSize
+			s.Idle = warmUpSize
+		}))
 		require.Equal(t, int32(warmUpSize), created.Load())
 	})
 
@@ -65,7 +69,11 @@ func TestWarmUp(t *testing.T) {
 			}),
 		)
 
-		require.Equal(t, limit, p.Stats().Idle)
+		requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+			s.WarmUp = warmUpSize
+			s.Size = limit
+			s.Idle = limit
+		}))
 		require.Equal(t, int32(limit), created.Load())
 	})
 

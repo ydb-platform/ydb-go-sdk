@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -15,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -53,7 +53,7 @@ type (
 	Pool[PT ItemConstraint[T], T any] struct {
 		config *Config[PT, T]
 
-		stats *xsync.Value[Stats]
+		stats *xsync.Value[dynamicStats]
 
 		sema chan struct{}
 		idle container[PT, T]
@@ -164,9 +164,7 @@ func New[PT ItemConstraint[T], T any](
 		}
 	}
 
-	p.stats = xsync.NewValue(Stats{
-		Limit: p.config.limit,
-	})
+	p.stats = xsync.NewValue(dynamicStats{})
 
 	if onNew := p.config.trace.OnNew; onNew != nil {
 		onDone := onNew(&ctx,
@@ -223,10 +221,9 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
 		}
 	}
 
-	p.changeStats(func(old Stats) Stats {
+	p.changeStats(func(old dynamicStats) dynamicStats {
 		old.Size = n
 		old.Idle = n
-		old.WarmUp = n
 
 		return old
 	})
@@ -238,13 +235,13 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
 //
 // Given context restrictions (timeout, cancel) ignored
 func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
-	p.changeStats(func(old Stats) (new Stats) {
+	p.changeStats(func(old dynamicStats) dynamicStats {
 		old.CreateInProgress++
 
 		return old
 	})
 	defer func() {
-		p.changeStats(func(old Stats) (new Stats) {
+		p.changeStats(func(old dynamicStats) dynamicStats {
 			old.CreateInProgress--
 
 			return old
@@ -268,7 +265,7 @@ func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
 		return nil, errNilItem
 	}
 
-	p.changeStats(func(old Stats) (new Stats) {
+	p.changeStats(func(old dynamicStats) dynamicStats {
 		old.Size++
 
 		return old
@@ -280,7 +277,7 @@ func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
 // closeItem wraps the Config.closeItemFunc function with timeout handling
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) {
 	defer func() {
-		p.changeStats(func(old Stats) (new Stats) {
+		p.changeStats(func(old dynamicStats) dynamicStats {
 			old.Size--
 
 			return old
@@ -299,21 +296,29 @@ func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) {
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
-	return p.stats.Get()
+	return Stats{
+		dynamicStats: p.stats.Get(),
+		Limit:        p.config.limit,
+		WarmUp:       p.config.warmUpItems,
+	}
 }
 
-func (p *Pool[PT, T]) changeStats(f func(old Stats) Stats) {
+func (p *Pool[PT, T]) changeStats(f func(old dynamicStats) dynamicStats) {
 	onChange := p.config.trace.OnChange
 
-	var new Stats
-	p.stats.Change(func(old Stats) Stats {
-		new = f(old)
+	var stats dynamicStats
+	p.stats.Change(func(old dynamicStats) dynamicStats {
+		stats = f(old)
 
-		return new
+		return stats
 	})
 
 	if onChange != nil {
-		onChange(new)
+		onChange(Stats{
+			dynamicStats: stats,
+			Limit:        p.config.limit,
+			WarmUp:       p.config.warmUpItems,
+		})
 	}
 }
 
@@ -337,6 +342,7 @@ func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
 	return nil
 }
 
+//nolint:funlen
 func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
 	if onTry := p.config.trace.OnTry; onTry != nil {
 		onDone := onTry(&ctx,
@@ -377,14 +383,14 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		return xerrors.WithStackTrace(err)
 	}
 
-	p.changeStats(func(old Stats) Stats {
+	p.changeStats(func(old dynamicStats) dynamicStats {
 		old.InUse++
 
 		return old
 	})
 
 	defer func() {
-		p.changeStats(func(old Stats) Stats {
+		p.changeStats(func(old dynamicStats) dynamicStats {
 			old.InUse--
 
 			return old
@@ -412,13 +418,13 @@ func (p *Pool[PT, T]) With(
 	f func(ctx context.Context, item PT) error,
 	opts ...retry.Option,
 ) (finalErr error) {
-	p.changeStats(func(old Stats) Stats {
+	p.changeStats(func(old dynamicStats) dynamicStats {
 		old.Concurrency++
 
 		return old
 	})
 	defer func() {
-		p.changeStats(func(old Stats) Stats {
+		p.changeStats(func(old dynamicStats) dynamicStats {
 			old.Concurrency--
 
 			return old
@@ -568,7 +574,7 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool) (info *itemInfo[PT, T], _ error) {
 	defer func() {
 		if info != nil {
-			p.changeStats(func(old Stats) Stats {
+			p.changeStats(func(old dynamicStats) dynamicStats {
 				old.Idle--
 
 				return old
@@ -677,7 +683,7 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (final
 		}
 
 		if info != nil {
-			p.changeStats(func(old Stats) Stats {
+			p.changeStats(func(old dynamicStats) dynamicStats {
 				old.Idle++
 
 				return old
