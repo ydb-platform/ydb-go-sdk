@@ -1005,6 +1005,79 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 	})
 	t.Run("With", func(t *testing.T) {
+		t.Run("SpoiledIdleItems", func(t *testing.T) {
+			// Models query sessions that become !IsAlive() while sitting in idle
+			// (e.g. attach stream Recv error in listenAttachStream).
+			ctx := t.Context()
+
+			var (
+				created atomic.Int32
+				closed  atomic.Int32
+				spoiled sync.Map // item id -> struct{}
+			)
+
+			p := New[*testItem, testItem](ctx,
+				WithLimit[*testItem, testItem](2),
+				WithMustDeleteItemFunc[*testItem, testItem](func(item *testItem, err error) bool {
+					return !item.IsAlive()
+				}),
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					id := created.Add(1)
+
+					return &testItem{
+						v: id,
+						onIsAlive: func() bool {
+							_, dead := spoiled.Load(id)
+
+							return !dead
+						},
+						onClose: func() error {
+							closed.Add(1)
+
+							return nil
+						},
+					}, nil
+				}),
+				WithTrace[*testItem, testItem](defaultTrace),
+			)
+			defer func() {
+				_ = p.Close(ctx)
+			}()
+
+			err := p.With(ctx, func(context.Context, *testItem) error {
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(1), created.Load())
+			require.Equal(t, int32(0), closed.Load())
+			require.Equal(t, 1, p.Stats().Idle)
+
+			spoiled.Store(int32(1), struct{}{})
+
+			var gotID int32
+			err = p.With(ctx, func(_ context.Context, item *testItem) error {
+				gotID = item.v
+
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(2), gotID, "must not reuse spoiled idle item")
+			require.Equal(t, int32(2), created.Load())
+			require.Equal(t, int32(1), closed.Load(), "spoiled idle item must be closed on get")
+			require.Equal(t, 1, p.Stats().Idle)
+
+			spoiled.Store(int32(2), struct{}{})
+
+			err = p.With(ctx, func(_ context.Context, item *testItem) error {
+				gotID = item.v
+
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(3), gotID)
+			require.Equal(t, int32(3), created.Load())
+			require.Equal(t, int32(2), closed.Load())
+		})
 		t.Run("ItemFromPoolIsNotAlive", func(t *testing.T) {
 			var (
 				created atomic.Int32
