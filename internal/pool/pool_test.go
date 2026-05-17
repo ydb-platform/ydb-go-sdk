@@ -1582,29 +1582,26 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				)
 
 				wait := make(chan struct{})
+				holding := make(chan struct{}, 2)
 
-				var (
-					started  sync.WaitGroup
-					finished sync.WaitGroup
-				)
-				started.Add(2)
+				var finished sync.WaitGroup
 				finished.Add(2)
 				for range 2 {
 					go func() {
-						started.Done()
+						defer finished.Done()
 						_ = p.With(t.Context(), func(ctx context.Context, item *testItem) error {
-							defer finished.Done()
-
+							holding <- struct{}{} // semaphore slot is taken
 							<-wait
 
 							return nil
 						})
 					}()
 				}
-				started.Wait()
+				<-holding
+				<-holding
 
 				ctx := endpoint.WithNodeID(t.Context(), 3)
-				getCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+				getCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 				defer cancel()
 				var overflowItem bool
 				err := p.With(getCtx, func(ctx context.Context, item *testItem) error {
@@ -1617,7 +1614,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				close(wait)
 				finished.Wait()
 				mustClose(t, p)
-			})
+			}, xtest.StopAfter(time.Minute))
 		})
 	})
 }
