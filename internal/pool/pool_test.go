@@ -1018,9 +1018,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			p := New[*testItem, testItem](ctx,
 				WithLimit[*testItem, testItem](2),
-				WithMustDeleteItemFunc[*testItem, testItem](func(item *testItem, err error) bool {
-					return !item.IsAlive()
-				}),
 				WithCreateItemFunc(func(context.Context) (*testItem, error) {
 					id := created.Add(1)
 
