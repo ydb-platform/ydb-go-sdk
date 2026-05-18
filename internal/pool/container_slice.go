@@ -9,58 +9,73 @@ type sliceContainer[PT ItemConstraint[T], T any] struct {
 	data []*itemInfo[PT, T]
 }
 
-func (container *sliceContainer[PT, T]) PopAll() (data []*itemInfo[PT, T]) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *sliceContainer[PT, T]) PutWithCheckLimit(info *itemInfo[PT, T], limit int) error {
+	items.mu.Lock()
+	defer items.mu.Unlock()
+
+	if len(items.data) >= limit {
+		return errPoolIsOverflow
+	}
+
+	return items.put(info)
+}
+
+func (items *sliceContainer[PT, T]) Clear() (data []*itemInfo[PT, T]) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
 	defer func() {
-		container.data = nil
+		items.data = nil
 	}()
 
-	return container.data
+	return items.data
 }
 
-func (container *sliceContainer[PT, T]) Len() int {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *sliceContainer[PT, T]) Len() int {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	return len(container.data)
+	return len(items.data)
 }
 
-func (container *sliceContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *sliceContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	container.data = append(container.data, info)
+	return items.put(info)
+}
+
+func (items *sliceContainer[PT, T]) put(info *itemInfo[PT, T]) error {
+	items.data = append(items.data, info)
 
 	return nil
 }
 
-func (container *sliceContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *sliceContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if len(container.data) == 0 {
+	if len(items.data) == 0 {
 		return nil, errNothingIdleItems
 	}
 
-	info, container.data = container.data[len(container.data)-1], container.data[:len(container.data)-1]
+	info, items.data = items.data[len(items.data)-1], items.data[:len(items.data)-1]
 
 	return info, nil
 }
 
-func (container *sliceContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT, T], error) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *sliceContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT, T], error) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if len(container.data) == 0 {
+	if len(items.data) == 0 {
 		return nil, errNothingIdleItems
 	}
 
-	for i := len(container.data) - 1; i >= 0; i-- {
-		info := container.data[i]
+	for i := len(items.data) - 1; i >= 0; i-- {
+		info := items.data[i]
 		if info.item.NodeID() == nodeID {
-			container.data = append(container.data[:i], container.data[i+1:]...)
+			items.data = append(items.data[:i], items.data[i+1:]...)
 
 			return info, nil
 		}

@@ -9,51 +9,66 @@ type mapContainer[PT ItemConstraint[T], T any] struct {
 	data map[*itemInfo[PT, T]]struct{}
 }
 
-func (container *mapContainer[PT, T]) PopAll() (data []*itemInfo[PT, T]) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *mapContainer[PT, T]) PutWithCheckLimit(info *itemInfo[PT, T], limit int) error {
+	items.mu.Lock()
+	defer items.mu.Unlock()
+
+	if len(items.data) >= limit {
+		return errPoolIsOverflow
+	}
+
+	return items.put(info)
+}
+
+func (items *mapContainer[PT, T]) Clear() (data []*itemInfo[PT, T]) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
 	defer func() {
-		container.data = make(map[*itemInfo[PT, T]]struct{})
+		items.data = make(map[*itemInfo[PT, T]]struct{})
 	}()
 
-	for info := range container.data {
+	for info := range items.data {
 		data = append(data, info)
 	}
 
 	return data
 }
 
-func (container *mapContainer[PT, T]) Len() int {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *mapContainer[PT, T]) Len() int {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	return len(container.data)
+	return len(items.data)
 }
 
-func (container *mapContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *mapContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if container.data == nil {
-		container.data = make(map[*itemInfo[PT, T]]struct{})
+	return items.put(info)
+}
+
+func (items *mapContainer[PT, T]) put(info *itemInfo[PT, T]) error {
+	if items.data == nil {
+		items.data = make(map[*itemInfo[PT, T]]struct{})
 	}
 
-	container.data[info] = struct{}{}
+	items.data[info] = struct{}{}
 
 	return nil
 }
 
-func (container *mapContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *mapContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if container.data == nil {
-		container.data = make(map[*itemInfo[PT, T]]struct{})
+	if items.data == nil {
+		items.data = make(map[*itemInfo[PT, T]]struct{})
 	}
 
-	for info := range container.data {
-		delete(container.data, info)
+	for info := range items.data {
+		delete(items.data, info)
 
 		return info, nil
 	}
@@ -61,17 +76,17 @@ func (container *mapContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 	return nil, errNothingIdleItems
 }
 
-func (container *mapContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT, T], error) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *mapContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT, T], error) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if container.data == nil {
-		container.data = make(map[*itemInfo[PT, T]]struct{})
+	if items.data == nil {
+		items.data = make(map[*itemInfo[PT, T]]struct{})
 	}
 
-	for info := range container.data {
+	for info := range items.data {
 		if info.item.NodeID() == nodeID {
-			delete(container.data, info)
+			delete(items.data, info)
 
 			return info, nil
 		}

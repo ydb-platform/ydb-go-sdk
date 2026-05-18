@@ -56,7 +56,7 @@ type (
 		stats *xsync.Value[dynamicStats]
 
 		sema chan struct{}
-		idle container[PT, T]
+		idle itemsContainer[PT, T]
 
 		done chan struct{}
 	}
@@ -488,7 +488,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 		locks.Wait()
 		close(p.sema)
 
-		data := p.idle.PopAll()
+		data := p.idle.Clear()
 		batchChanges.Idle -= len(data)
 
 		closes.Add(len(data))

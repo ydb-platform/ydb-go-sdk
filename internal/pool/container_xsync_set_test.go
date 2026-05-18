@@ -6,10 +6,18 @@ type xsyncSetContainer[PT ItemConstraint[T], T any] struct {
 	data xsync.Set[*itemInfo[PT, T]]
 }
 
-func (container *xsyncSetContainer[PT, T]) PopAll() (data []*itemInfo[PT, T]) {
-	container.data.Range(func(idle *itemInfo[PT, T]) bool {
+func (items *xsyncSetContainer[PT, T]) PutWithCheckLimit(info *itemInfo[PT, T], limit int) error {
+	if items.data.Size() >= limit {
+		return errPoolIsOverflow
+	}
+
+	return items.Put(info)
+}
+
+func (items *xsyncSetContainer[PT, T]) Clear() (data []*itemInfo[PT, T]) {
+	items.data.Range(func(idle *itemInfo[PT, T]) bool {
 		data = append(data, idle)
-		container.data.Remove(idle)
+		items.data.Remove(idle)
 
 		return true
 	})
@@ -17,22 +25,22 @@ func (container *xsyncSetContainer[PT, T]) PopAll() (data []*itemInfo[PT, T]) {
 	return data
 }
 
-func (container *xsyncSetContainer[PT, T]) Len() int {
-	return container.data.Size()
+func (items *xsyncSetContainer[PT, T]) Len() int {
+	return items.data.Size()
 }
 
-func (container *xsyncSetContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
-	if !container.data.Add(info) {
+func (items *xsyncSetContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
+	if !items.data.Add(info) {
 		return errItemAlreadyExists
 	}
 
 	return nil
 }
 
-func (container *xsyncSetContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
-	container.data.Range(func(idle *itemInfo[PT, T]) bool {
+func (items *xsyncSetContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
+	items.data.Range(func(idle *itemInfo[PT, T]) bool {
 		info = idle
-		container.data.Remove(idle)
+		items.data.Remove(idle)
 
 		return false
 	})
@@ -44,11 +52,11 @@ func (container *xsyncSetContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error
 	return info, nil
 }
 
-func (container *xsyncSetContainer[PT, T]) PopByNodeID(nodeID uint32) (info *itemInfo[PT, T], _ error) {
-	container.data.Range(func(idle *itemInfo[PT, T]) bool {
+func (items *xsyncSetContainer[PT, T]) PopByNodeID(nodeID uint32) (info *itemInfo[PT, T], _ error) {
+	items.data.Range(func(idle *itemInfo[PT, T]) bool {
 		if idle.item.NodeID() == nodeID {
 			info = idle
-			container.data.Remove(idle)
+			items.data.Remove(idle)
 
 			return false
 		}

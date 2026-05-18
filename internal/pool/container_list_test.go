@@ -11,58 +11,73 @@ type listContainer[PT ItemConstraint[T], T any] struct {
 	data xlist.List[*itemInfo[PT, T]]
 }
 
-func (container *listContainer[PT, T]) PopAll() (data []*itemInfo[PT, T]) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *listContainer[PT, T]) PutWithCheckLimit(info *itemInfo[PT, T], limit int) error {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if container.data == nil {
-		container.data = xlist.New[*itemInfo[PT, T]]()
+	if items.data.Len() >= limit {
+		return errPoolIsOverflow
 	}
 
-	for iter := container.data.Front(); iter != nil; iter = iter.Next() {
+	return items.put(info)
+}
+
+func (items *listContainer[PT, T]) Clear() (data []*itemInfo[PT, T]) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
+
+	if items.data == nil {
+		items.data = xlist.New[*itemInfo[PT, T]]()
+	}
+
+	for iter := items.data.Front(); iter != nil; iter = iter.Next() {
 		data = append(data, iter.Value)
 	}
 
-	container.data.Clear()
+	items.data.Clear()
 
 	return data
 }
 
-func (container *listContainer[PT, T]) Len() int {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *listContainer[PT, T]) Len() int {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if container.data == nil {
-		container.data = xlist.New[*itemInfo[PT, T]]()
+	if items.data == nil {
+		items.data = xlist.New[*itemInfo[PT, T]]()
 	}
 
-	return container.data.Len()
+	return items.data.Len()
 }
 
-func (container *listContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *listContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if container.data == nil {
-		container.data = xlist.New[*itemInfo[PT, T]]()
+	return items.put(info)
+}
+
+func (items *listContainer[PT, T]) put(info *itemInfo[PT, T]) error {
+	if items.data == nil {
+		items.data = xlist.New[*itemInfo[PT, T]]()
 	}
 
-	container.data.PushBack(info)
+	items.data.PushBack(info)
 
 	return nil
 }
 
-func (container *listContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *listContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if container.data == nil {
-		container.data = xlist.New[*itemInfo[PT, T]]()
+	if items.data == nil {
+		items.data = xlist.New[*itemInfo[PT, T]]()
 	}
 
-	iter := container.data.Front()
+	iter := items.data.Front()
 	if iter != nil {
-		container.data.Remove(iter)
+		items.data.Remove(iter)
 
 		return iter.Value, nil
 	}
@@ -70,17 +85,17 @@ func (container *listContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 	return nil, errNothingIdleItems
 }
 
-func (container *listContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT, T], error) {
-	container.mu.Lock()
-	defer container.mu.Unlock()
+func (items *listContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT, T], error) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
 
-	if container.data == nil {
-		container.data = xlist.New[*itemInfo[PT, T]]()
+	if items.data == nil {
+		items.data = xlist.New[*itemInfo[PT, T]]()
 	}
 
-	for iter := container.data.Front(); iter != nil; iter = iter.Next() {
+	for iter := items.data.Front(); iter != nil; iter = iter.Next() {
 		if iter.Value.item.NodeID() == nodeID {
-			container.data.Remove(iter)
+			items.data.Remove(iter)
 
 			return iter.Value, nil
 		}

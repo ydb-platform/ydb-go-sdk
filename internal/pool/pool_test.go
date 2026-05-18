@@ -551,7 +551,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 
 			mustClose(t, p)
-			// Close drains idle via PopAll with decrementing Idle stat; s3 is still held
+			// Close drains idle via Clear with decrementing Idle stat; s3 is still held
 			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 0 }))
 
 			assert.True(t, closed[0])  // idle info in pool
