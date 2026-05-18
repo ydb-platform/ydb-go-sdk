@@ -95,14 +95,15 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 				}, nil
 			}).AnyTimes()
 
-		p := testExplicitSessionPool(ctx, client)
+		p, err := testExplicitSessionPool(ctx, client)
+		require.NoError(t, err)
 		t.Cleanup(func() {
 			close(holdHealthyAttach)
 			_ = p.Close(ctx)
 		})
 
 		var firstSession *Session
-		err := do(ctx, p, func(ctx context.Context, s *Session) error {
+		err = do(ctx, p, func(ctx context.Context, s *Session) error {
 			firstSession = s
 			require.True(t, s.IsAlive())
 
@@ -138,7 +139,7 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 func testExplicitSessionPool(
 	ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
-) *pool.Pool[*Session, Session] {
+) (*pool.Pool[*Session, Session], error) {
 	cfg := config.New(
 		config.WithPoolLimit(2),
 		config.WithSessionCreateTimeout(time.Second),
@@ -167,9 +168,6 @@ func testExplicitSessionPool(
 			return s, nil
 		}),
 	)
-	if err != nil {
-		panic(err)
-	}
 
-	return p
+	return p, err
 }
