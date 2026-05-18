@@ -39,17 +39,19 @@ func TestTopicReaderOnStopPartitionSessionAfterReaderRebalance(t *testing.T) {
 	var msg0, msg1 *topicreader.Message
 
 	h.createReader(
-		topicoptions.WithReaderOnStopPartitionSession(func(req topicoptions.StopPartitionSessionRequest) {
+		topicoptions.WithReaderOnStopPartitionSession(func(req topicoptions.StopPartitionSessionRequest) topicoptions.OnStopPartitionSessionResult {
 			defer h.onStopCalledOnce.Do(func() { close(h.onStopCalled) })
 
 			if !req.Graceful {
-				return
+				return topicoptions.OnStopPartitionSessionResult{}
 			}
 
 			h.scope.Require.NotNil(msg0)
 			h.scope.Require.NotNil(msg1)
 			h.scope.Require.NoError(h.firstReader.commit(ctx, msg0))
 			h.scope.Require.NoError(h.firstReader.commit(ctx, msg1))
+
+			return topicoptions.OnStopPartitionSessionResult{}
 		}),
 	)
 	h.firstReader.waitGotAllPartitions(ctx)
@@ -85,10 +87,12 @@ func TestTopicReaderOnStopPartitionSessionNonGracefulWhenChangefeedDropped(t *te
 
 	h.createChangefeedTopic()
 	h.createReader(
-		topicoptions.WithReaderOnStopPartitionSession(func(req topicoptions.StopPartitionSessionRequest) {
+		topicoptions.WithReaderOnStopPartitionSession(func(req topicoptions.StopPartitionSessionRequest) topicoptions.OnStopPartitionSessionResult {
 			h.scope.Require.False(req.Graceful,
 				"StopPartitionSession after changefeed drop must be non-graceful, got graceful=%v", req.Graceful)
 			h.onStopCalledOnce.Do(func() { close(h.onStopCalled) })
+
+			return topicoptions.OnStopPartitionSessionResult{}
 		}),
 	)
 	h.firstReader.waitGotAllPartitions(ctx)

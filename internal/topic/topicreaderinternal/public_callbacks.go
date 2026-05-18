@@ -64,6 +64,11 @@ type PublicStopPartitionSessionRequest struct {
 	Graceful bool
 }
 
+// PublicOnStopPartitionSessionResult is the callback return value for
+// WithReaderOnStopPartitionSession. It is reserved for future feedback from the
+// user handler to the SDK.
+type PublicOnStopPartitionSessionResult struct{}
+
 // PublicOnStopPartitionSessionFunc is the type of the user callback registered
 // via topicoptions.WithReaderOnStopPartitionSession.
-type PublicOnStopPartitionSessionFunc func(req PublicStopPartitionSessionRequest)
+type PublicOnStopPartitionSessionFunc func(req PublicStopPartitionSessionRequest) PublicOnStopPartitionSessionResult

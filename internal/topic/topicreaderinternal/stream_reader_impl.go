@@ -477,7 +477,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	}()
 
 	if r.cfg.OnStopPartitionSession != nil {
-		r.cfg.OnStopPartitionSession(PublicStopPartitionSessionRequest{
+		_ = r.cfg.OnStopPartitionSession(PublicStopPartitionSessionRequest{
 			Topic:              session.Topic,
 			PartitionID:        session.PartitionID,
 			PartitionSessionID: session.StreamPartitionSessionID.ToInt64(),
