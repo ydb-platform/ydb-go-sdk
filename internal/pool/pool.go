@@ -696,16 +696,10 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchC
 
 		return xerrors.WithStackTrace(errClosedPool)
 	default:
-		if p.idle.Len() >= p.config.limit {
-			p.closeItem(ctx, info.item, batchChanges)
-
-			return errPoolIsOverflow
-		}
-
 		info.useCounter++
 		info.lastUsage = p.config.clock.Now()
 
-		if err := p.idle.Put(info); err != nil {
+		if err := p.idle.PutWithCheckLimit(info, p.config.limit); err != nil {
 			p.closeItem(ctx, info.item, batchChanges)
 
 			return err
