@@ -1646,12 +1646,13 @@ func TableOnPoolWith(t *Table, c *context.Context, call call) func(attempts int,
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TableOnPoolStateChange(t *Table, limit int, idle int, createInProgress int, concurrency int) {
+func TableOnPoolStateChange(t *Table, limit int, idle int, createInProgress int, concurrency int, attempts int) {
 	var p TablePoolStateChangeInfo
 	p.Limit = limit
 	p.Idle = idle
 	p.CreateInProgress = createInProgress
 	p.Concurrency = concurrency
+	p.Attempts = attempts
 	t.onPoolStateChange(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

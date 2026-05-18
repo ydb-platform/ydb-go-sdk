@@ -93,7 +93,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 			},
 			OnChange: func(stats pool.Stats) {
 				trace.TableOnPoolStateChange(config.Trace(),
-					stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency,
+					stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, 0,
 				)
 			},
 		}),
