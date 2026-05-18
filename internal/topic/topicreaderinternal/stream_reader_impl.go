@@ -77,6 +77,7 @@ type topicStreamReaderConfig struct {
 	ReadSelectors                   []*topicreadercommon.PublicReadSelector
 	Trace                           *trace.Topic
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
+	OnStopPartitionSession          PublicOnStopPartitionSessionFunc
 	CommitMode                      topicreadercommon.PublicCommitMode
 	Decoders                        *topicreadercommon.MultiDecoder
 	EnableSplitMergeSupport         bool
@@ -474,7 +475,23 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 		onDone(err)
 	}()
 
+	if r.cfg.OnStopPartitionSession != nil {
+		_ = r.cfg.OnStopPartitionSession(PublicStopPartitionSessionRequest{
+			Topic:              session.Topic,
+			PartitionID:        session.PartitionID,
+			PartitionSessionID: session.StreamPartitionSessionID.ToInt64(),
+			CommittedOffset:    msg.CommittedOffset.ToInt64(),
+			Graceful:           msg.Graceful,
+		})
+	}
+
 	if msg.Graceful {
+		if err = r.committer.Flush(); err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"ydb: flush buffered commits on graceful stop partition session: %w",
+				err,
+			))
+		}
 		session.Close()
 		resp := &rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: session.StreamPartitionSessionID,
