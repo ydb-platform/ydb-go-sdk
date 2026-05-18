@@ -27,7 +27,7 @@ import (
 // on the next pool.With and replaced with a newly created session.
 func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
 		var (

@@ -14,11 +14,10 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestSessionPoolWarmUp(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 
 	t.Run("DisabledByDefault", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

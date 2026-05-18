@@ -16,14 +16,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestResultNextResultSet(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(xtest.Context(t))
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		ctrl := gomock.NewController(t)
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -454,7 +453,7 @@ func TestResultNextResultSet(t *testing.T) {
 		}
 	})
 	t.Run("InterruptStream", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(xtest.Context(t))
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		ctrl := gomock.NewController(t)
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -559,7 +558,7 @@ func TestResultNextResultSet(t *testing.T) {
 		}
 	})
 	t.Run("WrongResultSetIndex", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(xtest.Context(t))
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		ctrl := gomock.NewController(t)
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -891,7 +890,7 @@ func TestResultNextResultSet(t *testing.T) {
 	})
 
 	t.Run("context canceling and closing issues", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(xtest.Context(t))
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		ctrl := gomock.NewController(t)
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -913,7 +912,7 @@ func TestResultNextResultSet(t *testing.T) {
 }
 
 func TestExactlyOneRowFromResult(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -1230,7 +1229,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 }
 
 func TestExactlyOneResultSetFromResult(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -1458,7 +1457,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 }
 
 func TestCloseResultOnCloseClosableResultSet(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
@@ -1619,7 +1618,7 @@ func TestCloseResultOnCloseClosableResultSet(t *testing.T) {
 func TestResultStats(t *testing.T) {
 	t.Run("Stats", func(t *testing.T) {
 		t.Run("Never", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -1969,7 +1968,7 @@ func TestResultStats(t *testing.T) {
 			require.Nil(t, s)
 		})
 		t.Run("SeparatedLastPart", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -2335,7 +2334,7 @@ func TestResultStats(t *testing.T) {
 			require.Equal(t, time.Microsecond*300, s.ProcessCPUTime())
 		})
 		t.Run("WithLastPart", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -2697,7 +2696,7 @@ func TestResultStats(t *testing.T) {
 			require.Equal(t, time.Microsecond*300, s.ProcessCPUTime())
 		})
 		t.Run("EveryPart", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -3051,7 +3050,7 @@ func TestMaterializedResultStats(t *testing.T) {
 	}
 	t.Run("Stats", func(t *testing.T) {
 		t.Run("Never", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -3401,7 +3400,7 @@ func TestMaterializedResultStats(t *testing.T) {
 			require.Nil(t, s)
 		})
 		t.Run("SeparatedLastPart", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -3767,7 +3766,7 @@ func TestMaterializedResultStats(t *testing.T) {
 			require.Equal(t, time.Microsecond*300, s.ProcessCPUTime())
 		})
 		t.Run("WithLastPart", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -4129,7 +4128,7 @@ func TestMaterializedResultStats(t *testing.T) {
 			require.Equal(t, time.Microsecond*300, s.ProcessCPUTime())
 		})
 		t.Run("EveryPart", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)

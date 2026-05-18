@@ -90,6 +90,9 @@ func WithCloseItemTimeout[PT ItemConstraint[T], T any](t time.Duration) Option[P
 func WithLimit[PT ItemConstraint[T], T any](limit int) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		if limit <= 0 {
+			// Panic is unreachable for table/query clients: pool size is taken from
+			// config only after validation (SizeLimit/PoolLimit > 0). Direct pool.New
+			// with WithLimit(<=0) is a programmer error.
 			panic(fmt.Errorf("wrong limit value: %d", limit))
 		}
 		c.limit = limit
@@ -340,6 +343,9 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 			return xerrors.WithStackTrace(errClosedPool)
 		}
 
+		// We intentionally do not re-check p.done after acquiring sema: select may
+		// pick this case while Close() has already closed p.done but tokens remain.
+		// try() may then run until user callback returns; Close() waits for sema drain.
 		defer func() {
 			p.sema <- struct{}{}
 		}()
@@ -630,7 +636,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		size := st.Size + batchChanges.Size
 		if st.Concurrency == p.config.limit || size >= p.config.limit {
 			// Free a slot before createItem: full concurrent load or pool already at limit.
-			info, err := p.idle.Pop()
+			info, err := p.popItem(0, false, batchChanges)
 			if err != nil {
 				return nil, errNothingIdleItems
 			}

@@ -19,13 +19,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestExecute(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		stream := happyWayStream(ctrl)
 		client := NewMockQueryServiceClient(ctrl)
@@ -140,7 +139,7 @@ func TestExecute(t *testing.T) {
 	})
 	t.Run("TransportError", func(t *testing.T) {
 		t.Run("OnCall", func(t *testing.T) {
-			ctx := xtest.Context(t)
+			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
@@ -150,7 +149,7 @@ func TestExecute(t *testing.T) {
 			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 		})
 		t.Run("OnStream", func(t *testing.T) {
-			ctx := xtest.Context(t)
+			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
@@ -305,7 +304,7 @@ func TestExecute(t *testing.T) {
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		t.Run("OnCall", func(t *testing.T) {
-			ctx := xtest.Context(t)
+			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(
@@ -319,7 +318,7 @@ func TestExecute(t *testing.T) {
 			require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 		})
 		t.Run("OnStream", func(t *testing.T) {
-			ctx := xtest.Context(t)
+			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
@@ -435,7 +434,7 @@ func TestExecute(t *testing.T) {
 	t.Run("ContextCancellation", func(t *testing.T) {
 		t.Run("CancelWhileExecute", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+			ctx, cancel := context.WithCancel(t.Context())
 			var executeCtx context.Context
 
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -480,23 +479,23 @@ func TestExecute(t *testing.T) {
 					return stream, nil
 				})
 
-			executeCtx, cancelExecuteCtx := context.WithCancel(xtest.Context(t))
+			executeCtx, cancelExecuteCtx := context.WithCancel(t.Context())
 			r, err := execute(executeCtx, "123", client, "", options.ExecuteSettings())
 			require.NoError(t, err)
 
 			cancelExecuteCtx()
 
-			_, err = readResultSet(xtest.Context(t), r)
+			_, err = readResultSet(t.Context(), r)
 			require.NoError(t, err)
-			_, err = readResultSet(xtest.Context(t), r)
+			_, err = readResultSet(t.Context(), r)
 			require.NoError(t, err)
-			_, err = readResultSet(xtest.Context(t), r)
+			_, err = readResultSet(t.Context(), r)
 			require.NoError(t, err)
 
 			// check here because the last `readResultSet()` closes stream with stream cancellation
 			require.NoError(t, streamCtx.Err())
 
-			_, err = readResultSet(xtest.Context(t), r)
+			_, err = readResultSet(t.Context(), r)
 			require.ErrorIs(t, err, io.EOF)
 		})
 
@@ -521,7 +520,7 @@ func TestExecute(t *testing.T) {
 		t.Run("CancelParentContextAfterStreamOpen", func(t *testing.T) {
 			t.Run("idempotent=true", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
-				ctx, cancel := context.WithCancel(xtest.Context(t))
+				ctx, cancel := context.WithCancel(t.Context())
 
 				// Recv() may or may not be reached depending on the AfterFunc race
 				// described above; on either path it returns the parent ctx's
@@ -551,7 +550,7 @@ func TestExecute(t *testing.T) {
 			})
 			t.Run("idempotent=false", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
-				ctx, cancel := context.WithCancel(xtest.Context(t))
+				ctx, cancel := context.WithCancel(t.Context())
 
 				// Same race-tolerant expectation as the idempotent=true case:
 				// Recv() may be invoked zero or more times depending on whether
@@ -624,7 +623,7 @@ func TestExecute(t *testing.T) {
 					return stream, nil
 				})
 
-			r, err := execute(xtest.Context(t), "123", client, "", options.ExecuteSettings())
+			r, err := execute(t.Context(), "123", client, "", options.ExecuteSettings())
 			require.NoError(t, err)
 			defer func() {
 				_ = r.Close(context.Background())

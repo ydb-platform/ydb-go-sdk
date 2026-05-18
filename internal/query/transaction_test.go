@@ -30,7 +30,7 @@ var _ baseTx.Transaction = &Transaction{}
 
 func TestBegin(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.BeginTransactionResponse{
@@ -45,7 +45,7 @@ func TestBegin(t *testing.T) {
 		require.Equal(t, "123", txID)
 	})
 	t.Run("TransportError", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
@@ -55,7 +55,7 @@ func TestBegin(t *testing.T) {
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 	})
 	t.Run("OperationError", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil,
@@ -70,7 +70,7 @@ func TestBegin(t *testing.T) {
 
 func TestCommitTx(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
@@ -83,7 +83,7 @@ func TestCommitTx(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("TransportError", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
@@ -95,7 +95,7 @@ func TestCommitTx(t *testing.T) {
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 	})
 	t.Run("OperationError", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(nil,
@@ -465,7 +465,7 @@ func TestTxOnCompleted(t *testing.T) {
 
 func TestRollback(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
@@ -478,7 +478,7 @@ func TestRollback(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("TransportError", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
@@ -490,7 +490,7 @@ func TestRollback(t *testing.T) {
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 	})
 	t.Run("OperationError", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(nil,
@@ -516,7 +516,7 @@ func TestTransactionSessionIDAndNodeID(t *testing.T) {
 
 func TestTransactionOnBeforeCommit(t *testing.T) {
 	e := fixenv.New(t)
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 
 	tx := TransactionOverGrpcMock(e)
 
@@ -541,7 +541,7 @@ func TestTransactionOnBeforeCommit(t *testing.T) {
 
 func TestTransactionOnBeforeCommitWithError(t *testing.T) {
 	e := fixenv.New(t)
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 
 	tx := TransactionOverGrpcMock(e)
 

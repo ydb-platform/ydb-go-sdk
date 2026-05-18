@@ -52,7 +52,7 @@ func TestPreferredNodeIDConcurrencyLimitEviction(t *testing.T) {
 
 		ctx := t.Context()
 		for _, node := range []uint32{nodeBusy, nodeIdle} {
-			info, err := getItemWithFlush(endpoint.WithNodeID(ctx, node), p)
+			info, err := getItemWithFlush(p, endpoint.WithNodeID(ctx, node))
 			require.NoError(t, err)
 			require.Equal(t, node, info.item.NodeID())
 			mustPutItem(t, p, info)
@@ -125,7 +125,7 @@ func TestPreferredNodeIDConcurrencyLimitEviction(t *testing.T) {
 
 		ctx := t.Context()
 		for _, node := range []uint32{0, 1} {
-			info, err := getItemWithFlush(endpoint.WithNodeID(ctx, node), p)
+			info, err := getItemWithFlush(p, endpoint.WithNodeID(ctx, node))
 			require.NoError(t, err)
 			mustPutItem(t, p, info)
 		}
