@@ -215,9 +215,11 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 			return xerrors.WithStackTrace(err)
 		}
 
+		now := p.config.clock.Now()
 		if err := p.idle.Put(&itemInfo[PT, T]{
-			item:    item,
-			created: p.config.clock.Now(),
+			item:      item,
+			created:   now,
+			lastUsage: now,
 		}); err != nil {
 			p.closeItem(ctx, item, batchChanges)
 
