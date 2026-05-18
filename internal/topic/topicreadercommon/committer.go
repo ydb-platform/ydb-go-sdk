@@ -146,8 +146,11 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 	}
 }
 
-// Flush swaps the buffer under c.m, then Optimize and send while holding sendMu
-// so only one sender runs at a time. Caller must not hold c.m or sendMu.
+// Flush processes all pending commit operations by clearing the internal buffer,
+// optimizing the commit ranges, and sending them to the server.
+//
+// The caller must not hold the Committer's mutex ([Committer.m]) when calling this method.
+// This method is thread-safe and can be called concurrently with other operations.
 func (c *Committer) Flush(ctx context.Context) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
