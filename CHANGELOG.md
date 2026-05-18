@@ -1,3 +1,4 @@
+## v3.137.0
 * Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a partition session on the reader
 
 ## v3.136.4
