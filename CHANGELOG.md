@@ -1,6 +1,8 @@
 * Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) sequence handling: concurrent writes with automatic sequence numbers keep per-partition enqueue order, and manual sequence numbers now return a clear error when they are not strictly increasing for a target partition
 * Changed `topicoptions.KeyHasher` for bound topic multiwriter partitioning to return `[]byte` instead of `string`, avoiding extra string conversion and byte-copy allocations per message
 * Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) error handling and shutdown: writes after close now fail, partition-split errors are propagated, sub-writer init errors are race-free, and idle sub-writers are closed correctly
+
+## v3.136.3
 * Fixed passing wait server ack to sub-writers in topicmultiwriter
 
 ## v3.136.2
