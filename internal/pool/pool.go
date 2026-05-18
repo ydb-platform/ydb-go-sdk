@@ -87,9 +87,12 @@ func WithCloseItemTimeout[PT ItemConstraint[T], T any](t time.Duration) Option[P
 	}
 }
 
-func WithLimit[PT ItemConstraint[T], T any](size int) Option[PT, T] {
+func WithLimit[PT ItemConstraint[T], T any](limit int) Option[PT, T] {
 	return func(c *Config[PT, T]) {
-		c.limit = size
+		if limit <= 0 {
+			panic(fmt.Errorf("wrong limit value: %d", limit))
+		}
+		c.limit = limit
 	}
 }
 
