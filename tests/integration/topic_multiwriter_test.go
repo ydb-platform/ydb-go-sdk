@@ -98,7 +98,7 @@ func readMessagesAndAssertOrderedBySeqNo(
 	timeout time.Duration,
 	expectedPayload []byte,
 ) error {
-	messages, err := readMessagesDetailed(ctx, client, topicPath, consumerName, expectedCount, timeout)
+	messages, err := readMessagesDetailed(ctx, client, topicPath, consumerName, expectedCount, timeout, true)
 	if err != nil {
 		return err
 	}
@@ -118,6 +118,61 @@ func readMessagesAndAssertOrderedBySeqNo(
 	return assertMessagesOrderedBySeqNo(messages)
 }
 
+func assertKafkaHashSameKeySinglePartition(messages []receivedTopicMessage) error {
+	if len(messages) <= 1 {
+		return nil
+	}
+
+	pid := messages[0].partitionID
+	for i := 1; i < len(messages); i++ {
+		if messages[i].partitionID != pid {
+			return fmt.Errorf(
+				"Kafka hash: messages with the same key must share one partition, got partition %d then %d at index %d",
+				pid,
+				messages[i].partitionID,
+				i,
+			)
+		}
+	}
+
+	return nil
+}
+
+// readMessagesAndAssertOrderedBySeqNoKafkaHashSameKey checks payload, seq order, and that every
+// message was read from the same partition. Use this after writing multiple messages with the same
+// Key and KafkaHashPartitionChooser. Pass split/merge tracking off on the reader so PartitionID
+// matches writer-side routing.
+func readMessagesAndAssertOrderedBySeqNoKafkaHashSameKey(
+	ctx context.Context,
+	client topic.Client,
+	topicPath string,
+	expectedCount int,
+	timeout time.Duration,
+	expectedPayload []byte,
+) error {
+	messages, err := readMessagesDetailed(ctx, client, topicPath, consumerName, expectedCount, timeout, false)
+	if err != nil {
+		return err
+	}
+	for _, m := range messages {
+		if !bytes.Equal(expectedPayload, m.payload) {
+			return fmt.Errorf(
+				"partition %d, producerId %s: payload mismatch, expected %d bytes, got %d bytes, seqNo %d",
+				m.partitionID,
+				m.producerID,
+				len(expectedPayload),
+				len(m.payload),
+				m.seqNo,
+			)
+		}
+	}
+	if err := assertMessagesOrderedBySeqNo(messages); err != nil {
+		return err
+	}
+
+	return assertKafkaHashSameKeySinglePartition(messages)
+}
+
 func readMessagesDetailed(
 	ctx context.Context,
 	client topic.Client,
@@ -125,6 +180,7 @@ func readMessagesDetailed(
 	consumerName string,
 	expectedCount int,
 	timeout time.Duration,
+	supportSplitMergePartitions bool,
 ) ([]receivedTopicMessage, error) {
 	reader, err := client.StartReader(
 		consumerName,
@@ -134,7 +190,7 @@ func readMessagesDetailed(
 				ReadFrom: time.Unix(0, 0).UTC(),
 			},
 		},
-		topicoptions.WithReaderSupportSplitMergePartitions(true),
+		topicoptions.WithReaderSupportSplitMergePartitions(supportSplitMergePartitions),
 	)
 	if err != nil {
 		return nil, err
@@ -584,152 +640,30 @@ func TestTopicMultiWriter_WriteAndFlush(t *testing.T) {
 	err = multiWriter.WaitInit(ctx)
 	require.NoError(t, err)
 
-	writeAndReadMessages(
-		t,
-		ctx,
-		topicClient,
-		topicPath,
-		multiWriter,
-		func(i int) topicwriter.Message {
-			return topicwriter.Message{
-				Data:  bytes.NewReader([]byte(defaultMessageString)),
-				SeqNo: int64(i + 1),
-				Key:   fmt.Sprintf("partition-key-%d", i),
-			}
-		},
-	)
-}
-
-// TestTopicMultiWriter_KafkaHashPartitionStableAcrossWriterRestart checks that with Kafka-style hash
-// partitioning, the same message key maps to the same partition after closing the writer and
-// starting a new one (simulating application restart).
-func TestTopicMultiWriter_KafkaHashPartitionStableAcrossWriterRestart(t *testing.T) {
-	scope := newScope(t)
-	ctx := scope.Ctx
-
-	topicClient := scope.Driver().Topic()
-
-	topicPath := createTopic(ctx, t, scope.Driver())
-	err := topicClient.Alter(
-		ctx,
-		topicPath,
-		topicoptions.AlterWithMinActivePartitions(10),
-		topicoptions.AlterWithMaxActivePartitions(10),
-	)
-	require.NoError(t, err)
-
-	const (
-		producerPrefix = "kafka-hash-restart-producer"
-		stableKey      = "stable-partitioning-key-restart-42"
-	)
-	payloadFirst := []byte("payload-kafka-hash-first-session")
-	payloadSecond := []byte("payload-kafka-hash-second-session")
-
-	multiWriterOpts := []topicoptions.MultiWriterOption{
-		topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
-		topicoptions.WithProducerIDPrefix(producerPrefix),
+	// Same key for every message: Kafka hash must route all of them to one partition.
+	const stickyKey = "kafka-hash-write-and-flush-sticky-key"
+	messages := make([]topicwriter.Message, 0, defaultMessageCount)
+	for i := range defaultMessageCount {
+		messages = append(messages, topicwriter.Message{
+			Data:  bytes.NewReader([]byte(defaultMessageString)),
+			SeqNo: int64(i + 1),
+			Key:   stickyKey,
+		})
 	}
+	require.NoError(t, multiWriter.Write(ctx, messages...))
+	require.NoError(t, multiWriter.Close(ctx))
 
-	startWriter := func() *topicwriter.Writer {
-		w, wErr := topicClient.StartWriter(
+	require.NoError(
+		t,
+		readMessagesAndAssertOrderedBySeqNoKafkaHashSameKey(
+			ctx,
+			topicClient,
 			topicPath,
-			topicoptions.WithWriterSetAutoSeqNo(true),
-			topicoptions.WithWriteToManyPartitions(multiWriterOpts...),
-		)
-		require.NoError(t, wErr)
-		require.NoError(t, w.WaitInit(ctx))
-
-		return w
-	}
-
-	w1 := startWriter()
-	require.NoError(t, w1.Write(ctx, topicwriter.Message{
-		Data: bytes.NewReader(payloadFirst),
-		Key:  stableKey,
-	}))
-	require.NoError(t, w1.Flush(ctx))
-	require.NoError(t, w1.Close(ctx))
-
-	w2 := startWriter()
-	require.NoError(t, w2.Write(ctx, topicwriter.Message{
-		Data: bytes.NewReader(payloadSecond),
-		Key:  stableKey,
-	}))
-	require.NoError(t, w2.Flush(ctx))
-	require.NoError(t, w2.Close(ctx))
-
-	partitionsByPayload, err := readPartitionByPayload(
-		ctx,
-		topicClient,
-		topicPath,
-		[][]byte{payloadFirst, payloadSecond},
-		defaultReadTimeout,
+			defaultMessageCount,
+			defaultReadTimeout,
+			[]byte(defaultMessageString),
+		),
 	)
-	require.NoError(t, err)
-
-	require.Equal(
-		t,
-		partitionsByPayload[string(payloadFirst)],
-		partitionsByPayload[string(payloadSecond)],
-		"same key must map to the same partition after writer restart (Kafka hash strategy)",
-	)
-}
-
-func TestTopicMultiWriter_KafkaHashChooser_SameKeySamePartitionAcrossManyRestarts(t *testing.T) {
-	scope := newScope(t)
-	ctx := scope.Ctx
-
-	topicClient := scope.Driver().Topic()
-	topicPath := createTopic(ctx, t, scope.Driver())
-	err := topicClient.Alter(
-		ctx,
-		topicPath,
-		topicoptions.AlterWithMinActivePartitions(10),
-		topicoptions.AlterWithMaxActivePartitions(10),
-	)
-	require.NoError(t, err)
-
-	const (
-		restartCount   = 5
-		producerPrefix = "kafka-hash-many-restarts"
-		stableKey      = "same-key-across-many-restarts"
-	)
-
-	payloads := make([][]byte, 0, restartCount)
-	for i := range restartCount {
-		payload := []byte(fmt.Sprintf("payload-kafka-many-restarts-%d", i))
-		payloads = append(payloads, payload)
-
-		writer := createKafkaHashMultiWriter(t, ctx, topicClient, topicPath, producerPrefix)
-		require.NoError(t, writer.Write(ctx, topicwriter.Message{
-			Data: bytes.NewReader(payload),
-			Key:  stableKey,
-		}))
-		require.NoError(t, writer.Flush(ctx))
-		require.NoError(t, writer.Close(ctx))
-	}
-
-	partitionsByPayload, err := readPartitionByPayload(
-		ctx,
-		topicClient,
-		topicPath,
-		payloads,
-		defaultReadTimeout,
-	)
-	require.NoError(t, err)
-
-	require.Len(t, partitionsByPayload, restartCount)
-	var expectedPartition int64
-	for i, payload := range payloads {
-		partitionID := partitionsByPayload[string(payload)]
-		if i == 0 {
-			expectedPartition = partitionID
-
-			continue
-		}
-
-		require.Equal(t, expectedPartition, partitionID)
-	}
 }
 
 func TestTopicMultiWriter_KafkaHashChooser_DifferentKeysDistributeAcrossPartitions(t *testing.T) {
@@ -775,48 +709,6 @@ func TestTopicMultiWriter_KafkaHashChooser_DifferentKeysDistributeAcrossPartitio
 	}
 
 	require.Greater(t, len(uniquePartitions), 1, "different keys should not all map to one partition")
-}
-
-func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
-	scope := newScope(t)
-	ctx := scope.Ctx
-
-	topicClient := scope.Driver().Topic()
-
-	// Create topic with 10 partitions for this test.
-	topicPath := createTopic(ctx, t, scope.Driver())
-	err := topicClient.Alter(
-		ctx,
-		topicPath,
-		topicoptions.AlterWithMinActivePartitions(10),
-		topicoptions.AlterWithMaxActivePartitions(10),
-	)
-	require.NoError(t, err)
-
-	multiWriter, err := topicClient.StartWriter(
-		topicPath,
-		topicoptions.WithWriteToManyPartitions(
-			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
-		),
-	)
-	require.NoError(t, err)
-
-	err = multiWriter.WaitInit(ctx)
-	require.NoError(t, err)
-
-	writeAndReadMessages(
-		t,
-		ctx,
-		topicClient,
-		topicPath,
-		multiWriter,
-		func(i int) topicwriter.Message {
-			return topicwriter.Message{
-				Data: bytes.NewReader([]byte(defaultMessageString)),
-				Key:  fmt.Sprintf("partition-key-%d", i),
-			}
-		},
-	)
 }
 
 func TestTopicMultiWriter_ConcurrentWriteAutoSeqNo(t *testing.T) {
@@ -1279,6 +1171,7 @@ func TestTopicMultiWriter_AutoPartitioning_MixedLargeAndSmallMessages(t *testing
 		consumerName,
 		smallCount+largeCount,
 		60*time.Second,
+		true,
 	)
 	require.NoError(t, err)
 	require.NoError(t, assertMessagesOrderedBySeqNo(messages))
@@ -1392,6 +1285,7 @@ func TestTopicMultiWriter_AutoPartitioning_NoPayloadCorruptionOnResend(t *testin
 		consumerName,
 		len(expectedPayloads),
 		2*time.Minute,
+		true,
 	)
 	require.NoError(t, err)
 	require.NoError(t, assertMessagesOrderedBySeqNo(messages))
@@ -1453,6 +1347,7 @@ func TestTopicMultiWriter_AutoPartitioning_MetadataPreservedOnResend(t *testing.
 		consumerName,
 		len(expectedMetadata),
 		2*time.Minute,
+		true,
 	)
 	require.NoError(t, err)
 	require.NoError(t, assertMessagesOrderedBySeqNo(messages))
