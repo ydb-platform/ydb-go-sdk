@@ -49,9 +49,9 @@ func StartWriterAcrossPartitionsBoundedKey(
 			// BoundPartitionChooser places messages by comparing a hashed partitioning key against ordered partition bounds.
 			// It is compatible with Topic auto partitioning that grows partition count over time—the client refreshes bounds.
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser(
-				// Optional: customize how raw Message.Key becomes the string matched against boundaries.
-				// The default hashes like legacy C++/Go producers; override only to align routing with upstream systems.
-				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) string { return key }),
+				// Optional: customize how Message.Key maps to partitioning key bytes before comparison with boundaries.
+				// The default matches legacy C++/Go producers (64-bit Murmur big-endian hash); override to align routing.
+				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) []byte { return []byte(key) }),
 			)),
 
 			// ProducerIDPrefix works like a regular producer ID: the server uses it for deduplication.
@@ -113,7 +113,7 @@ func StartTransactionalWriterAcrossPartitions(
 			topicoptions.WithWriterIdleTimeout(30*time.Minute),
 
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser(
-				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) string { return key }),
+				topicoptions.WithBoundPartitionChooserPartitioningKeyHasher(func(key string) []byte { return []byte(key) }),
 			)),
 		),
 	)

@@ -248,6 +248,10 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		return err
 	}
 
+	// saveMessageContent must run after choosePartition: BoundPartitionChooser may
+	// write choose_partition_key into msg.Metadata; CacheMessageData (inside saveMessageContent)
+	// freezes Metadata and would discard that key if it ran earlier. Keeping this outside
+	// o.mu avoids holding the lock over user io.Reader reads.
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
