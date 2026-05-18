@@ -128,17 +128,21 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 	for {
 		c.waitSendTrigger(ctx)
 
-		var commits CommitRanges
+		var commitsLen int
 		c.m.WithLock(func() {
-			commits = c.commits
+			commitsLen = c.commits.Len()
 		})
 
-		if commits.Len() == 0 && c.backgroundWorker.Context().Err() != nil {
+		if commitsLen == 0 && c.backgroundWorker.Context().Err() != nil {
 			// committer closed with empty buffer - target close state
 			return
 		}
 
-		if err := c.Flush(ctx); err != nil {
+		if commitsLen == 0 {
+			continue
+		}
+
+		if err := c.Flush(); err != nil {
 			_ = c.backgroundWorker.Close(ctx, err)
 
 			return
@@ -151,11 +155,7 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 //
 // The caller must not hold the Committer's mutex ([Committer.m]) when calling this method.
 // This method is thread-safe and can be called concurrently with other operations.
-func (c *Committer) Flush(ctx context.Context) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-
+func (c *Committer) Flush() error {
 	var commits CommitRanges
 
 	c.m.WithLock(func() {
@@ -169,6 +169,7 @@ func (c *Committer) Flush(ctx context.Context) error {
 
 	commits.Optimize()
 
+	ctx := c.backgroundWorker.Context()
 	onDone := trace.TopicOnReaderSendCommitMessage(
 		c.tracer,
 		&ctx,

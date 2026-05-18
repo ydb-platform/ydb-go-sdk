@@ -487,7 +487,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	}
 
 	if msg.Graceful {
-		if err = r.committer.Flush(ctx); err != nil {
+		if err = r.committer.Flush(); err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf(
 				"ydb: flush buffered commits on graceful stop partition session: %w",
 				err,
