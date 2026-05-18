@@ -76,9 +76,9 @@ func WithSessionPoolSessionUsageLimit[T interface{ uint64 | time.Duration }](lim
 	}
 }
 
-// WithKeepAliveMinSize sets the number of sessions to pre-create in the pool at client initialization.
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in the pool at client initialization.
 // If keepAliveMinSize is less than or equal to zero, pool warm-up is disabled.
-func WithKeepAliveMinSize(keepAliveMinSize int) Option {
+func WithSessionPoolWarmUpSessions(keepAliveMinSize int) Option {
 	return func(c *Config) {
 		c.poolWarmUpSize = keepAliveMinSize
 	}

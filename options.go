@@ -170,7 +170,8 @@ func WithApplicationName(applicationName string) Option {
 
 // WithUserAgent add provided user agent value to all api requests
 //
-// Deprecated: will be removed after Oct 2024.
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, d *Driver) error {
@@ -625,15 +626,23 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithSessionPoolKeepAliveMinSize sets the number of sessions to pre-create in session pools at driver initialization.
-// If keepAliveMinSize is less than or equal to zero, pool warm-up is disabled.
-func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in session pools at driver initialization.
+// If warmUpSessions is less than or equal to zero, pool warm-up is disabled.
+func WithSessionPoolWarmUpSessions(warmUpSessions int) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.WithKeepAliveMinSize(keepAliveMinSize))
-		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolKeepAliveMinSize(keepAliveMinSize))
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
 
 		return nil
 	}
+}
+
+// WithSessionPoolKeepAliveMinSize
+//
+// Deprecated: will be removed after Nov 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
+	return func(ctx context.Context, d *Driver) error { return nil }
 }
 
 // WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client

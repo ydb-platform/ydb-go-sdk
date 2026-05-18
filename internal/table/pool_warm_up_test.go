@@ -58,7 +58,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 
 		c, err := New(ctx, cc, config.New(
 			config.WithSizeLimit(10),
-			config.WithKeepAliveMinSize(warmUpSize),
+			config.WithSessionPoolWarmUpSessions(warmUpSize),
 		))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
@@ -90,7 +90,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 
 		c, err := New(ctx, cc, config.New(
 			config.WithSizeLimit(limit),
-			config.WithKeepAliveMinSize(warmUpSize),
+			config.WithSessionPoolWarmUpSessions(warmUpSize),
 		))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
@@ -107,7 +107,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 		}))
 
 		_, err := New(ctx, cc, config.New(
-			config.WithKeepAliveMinSize(1),
+			config.WithSessionPoolWarmUpSessions(1),
 		))
 		require.Error(t, err)
 	})

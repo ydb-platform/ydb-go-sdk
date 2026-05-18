@@ -94,10 +94,10 @@ func WithDisableSessionBalancer() Option {
 	}
 }
 
-// WithSessionPoolKeepAliveMinSize sets the number of sessions to pre-create in the explicit session pool
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in the explicit session pool
 // at client initialization.
 // If keepAliveMinSize is less than or equal to zero, pool warm-up is disabled.
-func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
+func WithSessionPoolWarmUpSessions(keepAliveMinSize int) Option {
 	return func(c *Config) {
 		c.poolWarmUpSize = keepAliveMinSize
 	}

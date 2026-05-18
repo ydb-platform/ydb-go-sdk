@@ -1,6 +1,19 @@
-* Reworked the internal table/query session pool (semaphore-based concurrency limit instead of a wait queue) for lower overhead under load ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163))
-* Implemented `WithSessionPoolKeepAliveMinSize`: at driver initialization, pre-creates up to N sessions in the table client pool and the query explicit session pool (`N > 0`; `N <= 0` disables warm-up, default is no warm-up). Driver initialization fails if warm-up session creation fails
-* **Trace/metrics (breaking for custom handlers):** Updated pool state events to expose `Concurrency` instead of `Index`/`Wait` (`TablePoolStateChangeInfo`, `QueryPoolChange`); table pool metrics gauge `concurrency` replaced `index` and `wait`, query pool metrics gauge `concurrency` replaced `index`, `waiters_queue`, and derived `in_use`; `Attempts` removed from `TablePoolGetDoneInfo` and `QueryPoolGetDoneInfo`
+* Reworked the internal table/query session pool ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163)): 
+  * semaphore-based concurrency limit instead of a wait queue, 
+  * synchronous session creation, 
+  * and batched pool statistics updates for lower CPU overhead under load
+* **Session reuse (behavior):** idle sessions are taken from the pool in LIFO order (most recently returned first). Previously idle items were taken from the front of the queue (FIFO). With `PreferredNodeID`, matching idle sessions are also selected from the end of the idle list (consistent LIFO semantics)
+* **Pool saturation (behavior):** 
+  * when the pool limit is reached, `table.Do` / `query` pool operations block until a slot is released (semaphore), instead of parking goroutines on an internal wait queue. `errPoolIsOverflow` is no longer returned from the pool path; 
+  * pool wait trace callbacks (`OnPoolWait`) are no longer invoked
+* Added **`WithSessionPoolWarmUpSessions`** driver option: 
+  * at driver initialization, pre-creates up to N sessions in the table client pool and the query explicit session pool (`N > 0`; `N <= 0` disables warm-up, default is no warm-up). 
+  * The configured value is capped by the pool size limit. 
+  * Driver/table/query client initialization fails if warm-up session creation fails
+* **Trace/metrics (breaking for custom handlers):** 
+  * pool state events expose `Concurrency` (active `With` calls) instead of `Index`/`Wait`; `TablePoolStateChangeInfo` no longer includes deprecated `Size` — use `Idle`, `CreateInProgress`, and `Concurrency` instead. 
+  * Table pool metrics: gauge `concurrency` replaces `index` and `wait`; 
+  * Query pool metrics: gauge `concurrency` replaces `index`, `waiters_queue`, and derived `in_use`.
 
 ## v3.136.3
 * Fixed passing wait server ack to sub-writers in topicmultiwriter

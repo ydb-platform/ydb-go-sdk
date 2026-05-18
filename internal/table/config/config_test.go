@@ -64,17 +64,17 @@ func TestWithSessionPoolSessionUsageLimit(t *testing.T) {
 
 func TestWithKeepAliveMinSize(t *testing.T) {
 	t.Run("explicit value", func(t *testing.T) {
-		c := New(WithKeepAliveMinSize(20))
+		c := New(WithSessionPoolWarmUpSessions(20))
 		require.Equal(t, 20, c.KeepAliveMinSize())
 	})
 
 	t.Run("zero disables warm-up", func(t *testing.T) {
-		c := New(WithKeepAliveMinSize(0))
+		c := New(WithSessionPoolWarmUpSessions(0))
 		require.Equal(t, 0, c.KeepAliveMinSize())
 	})
 
 	t.Run("negative disables warm-up", func(t *testing.T) {
-		c := New(WithKeepAliveMinSize(-1))
+		c := New(WithSessionPoolWarmUpSessions(-1))
 		require.Equal(t, 0, c.KeepAliveMinSize())
 	})
 

@@ -123,17 +123,17 @@ func TestNew(t *testing.T) {
 
 func TestWithSessionPoolKeepAliveMinSize(t *testing.T) {
 	t.Run("explicit value", func(t *testing.T) {
-		cfg := New(WithSessionPoolKeepAliveMinSize(20))
+		cfg := New(WithSessionPoolWarmUpSessions(20))
 		require.Equal(t, 20, cfg.PoolWarmUpSize())
 	})
 
 	t.Run("zero disables warm-up", func(t *testing.T) {
-		cfg := New(WithSessionPoolKeepAliveMinSize(0))
+		cfg := New(WithSessionPoolWarmUpSessions(0))
 		require.Equal(t, 0, cfg.PoolWarmUpSize())
 	})
 
 	t.Run("negative disables warm-up", func(t *testing.T) {
-		cfg := New(WithSessionPoolKeepAliveMinSize(-1))
+		cfg := New(WithSessionPoolWarmUpSessions(-1))
 		require.Equal(t, 0, cfg.PoolWarmUpSize())
 	})
 }

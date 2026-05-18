@@ -40,7 +40,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 
 		c, err := newWithQueryServiceClient(ctx, client, nil, config.New(
 			config.WithPoolLimit(10),
-			config.WithSessionPoolKeepAliveMinSize(warmUpSize),
+			config.WithSessionPoolWarmUpSessions(warmUpSize),
 		))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
@@ -58,7 +58,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 		c, err := newWithQueryServiceClient(ctx, client, nil, config.New(
 			config.AllowImplicitSessions(),
 			config.WithPoolLimit(10),
-			config.WithSessionPoolKeepAliveMinSize(warmUpSize),
+			config.WithSessionPoolWarmUpSessions(warmUpSize),
 		))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
@@ -78,7 +78,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 
 		c, err := newWithQueryServiceClient(ctx, client, nil, config.New(
 			config.WithPoolLimit(limit),
-			config.WithSessionPoolKeepAliveMinSize(warmUpSize),
+			config.WithSessionPoolWarmUpSessions(warmUpSize),
 		))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
@@ -92,7 +92,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil, context.DeadlineExceeded)
 
 		_, err := newWithQueryServiceClient(ctx, client, nil, config.New(
-			config.WithSessionPoolKeepAliveMinSize(1),
+			config.WithSessionPoolWarmUpSessions(1),
 		))
 		require.Error(t, err)
 	})
