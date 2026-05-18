@@ -6,13 +6,24 @@ import (
 	"strings"
 )
 
+func isDeprecatedCommentText(text string) bool {
+	text = strings.TrimSpace(text)
+	text = strings.TrimPrefix(text, "//")
+	text = strings.TrimPrefix(text, "/*")
+	text = strings.TrimSuffix(text, "*/")
+	text = strings.TrimSpace(text)
+
+	return text == "Deprecated" ||
+		strings.HasPrefix(text, "Deprecated:") ||
+		strings.HasPrefix(text, "Deprecated ")
+}
+
 func isDeprecatedCommentGroup(cg *ast.CommentGroup) bool {
 	if cg == nil {
 		return false
 	}
 	for _, c := range cg.List {
-		text := strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
-		if strings.Contains(text, "Deprecated") {
+		if isDeprecatedCommentText(c.Text) {
 			return true
 		}
 	}
