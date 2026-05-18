@@ -7,7 +7,7 @@
 * Added **`WithSessionPoolWarmUpSessions`** driver option: at driver initialization, pre-creates up to `N` sessions in the table client pool and the query **explicit** session pool (`N > 0`; `N <= 0` disables warm-up; default is no warm-up). The configured `N` is stored in pool stats as `WarmUp`; the number of sessions actually created is `min(N, pool limit)`. Driver initialization fails if warm-up session creation fails
 * **Deprecated:** `WithSessionPoolKeepAliveMinSize` is a no-op (removal planned Nov 2026); use `WithSessionPoolWarmUpSessions` instead
 * **Trace/metrics (breaking for custom handlers):**
-  * `TablePoolStateChangeInfo` / `QueryPoolChange`: `Concurrency` (active `With` calls) replaces `Index` and `Wait`; deprecated `Size` removed from table pool state change info
+  * `TablePoolStateChangeInfo` / `QueryPoolChange`: `Concurrency` (active `With` calls) replaces `Index` and `Wait`
   * `TablePoolGetDoneInfo` / `QueryPoolGetDoneInfo`: `Attempts` removed
   * Table pool metrics: gauge `concurrency` replaces `index` and `wait`
   * Query pool metrics: gauge `concurrency` replaces `index`, `waiters_queue`, and derived `in_use`
