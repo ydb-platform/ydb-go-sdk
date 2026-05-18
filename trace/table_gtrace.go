@@ -1619,16 +1619,17 @@ func TableOnPoolPut(t *Table, c *context.Context, call call, session sessionInfo
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TableOnPoolGet(t *Table, c *context.Context, call call) func(session sessionInfo, _ *NodeHintInfo, _ error) {
+func TableOnPoolGet(t *Table, c *context.Context, call call) func(session sessionInfo, _ *NodeHintInfo, _ error, attempts int) {
 	var p TablePoolGetStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onPoolGet(p)
-	return func(session sessionInfo, n *NodeHintInfo, e error) {
+	return func(session sessionInfo, n *NodeHintInfo, e error, attempts int) {
 		var p TablePoolGetDoneInfo
 		p.Session = session
 		p.NodeHintInfo = n
 		p.Error = e
+		p.Attempts = attempts
 		res(p)
 	}
 }
@@ -1646,13 +1647,15 @@ func TableOnPoolWith(t *Table, c *context.Context, call call) func(attempts int,
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TableOnPoolStateChange(t *Table, limit int, idle int, createInProgress int, concurrency int, attempts int) {
+func TableOnPoolStateChange(t *Table, limit int, idle int, createInProgress int, concurrency int, index int, size int, wait int) {
 	var p TablePoolStateChangeInfo
 	p.Limit = limit
 	p.Idle = idle
 	p.CreateInProgress = createInProgress
 	p.Concurrency = concurrency
-	p.Attempts = attempts
+	p.Index = index
+	p.Size = size
+	p.Wait = wait
 	t.onPoolStateChange(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

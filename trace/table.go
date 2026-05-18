@@ -361,7 +361,13 @@ type (
 
 		// Deprecated: will be removed after November 2026.
 		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-		Attempts int
+		Index int
+		// Deprecated: will be removed after November 2026.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		Size int
+		// Deprecated: will be removed after November 2026.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		Wait int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewStartInfo struct {
@@ -391,6 +397,10 @@ type (
 		Session      sessionInfo
 		NodeHintInfo *NodeHintInfo
 		Error        error
+
+		// Deprecated: will be removed after November 2026.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		Attempts int
 	}
 	// Deprecated
 	// Will be removed after March 2025.
