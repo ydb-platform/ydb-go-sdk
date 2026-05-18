@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -816,6 +817,76 @@ func TestTopicMultiWriter_WithDefaultSettings(t *testing.T) {
 			}
 		},
 	)
+}
+
+func TestTopicMultiWriter_ConcurrentWriteAutoSeqNo(t *testing.T) {
+	const (
+		goroutines          = 50
+		messagesPerRoutine  = 5
+		concurrentWriteKeys = 10
+	)
+
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicClient := scope.Driver().Topic()
+
+	topicPath := createTopic(ctx, t, scope.Driver())
+	err := topicClient.Alter(
+		ctx,
+		topicPath,
+		topicoptions.AlterWithMinActivePartitions(10),
+		topicoptions.AlterWithMaxActivePartitions(10),
+	)
+	require.NoError(t, err)
+
+	multiWriter, err := topicClient.StartWriter(
+		topicPath,
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithProducerIDPrefix("concurrent-auto-seq-"+uuid.NewString()),
+			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+		),
+	)
+	require.NoError(t, err)
+	require.NoError(t, multiWriter.WaitInit(ctx))
+
+	payload := bytes.Repeat([]byte("payload"), 1024)
+	var wg sync.WaitGroup
+	writeErrs := make(chan error, goroutines*messagesPerRoutine)
+	start := make(chan struct{})
+
+	for goroutineID := range goroutines {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			for messageID := range messagesPerRoutine {
+				writeErrs <- multiWriter.Write(ctx, topicwriter.Message{
+					Data: bytes.NewReader(payload),
+					Key:  fmt.Sprintf("concurrent-key-%d", (goroutineID+messageID)%concurrentWriteKeys),
+				})
+			}
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+	close(writeErrs)
+
+	for err := range writeErrs {
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, multiWriter.Close(ctx))
+	require.NoError(t, readMessagesAndAssertOrderedBySeqNo(
+		ctx,
+		topicClient,
+		topicPath,
+		consumerName,
+		goroutines*messagesPerRoutine,
+		defaultReadTimeout,
+		payload,
+	))
 }
 
 func TestTopicMultiWriter_WithPartitionIDInMessage(t *testing.T) {

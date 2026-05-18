@@ -16,9 +16,10 @@ type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDesc
 type PartitionInfo struct {
 	topictypes.PartitionInfo
 
-	Locked         bool
-	PendingResend  int
-	CachedMaxSeqNo int64
+	Locked          bool
+	PendingResend   int
+	CachedMaxSeqNo  int64
+	LastQueuedSeqNo int64
 }
 
 func (p *PartitionInfo) Splitted() bool {
@@ -44,8 +45,20 @@ type writerWrapper struct {
 	writer
 
 	initDone atomic.Bool
+	initErr  atomic.Value
 	direct   bool
-	err      error
+}
+
+func (w *writerWrapper) setInitErr(err error) {
+	if err != nil {
+		w.initErr.Store(err)
+	}
+}
+
+func (w *writerWrapper) getInitErr() error {
+	err, _ := w.initErr.Load().(error)
+
+	return err
 }
 
 type idleWriterInfo struct {
