@@ -128,36 +128,57 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 	for {
 		c.waitSendTrigger(ctx)
 
-		var commits CommitRanges
+		var commitsLen int
 		c.m.WithLock(func() {
-			commits = c.commits
-			c.commits = NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:mnd
+			commitsLen = c.commits.Len()
 		})
 
-		if commits.Len() == 0 && c.backgroundWorker.Context().Err() != nil {
+		if commitsLen == 0 && c.backgroundWorker.Context().Err() != nil {
 			// committer closed with empty buffer - target close state
 			return
 		}
 
-		// all ranges already committed of prev iteration
-		if commits.Len() == 0 {
+		if commitsLen == 0 {
 			continue
 		}
 
-		commits.Optimize()
-
-		onDone := trace.TopicOnReaderSendCommitMessage(
-			c.tracer,
-			&ctx,
-			&commits,
-		)
-		err := c.send(commits.ToRawMessage())
-		onDone(err)
-
-		if err != nil {
+		if err := c.Flush(); err != nil {
 			_ = c.backgroundWorker.Close(ctx, err)
+
+			return
 		}
 	}
+}
+
+// Flush processes all pending commit operations by clearing the internal buffer,
+// optimizing the commit ranges, and sending them to the server.
+//
+// The caller must not hold the Committer's mutex ([Committer.m]) when calling this method.
+// This method is thread-safe and can be called concurrently with other operations.
+func (c *Committer) Flush() error {
+	var commits CommitRanges
+
+	c.m.WithLock(func() {
+		commits = c.commits
+		c.commits = NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:mnd
+	})
+
+	if commits.Len() == 0 {
+		return nil
+	}
+
+	commits.Optimize()
+
+	ctx := c.backgroundWorker.Context()
+	onDone := trace.TopicOnReaderSendCommitMessage(
+		c.tracer,
+		&ctx,
+		&commits,
+	)
+	err := c.send(commits.ToRawMessage())
+	onDone(err)
+
+	return err
 }
 
 func (c *Committer) waitSendTrigger(ctx context.Context) {

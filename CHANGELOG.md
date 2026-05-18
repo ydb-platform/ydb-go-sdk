@@ -1,3 +1,5 @@
+* Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a partition session on the reader
+
 ## v3.136.4
 * Fixed concurrent partition map initialization in topic multiwriter (`topicoptions.WithWriteToManyPartitions`) so `DescribeTopic` setup does not race with an early partition-split callback
 * Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) sequence handling: concurrent writes with automatic sequence numbers serialize assignment with enqueue order, and manual sequence numbers return a client-side ordering error when not strictly increasing for a target partition
