@@ -175,11 +175,11 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	reportBenchLatency(b, merged)
 }
 
-// BenchmarkPoolWith reports throughput (ns/op) and exact per-call latency of pool.With:
-//   - latency-p50-ns/op — median wall time of one pool.With (typical call, includes sema wait)
-//   - latency-p99-ns/op — tail latency (queueing when concurrency > limit)
-//
-// Sorting/merge for percentiles runs after the timed section.
+// benchmark name                         CPU time   p50 (ns/op)    p99 (ns/op)    B/op   allocs/op
+// BenchmarkPoolWith/concurrency=1-12     1049       500.0          10708          974    19
+// BenchmarkPoolWith/concurrency=250-12   649.0      1083           149542         982    19
+// BenchmarkPoolWith/concurrency=500-12   645.8      1083           152000         982    19
+// BenchmarkPoolWith/concurrency=1000-12  1345       515042         1672916        982    19
 func BenchmarkPoolWith(b *testing.B) {
 	for _, goroutines := range []int{1, 250, 500, 1000} {
 		b.Run(fmt.Sprintf("concurrency=%d", goroutines), func(b *testing.B) {
