@@ -885,7 +885,7 @@ func poolTrace(t *trace.Query) *pool.Trace {
 			}
 		},
 		OnChange: func(stats pool.Stats) {
-			trace.QueryOnPoolChange(t, stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency)
+			trace.QueryOnPoolChange(t, stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, stats.Size)
 		},
 	}
 }

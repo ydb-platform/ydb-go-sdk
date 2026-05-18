@@ -1766,12 +1766,13 @@ func QueryOnPoolGet(t *Query, c *context.Context, call call) func(session sessio
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnPoolChange(t *Query, limit int, idle int, createInProgress int, concurrency int) {
+func QueryOnPoolChange(t *Query, limit int, idle int, createInProgress int, concurrency int, size int) {
 	var p QueryPoolChange
 	p.Limit = limit
 	p.Idle = idle
 	p.CreateInProgress = createInProgress
 	p.Concurrency = concurrency
+	p.Size = size
 	t.onPoolChange(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
