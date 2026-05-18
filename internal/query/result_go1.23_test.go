@@ -12,10 +12,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestResultRangeResultSets(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 	ctrl := gomock.NewController(t)
 	stream := NewMockQueryService_ExecuteQueryClient(ctrl)

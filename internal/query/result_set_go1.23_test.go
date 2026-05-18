@@ -16,10 +16,11 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestResultSetRangeRows(t *testing.T) {
-	ctx := t.Context()
+	ctx := xtest.Context(t)
 	ctrl := gomock.NewController(t)
 	t.Run("EmptyResultSet", func(t *testing.T) {
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
@@ -519,7 +520,7 @@ func TestResultSetRangeRows(t *testing.T) {
 		require.EqualValues(t, count, 5)
 	})
 	t.Run("CanceledContext", func(t *testing.T) {
-		childCtx, cancel := context.WithCancel(t.Context())
+		childCtx, cancel := context.WithCancel(xtest.Context(t))
 		defer cancel()
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
