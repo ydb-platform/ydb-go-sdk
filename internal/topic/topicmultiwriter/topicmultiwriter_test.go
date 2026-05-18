@@ -169,7 +169,9 @@ func (w *orderedSeqWriter) WriteInternal(
 		if w.onAckReceivedCallback != nil {
 			// Notify multiwriter the message was accepted so flush() in Close()
 			// can complete; mirror what real subwriter does after a server ack.
-			go w.onAckReceivedCallback(msg.SeqNo)
+			// Must be synchronous: async delivery can reorder acks vs. in-flight
+			// queue head and trigger seqNo mismatch in onAckReceivedNeedLock.
+			w.onAckReceivedCallback(msg.SeqNo)
 		}
 	}
 
