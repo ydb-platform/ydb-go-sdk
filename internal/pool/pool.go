@@ -363,6 +363,10 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 			return xerrors.WithStackTrace(xerrors.Retryable(err))
 		}
 
+		if xerrors.IsYdb(err) && !xerrors.IsOperationError(err, retry.StatusIds_UNAUTHORIZED) {
+			return xerrors.WithStackTrace(xerrors.Retryable(err))
+		}
+
 		return xerrors.WithStackTrace(err)
 	}
 
