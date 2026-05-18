@@ -8,6 +8,10 @@ import (
 
 const containerLen = 500
 
+// BenchmarkContainers/xsync.Set-12         	  747793	      1585 ns/op	      96 B/op	       2 allocs/op
+// BenchmarkContainers/slice-12             	 3094249	      390.7 ns/op	      0 B/op	       0 allocs/op
+// BenchmarkContainers/map-12               	  511998	      2247 ns/op	      0 B/op	       0 allocs/op
+// BenchmarkContainers/xlist.List-12        	  921478	      1274 ns/op	      64 B/op	       2 allocs/op
 func BenchmarkContainers(b *testing.B) {
 	for _, tt := range []struct {
 		name      string
