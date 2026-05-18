@@ -28,7 +28,7 @@ func TestBoundPartitionChooser(t *testing.T) {
 
 		msg := messageWithKey("key-a")
 		partitionID, err := chooser.ChoosePartition(msg)
-		require.Equal(t, defaultKeyHasher("key-a"), msg.Metadata[PartitionKeyMetadataKey])
+		require.Equal(t, []byte(defaultKeyHasher("key-a")), msg.Metadata[PartitionKeyMetadataKey])
 		require.NoError(t, err)
 		require.Equal(t, int64(1), partitionID)
 	})
@@ -37,7 +37,7 @@ func TestBoundPartitionChooser(t *testing.T) {
 		t.Parallel()
 
 		chooser := NewBoundPartitionChooser(
-			WithKeyHasher(func(k string) []byte { return []byte(k) }),
+			WithKeyHasher(func(k string) string { return k }),
 		)
 		partitions := []topictypes.PartitionInfo{
 			{PartitionID: 1, FromBound: []byte{}, ToBound: []byte("m")},
@@ -59,8 +59,8 @@ func TestBoundPartitionChooser(t *testing.T) {
 		t.Parallel()
 
 		chooser := NewBoundPartitionChooser(
-			WithKeyHasher(func(key string) []byte {
-				return []byte("hashed-" + key)
+			WithKeyHasher(func(key string) string {
+				return "hashed-" + key
 			}),
 		)
 
@@ -79,7 +79,7 @@ func TestBoundPartitionChooser(t *testing.T) {
 		t.Parallel()
 
 		chooser := NewBoundPartitionChooser(
-			WithKeyHasher(func(k string) []byte { return []byte(k) }),
+			WithKeyHasher(func(k string) string { return k }),
 		)
 		partitions := []topictypes.PartitionInfo{
 			{PartitionID: 1, Active: true, FromBound: []byte{}, ToBound: []byte("m")},
