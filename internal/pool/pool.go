@@ -232,9 +232,11 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 	return nil
 }
 
-// createItem wraps the Config.createItemFunc function with timeout handling
+// createItem wraps Config.createItemFunc with pool-controlled context handling.
 //
-// Given context restrictions (timeout, cancel) ignored
+// Caller context values are preserved, but caller cancellation and deadlines are
+// not propagated. Creation is canceled when the pool is done, and
+// Config.createTimeout is applied when configured.
 func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats) (PT, error) {
 	batchChanges.CreateInProgress++
 	defer func() {
