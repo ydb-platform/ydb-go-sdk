@@ -6,17 +6,24 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var (
 	errClosedPool        = errors.New("closed pool")
-	errNilItem           = xerrors.Retryable(errors.New("nil item"))
 	errItemAlreadyExists = errors.New("item already exists")
 	errItemIsNotAlive    = errors.New("item is not alive")
 	errPoolIsOverflow    = errors.New("pool is overflow")
 	errNoProgress        = errors.New("no progress")
-	errNothingIdleItems  = errors.New("nothing idle items")
+	errNothingIdleItems  = xerrors.Retryable(
+		errors.New("nothing idle items"),
+		xerrors.WithBackoff(backoff.TypeFast),
+	)
+	errNilItem = xerrors.Retryable(
+		errors.New("nil item"),
+		xerrors.WithBackoff(backoff.TypeInstant),
+	)
 )
 
 func isRetriable(err error) bool {

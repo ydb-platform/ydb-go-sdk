@@ -588,6 +588,8 @@ func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool, batchChanges *dynam
 }
 
 // getItem called only under p.sema lock
+//
+//nolint:funlen
 func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (info *itemInfo[PT, T], finalErr error) {
 	nodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
@@ -620,10 +622,16 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		}
 	}
 
-	if hasPreferredNodeID && p.idle.Len() >= p.config.limit { // race between Len and Pop
-		// clear one slot in p.idle for create item with predefined nodeID later
-		info, err := p.idle.Pop()
-		if err == nil {
+	if hasPreferredNodeID {
+		st := p.stats.Get()
+		size := st.Size + batchChanges.Size
+		if st.Concurrency == p.config.limit || size >= p.config.limit {
+			// Free a slot before createItem: full concurrent load or pool already at limit.
+			info, err := p.idle.Pop()
+			if err != nil {
+				return nil, errNothingIdleItems
+			}
+
 			p.closeItem(ctx, info.item, batchChanges)
 		}
 	}
@@ -671,6 +679,12 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchC
 
 		return xerrors.WithStackTrace(errClosedPool)
 	default:
+		if p.idle.Len() >= p.config.limit {
+			p.closeItem(ctx, info.item, batchChanges)
+
+			return errPoolIsOverflow
+		}
+
 		info.useCounter++
 		info.lastUsage = p.config.clock.Now()
 

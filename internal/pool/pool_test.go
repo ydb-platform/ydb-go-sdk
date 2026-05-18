@@ -359,43 +359,45 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			})
 		})
 		t.Run("PreferredNodeTakenAndPoolFull", func(t *testing.T) {
-			p := mustNewPool[*testItem, testItem](t,
-				WithTrace[*testItem, testItem](defaultTrace),
-				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
-					v := testItem{
-						v: 0,
-						onNodeID: func() uint32 {
-							nodeID, has := endpoint.ContextNodeID(ctx)
-							if !has {
-								nodeID = 0
-							}
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				p := mustNewPool[*testItem, testItem](t,
+					WithTrace[*testItem, testItem](defaultTrace),
+					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+						v := testItem{
+							v: 0,
+							onNodeID: func() uint32 {
+								nodeID, has := endpoint.ContextNodeID(ctx)
+								if !has {
+									nodeID = 0
+								}
 
-							return nodeID
-						},
-					}
+								return nodeID
+							},
+						}
 
-					return &v, nil
-				}),
-				WithLimit[*testItem, testItem](2),
-			)
-			requirePoolStats(t, p, poolStats(2, nil))
+						return &v, nil
+					}),
+					WithLimit[*testItem, testItem](2),
+				)
+				requirePoolStats(t, p, poolStats(2, nil))
 
-			info1, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
-			assert.NoError(t, err)
-			assert.EqualValues(t, 32, info1.item.NodeID())
-			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1 }))
-			info2, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 33), p)
-			assert.NoError(t, err)
-			assert.EqualValues(t, 33, info2.item.NodeID())
-			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2 }))
+				info1, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 32, info1.item.NodeID())
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1 }))
+				info2, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 33), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 33, info2.item.NodeID())
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2 }))
 
-			mustPutItem(t, p, info2)
-			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2; s.Idle = 1 }))
+				mustPutItem(t, p, info2)
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2; s.Idle = 1 }))
 
-			info3, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
-			assert.NoError(t, err)
-			assert.EqualValues(t, 32, info3.item.NodeID())
-			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
+				info3, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 32, info3.item.NodeID())
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2; s.Idle = 1 }))
+			})
 		})
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
 			var newItemCalled uint32
