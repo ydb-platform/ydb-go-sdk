@@ -16,6 +16,7 @@ var (
 	ErrTransactionRollingBack = xerrors.Wrap(errors.New("the transaction is rolling back"))
 
 	errNilClient               = xerrors.Wrap(errors.New("table client is not initialized"))
+	errClosedClient            = xerrors.Wrap(errors.New("query client closed early"))
 	errWrongNextResultSetIndex = errors.New("wrong result set index")
 	errWrongResultSetIndex     = errors.New("critical violation of the logic - wrong result set index")
 	errNilOption               = errors.New("nil option")

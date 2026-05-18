@@ -5,7 +5,6 @@ import (
 	"os"
 	"runtime/pprof"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -37,27 +36,24 @@ type (
 		closer.Closer
 		pool.Item
 
-		Done() <-chan struct{}
 		SetStatus(code Status)
 	}
 	sessionCore struct {
 		cc     grpc.ClientConnInterface
 		Client Ydb_Query_V1.QueryServiceClient
 		Trace  *trace.Query
-		done   chan struct{}
+		closed atomic.Bool
 
 		deleteTimeout  time.Duration
 		id             string
 		nodeID         uint32
 		status         atomic.Uint32
 		onChangeStatus []func(status Status)
-		closeOnce      func()
+		cancelAttach   context.CancelFunc
+
+		registerCloseCancel func(context.CancelFunc) func()
 	}
 )
-
-func (core *sessionCore) Done() <-chan struct{} {
-	return core.done
-}
 
 func (core *sessionCore) ID() string {
 	return core.id
@@ -85,12 +81,11 @@ func (core *sessionCore) SetStatus(status Status) {
 }
 
 func (core *sessionCore) Status() string {
-	select {
-	case <-core.done:
+	if core.closed.Load() {
 		return StatusClosed.String()
-	default:
-		return core.statusCode().String()
 	}
+
+	return core.statusCode().String()
 }
 
 func (core *sessionCore) checkCloseHint(md metadata.MD) {
@@ -132,13 +127,18 @@ func WithTrace(t *trace.Query) Option {
 	}
 }
 
+func WithRegisterCloseCancel(register func(context.CancelFunc) func()) Option {
+	return func(c *sessionCore) {
+		c.registerCloseCancel = register
+	}
+}
+
 func Open(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...Option,
 ) (_ *sessionCore, finalErr error) {
 	core := &sessionCore{
 		Client: client,
 		Trace:  &trace.Query{},
-		done:   make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -197,7 +197,7 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	attachCtx, cancelAttach := xcontext.WithDone(xcontext.ValueOnly(ctx), core.done)
+	attachCtx, cancelAttach := context.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
 		if finalErr != nil {
 			cancelAttach()
@@ -216,11 +216,7 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	core.closeOnce = sync.OnceFunc(func() {
-		defer close(core.done)
-		defer cancelAttach()
-		core.SetStatus(StatusClosed)
-	})
+	core.cancelAttach = cancelAttach
 
 	if markGoroutineWithLabelNodeIDForAttachStream {
 		pprof.Do(ctx, pprof.Labels(
@@ -238,11 +234,38 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryService_AttachSessionClient) {
 	for core.IsAlive() {
 		if _, recvErr := attachStream.Recv(); recvErr != nil {
-			core.closeOnce()
+			core.releaseSession()
 
 			return
 		}
 	}
+}
+
+type deleteSessionClient interface {
+	DeleteSession(
+		ctx context.Context, in *Ydb_Query.DeleteSessionRequest, opts ...grpc.CallOption,
+	) (*Ydb_Query.DeleteSessionResponse, error)
+}
+
+func deleteSession(ctx context.Context,
+	client deleteSessionClient, sessionID string, deleteTimeout time.Duration,
+) (finalErr error) {
+	if d := deleteTimeout; d > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = xcontext.WithTimeout(ctx, d)
+		defer cancel()
+	}
+
+	_, err := client.DeleteSession(ctx,
+		&Ydb_Query.DeleteSessionRequest{
+			SessionId: sessionID,
+		},
+	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
@@ -254,22 +277,24 @@ func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	if d := core.deleteTimeout; d > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = xcontext.WithTimeout(ctx, d)
-		defer cancel()
-	}
-
 	if err := ctx.Err(); err != nil {
-		return xerrors.WithStackTrace(err)
+		if core.registerCloseCancel != nil {
+			deleteCtx, cancelDelete := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+			unregister := core.registerCloseCancel(cancelDelete)
+			go func() {
+				defer func() {
+					cancelDelete()
+					unregister()
+				}()
+
+				_ = deleteSession(deleteCtx, core.Client, core.id, core.deleteTimeout)
+			}()
+		}
+
+		return nil
 	}
 
-	_, err := core.Client.DeleteSession(ctx,
-		&Ydb_Query.DeleteSessionRequest{
-			SessionId: core.id,
-		},
-	)
-	if err != nil {
+	if err := deleteSession(ctx, core.Client, core.id, core.deleteTimeout); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -277,31 +302,36 @@ func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
 }
 
 func (core *sessionCore) IsAlive() bool {
-	select {
-	case <-core.done:
+	if core.closed.Load() {
 		return false
-	default:
-		return IsAlive(Status(core.status.Load()))
 	}
+
+	return IsAlive(Status(core.status.Load()))
+}
+
+func (core *sessionCore) releaseSession() {
+	if core.cancelAttach != nil {
+		core.cancelAttach()
+	}
+
+	core.SetStatus(StatusClosed)
 }
 
 func (core *sessionCore) Close(ctx context.Context) (err error) {
-	if core.closeOnce != nil {
-		defer core.closeOnce()
-	}
-
-	select {
-	case <-core.done:
+	if !core.closed.CompareAndSwap(false, true) {
 		return nil
-	default:
-		core.SetStatus(StatusClosing)
-
-		if err = core.deleteSession(ctx); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
 	}
 
-	return nil
+	core.SetStatus(StatusClosing)
+
+	err = core.deleteSession(ctx)
+	if err != nil {
+		err = xerrors.WithStackTrace(err)
+	}
+
+	core.releaseSession()
+
+	return err
 }
 
 func StatusFromErr(err error) Status {

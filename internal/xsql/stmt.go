@@ -55,7 +55,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 		return nil, xerrors.WithStackTrace(badconn.Map(err))
 	}
 
-	return newRows(rows), nil
+	return newRows(ctx, rows), nil
 }
 
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {

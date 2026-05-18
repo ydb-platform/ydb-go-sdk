@@ -126,12 +126,12 @@ func (e *transportError) BackoffType() backoff.Type {
 		return backoff.TypeFast
 	case grpcCodes.ResourceExhausted:
 		if e.isMessageLargerThanMax() {
-			return backoff.TypeNoBackoff
+			return backoff.TypeInstant
 		}
 
 		return backoff.TypeSlow
 	default:
-		return backoff.TypeNoBackoff
+		return backoff.TypeInstant
 	}
 }
 

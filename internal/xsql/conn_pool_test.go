@@ -34,7 +34,7 @@ func (c *deadSessionCommonConn) ID() string     { return "dead-test-session" }
 func (c *deadSessionCommonConn) NodeID() uint32 { return 0 }
 
 func (c *deadSessionCommonConn) Ping(_ context.Context) error { return nil }
-func (c *deadSessionCommonConn) Close() error                 { return nil }
+func (c *deadSessionCommonConn) Close(context.Context) error  { return nil }
 
 func (c *deadSessionCommonConn) Query(
 	_ context.Context, _ string, _ *params.Params,

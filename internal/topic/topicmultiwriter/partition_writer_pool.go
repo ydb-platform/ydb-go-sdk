@@ -95,6 +95,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 
 				return checkErrorResult
 			}),
+			topicwriterinternal.WithWaitAckOnWrite(false),
 			topicwriterinternal.WithMaxQueueLen(p.writerCfg.MaxQueueLen),
 		}
 	)
