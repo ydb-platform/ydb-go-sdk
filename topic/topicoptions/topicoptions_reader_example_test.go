@@ -32,14 +32,15 @@ func ExampleWithReaderOnStopPartitionSession() {
 		"consumer",
 		topicoptions.ReadTopic("topic"),
 
-		topicoptions.WithReaderOnStopPartitionSession(func(req topicoptions.StopPartitionSessionRequest) topicoptions.OnStopPartitionSessionResult {
-			// do some work before the partition session is stopped, e.g. commit
-			// processed messages or flush local state for req.PartitionID /
-			// req.PartitionSessionID up to req.CommittedOffset.
-			_ = req
+		topicoptions.WithReaderOnStopPartitionSession(
+			func(req topicoptions.StopPartitionSessionRequest) topicoptions.OnStopPartitionSessionResult {
+				// do some work before the partition session is stopped, e.g. commit
+				// processed messages or flush local state for req.PartitionID /
+				// req.PartitionSessionID up to req.CommittedOffset.
+				_ = req
 
-			return topicoptions.OnStopPartitionSessionResult{}
-		}),
+				return topicoptions.OnStopPartitionSessionResult{}
+			}),
 	)
 	_, _ = reader, err
 }
