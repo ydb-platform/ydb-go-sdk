@@ -120,7 +120,7 @@ func main() {
 		panic(fmt.Sprintf("type error: %v", err))
 	}
 
-	p := buildPackage(pkg, info, buildConstraints, items)
+	p := buildPackage(pkg, info, buildConstraints, items, astFiles)
 
 	for _, w := range writers {
 		if err := w.Write(p); err != nil {
@@ -178,7 +178,7 @@ func runBatch(workDir string) error {
 			Context: bctx,
 			Output:  f,
 		}
-		p := buildPackage(pkg, info, o.constrs, o.items)
+		p := buildPackage(pkg, info, o.constrs, o.items, astFiles)
 		if err := w.Write(p); err != nil {
 			if cerr := f.Close(); cerr != nil {
 				return fmt.Errorf("write failed: %w; close failed: %w", err, cerr)
@@ -339,10 +339,17 @@ func extractGenItems(astFile *ast.File) []*GenItem {
 	return items
 }
 
-func buildPackage(pkg *types.Package, info *types.Info, buildConstraints []string, items []*GenItem) Package {
+func buildPackage(
+	pkg *types.Package,
+	info *types.Info,
+	buildConstraints []string,
+	items []*GenItem,
+	astFiles []*ast.File,
+) Package {
 	p := Package{
 		Package:          pkg,
 		BuildConstraints: buildConstraints,
+		DeprecatedFields: collectDeprecatedFields(astFiles),
 	}
 	traces := make(map[string]*Trace)
 	for _, item := range items {
@@ -356,6 +363,9 @@ func buildPackage(pkg *types.Package, info *types.Info, buildConstraints []strin
 		t := p.Traces[i]
 		for _, field := range item.StructType.Fields.List {
 			if _, ok := field.Type.(*ast.FuncType); !ok {
+				continue
+			}
+			if isDeprecatedField(field) {
 				continue
 			}
 			name := field.Names[0].Name
@@ -447,6 +457,7 @@ type Package struct {
 	*types.Package
 
 	BuildConstraints []string
+	DeprecatedFields map[string]map[string]struct{}
 	Traces           []*Trace
 }
 

@@ -358,13 +358,11 @@ type (
 		Idle             int
 		CreateInProgress int
 		Concurrency      int
+		Size             int
 
 		// Deprecated: will be removed after November 2026.
 		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 		Index int
-		// Deprecated: will be removed after November 2026.
-		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-		Size int
 		// Deprecated: will be removed after November 2026.
 		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 		Wait int

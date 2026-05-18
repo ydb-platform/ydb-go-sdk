@@ -5,7 +5,6 @@ package trace
 import (
 	"context"
 	"database/sql/driver"
-	"time"
 )
 
 // databaseSQLComposeOptions is a holder of options
@@ -1208,14 +1207,13 @@ func DatabaseSQLOnConnCheckNamedValue(t *DatabaseSQL, c *context.Context, call c
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
+func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool) func(error) {
 	var p DatabaseSQLConnQueryStartInfo
 	p.Context = c
 	p.Call = call
 	p.Query = query
 	p.Mode = mode
 	p.Idempotent = idempotent
-	p.IdleTime = idleTime
 	res := t.onConnQuery(p)
 	return func(e error) {
 		var p DatabaseSQLConnQueryDoneInfo
@@ -1224,14 +1222,13 @@ func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
+func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool) func(error) {
 	var p DatabaseSQLConnExecStartInfo
 	p.Context = c
 	p.Call = call
 	p.Query = query
 	p.Mode = mode
 	p.Idempotent = idempotent
-	p.IdleTime = idleTime
 	res := t.onConnExec(p)
 	return func(e error) {
 		var p DatabaseSQLConnExecDoneInfo
