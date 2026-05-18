@@ -486,6 +486,8 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 
 		defer p.applyBatchStats(&batchChanges)
 
+		// Drain sema with one goroutine per slot (not a single loop) so all tokens are
+		// acquired in parallel: faster occupancy of the semaphore and shorter Close().
 		locks.Add(p.config.limit)
 		for range p.config.limit {
 			go func() {
