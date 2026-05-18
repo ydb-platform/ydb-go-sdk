@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -61,6 +62,37 @@ func benchPoolWithWork(ops *atomic.Uint64) error {
 	return nil
 }
 
+func benchPoolWithOnce(
+	ctx context.Context,
+	p *Pool[*testItem, testItem],
+	ops *atomic.Uint64,
+) error {
+	return p.With(ctx, func(context.Context, *testItem) error {
+		return benchPoolWithWork(ops)
+	}, benchRetryOpts...)
+}
+
+func reportBenchLatency(b *testing.B, samples []uint64) {
+	b.Helper()
+
+	if len(samples) == 0 {
+		return
+	}
+
+	slices.Sort(samples)
+
+	n := len(samples)
+	p50 := samples[n*50/100]
+	p99Idx := n * 99 / 100
+	if p99Idx >= n {
+		p99Idx = n - 1
+	}
+	p99 := samples[p99Idx]
+
+	b.ReportMetric(float64(p50), "ns/op(p50)")
+	b.ReportMetric(float64(p99), "ns/op(p99)")
+}
+
 func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	b.Helper()
 
@@ -74,26 +106,35 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	}()
 
 	var ops atomic.Uint64
-	work := func() error {
-		return p.With(ctx, func(context.Context, *testItem) error {
-			return benchPoolWithWork(&ops)
-		}, benchRetryOpts...)
-	}
 
 	if goroutines == 1 {
+		samples := make([]uint64, b.N)
+
 		b.ResetTimer()
 		b.ReportAllocs()
-		for range b.N {
-			if err := work(); err != nil {
+		for i := range b.N {
+			start := time.Now()
+			if err := benchPoolWithOnce(ctx, p, &ops); err != nil {
 				b.Fatalf("pool.With: %v", err)
 			}
+			samples[i] = uint64(time.Since(start))
 		}
+		reportBenchLatency(b, samples)
 
 		return
 	}
 
 	perWorker := b.N / goroutines
 	extra := b.N % goroutines
+
+	samples := make([][]uint64, goroutines)
+	for g := range goroutines {
+		iterations := perWorker
+		if g < extra {
+			iterations++
+		}
+		samples[g] = make([]uint64, iterations)
+	}
 
 	var (
 		wg       sync.WaitGroup
@@ -104,21 +145,19 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	start := make(chan struct{})
 
 	for g := range goroutines {
-		iterations := perWorker
-		if g < extra {
-			iterations++
-		}
-		go func() {
+		go func(local []uint64) {
 			defer wg.Done()
 			<-start
-			for range iterations {
-				if err := work(); err != nil {
+			for i := range local {
+				t0 := time.Now()
+				if err := benchPoolWithOnce(ctx, p, &ops); err != nil {
 					errOnce.Do(func() { firstErr = err })
 
 					return
 				}
+				local[i] = uint64(time.Since(t0))
 			}
-		}()
+		}(samples[g])
 	}
 
 	b.ResetTimer()
@@ -128,12 +167,19 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	if firstErr != nil {
 		b.Fatalf("pool.With: %v", firstErr)
 	}
+
+	merged := make([]uint64, 0, b.N)
+	for _, part := range samples {
+		merged = append(merged, part...)
+	}
+	reportBenchLatency(b, merged)
 }
 
-// BenchmarkPoolWith/concurrency=1-12         12020355       1056 ns/op     976 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=250-12       14459697       820.4 ns/op    976 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=500-12       14508535       793.7 ns/op    975 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=1000-12      14254402       891.7 ns/op    975 B/op     19 allocs/op
+// BenchmarkPoolWith reports throughput (ns/op) and exact per-call latency of pool.With:
+//   - latency-p50-ns/op — median wall time of one pool.With (typical call, includes sema wait)
+//   - latency-p99-ns/op — tail latency (queueing when concurrency > limit)
+//
+// Sorting/merge for percentiles runs after the timed section.
 func BenchmarkPoolWith(b *testing.B) {
 	for _, goroutines := range []int{1, 250, 500, 1000} {
 		b.Run(fmt.Sprintf("concurrency=%d", goroutines), func(b *testing.B) {
