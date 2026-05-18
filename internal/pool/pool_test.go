@@ -136,8 +136,8 @@ func getItemWithFlush[PT ItemConstraint[T], T any](
 }
 
 func putItemWithFlush[PT ItemConstraint[T], T any](
-	p *Pool[PT, T],
 	ctx context.Context,
+	p *Pool[PT, T],
 	info *itemInfo[PT, T],
 ) error {
 	var batchChanges dynamicStats
@@ -160,7 +160,7 @@ func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T]) *ite
 func mustPutItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T], info *itemInfo[PT, T]) {
 	t.Helper()
 
-	if err := putItemWithFlush(p, t.Context(), info); err != nil {
+	if err := putItemWithFlush(t.Context(), p, info); err != nil {
 		panic(err)
 	}
 }
@@ -560,7 +560,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.True(t, closed[1])  // idle info in pool
 			require.False(t, closed[2]) // info extracted from idle but closed later on putItem
 
-			require.ErrorIs(t, putItemWithFlush(p, t.Context(), s3), errClosedPool)
+			require.ErrorIs(t, putItemWithFlush(t.Context(), p, s3), errClosedPool)
 
 			require.True(t, closed[2]) // after putItem s3 must be closed
 		})
@@ -1551,7 +1551,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			assertClosed(0)
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 2 }))
 
-			require.ErrorIs(t, putItemWithFlush(p, t.Context(), info2), errClosedPool)
+			require.ErrorIs(t, putItemWithFlush(t.Context(), p, info2), errClosedPool)
 			assertClosed(1)
 
 			require.True(t, info2.item.closed)
