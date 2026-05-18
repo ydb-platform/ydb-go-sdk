@@ -39,27 +39,13 @@ func newBenchPool(ctx context.Context) (*Pool[*testItem, testItem], error) {
 		WithMustDeleteItemFunc[*testItem, testItem](func(_ *testItem, err error) bool {
 			return errors.Is(err, errBenchDeleteItem)
 		}),
+		WithWarmUpItems[*testItem, testItem](benchPrefillItems),
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	return p, nil
-}
-
-func prefillBenchPool(ctx context.Context, p *Pool[*testItem, testItem], count int) error {
-	for range count {
-		info, err := p.getItem(ctx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		if err := p.putItem(ctx, info); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-	}
-
-	return nil
 }
 
 var benchRetryOpts = []retry.Option{
@@ -82,9 +68,6 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	p, err := newBenchPool(ctx)
 	if err != nil {
 		b.Fatalf("new pool: %v", err)
-	}
-	if err := prefillBenchPool(ctx, p, benchPrefillItems); err != nil {
-		b.Fatalf("prefill pool: %v", err)
 	}
 	defer func() {
 		_ = p.Close(ctx)
@@ -147,10 +130,10 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 	}
 }
 
-// BenchmarkPoolWith/concurrency=1-12         11756128       996.1 ns/op    976 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=250-12       14696725       881.6 ns/op    976 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=500-12       14672084       821.6 ns/op    975 B/op     19 allocs/op
-// BenchmarkPoolWith/concurrency=1000-12      13292019       1629 ns/op     975 B/op     19 allocs/op
+// BenchmarkPoolWith/concurrency=1-12         12020355       1056 ns/op     976 B/op     19 allocs/op
+// BenchmarkPoolWith/concurrency=250-12       14459697       820.4 ns/op    976 B/op     19 allocs/op
+// BenchmarkPoolWith/concurrency=500-12       14508535       793.7 ns/op    975 B/op     19 allocs/op
+// BenchmarkPoolWith/concurrency=1000-12      14254402       891.7 ns/op    975 B/op     19 allocs/op
 func BenchmarkPoolWith(b *testing.B) {
 	for _, goroutines := range []int{1, 250, 500, 1000} {
 		b.Run(fmt.Sprintf("concurrency=%d", goroutines), func(b *testing.B) {

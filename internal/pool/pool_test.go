@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -125,8 +125,31 @@ func caller() string {
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
 }
 
+func getItemWithFlush[PT ItemConstraint[T], T any](
+	ctx context.Context,
+	p *Pool[PT, T],
+) (*itemInfo[PT, T], error) {
+	var batchChanges dynamicStats
+	defer p.applyBatchStats(&batchChanges)
+
+	return p.getItem(ctx, &batchChanges)
+}
+
+func putItemWithFlush[PT ItemConstraint[T], T any](
+	ctx context.Context,
+	p *Pool[PT, T],
+	info *itemInfo[PT, T],
+) error {
+	var batchChanges dynamicStats
+	defer p.applyBatchStats(&batchChanges)
+
+	return p.putItem(ctx, info, &batchChanges)
+}
+
 func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T]) *itemInfo[PT, T] {
-	info, err := p.getItem(t.Context())
+	t.Helper()
+
+	info, err := getItemWithFlush(t.Context(), p)
 	if err != nil {
 		panic(err)
 	}
@@ -135,7 +158,9 @@ func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T]) *ite
 }
 
 func mustPutItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T], info *itemInfo[PT, T]) {
-	if err := p.putItem(t.Context(), info); err != nil {
+	t.Helper()
+
+	if err := putItemWithFlush(t.Context(), p, info); err != nil {
 		panic(err)
 	}
 }
@@ -147,7 +172,7 @@ func mustNewPool[PT ItemConstraint[T], T any](
 	t.Helper()
 
 	p, err := New(t.Context(), opts...)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	return p
 }
@@ -169,7 +194,7 @@ func poolStats(limit int, mutate func(*Stats)) Stats {
 
 func requirePoolStats(t testing.TB, p *Pool[*testItem, testItem], want Stats, msg ...any) {
 	t.Helper()
-	require.Equal(t, want, p.Stats(), msg...)
+	assert.Equal(t, want, p.Stats(), msg...)
 }
 
 func TestPool(t *testing.T) { //nolint:gocyclo
@@ -181,11 +206,11 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 
 			err := p.With(t.Context(), func(ctx context.Context, testItem *testItem) error {
-				require.EqualValues(t, 0, testItem.NodeID())
+				assert.EqualValues(t, 0, testItem.NodeID())
 
 				return nil
 			})
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) {
 				s.Size = 1
 				s.Idle = 1
@@ -230,77 +255,77 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				requirePoolStats(t, p, poolStats(3, nil))
 
 				info := mustGetItem(t, p)
-				require.EqualValues(t, 0, int(info.item.NodeID()))
-				require.EqualValues(t, true, info.item.IsAlive())
+				assert.EqualValues(t, 0, int(info.item.NodeID()))
+				assert.EqualValues(t, true, info.item.IsAlive())
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1 }))
 				mustPutItem(t, p, info)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
-				info, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
-				require.NoError(t, err)
-				require.EqualValues(t, 32, int(info.item.NodeID()))
+				info, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 32, int(info.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 2; s.Idle = 1 }))
 				mustPutItem(t, p, info)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 2; s.Idle = 2 }))
 
-				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
-				require.NoError(t, err)
-				require.EqualValues(t, 33, int(info.item.NodeID()))
+				info, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 33), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 33, int(info.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
-				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-				require.NoError(t, err)
-				require.EqualValues(t, 32, int(info.item.NodeID()))
+				info, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 32, int(info.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
-				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
-				require.NoError(t, err)
-				require.EqualValues(t, 33, int(info.item.NodeID()))
+				info, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 33), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 33, int(info.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
-				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-				require.NoError(t, err)
-				require.EqualValues(t, 32, int(info.item.NodeID()))
+				info, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 32, int(info.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
-				info2, err := p.getItem(endpoint.WithNodeID(t.Context(), 33))
-				require.NoError(t, err)
-				require.EqualValues(t, 33, info2.item.NodeID())
+				info2, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 33), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 33, info2.item.NodeID())
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
 				mustPutItem(t, p, info2)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
-				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-				require.NoError(t, err)
-				require.EqualValues(t, 32, int(info.item.NodeID()))
+				info, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 32, int(info.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
-				info2, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
-				require.NoError(t, err)
-				require.EqualValues(t, 33, info2.item.NodeID())
+				info2, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 33), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 33, info2.item.NodeID())
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
 				mustPutItem(t, p, info)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info2)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
 
-				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 32))
-				require.NoError(t, err)
-				require.EqualValues(t, 32, int(info.item.NodeID()))
+				info, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 32, int(info.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
-				info2, err = p.getItem(endpoint.WithNodeID(t.Context(), 33))
-				require.NoError(t, err)
-				require.EqualValues(t, 33, int(info2.item.NodeID()))
+				info2, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 33), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 33, int(info2.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
-				info3, err := p.getItem(t.Context())
-				require.NoError(t, err)
-				require.EqualValues(t, 0, info3.item.NodeID())
+				info3, err := getItemWithFlush(t.Context(), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 0, info3.item.NodeID())
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 0 }))
 				mustPutItem(t, p, info)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
@@ -308,30 +333,29 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 				mustPutItem(t, p, info3)
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
-				info, err = p.getItem(endpoint.WithNodeID(t.Context(), 100))
-				require.NoError(t, err)
-				require.EqualValues(t, 100, preferredID)
-				require.EqualValues(t, 100, int(info.item.NodeID()))
-				// preferred-node eviction uses idle.Pop without decrementing Idle stat
+				info, err = getItemWithFlush(endpoint.WithNodeID(t.Context(), 100), p)
+				assert.NoError(t, err)
+				assert.EqualValues(t, 100, preferredID)
+				assert.EqualValues(t, 100, int(info.item.NodeID()))
 				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 3 }))
-				require.EqualValues(t, 4, int(newItemCalled))
-				_, _ = p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				assert.EqualValues(t, 4, int(newItemCalled))
+				_, _ = getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
 				stats := p.Stats()
-				require.Equal(t, 3, stats.Limit)
-				require.LessOrEqual(t, stats.Idle, 3)
-				require.GreaterOrEqual(t, stats.Size, 3)
-				_, _ = p.getItem(endpoint.WithNodeID(t.Context(), 32))
+				assert.Equal(t, 3, stats.Limit)
+				assert.LessOrEqual(t, stats.Idle, 3)
+				assert.GreaterOrEqual(t, stats.Size, 3)
+				_, _ = getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
 				stats = p.Stats()
-				require.Equal(t, 3, stats.Limit)
-				require.LessOrEqual(t, stats.Idle, 3)
-				require.GreaterOrEqual(t, stats.Size, 3)
+				assert.Equal(t, 3, stats.Limit)
+				assert.LessOrEqual(t, stats.Idle, 3)
+				assert.GreaterOrEqual(t, stats.Size, 3)
 				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 				defer cancel()
 				// should not panic
-				_, _ = p.getItem(endpoint.WithNodeID(ctx, 32))
+				_, _ = getItemWithFlush(endpoint.WithNodeID(ctx, 32), p)
 				stats = p.Stats()
-				require.Equal(t, 3, stats.Limit)
-				require.LessOrEqual(t, stats.Idle, 3)
+				assert.Equal(t, 3, stats.Limit)
+				assert.LessOrEqual(t, stats.Idle, 3)
 			})
 		})
 		t.Run("PreferredNodeTakenAndPoolFull", func(t *testing.T) {
@@ -356,21 +380,21 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			)
 			requirePoolStats(t, p, poolStats(2, nil))
 
-			info1, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			require.NoError(t, err)
-			require.EqualValues(t, 32, info1.item.NodeID())
+			info1, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+			assert.NoError(t, err)
+			assert.EqualValues(t, 32, info1.item.NodeID())
 			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1 }))
-			info2, err := p.getItem(endpoint.WithNodeID(t.Context(), 33))
-			require.NoError(t, err)
-			require.EqualValues(t, 33, info2.item.NodeID())
+			info2, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 33), p)
+			assert.NoError(t, err)
+			assert.EqualValues(t, 33, info2.item.NodeID())
 			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2 }))
 
 			mustPutItem(t, p, info2)
 			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2; s.Idle = 1 }))
 
-			info3, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			require.NoError(t, err)
-			require.EqualValues(t, 32, info3.item.NodeID())
+			info3, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+			assert.NoError(t, err)
+			assert.EqualValues(t, 32, info3.item.NodeID())
 			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 3; s.Idle = 1 }))
 		})
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
@@ -393,29 +417,29 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			)
 			requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 
-			info, err := p.getItem(endpoint.WithNodeID(t.Context(), 32))
-			require.NoError(t, err)
-			require.NotNil(t, info)
-			require.NotNil(t, info.item)
-			require.EqualValues(t, 32, int(info.item.NodeID()))
-			require.EqualValues(t, true, info.item.IsAlive())
+			info, err := getItemWithFlush(endpoint.WithNodeID(t.Context(), 32), p)
+			assert.NoError(t, err)
+			assert.NotNil(t, info)
+			assert.NotNil(t, info.item)
+			assert.EqualValues(t, 32, int(info.item.NodeID()))
+			assert.EqualValues(t, true, info.item.IsAlive())
 			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) { s.Size = 1 }))
 			mustPutItem(t, p, info)
 			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			info = mustGetItem(t, p)
-			require.EqualValues(t, 32, int(info.item.NodeID()))
+			assert.EqualValues(t, 32, int(info.item.NodeID()))
 			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) { s.Size = 1 }))
 			mustPutItem(t, p, info)
 			requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
-			require.EqualValues(t, 1, newItemCalled)
+			assert.EqualValues(t, 1, newItemCalled)
 		})
 		t.Run("WithLimit", func(t *testing.T) {
 			p := mustNewPool[*testItem, testItem](t, WithLimit[*testItem, testItem](1),
 				WithTrace[*testItem, testItem](defaultTrace),
 			)
-			require.EqualValues(t, 1, p.config.limit)
+			assert.EqualValues(t, 1, p.config.limit)
 			requirePoolStats(t, p, poolStats(1, nil))
 		})
 		t.Run("WithItemUsageLimit", func(t *testing.T) {
@@ -439,7 +463,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					return !item.IsAlive() || xerrors.Is(err, errMustDeleteItem)
 				}),
 			)
-			require.EqualValues(t, 1, p.config.limit)
+			assert.EqualValues(t, 1, p.config.limit)
 			requirePoolStats(t, p, poolStats(1, nil))
 			var lambdaCounter atomic.Int64
 			err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
@@ -449,8 +473,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 				return nil
 			})
-			require.NoError(t, err)
-			require.EqualValues(t, 10, newCounter)
+			assert.NoError(t, err)
+			assert.EqualValues(t, 10, newCounter)
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 		t.Run("WithCreateItemFunc", func(t *testing.T) {
@@ -469,8 +493,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 				return nil
 			})
-			require.NoError(t, err)
-			require.EqualValues(t, p.config.limit, newCounter.Load())
+			assert.NoError(t, err)
+			assert.EqualValues(t, p.config.limit, newCounter.Load())
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 	})
@@ -528,16 +552,17 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 
 			mustClose(t, p)
-			// Close drains idle via PopAll without decrementing Idle stat; s3 is still held
-			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 2 }))
+			// Close drains idle via PopAll with decrementing Idle stat; s3 is still held
+			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 0 }))
 
-			require.True(t, closed[0])  // idle info in pool
-			require.True(t, closed[1])  // idle info in pool
-			require.False(t, closed[2]) // info extracted from idle but closed later on putItem
+			assert.True(t, closed[0])  // idle info in pool
+			assert.True(t, closed[1])  // idle info in pool
+			assert.False(t, closed[2]) // info extracted from idle but closed later on putItem
 
-			require.ErrorIs(t, p.putItem(t.Context(), s3), errClosedPool)
+			assert.ErrorIs(t, putItemWithFlush(t.Context(), p, s3), errClosedPool)
+			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 0; s.Idle = 0 }))
 
-			require.True(t, closed[2]) // after putItem s3 must be closed
+			assert.True(t, closed[2]) // after putItem s3 must be closed
 		})
 		t.Run("WithCancelledContext", func(t *testing.T) {
 			// Regression test: closing idle infos from the pool must succeed even
@@ -579,11 +604,11 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				cancel()
 
 				err := p.Close(cancelCtx)
-				require.NoError(t, err)
-				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 2 }))
+				assert.NoError(t, err)
+				requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 0 }))
 
 				// Both idle infos must have been closed despite the cancelled context.
-				require.Equal(t, int32(2), closedCount.Load())
+				assert.Equal(t, int32(2), closedCount.Load())
 
 				_ = info3 // info3 is still "in use" and not in the idle list
 			})
@@ -595,7 +620,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				t.Helper()
 				select {
 				case err := <-ch:
-					require.NoError(t, err)
+					assert.NoError(t, err)
 				case <-time.After(timeout):
 					t.Fatalf("pool.Close did not finish within %s", timeout)
 				}
@@ -605,7 +630,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				t.Helper()
 				select {
 				case err := <-ch:
-					require.ErrorIs(t, err, errClosedPool)
+					assert.ErrorIs(t, err, errClosedPool)
 				case <-time.After(timeout):
 					t.Fatalf("pool.With did not finish within %s", timeout)
 				}
@@ -672,13 +697,13 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				)
 				requirePoolStats(t, p, poolStats(1, nil))
 
-				require.NoError(t, p.Close(ctx))
+				assert.NoError(t, p.Close(ctx))
 				requirePoolStats(t, p, poolStats(1, nil))
 
 				err := p.With(ctx, func(context.Context, *testItem) error {
 					return nil
 				})
-				require.ErrorIs(t, err, errClosedPool)
+				assert.ErrorIs(t, err, errClosedPool)
 			})
 
 			t.Run("CloseWhileTryBeforeSemaphoreAcquire", func(t *testing.T) {
@@ -922,8 +947,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 				_ = p.Close(t.Context())
-				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Idle = 1 }))
-				require.Equal(t, 0, p.Stats().Size)
+				requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Idle = 0 }))
+				assert.Equal(t, 0, p.Stats().Size)
 			})
 		})
 	})
@@ -964,8 +989,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 							return nil
 						})
-						require.NoError(t, err)
-						require.GreaterOrEqual(t, counter.Load(), int64(10))
+						assert.NoError(t, err)
+						assert.GreaterOrEqual(t, counter.Load(), int64(10))
 						requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) {
 							s.Size = 1
 							s.Idle = 1
@@ -994,8 +1019,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 					return nil
 				})
-				require.NoError(t, err)
-				require.GreaterOrEqual(t, counter.Load(), int64(10))
+				assert.NoError(t, err)
+				assert.GreaterOrEqual(t, counter.Load(), int64(10))
 				requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) {
 					s.Size = 1
 					s.Idle = 1
@@ -1022,8 +1047,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
 					return nil
 				})
-				require.NoError(t, err)
-				require.GreaterOrEqual(t, counter.Load(), int64(10))
+				assert.NoError(t, err)
+				assert.GreaterOrEqual(t, counter.Load(), int64(10))
 				requirePoolStats(t, p, poolStats(DefaultLimit, func(s *Stats) {
 					s.Size = 1
 					s.Idle = 1
@@ -1049,11 +1074,11 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 					return nil
 				})
-				require.Error(t, err)
-				require.Equal(t, 0, callbackRuns)
-				require.Equal(t, int64(1), createAttempts.Load())
-				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED))
-				require.Nil(t, xerrors.RetryableError(err))
+				assert.Error(t, err)
+				assert.Equal(t, 0, callbackRuns)
+				assert.Equal(t, int64(1), createAttempts.Load())
+				assert.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED))
+				assert.Nil(t, xerrors.RetryableError(err))
 				requirePoolStats(t, p, poolStats(1, nil))
 			})
 			t.Run("NilNil", func(t *testing.T) {
@@ -1078,7 +1103,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							time.Duration(r.Int64(int64(time.Second))),
 						)
 						defer childCancel()
-						s, err := p.createItem(childCtx)
+						var batchChanges dynamicStats
+						defer p.applyBatchStats(&batchChanges)
+
+						s, err := p.createItem(childCtx, &batchChanges)
 						if s == nil && err == nil {
 							errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
 						}
@@ -1104,24 +1132,24 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					ctx, cancel := context.WithCancel(t.Context())
 					cancel()
 					p, err := New(ctx, WithLimit[*testItem, testItem](1))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					requirePoolStats(t, p, poolStats(1, nil))
 					err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 						return nil
 					})
-					require.ErrorIs(t, err, context.Canceled)
+					assert.ErrorIs(t, err, context.Canceled)
 					requirePoolStats(t, p, poolStats(1, nil))
 				})
 				t.Run("DeadlineExceeded", func(t *testing.T) {
 					ctx, cancel := context.WithTimeout(t.Context(), 0)
 					cancel()
 					p, err := New(ctx, WithLimit[*testItem, testItem](1))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					requirePoolStats(t, p, poolStats(1, nil))
 					err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 						return nil
 					})
-					require.ErrorIs(t, err, context.DeadlineExceeded)
+					assert.ErrorIs(t, err, context.DeadlineExceeded)
 					requirePoolStats(t, p, poolStats(1, nil))
 				})
 			})
@@ -1142,7 +1170,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					backoff := make(chan chan time.Time)
 					ctx, cancel := xcontext.WithCancel(t.Context())
 					p, err := New(ctx, WithLimit[*testItem, testItem](1))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					requirePoolStats(t, p, poolStats(1, nil))
 
 					results := make(chan error)
@@ -1210,15 +1238,15 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				err := p.With(t.Context(), func(ctx context.Context, testItem *testItem) error {
 					return nil
 				})
-				require.NoError(t, err)
-				require.GreaterOrEqual(t, createCounter.Load(), closeCounter.Load())
+				assert.NoError(t, err)
+				assert.GreaterOrEqual(t, createCounter.Load(), closeCounter.Load())
 				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 				err = p.Close(t.Context())
-				require.NoError(t, err)
-				require.EqualValues(t, createCounter.Load(), closeCounter.Load())
-				// Close drains idle without decrementing Idle stat
-				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Idle = 1 }))
-				require.Equal(t, 0, p.Stats().Size)
+				assert.NoError(t, err)
+				assert.EqualValues(t, createCounter.Load(), closeCounter.Load())
+				// Close drains idle with decrementing Idle stat
+				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Idle = 0 }))
+				assert.Equal(t, 0, p.Stats().Size)
 			})
 		})
 		t.Run("IsAlive", func(t *testing.T) {
@@ -1257,14 +1285,14 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 					return nil
 				})
-				require.NoError(t, err)
-				require.GreaterOrEqual(t, newItems.Load(), int64(9))
-				require.GreaterOrEqual(t, newItems.Load(), deleteItems.Load())
+				assert.NoError(t, err)
+				assert.GreaterOrEqual(t, newItems.Load(), int64(9))
+				assert.GreaterOrEqual(t, newItems.Load(), deleteItems.Load())
 				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 				err = p.Close(t.Context())
-				require.NoError(t, err)
-				require.EqualValues(t, newItems.Load(), deleteItems.Load())
-				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Idle = 1 }))
+				assert.NoError(t, err)
+				assert.EqualValues(t, newItems.Load(), deleteItems.Load())
+				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Idle = 0 }))
 			})
 		})
 	})
@@ -1303,20 +1331,20 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				err := p.With(ctx, func(context.Context, *testItem) error {
 					return nil
 				})
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
-			require.Equal(t, int32(1), created.Load())
-			require.Equal(t, int32(0), closed.Load())
+			assert.Equal(t, int32(1), created.Load())
+			assert.Equal(t, int32(0), closed.Load())
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			err := p.With(ctx, func(_ context.Context, item *testItem) error {
-				require.Equal(t, int32(2), item.v, "item must be recreated after usage limit is reached")
+				assert.Equal(t, int32(2), item.v, "item must be recreated after usage limit is reached")
 
 				return nil
 			})
-			require.NoError(t, err)
-			require.Equal(t, int32(2), created.Load())
-			require.Equal(t, int32(1), closed.Load())
+			assert.NoError(t, err)
+			assert.Equal(t, int32(2), created.Load())
+			assert.Equal(t, int32(1), closed.Load())
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 		t.Run("ItemUsageTTL", func(t *testing.T) {
@@ -1354,20 +1382,20 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			err := p.With(ctx, func(context.Context, *testItem) error {
 				return nil
 			})
-			require.NoError(t, err)
-			require.Equal(t, int32(1), created.Load())
+			assert.NoError(t, err)
+			assert.Equal(t, int32(1), created.Load())
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			fakeClock.Advance(usageTTL + time.Nanosecond)
 
 			err = p.With(ctx, func(_ context.Context, item *testItem) error {
-				require.Equal(t, int32(2), item.v, "item must be recreated after item usage TTL")
+				assert.Equal(t, int32(2), item.v, "item must be recreated after item usage TTL")
 
 				return nil
 			})
-			require.NoError(t, err)
-			require.Equal(t, int32(2), created.Load())
-			require.Equal(t, int32(1), closed.Load())
+			assert.NoError(t, err)
+			assert.Equal(t, int32(2), created.Load())
+			assert.Equal(t, int32(1), closed.Load())
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 		t.Run("SpoiledIdleItems", func(t *testing.T) {
@@ -1410,9 +1438,9 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			err := p.With(ctx, func(context.Context, *testItem) error {
 				return nil
 			})
-			require.NoError(t, err)
-			require.Equal(t, int32(1), created.Load())
-			require.Equal(t, int32(0), closed.Load())
+			assert.NoError(t, err)
+			assert.Equal(t, int32(1), created.Load())
+			assert.Equal(t, int32(0), closed.Load())
 			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			spoiled.Store(int32(1), struct{}{})
@@ -1423,10 +1451,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 				return nil
 			})
-			require.NoError(t, err)
-			require.Equal(t, int32(2), gotID, "must not reuse spoiled idle item")
-			require.Equal(t, int32(2), created.Load())
-			require.Equal(t, int32(1), closed.Load(), "spoiled idle item must be closed on get")
+			assert.NoError(t, err)
+			assert.Equal(t, int32(2), gotID, "must not reuse spoiled idle item")
+			assert.Equal(t, int32(2), created.Load())
+			assert.Equal(t, int32(1), closed.Load(), "spoiled idle item must be closed on get")
 			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
 			spoiled.Store(int32(2), struct{}{})
@@ -1436,10 +1464,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 				return nil
 			})
-			require.NoError(t, err)
-			require.Equal(t, int32(3), gotID)
-			require.Equal(t, int32(3), created.Load())
-			require.Equal(t, int32(2), closed.Load())
+			assert.NoError(t, err)
+			assert.Equal(t, int32(3), gotID)
+			assert.Equal(t, int32(3), created.Load())
+			assert.Equal(t, int32(2), closed.Load())
 			requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 		})
 		t.Run("ItemFromPoolIsNotAlive", func(t *testing.T) {
@@ -1507,28 +1535,28 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			assertCreated(1)
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 
-			info2, err := p.getItem(t.Context())
-			require.NoError(t, err)
+			info2, err := getItemWithFlush(t.Context(), p)
+			assert.NoError(t, err)
 			assertCreated(1)
 			assertClosed(0)
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1 }))
 
-			_, err = p.getItem(t.Context())
-			require.NoError(t, err)
+			_, err = getItemWithFlush(t.Context(), p)
+			assert.NoError(t, err)
 			assertCreated(2)
 			assertClosed(0)
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 2 }))
 
-			require.NoError(t, p.Close(t.Context()))
+			assert.NoError(t, p.Close(t.Context()))
 			assertCreated(2)
 			assertClosed(0)
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 2 }))
 
-			require.ErrorIs(t, p.putItem(t.Context(), info2), errClosedPool)
+			assert.ErrorIs(t, putItemWithFlush(t.Context(), p, info2), errClosedPool)
 			assertClosed(1)
 
-			require.True(t, info2.item.closed)
-			require.False(t, info2.item.IsAlive())
+			assert.True(t, info2.item.closed)
+			assert.False(t, info2.item.IsAlive())
 			requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1 }))
 		})
 		t.Run("ExplicitItemClose", func(t *testing.T) {
@@ -1626,12 +1654,12 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				errThrown := false
 				err := p.With(t.Context(), func(ctx context.Context, testItem *testItem) error {
 					if errThrown {
-						require.EqualValues(t, 2, testItem.v)
+						assert.EqualValues(t, 2, testItem.v)
 
 						return nil
 					}
 
-					require.EqualValues(t, 1, testItem.v)
+					assert.EqualValues(t, 1, testItem.v)
 
 					defer func() {
 						errThrown = true
@@ -1640,7 +1668,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					return xerrors.Retryable(errMustDeleteItem)
 				})
 
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
 			})
 		})
@@ -1648,7 +1676,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				trace := &Trace{
 					OnChange: func(stats Stats) {
-						require.GreaterOrEqual(t, stats.Limit, stats.Idle)
+						assert.GreaterOrEqual(t, stats.Limit, stats.Idle)
 					},
 				}
 				p := mustNewPool[*testItem, testItem](t,
@@ -1678,7 +1706,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					defer wg.Done()
 					time.Sleep(time.Millisecond)
 					err := p.Close(t.Context())
-					require.NoError(t, err)
+					assert.NoError(t, err)
 				}()
 				wg.Wait()
 			})
@@ -1687,8 +1715,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				trace := &Trace{
 					OnChange: func(stats Stats) {
-						require.Equal(t, DefaultLimit, stats.Limit)
-						require.LessOrEqual(t, stats.Idle, DefaultLimit)
+						assert.Equal(t, DefaultLimit, stats.Limit)
+						assert.LessOrEqual(t, stats.Idle, DefaultLimit)
 					},
 				}
 				p := mustNewPool[*testItem, testItem](t,
@@ -1709,7 +1737,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 							t.Failed()
 						}
 						stats := p.Stats()
-						require.LessOrEqual(t, stats.Idle, DefaultLimit)
+						assert.LessOrEqual(t, stats.Idle, DefaultLimit)
 					}()
 				}
 
@@ -1753,14 +1781,14 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			mustPutItem(t, p, info1)
 			requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 3; s.Idle = 2 }))
 
-			info1, _ = p.getItem(endpoint.WithNodeID(t.Context(), 1))
-			info2, _ := p.getItem(endpoint.WithNodeID(t.Context(), 1))
-			require.Equal(t, uint32(1), info1.item.NodeID())
-			require.Equal(t, uint32(1), info2.item.NodeID())
+			info1, _ = getItemWithFlush(endpoint.WithNodeID(t.Context(), 1), p)
+			info2, _ := getItemWithFlush(endpoint.WithNodeID(t.Context(), 1), p)
+			assert.Equal(t, uint32(1), info1.item.NodeID())
+			assert.Equal(t, uint32(1), info2.item.NodeID())
 			stats := p.Stats()
-			require.Equal(t, 3, stats.Limit)
-			require.LessOrEqual(t, stats.Idle, 3)
-			require.LessOrEqual(t, stats.Size, stats.Limit+2)
+			assert.Equal(t, 3, stats.Limit)
+			assert.LessOrEqual(t, stats.Idle, 3)
+			assert.LessOrEqual(t, stats.Size, stats.Limit+2)
 		})
 
 		t.Run("RemovesIdleToMakeSpace", func(t *testing.T) {
@@ -1795,14 +1823,14 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			// Try to get info with preferred nodeID=99 (non-existent)
 			// This should remove idle info and create new info with preferred nodeID
 			getCtx := endpoint.WithNodeID(t.Context(), 99)
-			info99, _ := p.getItem(getCtx)
+			info99, _ := getItemWithFlush(getCtx, p)
 
 			// Item should have nodeID 99 (newly created with preferred)
-			require.Equal(t, uint32(99), info99.item.NodeID())
+			assert.Equal(t, uint32(99), info99.item.NodeID())
 			stats := p.Stats()
-			require.Equal(t, 2, stats.Limit)
-			require.LessOrEqual(t, stats.Idle, 2)
-			require.LessOrEqual(t, stats.Size, stats.Limit+1)
+			assert.Equal(t, 2, stats.Limit)
+			assert.LessOrEqual(t, stats.Idle, 2)
+			assert.LessOrEqual(t, stats.Size, stats.Limit+1)
 		})
 
 		t.Run("PreferredNodeIDAllBusy", func(t *testing.T) {
@@ -1855,8 +1883,8 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 					return nil
 				})
-				require.ErrorIs(t, err, context.DeadlineExceeded)
-				require.False(t, overflowItem)
+				assert.ErrorIs(t, err, context.DeadlineExceeded)
+				assert.False(t, overflowItem)
 				close(wait)
 				finished.Wait()
 				mustClose(t, p)

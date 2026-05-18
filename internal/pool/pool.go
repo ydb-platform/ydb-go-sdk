@@ -131,6 +131,7 @@ func WithWarmUpItems[PT ItemConstraint[T], T any](size int) Option[PT, T] {
 	}
 }
 
+//nolint:funlen
 func New[PT ItemConstraint[T], T any](
 	ctx context.Context,
 	opts ...Option[PT, T],
@@ -183,7 +184,10 @@ func New[PT ItemConstraint[T], T any](
 		p.sema <- struct{}{}
 	}
 
-	if err = p.warmUp(ctx); err != nil {
+	var batchChanges dynamicStats
+	defer p.applyBatchStats(&batchChanges)
+
+	if err = p.warmUp(ctx, &batchChanges); err != nil {
 		_ = p.Close(ctx)
 
 		return nil, xerrors.WithStackTrace(err)
@@ -192,7 +196,7 @@ func New[PT ItemConstraint[T], T any](
 	return p, nil
 }
 
-func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
+func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) error {
 	n := p.config.warmUpItems
 	if n <= 0 {
 		return nil
@@ -206,7 +210,7 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
 			return xerrors.WithStackTrace(ctx.Err())
 		}
 
-		item, err := p.createItem(ctx)
+		item, err := p.createItem(ctx, batchChanges)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -215,18 +219,13 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
 			item:    item,
 			created: p.config.clock.Now(),
 		}); err != nil {
-			p.closeItem(ctx, item)
+			p.closeItem(ctx, item, batchChanges)
 
 			return xerrors.WithStackTrace(err)
 		}
+
+		batchChanges.Idle++
 	}
-
-	p.changeStats(func(old dynamicStats) dynamicStats {
-		old.Size = n
-		old.Idle = n
-
-		return old
-	})
 
 	return nil
 }
@@ -234,18 +233,10 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context) error {
 // createItem wraps the Config.createItemFunc function with timeout handling
 //
 // Given context restrictions (timeout, cancel) ignored
-func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
-	p.changeStats(func(old dynamicStats) dynamicStats {
-		old.CreateInProgress++
-
-		return old
-	})
+func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats) (PT, error) {
+	batchChanges.CreateInProgress++
 	defer func() {
-		p.changeStats(func(old dynamicStats) dynamicStats {
-			old.CreateInProgress--
-
-			return old
-		})
+		batchChanges.CreateInProgress--
 	}()
 
 	createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
@@ -265,23 +256,17 @@ func (p *Pool[PT, T]) createItem(ctx context.Context) (PT, error) {
 		return nil, errNilItem
 	}
 
-	p.changeStats(func(old dynamicStats) dynamicStats {
-		old.Size++
-
-		return old
-	})
+	batchChanges.Size++
 
 	return item, nil
 }
 
 // closeItem wraps the Config.closeItemFunc function with timeout handling
-func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) {
+func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dynamicStats) {
 	defer func() {
-		p.changeStats(func(old dynamicStats) dynamicStats {
-			old.Size--
-
-			return old
-		})
+		if batchChanges != nil {
+			batchChanges.Size--
+		}
 	}()
 
 	closeCtx, cancelClose := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
@@ -300,25 +285,6 @@ func (p *Pool[PT, T]) Stats() Stats {
 		dynamicStats: p.stats.Get(),
 		Limit:        p.config.limit,
 		WarmUp:       p.config.warmUpItems,
-	}
-}
-
-func (p *Pool[PT, T]) changeStats(f func(old dynamicStats) dynamicStats) {
-	onChange := p.config.trace.OnChange
-
-	var stats dynamicStats
-	p.stats.Change(func(old dynamicStats) dynamicStats {
-		stats = f(old)
-
-		return stats
-	})
-
-	if onChange != nil {
-		onChange(Stats{
-			dynamicStats: stats,
-			Limit:        p.config.limit,
-			WarmUp:       p.config.warmUpItems,
-		})
 	}
 }
 
@@ -343,7 +309,9 @@ func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
 }
 
 //nolint:funlen
-func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
+func (p *Pool[PT, T]) try(ctx context.Context,
+	f func(ctx context.Context, item PT) error, batchChanges *dynamicStats,
+) (finalErr error) {
 	if onTry := p.config.trace.OnTry; onTry != nil {
 		onDone := onTry(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).try"),
@@ -370,7 +338,7 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		}()
 	}
 
-	info, err := p.getItem(ctx)
+	info, err := p.getItem(ctx, batchChanges)
 	if err != nil {
 		if isRetriable(err) {
 			return xerrors.WithStackTrace(xerrors.Retryable(err))
@@ -383,26 +351,18 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		return xerrors.WithStackTrace(err)
 	}
 
-	p.changeStats(func(old dynamicStats) dynamicStats {
-		old.InUse++
-
-		return old
-	})
+	batchChanges.InUse++
 
 	defer func() {
-		p.changeStats(func(old dynamicStats) dynamicStats {
-			old.InUse--
-
-			return old
-		})
+		batchChanges.InUse--
 
 		if err := p.checkItemAndError(info.item, finalErr); err != nil {
-			p.closeItem(ctx, info.item)
+			p.closeItem(ctx, info.item, batchChanges)
 
 			return
 		}
 
-		_ = p.putItem(ctx, info)
+		_ = p.putItem(ctx, info, batchChanges)
 	}()
 
 	err = f(ctx, info.item)
@@ -413,22 +373,43 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	return nil
 }
 
+func (p *Pool[PT, T]) applyBatchStats(batch *dynamicStats) {
+	onChange := p.config.trace.OnChange
+
+	var stats dynamicStats
+	p.stats.Change(func(old dynamicStats) dynamicStats {
+		stats = old
+
+		stats.Concurrency += batch.Concurrency
+		stats.CreateInProgress += batch.CreateInProgress
+		stats.InUse += batch.InUse
+		stats.Idle += batch.Idle
+		stats.Size += batch.Size
+
+		return stats
+	})
+
+	if onChange != nil {
+		onChange(Stats{
+			dynamicStats: stats,
+			Limit:        p.config.limit,
+			WarmUp:       p.config.warmUpItems,
+		})
+	}
+}
+
 func (p *Pool[PT, T]) With(
 	ctx context.Context,
 	f func(ctx context.Context, item PT) error,
 	opts ...retry.Option,
 ) (finalErr error) {
-	p.changeStats(func(old dynamicStats) dynamicStats {
-		old.Concurrency++
-
-		return old
-	})
+	batchChanges := dynamicStats{
+		Concurrency: 1,
+	}
 	defer func() {
-		p.changeStats(func(old dynamicStats) dynamicStats {
-			old.Concurrency--
+		batchChanges.Concurrency--
 
-			return old
-		})
+		p.applyBatchStats(&batchChanges)
 	}()
 
 	var attempts int
@@ -446,7 +427,7 @@ func (p *Pool[PT, T]) With(
 
 	err := retry.Retry(ctx, func(ctx context.Context) error {
 		attempts++
-		err := p.try(ctx, f)
+		err := p.try(ctx, f, &batchChanges)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -478,27 +459,38 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	default:
 		close(p.done)
 
-		var waitLocks sync.WaitGroup
-		waitLocks.Add(p.config.limit)
+		var (
+			closes       sync.WaitGroup
+			locks        sync.WaitGroup
+			batchChanges dynamicStats
+		)
+
+		defer p.applyBatchStats(&batchChanges)
+
+		locks.Add(p.config.limit)
 		for range p.config.limit {
 			go func() {
-				defer waitLocks.Done()
+				defer locks.Done()
 				<-p.sema
 			}()
 		}
-		waitLocks.Wait()
+		locks.Wait()
 		close(p.sema)
 
-		var waitCloses sync.WaitGroup
 		data := p.idle.PopAll()
-		waitCloses.Add(len(data))
+		batchChanges.Idle -= len(data)
+
+		closes.Add(len(data))
 		for _, info := range data {
-			go func() {
-				defer waitCloses.Done()
-				p.closeItem(ctx, info.item)
-			}()
+			go func(info *itemInfo[PT, T]) {
+				defer closes.Done()
+
+				// nil batchChanges need for exclude data race on concurrent batchChanges changes
+				p.closeItem(ctx, info.item, nil)
+			}(info)
 		}
-		waitCloses.Wait()
+		closes.Wait()
+		batchChanges.Size -= len(data)
 
 		return nil
 	}
@@ -571,14 +563,12 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 	return res
 }
 
-func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool) (info *itemInfo[PT, T], _ error) {
+func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool, batchChanges *dynamicStats) (
+	info *itemInfo[PT, T], _ error,
+) {
 	defer func() {
 		if info != nil {
-			p.changeStats(func(old dynamicStats) dynamicStats {
-				old.Idle--
-
-				return old
-			})
+			batchChanges.Idle--
 		}
 	}()
 
@@ -590,7 +580,7 @@ func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool) (info *itemInfo[PT,
 }
 
 // getItem called only under p.sema lock
-func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], finalErr error) {
+func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (info *itemInfo[PT, T], finalErr error) {
 	nodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
 	if onGet := p.config.trace.OnGet; onGet != nil {
@@ -609,7 +599,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 	}
 
 	for range 2 {
-		info, err := p.popItem(nodeID, hasPreferredNodeID)
+		info, err := p.popItem(nodeID, hasPreferredNodeID, batchChanges)
 		if err != nil {
 			if xerrors.Is(err, errNothingIdleItems) {
 				break
@@ -618,7 +608,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 			if info.item.IsAlive() && !needCloseItem(p.config, info) {
 				return info, nil
 			}
-			p.closeItem(ctx, info.item)
+			p.closeItem(ctx, info.item, batchChanges)
 		}
 	}
 
@@ -626,12 +616,12 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 		// clear one slot in p.idle for create item with predefined nodeID later
 		info, err := p.idle.Pop()
 		if err == nil {
-			p.closeItem(ctx, info.item)
+			p.closeItem(ctx, info.item, batchChanges)
 		}
 	}
 
 	// create item after two fails
-	item, err := p.createItem(ctx)
+	item, err := p.createItem(ctx, batchChanges)
 	if err != nil {
 		if isRetriable(err) {
 			return nil, xerrors.Retryable(err)
@@ -654,7 +644,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (info *itemInfo[PT, T], final
 	}, nil
 }
 
-func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (finalErr error) {
+func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchChanges *dynamicStats) (finalErr error) {
 	if onPut := p.config.trace.OnPut; onPut != nil {
 		onDone := onPut(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).putItem"),
@@ -669,7 +659,7 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (final
 
 	select {
 	case <-p.done:
-		p.closeItem(ctx, info.item)
+		p.closeItem(ctx, info.item, batchChanges)
 
 		return xerrors.WithStackTrace(errClosedPool)
 	default:
@@ -677,17 +667,13 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T]) (final
 		info.lastUsage = p.config.clock.Now()
 
 		if err := p.idle.Put(info); err != nil {
-			p.closeItem(ctx, info.item)
+			p.closeItem(ctx, info.item, batchChanges)
 
 			return err
 		}
 
 		if info != nil {
-			p.changeStats(func(old dynamicStats) dynamicStats {
-				old.Idle++
-
-				return old
-			})
+			batchChanges.Idle++
 		}
 
 		return nil
