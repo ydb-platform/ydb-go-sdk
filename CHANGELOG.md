@@ -1,19 +1,17 @@
-* Reworked the internal table/query session pool ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163)): 
-  * semaphore-based concurrency limit instead of a wait queue, 
-  * synchronous session creation, 
-  * and batched pool statistics updates for lower CPU overhead under load
-* **Session reuse (behavior):** idle sessions are taken from the pool in LIFO order (most recently returned first). Previously idle items were taken from the front of the queue (FIFO). With `PreferredNodeID`, matching idle sessions are also selected from the end of the idle list (consistent LIFO semantics)
-* **Pool saturation (behavior):** 
-  * when the pool limit is reached, `table.Do` / `query` pool operations block until a slot is released (semaphore), instead of parking goroutines on an internal wait queue. `errPoolIsOverflow` is no longer returned from the pool path; 
-  * pool wait trace callbacks (`OnPoolWait`) are no longer invoked
-* Added **`WithSessionPoolWarmUpSessions`** driver option: 
-  * at driver initialization, pre-creates up to N sessions in the table client pool and the query explicit session pool (`N > 0`; `N <= 0` disables warm-up, default is no warm-up). 
-  * The configured value is capped by the pool size limit. 
-  * Driver/table/query client initialization fails if warm-up session creation fails
-* **Trace/metrics (breaking for custom handlers):** 
-  * pool state events expose `Concurrency` (active `With` calls) instead of `Index`/`Wait`; `TablePoolStateChangeInfo` no longer includes deprecated `Size` — use `Idle`, `CreateInProgress`, and `Concurrency` instead. 
-  * Table pool metrics: gauge `concurrency` replaces `index` and `wait`; 
-  * Query pool metrics: gauge `concurrency` replaces `index`, `waiters_queue`, and derived `in_use`.
+* Reworked the internal table/query session pool ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163)):
+  * semaphore-based concurrency limit instead of an internal wait queue and `index` map;
+  * synchronous session creation in the caller goroutine (no background create goroutine per slot);
+  * batched pool statistics updates during `With` to reduce CPU overhead under load
+* **Session reuse (behavior):** idle sessions are taken in LIFO order (most recently returned first). Previously the idle list behaved as FIFO. With `PreferredNodeID`, matching idle sessions are also picked from the end of the idle list (same LIFO semantics)
+* **Pool saturation (behavior):** when the pool limit is reached, `table.Do` / query pool `With` block on a semaphore until a slot is released, instead of registering on an internal wait queue. `errPoolIsOverflow` is no longer returned from the pool; `trace.Table.OnPoolWait` callbacks are no longer invoked (the hook remains in the trace API but is unused by the pool)
+* Added **`WithSessionPoolWarmUpSessions`** driver option: at driver initialization, pre-creates up to `N` sessions in the table client pool and the query **explicit** session pool (`N > 0`; `N <= 0` disables warm-up; default is no warm-up). The configured `N` is stored in pool stats as `WarmUp`; the number of sessions actually created is `min(N, pool limit)`. Driver initialization fails if warm-up session creation fails
+* **Deprecated:** `WithSessionPoolKeepAliveMinSize` is a no-op (removal planned Nov 2026); use `WithSessionPoolWarmUpSessions` instead
+* **Trace/metrics (breaking for custom handlers):**
+  * `TablePoolStateChangeInfo` / `QueryPoolChange`: `Concurrency` (active `With` calls) replaces `Index` and `Wait`; deprecated `Size` removed from table pool state change info
+  * `TablePoolGetDoneInfo` / `QueryPoolGetDoneInfo`: `Attempts` removed
+  * Table pool metrics: gauge `concurrency` replaces `index` and `wait`
+  * Query pool metrics: gauge `concurrency` replaces `index`, `waiters_queue`, and derived `in_use`
+  * Table pool state change logs: `concurrency` replaces `index` / `wait`
 
 ## v3.136.3
 * Fixed passing wait server ack to sub-writers in topicmultiwriter
