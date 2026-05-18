@@ -1,4 +1,5 @@
 * Fixed concurrent partition map initialization in topic multiwriter (`topicoptions.WithWriteToManyPartitions`) so `DescribeTopic` setup does not race with an early partition-split callback
+* Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) sequence handling: concurrent writes with automatic sequence numbers serialize assignment with enqueue order, and manual sequence numbers return a client-side ordering error when not strictly increasing for a target partition
 * Changed `topicoptions.KeyHasher` for bound topic multiwriter partitioning to return `[]byte` instead of `string`, avoiding extra string conversion and byte-copy allocations per message
 * Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) error handling and shutdown: writes after close now fail, partition-split errors are propagated, sub-writer init errors are race-free, and idle sub-writers are closed correctly
 
