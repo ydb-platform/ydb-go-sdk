@@ -37,7 +37,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 
 	sessionPool, err := pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session, Session](config.SizeLimit()),
-		pool.WithWarmUpItems[*Session, Session](config.KeepAliveMinSize()),
+		pool.WithWarmUpItems[*Session, Session](config.PoolWarmUpSize()),
 		pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
 		pool.WithItemUsageTTL[*Session, Session](config.SessionUsageTTL()),
 		pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),

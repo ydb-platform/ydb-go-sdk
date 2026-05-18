@@ -121,7 +121,7 @@ func TestNew(t *testing.T) {
 	})
 }
 
-func TestWithSessionPoolKeepAliveMinSize(t *testing.T) {
+func TestWithSessionPoolWarmUpSessions(t *testing.T) {
 	t.Run("explicit value", func(t *testing.T) {
 		cfg := New(WithSessionPoolWarmUpSessions(20))
 		require.Equal(t, 20, cfg.PoolWarmUpSize())
