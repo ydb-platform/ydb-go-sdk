@@ -5,15 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -98,6 +103,29 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 	}
 }
 
+type overloadedInitWriter struct{}
+
+func (w *overloadedInitWriter) Close(ctx context.Context) error {
+	return nil
+}
+
+func (w *overloadedInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	return topicwriterinternal.InitialInfo{}, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+}
+
+func (w *overloadedInitWriter) WriteInternal(
+	ctx context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
+	return nil
+}
+
+type overloadedInitWritersFactory struct{}
+
+func (f *overloadedInitWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	return &overloadedInitWriter{}, nil
+}
+
 type choosePartitionKeyCheckWritersFactory struct {
 	t testing.TB
 }
@@ -112,6 +140,76 @@ func (f *choosePartitionKeyCheckWritersFactory) Create(
 		0,
 		stubs.WithRequireChoosePartitionKeyMetadata(f.t),
 	), nil
+}
+
+type orderedSeqWriter struct {
+	lastSeqNo             int64
+	writes                chan int64
+	onAckReceivedCallback func(seqNo int64)
+}
+
+func (w *orderedSeqWriter) Close(ctx context.Context) error {
+	return nil
+}
+
+func (w *orderedSeqWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	return topicwriterinternal.InitialInfo{}, nil
+}
+
+func (w *orderedSeqWriter) WriteInternal(
+	ctx context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
+	for _, msg := range messages {
+		if msg.SeqNo <= w.lastSeqNo {
+			return fmt.Errorf("unordered seq no: %d <= %d", msg.SeqNo, w.lastSeqNo)
+		}
+		w.lastSeqNo = msg.SeqNo
+		w.writes <- msg.SeqNo
+		if w.onAckReceivedCallback != nil {
+			// Notify multiwriter the message was accepted so flush() in Close()
+			// can complete; mirror what real subwriter does after a server ack.
+			go w.onAckReceivedCallback(msg.SeqNo)
+		}
+	}
+
+	return nil
+}
+
+type orderedSeqWriterFactory struct {
+	writer *orderedSeqWriter
+}
+
+func (f orderedSeqWriterFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	partitionID, _ := cfg.PartitionID()
+	if partitionID != 1 {
+		return &orderedSeqWriter{
+			writes:                make(chan int64, 1),
+			onAckReceivedCallback: cfg.OnAckReceivedCallback,
+		}, nil
+	}
+
+	f.writer.onAckReceivedCallback = cfg.OnAckReceivedCallback
+
+	return f.writer, nil
+}
+
+type blockingReader struct {
+	started chan struct{}
+	release chan struct{}
+	data    []byte
+	done    bool
+}
+
+func (r *blockingReader) Read(p []byte) (int, error) {
+	if r.done {
+		return 0, io.EOF
+	}
+	close(r.started)
+	<-r.release
+	r.done = true
+
+	return copy(p, r.data), nil
 }
 
 func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
@@ -283,6 +381,199 @@ func newTestMultiWriterWithCustomWritersFactory(
 	return writer
 }
 
+type failingAddPartitionChooser struct {
+	delegate PartitionChooser
+	addCalls int
+	err      error
+}
+
+func (c *failingAddPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error) {
+	return c.delegate.ChoosePartition(msg)
+}
+
+func (c *failingAddPartitionChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
+	c.addCalls++
+	if c.addCalls > 1 {
+		return c.err
+	}
+
+	return c.delegate.AddNewPartitions(partitions...)
+}
+
+func (c *failingAddPartitionChooser) RemovePartition(partitionID int64) {
+	c.delegate.RemovePartition(partitionID)
+}
+
+type errorPartitionChooser struct {
+	err error
+}
+
+func (c *errorPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error) {
+	return 0, c.err
+}
+
+func (c *errorPartitionChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
+	return nil
+}
+
+func (c *errorPartitionChooser) RemovePartition(partitionID int64) {
+}
+
+func newTestMultiWriterWithPartitionChooser(
+	t testing.TB,
+	describer TopicDescriber,
+	partitionChooser PartitionChooser,
+) *MultiWriter {
+	t.Helper()
+
+	cfg := MultiWriterConfig{}
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByKey(partitionChooser)(&cfg)
+
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	require.NoError(t, err)
+
+	return writer
+}
+
+func TestInflightBuffer_AcquireMessageAfterStopReturnsClosedError(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	bufCtx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	buf := newInflightBuffer(
+		bufCtx,
+		&xsync.Mutex{},
+		&topicwriterinternal.WriterReconnectorConfig{},
+		func() error { return nil },
+	)
+
+	require.ErrorIs(t, buf.acquireMessage(ctx), ErrAlreadyClosed)
+}
+
+func TestMultiWriter_WriteAfterClose(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	require.NoError(t, multiWriter.Close(ctx))
+
+	err := multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data:  bytes.NewReader([]byte("hello")),
+		SeqNo: 1,
+		Key:   "partition-key-1",
+	}})
+	require.ErrorIs(t, err, ErrAlreadyClosed)
+}
+
+func TestMultiWriter_WriteReturnsChoosePartitionError(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	choosePartitionErr := errors.New("choose partition failed")
+	multiWriter := newTestMultiWriterWithPartitionChooser(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		&errorPartitionChooser{err: choosePartitionErr},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+
+	err := multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data:  bytes.NewReader([]byte("hello")),
+		SeqNo: 1,
+		Key:   "partition-key-1",
+	}})
+	require.ErrorIs(t, err, choosePartitionErr)
+
+	multiWriter.orchestrator.mu.WithLock(func() {
+		require.Equal(t, 0, multiWriter.orchestrator.buf.inFlightMessages.Len())
+		require.Len(t, multiWriter.orchestrator.buf.messagesSema, 0)
+	})
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestOrchestratorOnAckReceivedIgnoresMissingPartition(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	multiWriter.orchestrator.mu.WithLock(func() {
+		multiWriter.orchestrator.buf.messagesSema <- struct{}{}
+		multiWriter.orchestrator.buf.pushNeedLock(message{
+			MessageWithDataContent: topicwritercommon.MessageWithDataContent{
+				PublicMessage: topicwritercommon.PublicMessage{
+					SeqNo:       1,
+					PartitionID: 1,
+				},
+			},
+		})
+		delete(multiWriter.orchestrator.buf.pendingMessagesIndex, 1)
+		delete(multiWriter.orchestrator.partitions, 1)
+		require.NotPanics(t, func() {
+			multiWriter.orchestrator.onAckReceivedNeedLock(1, 1)
+		})
+		require.Equal(t, 0, multiWriter.orchestrator.buf.inFlightMessages.Len())
+		require.Len(t, multiWriter.orchestrator.buf.messagesSema, 0)
+	})
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestMultiWriter_OnPartitionSplitReturnsAddPartitionsError(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	baseDesc := stubs.DefaultStubTopicDescription(t)
+	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6)
+	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
+	addPartitionsErr := errors.New("add child partitions failed")
+	partitionChooser := &failingAddPartitionChooser{
+		delegate: partitionchooser.NewBoundPartitionChooser(),
+		err:      addPartitionsErr,
+	}
+	multiWriter := newTestMultiWriterWithPartitionChooser(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		partitionChooser,
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	state.RecordSplit(1)
+
+	err := multiWriter.orchestrator.onPartitionSplit(1)
+	require.ErrorIs(t, err, addPartitionsErr)
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
 func TestMultiWriter_ErrAlreadyClosed(t *testing.T) {
 	t.Parallel()
 
@@ -313,6 +604,54 @@ func TestMultiWriter_WaitInit_Success(t *testing.T) {
 
 	err = multiWriter.Close(ctx)
 	require.NoError(t, err)
+}
+
+func TestMultiWriter_CloseCancelsInitSeqNoRetrySleep(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	multiWriter := newTestMultiWriterWithCustomWritersFactory(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		&overloadedInitWritersFactory{},
+	)
+
+	closeCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	startedAt := time.Now()
+	require.NoError(t, multiWriter.Close(closeCtx))
+	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
+}
+
+func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	bg := background.NewWorker(ctx, "describe-retry-test")
+	describeResult := stubs.DefaultStubTopicDescription(t)
+	o := newOrchestrator(
+		ctx,
+		cancel,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return describeResult, nil
+		},
+		bg,
+		&topicwriterinternal.WriterReconnectorConfig{},
+		&MultiWriterConfig{},
+	)
+	cancel()
+	defer func() {
+		_ = bg.Close(xtest.Context(t), nil)
+	}()
+
+	startedAt := time.Now()
+	_, err := o.describeTopicWithRetries(describeResult.Partitions[0].PartitionID)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
 }
 
 func TestMultiWriter_WaitInit_ContextCanceled(t *testing.T) {
@@ -554,6 +893,14 @@ func TestMultiWriter_Write_CloseTimeout(t *testing.T) {
 	defer cancel()
 
 	require.ErrorIs(t, multiWriter.Close(ctxTimeout), context.DeadlineExceeded)
+	require.Eventually(t, func() bool {
+		select {
+		case <-multiWriter.background.Done():
+			return true
+		default:
+			return false
+		}
+	}, time.Second, time.Millisecond*10)
 }
 
 func TestMultiWriter_Write_ErrNoSeqNo(t *testing.T) {
@@ -580,6 +927,120 @@ func TestMultiWriter_Write_ErrNoSeqNo(t *testing.T) {
 	})
 
 	require.ErrorIs(t, err, ErrNoSeqNo)
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestMultiWriter_Write_ErrUnorderedSeqNo(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	cfg := MultiWriterConfig{}
+	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByPartitionID()(&cfg)
+
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+
+	multiWriter, err := NewMultiWriter(
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		writerCfg,
+		&cfg,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:        bytes.NewReader([]byte("hello")),
+			SeqNo:       2,
+			PartitionID: 1,
+		},
+	}))
+	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:        bytes.NewReader([]byte("hello")),
+			SeqNo:       2,
+			PartitionID: 2,
+		},
+	}))
+
+	err = multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:        bytes.NewReader([]byte("hello")),
+			SeqNo:       2,
+			PartitionID: 1,
+		},
+	})
+	require.ErrorIs(t, err, ErrUnorderedSeqNo)
+
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func TestMultiWriter_Write_AutoSeqNoFollowsQueueOrder(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
+	orderedWriter := &orderedSeqWriter{
+		writes: make(chan int64, 2),
+	}
+	cfg := MultiWriterConfig{}
+	withWritersFactory(orderedSeqWriterFactory{writer: orderedWriter})(&cfg)
+	WithProducerIDPrefix("test-producer")(&cfg)
+	WithWriterPartitionByPartitionID()(&cfg)
+
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
+
+	multiWriter, err := NewMultiWriter(
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		writerCfg,
+		&cfg,
+	)
+	require.NoError(t, err)
+	require.NoError(t, multiWriter.WaitInit(ctx))
+
+	reader := &blockingReader{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		data:    []byte("slow"),
+	}
+	firstWriteDone := make(chan error, 1)
+	go func() {
+		firstWriteDone <- multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+			{
+				Data:        reader,
+				PartitionID: 1,
+			},
+		})
+	}()
+
+	<-reader.started
+	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{
+		{
+			Data:        bytes.NewReader([]byte("fast")),
+			PartitionID: 1,
+		},
+	}))
+	require.Equal(t, int64(1), <-orderedWriter.writes)
+
+	close(reader.release)
+	require.NoError(t, <-firstWriteDone)
+	require.Equal(t, int64(2), <-orderedWriter.writes)
+
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
