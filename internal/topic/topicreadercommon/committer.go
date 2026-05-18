@@ -3,7 +3,6 @@ package topicreadercommon
 import (
 	"context"
 	"errors"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -50,7 +49,6 @@ type Committer struct {
 	tracer           *trace.Topic
 
 	m       xsync.Mutex
-	sendMu  sync.Mutex // serializes swap+send so concurrent Flush calls and pushCommitsLoop never overlap sends
 	waiters []commitWaiter
 	commits CommitRanges
 }
@@ -154,9 +152,6 @@ func (c *Committer) Flush(ctx context.Context) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-
-	c.sendMu.Lock()
-	defer c.sendMu.Unlock()
 
 	var commits CommitRanges
 
