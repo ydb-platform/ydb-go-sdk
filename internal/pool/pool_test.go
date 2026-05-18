@@ -13,6 +13,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -150,9 +151,7 @@ func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T]) *ite
 	t.Helper()
 
 	info, err := getItemWithFlush(t.Context(), p)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	return info
 }
@@ -160,9 +159,7 @@ func mustGetItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T]) *ite
 func mustPutItem[PT ItemConstraint[T], T any](t testing.TB, p *Pool[PT, T], info *itemInfo[PT, T]) {
 	t.Helper()
 
-	if err := putItemWithFlush(t.Context(), p, info); err != nil {
-		panic(err)
-	}
+	require.NoError(t, putItemWithFlush(t.Context(), p, info))
 }
 
 func mustNewPool[PT ItemConstraint[T], T any](
@@ -172,7 +169,7 @@ func mustNewPool[PT ItemConstraint[T], T any](
 	t.Helper()
 
 	p, err := New(t.Context(), opts...)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return p
 }
