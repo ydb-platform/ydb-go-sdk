@@ -766,7 +766,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					close(release2)
 					holders.Wait()
 					waitPoolClosed(t, closed)
-				}, xtest.StopAfter(time.Minute))
+				})
 			})
 			t.Run("CloseWhileWithInCallback", func(t *testing.T) {
 				xtest.TestManyTimes(t, func(t testing.TB) {
