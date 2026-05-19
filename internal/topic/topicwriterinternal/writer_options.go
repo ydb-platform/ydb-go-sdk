@@ -127,6 +127,16 @@ func WithMaxQueueLen(num int) PublicWriterOption {
 	}
 }
 
+// WithErrOnQueueFull controls WriterReconnector.Write when the internal message queue
+// is full. When enable is false (default), the call blocks until space is available
+// or ctx is cancelled. When enable is true, the call returns ErrPublicQueueIsFull
+// immediately without blocking.
+func WithErrOnQueueFull(enable bool) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.ErrOnQueueFull = enable
+	}
+}
+
 func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.defaultPartitioning = partitioning.ToRaw()

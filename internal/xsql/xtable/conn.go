@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -29,8 +28,6 @@ type (
 		Scripting() scripting.Client
 	}
 	Conn struct {
-		ctx context.Context //nolint:containedctx
-
 		scriptingClient scripting.Client
 		session         table.ClosableSession // Immutable and r/o usage.
 
@@ -55,10 +52,10 @@ func (c *Conn) NodeID() uint32 {
 
 func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (result driver.Result, err error) {
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
@@ -76,13 +73,13 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (res
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
-	result driver.RowsNextResultSet, finalErr error,
+	result common.Rows, finalErr error,
 ) {
 	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	switch queryMode := queryModeFromContext(ctx, c.defaultQueryMode); queryMode {
@@ -100,7 +97,7 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast string, plan string, err error) {
 	exp, err := c.session.Explain(ctx, sql)
 	if err != nil {
-		return "", "", badconn.Map(xerrors.WithStackTrace(err))
+		return "", "", xerrors.WithStackTrace(err)
 	}
 
 	return exp.AST, exp.Plan, nil
@@ -120,9 +117,8 @@ type resultNoRows struct{}
 func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
-func New(ctx context.Context, scriptingClient scripting.Client, s table.ClosableSession, opts ...Option) *Conn {
+func New(scriptingClient scripting.Client, s table.ClosableSession, opts ...Option) *Conn {
 	cc := &Conn{
-		ctx:              ctx,
 		scriptingClient:  scriptingClient,
 		session:          s,
 		defaultQueryMode: DataQueryMode,
@@ -215,7 +211,7 @@ func (c *Conn) executeScriptingQuery(ctx context.Context, sql string, params *pa
 }
 
 func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error,
+	common.Rows, error,
 ) {
 	dataOpts := c.dataOpts
 	sm := stats.ModeCallbackFromContext(ctx)
@@ -248,7 +244,7 @@ func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Par
 }
 
 func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error,
+	common.Rows, error,
 ) {
 	res, err := c.session.StreamExecuteScanQuery(ctx,
 		sql, params, c.scanOpts...,
@@ -267,7 +263,7 @@ func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Par
 }
 
 func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *params.Params) (
-	driver.RowsNextResultSet, error,
+	common.Rows, error,
 ) {
 	res, err := c.scriptingClient.StreamExecute(ctx, sql, params)
 	if err != nil {
@@ -285,10 +281,10 @@ func (c *Conn) execScriptingQuery(ctx context.Context, sql string, params *param
 
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	if !c.isReady() {
-		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 	if err := c.session.KeepAlive(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
@@ -297,12 +293,12 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-func (c *Conn) Close() (finalErr error) {
+func (c *Conn) Close(ctx context.Context) (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
-		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
+		return xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.session),
-		)))
+		))
 	}
 
 	defer func() {
@@ -311,7 +307,7 @@ func (c *Conn) Close() (finalErr error) {
 		}
 	}()
 
-	err := c.session.Close(xcontext.ValueOnly(c.ctx))
+	err := c.session.Close(xcontext.ValueOnly(ctx))
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

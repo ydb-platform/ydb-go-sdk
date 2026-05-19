@@ -1,5 +1,97 @@
 * Fixed YSON scanning in `TableService` to support both underlying types `TextValue` and `BytesValue`
 
+## v3.137.0
+* Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a partition session on the reader
+
+## v3.136.4
+* Fixed concurrent partition map initialization in topic multiwriter (`topicoptions.WithWriteToManyPartitions`) so `DescribeTopic` setup does not race with an early partition-split callback
+* Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) sequence handling: concurrent writes with automatic sequence numbers serialize assignment with enqueue order, and manual sequence numbers return a client-side ordering error when not strictly increasing for a target partition
+* Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) error handling and shutdown: writes after close now fail, partition-split errors are propagated, sub-writer init errors are race-free, and idle sub-writers are closed correctly
+
+## v3.136.3
+* Fixed passing wait server ack to sub-writers in topicmultiwriter
+
+## v3.136.2
+* Fixed `MultiWriterWithTransaction.Write` to materialize lazy query transactions via `tx.UnLazy` before writing (same as single-partition transactional writer)
+* Fixed `MultiWriterWithTransaction`: pass transaction to each incoming message
+
+## v3.136.1
+* Changed the retry behavior for operation error `TIMEOUT` from non-retryable to conditionally retryable
+* Added public `retry.TypeInstant` enum alias to `retry.TypeNoBackoff`
+
+## v3.136.0
+* The `query.WithResponsePartPrefetch(n)` method has been added to enable the prefetching of parts of query results.
+  By default, this feature is disabled. Prefetching produces the following effects:
+  - One additional goroutine per query.
+  - Approximately 5 allocations per query.
+  - Approximately 200–300 additional bytes per query.
+  However, each query also reduced the execution time by approximately 2 milliseconds.
+
+## v3.135.15
+* `database/sql` driver (no public API changes): `QueryContext` / `Stmt.QueryContext` / `Tx.QueryContext` cancellation propagated through row iteration consistently—the SQL `Rows` adapter retained that context for every `Next`, `NextResultSet`, and column-metadata call, and both Query Service and Table Service backends received it where supported.
+* When using **QueryService** (`ydb.WithQueryService(true)`, default), canceling the query context after starting to read a result set surfaced `context.Canceled` from `(*sql.Rows).Err()` after `Next` stopped, matching typical `database/sql` expectations for context-aware queries.
+* When using **TableService** (`ydb.WithQueryService(false)`), row iteration continued to rely on the table client read path; `Rows.Err()` after cancel could be empty or `io.EOF` once rows were exhausted, rather than the cancellation error.
+* Replaced internal query-client "done" signal channels with `atomic.Bool` to improve performance:
+  * Reduced allocations per query and decreased latency for each query.
+  * Disabled cascading cancellation of all child operations, such as canceling a query on session close or query-client close — YDB server is supposed to cancel query executions on closing sessions.
+
+## v3.135.14
+* Adjusted gRPC client-stream error wrapping to improve topic writer reconnect behavior, ensuring stream teardown races don’t cause server-side gRPC cancellations to be misclassified as purely local context cancellations.
+
+## v3.135.13
+* Optimized the `internal/stack.FunctionID` for decreased allocations and CPU usage
+
+## v3.135.12
+* Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header
+
+## v3.135.11
+* The `trace.DatabaseSQLConnExecStartInfo.IdleTime` and `trace.DatabaseSQLConnQueryStartInfo.IdleTime` fields have been marked as deprecated and will always be zero from now.
+* Default connection last usage tracking has been changed to "no tracking", with real-time tracking enabled only if a connection's time-to-live (TTL) has been defined.
+* `lastUsage.Start()` has been optimized to replace the `sync.OnceFunc` approach with an atomic.Bool-based one, reducing heap allocations for each query start.
+* Optimized `io.EOF` handling in QueryService result iteration by returning `io.EOF` directly instead of wrapping it with `xerrors.WithStackTrace`, reducing per-query allocations
+
+## v3.135.10
+* Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
+
+## v3.135.9
+* Implemented `driver.Validator` on the SDK's `database/sql` driver connection so that `database/sql` discards invalidated sessions before reusing connections from its pool
+* Fixed `query.Session.Begin` to return `BAD_SESSION` immediately for dead lazy-tx sessions instead of silently creating a transaction that would fail on the next server call
+* Fixed `Rollback` to signal `driver.ErrBadConn` to `database/sql` when the session is no longer alive after a rollback, ensuring the dead connection is discarded
+
+## v3.135.8
+* Fixed a race condition in the session pool where canceling a caller's context while a creation goroutine was still running could allow the pool to exceed its size limit
+
+## v3.135.7
+* Fixed `transport/ResourceExhausted` errors with description "trying to send message larger than max" or "received message larger than max" to be treated as non-retryable, so callers get an immediate error instead of repeated retries that cannot succeed
+
+## v3.135.6
+* Added logging for YQL compiler warnings returned via `trace.DriverConnInvokeDoneInfo.Issues` so they become visible in SDK logs (including when `trace.DetailsAll` is enabled), instead of being silently dropped.
+
+## v3.135.5
+* Fixed transactional topic writers with lazy query transactions (`query.WithLazyTx(true)`)
+
+## v3.135.4
+* Fixed query `Execute`/`Query` sometimes returning `context.Canceled` instead of retrying when the session was closed while the gRPC stream was still valid, by using the stream-scoped context when creating the result reader
+
+## v3.135.3
+* Fixed gRPC stream operations (`CloseSend`, `SendMsg`, `RecvMsg`) to check the stream context directly instead of inspecting the error type, so errors from a cancelled stream are no longer misclassified as transport errors
+
+## v3.135.2
+* Fixed closing idle sessions from the session pool when the `Close` context is already cancelled
+
+## v3.135.1
+* Fixed `database/sql` query service transactions to map connection-related errors to `driver.ErrBadConn` (begin, commit, rollback, exec, and query) so the pool can discard bad connections
+
+## v3.135.0
+* Added `topicoptions.WithWriterErrOnQueueFull(bool)` option for topic writer to make `Write` return `topicwriter.ErrQueueLimitExceed` immediately when the internal queue is full, instead of blocking. Useful for preventing OOM when the writer cannot keep up with produced messages.
+* Un-deprecated `topicwriter.ErrQueueLimitExceed`: it is returned by `Write` when a writer is created with `topicoptions.WithWriterErrOnQueueFull(true)` and the internal queue is full.
+
+## v3.134.2
+* Fixed `table.Session.Execute` ignoring `options.WithCommit()` so transactions were not committed when the option was passed
+
+## v3.134.1
+* Changed multi-partition topic writer (`topicoptions.WithWriteToManyPartitions`) so `Write` and `Flush` block until internal initialization completes, consistent with single-partition writers
+
 ## v3.134.0
 * Fixed `sugar.RemoveRecursive()` for directories containing external data sources or external tables
 * Added `table.DescribeExternalDataSource()` and `table.DescribeExternalTable()` methods for describing external data sources and external tables

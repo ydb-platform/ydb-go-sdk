@@ -960,7 +960,7 @@ func TestClient(t *testing.T) {
 					if want.a == 5 {
 						require.NoError(t, err)
 					}
-					if errors.Is(err, io.EOF) {
+					if xerrors.Is(err, io.EOF) {
 						require.Fail(t, "unexpected EOF")
 					}
 					var a uint64
@@ -1083,7 +1083,7 @@ func TestClient(t *testing.T) {
 					if want.a == 5 {
 						require.NoError(t, err)
 					}
-					if errors.Is(err, io.EOF) {
+					if xerrors.Is(err, io.EOF) {
 						require.Fail(t, "unexpected EOF")
 					}
 					var a uint64
@@ -1204,7 +1204,7 @@ func TestClient(t *testing.T) {
 					{5, "5"},
 				} {
 					row, err := rs.NextRow(ctx)
-					if errors.Is(err, io.EOF) {
+					if xerrors.Is(err, io.EOF) {
 						require.Fail(t, "unexpected EOF in RS0")
 					}
 					require.NoError(t, err)
@@ -1822,7 +1822,6 @@ func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client
 type sessionControllerMock struct {
 	id     string
 	status Status
-	done   chan struct{}
 }
 
 func (s *sessionControllerMock) IsAlive() bool {
@@ -1849,15 +1848,10 @@ func (s sessionControllerMock) Status() string {
 	return s.status.String()
 }
 
-func (s sessionControllerMock) Done() <-chan struct{} {
-	return s.done
-}
-
 func newTestSession(id string) *Session {
 	return &Session{
 		Core: &sessionControllerMock{
-			id:   id,
-			done: make(chan struct{}),
+			id: id,
 		},
 		trace: &trace.Query{},
 	}
@@ -1866,8 +1860,7 @@ func newTestSession(id string) *Session {
 func newTestSessionWithClient(id string, client Ydb_Query_V1.QueryServiceClient, lazyTx bool) *Session {
 	return &Session{
 		Core: &sessionControllerMock{
-			id:   id,
-			done: make(chan struct{}),
+			id: id,
 		},
 		client: client,
 		trace:  &trace.Query{},

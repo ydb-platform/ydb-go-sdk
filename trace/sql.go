@@ -1,7 +1,5 @@
 package trace
 
-//go:generate gtrace
-
 import (
 	"context"
 	"database/sql/driver"
@@ -189,7 +187,10 @@ type (
 		Query      string
 		Mode       string
 		Idempotent bool
-		IdleTime   time.Duration
+
+		// Deprecated: will be removed after October 2026.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		IdleTime time.Duration
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnQueryDoneInfo struct {
@@ -206,7 +207,10 @@ type (
 		Query      string
 		Mode       string
 		Idempotent bool
-		IdleTime   time.Duration
+
+		// Deprecated: will be removed after October 2026.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		IdleTime time.Duration
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnExecDoneInfo struct {

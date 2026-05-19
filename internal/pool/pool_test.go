@@ -481,6 +481,57 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 			require.True(t, closed[2]) // after putItem s3 must be closed
 		})
+		t.Run("WithCancelledContext", func(t *testing.T) {
+			// Regression test: closing idle items from the pool must succeed even
+			// when the context passed to Close is already cancelled.
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				var closedCount atomic.Int32
+
+				p := New[*testItem, testItem](rootCtx,
+					WithLimit[*testItem, testItem](3),
+					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
+					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
+					WithCreateItemFunc(func(context.Context) (*testItem, error) {
+						var v testItem
+
+						return &v, nil
+					}),
+					WithTrace[*testItem, testItem](defaultTrace),
+				)
+
+				// Override the close func to detect context-cancelled failures.
+				// In a real scenario (e.g. gRPC session close), a cancelled context
+				// would cause the close call to fail immediately.
+				p.config.closeItemFunc = func(ctx context.Context, item *testItem) {
+					if ctx.Err() != nil {
+						// context already cancelled — item would not be closed in practice
+						return
+					}
+					closedCount.Add(1)
+				}
+
+				s1 := mustGetItem(t, p)
+				s2 := mustGetItem(t, p)
+				s3 := mustGetItem(t, p)
+
+				mustPutItem(t, p, s1)
+				mustPutItem(t, p, s2)
+
+				require.Equal(t, 2, p.idle.Len())
+
+				// Close the pool with an already-cancelled context.
+				cancelCtx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				err := p.Close(cancelCtx)
+				require.NoError(t, err)
+
+				// Both idle items must have been closed despite the cancelled context.
+				require.EqualValues(t, int32(2), closedCount.Load())
+
+				_ = s3 // s3 is still "in use" and not in the idle list
+			})
+		})
 		t.Run("WhenWaiting", func(t *testing.T) {
 			for _, test := range []struct {
 				name string
@@ -954,6 +1005,76 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 	})
 	t.Run("With", func(t *testing.T) {
+		t.Run("SpoiledIdleItems", func(t *testing.T) {
+			// Models query sessions that become !IsAlive() while sitting in idle
+			// (e.g. attach stream Recv error in listenAttachStream).
+			ctx := t.Context()
+
+			var (
+				created atomic.Int32
+				closed  atomic.Int32
+				spoiled sync.Map // item id -> struct{}
+			)
+
+			p := New[*testItem, testItem](ctx,
+				WithLimit[*testItem, testItem](2),
+				WithCreateItemFunc(func(context.Context) (*testItem, error) {
+					id := created.Add(1)
+
+					return &testItem{
+						v: id,
+						onIsAlive: func() bool {
+							_, dead := spoiled.Load(id)
+
+							return !dead
+						},
+						onClose: func() error {
+							closed.Add(1)
+
+							return nil
+						},
+					}, nil
+				}),
+				WithTrace[*testItem, testItem](defaultTrace),
+			)
+			defer func() {
+				_ = p.Close(ctx)
+			}()
+
+			err := p.With(ctx, func(context.Context, *testItem) error {
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(1), created.Load())
+			require.Equal(t, int32(0), closed.Load())
+			require.Equal(t, 1, p.Stats().Idle)
+
+			spoiled.Store(int32(1), struct{}{})
+
+			var gotID int32
+			err = p.With(ctx, func(_ context.Context, item *testItem) error {
+				gotID = item.v
+
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(2), gotID, "must not reuse spoiled idle item")
+			require.Equal(t, int32(2), created.Load())
+			require.Equal(t, int32(1), closed.Load(), "spoiled idle item must be closed on get")
+			require.Equal(t, 1, p.Stats().Idle)
+
+			spoiled.Store(int32(2), struct{}{})
+
+			err = p.With(ctx, func(_ context.Context, item *testItem) error {
+				gotID = item.v
+
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(3), gotID)
+			require.Equal(t, int32(3), created.Load())
+			require.Equal(t, int32(2), closed.Load())
+		})
 		t.Run("ItemFromPoolIsNotAlive", func(t *testing.T) {
 			var (
 				created atomic.Int32
@@ -1588,20 +1709,21 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			require.ErrorIs(t, getErr, context.Canceled,
 				"getItem should fail with context canceled: got %v", getErr)
 
-			// Check that createInProgress was cleaned up
+			// Verify pool can still operate at full capacity.
+			// mustGetItem blocks until the background creation goroutine finishes
+			// and places its item in the pool. By the time mustGetItem returns,
+			// the goroutine has already decremented createInProgress (atomically
+			// with adding the item to the index), so the checks below are race-free.
+			item3 := mustGetItem(t, p)
+			require.NotNil(t, item3)
+
 			finalStats := p.Stats()
 			t.Logf("Stats after cancel: Index=%d, Idle=%d, CreateInProgress=%d",
 				finalStats.Index, finalStats.Idle, finalStats.CreateInProgress)
 
 			require.Equal(t, 0, finalStats.CreateInProgress,
 				"createInProgress should be cleaned up after context cancellation")
-
-			// Verify pool can still operate at full capacity
-			item3 := mustGetItem(t, p)
-			require.NotNil(t, item3)
-
-			finalStats2 := p.Stats()
-			require.Equal(t, finalStats2.Index, 3,
+			require.Equal(t, 3, finalStats.Index,
 				"Pool should not exceed limit")
 		})
 	})

@@ -63,6 +63,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 
 	cc = newConn(endpoint, p,
 		withOnClose(p.remove),
+		withTrackLastUsage(p.config.ConnectionTTL() > 0),
 	)
 
 	p.conns.Set(endpoint.Key(), cc)
@@ -174,7 +175,7 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 			return
 		case <-ticker.Chan():
 			p.conns.Range(func(_ endpoint.Key, c *conn) bool {
-				if time.Since(c.LastUsage()) > ttl {
+				if t, err := c.LastUsage(); err == nil && time.Since(*t) > ttl {
 					switch c.GetState() {
 					case state.Online, state.Banned:
 						_ = c.park(ctx)

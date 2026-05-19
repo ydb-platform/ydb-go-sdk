@@ -1,9 +1,5 @@
 package trace
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 import (
 	"context"
 	"fmt"

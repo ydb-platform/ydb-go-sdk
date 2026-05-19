@@ -17,6 +17,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -498,6 +499,197 @@ func TestExecute(t *testing.T) {
 			_, err = readResultSet(xtest.Context(t), r)
 			require.ErrorIs(t, err, io.EOF)
 		})
+
+		// Regression test for https://github.com/ydb-platform/ydb-go-sdk/issues/2081.
+		//
+		// When the parent ctx is cancelled inside ExecuteQuery (simulating session
+		// expiry while the gRPC stream is still open), execute() must surface that
+		// cancellation as context.Canceled to the caller, regardless of whether the
+		// stream's Recv() is reached.
+		//
+		// Two paths can lead to context.Canceled, depending on how the
+		// context.AfterFunc that forwards the parent ctx to executeCtx races with
+		// execute() proceeding into newResult:
+		//   - the AfterFunc has already cancelled executeCtx by the time
+		//     nextPart() runs, so the ctx.Err() check at the top of nextPart()
+		//     returns context.Canceled without invoking Recv();
+		//   - the AfterFunc has not fired yet, nextPart() proceeds to Recv() and
+		//     the mock returns ctx.Err() (parent ctx is already cancelled).
+		// Either way the final error must be context.Canceled. The mock therefore
+		// allows Recv() any number of times - including zero - so the test stays
+		// deterministic across both paths.
+		t.Run("CancelParentContextAfterStreamOpen", func(t *testing.T) {
+			t.Run("idempotent=true", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				ctx, cancel := context.WithCancel(xtest.Context(t))
+
+				// Recv() may or may not be reached depending on the AfterFunc race
+				// described above; on either path it returns the parent ctx's
+				// cancellation error.
+				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+					return nil, ctx.Err()
+				}).AnyTimes()
+
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+						Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+					) {
+						// Simulate session expiry: canceling ctx closes ctx.Done() so that
+						// the non-blocking check in execute() fires after ExecuteQuery returns.
+						cancel()
+
+						return stream, nil
+					})
+
+				_, err := execute(xcontext.WithIdempotent(ctx, true),
+					"123", client, "", options.ExecuteSettings(),
+				)
+				require.Error(t, err)
+				require.ErrorIs(t, err, context.Canceled)
+			})
+			t.Run("idempotent=false", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				ctx, cancel := context.WithCancel(xtest.Context(t))
+
+				// Same race-tolerant expectation as the idempotent=true case:
+				// Recv() may be invoked zero or more times depending on whether
+				// the AfterFunc forwarding parent ctx → executeCtx fires before
+				// nextPart()'s ctx.Err() check.
+				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+					return nil, ctx.Err()
+				}).AnyTimes()
+
+				client := NewMockQueryServiceClient(ctrl)
+				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+						Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+					) {
+						// Simulate session expiry: canceling ctx closes ctx.Done() so that
+						// the non-blocking check in execute() fires after ExecuteQuery returns.
+						cancel()
+
+						return stream, nil
+					})
+
+				_, err := execute(ctx, // xcontext.WithIdempotent(ctx, false),
+					"123", client, "", options.ExecuteSettings(),
+				)
+				require.Error(t, err)
+				require.ErrorIs(t, err, context.Canceled)
+			})
+		})
+
+		// Verifies that canceling the ctx passed to nextPart unblocks a Recv
+		// that is already waiting on the wire. Without the per-call
+		// context.AfterFunc(ctx, streamCancel) installed by nextPart, Recv
+		// would block indefinitely until the server sends or ends the stream
+		// because executeCtx is decoupled from the caller's ctx after
+		// execute() returns (see CancelAfterExecute for the decoupling
+		// contract).
+		t.Run("CancelCallCtxUnblocksBlockedRecv", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			recvStarted := make(chan struct{})
+			var streamCtx context.Context
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			// First Recv() satisfies newResult() inside execute().
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+				ResultSetIndex: 0,
+				ResultSet:      &Ydb.ResultSet{},
+			}, nil)
+			// Second Recv() simulates a slow server: it blocks until the gRPC
+			// stream's ctx is cancelled and only then surfaces the cancellation,
+			// matching real gRPC behavior where Recv unblocks on stream ctx
+			// cancellation.
+			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+				close(recvStarted)
+				<-streamCtx.Done()
+
+				return nil, streamCtx.Err()
+			})
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(ctx context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+				) {
+					streamCtx = ctx
+
+					return stream, nil
+				})
+
+			r, err := execute(xtest.Context(t), "123", client, "", options.ExecuteSettings())
+			require.NoError(t, err)
+			defer func() {
+				_ = r.Close(context.Background())
+			}()
+
+			callCtx, callCancel := context.WithCancel(context.Background())
+			go func() {
+				<-recvStarted
+				callCancel()
+			}()
+
+			_, err = r.nextPart(callCtx)
+			require.ErrorIs(t, err, context.Canceled)
+		})
+	})
+}
+
+// TestNewResult_DecoupledExecuteCtx verifies the semantic contract that
+// newResult succeeds when passed executeCtx (derived from a cancelled parent
+// via xcontext.ValueOnly), which is exactly what execute() does after the fix
+// for https://github.com/ydb-platform/ydb-go-sdk/issues/2081.
+func TestNewResult_DecoupledExecuteCtx(t *testing.T) {
+	t.Run("CancelledParentCtxCausesImmediateError", func(t *testing.T) {
+		// With the parent ctx passed directly, a cancelled ctx makes newResult
+		// fail before it ever calls Recv(). This is the old (buggy) behavior
+		// that the fix addresses at the execute() call-site.
+		parentCtx, parentCancel := context.WithCancel(context.Background())
+		parentCancel()
+
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		// Recv must NOT be called — the cancelled ctx short-circuits newResult.
+
+		_, err := newResult(parentCtx, stream)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("DecoupledExecuteCtxSucceedsWhenParentCancelled", func(t *testing.T) {
+		// Create executeCtx exactly as execute() does: strip cancellation from
+		// parent via xcontext.ValueOnly, then add an independent cancel.
+		// Even though parentCtx is already cancelled, executeCtx is not — so
+		// newResult can proceed to Recv() and return the first response part.
+		parentCtx, parentCancel := context.WithCancel(context.Background())
+		parentCancel()
+
+		executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(parentCtx))
+		defer executeCancel()
+
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet:      &Ydb.ResultSet{},
+		}, nil)
+		stream.EXPECT().Recv().Return(nil, io.EOF)
+
+		r, err := newResult(executeCtx, stream)
+		require.NoError(t, err)
+		if r != nil {
+			r.Close(context.Background())
+		}
 	})
 }
 

@@ -11,9 +11,9 @@ require (
 	github.com/ydb-platform/gorm-driver v0.1.3
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.67.0
-	go.opentelemetry.io/otel v1.40.0
+	go.opentelemetry.io/otel v1.41.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.38.0
-	go.opentelemetry.io/otel/metric v1.40.0
+	go.opentelemetry.io/otel/metric v1.41.0
 	go.opentelemetry.io/otel/sdk v1.40.0
 	go.opentelemetry.io/otel/sdk/metric v1.40.0
 	golang.org/x/sync v0.19.0
@@ -46,7 +46,7 @@ require (
 	github.com/ydb-platform/ydb-go-yc v0.12.1 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel/trace v1.40.0 // indirect
+	go.opentelemetry.io/otel/trace v1.41.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect

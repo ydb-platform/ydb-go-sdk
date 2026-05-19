@@ -36,6 +36,7 @@ type executeSettings interface {
 	ConcurrentResultSets() bool
 	UserProvidedTxControl() bool
 	IssuesOpts() func([]*Ydb_Issue.IssueMessage)
+	ResponsePartPrefetch() int
 }
 
 type executeScriptConfig interface {
@@ -124,6 +125,8 @@ func execute(
 
 	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 
+	// AfterFunc propagates parent cancellation to executeCtx during ExecuteQuery,
+	// ensuring the gRPC call honors ctx's lifetime (e.g. user cancel, deadline).
 	stop := context.AfterFunc(ctx, executeCancel)
 	defer stop()
 
@@ -138,9 +141,19 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	r, err := newResult(ctx, stream, append(opts,
+	stream = wrapExecuteQueryStreamWithAsyncPrefetch(stream, settings.ResponsePartPrefetch())
+
+	// newResult must use executeCtx, not the parent ctx: parent ctx may already
+	// be done (e.g. session death) while the gRPC stream is still readable.
+	//
+	// withStreamCancel exposes executeCancel to nextPart so a Recv blocked
+	// waiting for the server can be unblocked from the caller's ctx via a
+	// per-call context.AfterFunc; withStreamResultOnClose ensures the same
+	// CancelFunc fires once when the user closes the streamResult.
+	r, err := newResult(executeCtx, stream, append(opts,
 		withStreamResultStatsCallback(settings.StatsCallback()),
 		withStreamResultOnClose(executeCancel),
+		withStreamCancel(executeCancel),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

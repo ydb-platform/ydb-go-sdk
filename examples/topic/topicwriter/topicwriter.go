@@ -1,3 +1,4 @@
+// Multi-partition writers: see topicwriter_to_many_partitions.go in this package.
 package topicwriter
 
 import (

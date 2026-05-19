@@ -31,12 +31,14 @@ import (
 )
 
 var (
-	errConnTimeout                                 = xerrors.Wrap(errors.New("ydb: connection timeout"))
-	errStopWriterReconnector                       = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	ErrNonZeroSeqNo                                = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode")) //nolint:lll
-	errNoAllowedCodecs                             = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
-	errLargeMessage                                = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))                                                                                                                                                                                             //nolint:lll
-	ErrPublicQueueIsFull                           = xerrors.Wrap(errors.New("ydb: queue is full"))                                                                                                                                                                                                                          // Deprecated.
+	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
+	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
+	ErrNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
+	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
+	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
+	ErrPublicQueueIsFull     = xerrors.Wrap(
+		errors.New("ydb: queue is full"),
+	)
 	ErrPublicMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 	errWritingByKeyNotSupported                    = xerrors.Wrap(errors.New("ydb: writing by key is not supported for single writer, use WithWriterPartitionByKey or WithPartitionByPartitionID options"))                                                                                                                  //nolint:lll
@@ -63,6 +65,12 @@ type WriterReconnectorConfig struct {
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 	OnAckReceivedCallback        func(seqNo int64)
 	MultiMode                    bool
+
+	// ErrOnQueueFull controls Write behavior when the internal message queue is full.
+	// false (default): Write blocks until queue space becomes available or ctx is cancelled.
+	// true: Write returns ErrPublicQueueIsFull immediately without blocking,
+	// allowing callers to implement back-pressure and avoid unbounded memory growth.
+	ErrOnQueueFull bool
 
 	MultiWriterConfig any
 	RetrySettings     topic.RetrySettings
@@ -255,6 +263,28 @@ func (w *WriterReconnector) validateWriteMessages(messages []PublicMessage) erro
 	return nil
 }
 
+// acquireQueueSpaceForWrite reserves capacity in the internal message queue for weight messages.
+// On success the caller must release the same weight with w.semaphore.Release (typically in defer).
+func (w *WriterReconnector) acquireQueueSpaceForWrite(ctx context.Context, weight int64) error {
+	if w.cfg.ErrOnQueueFull {
+		// Non-blocking path: fail fast with ErrPublicQueueIsFull when the queue has no room.
+		// This lets callers avoid unbounded memory growth and implement their own back-pressure.
+		if !w.semaphore.TryAcquire(weight) {
+			return xerrors.WithStackTrace(ErrPublicQueueIsFull)
+		}
+
+		return nil
+	}
+
+	if err := w.semaphore.Acquire(ctx, weight); err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("ydb: timeout waiting for queue space to become available: %w", err),
+		)
+	}
+
+	return nil
+}
+
 func (w *WriterReconnector) writePrepared(
 	ctx context.Context,
 	messageCount int,
@@ -272,10 +302,8 @@ func (w *WriterReconnector) writePrepared(
 	}
 
 	semaphoreWeight := int64(messageCount)
-	if err := w.semaphore.Acquire(ctx, semaphoreWeight); err != nil {
-		return xerrors.WithStackTrace(
-			fmt.Errorf("ydb: timeout waiting for queue space to become available: %w", err),
-		)
+	if err := w.acquireQueueSpaceForWrite(ctx, semaphoreWeight); err != nil {
+		return err
 	}
 	defer func() {
 		w.semaphore.Release(semaphoreWeight)

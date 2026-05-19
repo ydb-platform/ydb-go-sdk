@@ -411,7 +411,7 @@ func Example_scripting() {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"), //nolint:err113
-				retry.WithBackoff(retry.TypeNoBackoff),
+				retry.WithBackoff(retry.TypeInstant),
 			)
 		}
 		if !res.NextRow() {

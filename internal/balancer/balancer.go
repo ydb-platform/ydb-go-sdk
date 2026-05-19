@@ -2,7 +2,6 @@ package balancer
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -47,7 +46,7 @@ type streamWrapper struct {
 
 func (s *streamWrapper) SendMsg(m any) error {
 	err := s.ClientStream.SendMsg(m)
-	if err != nil && !errors.Is(err, io.EOF) {
+	if err != nil && !xerrors.Is(err, io.EOF) {
 		s.onErr(err)
 	}
 
@@ -56,7 +55,7 @@ func (s *streamWrapper) SendMsg(m any) error {
 
 func (s *streamWrapper) RecvMsg(m any) error {
 	err := s.ClientStream.RecvMsg(m)
-	if err != nil && !errors.Is(err, io.EOF) {
+	if err != nil && !xerrors.Is(err, io.EOF) {
 		s.onErr(err)
 	}
 

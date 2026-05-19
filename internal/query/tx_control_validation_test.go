@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -163,21 +164,23 @@ func TestClientQueryRowWithInvalidTxControl(t *testing.T) {
 	require.ErrorIs(t, err, query.ErrTxControlWithoutCommit)
 }
 
-func testClient(t *testing.T, client *MockQueryServiceClient) *Client {
+func testClient(_ *testing.T, client *MockQueryServiceClient) *Client {
 	return &Client{
 		config: config.New(),
 		client: client,
-		done:   make(chan struct{}),
 		explicitSessionPool: &mockSessionPool{
 			withFunc: func(ctx context.Context, f func(ctx context.Context, s *Session) error) error {
-				return f(ctx, &Session{})
+				return f(ctx, newTestSession("s-1"))
 			},
 		},
 		implicitSessionPool: &mockSessionPool{
 			withFunc: func(ctx context.Context, f func(ctx context.Context, s *Session) error) error {
-				return f(ctx, &Session{})
+				return f(ctx, newTestSession("s-2"))
 			},
 		},
+		closed: xsync.NewValue(&closeState{
+			cancels: make(map[uint64]context.CancelFunc),
+		}),
 	}
 }
 

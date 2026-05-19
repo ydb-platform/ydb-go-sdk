@@ -2,10 +2,10 @@ package sugar
 
 import (
 	"context"
-	"errors"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -20,7 +20,7 @@ type result struct {
 func (r *result) NextResultSet(ctx context.Context) bool {
 	var err error
 	r.rs, err = r.r.NextResultSet(ctx)
-	if err != nil && errors.Is(err, io.EOF) {
+	if err != nil && xerrors.Is(err, io.EOF) {
 		return false
 	}
 
@@ -34,7 +34,7 @@ func (r *result) NextRow() bool {
 
 	var err error
 	r.row, err = r.rs.NextRow(context.Background())
-	if err != nil && errors.Is(err, io.EOF) {
+	if err != nil && xerrors.Is(err, io.EOF) {
 		return false
 	}
 

@@ -63,6 +63,16 @@ func NewMultiWriter(
 }
 
 func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
+	if p.closed.Load() {
+		return ErrAlreadyClosed
+	}
+
+	// Same idea as WriterReconnector.waitFirstInitResponse: do not process writes until
+	// orchestrator init() finished (describe topic, seq baseline, partition chooser).
+	if err := p.orchestrator.waitInitDone(ctx); err != nil {
+		return err
+	}
+
 	for _, msg := range messages {
 		if err := p.orchestrator.pushMessage(ctx, message{
 			MessageWithDataContent: topicwritercommon.NewMessageDataWithContent(msg, p.encoders),
@@ -87,19 +97,26 @@ func (p *MultiWriter) Close(ctx context.Context) error {
 		_ = p.orchestrator.writerPool.close(ctx)
 	}()
 
-	if err := p.orchestrator.flush(ctx); err != nil {
-		return err
-	}
+	flushErr := p.orchestrator.flush(ctx)
 
 	p.orchestrator.stop()
-	if err := p.background.Close(ctx, nil); err != nil {
-		return err
+	backgroundErr := p.background.Close(ctx, nil)
+
+	if flushErr != nil {
+		return flushErr
+	}
+	if backgroundErr != nil {
+		return backgroundErr
 	}
 
 	return p.orchestrator.getResultErr()
 }
 
 func (p *MultiWriter) Flush(ctx context.Context) error {
+	if err := p.orchestrator.waitInitDone(ctx); err != nil {
+		return err
+	}
+
 	return p.orchestrator.flush(ctx)
 }
 

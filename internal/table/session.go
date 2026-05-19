@@ -151,9 +151,6 @@ func (e queryClientExecutor) execute(
 	request.StatsMode = statsModeToStatsMode(executeDataQueryRequest.GetCollectStats())
 	request.ConcurrentResultSets = false
 
-	ctx, cancel := xcontext.WithDone(xcontext.ValueOnly(ctx), e.core.Done())
-	defer cancel()
-
 	stream, err := e.client.ExecuteQuery(ctx, request, callOptions...)
 	if err != nil {
 		if status := query.StatusFromErr(err); status != query.StatusUnknown {
@@ -168,12 +165,10 @@ func (e queryClientExecutor) execute(
 
 func (e tableClientExecutor) execute(
 	ctx context.Context,
-	txControl *tx.Control,
+	_ *tx.Control,
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (*transaction, result.Result, error) {
-	request.TxControl = txControl.ToYdbTableTransactionControl()
-
 	r, err := executeDataQuery(ctx, e.client, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)

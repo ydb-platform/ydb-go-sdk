@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
@@ -176,6 +177,80 @@ func TestTopicWriterTLI(t *testing.T) {
 	scope.Require.Equal("test", string(content))
 }
 
+// TestTopicTransactionalWriterWithLazyTx exercises transactional topic writes when the query transaction is lazy
+// (`query.WithLazyTx(true)`). Without materializing the transaction before the topic stream sends the tx id, YDB
+// returns `Transaction not found: LAZY_TX` on the topic writer receive path.
+func TestTopicTransactionalWriterWithLazyTx(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	reader := scope.TopicReader()
+
+	const payload = "lazy-tx-writer"
+	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		writer, err := db.Topic().StartTransactionalWriter(tx, scope.TopicPath(),
+			topicoptions.WithWriterWaitServerAck(true))
+		if err != nil {
+			return fmt.Errorf("start transactional writer: %w", err)
+		}
+
+		err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(payload)})
+		if err != nil {
+			return fmt.Errorf("write message: %w", err)
+		}
+
+		return nil
+	}, query.WithLazyTx(true))
+	require.NoError(t, err)
+
+	batch, err := reader.ReadMessagesBatch(ctx)
+	require.NoError(t, err)
+	require.Len(t, batch.Messages, 1)
+	content, err := io.ReadAll(batch.Messages[0])
+	require.NoError(t, err)
+	require.Equal(t, payload, string(content))
+}
+
+// TestTopicTransactionalMultiWriterWithLazyTx uses StartTransactionalWriter with
+// topicoptions.WithWriteToManyPartitions (internal multi-writer) together with lazy query transactions.
+func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	reader := scope.TopicReader()
+
+	const payload = "lazy-tx-multi-writer"
+	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		writer, err := db.Topic().StartTransactionalWriter(tx, scope.TopicPath(),
+			topicoptions.WithWriterWaitServerAck(true),
+			topicoptions.WithWriteToManyPartitions(
+				topicoptions.WithProducerIDPrefix("lazy-tx-multi"),
+			),
+		)
+		if err != nil {
+			return fmt.Errorf("start transactional writer: %w", err)
+		}
+
+		err = writer.Write(ctx, topicwriter.Message{
+			Data: strings.NewReader(payload),
+			Key:  "abc",
+		})
+		if err != nil {
+			return fmt.Errorf("write message: %w", err)
+		}
+
+		return nil
+	}, query.WithLazyTx(true))
+	require.NoError(t, err)
+
+	batch, err := reader.ReadMessagesBatch(ctx)
+	require.NoError(t, err)
+	require.Len(t, batch.Messages, 1)
+	content, err := io.ReadAll(batch.Messages[0])
+	require.NoError(t, err)
+	require.Equal(t, payload, string(content))
+}
+
 func TestWriteInTransaction(t *testing.T) {
 	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
 		t.Skip("require enables transactions for topics")
@@ -241,6 +316,118 @@ func TestWriteInTransaction(t *testing.T) {
 				}
 
 				require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(strconv.Itoa(transactionsCount))}))
+				return testErr
+			})
+			require.ErrorIs(t, err, testErr)
+			transactionsCount++
+			if time.Now().After(deadline) {
+				break
+			}
+		}
+
+		protectCtx, cancel = context.WithTimeout(scope.Ctx, time.Millisecond*10)
+		defer cancel()
+
+		mess, err := reader.ReadMessage(protectCtx)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		_ = mess
+		t.Logf("transactions count: %v", transactionsCount)
+	})
+}
+
+func TestWriteInTransactionMultiWriter(t *testing.T) {
+	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
+		t.Skip("require enables transactions for topics")
+	}
+
+	// Single stable key routes all messages to one partition so read order matches TestWriteInTransaction.
+	const stablePartitionKey = "stable-partition-key-for-tx-order"
+
+	t.Run("OK", func(t *testing.T) {
+		scope := newScope(t)
+		reader := scope.TopicReader()
+
+		driver := scope.DriverWithGRPCLogging()
+
+		const writeTime = time.Second
+		protectCtx, cancel := context.WithTimeout(scope.Ctx, writeTime*10)
+		defer cancel()
+
+		deadline := time.Now().Add(writeTime)
+		transactionsCount := 0
+		for {
+			err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+				writer, err := driver.Topic().StartTransactionalWriter(
+					tx,
+					scope.TopicPath(),
+					topicoptions.WithWriterSetAutoSeqNo(true),
+					topicoptions.WithWriteToManyPartitions(
+						topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+						topicoptions.WithProducerIDPrefix("tx-multiwriter-ok"),
+					),
+				)
+				if err != nil {
+					return err
+				}
+
+				return writer.Write(ctx, topicwriter.Message{
+					Data: strings.NewReader(strconv.Itoa(transactionsCount)),
+					Key:  stablePartitionKey,
+				})
+			})
+			require.NoError(t, err)
+			transactionsCount++
+			if time.Now().After(deadline) {
+				break
+			}
+		}
+
+		for i := 0; i < transactionsCount; i++ {
+			mess, err := reader.ReadMessage(protectCtx)
+			require.NoError(t, err)
+
+			contentBytes, _ := io.ReadAll(mess)
+			content := string(contentBytes)
+			require.Equal(t, strconv.Itoa(i), content)
+		}
+		t.Logf("transactions count: %v", transactionsCount)
+	})
+
+	t.Run("Rollback", func(t *testing.T) {
+		scope := newScope(t)
+		reader := scope.TopicReader()
+
+		driver := scope.Driver()
+
+		const writeTime = time.Second
+		protectCtx, cancel := context.WithTimeout(scope.Ctx, writeTime*10)
+		defer cancel()
+
+		deadline := time.Now().Add(writeTime)
+		transactionsCount := 0
+		testErr := errors.New("test")
+		for {
+			err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
+				writer, err := driver.Topic().StartTransactionalWriter(
+					tx,
+					scope.TopicPath(),
+					topicoptions.WithWriterSetAutoSeqNo(true),
+					topicoptions.WithWriteToManyPartitions(
+						topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+						topicoptions.WithProducerIDPrefix("tx-multiwriter-rollback"),
+					),
+				)
+				if err != nil {
+					return err
+				}
+
+				require.NoError(t, writer.WaitInit(ctx))
+
+				require.NoError(t, writer.Write(ctx, topicwriter.Message{
+					Data: strings.NewReader(strconv.Itoa(transactionsCount)),
+					Key:  stablePartitionKey,
+				}))
+				time.Sleep(time.Second * 3)
 				return testErr
 			})
 			require.ErrorIs(t, err, testErr)
