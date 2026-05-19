@@ -616,7 +616,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("WhenWaiting", func(t *testing.T) {
 			const timeout = time.Second
 
-			waitPoolClosed := func(t *testing.T, ch <-chan error) {
+			waitPoolClosed := func(t testing.TB, ch <-chan error) {
 				t.Helper()
 				select {
 				case err := <-ch:
@@ -757,36 +757,42 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				waitPoolClosed(t, closed)
 			})
 			t.Run("CloseWhileWithInCallback", func(t *testing.T) {
-				// pool.Close waits until an in-flight pool.With releases its slot.
-				ctx := t.Context()
-				p := mustNewPool[*testItem, testItem](t,
-					WithLimit[*testItem, testItem](1),
-					WithTrace[*testItem, testItem](defaultTrace),
-				)
-				requirePoolStats(t, p, poolStats(1, nil))
+				xtest.TestManyTimes(t, func(t testing.TB) {
+					// pool.Close waits until an in-flight pool.With releases its slot.
+					ctx := t.Context()
+					p := mustNewPool[*testItem, testItem](t,
+						WithLimit[*testItem, testItem](1),
+						WithTrace[*testItem, testItem](defaultTrace),
+					)
+					requirePoolStats(t, p, poolStats(1, nil))
 
-				release := make(chan struct{})
-				ready := make(chan struct{})
-				closed := make(chan error, 1)
+					release := make(chan struct{})
+					ready := make(chan struct{})
+					closed := make(chan error, 1)
+					withDone := make(chan struct{})
 
-				go func() {
-					_ = holdInWith(ctx, p, ready, release)
-				}()
-				<-ready
+					go func() {
+						defer close(withDone)
+						_ = holdInWith(ctx, p, ready, release)
+					}()
+					<-ready
 
-				go func() {
-					closed <- p.Close(ctx)
-				}()
+					go func() {
+						closed <- p.Close(ctx)
+					}()
 
-				select {
-				case <-closed:
-					t.Fatal("pool.Close returned before active pool.With released its slot")
-				case <-time.After(50 * time.Millisecond):
-				}
+					select {
+					case <-closed:
+						t.Fatal("pool.Close returned before active pool.With released its slot")
+					case <-time.After(50 * time.Millisecond):
+					}
 
-				close(release)
-				waitPoolClosed(t, closed)
-				requirePoolStats(t, p, poolStats(1, nil))
+					close(release)
+					waitPoolClosed(t, closed)
+					// Close waits for sema only; Concurrency is decremented in With defer after try returns.
+					<-withDone
+					requirePoolStats(t, p, poolStats(1, nil))
+				})
 			})
 
 			t.Run("NoSendOnClosedSemaphore", func(t *testing.T) {
