@@ -17,7 +17,7 @@ var (
 	errPoolIsOverflow    = errors.New("pool is overflow")
 	errNoProgress        = errors.New("no progress")
 	errNothingIdleItems  = xerrors.Retryable(
-		errors.New("nothing idle items"),
+		errors.New("no idle items"),
 		xerrors.WithBackoff(backoff.TypeFast),
 	)
 	errNilItem = xerrors.Retryable(
