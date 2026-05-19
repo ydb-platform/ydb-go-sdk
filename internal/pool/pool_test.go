@@ -626,7 +626,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				}
 			}
 
-			waitWithClosed := func(t *testing.T, ch <-chan error) {
+			waitWithClosed := func(t testing.TB, ch <-chan error) {
 				t.Helper()
 				select {
 				case err := <-ch:
@@ -707,54 +707,66 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			})
 
 			t.Run("CloseWhileTryBeforeSemaphoreAcquire", func(t *testing.T) {
-				// pool.With entered try (OnTry fired) but has not taken a semaphore slot yet;
-				// analog of the old "racy" wait-queue registration case.
-				ctx := t.Context()
-				tryStarted := make(chan struct{})
-				trace := *defaultTrace
-				trace.OnTry = func(ctx *context.Context, call stack.Caller) func(err error) {
-					select {
-					case tryStarted <- struct{}{}:
-					default:
+				xtest.TestManyTimes(t, func(t testing.TB) {
+					// pool.With entered try (OnTry fired) but has not taken a semaphore slot yet;
+					// analog of the old "racy" wait-queue registration case.
+					ctx := t.Context()
+					tryStarted := make(chan struct{}, 1)
+					var tryCalls atomic.Int32
+					trace := *defaultTrace
+					trace.OnTry = func(ctx *context.Context, call stack.Caller) func(err error) {
+						// Signal only when the third With enters try (two holders already did).
+						if tryCalls.Add(1) == 3 {
+							tryStarted <- struct{}{}
+						}
+
+						return func(err error) {}
 					}
 
-					return func(err error) {}
-				}
+					p := mustNewPool[*testItem, testItem](t,
+						WithLimit[*testItem, testItem](2),
+						WithTrace[*testItem, testItem](&trace),
+					)
+					requirePoolStats(t, p, poolStats(2, nil))
 
-				p := mustNewPool[*testItem, testItem](t,
-					WithLimit[*testItem, testItem](2),
-					WithTrace[*testItem, testItem](&trace),
-				)
-				requirePoolStats(t, p, poolStats(2, nil))
+					release1 := make(chan struct{})
+					release2 := make(chan struct{})
+					ready1 := make(chan struct{})
+					ready2 := make(chan struct{})
 
-				release1 := make(chan struct{})
-				release2 := make(chan struct{})
-				ready1 := make(chan struct{})
-				ready2 := make(chan struct{})
+					var holders sync.WaitGroup
+					holders.Add(2)
+					go func() {
+						defer holders.Done()
+						_ = holdInWith(ctx, p, ready1, release1)
+					}()
+					go func() {
+						defer holders.Done()
+						_ = holdInWith(ctx, p, ready2, release2)
+					}()
+					<-ready1
+					<-ready2
 
-				go func() { _ = holdInWith(ctx, p, ready1, release1) }()
-				go func() { _ = holdInWith(ctx, p, ready2, release2) }()
-				<-ready1
-				<-ready2
+					waiting := make(chan error, 1)
+					go func() {
+						waiting <- p.With(ctx, func(context.Context, *testItem) error {
+							return nil
+						})
+					}()
+					<-tryStarted
 
-				waiting := make(chan error, 1)
-				go func() {
-					waiting <- p.With(ctx, func(context.Context, *testItem) error {
-						return nil
-					})
-				}()
-				<-tryStarted
+					closed := make(chan error, 1)
+					go func() {
+						closed <- p.Close(ctx)
+					}()
 
-				closed := make(chan error, 1)
-				go func() {
-					closed <- p.Close(ctx)
-				}()
+					waitWithClosed(t, waiting)
 
-				waitWithClosed(t, waiting)
-
-				close(release1)
-				close(release2)
-				waitPoolClosed(t, closed)
+					close(release1)
+					close(release2)
+					holders.Wait()
+					waitPoolClosed(t, closed)
+				}, xtest.StopAfter(time.Minute))
 			})
 			t.Run("CloseWhileWithInCallback", func(t *testing.T) {
 				xtest.TestManyTimes(t, func(t testing.TB) {
