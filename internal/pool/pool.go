@@ -240,16 +240,21 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 }
 
 // createItem wraps Config.createItemFunc with pool-controlled context handling.
+// createItem called only under p.sema lock
 //
 // Caller context values are preserved, but caller cancellation and deadlines are
 // not propagated. Creation is canceled when the pool is done, and
 // Config.createTimeout is applied when configured.
 func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats) (PT, error) {
-	p.applyBatchStats(&dynamicStats{
-		CreateInProgress: 1,
+	p.stats.Change(func(old dynamicStats) dynamicStats {
+		old.CreateInProgress++
+
+		return old
 	})
-	defer p.applyBatchStats(&dynamicStats{
-		CreateInProgress: -1,
+	defer p.stats.Change(func(old dynamicStats) dynamicStats {
+		old.CreateInProgress--
+
+		return old
 	})
 
 	createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
@@ -260,9 +265,13 @@ func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats
 		defer cancelCreate()
 	}
 
+	start := p.config.clock.Now()
 	item, err := p.config.createItemFunc(createCtx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create item for %0.2f seconds: %w",
+			p.config.clock.Since(start).Seconds(),
+			err,
+		)
 	}
 
 	if item == nil {
@@ -275,6 +284,7 @@ func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats
 }
 
 // closeItem wraps the Config.closeItemFunc function with timeout handling
+// createItem called only under p.sema lock
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dynamicStats) {
 	defer func() {
 		if batchChanges != nil {
@@ -557,6 +567,9 @@ func needCloseItemByIdleTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info 
 }
 
 func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
+	if !info.item.IsAlive() {
+		return true
+	}
 	if needCloseItemByMaxUsage(c, info) {
 		return true
 	}
@@ -629,14 +642,14 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 	for range 2 {
 		info, err := p.popItem(nodeID, hasPreferredNodeID, batchChanges)
 		if err != nil {
-			if xerrors.Is(err, errNothingIdleItems) {
-				break
-			}
+			break
 		} else {
-			if info.item.IsAlive() && !needCloseItem(p.config, info) {
+			switch {
+			case needCloseItem(p.config, info):
+				p.closeItem(ctx, info.item, batchChanges)
+			default:
 				return info, nil
 			}
-			p.closeItem(ctx, info.item, batchChanges)
 		}
 	}
 
@@ -678,6 +691,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 	}, nil
 }
 
+// putItem called only under p.sema lock
 func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchChanges *dynamicStats) (finalErr error) {
 	if onPut := p.config.trace.OnPut; onPut != nil {
 		onDone := onPut(&ctx,
