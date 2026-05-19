@@ -643,13 +643,13 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		info, err := p.popItem(nodeID, hasPreferredNodeID, batchChanges)
 		if err != nil {
 			break
-		} else {
-			switch {
-			case needCloseItem(p.config, info):
-				p.closeItem(ctx, info.item, batchChanges)
-			default:
-				return info, nil
-			}
+		}
+
+		switch {
+		case needCloseItem(p.config, info):
+			p.closeItem(ctx, info.item, batchChanges)
+		default:
+			return info, nil
 		}
 	}
 
