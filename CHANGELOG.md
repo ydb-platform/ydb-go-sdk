@@ -1,3 +1,5 @@
+* Fixed YSON scanning in `TableService` to support both underlying types `TextValue` and `BytesValue`
+
 ## v3.137.0
 * Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a partition session on the reader
 
