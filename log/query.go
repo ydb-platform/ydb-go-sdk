@@ -210,7 +210,7 @@ func internalQuery(
 			}
 		},
 		OnPoolChange: func(info trace.QueryPoolChange) {
-			if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
+			if d.Details()&trace.QueryPoolEvents == 0 {
 				return
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "query", "pool", "state", "change")
