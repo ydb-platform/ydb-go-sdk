@@ -14,6 +14,7 @@ func table(config Config) (t trace.Table) {
 	session := config.WithSystem("session")
 	config = config.WithSystem("pool")
 	limit := config.GaugeVec("limit")
+	index := config.GaugeVec("index")
 	concurrency := config.GaugeVec("concurrency")
 	idle := config.GaugeVec("idle")
 	wait := config.GaugeVec("wait")
@@ -87,6 +88,7 @@ func table(config Config) (t trace.Table) {
 	t.OnPoolStateChange = func(info trace.TablePoolStateChangeInfo) {
 		if config.Details()&trace.TablePoolEvents != 0 {
 			limit.With(nil).Set(float64(info.Limit))
+			index.With(nil).Set(float64(info.Size))
 			concurrency.With(nil).Set(float64(info.Concurrency))
 			idle.With(nil).Set(float64(info.Idle))
 			wait.With(nil).Set(func() float64 {
@@ -96,8 +98,8 @@ func table(config Config) (t trace.Table) {
 
 				return 0
 			}())
-			inUse.With(nil).Set(float64(info.Size - info.Idle))
 			createInProgress.With(nil).Set(float64(info.CreateInProgress))
+			inUse.With(nil).Set(float64(info.Size - info.Idle))
 		}
 	}
 	{
