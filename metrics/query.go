@@ -57,7 +57,7 @@ func query(config Config) (t trace.Query) {
 			limit := sizeConfig.GaugeVec("limit")
 			idle := sizeConfig.GaugeVec("idle")
 			index := sizeConfig.GaugeVec("index")
-			wait := sizeConfig.GaugeVec("waiter_queue")
+			wait := sizeConfig.GaugeVec("waiters_queue")
 			inUse := sizeConfig.GaugeVec("in_use")
 			concurrency := sizeConfig.GaugeVec("concurrency")
 			createInProgress := sizeConfig.GaugeVec("create_in_progress")
