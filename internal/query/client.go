@@ -788,22 +788,11 @@ func newWithQueryServiceClient(ctx context.Context,
 		}),
 		pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
-			var (
-				createCtx    context.Context
-				cancelCreate context.CancelFunc
-			)
-			if d := cfg.SessionCreateTimeout(); d > 0 {
-				createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
-			} else {
-				createCtx, cancelCreate = xcontext.WithCancel(ctx)
-			}
-			defer cancelCreate()
-
 			if !cfg.DisableSessionBalancer() {
-				createCtx = meta.WithAllowFeatures(createCtx, meta.HintSessionBalancer)
+				ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
 			}
 
-			s, err := createSession(createCtx, client,
+			s, err := createSession(ctx, client,
 				WithConn(cc),
 				WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 				WithRegisterCloseCancel(c.registerCloseCancel),
