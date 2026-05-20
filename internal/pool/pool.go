@@ -726,9 +726,7 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchC
 			return err
 		}
 
-		if info != nil {
-			batchChanges.Idle++
-		}
+		batchChanges.Idle++
 
 		return nil
 	}
