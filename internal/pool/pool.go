@@ -624,6 +624,8 @@ func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool, batchChanges *dynam
 func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (info *itemInfo[PT, T], finalErr error) {
 	nodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
+	var attempts int
+
 	if onGet := p.config.trace.OnGet; onGet != nil {
 		onDone := onGet(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).getItem"),
@@ -634,12 +636,14 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 				if info != nil {
 					item = info.item
 				}
-				onDone(item, getNodeHintInfo(item, nodeID, hasPreferredNodeID, finalErr), finalErr)
+				onDone(item, getNodeHintInfo(item, nodeID, hasPreferredNodeID, finalErr), attempts, finalErr)
 			}()
 		}
 	}
 
 	for range 2 {
+		attempts++
+
 		info, err := p.popItem(nodeID, hasPreferredNodeID, batchChanges)
 		if err != nil {
 			break
@@ -666,6 +670,8 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 			p.closeItem(ctx, info.item, batchChanges)
 		}
 	}
+
+	attempts++
 
 	// create item after two fails
 	item, err := p.createItem(ctx, batchChanges)

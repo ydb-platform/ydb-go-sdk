@@ -17,6 +17,7 @@ type (
 		OnGet   func(ctx *context.Context, call stack.Caller) func(
 			item any,
 			nodeHintInfo *trace.NodeHintInfo,
+			attempts int,
 			err error,
 		)
 		onWait   func() func(item any, err error)

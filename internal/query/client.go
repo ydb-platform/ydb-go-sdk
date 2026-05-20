@@ -876,12 +876,13 @@ func poolTrace(t *trace.Query) *pool.Trace {
 		OnGet: func(ctx *context.Context, call stack.Caller) func(
 			item any,
 			hint *trace.NodeHintInfo,
+			attempts int,
 			err error,
 		) {
 			onDone := trace.QueryOnPoolGet(t, ctx, call)
 
-			return func(item any, hint *trace.NodeHintInfo, err error) {
-				onDone(item.(*Session), hint, err) //nolint:forcetypeassert
+			return func(item any, hint *trace.NodeHintInfo, attempts int, err error) {
+				onDone(item.(*Session), hint, attempts, err) //nolint:forcetypeassert
 			}
 		},
 		OnChange: func(stats pool.Stats) {

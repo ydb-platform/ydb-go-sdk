@@ -592,10 +592,12 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						kv.Latency(start),
 						kv.String("id", session.ID()),
 						kv.String("status", session.Status()),
+						kv.Int("attempts", info.Attempts),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
 						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
@@ -610,6 +612,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			l.Log(WithLevel(ctx, DEBUG), "table session pool state changed",
 				kv.Int("limit", info.Limit),
 				kv.Int("idle", info.Idle),
+				kv.Int("wait", func() int {
+					if info.Concurrency > info.Limit {
+						return info.Concurrency - info.Limit
+					}
+
+					return 0
+				}()),
 				kv.Int("concurrency", info.Concurrency),
 				kv.Int("create_in_progress", info.CreateInProgress),
 			)

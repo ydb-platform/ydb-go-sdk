@@ -394,11 +394,8 @@ type (
 	TablePoolGetDoneInfo struct {
 		Session      sessionInfo
 		NodeHintInfo *NodeHintInfo
+		Attempts     int
 		Error        error
-
-		// Deprecated: will be removed after November 2026.
-		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-		Attempts int
 	}
 	// Deprecated
 	// Will be removed after March 2025.

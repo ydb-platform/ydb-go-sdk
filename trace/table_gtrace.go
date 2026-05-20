@@ -1517,15 +1517,16 @@ func TableOnPoolPut(t *Table, c *context.Context, call call, session sessionInfo
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TableOnPoolGet(t *Table, c *context.Context, call call) func(session sessionInfo, _ *NodeHintInfo, _ error) {
+func TableOnPoolGet(t *Table, c *context.Context, call call) func(session sessionInfo, _ *NodeHintInfo, attempts int, _ error) {
 	var p TablePoolGetStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onPoolGet(p)
-	return func(session sessionInfo, n *NodeHintInfo, e error) {
+	return func(session sessionInfo, n *NodeHintInfo, attempts int, e error) {
 		var p TablePoolGetDoneInfo
 		p.Session = session
 		p.NodeHintInfo = n
+		p.Attempts = attempts
 		p.Error = e
 		res(p)
 	}

@@ -445,6 +445,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 				finish(
 					start,
 					info.Error,
+					kv.Int("attempts", info.Attempts),
 					kv.String("status", safeStatus(info.Session)),
 					kv.String("node_id", nodeID(safeID(info.Session))),
 					kv.String("session_id", safeID(info.Session)),

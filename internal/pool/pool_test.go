@@ -70,9 +70,10 @@ var defaultTrace = &Trace{
 	OnGet: func(ctx *context.Context, call stack.Caller) func(
 		info any,
 		nodeHintInfo *trace.NodeHintInfo,
+		attempts int,
 		err error,
 	) {
-		return func(info any, nodeHintInfo *trace.NodeHintInfo, err error) {
+		return func(info any, nodeHintInfo *trace.NodeHintInfo, attempts int, err error) {
 		}
 	},
 	onWait: func() func(info any, err error) {
@@ -223,9 +224,10 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				hintTrace.OnGet = func(ctx *context.Context, call stack.Caller) func(
 					info any,
 					nodeHintInfo *trace.NodeHintInfo,
+					attempts int,
 					err error,
 				) {
-					return func(info any, nodeHintInfo *trace.NodeHintInfo, err error) {
+					return func(info any, nodeHintInfo *trace.NodeHintInfo, attempts int, err error) {
 						if nodeHintInfo != nil {
 							preferredID = nodeHintInfo.PreferredNodeID
 						}

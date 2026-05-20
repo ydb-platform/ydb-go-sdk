@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
@@ -191,6 +192,7 @@ func internalQuery(
 			return func(info trace.QueryPoolGetDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "query pool get done",
+						kv.Int("attempts", info.Attempts),
 						kv.Latency(start),
 					)
 				} else {
@@ -200,11 +202,31 @@ func internalQuery(
 					}
 					l.Log(WithLevel(ctx, lvl), "query pool get failed",
 						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
 				}
 			}
+		},
+		OnPoolChange: func(info trace.QueryPoolChange) {
+			if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
+				return
+			}
+			ctx := with(context.Background(), TRACE, "ydb", "query", "pool", "state", "change")
+			l.Log(WithLevel(ctx, DEBUG), "query session pool state changed",
+				kv.Int("limit", info.Limit),
+				kv.Int("idle", info.Idle),
+				kv.Int("wait", func() int {
+					if info.Concurrency > info.Limit {
+						return info.Concurrency - info.Limit
+					}
+
+					return 0
+				}()),
+				kv.Int("concurrency", info.Concurrency),
+				kv.Int("create_in_progress", info.CreateInProgress),
+			)
 		},
 		OnDo: func(info trace.QueryDoStartInfo) func(trace.QueryDoDoneInfo) {
 			if d.Details()&trace.QueryEvents == 0 {

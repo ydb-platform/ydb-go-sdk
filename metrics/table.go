@@ -16,6 +16,8 @@ func table(config Config) (t trace.Table) {
 	limit := config.GaugeVec("limit")
 	concurrency := config.GaugeVec("concurrency")
 	idle := config.GaugeVec("idle")
+	wait := config.GaugeVec("wait")
+	inUse := config.GaugeVec("in_use")
 	createInProgress := config.GaugeVec("createInProgress")
 	get := config.CounterVec("get")
 	put := config.CounterVec("put")
@@ -87,6 +89,14 @@ func table(config Config) (t trace.Table) {
 			limit.With(nil).Set(float64(info.Limit))
 			concurrency.With(nil).Set(float64(info.Concurrency))
 			idle.With(nil).Set(float64(info.Idle))
+			wait.With(nil).Set(func() float64 {
+				if info.Concurrency > info.Limit {
+					return float64(info.Concurrency - info.Limit)
+				}
+
+				return 0
+			}())
+			inUse.With(nil).Set(float64(info.Size - info.Idle))
 			createInProgress.With(nil).Set(float64(info.CreateInProgress))
 		}
 	}

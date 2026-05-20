@@ -1,17 +1,16 @@
 * Reworked the internal table/query session pool ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163)):
   * semaphore-based concurrency limit instead of an internal wait queue and `index` map;
-  * synchronous session creation in the caller goroutine (no background create goroutine per slot);
-  * batched pool statistics updates during `With` to reduce CPU overhead under load
-* **Session reuse (behavior):** idle sessions are taken in LIFO order (most recently returned first). Previously the idle list behaved as FIFO. With `PreferredNodeID`, matching idle sessions are also picked from the end of the idle list (same LIFO semantics)
-* **Pool saturation (behavior):** when the pool limit is reached, `table.Do` / query pool `With` block on a semaphore until a slot is released, instead of registering on an internal wait queue. `errPoolIsOverflow` is no longer returned from the pool; `trace.Table.OnPoolWait` callbacks are no longer invoked (the hook remains in the trace API but is unused by the pool)
+  * synchronous session creation in the caller goroutine (no background create goroutine per session slot);
+  * pool statistics are updated less frequently after finishing `internal.Pool.With` call to reduce CPU overhead
+* **Session pool behavior:**
+  * `FIFO` semantics replaced to `LIFO` semantics (read about `LIFO` advantages in [article](https://habr.com/ru/companies/ydb/articles/978444/))
+  * when the pool limit is reached, sessions pool block on a semaphore until a slot is released, instead of registering on an internal wait queue 
+  * `errPoolIsOverflow` is no longer returned from the pool. Client can receive only context errors if context is done and pool cannot get session for work  
+  * `trace.Table.OnPoolWait` callbacks are no longer invoked (the hook remains in the trace API but is unused by the pool)
 * Added **`WithSessionPoolWarmUpSessions`** driver option: at driver initialization, pre-creates up to `N` sessions in the table client pool and the query **explicit** session pool (`N > 0`; `N <= 0` disables warm-up; default is no warm-up). The configured `N` is stored in pool stats as `WarmUp`; the number of sessions actually created is `min(N, pool limit)`. Driver initialization fails if warm-up session creation fails
-* **Deprecated:** `WithSessionPoolKeepAliveMinSize` is a no-op (removal planned Nov 2026); use `WithSessionPoolWarmUpSessions` instead
 * **Trace/metrics (breaking for custom handlers):**
-  * `TablePoolStateChangeInfo` / `QueryPoolChange`: `Concurrency` (active `With` calls) replaces `Index` and `Wait`
-  * `TablePoolGetDoneInfo` / `QueryPoolGetDoneInfo`: `Attempts` removed
-  * Table pool metrics: gauge `concurrency` replaces `index` and `wait`
-  * Query pool metrics: gauge `concurrency` replaces `index`, `waiters_queue`, and derived `in_use`
-  * Table pool state change logs: `concurrency` replaces `index` / `wait`
+  * Added to `trace.{TablePoolStateChangeInfo,QueryPoolChange}` field `Concurrency`
+  * Marked as deprecated fields `Index` and `Wait` in `trace.{TablePoolStateChangeInfo,QueryPoolChange}`  
 
 ## v3.137.0
 * Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a partition session on the reader
