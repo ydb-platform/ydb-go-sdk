@@ -393,8 +393,8 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolGetDoneInfo struct {
 		Session      sessionInfo
-		NodeHintInfo *NodeHintInfo
 		Attempts     int
+		NodeHintInfo *NodeHintInfo
 		Error        error
 	}
 	// Deprecated

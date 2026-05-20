@@ -588,8 +588,8 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryPoolGetDoneInfo struct {
 		Session      sessionInfo
-		NodeHintInfo *NodeHintInfo
 		Attempts     int
+		NodeHintInfo *NodeHintInfo
 		Error        error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -603,5 +603,8 @@ type (
 		// Deprecated: will be removed after November 2026.
 		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 		Index int
+		// Deprecated: will be removed after November 2026.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		Wait int
 	}
 )
