@@ -57,7 +57,10 @@ func (items *sliceContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 		return nil, errNothingIdleItems
 	}
 
-	info, items.data = items.data[len(items.data)-1], items.data[:len(items.data)-1]
+	last := len(items.data) - 1
+	info = items.data[last]
+	items.data[last] = nil
+	items.data = items.data[:last]
 
 	return info, nil
 }
@@ -71,12 +74,17 @@ func (items *sliceContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT, T]
 	}
 
 	for i := len(items.data) - 1; i >= 0; i-- {
-		info := items.data[i]
-		if info.item.NodeID() == nodeID {
-			items.data = append(items.data[:i], items.data[i+1:]...)
-
-			return info, nil
+		if items.data[i].item.NodeID() != nodeID {
+			continue
 		}
+
+		last := len(items.data) - 1
+		info := items.data[i]
+		copy(items.data[i:], items.data[i+1:])
+		items.data[last] = nil
+		items.data = items.data[:last]
+
+		return info, nil
 	}
 
 	return nil, errNothingIdleItems
