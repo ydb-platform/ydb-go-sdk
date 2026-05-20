@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -1910,4 +1912,639 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			})
 		})
 	})
+}
+
+func TestWarmUp(t *testing.T) {
+	t.Run("DisabledByDefault", func(t *testing.T) {
+		var created atomic.Int32
+
+		p := mustNewPool[*testItem, testItem](t,
+			WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				created.Add(1)
+
+				return &testItem{}, nil
+			}),
+		)
+
+		requirePoolStats(t, p, poolStats(DefaultLimit, nil))
+		require.Equal(t, int32(0), created.Load())
+	})
+
+	t.Run("PreCreatesItems", func(t *testing.T) {
+		const warmUpSize = 3
+
+		var created atomic.Int32
+
+		p := mustNewPool[*testItem, testItem](t,
+			WithLimit[*testItem, testItem](10),
+			WithWarmUpItems[*testItem, testItem](warmUpSize),
+			WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				created.Add(1)
+
+				return &testItem{v: created.Load()}, nil
+			}),
+		)
+
+		requirePoolStats(t, p, poolStats(10, func(s *Stats) {
+			s.WarmUp = warmUpSize
+			s.Size = warmUpSize
+			s.Idle = warmUpSize
+		}))
+		require.Equal(t, int32(warmUpSize), created.Load())
+	})
+
+	t.Run("CappedByLimit", func(t *testing.T) {
+		const (
+			limit      = 2
+			warmUpSize = 5
+		)
+
+		var created atomic.Int32
+
+		p := mustNewPool[*testItem, testItem](t,
+			WithLimit[*testItem, testItem](limit),
+			WithWarmUpItems[*testItem, testItem](warmUpSize),
+			WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				created.Add(1)
+
+				return &testItem{}, nil
+			}),
+		)
+
+		requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+			s.WarmUp = warmUpSize
+			s.Size = limit
+			s.Idle = limit
+		}))
+		require.Equal(t, int32(limit), created.Load())
+	})
+
+	t.Run("CreateErrorFailsNew", func(t *testing.T) {
+		createErr := errors.New("warm-up create failed")
+
+		_, err := New[*testItem, testItem](t.Context(),
+			WithWarmUpItems[*testItem, testItem](2),
+			WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				return nil, createErr
+			}),
+		)
+		require.ErrorIs(t, err, createErr)
+	})
+
+	t.Run("YdbErrorFailsNew", func(t *testing.T) {
+		ydbErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
+
+		_, err := New[*testItem, testItem](t.Context(),
+			WithWarmUpItems[*testItem, testItem](1),
+			WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				return nil, ydbErr
+			}),
+		)
+		require.Error(t, err)
+	})
+
+	t.Run("CancelledContextFailsNew", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		var created atomic.Int32
+
+		_, err := New[*testItem, testItem](ctx,
+			WithWarmUpItems[*testItem, testItem](1),
+			WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				created.Add(1)
+
+				return &testItem{}, nil
+			}),
+		)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Equal(t, int32(0), created.Load())
+	})
+}
+
+// errNothingIdleItems from getItem (idle pop failed, createItem returns it) is retriable in try
+// and must be retried by pool.With when the context is still active.
+func TestPoolWith_retriesOnNothingIdleItems(t *testing.T) {
+	t.Parallel()
+
+	var (
+		createCalls  atomic.Int32
+		callbackRuns atomic.Int32
+		attempts     atomic.Int32
+	)
+
+	trace := *defaultTrace
+	trace.OnWith = func(_ *context.Context, _ stack.Caller) func(int, error) {
+		return func(a int, err error) {
+			attempts.Store(int32(a))
+		}
+	}
+
+	p := mustNewPool(t,
+		WithLimit[*testItem, testItem](1),
+		WithTrace[*testItem, testItem](&trace),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			if createCalls.Add(1) == 1 {
+				return nil, errNothingIdleItems
+			}
+
+			return &testItem{}, nil
+		}),
+	)
+	defer mustClose(t, p)
+
+	err := p.With(t.Context(), func(context.Context, *testItem) error {
+		callbackRuns.Add(1)
+
+		return nil
+	}, retry.WithFastBackoff(testutil.BackoffFunc(func(int) <-chan time.Time {
+		ch := make(chan time.Time, 1)
+		ch <- time.Time{}
+
+		return ch
+	})))
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, attempts.Load(), int32(2))
+	require.Equal(t, int32(2), createCalls.Load())
+	require.Equal(t, int32(1), callbackRuns.Load())
+	requirePoolStats(t, p, poolStats(1, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
+}
+
+func TestPoolWith_doesNotRetryOnNothingIdleItemsWhenContextCanceled(t *testing.T) {
+	t.Parallel()
+
+	backoffCh := make(chan chan time.Time)
+	ctx, cancel := xcontext.WithCancel(t.Context())
+
+	var createCalls atomic.Int32
+	p, err := New(ctx,
+		WithLimit[*testItem, testItem](1),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			createCalls.Add(1)
+
+			return nil, errNothingIdleItems
+		}),
+	)
+	require.NoError(t, err)
+	requirePoolStats(t, p, poolStats(1, nil))
+
+	results := make(chan error, 1)
+	go func() {
+		results <- p.With(ctx, func(context.Context, *testItem) error {
+			return nil
+		}, retry.WithFastBackoff(testutil.BackoffFunc(func(int) <-chan time.Time {
+			ch := make(chan time.Time)
+			backoffCh <- ch
+
+			return ch
+		})))
+	}()
+
+	var backoffTimer chan time.Time
+	select {
+	case backoffTimer = <-backoffCh:
+	case res := <-results:
+		t.Fatalf("unexpected early result: %v", res)
+	}
+
+	cancel()
+	backoffTimer <- time.Now()
+
+	select {
+	case err := <-results:
+		require.ErrorIs(t, err, context.Canceled)
+		require.GreaterOrEqual(t, createCalls.Load(), int32(1))
+		require.ErrorIs(t, err, errNothingIdleItems)
+	case <-time.After(time.Second):
+		t.Fatal("pool.With did not finish after context cancel")
+	}
+}
+
+func TestNothingIdleItems_isFastRetryable(t *testing.T) {
+	t.Parallel()
+
+	re := xerrors.RetryableError(errNothingIdleItems)
+	require.NotNil(t, re)
+	require.Equal(t, backoff.TypeFast, re.BackoffType())
+}
+
+// PreferredNodeID create path evicts one idle item when Concurrency==limit or Size>=limit
+// before createItem (see pool.go getItem).
+func TestPreferredNodeIDConcurrencyLimitEviction(t *testing.T) {
+	const (
+		limit    = 2
+		nodeBusy = uint32(32)
+		nodeIdle = uint32(33)
+	)
+
+	newCountedPool := func(t *testing.T) (*Pool[*testItem, testItem], *atomic.Int32) {
+		t.Helper()
+
+		var created atomic.Int32
+
+		p := mustNewPool[*testItem, testItem](t,
+			WithLimit[*testItem, testItem](limit),
+			WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+				id := created.Add(1)
+				nodeID, has := endpoint.ContextNodeID(ctx)
+				if !has {
+					return nil, errNilItem
+				}
+
+				return &testItem{
+					v: id,
+					onNodeID: func() uint32 {
+						return nodeID
+					},
+				}, nil
+			}),
+		)
+
+		return p, &created
+	}
+
+	seedTwoNodes := func(t *testing.T, p *Pool[*testItem, testItem], created *atomic.Int32) {
+		t.Helper()
+
+		ctx := t.Context()
+		for _, node := range []uint32{nodeBusy, nodeIdle} {
+			info, err := getItemWithFlush(endpoint.WithNodeID(ctx, node), p)
+			require.NoError(t, err)
+			require.Equal(t, node, info.item.NodeID())
+			mustPutItem(t, p, info)
+		}
+		require.Equal(t, int32(limit), created.Load())
+		requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+			s.Size = limit
+			s.Idle = limit
+		}))
+	}
+
+	t.Run("ReviewerScenarioConcurrentWithRespectsLimit", func(t *testing.T) {
+		p, created := newCountedPool(t)
+		defer mustClose(t, p)
+
+		seedTwoNodes(t, p, created)
+
+		ctx := t.Context()
+		releaseFirst := make(chan struct{})
+		firstHolding := make(chan struct{})
+
+		var firstWG sync.WaitGroup
+		firstWG.Add(1)
+		go func() {
+			defer firstWG.Done()
+			_ = p.With(endpoint.WithNodeID(ctx, nodeBusy), func(_ context.Context, item *testItem) error {
+				require.Equal(t, nodeBusy, item.NodeID())
+				close(firstHolding)
+				<-releaseFirst
+
+				return nil
+			})
+		}()
+		<-firstHolding
+
+		var (
+			secondErr  error
+			secondNode uint32
+		)
+		secondDone := make(chan struct{})
+		go func() {
+			secondErr = p.With(endpoint.WithNodeID(ctx, nodeBusy), func(_ context.Context, item *testItem) error {
+				secondNode = item.NodeID()
+
+				return nil
+			})
+			close(secondDone)
+		}()
+
+		select {
+		case <-secondDone:
+		case <-time.After(5 * time.Second):
+			t.Fatal("second With did not complete")
+		}
+
+		close(releaseFirst)
+		firstWG.Wait()
+
+		require.NoError(t, secondErr)
+		require.Equal(t, nodeBusy, secondNode)
+		require.Equal(t, int32(3), created.Load())
+		require.LessOrEqual(t, p.Stats().Size, limit)
+	})
+
+	t.Run("SingleWithFullPoolPreferredKeepsSizeAtLimit", func(t *testing.T) {
+		const preferred = uint32(99)
+
+		p, created := newCountedPool(t)
+		defer mustClose(t, p)
+
+		ctx := t.Context()
+		for _, node := range []uint32{0, 1} {
+			info, err := getItemWithFlush(endpoint.WithNodeID(ctx, node), p)
+			require.NoError(t, err)
+			mustPutItem(t, p, info)
+		}
+		require.Equal(t, int32(2), created.Load())
+		requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+			s.Size = limit
+			s.Idle = limit
+		}))
+
+		err := p.With(endpoint.WithNodeID(ctx, preferred), func(_ context.Context, item *testItem) error {
+			require.Equal(t, preferred, item.NodeID())
+
+			return nil
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, int32(3), created.Load())
+		require.LessOrEqual(t, p.Stats().Size, limit)
+	})
+
+	t.Run("ConcurrentWithAllItemsBusyDoesNotCreateBeyondLimit", func(t *testing.T) {
+		p, created := newCountedPool(t)
+		defer mustClose(t, p)
+
+		seedTwoNodes(t, p, created)
+
+		ctx := t.Context()
+		wait := make(chan struct{})
+		holding := make(chan struct{}, limit)
+
+		var holdWG sync.WaitGroup
+		holdWG.Add(limit)
+		for range limit {
+			go func() {
+				defer holdWG.Done()
+				_ = p.With(t.Context(), func(context.Context, *testItem) error {
+					holding <- struct{}{}
+					<-wait
+
+					return nil
+				})
+			}()
+		}
+		for range limit {
+			<-holding
+		}
+
+		getCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+		defer cancel()
+
+		var thirdGotItem bool
+		err := p.With(endpoint.WithNodeID(getCtx, nodeBusy), func(context.Context, *testItem) error {
+			thirdGotItem = true
+
+			return nil
+		})
+		require.Error(t, err)
+		require.False(t, thirdGotItem)
+		require.Equal(t, int32(limit), created.Load())
+		require.LessOrEqual(t, p.Stats().Size, limit)
+
+		close(wait)
+		holdWG.Wait()
+	})
+}
+
+func TestPoolPutItemRejectsWhenIdleAtLimit(t *testing.T) {
+	const limit = 2
+
+	var closed atomic.Int32
+
+	p := mustNewPool[*testItem, testItem](t,
+		WithLimit[*testItem, testItem](limit),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			return &testItem{
+				onClose: func() error {
+					closed.Add(1)
+
+					return nil
+				},
+			}, nil
+		}),
+	)
+	defer func() {
+		_ = p.Close(t.Context())
+	}()
+
+	ctx := t.Context()
+
+	infos := make([]*itemInfo[*testItem, testItem], limit)
+	for i := range limit {
+		infos[i] = mustGetItem(t, p)
+	}
+	for _, info := range infos {
+		mustPutItem(t, p, info)
+	}
+	require.Equal(t, limit, p.idle.Len())
+	requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+		s.Size = limit
+		s.Idle = limit
+	}))
+
+	var createBatch dynamicStats
+	extraItem, err := p.createItem(ctx, &createBatch)
+	require.NoError(t, err)
+	p.applyBatchStats(&createBatch)
+
+	requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+		s.Size = limit + 1
+		s.Idle = limit
+	}))
+
+	extraInfo := &itemInfo[*testItem, testItem]{
+		item:      extraItem,
+		created:   p.config.clock.Now(),
+		lastUsage: p.config.clock.Now(),
+	}
+
+	var putBatch dynamicStats
+	err = p.putItem(ctx, extraInfo, &putBatch)
+	p.applyBatchStats(&putBatch)
+
+	require.ErrorIs(t, err, errPoolIsOverflow)
+	require.Equal(t, int32(1), closed.Load())
+	require.True(t, extraItem.closed)
+	require.Equal(t, limit, p.idle.Len())
+	requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+		s.Size = limit
+		s.Idle = limit
+	}))
+}
+
+const (
+	benchPoolLimit         = 500
+	benchPrefillItems      = benchPoolLimit / 3
+	benchDeleteProbability = 20 // 1/N operations triggers item delete and recreate
+	benchCreateItemTimeout = time.Second
+	benchCloseItemTimeout  = time.Second
+)
+
+var errBenchDeleteItem = errors.New("bench: delete pool item")
+
+func newBenchPool(ctx context.Context) (*Pool[*testItem, testItem], error) {
+	var created atomic.Uint64
+
+	p, err := New[*testItem, testItem](ctx,
+		WithLimit[*testItem, testItem](benchPoolLimit),
+		WithCreateItemTimeout[*testItem, testItem](benchCreateItemTimeout),
+		WithCloseItemTimeout[*testItem, testItem](benchCloseItemTimeout),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			id := created.Add(1)
+
+			return &testItem{v: int32(id)}, nil
+		}),
+		WithMustDeleteItemFunc[*testItem, testItem](func(_ *testItem, err error) bool {
+			return errors.Is(err, errBenchDeleteItem)
+		}),
+		WithWarmUpItems[*testItem, testItem](benchPrefillItems),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
+var benchRetryOpts = []retry.Option{
+	retry.WithFastBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
+	retry.WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
+}
+
+func benchPoolWithWork(ops *atomic.Uint64) error {
+	if ops.Add(1)%benchDeleteProbability == 0 {
+		return xerrors.Retryable(errBenchDeleteItem)
+	}
+
+	return nil
+}
+
+func benchPoolWithOnce(
+	ctx context.Context,
+	p *Pool[*testItem, testItem],
+	ops *atomic.Uint64,
+) error {
+	return p.With(ctx, func(context.Context, *testItem) error {
+		return benchPoolWithWork(ops)
+	}, benchRetryOpts...)
+}
+
+func reportBenchLatency(b *testing.B, samples []uint64) {
+	b.Helper()
+
+	if len(samples) == 0 {
+		return
+	}
+
+	slices.Sort(samples)
+
+	n := len(samples)
+	p50 := samples[n*50/100]
+	p99Idx := n * 99 / 100
+	if p99Idx >= n {
+		p99Idx = n - 1
+	}
+	p99 := samples[p99Idx]
+
+	b.ReportMetric(float64(p50), "ns/op(p50)")
+	b.ReportMetric(float64(p99), "ns/op(p99)")
+}
+
+func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
+	b.Helper()
+
+	ctx := b.Context()
+	p, err := newBenchPool(ctx)
+	if err != nil {
+		b.Fatalf("new pool: %v", err)
+	}
+	defer func() {
+		_ = p.Close(ctx)
+	}()
+
+	var ops atomic.Uint64
+
+	if goroutines == 1 {
+		samples := make([]uint64, b.N)
+
+		b.ResetTimer()
+		b.ReportAllocs()
+		for i := range b.N {
+			start := time.Now()
+			if err := benchPoolWithOnce(ctx, p, &ops); err != nil {
+				b.Fatalf("pool.With: %v", err)
+			}
+			samples[i] = uint64(time.Since(start))
+		}
+		reportBenchLatency(b, samples)
+
+		return
+	}
+
+	perWorker := b.N / goroutines
+	extra := b.N % goroutines
+
+	samples := make([][]uint64, goroutines)
+	for g := range goroutines {
+		iterations := perWorker
+		if g < extra {
+			iterations++
+		}
+		samples[g] = make([]uint64, iterations)
+	}
+
+	var (
+		wg       sync.WaitGroup
+		firstErr error
+		errOnce  sync.Once
+	)
+	wg.Add(goroutines)
+	start := make(chan struct{})
+
+	for g := range goroutines {
+		go func(local []uint64) {
+			defer wg.Done()
+			<-start
+			for i := range local {
+				t0 := time.Now()
+				if err := benchPoolWithOnce(ctx, p, &ops); err != nil {
+					errOnce.Do(func() { firstErr = err })
+
+					return
+				}
+				local[i] = uint64(time.Since(t0))
+			}
+		}(samples[g])
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	close(start)
+	wg.Wait()
+	if firstErr != nil {
+		b.Fatalf("pool.With: %v", firstErr)
+	}
+
+	merged := make([]uint64, 0, b.N)
+	for _, part := range samples {
+		merged = append(merged, part...)
+	}
+	reportBenchLatency(b, merged)
+}
+
+// benchmark name                         CPU time(ns/op)   p50 (ns/op)      p99 (ns/op)    B/op   allocs/op
+// BenchmarkPoolWith/concurrency=1-12     1045              459.0            10708          974    19
+// BenchmarkPoolWith/concurrency=250-12   740.1             959.0            195708         982    19
+// BenchmarkPoolWith/concurrency=490-12   744.6             959.0            207209         982    19
+// BenchmarkPoolWith/concurrency=500-12   744.9             959.0            207291         982    19
+// BenchmarkPoolWith/concurrency=510-12   848.5             1000.0           278750         982    19
+// BenchmarkPoolWith/concurrency=1000-12  1129              1958.0           1738541        982    19
+func BenchmarkPoolWith(b *testing.B) {
+	for _, goroutines := range []int{1, 250, 490, 500, 510, 1000} {
+		b.Run(fmt.Sprintf("concurrency=%d", goroutines), func(b *testing.B) {
+			benchmarkPoolWithConcurrency(b, goroutines)
+		})
+	}
 }
