@@ -143,6 +143,10 @@ func New[PT ItemConstraint[T], T any](
 	ctx context.Context,
 	opts ...Option[PT, T],
 ) (_ *Pool[PT, T], err error) {
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
 	p := &Pool[PT, T]{
 		config: &Config[PT, T]{
 			trace: &Trace{},
@@ -246,10 +250,14 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 			item, err := p.config.createItemFunc(ctx)
 			if err != nil {
 				errs <- err
+
+				return
 			}
 
 			if item == nil {
 				errs <- errNilItem
+
+				return
 			}
 
 			now := p.config.clock.Now()
@@ -263,6 +271,9 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 	}
 
 	wg.Wait()
+
+	close(errs)
+	close(items)
 
 	if len(errs) > 0 {
 		joinErrs := make([]error, 0, len(errs))
