@@ -10,13 +10,10 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestSessionPoolWarmUp(t *testing.T) {
-	ctx := xtest.Context(t)
-
 	t.Run("DisabledByDefault", func(t *testing.T) {
 		var createCalls atomic.Int32
 
@@ -30,9 +27,9 @@ func TestSessionPoolWarmUp(t *testing.T) {
 			},
 		}))
 
-		c, err := New(ctx, cc, config.New(config.WithSizeLimit(10)))
+		c, err := New(t.Context(), cc, config.New(config.WithSizeLimit(10)))
 		require.NoError(t, err)
-		t.Cleanup(func() { _ = c.Close(ctx) })
+		t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 		require.Equal(t, 0, c.pool.Stats().Idle)
 		require.Equal(t, int32(0), createCalls.Load())
@@ -56,12 +53,12 @@ func TestSessionPoolWarmUp(t *testing.T) {
 			},
 		}))
 
-		c, err := New(ctx, cc, config.New(
+		c, err := New(t.Context(), cc, config.New(
 			config.WithSizeLimit(10),
 			config.WithSessionPoolWarmUpSessions(warmUpSize),
 		))
 		require.NoError(t, err)
-		t.Cleanup(func() { _ = c.Close(ctx) })
+		t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 		require.Equal(t, warmUpSize, c.pool.Stats().Idle)
 		require.Equal(t, int32(warmUpSize), createCalls.Load())
@@ -88,12 +85,12 @@ func TestSessionPoolWarmUp(t *testing.T) {
 			},
 		}))
 
-		c, err := New(ctx, cc, config.New(
+		c, err := New(t.Context(), cc, config.New(
 			config.WithSizeLimit(limit),
 			config.WithSessionPoolWarmUpSessions(warmUpSize),
 		))
 		require.NoError(t, err)
-		t.Cleanup(func() { _ = c.Close(ctx) })
+		t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 		require.Equal(t, limit, c.pool.Stats().Idle)
 		require.Equal(t, int32(limit), createCalls.Load())
@@ -106,7 +103,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 			},
 		}))
 
-		_, err := New(ctx, cc, config.New(
+		_, err := New(t.Context(), cc, config.New(
 			config.WithSessionPoolWarmUpSessions(1),
 		))
 		require.Error(t, err)
