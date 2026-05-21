@@ -693,6 +693,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 	return &itemInfo[PT, T]{
 		item:       item,
 		created:    p.config.clock.Now(),
+		lastUsage:  p.config.clock.Now(),
 		useCounter: 0,
 	}, nil
 }
