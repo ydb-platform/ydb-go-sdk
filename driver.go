@@ -485,7 +485,7 @@ func (d *Driver) connect(ctx context.Context) error {
 					d.tableOptions...,
 				)...,
 			),
-		), nil
+		)
 	})
 
 	d.query = xsync.OnceValue(func() (*internalQuery.Client, error) {
@@ -500,7 +500,7 @@ func (d *Driver) connect(ctx context.Context) error {
 					d.queryOptions...,
 				)...,
 			),
-		), nil
+		)
 	})
 
 	d.scheme = xsync.OnceValue(func() (*internalScheme.Client, error) {

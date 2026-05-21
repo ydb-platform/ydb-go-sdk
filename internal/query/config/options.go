@@ -93,3 +93,12 @@ func WithDisableSessionBalancer() Option {
 		c.SetDisableSessionBalancer()
 	}
 }
+
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in the explicit session pool
+// at client initialization.
+// If poolWarmUpSize is less than or equal to zero, pool warm-up is disabled.
+func WithSessionPoolWarmUpSessions(poolWarmUpSize int) Option {
+	return func(c *Config) {
+		c.poolWarmUpSize = poolWarmUpSize
+	}
+}

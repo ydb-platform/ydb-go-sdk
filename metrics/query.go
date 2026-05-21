@@ -59,6 +59,7 @@ func query(config Config) (t trace.Query) {
 			index := sizeConfig.GaugeVec("index")
 			wait := sizeConfig.GaugeVec("waiters_queue")
 			inUse := sizeConfig.GaugeVec("in_use")
+			concurrency := sizeConfig.GaugeVec("concurrency")
 			createInProgress := sizeConfig.GaugeVec("create_in_progress")
 			t.OnPoolChange = func(stats trace.QueryPoolChange) {
 				if sizeConfig.Details()&trace.QueryPoolEvents == 0 {
@@ -67,10 +68,17 @@ func query(config Config) (t trace.Query) {
 
 				limit.With(nil).Set(float64(stats.Limit))
 				idle.With(nil).Set(float64(stats.Idle))
-				index.With(nil).Set(float64(stats.Index))
-				wait.With(nil).Set(float64(stats.Wait))
+				index.With(nil).Set(float64(stats.Size))
+				wait.With(nil).Set(func() float64 {
+					if stats.Concurrency > stats.Limit {
+						return float64(stats.Concurrency - stats.Limit)
+					}
+
+					return 0
+				}())
+				concurrency.With(nil).Set(float64(stats.Concurrency))
 				createInProgress.With(nil).Set(float64(stats.CreateInProgress))
-				inUse.With(nil).Set(float64(stats.Index - stats.Idle))
+				inUse.With(nil).Set(float64(stats.Size - stats.Idle))
 			}
 		}
 	}

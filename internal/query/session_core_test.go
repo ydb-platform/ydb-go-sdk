@@ -21,7 +21,7 @@ import (
 
 func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
@@ -69,7 +69,7 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 
 func TestSessionCoreAttachError(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
@@ -98,7 +98,7 @@ func TestSessionCoreAttachError(t *testing.T) {
 func TestSessionCoreClose(t *testing.T) {
 	debug.SetTraceback("all")
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{

@@ -611,9 +611,16 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			ctx := with(context.Background(), TRACE, "ydb", "table", "pool", "state", "change")
 			l.Log(WithLevel(ctx, DEBUG), "table session pool state changed",
 				kv.Int("limit", info.Limit),
-				kv.Int("index", info.Index),
+				kv.Int("index", info.Size),
 				kv.Int("idle", info.Idle),
-				kv.Int("wait", info.Wait),
+				kv.Int("wait", func() int {
+					if info.Concurrency > info.Limit {
+						return info.Concurrency - info.Limit
+					}
+
+					return 0
+				}()),
+				kv.Int("concurrency", info.Concurrency),
 				kv.Int("create_in_progress", info.CreateInProgress),
 			)
 		},
