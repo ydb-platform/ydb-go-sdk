@@ -20,7 +20,6 @@ type (
 			attempts int,
 			err error,
 		)
-		onWait   func() func(item any, err error)
 		OnChange func(Stats)
 	}
 )

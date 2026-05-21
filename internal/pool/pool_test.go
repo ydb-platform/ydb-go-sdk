@@ -78,10 +78,6 @@ var defaultTrace = &Trace{
 		return func(info any, nodeHintInfo *trace.NodeHintInfo, attempts int, err error) {
 		}
 	},
-	onWait: func() func(info any, err error) {
-		return func(info any, err error) {
-		}
-	},
 	OnChange: func(stats Stats) {
 	},
 }
