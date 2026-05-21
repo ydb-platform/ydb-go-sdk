@@ -7,6 +7,7 @@
 package pool
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -40,10 +41,10 @@ type (
 
 const containerLen = 500
 
-// BenchmarkContainers/xsync.Set-12         	  747793	      1585 ns/op	      96 B/op	       2 allocs/op
-// BenchmarkContainers/slice-12             	 3094249	      390.7 ns/op	      0 B/op	       0 allocs/op
-// BenchmarkContainers/map-12               	  511998	      2247 ns/op	      0 B/op	       0 allocs/op
-// BenchmarkContainers/xlist.List-12        	  921478	      1274 ns/op	      64 B/op	       2 allocs/op
+// BenchmarkContainers/xsync.Set-12         	 1174489	      1011 ns/op	      86 B/op	       1 allocs/op
+// BenchmarkContainers/slice-12             	 1000000	      1511 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkContainers/map-12               	  674767	      1757 ns/op	       1 B/op	       0 allocs/op
+// BenchmarkContainers/xlist.List-12        	  694712	      1504 ns/op	      33 B/op	       1 allocs/op
 func BenchmarkContainers(b *testing.B) {
 	for _, tt := range []struct {
 		name  string
@@ -87,15 +88,30 @@ func BenchmarkContainers(b *testing.B) {
 
 			require.Equal(b, containerLen, container.Len())
 
-			var i uint32
-			for b.Loop() {
-				info, err := container.Pop()
-				require.NoError(b, err)
-				require.NoError(b, container.Put(info))
-				info, err = container.PopByNodeID(i % containerLen)
-				require.NoError(b, err)
-				require.NoError(b, container.Put(info))
-			}
+			b.SetParallelism(containerLen)
+			b.RunParallel(func(pb *testing.PB) {
+				var i uint32
+				for pb.Next() {
+					{
+						info, err := container.Pop()
+						if err != nil {
+							require.Nil(b, info)
+							require.ErrorIs(b, err, errNothingIdleItems)
+						} else {
+							require.NoError(b, container.Put(info))
+						}
+					}
+					{
+						info, err := container.PopByNodeID(i % containerLen)
+						if err != nil {
+							require.Nil(b, info)
+							require.ErrorIs(b, err, errNothingIdleItems)
+						} else {
+							require.NoError(b, container.Put(info))
+						}
+					}
+				}
+			})
 
 			require.Equal(b, containerLen, container.Len())
 			data := container.Clear()
@@ -308,7 +324,7 @@ func (items *xsyncSetContainer[PT, T]) Len() int {
 
 func (items *xsyncSetContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
 	if !items.data.Add(info) {
-		return errItemAlreadyExists
+		return fmt.Errorf("item %+v already exists: %w", info, errItemAlreadyExists)
 	}
 
 	return nil
@@ -316,10 +332,13 @@ func (items *xsyncSetContainer[PT, T]) Put(info *itemInfo[PT, T]) error {
 
 func (items *xsyncSetContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 	items.data.Range(func(idle *itemInfo[PT, T]) bool {
-		info = idle
-		items.data.Remove(idle)
+		if items.data.Remove(idle) {
+			info = idle
 
-		return false
+			return false
+		}
+
+		return true
 	})
 
 	if info == nil {
@@ -332,10 +351,13 @@ func (items *xsyncSetContainer[PT, T]) Pop() (info *itemInfo[PT, T], _ error) {
 func (items *xsyncSetContainer[PT, T]) PopByNodeID(nodeID uint32) (info *itemInfo[PT, T], _ error) {
 	items.data.Range(func(idle *itemInfo[PT, T]) bool {
 		if idle.item.NodeID() == nodeID {
-			info = idle
-			items.data.Remove(idle)
+			if items.data.Remove(idle) {
+				info = idle
 
-			return false
+				return false
+			}
+
+			return true
 		}
 
 		return true
