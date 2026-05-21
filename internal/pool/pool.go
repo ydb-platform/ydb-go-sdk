@@ -679,9 +679,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		if isRetriable(err) {
 			return nil, xerrors.Retryable(err)
 		}
-		if xerrors.IsYdb(err) {
-			return nil, err
-		}
 
 		return nil, err
 	}
