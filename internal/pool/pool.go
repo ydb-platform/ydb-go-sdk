@@ -748,10 +748,12 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		return nil, errNilItem
 	}
 
+	now := p.config.clock.Now()
+
 	return &itemInfo[PT, T]{
 		item:       item,
-		created:    p.config.clock.Now(),
-		lastUsage:  p.config.clock.Now(),
+		created:    now,
+		lastUsage:  now,
 		useCounter: 0,
 	}, nil
 }
