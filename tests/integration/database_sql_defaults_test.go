@@ -5,6 +5,7 @@ package integration
 
 import (
 	"database/sql"
+	"os"
 	"testing"
 
 	_ "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -18,5 +19,10 @@ func TestDatabaseSQLDefaultProcessor(st *testing.T) {
 	defer db.Close()
 
 	_, err = db.Exec("DISCARD SELECT 1")
-	t.Require.Error(err, "DISCARD is supported in TABLE service but not in QUERY service")
+
+	if os.Getenv("YDB_VERSION") == "nightly" {
+		t.Require.NoError(err)
+	} else {
+		t.Require.Error(err, "DISCARD is supported in TABLE service but not in QUERY service")
+	}
 }
