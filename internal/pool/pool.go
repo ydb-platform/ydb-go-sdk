@@ -223,7 +223,7 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 	)
 	for range n {
 		wg.Add(1)
-		go func() {
+		go func(ctx context.Context) {
 			defer wg.Done()
 
 			if d := p.config.createTimeout; d > 0 {
@@ -267,7 +267,7 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 				lastUsage:  now,
 				useCounter: 0,
 			}
-		}()
+		}(ctx)
 	}
 
 	wg.Wait()
@@ -575,7 +575,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 
 		closes.Add(len(data))
 		for _, info := range data {
-			go func(info *itemInfo[PT, T]) {
+			go func(ctx context.Context, info *itemInfo[PT, T]) {
 				defer closes.Done()
 
 				if d := p.config.closeTimeout; d > 0 {
@@ -585,7 +585,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 				}
 
 				p.config.closeItemFunc(ctx, info.item)
-			}(info)
+			}(ctx, info)
 		}
 		closes.Wait()
 		batchChanges.Size -= len(data)
