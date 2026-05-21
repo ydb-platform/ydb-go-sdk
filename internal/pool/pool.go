@@ -192,9 +192,9 @@ func New[PT ItemConstraint[T], T any](
 	}
 
 	var batchChanges dynamicStats
-	defer p.applyBatchStats(&batchChanges)
-
-	if err = p.warmUp(ctx, &batchChanges); err != nil {
+	err = p.warmUp(ctx, &batchChanges)
+	p.applyBatchStats(&batchChanges)
+	if err != nil {
 		_ = p.Close(ctx)
 
 		return nil, xerrors.WithStackTrace(err)
@@ -212,29 +212,75 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 		n = p.config.limit
 	}
 
+	var (
+		wg    sync.WaitGroup
+		errs  = make(chan error, n)
+		items = make(chan *itemInfo[PT, T], n)
+	)
 	for range n {
-		if err := ctx.Err(); err != nil {
-			return xerrors.WithStackTrace(ctx.Err())
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-		item, err := p.createItem(ctx, batchChanges)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
+			if d := p.config.createTimeout; d > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(xcontext.ValueOnly(ctx), d)
+				defer cancel()
+			} else {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(xcontext.ValueOnly(ctx))
+				defer cancel()
+			}
 
-		now := p.config.clock.Now()
-		if err := p.idle.Put(&itemInfo[PT, T]{
-			item:      item,
-			created:   now,
-			lastUsage: now,
-		}); err != nil {
-			p.closeItem(ctx, item, batchChanges)
+			p.stats.Change(func(old dynamicStats) dynamicStats {
+				old.CreateInProgress++
 
-			return xerrors.WithStackTrace(err)
-		}
+				return old
+			})
+			defer p.stats.Change(func(old dynamicStats) dynamicStats {
+				old.CreateInProgress--
 
-		batchChanges.Idle++
+				return old
+			})
+
+			item, err := p.config.createItemFunc(ctx)
+			if err != nil {
+				errs <- err
+			}
+
+			if item == nil {
+				errs <- errNilItem
+			}
+
+			now := p.config.clock.Now()
+			items <- &itemInfo[PT, T]{
+				item:       item,
+				created:    now,
+				lastUsage:  now,
+				useCounter: 0,
+			}
+		}()
 	}
+
+	wg.Wait()
+
+	if len(errs) > 0 {
+		joinErrs := make([]error, 0, len(errs))
+		for err := range errs {
+			joinErrs = append(joinErrs, err)
+		}
+
+		return xerrors.WithStackTrace(xerrors.Join(joinErrs...))
+	}
+
+	for info := range items {
+		if err := p.idle.Put(info); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+	}
+
+	batchChanges.Idle += n
+	batchChanges.Size += n
 
 	return nil
 }
