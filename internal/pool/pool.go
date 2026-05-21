@@ -284,7 +284,7 @@ func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats
 }
 
 // closeItem wraps the Config.closeItemFunc function with timeout handling
-// createItem called only under p.sema lock
+// closeItem called only under p.sema lock
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dynamicStats) {
 	defer func() {
 		if batchChanges != nil {
