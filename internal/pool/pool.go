@@ -521,8 +521,13 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 			go func(info *itemInfo[PT, T]) {
 				defer closes.Done()
 
-				// nil batchChanges need for exclude data race on concurrent batchChanges changes
-				p.closeItem(ctx, info.item, nil)
+				if d := p.config.closeTimeout; d > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, d)
+					defer cancel()
+				}
+
+				p.config.closeItemFunc(ctx, info.item)
 			}(info)
 		}
 		closes.Wait()
