@@ -1154,25 +1154,17 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					ctx, cancel := context.WithCancel(t.Context())
 					cancel()
 					p, err := New(ctx, WithLimit[*testItem, testItem](1))
-					require.NoError(t, err)
-					requirePoolStats(t, p, poolStats(1, nil))
-					err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
-						return nil
-					})
+					require.Error(t, err)
 					require.ErrorIs(t, err, context.Canceled)
-					requirePoolStats(t, p, poolStats(1, nil))
+					require.Nil(t, p)
 				})
 				t.Run("DeadlineExceeded", func(t *testing.T) {
 					ctx, cancel := context.WithTimeout(t.Context(), 0)
 					cancel()
 					p, err := New(ctx, WithLimit[*testItem, testItem](1))
-					require.NoError(t, err)
-					requirePoolStats(t, p, poolStats(1, nil))
-					err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
-						return nil
-					})
+					require.Error(t, err)
 					require.ErrorIs(t, err, context.DeadlineExceeded)
-					requirePoolStats(t, p, poolStats(1, nil))
+					require.Nil(t, p)
 				})
 			})
 		})

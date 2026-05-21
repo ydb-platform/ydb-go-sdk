@@ -143,10 +143,6 @@ func New[PT ItemConstraint[T], T any](
 	ctx context.Context,
 	opts ...Option[PT, T],
 ) (_ *Pool[PT, T], err error) {
-	if err := ctx.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
 	p := &Pool[PT, T]{
 		config: &Config[PT, T]{
 			trace: &Trace{},
@@ -208,6 +204,10 @@ func New[PT ItemConstraint[T], T any](
 }
 
 func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) error {
+	if err := ctx.Err(); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
 	n := p.config.warmUpItems
 	if n <= 0 {
 		return nil
