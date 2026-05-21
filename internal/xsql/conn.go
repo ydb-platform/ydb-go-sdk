@@ -163,7 +163,7 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 ) {
 	onDone := trace.DatabaseSQLOnConnQuery(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).QueryContext" /*stack.Package("database/sql")*/),
-		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), 0,
+		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -205,7 +205,7 @@ func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 ) {
 	onDone := trace.DatabaseSQLOnConnExec(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).ExecContext" /*stack.Package("database/sql")*/),
-		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), 0,
+		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx),
 	)
 	defer func() {
 		onDone(finalErr)

@@ -27,7 +27,7 @@ import (
 // on the next pool.With and replaced with a newly created session.
 func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
 		var (
@@ -95,14 +95,15 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 				}, nil
 			}).AnyTimes()
 
-		p := testExplicitSessionPool(ctx, client)
+		p, err := testExplicitSessionPool(ctx, client)
+		require.NoError(t, err)
 		t.Cleanup(func() {
 			close(holdHealthyAttach)
 			_ = p.Close(ctx)
 		})
 
 		var firstSession *Session
-		err := do(ctx, p, func(ctx context.Context, s *Session) error {
+		err = do(ctx, p, func(ctx context.Context, s *Session) error {
 			firstSession = s
 			require.True(t, s.IsAlive())
 
@@ -138,14 +139,14 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 func testExplicitSessionPool(
 	ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
-) *pool.Pool[*Session, Session] {
+) (*pool.Pool[*Session, Session], error) {
 	cfg := config.New(
 		config.WithPoolLimit(2),
 		config.WithSessionCreateTimeout(time.Second),
 		config.WithSessionDeleteTimeout(time.Second),
 	)
 
-	return pool.New[*Session, Session](ctx,
+	p, err := pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
 		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
 		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
@@ -167,4 +168,6 @@ func testExplicitSessionPool(
 			return s, nil
 		}),
 	)
+
+	return p, err
 }

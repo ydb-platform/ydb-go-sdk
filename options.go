@@ -626,10 +626,20 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in session pools at driver initialization.
+// If warmUpSessions is less than or equal to zero, pool warm-up is disabled.
+func WithSessionPoolWarmUpSessions(warmUpSessions int) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+
+		return nil
+	}
+}
+
+// WithSessionPoolKeepAliveMinSize
 //
-// Deprecated: use WithApplicationName instead.
-// Will be removed after Oct 2024.
+// Deprecated: will be removed after Nov 2026.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(ctx context.Context, d *Driver) error { return nil }
@@ -637,8 +647,7 @@ func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 
 // WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
 //
-// Deprecated: use WithApplicationName instead.
-// Will be removed after Oct 2024.
+// Deprecated: will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error { return nil }

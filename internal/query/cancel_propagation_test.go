@@ -55,7 +55,7 @@ func TestStreamResultNextResultSet_CtxErrorCancelsStream(t *testing.T) {
 
 func TestClientCloseCancelsInflightDo(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		opStarted := make(chan struct{})
 
 		c := &Client{
@@ -109,7 +109,7 @@ func TestClientCloseCancelsInflightDo(t *testing.T) {
 
 func TestClientCloseCancelsInflightDoTx(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
 		queryService := NewMockQueryServiceClient(ctrl)
@@ -175,7 +175,7 @@ func TestClientCloseCancelsInflightDoTx(t *testing.T) {
 
 func TestClientCallUnregistersCloseCancel(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 
 		c := &Client{
 			config: config.New(),
