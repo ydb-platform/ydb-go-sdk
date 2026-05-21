@@ -3,8 +3,8 @@
   * synchronous session creation in the caller goroutine (no background create goroutine per session slot);
   * pool statistics are updated less frequently after finishing `internal.Pool.With` call to reduce CPU overhead
 * **Session pool behavior:**
-  * `FIFO` semantics replaced to `LIFO` semantics (read about `LIFO` advantages in [article](https://habr.com/ru/companies/ydb/articles/978444/))
-  * when the pool limit is reached, sessions pool block on a semaphore until a slot is released, instead of registering on an internal wait queue 
+  * `FIFO` semantics replaced with `LIFO` semantics (read about `LIFO` advantages in [article](https://habr.com/ru/companies/ydb/articles/978444/))
+  * when the pool limit is reached, session pool blocks on a semaphore until a slot is released, instead of registering on an internal wait queue 
   * `errPoolIsOverflow` is no longer returned from the pool. Client can receive only context errors if context is done and pool cannot get session for work  
   * `trace.Table.OnPoolWait` callbacks are no longer invoked (the hook remains in the trace API but is unused by the pool)
   * default create/close timeout has been reduced to 500 msec in order to achieve a faster failure, thus leading to earlier retry and successful call, rather than the default multi-second delay on a cold start or under overload conditions.
