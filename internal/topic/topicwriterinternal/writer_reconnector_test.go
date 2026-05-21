@@ -831,6 +831,22 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 	}
 }
 
+func TestWriterImpl_WriteAfterClose_ReturnsErrPublicWriterClosed(t *testing.T) {
+	ctx := context.Background()
+	w := newTestWriterStopped(WithAutoSetSeqNo(true))
+	w.firstConnectionHandled.Store(true)
+
+	terminalErr := errors.New("terminal stream error")
+	closeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_ = w.close(closeCtx, terminalErr)
+
+	err := w.Write(ctx, []PublicMessage{{Data: bytes.NewReader([]byte("msg"))}})
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPublicWriterClosed)
+	require.ErrorIs(t, err, terminalErr)
+}
+
 func TestAllMessagesHasSameBufCodec(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		require.True(t, allMessagesHasSameBufCodec(nil))
