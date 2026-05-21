@@ -203,7 +203,7 @@ func New[PT ItemConstraint[T], T any](
 	return p, nil
 }
 
-func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) error {
+func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) error { //nolint:funlen
 	if err := ctx.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -275,6 +275,14 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 	close(errs)
 	close(items)
 
+	for info := range items {
+		if err := p.idle.Put(info); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		batchChanges.Idle++
+		batchChanges.Size++
+	}
+
 	if len(errs) > 0 {
 		joinErrs := make([]error, 0, len(errs))
 		for err := range errs {
@@ -283,15 +291,6 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 
 		return xerrors.WithStackTrace(xerrors.Join(joinErrs...))
 	}
-
-	for info := range items {
-		if err := p.idle.Put(info); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-	}
-
-	batchChanges.Idle += n
-	batchChanges.Size += n
 
 	return nil
 }

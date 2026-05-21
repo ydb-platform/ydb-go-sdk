@@ -1979,6 +1979,51 @@ func TestWarmUp(t *testing.T) {
 		require.ErrorIs(t, err, createErr)
 	})
 
+	t.Run("ClosesSuccessfulItemsWhenWarmUpFails", func(t *testing.T) {
+		const warmUpSize = 3
+
+		warmUpErr := errors.New("warm-up: third create failed")
+
+		var (
+			createCalls atomic.Int32
+			closed      atomic.Int32
+		)
+
+		var live sync.Map // *testItem still expected to be open
+
+		_, err := New[*testItem, testItem](t.Context(),
+			WithLimit[*testItem, testItem](warmUpSize),
+			WithWarmUpItems[*testItem, testItem](warmUpSize),
+			WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				n := createCalls.Add(1)
+				if n > 2 {
+					return nil, warmUpErr
+				}
+
+				item := &testItem{v: n}
+				item.onClose = func() error {
+					closed.Add(1)
+					live.Delete(item)
+
+					return nil
+				}
+				live.Store(item, struct{}{})
+
+				return item, nil
+			}),
+		)
+		require.Error(t, err)
+		require.ErrorIs(t, err, warmUpErr)
+		require.Equal(t, int32(warmUpSize), createCalls.Load())
+		require.Equal(t, int32(2), closed.Load(), "successful warm-up items must be closed via New->Close")
+
+		live.Range(func(key, _ any) bool {
+			t.Fatalf("item %p was created but not closed", key)
+
+			return false
+		})
+	})
+
 	t.Run("YdbErrorFailsNew", func(t *testing.T) {
 		ydbErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 
