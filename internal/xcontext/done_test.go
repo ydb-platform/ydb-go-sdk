@@ -82,7 +82,9 @@ func BenchmarkWithDone(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for b.Loop() {
+			b.StopTimer()
 			done := make(chan struct{})
+			b.StartTimer()
 			ctx, cancel := WithDone(b.Context(), done)
 			close(done)
 			<-ctx.Done()
