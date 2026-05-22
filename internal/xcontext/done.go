@@ -56,6 +56,10 @@ func (done doneCtx) Value(key any) any {
 }
 
 func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
+	if parent == nil {
+		panic("cannot create context from nil parent")
+	}
+
 	select {
 	case <-done:
 		return doneAlreadySignaledCtx{Context: parent}, noopCancel
