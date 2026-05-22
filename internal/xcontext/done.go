@@ -14,7 +14,7 @@ type (
 
 var (
 	noopCancel     = func() {}
-	closedDoneChan = func() chan struct{} {
+	closedDoneChan = func() <-chan struct{} {
 		ch := make(chan struct{})
 		close(ch)
 
