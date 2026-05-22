@@ -67,14 +67,13 @@ func BenchmarkWithDone(b *testing.B) {
 	})
 
 	b.Run("Open_CancelImmediately", func(b *testing.B) {
+		done := make(chan struct{})
 		b.ReportAllocs()
 		b.ResetTimer()
 		for b.Loop() {
-			done := make(chan struct{})
 			ctx, cancel := WithDone(b.Context(), done)
 			cancel()
 			_ = ctx
-			_ = done
 		}
 	})
 
