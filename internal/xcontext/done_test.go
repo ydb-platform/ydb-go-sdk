@@ -50,9 +50,9 @@ func TestWithDone(t *testing.T) {
 	})
 }
 
-// BenchmarkWithDone/AlreadyClosed-12         	  67398998	17.58 ns/op	   16 B/op	1 allocs/op
-// BenchmarkWithDone/Open_CancelImmediately-12     3005686	399.4 ns/op	  424 B/op	8 allocs/op
-// BenchmarkWithDone/Open_CloseDoneThenCancel-12   1301546	922.2 ns/op	  648 B/op	10 allocs/op
+// BenchmarkWithDone/AlreadyClosed-12         	  60969152	19.75 ns/op	   16 B/op	  1 allocs/op
+// BenchmarkWithDone/Open_CancelImmediately-12    2763906	433.9 ns/op	   312 B/op	  7 allocs/op
+// BenchmarkWithDone/Open_CloseDoneThenCancel-12  673682	1707 ns/op	   536 B/op	  9 allocs/op
 func BenchmarkWithDone(b *testing.B) {
 	b.Run("AlreadyClosed", func(b *testing.B) {
 		done := make(chan struct{})

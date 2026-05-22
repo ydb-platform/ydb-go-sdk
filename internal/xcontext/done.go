@@ -56,24 +56,23 @@ func (done doneCtx) Value(key any) any {
 }
 
 func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
-	if parent == nil {
-		panic("cannot create context from nil parent")
+	if parent.Err() != nil {
+		return parent, noopCancel
 	}
 
 	select {
 	case <-done:
 		return doneAlreadySignaledCtx{Context: parent}, noopCancel
 	default:
-	}
+		ctx, cancel := context.WithCancel(parent)
 
-	ctx, cancel := context.WithCancel(parent)
+		stop := context.AfterFunc(doneCtx(done), func() {
+			cancel()
+		})
 
-	stop := context.AfterFunc(doneCtx(done), func() {
-		cancel()
-	})
-
-	return ctx, func() {
-		stop()
-		cancel()
+		return ctx, func() {
+			stop()
+			cancel()
+		}
 	}
 }
