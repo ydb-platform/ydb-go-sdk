@@ -26,7 +26,11 @@ func (doneAlreadySignaledCtx) Done() <-chan struct{} {
 	return closedDoneChan
 }
 
-func (doneAlreadySignaledCtx) Err() error {
+func (ctx doneAlreadySignaledCtx) Err() error {
+	if err := ctx.Context.Err(); err != nil {
+		return err
+	}
+
 	return context.Canceled
 }
 
