@@ -16,28 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Stub is a helper function that stubs all functional fields of x with given f.
-func Stub(x any, f func(name string, args ...any)) {
-	(FieldStubber{
-		OnCall: f,
-	}).Stub(reflect.ValueOf(x))
-}
-
-func ClearContext(x any) any {
-	p := reflect.ValueOf(x).Index(0)
-	t := p.Elem().Type()
-	f, has := t.FieldByName("Context")
-	if has && f.Type.Kind() == reflect.Interface {
-		x := reflect.New(t)
-		x.Elem().Set(p.Elem())
-		c := x.Elem().FieldByName(f.Name)
-		c.Set(reflect.Zero(c.Type()))
-		p.Set(x)
-	}
-
-	return p.Interface()
-}
-
 // FieldStubber contains options of filling all struct functional fields.
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type FieldStubber struct {
@@ -143,7 +121,7 @@ func TestDatabaseSQL(t *testing.T) {
 func testSingleTrace[T any](t *testing.T, x *T, traceName string, compose func(lhs, rhs *T) *T) {
 	t.Helper()
 	compose(x, new(T))
-	a := reflect.New(reflect.TypeOf(x).Elem())
+	a := reflect.New(reflect.TypeFor[T]())
 	defer assertCalled(t, traceName, stubEachFunc(a))
 	callEachFunc(a.Elem())
 }

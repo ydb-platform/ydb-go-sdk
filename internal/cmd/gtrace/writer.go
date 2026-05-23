@@ -222,6 +222,7 @@ func (w *Writer) typeImports(dst []dep, t types.Type) []dep {
 		if w.external() && (pkg.Path() == w.pkg.Path() || pkg.Path() == "." || pkg.Path() == w.Target.TraceImportPath) {
 			return dst
 		}
+
 		return append(dst, dep{
 			pkgPath: pkg.Path(),
 			pkgName: pkg.Name(),
@@ -420,10 +421,13 @@ func (w *Writer) compose(trace *Trace) {
 		)
 		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		if w.external() {
-			w.code(`func Compose(`, lhs, ` *`, w.traceStruct(trace.Name), `, `, rhs, ` *`, w.traceStruct(trace.Name), `, opts ...`+trace.Name+`ComposeOption) `)
+			w.code(`func Compose(`, lhs, ` *`, w.traceStruct(trace.Name))
+			w.code(`, `, rhs, ` *`, w.traceStruct(trace.Name))
+			w.code(`, opts ...`, trace.Name, `ComposeOption) `)
 			w.line(`*`, w.traceStruct(trace.Name), ` {`)
 		} else {
-			w.code(`func (`, lhs, ` *`, trace.Name, `) Compose(`, rhs, ` *`, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
+			w.code(`func (`, lhs, ` *`, trace.Name, `) Compose(`, rhs, ` *`, trace.Name)
+			w.code(`, opts ...`, trace.Name, `ComposeOption) `)
 			w.line(`*`, trace.Name, ` {`)
 		}
 		w.block(func() {
@@ -775,7 +779,7 @@ func (w *Writer) constructStruct(n types.Type, s *types.Struct, vars []string) (
 	return p, vars
 }
 
-func (w *Writer) invokeHookShortcut(trace *Trace, hook Hook, recv string, vars []string) string {
+func (w *Writer) invokeHookShortcut(hook Hook, recv string, vars []string) string {
 	callArgs := vars
 	if w.external() {
 		callArgs = append([]string{recv}, vars...)
@@ -833,7 +837,7 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 				w.capture(name)
 			}
 			vars := w.constructParams(hook.Func.Params, names)
-			res := w.invokeHookShortcut(trace, hook, t, vars)
+			res := w.invokeHookShortcut(hook, t, vars)
 			if hook.Func.HasResult() {
 				w.code(`return `)
 				r := hook.Func.Result[0]

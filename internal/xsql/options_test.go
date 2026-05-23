@@ -71,8 +71,7 @@ func TestRetryBudgetOption_Apply(t *testing.T) {
 func TestTraceRetryOption_Apply(t *testing.T) {
 	tr := &trace.Retry{}
 	opt := traceRetryOption{
-		t:    tr,
-		opts: nil,
+		t: tr,
 	}
 	connector := &Connector{
 		traceRetry: &trace.Retry{},
@@ -111,8 +110,7 @@ func TestDisableServerBalancerOption_Apply(t *testing.T) {
 func TestTraceDatabaseSQLOption_Apply(t *testing.T) {
 	tr := &trace.DatabaseSQL{}
 	opt := traceDatabaseSQLOption{
-		t:    tr,
-		opts: nil,
+		t: tr,
 	}
 	connector := &Connector{
 		trace: &trace.DatabaseSQL{},
