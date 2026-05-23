@@ -3,6 +3,7 @@ package xcontext
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -40,6 +41,21 @@ func TestWithDone(t *testing.T) {
 		ctx, cancel := WithDone(context.Background(), done)
 		require.Error(t, ctx.Err())
 		cancel()
+	})
+	t.Run("WithClosedDoneErrShouldNotChangeAfterParentTimeout", func(t *testing.T) {
+		done := make(chan struct{})
+		close(done)
+
+		parent, cancelParent := context.WithTimeout(context.Background(), time.Millisecond)
+		t.Cleanup(cancelParent)
+
+		ctx, cancel := WithDone(parent, done)
+		t.Cleanup(cancel)
+		require.ErrorIs(t, ctx.Err(), context.Canceled)
+
+		<-parent.Done()
+		require.ErrorIs(t, parent.Err(), context.DeadlineExceeded)
+		require.ErrorIs(t, ctx.Err(), context.Canceled)
 	})
 	t.Run("WithNilDone", func(t *testing.T) {
 		var done chan struct{}

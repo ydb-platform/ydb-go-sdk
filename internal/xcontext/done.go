@@ -9,6 +9,7 @@ type (
 	doneCtx                <-chan struct{}
 	doneAlreadySignaledCtx struct {
 		context.Context //nolint:containedctx // thin wrapper delegating Deadline/Value
+		err             error
 	}
 )
 
@@ -27,11 +28,7 @@ func (doneAlreadySignaledCtx) Done() <-chan struct{} {
 }
 
 func (ctx doneAlreadySignaledCtx) Err() error {
-	if err := ctx.Context.Err(); err != nil {
-		return err
-	}
-
-	return context.Canceled
+	return ctx.err
 }
 
 func (done doneCtx) Deadline() (deadline time.Time, ok bool) {
@@ -62,7 +59,15 @@ func WithDone(parent context.Context, done <-chan struct{}) (context.Context, co
 
 	select {
 	case <-done:
-		return doneAlreadySignaledCtx{Context: parent}, noopCancel
+		err := parent.Err()
+		if err == nil {
+			err = context.Canceled
+		}
+
+		return doneAlreadySignaledCtx{
+			Context: parent,
+			err:     err,
+		}, noopCancel
 	default:
 		ctx, cancel := context.WithCancel(parent)
 
