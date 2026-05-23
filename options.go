@@ -780,8 +780,8 @@ func WithTraceTopic(t trace.Topic) Option { //nolint:gocritic
 func WithTraceDatabaseSQL(t trace.DatabaseSQL) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.databaseSQLOptions = append(d.databaseSQLOptions,
-			xsql.WithTrace(&t),
 			xsql.WithComposePanicCallback(d.panicCallback),
+			xsql.WithTrace(&t),
 		)
 
 		return nil

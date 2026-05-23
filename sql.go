@@ -284,10 +284,14 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	c, err := xsql.Open(parent, parent.metaBalancer, parent.query.Must().Config(),
 		append(
 			append(
-				parent.databaseSQLOptions,
+				append(
+					[]ConnectorOption{
+						xsql.WithComposePanicCallback(parent.config.PanicCallback()),
+					},
+					parent.databaseSQLOptions...,
+				),
 				opts...,
 			),
-			xsql.WithComposePanicCallback(parent.config.PanicCallback()),
 			xsql.WithTraceRetry(parent.config.TraceRetry()),
 			xsql.WithRetryBudget(parent.config.RetryBudget()),
 		)...,

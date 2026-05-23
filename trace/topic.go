@@ -676,7 +676,7 @@ const (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterCompressMessagesReasonCompressData = TopicWriterCompressMessagesReason("compress-on-send")
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData = TopicWriterCompressMessagesReason("compress-on-Call-write") //nolint:lll
+	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData = TopicWriterCompressMessagesReason("compress-on-call-write") //nolint:lll
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterCompressMessagesReasonCodecsMeasure = TopicWriterCompressMessagesReason("compress-on-codecs-measure") //nolint:lll
 )
