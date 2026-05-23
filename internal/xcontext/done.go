@@ -9,7 +9,8 @@ type (
 	doneCtx                <-chan struct{}
 	doneAlreadySignaledCtx struct {
 		context.Context //nolint:containedctx // thin wrapper delegating Deadline/Value
-		err             error
+
+		err error
 	}
 )
 
