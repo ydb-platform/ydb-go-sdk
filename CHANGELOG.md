@@ -1,5 +1,5 @@
 * Moved the trace-generated code in `trace` package from the public API to the internal packages
-  This is a backward-incompatible change, but it has been documented in the [versioning policy](VERSIONING.md)
+  This was a backward-incompatible change, but it had been documented in the [versioning policy](VERSIONING.md)
 
 ## v3.138.0
 * Reworked the internal table/query session pool ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163)):
