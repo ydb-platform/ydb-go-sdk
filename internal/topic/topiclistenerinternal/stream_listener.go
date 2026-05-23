@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -83,7 +84,7 @@ func newStreamListener(
 	res.initVars(sessionIDCounter)
 
 	logCtx := connectionCtx
-	initDone := trace.TopicOnListenerInit(
+	initDone := gtrace.TopicOnListenerInit(
 		res.tracer, &logCtx, res.listenerID, res.cfg.Consumer, extractSelectorNames(res.cfg.Selectors),
 	)
 
@@ -115,7 +116,7 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 	}
 
 	logCtx := ctx
-	closeDone := trace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
+	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
 
 	var resErrors []error
 
@@ -282,7 +283,7 @@ func (l *streamListener) sendMessagesLoop(ctx context.Context) {
 				if err := l.stream.Send(m); err != nil {
 					// Trace send error
 					l.traceMessageSend(&logCtx, messageType, err)
-					trace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
+					gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 
 					reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 						"ydb: failed send message by grpc to topic reader stream from listener: "+
@@ -304,7 +305,7 @@ func (l *streamListener) sendMessagesLoop(ctx context.Context) {
 // traceMessageSend provides consistent tracing for message sends
 func (l *streamListener) traceMessageSend(ctx *context.Context, messageType string, err error) {
 	// Use TopicOnListenerSendDataRequest for all message send tracing
-	trace.TopicOnListenerSendDataRequest(l.tracer, ctx, l.listenerID, l.sessionID, messageType, err)
+	gtrace.TopicOnListenerSendDataRequest(l.tracer, ctx, l.listenerID, l.sessionID, messageType, err)
 }
 
 // getMessageTypeName returns a human-readable name for the message type
@@ -337,8 +338,8 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		logCtx := ctx
 		if err != nil {
-			trace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
-			trace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
+			gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
+			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
 			)))
@@ -352,10 +353,10 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 			bytesSize = mess.BytesSize
 		}
 
-		trace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, messageType, bytesSize, nil)
+		gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, messageType, bytesSize, nil)
 
 		if err := l.routeMessage(ctx, mess); err != nil {
-			trace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
+			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, err)
 		}
 	}
@@ -457,7 +458,7 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 
 		// Emit trace event - use partition context instead of background
 		logCtx := session.Context()
-		trace.TopicOnReaderCommittedNotify(
+		gtrace.TopicOnReaderCommittedNotify(
 			l.tracer,
 			&logCtx,
 			l.listenerID,

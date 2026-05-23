@@ -1,9 +1,19 @@
-package trace
+package trace_test
 
 import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	conngtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
+	coordinationgtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/gtrace"
+	discoverygtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/gtrace"
+	querygtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
+	retrygtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry/gtrace"
+	tablegtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
+	topicgtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	xsqlgtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Stub is a helper function that stubs all functional fields of x with given f.
@@ -83,44 +93,56 @@ func (f FieldStubber) Stub(x reflect.Value) {
 }
 
 func TestTable(t *testing.T) {
-	testSingleTrace(t, &Table{}, "Table")
+	testSingleTrace(t, &trace.Table{}, "Table", func(lhs, rhs *trace.Table) *trace.Table {
+		return tablegtrace.Compose(lhs, rhs)
+	})
 }
 
 func TestDriver(t *testing.T) {
-	testSingleTrace(t, &Driver{}, "Driver")
+	testSingleTrace(t, &trace.Driver{}, "Driver", func(lhs, rhs *trace.Driver) *trace.Driver {
+		return conngtrace.Compose(lhs, rhs)
+	})
 }
 
 func TestRetry(t *testing.T) {
-	testSingleTrace(t, &Retry{}, "Retry")
+	testSingleTrace(t, &trace.Retry{}, "Retry", func(lhs, rhs *trace.Retry) *trace.Retry {
+		return retrygtrace.Compose(lhs, rhs)
+	})
 }
 
 func TestCoordination(t *testing.T) {
-	testSingleTrace(t, &Table{}, "Coordination")
+	testSingleTrace(t, &trace.Coordination{}, "Coordination", func(lhs, rhs *trace.Coordination) *trace.Coordination {
+		return coordinationgtrace.Compose(lhs, rhs)
+	})
 }
 
 func TestRatelimiter(t *testing.T) {
-	testSingleTrace(t, &Ratelimiter{}, "Ratelimiter")
+	testSingleTrace(t, &trace.Ratelimiter{}, "Ratelimiter", func(lhs, rhs *trace.Ratelimiter) *trace.Ratelimiter {
+		return lhs
+	})
 }
 
 func TestTopic(t *testing.T) {
-	testSingleTrace(t, &Topic{}, "Topic")
+	testSingleTrace(t, &trace.Topic{}, "Topic", func(lhs, rhs *trace.Topic) *trace.Topic {
+		return topicgtrace.Compose(lhs, rhs)
+	})
 }
 
 func TestDiscovery(t *testing.T) {
-	testSingleTrace(t, &Discovery{}, "Discovery")
+	testSingleTrace(t, &trace.Discovery{}, "Discovery", func(lhs, rhs *trace.Discovery) *trace.Discovery {
+		return discoverygtrace.Compose(lhs, rhs)
+	})
 }
 
 func TestDatabaseSQL(t *testing.T) {
-	testSingleTrace(t, &DatabaseSQL{}, "DatabaseSQL")
+	testSingleTrace(t, &trace.DatabaseSQL{}, "DatabaseSQL", func(lhs, rhs *trace.DatabaseSQL) *trace.DatabaseSQL {
+		return xsqlgtrace.Compose(lhs, rhs)
+	})
 }
 
-func testSingleTrace(t *testing.T, x any, traceName string) {
+func testSingleTrace[T any](t *testing.T, x *T, traceName string, compose func(lhs, rhs *T) *T) {
 	t.Helper()
-	v := reflect.ValueOf(x)
-	m := v.MethodByName("Compose")
-	m.Call(
-		[]reflect.Value{reflect.New(reflect.ValueOf(x).Elem().Type())},
-	)
+	compose(x, new(T))
 	a := reflect.New(reflect.TypeOf(x).Elem())
 	defer assertCalled(t, traceName, stubEachFunc(a))
 	callEachFunc(a.Elem())
@@ -167,18 +189,19 @@ func callFunc(f reflect.Value, ft reflect.Type) {
 		case reflect.Func:
 			callFunc(xx, xx.Type())
 		default:
-			_ = xx
 		}
 	}
 }
 
-func callEachFunc(x reflect.Value) {
-	t := x.Type()
+func callEachFunc(v reflect.Value) {
+	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
-		var (
-			f  = x.Field(i)
-			ft = f.Type()
-		)
-		callFunc(f, ft)
+		callFunc(v.Field(i), t.Field(i).Type)
 	}
+}
+
+func TestQuery(t *testing.T) {
+	testSingleTrace(t, &trace.Query{}, "Query", func(lhs, rhs *trace.Query) *trace.Query {
+		return querygtrace.Compose(lhs, rhs)
+	})
 }

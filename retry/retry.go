@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -110,7 +111,7 @@ type traceOption struct {
 }
 
 func (t traceOption) ApplyRetryOption(opts *retryOptions) {
-	opts.trace = opts.trace.Compose(t.t)
+	opts.trace = gtrace.Compose(opts.trace, t.t)
 }
 
 func (t traceOption) ApplyDoOption(opts *doOptions) {
@@ -322,7 +323,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 		lastErr  error
 
 		code   = int64(0)
-		onDone = trace.RetryOnRetry(options.trace, &ctx,
+		onDone = gtrace.RetryOnRetry(options.trace, &ctx,
 			options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
 	)

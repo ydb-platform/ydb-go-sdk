@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/conversation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -153,7 +154,7 @@ func (s *session) newStream( //nolint:funlen
 				sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient
 				err           error
 			)
-			onDone := trace.CoordinationOnSessionNewStream(s.trace, &streamCtx,
+			onDone := gtrace.CoordinationOnSessionNewStream(s.trace, &streamCtx,
 				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*session).newStream"),
 			)
 			sessionClient, err = s.client.Session(streamCtx)
@@ -183,7 +184,7 @@ func (s *session) newStream( //nolint:funlen
 		case <-s.ctx.Done():
 		case client = <-result:
 		case <-timer.C:
-			trace.CoordinationOnSessionClientTimeout(
+			gtrace.CoordinationOnSessionClientTimeout(
 				s.trace,
 				s.getLastGoodResponseTime(),
 				s.sessionTimeout,
@@ -260,7 +261,7 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 		s.controller.OnAttach()
 
 		// Start a new session.
-		onStart := trace.CoordinationOnSessionStart(s.trace)
+		onStart := gtrace.CoordinationOnSessionStart(s.trace)
 		startSession := Ydb_Coordination.SessionRequest{
 			Request: &Ydb_Coordination.SessionRequest_SessionStart_{
 				SessionStart: &Ydb_Coordination.SessionRequest_SessionStart{
@@ -303,7 +304,7 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 		// account stream context cancellation in order to proceed with the graceful shutdown if it requires reconnect.
 		select {
 		case start := <-sessionStarted:
-			trace.CoordinationOnSessionStarted(s.trace, start.GetSessionId(), s.sessionID)
+			gtrace.CoordinationOnSessionStarted(s.trace, start.GetSessionId(), s.sessionID)
 			if s.sessionID == 0 {
 				s.sessionID = start.GetSessionId()
 				close(sessionStartedChan)
@@ -314,7 +315,7 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 			close(startSending)
 		case <-time.After(s.sessionStartTimeout):
 			// Reconnect if no response was received before the timeout occurred.
-			trace.CoordinationOnSessionStartTimeout(s.trace, s.sessionStartTimeout)
+			gtrace.CoordinationOnSessionStartTimeout(s.trace, s.sessionStartTimeout)
 			cancelStream()
 		case <-streamCtx.Done():
 		case <-s.ctx.Done():
@@ -339,7 +340,7 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 				last := s.getLastGoodResponseTime()
 				if time.Since(last) > s.sessionKeepAliveTimeout {
 					// Reconnect if the underlying stream is likely to be dead.
-					trace.CoordinationOnSessionKeepAliveTimeout(
+					gtrace.CoordinationOnSessionKeepAliveTimeout(
 						s.trace,
 						last,
 						s.sessionKeepAliveTimeout,
@@ -360,7 +361,7 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 				return
 			}
 
-			trace.CoordinationOnSessionStop(s.trace, s.sessionID)
+			gtrace.CoordinationOnSessionStop(s.trace, s.sessionID)
 			s.controller.Close(conversation.NewConversation(
 				func() *Ydb_Coordination.SessionRequest {
 					return &Ydb_Coordination.SessionRequest{
@@ -374,7 +375,7 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 			// Wait for the session stopped response unless the stream context is done.
 			select {
 			case stop := <-sessionStopped:
-				trace.CoordinationOnSessionStopped(s.trace, stop.GetSessionId(), s.sessionID)
+				gtrace.CoordinationOnSessionStopped(s.trace, stop.GetSessionId(), s.sessionID)
 				if stop.GetSessionId() == s.sessionID {
 					cancelStream()
 
@@ -385,7 +386,7 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 				cancelStream()
 			case <-time.After(s.sessionStopTimeout):
 				// Reconnect if no response was received before the timeout occurred.
-				trace.CoordinationOnSessionStopTimeout(s.trace, s.sessionStopTimeout)
+				gtrace.CoordinationOnSessionStopTimeout(s.trace, s.sessionStopTimeout)
 				cancelStream()
 			case <-s.ctx.Done():
 				cancelStream()
@@ -416,7 +417,7 @@ func (s *session) receiveLoop( //nolint:funlen
 	defer cancelStream()
 
 	for {
-		onDone := trace.CoordinationOnSessionReceive(s.trace)
+		onDone := gtrace.CoordinationOnSessionReceive(s.trace)
 		message, err := sessionClient.Recv()
 		if err != nil {
 			// Any stream error is unrecoverable, try to reconnect.
@@ -432,12 +433,12 @@ func (s *session) receiveLoop( //nolint:funlen
 				message.GetFailure().GetStatus() == Ydb.StatusIds_UNAUTHORIZED ||
 				message.GetFailure().GetStatus() == Ydb.StatusIds_NOT_FOUND {
 				// Consider the session expired if we got an unrecoverable status.
-				trace.CoordinationOnSessionServerExpire(s.trace, message.GetFailure())
+				gtrace.CoordinationOnSessionServerExpire(s.trace, message.GetFailure())
 
 				return
 			}
 
-			trace.CoordinationOnSessionServerError(s.trace, message.GetFailure())
+			gtrace.CoordinationOnSessionServerError(s.trace, message.GetFailure())
 
 			return
 		case *Ydb_Coordination.SessionResponse_SessionStarted_:
@@ -471,7 +472,7 @@ func (s *session) receiveLoop( //nolint:funlen
 		default:
 			if !s.controller.OnRecv(message) {
 				// Reconnect if the message is not from any known conversation.
-				trace.CoordinationOnSessionReceiveUnexpected(s.trace, message)
+				gtrace.CoordinationOnSessionReceiveUnexpected(s.trace, message)
 
 				return
 			}
@@ -508,7 +509,7 @@ func (s *session) sendLoop(
 			return
 		}
 
-		onSendDone := trace.CoordinationOnSessionSend(s.trace, message)
+		onSendDone := gtrace.CoordinationOnSessionSend(s.trace, message)
 		err = sessionClient.Send(message)
 		if err != nil {
 			// Any stream error is unrecoverable, try to reconnect.

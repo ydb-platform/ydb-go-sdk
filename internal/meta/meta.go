@@ -11,6 +11,7 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -163,7 +164,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 
 	var token string
-	done := trace.DriverOnGetCredentials(m.trace, &ctx,
+	done := gtrace.DriverOnGetCredentials(m.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/meta.(*Meta).meta"),
 	)
 	defer func() {

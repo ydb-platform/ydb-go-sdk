@@ -167,9 +167,33 @@ func runBatch(workDir string) error {
 		return outs[i].path < outs[j].path
 	})
 
+	moduleRoot, modulePath, err := findModuleRoot(workDir)
+	if err != nil {
+		return err
+	}
+
 	for _, o := range outs {
 		base := strings.TrimSuffix(filepath.Base(o.path), filepath.Ext(o.path))
-		outPath := filepath.Join(workDir, base+"_gtrace.go")
+		p := buildPackage(pkg, info, o.constrs, o.items, astFiles)
+
+		outDir := workDir
+		if len(o.items) > 0 && o.items[0].OutDir != "" {
+			outDir = filepath.Join(moduleRoot, o.items[0].OutDir)
+			if err := os.MkdirAll(outDir, 0o750); err != nil { //nolint:mnd
+				return err
+			}
+			p.OutPackage = filepath.Base(outDir)
+			p.Target = &GenTarget{
+				ModulePath:      modulePath,
+				TraceImportPath: modulePath + "/trace",
+				TraceImportName: "trace",
+				OutImportPath:   modulePath + "/" + filepath.ToSlash(o.items[0].OutDir),
+				OutDir:          outDir,
+				TraceDir:        workDir,
+			}
+		}
+
+		outPath := filepath.Join(outDir, base+"_gtrace.go")
 		f, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:gosec,mnd
 		if err != nil {
 			return err
@@ -177,8 +201,8 @@ func runBatch(workDir string) error {
 		w := &Writer{
 			Context: bctx,
 			Output:  f,
+			Target:  p.Target,
 		}
-		p := buildPackage(pkg, info, o.constrs, o.items, astFiles)
 		if err := w.Write(p); err != nil {
 			if cerr := f.Close(); cerr != nil {
 				return fmt.Errorf("write failed: %w; close failed: %w", err, cerr)
@@ -192,6 +216,34 @@ func runBatch(workDir string) error {
 	}
 
 	return nil
+}
+
+func findModuleRoot(from string) (root, modulePath string, err error) {
+	dir, err := filepath.Abs(from)
+	if err != nil {
+		return "", "", err
+	}
+	for {
+		modPath := filepath.Join(dir, "go.mod")
+		if _, statErr := os.Stat(modPath); statErr == nil {
+			data, readErr := os.ReadFile(modPath)
+			if readErr != nil {
+				return "", "", readErr
+			}
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "module ") {
+					return dir, strings.TrimSpace(strings.TrimPrefix(line, "module ")), nil
+				}
+			}
+			return "", "", fmt.Errorf("module path not found in %s", modPath)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", "", fmt.Errorf("go.mod not found from %q", from)
+		}
+		dir = parent
+	}
 }
 
 func loadTracePackageAST(workDir string) (
@@ -314,10 +366,17 @@ func extractGenItems(astFile *ast.File) []*GenItem {
 
 		case *ast.CommentGroup:
 			for _, c := range v.List {
-				if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
+				text := strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
+				switch {
+				case strings.HasPrefix(text, "gtrace:gen"):
 					if item == nil {
 						item = &GenItem{}
 					}
+				case strings.HasPrefix(text, "gtrace:out "):
+					if item == nil {
+						item = &GenItem{}
+					}
+					item.OutDir = strings.TrimSpace(strings.TrimPrefix(text, "gtrace:out "))
 				}
 			}
 
@@ -453,12 +512,23 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 	)
 }
 
+type GenTarget struct {
+	ModulePath      string
+	TraceImportPath string
+	TraceImportName string
+	OutImportPath   string
+	OutDir          string
+	TraceDir        string
+}
+
 type Package struct {
 	*types.Package
 
 	BuildConstraints []string
 	DeprecatedFields map[string]map[string]struct{}
 	Traces           []*Trace
+	OutPackage       string
+	Target           *GenTarget
 }
 
 type Trace struct {
@@ -507,6 +577,7 @@ func (f GenFlag) Has(x GenFlag) bool {
 type GenItem struct {
 	Ident      *ast.Ident
 	StructType *ast.StructType
+	OutDir     string
 }
 
 func rsplit(s string, c byte) (s1, s2 string) {

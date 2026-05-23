@@ -261,9 +261,8 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 
 func WithDatabaseSQLTrace(
 	t trace.DatabaseSQL, //nolint:gocritic
-	opts ...trace.DatabaseSQLComposeOption,
 ) ConnectorOption {
-	return xsql.WithTrace(&t, opts...)
+	return xsql.WithTrace(&t)
 }
 
 func WithDisableServerBalancer() ConnectorOption {
@@ -288,6 +287,7 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 				parent.databaseSQLOptions,
 				opts...,
 			),
+			xsql.WithComposePanicCallback(parent.config.PanicCallback()),
 			xsql.WithTraceRetry(parent.config.TraceRetry()),
 			xsql.WithRetryBudget(parent.config.RetryBudget()),
 		)...,

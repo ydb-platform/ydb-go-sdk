@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -163,9 +164,13 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 	}
 }
 
-func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
+func WithTrace(t trace.Driver) Option { //nolint:gocritic
 	return func(c *Config) {
-		c.trace = c.trace.Compose(&t, opts...)
+		var opts []gtrace.DriverComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithDriverPanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, &t, opts...)
 	}
 }
 
@@ -176,9 +181,9 @@ func WithRetryBudget(b budget.Budget) Option {
 	}
 }
 
-func WithTraceRetry(t *trace.Retry, opts ...trace.RetryComposeOption) Option {
+func WithTraceRetry(t *trace.Retry) Option {
 	return func(c *Config) {
-		config.SetTraceRetry(&c.Common, t, opts...)
+		config.SetTraceRetry(&c.Common, t)
 	}
 }
 

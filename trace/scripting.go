@@ -7,6 +7,7 @@ import (
 type (
 	// Scripting specified trace of scripting client activity.
 	// gtrace:gen
+	// gtrace:out internal/scripting/gtrace
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	Scripting struct {
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -24,14 +25,17 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnClose func(ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo)
 	}
-	scriptingQueryParameters interface {
+	// ScriptingQueryParameters contains query parameters metadata for trace hooks.
+	ScriptingQueryParameters interface {
 		String() string
 	}
-	scriptingResultErr interface {
+	// ScriptingResultErr contains result error metadata for trace hooks.
+	ScriptingResultErr interface {
 		Err() error
 	}
-	scriptingResult interface {
-		scriptingResultErr
+	// ScriptingResult contains result metadata for trace hooks.
+	ScriptingResult interface {
+		ScriptingResultErr
 		ResultSetCount() int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -41,13 +45,13 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
-		Call       call
+		Call       Call
 		Query      string
-		Parameters scriptingQueryParameters
+		Parameters ScriptingQueryParameters
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingExecuteDoneInfo struct {
-		Result scriptingResult
+		Result ScriptingResult
 		Error  error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -57,9 +61,9 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
-		Call       call
+		Call       Call
 		Query      string
-		Parameters scriptingQueryParameters
+		Parameters ScriptingQueryParameters
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingStreamExecuteIntermediateInfo struct {
@@ -76,7 +80,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -91,7 +95,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingCloseDoneInfo struct {

@@ -1,3 +1,5 @@
+* Moved gtrace-generated code out of the public `trace` package
+
 ## v3.138.0
 * Reworked the internal table/query session pool ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163)):
   * semaphore-based concurrency limit instead of an internal wait queue and `index` map;

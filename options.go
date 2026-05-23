@@ -427,25 +427,18 @@ func WithRetryBudget(b budget.Budget) Option {
 }
 
 // WithTraceDriver appends trace.Driver into driver traces
-func WithTraceDriver(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
+func WithTraceDriver(t trace.Driver) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithTrace(t, opts...))
+		d.options = append(d.options, config.WithTrace(t))
 
 		return nil
 	}
 }
 
 // WithTraceRetry appends trace.Retry into retry traces
-func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
+func WithTraceRetry(t trace.Retry) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options,
-			config.WithTraceRetry(&t, append(
-				[]trace.RetryComposeOption{
-					trace.WithRetryPanicCallback(d.panicCallback),
-				},
-				opts...,
-			)...),
-		)
+		d.options = append(d.options, config.WithTraceRetry(&t))
 
 		return nil
 	}
@@ -686,19 +679,11 @@ func WithSharedBalancer(parent *Driver) Option {
 }
 
 // WithTraceTable appends trace.Table into table traces
-func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //nolint:gocritic
+func WithTraceTable(t trace.Table) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.tableOptions = append(
 			d.tableOptions,
-			tableConfig.WithTrace(
-				&t,
-				append(
-					[]trace.TableComposeOption{
-						trace.WithTablePanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			tableConfig.WithTrace(&t),
 		)
 
 		return nil
@@ -706,17 +691,10 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 }
 
 // WithTraceQuery appends trace.Query into query traces
-func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option { //nolint:gocritic
+func WithTraceQuery(t trace.Query) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.queryOptions = append(d.queryOptions,
-			queryConfig.WithTrace(&t,
-				append(
-					[]trace.QueryComposeOption{
-						trace.WithQueryPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			queryConfig.WithTrace(&t),
 		)
 
 		return nil
@@ -724,18 +702,10 @@ func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option { //
 }
 
 // WithTraceScripting scripting trace option
-func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption) Option {
+func WithTraceScripting(t trace.Scripting) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.scriptingOptions = append(d.scriptingOptions,
-			scriptingConfig.WithTrace(
-				t,
-				append(
-					[]trace.ScriptingComposeOption{
-						trace.WithScriptingPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			scriptingConfig.WithTrace(t),
 		)
 
 		return nil
@@ -743,18 +713,10 @@ func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption)
 }
 
 // WithTraceScheme returns scheme trace option
-func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
+func WithTraceScheme(t trace.Scheme) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.schemeOptions = append(d.schemeOptions,
-			schemeConfig.WithTrace(
-				t,
-				append(
-					[]trace.SchemeComposeOption{
-						trace.WithSchemePanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			schemeConfig.WithTrace(t),
 		)
 
 		return nil
@@ -762,18 +724,10 @@ func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 }
 
 // WithTraceCoordination returns coordination trace option
-func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option { //nolint:gocritic
+func WithTraceCoordination(t trace.Coordination) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.coordinationOptions = append(d.coordinationOptions,
-			coordinationConfig.WithTrace(
-				&t,
-				append(
-					[]trace.CoordinationComposeOption{
-						trace.WithCoordinationPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			coordinationConfig.WithTrace(&t),
 		)
 
 		return nil
@@ -781,18 +735,10 @@ func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationCompo
 }
 
 // WithTraceRatelimiter returns ratelimiter trace option
-func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeOption) Option {
+func WithTraceRatelimiter(t trace.Ratelimiter) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.ratelimiterOptions = append(d.ratelimiterOptions,
-			ratelimiterConfig.WithTrace(
-				t,
-				append(
-					[]trace.RatelimiterComposeOption{
-						trace.WithRatelimiterPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			ratelimiterConfig.WithTrace(t),
 		)
 
 		return nil
@@ -809,18 +755,10 @@ func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 }
 
 // WithTraceDiscovery adds configured discovery tracer to Driver
-func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
+func WithTraceDiscovery(t trace.Discovery) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.discoveryOptions = append(d.discoveryOptions,
-			discoveryConfig.WithTrace(
-				t,
-				append(
-					[]trace.DiscoveryComposeOption{
-						trace.WithDiscoveryPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			discoveryConfig.WithTrace(t),
 		)
 
 		return nil
@@ -828,18 +766,10 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 }
 
 // WithTraceTopic adds configured discovery tracer to Driver
-func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //nolint:gocritic
+func WithTraceTopic(t trace.Topic) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.topicOptions = append(d.topicOptions,
-			topicoptions.WithTrace(
-				t,
-				append(
-					[]trace.TopicComposeOption{
-						trace.WithTopicPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			topicoptions.WithTrace(t),
 		)
 
 		return nil
@@ -847,18 +777,11 @@ func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //
 }
 
 // WithTraceDatabaseSQL adds configured discovery tracer to Driver
-func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option { //nolint:gocritic
+func WithTraceDatabaseSQL(t trace.DatabaseSQL) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.databaseSQLOptions = append(d.databaseSQLOptions,
-			xsql.WithTrace(
-				&t,
-				append(
-					[]trace.DatabaseSQLComposeOption{
-						trace.WithDatabaseSQLPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			xsql.WithTrace(&t),
+			xsql.WithComposePanicCallback(d.panicCallback),
 		)
 
 		return nil

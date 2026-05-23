@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -355,7 +356,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 
 	var (
 		settings = options.ParseDoOpts(c.config.Trace(), opts...)
-		onDone   = trace.QueryOnDo(settings.Trace(), &ctx,
+		onDone   = gtrace.QueryOnDo(settings.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Do"),
 			settings.Label(),
 		)
@@ -463,7 +464,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 
 	settings := options.ExecuteSettings(opts...)
 
-	onDone := trace.QueryOnQueryRow(c.config.Trace(), &ctx,
+	onDone := gtrace.QueryOnQueryRow(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
 		q, settings.Label(),
 	)
@@ -521,7 +522,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	defer leave()
 
 	settings := options.ExecuteSettings(opts...)
-	onDone := trace.QueryOnExec(c.config.Trace(), &ctx,
+	onDone := gtrace.QueryOnExec(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
 		q,
 		settings.Label(),
@@ -579,7 +580,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 	defer leave()
 
 	settings := options.ExecuteSettings(opts...)
-	onDone := trace.QueryOnQuery(c.config.Trace(), &ctx,
+	onDone := gtrace.QueryOnQuery(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
 		q, settings.Label(),
 	)
@@ -640,7 +641,7 @@ func (c *Client) QueryResultSet(
 		rowsCount int
 	)
 
-	onDone := trace.QueryOnQueryResultSet(c.config.Trace(), &ctx,
+	onDone := gtrace.QueryOnQueryResultSet(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryResultSet"),
 		q, settings.Label(),
 	)
@@ -679,7 +680,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 
 	var (
 		settings = options.ParseDoTxOpts(c.config.Trace(), opts...)
-		onDone   = trace.QueryOnDoTx(settings.Trace(), &ctx,
+		onDone   = gtrace.QueryOnDoTx(settings.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).DoTx"),
 			settings.Label(),
 		)
@@ -748,7 +749,7 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 }
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (*Client, error) {
-	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
+	onDone := gtrace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
 	defer onDone()
@@ -828,35 +829,35 @@ func newWithQueryServiceClient(ctx context.Context,
 func poolTrace(t *trace.Query) *pool.Trace {
 	return &pool.Trace{
 		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
-			onDone := trace.QueryOnPoolNew(t, ctx, call)
+			onDone := gtrace.QueryOnPoolNew(t, ctx, call)
 
 			return func(limit int) {
 				onDone(limit)
 			}
 		},
 		OnClose: func(ctx *context.Context, call stack.Caller) func(err error) {
-			onDone := trace.QueryOnClose(t, ctx, call)
+			onDone := gtrace.QueryOnClose(t, ctx, call)
 
 			return func(err error) {
 				onDone(err)
 			}
 		},
 		OnTry: func(ctx *context.Context, call stack.Caller) func(err error) {
-			onDone := trace.QueryOnPoolTry(t, ctx, call)
+			onDone := gtrace.QueryOnPoolTry(t, ctx, call)
 
 			return func(err error) {
 				onDone(err)
 			}
 		},
 		OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
-			onDone := trace.QueryOnPoolWith(t, ctx, call)
+			onDone := gtrace.QueryOnPoolWith(t, ctx, call)
 
 			return func(attempts int, err error) {
 				onDone(attempts, err)
 			}
 		},
 		OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
-			onDone := trace.QueryOnPoolPut(t, ctx, call, item.(*Session)) //nolint:forcetypeassert
+			onDone := gtrace.QueryOnPoolPut(t, ctx, call, item.(*Session)) //nolint:forcetypeassert
 
 			return func(err error) {
 				onDone(err)
@@ -868,14 +869,14 @@ func poolTrace(t *trace.Query) *pool.Trace {
 			attempts int,
 			err error,
 		) {
-			onDone := trace.QueryOnPoolGet(t, ctx, call)
+			onDone := gtrace.QueryOnPoolGet(t, ctx, call)
 
 			return func(item any, hint *trace.NodeHintInfo, attempts int, err error) {
 				onDone(item.(*Session), attempts, hint, err) //nolint:forcetypeassert
 			}
 		},
 		OnChange: func(stats pool.Stats) {
-			trace.QueryOnPoolChange(t, stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, stats.Size)
+			gtrace.QueryOnPoolChange(t, stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, stats.Size)
 		},
 	}
 }

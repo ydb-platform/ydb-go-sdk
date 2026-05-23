@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -279,7 +280,7 @@ func (o *orchestrator) saveMessageContent(msg *message) error {
 		tracer = &trace.Topic{}
 	}
 	logCtx := o.writerCfg.LogContext
-	onCompressDone := trace.TopicOnWriterCompressMessages(
+	onCompressDone := gtrace.TopicOnWriterCompressMessages(
 		tracer,
 		&logCtx,
 		o.multiWriterCfg.ProducerIDPrefix,

@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
@@ -147,7 +148,7 @@ func (b *Balancer) discoveryConn(ctx context.Context) (*grpc.ClientConn, error) 
 }
 
 func (b *Balancer) clusterDiscoveryAttemptWithDial(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnBalancerClusterDiscoveryAttempt(
+	onDone := gtrace.DriverOnBalancerClusterDiscoveryAttempt(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID(
 			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).clusterDiscoveryAttemptWithDial",
@@ -172,7 +173,7 @@ func (b *Balancer) clusterDiscoveryAttemptWithDial(ctx context.Context) (finalEr
 }
 
 func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientConn) (finalErr error) {
-	onDone := trace.DriverOnBalancerClusterDiscoveryAttempt(
+	onDone := gtrace.DriverOnBalancerClusterDiscoveryAttempt(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID(
 			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).clusterDiscoveryAttempt",
@@ -205,7 +206,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoint.Endpoint, localDC string) {
 	var (
-		onDone = trace.DriverOnBalancerUpdate(
+		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
@@ -255,7 +256,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 func (b *Balancer) Close(ctx context.Context) (err error) {
 	b.closed.Store(true)
 
-	onDone := trace.DriverOnBalancerClose(
+	onDone := gtrace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).Close"),
 	)
@@ -314,7 +315,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 
-	onDone := trace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
+	onDone := gtrace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
 		driverConfig.Balancer().String(),
 	)
@@ -459,7 +460,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(errBalancerClosed)
 	}
 
-	onDone := trace.DriverOnBalancerChooseEndpoint(
+	onDone := gtrace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).nextConn"),
 	)

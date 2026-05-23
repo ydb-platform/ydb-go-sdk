@@ -10,13 +10,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -58,7 +58,7 @@ type transaction struct {
 func (tx *transaction) Execute(ctx context.Context, sql string, params *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	onDone := trace.TableOnTxExecute(
+	onDone := gtrace.TableOnTxExecute(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).Execute"),
 		tx.s, tx, queryFromText(sql), params,
@@ -97,7 +97,7 @@ func (tx *transaction) ExecuteStatement(
 		panic(fmt.Sprintf("unsupported type conversion from %T to *statement", val))
 	}
 
-	onDone := trace.TableOnTxExecuteStatement(
+	onDone := gtrace.TableOnTxExecuteStatement(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).ExecuteStatement"),
 		tx.s, tx, val.query, parameters,
@@ -130,7 +130,7 @@ func (tx *transaction) CommitTx(
 	ctx context.Context,
 	opts ...options.CommitTransactionOption,
 ) (r result.Result, err error) {
-	onDone := trace.TableOnTxCommit(
+	onDone := gtrace.TableOnTxCommit(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).CommitTx"),
 		tx.s, tx,
@@ -194,7 +194,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	case txStateRollbacked:
 		return xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-		onDone := trace.TableOnTxRollback(
+		onDone := gtrace.TableOnTxRollback(
 			tx.s.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*transaction).Rollback"),
 			tx.s, tx,

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -264,7 +265,7 @@ func WithReaderGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOpti
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithReaderTrace(t trace.Topic) ReaderOption { //nolint:gocritic
 	return func(cfg *topicreaderinternal.ReaderConfig) {
-		cfg.Trace = cfg.Trace.Compose(&t)
+		cfg.Trace = gtrace.Compose(cfg.Trace, &t)
 	}
 }
 

@@ -22,6 +22,8 @@ import (
 type Writer struct {
 	Output  io.Writer
 	Context build.Context
+	Target  *GenTarget
+	Mode    writeMode
 
 	once sync.Once
 	bw   *bufio.Writer
@@ -33,6 +35,42 @@ type Writer struct {
 	pkg        *types.Package
 	deprecated map[string]map[string]struct{}
 	std        map[string]bool
+}
+
+type writeMode uint8
+
+const (
+	writeModeFull writeMode = iota
+	writeModeComposeOnly
+	writeModeShortcutsOnly
+)
+
+func (w *Writer) external() bool {
+	return w.Target != nil && w.Target.TraceImportPath != ""
+}
+
+func (w *Writer) composeOnly() bool {
+	return w.Mode == writeModeComposeOnly
+}
+
+func (w *Writer) shortcutsOnly() bool {
+	return w.Mode == writeModeShortcutsOnly
+}
+
+func (w *Writer) outPackage(p Package) string {
+	if p.OutPackage != "" {
+		return p.OutPackage
+	}
+
+	return p.Name()
+}
+
+func (w *Writer) traceStruct(name string) string {
+	if w.external() {
+		return w.Target.TraceImportName + "." + name
+	}
+
+	return name
 }
 
 func (w *Writer) Write(p Package) error {
@@ -49,29 +87,43 @@ func (w *Writer) Write(p Package) error {
 		w.line(line)
 	}
 	w.line()
-	w.line(`package `, p.Name())
+	w.line(`package `, w.outPackage(p))
 	w.line()
 
 	var deps []dep
-	for _, trace := range p.Traces {
-		deps = w.traceImports(deps, trace)
+	if !w.composeOnly() {
+		for _, trace := range p.Traces {
+			deps = w.traceImports(deps, trace)
+		}
+	}
+	if w.external() {
+		deps = append(deps, dep{
+			pkgPath: w.Target.TraceImportPath,
+			pkgName: w.Target.TraceImportName,
+		})
 	}
 	w.importDeps(deps)
 
 	w.newScope(func() {
 		for _, trace := range p.Traces {
-			w.options(trace)
-			w.compose(trace)
-			if trace.Nested {
-				w.isZero(trace)
+			if !w.shortcutsOnly() {
+				w.options(trace)
+				w.compose(trace)
+				if trace.Nested {
+					w.isZero(trace)
+				}
 			}
-			for _, hook := range trace.Hooks {
-				w.hook(trace, hook)
+			if !w.composeOnly() {
+				for _, hook := range trace.Hooks {
+					w.hook(trace, hook)
+				}
 			}
 		}
-		for _, trace := range p.Traces {
-			for _, hook := range trace.Hooks {
-				w.hookShortcut(trace, hook)
+		if !w.composeOnly() {
+			for _, trace := range p.Traces {
+				for _, hook := range trace.Hooks {
+					w.hookShortcut(trace, hook)
+				}
 			}
 		}
 	})
@@ -163,7 +215,13 @@ func (w *Writer) typeImports(dst []dep, t types.Type) []dep {
 		obj = n.Obj()
 		pkg = obj.Pkg()
 	)
-	if pkg != nil && pkg.Path() != w.pkg.Path() {
+	if pkg != nil {
+		if !w.external() && pkg.Path() == w.pkg.Path() {
+			return dst
+		}
+		if w.external() && (pkg.Path() == w.pkg.Path() || pkg.Path() == "." || pkg.Path() == w.Target.TraceImportPath) {
+			return dst
+		}
 		return append(dst, dep{
 			pkgPath: pkg.Path(),
 			pkgName: pkg.Name(),
@@ -337,7 +395,7 @@ func (w *Writer) isZero(trace *Trace) {
 	w.newScope(func() {
 		t := w.declare("t")
 		w.line(`// isZero checks whether `, t, ` is empty`)
-		w.line(`func (`, t, ` `, trace.Name, `) isZero() bool {`)
+		w.line(`func (`, t, ` `, w.traceStruct(trace.Name), `) isZero() bool {`)
 		w.block(func() {
 			for _, hook := range trace.Hooks {
 				w.line(`if `, t, `.`, hook.Name, ` != nil {`)
@@ -354,22 +412,27 @@ func (w *Writer) isZero(trace *Trace) {
 
 func (w *Writer) compose(trace *Trace) {
 	w.newScope(func() {
-		t := w.declare("t")
-		x := w.declare("x")
+		lhs := w.declare("lhs")
+		rhs := w.declare("rhs")
 		ret := w.declare("ret")
 		w.line(`// Compose returns a new `, trace.Name, ` which has functional fields composed both from `,
-			t, ` and `, x, `.`,
+			lhs, ` and `, rhs, `.`,
 		)
 		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
-		w.code(`func (`, t, ` *`, trace.Name, `) Compose(`, x, ` *`, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
-		w.line(`*`, trace.Name, ` {`)
+		if w.external() {
+			w.code(`func Compose(`, lhs, ` *`, w.traceStruct(trace.Name), `, `, rhs, ` *`, w.traceStruct(trace.Name), `, opts ...`+trace.Name+`ComposeOption) `)
+			w.line(`*`, w.traceStruct(trace.Name), ` {`)
+		} else {
+			w.code(`func (`, lhs, ` *`, trace.Name, `) Compose(`, rhs, ` *`, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
+			w.line(`*`, trace.Name, ` {`)
+		}
 		w.block(func() {
-			w.line(`if `, t, ` == nil {`)
+			w.line(`if `, lhs, ` == nil {`)
 			w.block(func() {
-				w.line(`return x`)
+				w.line(`return `, rhs)
 			})
 			w.line(`}`)
-			w.line(`var `, ret, ` `, trace.Name, ``)
+			w.line(`var `, ret, ` `, w.traceStruct(trace.Name), ``)
 			if len(trace.Hooks) > 0 {
 				w.line(`options := `, unexported(trace.Name), `ComposeOptions{}`)
 				w.line(`for _, opt := range opts {`)
@@ -383,7 +446,7 @@ func (w *Writer) compose(trace *Trace) {
 				w.line(`}`)
 			}
 			for _, hook := range trace.Hooks {
-				w.composeHook(hook, t, x, ret+"."+hook.Name)
+				w.composeHook(hook, lhs, rhs, ret+"."+hook.Name)
 			}
 			w.line(`return &`, ret)
 		})
@@ -461,7 +524,11 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 				case *Func:
 					w.composeHookCall(x, r1, r2)
 				case *Trace:
-					w.line(r1, `.Compose(`, r2, `)`)
+					if w.external() {
+						w.line(`Compose(`, r1, `, `, r2, `)`)
+					} else {
+						w.line(r1, `.Compose(`, r2, `)`)
+					}
 				default:
 					panic("unknown result type")
 				}
@@ -508,12 +575,15 @@ func (w *Writer) hook(trace *Trace, hook Hook) {
 		t := w.declare("t")
 		fn := w.declare("fn")
 
-		w.code(`func (`, t, ` *`, trace.Name, `) `, unexported(hook.Name))
-
-		w.code(`(`)
+		if w.external() {
+			w.code(`func `, unexported(hook.Name), `(`, t, ` *`, w.traceStruct(trace.Name))
+		} else {
+			w.code(`func (`, t, ` *`, trace.Name, `) `, unexported(hook.Name))
+			w.code(`(`)
+		}
 		var args []string
 		for i := range hook.Func.Params {
-			if i > 0 {
+			if i > 0 || w.external() {
 				w.code(`, `)
 			}
 			args = append(args, w.funcParam(&hook.Func.Params[i]))
@@ -705,6 +775,33 @@ func (w *Writer) constructStruct(n types.Type, s *types.Struct, vars []string) (
 	return p, vars
 }
 
+func (w *Writer) invokeHookShortcut(trace *Trace, hook Hook, recv string, vars []string) string {
+	callArgs := vars
+	if w.external() {
+		callArgs = append([]string{recv}, vars...)
+	}
+	if hook.Func.HasResult() {
+		res := w.declare("res")
+		w.code(res, ` := `)
+		if w.external() {
+			w.code(unexported(hook.Name))
+		} else {
+			w.code(recv, `.`, unexported(hook.Name))
+		}
+		w.call(callArgs)
+
+		return res
+	}
+	if w.external() {
+		w.code(unexported(hook.Name))
+	} else {
+		w.code(recv, `.`, unexported(hook.Name))
+	}
+	w.call(callArgs)
+
+	return ""
+}
+
 func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 	name := exported(tempName(trace.Name, hook.Name))
 
@@ -715,8 +812,7 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.code(`func `, name)
 		w.code(`(`)
-		var ctx string
-		w.code(t, ` *`, trace.Name)
+		w.code(t, ` *`, w.traceStruct(trace.Name))
 
 		var (
 			params = w.flattenParams(hook.Func.Params)
@@ -737,16 +833,7 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 				w.capture(name)
 			}
 			vars := w.constructParams(hook.Func.Params, names)
-			var res string
-			if hook.Func.HasResult() {
-				res = w.declare("res")
-				w.code(res, ` := `)
-			}
-			w.code(t, `.`, unexported(hook.Name))
-			if ctx != "" {
-				vars = append([]string{ctx}, vars...)
-			}
-			w.call(vars)
+			res := w.invokeHookShortcut(trace, hook, t, vars)
 			if hook.Func.HasResult() {
 				w.code(`return `)
 				r := hook.Func.Result[0]
@@ -828,7 +915,7 @@ func (w *Writer) zeroReturn(fn *Func) {
 		})
 		w.line(`}`)
 	case *Trace:
-		w.line(x.Name, `{}`)
+		w.line(w.traceStruct(x.Name), `{}`)
 	default:
 		panic("unexpected result type")
 	}
@@ -973,7 +1060,13 @@ func haveNames(params []Param) bool {
 
 func (w *Writer) typeString(t types.Type) string {
 	return types.TypeString(t, func(pkg *types.Package) string {
-		if pkg.Path() == w.pkg.Path() {
+		if pkg == nil {
+			return ""
+		}
+		if w.external() && pkg.Path() == w.Target.TraceImportPath {
+			return w.Target.TraceImportName
+		}
+		if !w.external() && pkg.Path() == w.pkg.Path() {
 			return "" // same package; unqualified
 		}
 

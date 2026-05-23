@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -484,7 +485,7 @@ type traceOption struct {
 }
 
 func (opt traceOption) ApplyTableOption(opts *Options) {
-	opts.Trace = opts.Trace.Compose(opt.t)
+	opts.Trace = gtrace.Compose(opts.Trace, opt.t)
 }
 
 func WithTrace(t trace.Table) traceOption { //nolint:gocritic
