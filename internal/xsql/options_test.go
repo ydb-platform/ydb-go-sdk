@@ -299,6 +299,165 @@ func TestWithQueryOptions(t *testing.T) {
 	require.Len(t, connector.QueryOpts, 1)
 }
 
+func TestWithComposePanicCallback(t *testing.T) {
+	cb := func(e any) {}
+	opt := WithComposePanicCallback(cb)
+	require.NotNil(t, opt)
+
+	connector := &Connector{}
+	err := opt.Apply(connector)
+	require.NoError(t, err)
+	require.NotNil(t, connector.composePanicCallback)
+}
+
+func TestTraceRetryOption_ComposeWithoutPanicCallback(t *testing.T) {
+	var lhsCalls, rhsCalls int
+	lhs := &trace.Retry{
+		OnRetry: func(trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			lhsCalls++
+
+			return func(trace.RetryLoopDoneInfo) {}
+		},
+	}
+	rhs := &trace.Retry{
+		OnRetry: func(trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			rhsCalls++
+
+			return func(trace.RetryLoopDoneInfo) {}
+		},
+	}
+
+	connector := &Connector{traceRetry: lhs}
+	require.NoError(t, traceRetryOption{t: rhs}.Apply(connector))
+
+	done := connector.traceRetry.OnRetry(trace.RetryLoopStartInfo{})
+	require.NotNil(t, done)
+	done(trace.RetryLoopDoneInfo{})
+
+	require.Equal(t, 1, lhsCalls)
+	require.Equal(t, 1, rhsCalls)
+}
+
+func TestTraceRetryOption_ComposePanicCallback(t *testing.T) {
+	var panicked any
+	cb := func(e any) { panicked = e }
+
+	lhs := &trace.Retry{
+		OnRetry: func(trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			return func(trace.RetryLoopDoneInfo) {
+				panic("retry panic")
+			}
+		},
+	}
+
+	connector := &Connector{traceRetry: lhs}
+	require.NoError(t, WithComposePanicCallback(cb).Apply(connector))
+	require.NoError(t, traceRetryOption{t: &trace.Retry{}}.Apply(connector))
+
+	require.NotPanics(t, func() {
+		done := connector.traceRetry.OnRetry(trace.RetryLoopStartInfo{})
+		done(trace.RetryLoopDoneInfo{})
+	})
+	require.Equal(t, "retry panic", panicked)
+}
+
+func TestTraceRetryOption_ComposePanicCallbackRequiresEarlyApply(t *testing.T) {
+	var panicked any
+	cb := func(e any) { panicked = e }
+
+	lhs := &trace.Retry{
+		OnRetry: func(trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			return func(trace.RetryLoopDoneInfo) {
+				panic("retry panic")
+			}
+		},
+	}
+
+	connector := &Connector{traceRetry: lhs}
+	require.NoError(t, traceRetryOption{t: &trace.Retry{}}.Apply(connector))
+	require.NoError(t, WithComposePanicCallback(cb).Apply(connector))
+
+	require.Panics(t, func() {
+		done := connector.traceRetry.OnRetry(trace.RetryLoopStartInfo{})
+		done(trace.RetryLoopDoneInfo{})
+	})
+	require.Nil(t, panicked)
+}
+
+func TestTraceDatabaseSQLOption_ComposeWithoutPanicCallback(t *testing.T) {
+	var lhsCalls, rhsCalls int
+	lhs := &trace.DatabaseSQL{
+		OnConnectorConnect: func(trace.DatabaseSQLConnectorConnectStartInfo) func(trace.DatabaseSQLConnectorConnectDoneInfo) {
+			lhsCalls++
+
+			return func(trace.DatabaseSQLConnectorConnectDoneInfo) {}
+		},
+	}
+	rhs := &trace.DatabaseSQL{
+		OnConnectorConnect: func(trace.DatabaseSQLConnectorConnectStartInfo) func(trace.DatabaseSQLConnectorConnectDoneInfo) {
+			rhsCalls++
+
+			return func(trace.DatabaseSQLConnectorConnectDoneInfo) {}
+		},
+	}
+
+	connector := &Connector{trace: lhs}
+	require.NoError(t, traceDatabaseSQLOption{t: rhs}.Apply(connector))
+
+	done := connector.trace.OnConnectorConnect(trace.DatabaseSQLConnectorConnectStartInfo{})
+	require.NotNil(t, done)
+	done(trace.DatabaseSQLConnectorConnectDoneInfo{})
+
+	require.Equal(t, 1, lhsCalls)
+	require.Equal(t, 1, rhsCalls)
+}
+
+func TestTraceDatabaseSQLOption_ComposePanicCallback(t *testing.T) {
+	var panicked any
+	cb := func(e any) { panicked = e }
+
+	lhs := &trace.DatabaseSQL{
+		OnConnectorConnect: func(trace.DatabaseSQLConnectorConnectStartInfo) func(trace.DatabaseSQLConnectorConnectDoneInfo) {
+			return func(trace.DatabaseSQLConnectorConnectDoneInfo) {
+				panic("database/sql panic")
+			}
+		},
+	}
+
+	connector := &Connector{trace: lhs}
+	require.NoError(t, WithComposePanicCallback(cb).Apply(connector))
+	require.NoError(t, traceDatabaseSQLOption{t: &trace.DatabaseSQL{}}.Apply(connector))
+
+	require.NotPanics(t, func() {
+		done := connector.trace.OnConnectorConnect(trace.DatabaseSQLConnectorConnectStartInfo{})
+		done(trace.DatabaseSQLConnectorConnectDoneInfo{})
+	})
+	require.Equal(t, "database/sql panic", panicked)
+}
+
+func TestTraceDatabaseSQLOption_ComposePanicCallbackRequiresEarlyApply(t *testing.T) {
+	var panicked any
+	cb := func(e any) { panicked = e }
+
+	lhs := &trace.DatabaseSQL{
+		OnConnectorConnect: func(trace.DatabaseSQLConnectorConnectStartInfo) func(trace.DatabaseSQLConnectorConnectDoneInfo) {
+			return func(trace.DatabaseSQLConnectorConnectDoneInfo) {
+				panic("database/sql panic")
+			}
+		},
+	}
+
+	connector := &Connector{trace: lhs}
+	require.NoError(t, traceDatabaseSQLOption{t: &trace.DatabaseSQL{}}.Apply(connector))
+	require.NoError(t, WithComposePanicCallback(cb).Apply(connector))
+
+	require.Panics(t, func() {
+		done := connector.trace.OnConnectorConnect(trace.DatabaseSQLConnectorConnectStartInfo{})
+		done(trace.DatabaseSQLConnectorConnectDoneInfo{})
+	})
+	require.Nil(t, panicked)
+}
+
 func TestWithQueryService(t *testing.T) {
 	t.Run("EnableQueryService", func(t *testing.T) {
 		opt := WithQueryService(true)

@@ -765,7 +765,7 @@ func WithTraceDiscovery(t trace.Discovery) Option {
 	}
 }
 
-// WithTraceTopic adds configured discovery tracer to Driver
+// WithTraceTopic adds configured topic tracer to Driver
 func WithTraceTopic(t trace.Topic) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.topicOptions = append(d.topicOptions,
@@ -776,7 +776,7 @@ func WithTraceTopic(t trace.Topic) Option { //nolint:gocritic
 	}
 }
 
-// WithTraceDatabaseSQL adds configured discovery tracer to Driver
+// WithTraceDatabaseSQL adds configured database/sql tracer to Driver
 func WithTraceDatabaseSQL(t trace.DatabaseSQL) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.databaseSQLOptions = append(d.databaseSQLOptions,
