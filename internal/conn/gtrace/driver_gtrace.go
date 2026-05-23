@@ -1266,7 +1266,6 @@ func onGetCredentials(t *trace.Driver, d trace.DriverGetCredentialsStartInfo) fu
 	}
 	return res
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnInit(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint string, database string, secure bool) func(error) {
 	var p trace.DriverInitStartInfo
@@ -1282,7 +1281,6 @@ func DriverOnInit(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint s
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnWith(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint string, database string, secure bool) func(error) {
 	var p trace.DriverWithStartInfo
@@ -1298,7 +1296,6 @@ func DriverOnWith(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint s
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnClose(t *trace.Driver, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.DriverCloseStartInfo
@@ -1311,7 +1308,6 @@ func DriverOnClose(t *trace.Driver, c *context.Context, c1 trace.Call) func(erro
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnPoolNew(t *trace.Driver, c *context.Context, c1 trace.Call) func() {
 	var p trace.DriverConnPoolNewStartInfo
@@ -1323,7 +1319,6 @@ func DriverOnPoolNew(t *trace.Driver, c *context.Context, c1 trace.Call) func() 
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnPoolRelease(t *trace.Driver, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.DriverConnPoolReleaseStartInfo
@@ -1336,7 +1331,6 @@ func DriverOnPoolRelease(t *trace.Driver, c *context.Context, c1 trace.Call) fun
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnResolve(t *trace.Driver, c trace.Call, target string, resolved []string) func(error) {
 	var p trace.DriverResolveStartInfo
@@ -1350,7 +1344,6 @@ func DriverOnResolve(t *trace.Driver, c trace.Call, target string, resolved []st
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStateChange(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint trace.EndpointInfo, state trace.ConnState) func(state trace.ConnState) {
 	var p trace.DriverConnStateChangeStartInfo
@@ -1365,7 +1358,6 @@ func DriverOnConnStateChange(t *trace.Driver, c *context.Context, c1 trace.Call,
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnInvoke(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint trace.EndpointInfo, m trace.Method) func(_ error, issues []trace.Issue, opID string, state trace.ConnState, metadata map[string][]string) {
 	var p trace.DriverConnInvokeStartInfo
@@ -1384,7 +1376,6 @@ func DriverOnConnInvoke(t *trace.Driver, c *context.Context, c1 trace.Call, endp
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnNewStream(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint trace.EndpointInfo, m trace.Method) func(_ error, state trace.ConnState) {
 	var p trace.DriverConnNewStreamStartInfo
@@ -1400,7 +1391,6 @@ func DriverOnConnNewStream(t *trace.Driver, c *context.Context, c1 trace.Call, e
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamRecvMsg(t *trace.Driver, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.DriverConnStreamRecvMsgStartInfo
@@ -1413,7 +1403,6 @@ func DriverOnConnStreamRecvMsg(t *trace.Driver, c *context.Context, c1 trace.Cal
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamSendMsg(t *trace.Driver, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.DriverConnStreamSendMsgStartInfo
@@ -1426,7 +1415,6 @@ func DriverOnConnStreamSendMsg(t *trace.Driver, c *context.Context, c1 trace.Cal
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamCloseSend(t *trace.Driver, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.DriverConnStreamCloseSendStartInfo
@@ -1439,7 +1427,6 @@ func DriverOnConnStreamCloseSend(t *trace.Driver, c *context.Context, c1 trace.C
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamFinish(t *trace.Driver, c context.Context, c1 trace.Call, e error) {
 	var p trace.DriverConnStreamFinishInfo
@@ -1448,7 +1435,6 @@ func DriverOnConnStreamFinish(t *trace.Driver, c context.Context, c1 trace.Call,
 	p.Error = e
 	onConnStreamFinish(t, p)
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnDial(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint trace.EndpointInfo) func(error) {
 	var p trace.DriverConnDialStartInfo
@@ -1462,7 +1448,6 @@ func DriverOnConnDial(t *trace.Driver, c *context.Context, c1 trace.Call, endpoi
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnBan(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint trace.EndpointInfo, state trace.ConnState, cause error) func(state trace.ConnState) {
 	var p trace.DriverConnBanStartInfo
@@ -1478,7 +1463,6 @@ func DriverOnConnBan(t *trace.Driver, c *context.Context, c1 trace.Call, endpoin
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnAllow(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint trace.EndpointInfo, state trace.ConnState) func(state trace.ConnState) {
 	var p trace.DriverConnAllowStartInfo
@@ -1493,7 +1477,6 @@ func DriverOnConnAllow(t *trace.Driver, c *context.Context, c1 trace.Call, endpo
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnPark(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint trace.EndpointInfo) func(error) {
 	var p trace.DriverConnParkStartInfo
@@ -1507,7 +1490,6 @@ func DriverOnConnPark(t *trace.Driver, c *context.Context, c1 trace.Call, endpoi
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnClose(t *trace.Driver, c *context.Context, c1 trace.Call, endpoint trace.EndpointInfo) func(error) {
 	var p trace.DriverConnCloseStartInfo
@@ -1521,7 +1503,6 @@ func DriverOnConnClose(t *trace.Driver, c *context.Context, c1 trace.Call, endpo
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnRepeaterWakeUp(t *trace.Driver, c *context.Context, c1 trace.Call, name string, event string) func(error) {
 	var p trace.DriverRepeaterWakeUpStartInfo
@@ -1536,7 +1517,6 @@ func DriverOnRepeaterWakeUp(t *trace.Driver, c *context.Context, c1 trace.Call, 
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerInit(t *trace.Driver, c *context.Context, c1 trace.Call, name string) func(error) {
 	var p trace.DriverBalancerInitStartInfo
@@ -1550,7 +1530,6 @@ func DriverOnBalancerInit(t *trace.Driver, c *context.Context, c1 trace.Call, na
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerClose(t *trace.Driver, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.DriverBalancerCloseStartInfo
@@ -1563,7 +1542,6 @@ func DriverOnBalancerClose(t *trace.Driver, c *context.Context, c1 trace.Call) f
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerChooseEndpoint(t *trace.Driver, c *context.Context, c1 trace.Call) func(endpoint trace.EndpointInfo, _ error) {
 	var p trace.DriverBalancerChooseEndpointStartInfo
@@ -1577,7 +1555,6 @@ func DriverOnBalancerChooseEndpoint(t *trace.Driver, c *context.Context, c1 trac
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerClusterDiscoveryAttempt(t *trace.Driver, c *context.Context, c1 trace.Call, address string, database string) func(error) {
 	var p trace.DriverBalancerClusterDiscoveryAttemptStartInfo
@@ -1592,7 +1569,6 @@ func DriverOnBalancerClusterDiscoveryAttempt(t *trace.Driver, c *context.Context
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerUpdate(t *trace.Driver, c *context.Context, c1 trace.Call, needLocalDC bool, database string) func(endpoints []trace.EndpointInfo, added []trace.EndpointInfo, dropped []trace.EndpointInfo, localDC string) {
 	var p trace.DriverBalancerUpdateStartInfo
@@ -1610,7 +1586,6 @@ func DriverOnBalancerUpdate(t *trace.Driver, c *context.Context, c1 trace.Call, 
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnGetCredentials(t *trace.Driver, c *context.Context, c1 trace.Call) func(token string, _ error) {
 	var p trace.DriverGetCredentialsStartInfo
