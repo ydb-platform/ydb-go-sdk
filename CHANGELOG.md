@@ -1,3 +1,4 @@
+## v3.138.1
 * Moved the trace-generated code in `trace` package from the public API to the internal packages
   This was a backward-incompatible change, but it had been documented in the [versioning policy](VERSIONING.md)
 
