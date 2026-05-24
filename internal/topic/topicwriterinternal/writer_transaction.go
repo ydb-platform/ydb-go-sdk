@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -33,7 +34,7 @@ func NewTopicWriterTransaction(w *WriterReconnector, tx tx.Transaction, tracer *
 
 func (w *WriterWithTransaction) onBeforeCommitTransaction(ctx context.Context) (err error) {
 	traceCtx := ctx
-	onDone := trace.TopicOnWriterBeforeCommitTransaction(
+	onDone := gtrace.TopicOnWriterBeforeCommitTransaction(
 		w.tracer,
 		&traceCtx,
 		w.tx.SessionID(),

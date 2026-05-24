@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -84,7 +85,7 @@ func NewPartitionWorker(
 // Start begins processing messages for this partition
 func (w *PartitionWorker) Start(ctx context.Context) {
 	// Add trace for worker creation
-	trace.TopicOnPartitionWorkerStart(
+	gtrace.TopicOnPartitionWorkerStart(
 		w.tracer,
 		&ctx,
 		w.listenerID,
@@ -256,7 +257,7 @@ func (w *PartitionWorker) callUserHandler(
 	)
 
 	// Add handler call tracing
-	handlerTraceDone := trace.TopicOnPartitionWorkerHandlerCall(
+	handlerTraceDone := gtrace.TopicOnPartitionWorkerHandlerCall(
 		w.tracer,
 		&ctx,
 		w.listenerID,
@@ -285,7 +286,7 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 	// Add tracing for batch processing
 	messagesCount, accountBytes := w.calculateBatchMetrics(msg)
 
-	traceDone := trace.TopicOnPartitionWorkerProcessMessage(
+	traceDone := gtrace.TopicOnPartitionWorkerProcessMessage(
 		w.tracer,
 		&ctx,
 		w.listenerID,

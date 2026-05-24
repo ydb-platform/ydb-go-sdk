@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -46,13 +47,14 @@ type (
 		disableServerBalancer bool
 		onClose               []func(*Connector)
 
-		clock          clockwork.Clock
-		done           chan struct{}
-		trace          *trace.DatabaseSQL
-		traceRetry     *trace.Retry
-		retryBudget    budget.Budget
-		pathNormalizer bind.TablePathPrefix
-		bindings       bind.Bindings
+		clock                clockwork.Clock
+		done                 chan struct{}
+		trace                *trace.DatabaseSQL
+		traceRetry           *trace.Retry
+		composePanicCallback func(e any)
+		retryBudget          budget.Budget
+		pathNormalizer       bind.TablePathPrefix
+		bindings             bind.Bindings
 	}
 	ydbDriver interface {
 		Name() string
@@ -108,7 +110,7 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 }
 
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) {
-	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Connector).Connect" /*stack.Package("database/sql")*/),
 	)
 

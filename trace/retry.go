@@ -7,6 +7,7 @@ import (
 type (
 	// Retry specified trace of retry call activity.
 	// gtrace:gen
+	// gtrace:out internal/retry/gtrace
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	Retry struct {
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -20,7 +21,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 
-		Call       call
+		Call       Call
 		Label      string
 		Idempotent bool
 

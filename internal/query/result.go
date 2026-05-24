@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
@@ -169,7 +170,7 @@ func newResult(
 	}
 
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNew(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNew(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.newResult"),
 		)
 		defer func() {
@@ -206,7 +207,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	}()
 
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNextPart(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart"),
 		)
 		defer func() {
@@ -304,7 +305,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	}
 
 	if r.trace != nil {
-		onDone := trace.QueryOnResultClose(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultClose(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
 		)
 		defer func() {
@@ -419,7 +420,7 @@ func (r *streamResult) nextPartFunc(
 
 func (r *streamResult) NextResultSet(ctx context.Context) (_ result.Set, err error) {
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNextResultSet(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).NextResultSet"),
 		)
 		defer func() {

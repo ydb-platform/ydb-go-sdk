@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -131,7 +132,7 @@ func (w *SingleStreamWriter) start() {
 
 func (w *SingleStreamWriter) initStream() (err error) {
 	logCtx := w.cfg.LogContext
-	traceOnDone := trace.TopicOnWriterInitStream(
+	traceOnDone := gtrace.TopicOnWriterInitStream(
 		w.cfg.Tracer,
 		&logCtx,
 		w.cfg.reconnectorInstanceID,
@@ -208,7 +209,7 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 		switch m := mess.(type) {
 		case *rawtopicwriter.WriteResult:
 			logCtx := w.cfg.LogContext
-			trace.TopicOnWriterReceiveResult(
+			gtrace.TopicOnWriterReceiveResult(
 				w.cfg.Tracer,
 				&logCtx,
 				w.cfg.reconnectorInstanceID,
@@ -229,7 +230,7 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 		default:
 			{
 				logCtx := w.cfg.LogContext
-				trace.TopicOnWriterReadUnknownGrpcMessage(
+				gtrace.TopicOnWriterReadUnknownGrpcMessage(
 					w.cfg.Tracer,
 					&logCtx,
 					w.cfg.reconnectorInstanceID,
@@ -263,7 +264,7 @@ func (w *SingleStreamWriter) sendMessagesFromQueueToStreamLoop(ctx context.Conte
 		err = sendMessagesToStream(w.cfg.stream, w.cfg.maxBytesPerMessage, targetCodec, messages)
 
 		logCtx := w.cfg.LogContext
-		onSentComplete := trace.TopicOnWriterSendMessages(
+		onSentComplete := gtrace.TopicOnWriterSendMessages(
 			w.cfg.Tracer,
 			&logCtx,
 			w.cfg.reconnectorInstanceID,

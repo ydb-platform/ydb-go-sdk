@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -16,9 +17,13 @@ type Config struct {
 
 type Option func(c *Config)
 
-func PublicWithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) Option { //nolint:gocritic
+func PublicWithTrace(t trace.Topic) Option { //nolint:gocritic
 	return func(c *Config) {
-		c.Trace = c.Trace.Compose(&trace, opts...)
+		var opts []gtrace.TopicComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithTopicPanicCallback(cb))
+		}
+		c.Trace = gtrace.Compose(c.Trace, &t, opts...)
 	}
 }
 

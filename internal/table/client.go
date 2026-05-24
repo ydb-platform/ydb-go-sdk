@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -31,7 +32,7 @@ import (
 type sessionBuilder func(ctx context.Context) (*Session, error)
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) { //nolint:funlen
-	onDone := trace.TableOnInit(config.Trace(), &ctx,
+	onDone := gtrace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
 
@@ -65,7 +66,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				}
 			},
 			OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
-				onDone := trace.TableOnPoolPut( //nolint:forcetypeassert
+				onDone := gtrace.TableOnPoolPut( //nolint:forcetypeassert
 					config.Trace(), ctx, call, item.(*Session),
 				)
 
@@ -79,21 +80,21 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				attempts int,
 				err error,
 			) {
-				onDone := trace.TableOnPoolGet(config.Trace(), ctx, call)
+				onDone := gtrace.TableOnPoolGet(config.Trace(), ctx, call)
 
 				return func(item any, hintInfo *trace.NodeHintInfo, attempts int, err error) {
 					onDone(item.(*Session), attempts, hintInfo, err) //nolint:forcetypeassert
 				}
 			},
 			OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
-				onDone := trace.TableOnPoolWith(config.Trace(), ctx, call)
+				onDone := gtrace.TableOnPoolWith(config.Trace(), ctx, call)
 
 				return func(attempts int, err error) {
 					onDone(attempts, err)
 				}
 			},
 			OnChange: func(stats pool.Stats) {
-				trace.TableOnPoolStateChange(config.Trace(),
+				gtrace.TableOnPoolStateChange(config.Trace(),
 					stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, stats.Size,
 				)
 			},
@@ -231,7 +232,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	}
 
 	var (
-		onDone = trace.TableOnCreateSession(c.config.Trace(), &ctx,
+		onDone = gtrace.TableOnCreateSession(c.config.Trace(), &ctx,
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"),
 		)
@@ -287,7 +288,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 	close(c.done)
 
-	onDone := trace.TableOnClose(c.config.Trace(), &ctx,
+	onDone := gtrace.TableOnClose(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Close"),
 	)
 	defer func() {
@@ -313,7 +314,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 	config := c.retryOptions(opts...)
 
-	attempts, onDone := 0, trace.TableOnDo(config.Trace, &ctx,
+	attempts, onDone := 0, gtrace.TableOnDo(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Do"),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
@@ -344,7 +345,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 	config := c.retryOptions(opts...)
 
-	attempts, onDone := 0, trace.TableOnDoTx(config.Trace, &ctx,
+	attempts, onDone := 0, gtrace.TableOnDoTx(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).DoTx"),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
@@ -403,7 +404,7 @@ func (c *Client) BulkUpsert(
 		}),
 	)
 
-	onDone := trace.TableOnBulkUpsert(config.Trace, &ctx,
+	onDone := gtrace.TableOnBulkUpsert(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
 	)
 	defer func() {

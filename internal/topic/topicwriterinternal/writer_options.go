@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -179,7 +180,7 @@ func WithWaitAckOnWrite(val bool) PublicWriterOption {
 
 func WithTrace(tracer *trace.Topic) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
-		cfg.Tracer = cfg.Tracer.Compose(tracer)
+		cfg.Tracer = gtrace.Compose(cfg.Tracer, tracer)
 	}
 }
 

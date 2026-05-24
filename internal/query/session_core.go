@@ -20,6 +20,7 @@ import (
 	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -123,7 +124,7 @@ func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 
 func WithTrace(t *trace.Query) Option {
 	return func(c *sessionCore) {
-		c.Trace = c.Trace.Compose(t)
+		c.Trace = gtrace.Compose(c.Trace, t)
 	}
 }
 
@@ -147,7 +148,7 @@ func Open(
 		}
 	}
 
-	onDone := trace.QueryOnSessionCreate(core.Trace, &ctx,
+	onDone := gtrace.QueryOnSessionCreate(core.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Open"),
 	)
 	defer func() {
@@ -189,7 +190,7 @@ func Open(
 }
 
 func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
-	onDone := trace.QueryOnSessionAttach(core.Trace, &ctx,
+	onDone := gtrace.QueryOnSessionAttach(core.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach"),
 		core,
 	)
@@ -269,7 +270,7 @@ func deleteSession(ctx context.Context,
 }
 
 func (core *sessionCore) deleteSession(ctx context.Context) (finalErr error) {
-	onDone := trace.QueryOnSessionDelete(core.Trace, &ctx,
+	onDone := gtrace.QueryOnSessionDelete(core.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).deleteSession"),
 		core,
 	)
