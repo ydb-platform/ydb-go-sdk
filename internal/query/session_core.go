@@ -253,8 +253,12 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 		}
 		if hint := msg.GetNodeShutdown(); hint != nil {
 			core.onNodeShutdown(errNodeShutdownHint)
+			if core.cancelAttach != nil {
+				core.cancelAttach()
+			}
 
 			return
+		}
 		}
 	}
 }
