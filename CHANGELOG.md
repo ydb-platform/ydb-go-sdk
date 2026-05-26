@@ -1,3 +1,4 @@
+## v3.138.2
 * Added an internal query transaction trace field `WithCommit` for spans and logs
 
 ## v3.138.1
