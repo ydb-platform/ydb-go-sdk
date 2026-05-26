@@ -59,6 +59,7 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 				Ydb_Query_V1.QueryService_AttachSessionClient, error,
 			) {
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+				stubAttachStreamContext(attachStream, nil)
 				var firstRecv atomic.Bool
 				breakableAttach := attachSessions.Add(1) == 1
 				attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {

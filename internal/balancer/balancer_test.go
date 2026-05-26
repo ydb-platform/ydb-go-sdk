@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync/atomic"
@@ -171,6 +172,53 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 	overloadedErr := xerrors.WithStackTrace(xerrors.Operation(
 		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
 	))
+
+	t.Run("BanCallbackPessimizesConnection", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		cc := mock.NewMockClientConnInterface(ctrl)
+		cc.EXPECT().Invoke(
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).DoAndReturn(func(ctx context.Context, _ string, _, _ any, _ ...grpc.CallOption) error {
+			conn.Ban(ctx, errors.New("node shutdown hint"))
+
+			return nil
+		})
+
+		cc1 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node1:2135",
+			NodeIDField:         1,
+			State:               state.Online,
+		}
+		cc2 := &mock.Conn{
+			AddrField: "node2:2135", NodeIDField: 2, State: state.Online,
+		}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(s)
+
+		err := b.Invoke(endpoint.WithNodeID(ctx, cc1.NodeIDField), "/test.Service/Method", nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, state.Banned, cc1.GetState())
+
+		for range 10 {
+			c, nextErr := b.nextConn(ctx)
+			require.NoError(t, nextErr)
+			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
+		}
+	})
 
 	t.Run("HappyPath", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

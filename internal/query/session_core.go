@@ -50,6 +50,7 @@ type (
 		nodeID         uint32
 		status         atomic.Uint32
 		onChangeStatus []func(status Status)
+		onNodeShutdown func(cause error)
 		cancelAttach   context.CancelFunc
 
 		registerCloseCancel func(context.CancelFunc) func()
@@ -178,7 +179,7 @@ func Open(
 	core.id = response.GetSessionId()
 	core.nodeID = uint32(response.GetNodeId())
 
-	if err = core.attach(ctx); err != nil {
+	if err = core.attach(ctx, client); err != nil {
 		_ = core.deleteSession(ctx)
 
 		return nil, xerrors.WithStackTrace(err)
@@ -189,7 +190,9 @@ func Open(
 	return core, nil
 }
 
-func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
+func (core *sessionCore) attach(
+	ctx context.Context, client Ydb_Query_V1.QueryServiceClient,
+) (finalErr error) {
 	onDone := gtrace.QueryOnSessionAttach(core.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach"),
 		core,
@@ -205,11 +208,17 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		}
 	}()
 
-	attachStream, err := core.Client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
+	// AttachSession must go through the balancer client so wrapCall installs a ban callback
+	// on the stream context (see attachStream.Context()).
+	attachStream, err := client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
 		SessionId: core.id,
 	})
 	if err != nil {
 		return xerrors.WithStackTrace(err)
+	}
+
+	core.onNodeShutdown = func(cause error) {
+		conn.Ban(attachStream.Context(), cause)
 	}
 
 	_, err = attachStream.Recv()
@@ -234,10 +243,21 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 
 func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryService_AttachSessionClient) {
 	for core.IsAlive() {
-		if _, recvErr := attachStream.Recv(); recvErr != nil {
+		if msg, recvErr := attachStream.Recv(); recvErr != nil {
 			core.releaseSession()
 
 			return
+		} else {
+			if hint := msg.GetSessionShutdown(); hint != nil {
+				core.releaseSession()
+
+				return
+			}
+			if hint := msg.GetNodeShutdown(); hint != nil {
+				core.onNodeShutdown(errNodeShutdownHint)
+
+				return
+			}
 		}
 	}
 }

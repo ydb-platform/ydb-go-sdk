@@ -432,7 +432,9 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 		}
 	}()
 
-	if err = f(ctx, cc); err != nil {
+	if err = f(conn.WithBanCallback(ctx, func(cause error) {
+		b.pool.Ban(ctx, cc, cause)
+	}), cc); err != nil {
 		if conn.UseWrapping(ctx) {
 			if credentials.IsAccessError(err) {
 				err = credentials.AccessError("no access", err,
