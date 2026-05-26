@@ -259,7 +259,6 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 
 			return
 		}
-		}
 	}
 }
 
