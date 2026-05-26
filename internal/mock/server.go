@@ -61,7 +61,7 @@ type server struct {
 	executeDataQueryCalls atomic.Uint64
 }
 
-// TriggerNodeShutdown makes every active AttachSession stream send a
+// TriggerNodeShutdown makes one AttachSession handler send a
 // NodeShutdown hint after its initial SessionState.
 func (m *server) TriggerNodeShutdown() {
 	select {
