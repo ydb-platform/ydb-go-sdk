@@ -64,7 +64,8 @@ func TestCreateSession(t *testing.T) {
 		stubAttachStreamContext(attachStream)
 		attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 			Status: Ydb.StatusIds_SUCCESS,
-		}, nil).AnyTimes()
+		}, nil)
+		attachStream.EXPECT().Recv().Return(nil, errSessionClosed).AnyTimes()
 		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
 			SessionId: "123",
 		}).Return(attachStream, nil)
