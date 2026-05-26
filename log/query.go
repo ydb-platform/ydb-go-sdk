@@ -668,7 +668,7 @@ func internalQuery(
 
 			return func(info trace.QueryTxQueryRowDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, DEBUG), "query transaction query done",
+					l.Log(WithLevel(ctx, DEBUG), "query transaction query row done",
 						kv.Latency(start),
 					)
 				} else {
