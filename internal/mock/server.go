@@ -421,14 +421,15 @@ func waitListenerReady(tb testing.TB, addr string) {
 	tb.Helper()
 
 	for range 100 {
-		conn, err := net.Dial("tcp", addr) //nolint:noctx
+		c, err := net.Dial("tcp", addr) //nolint:noctx
 		if err == nil {
-			conn.Close()
-
+			_ = c.Close()
 			return
 		}
 		time.Sleep(time.Millisecond)
 	}
+
+	tb.Fatalf("mock gRPC listener did not become ready: %s", addr)
 }
 
 // Server binds a random TCP port, registers Discovery + Table + Query mocks, and serves until Close or tb cleanup.
