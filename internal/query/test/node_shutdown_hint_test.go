@@ -65,7 +65,7 @@ func TestNodeShutdownHintPessimizesSessionNode(t *testing.T) {
 
 			return bannedNodeID == 1 && banCause != nil
 		}, time.Second, 10*time.Millisecond,
-			"NodeShutdown hint must pessimise the connection to the session node",
+			"NodeShutdown hint must pessimize the connection to the session node",
 		)
 
 		return nil
