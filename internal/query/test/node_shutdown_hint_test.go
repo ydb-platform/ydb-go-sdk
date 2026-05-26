@@ -71,7 +71,11 @@ func TestNodeShutdownHintPessimizesSessionNode(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-	require.ErrorContains(t, banCause, "received node shutdown hint")
+
+	banMu.Lock()
+	cause := banCause
+	banMu.Unlock()
+	require.ErrorContains(t, cause, "received node shutdown hint")
 
 	// The second node must stay available for new sessions.
 	err = driver.Query().Do(endpoint.WithNodeID(openCtx, 2), func(ctx context.Context, s query.Session) error {
