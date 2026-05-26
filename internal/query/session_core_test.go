@@ -30,7 +30,7 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 			SessionId: "123",
 		}, nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-		stubAttachStreamContext(attachStream, nil)
+		stubAttachStreamContext(attachStream)
 		var (
 			corePtr        atomic.Pointer[sessionCore]
 			startRecv      = make(chan struct{}, 1)
@@ -85,7 +85,7 @@ func TestSessionCoreAttachError(t *testing.T) {
 				return &Ydb_Query.DeleteSessionResponse{}, nil
 			})
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-		stubAttachStreamContext(attachStream, nil)
+		stubAttachStreamContext(attachStream)
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			return nil, errSessionClosed
 		}).AnyTimes()
@@ -109,7 +109,7 @@ func TestSessionCoreClose(t *testing.T) {
 			SessionId: "123",
 		}, nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-		stubAttachStreamContext(attachStream, nil)
+		stubAttachStreamContext(attachStream)
 		var (
 			corePtr        atomic.Pointer[sessionCore]
 			startRecv      = make(chan struct{}, 1)
@@ -202,7 +202,7 @@ func TestSessionCoreNodeShutdownHintBansConnection(t *testing.T) {
 			banned.Store(true)
 			require.ErrorIs(t, cause, errNodeShutdownHint)
 		})
-		stubAttachStreamContext(attachStream, ctx)
+		stubAttachStreamContextWith(ctx, attachStream)
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			if !firstRecv.Swap(true) {
 				return &Ydb_Query.SessionState{
@@ -247,7 +247,7 @@ func TestSessionCoreSessionShutdownHintClosesSession(t *testing.T) {
 
 		var firstRecv atomic.Bool
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-		stubAttachStreamContext(attachStream, nil)
+		stubAttachStreamContext(attachStream)
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			if !firstRecv.Swap(true) {
 				return &Ydb_Query.SessionState{

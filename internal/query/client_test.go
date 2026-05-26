@@ -35,7 +35,7 @@ func TestClient(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-			stubAttachStreamContext(attachStream, nil)
+			stubAttachStreamContext(attachStream)
 			attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil).AnyTimes()
@@ -97,7 +97,7 @@ func TestClient(t *testing.T) {
 			t.Run("OnRecv", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-				stubAttachStreamContext(attachStream, nil)
+				stubAttachStreamContext(attachStream)
 				attachStream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, "")).AnyTimes()
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
@@ -127,7 +127,7 @@ func TestClient(t *testing.T) {
 			t.Run("OnRecv", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-				stubAttachStreamContext(attachStream, nil)
+				stubAttachStreamContext(attachStream)
 				attachStream.EXPECT().Recv().Return(nil,
 					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 				)

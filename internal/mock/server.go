@@ -28,7 +28,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// ServerOption configures mock server behaviour.
+// ServerOption configures mock server behavior.
 type ServerOption func(*server)
 
 // WithClusterNodes makes discovery report multiple endpoints that share the
@@ -387,6 +387,38 @@ func select42ResultSet() *Ydb.ResultSet {
 	}
 }
 
+func discoveryEndpoints(host string, port uint32, nodeIDs []uint32) []*Ydb_Discovery.EndpointInfo {
+	endpoints := make([]*Ydb_Discovery.EndpointInfo, len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		endpoints[i] = &Ydb_Discovery.EndpointInfo{
+			Address:    host,
+			Port:       port,
+			LoadFactor: 0,
+			Ssl:        false,
+			Service:    nil,
+			Location:   "",
+			NodeId:     nodeID,
+			IpV4:       []string{"127.0.0.1"},
+		}
+	}
+
+	return endpoints
+}
+
+func waitListenerReady(tb testing.TB, addr string) {
+	tb.Helper()
+
+	for range 100 {
+		conn, err := net.Dial("tcp", addr) //nolint:noctx
+		if err == nil {
+			conn.Close()
+
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 // Server binds a random TCP port, registers Discovery + Table + Query mocks, and serves until Close or tb cleanup.
 func Server(tb testing.TB, opts ...ServerOption) *server {
 	tb.Helper()
@@ -419,22 +451,8 @@ func Server(tb testing.TB, opts ...ServerOption) *server {
 		nodeIDs = []uint32{1}
 	}
 
-	discoveryEndpoints := make([]*Ydb_Discovery.EndpointInfo, len(nodeIDs))
-	for i, nodeID := range nodeIDs {
-		discoveryEndpoints[i] = &Ydb_Discovery.EndpointInfo{
-			Address:    host,
-			Port:       uint32(port),
-			LoadFactor: 0,
-			Ssl:        false,
-			Service:    nil,
-			Location:   "",
-			NodeId:     nodeID,
-			IpV4:       []string{"127.0.0.1"},
-		}
-	}
-
 	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(m.grpcServer, &discoverySrv{
-		endpoints: discoveryEndpoints,
+		endpoints: discoveryEndpoints(host, uint32(port), nodeIDs),
 	})
 	Ydb_Table_V1.RegisterTableServiceServer(m.grpcServer, &tableSrv{mock: m})
 	Ydb_Query_V1.RegisterQueryServiceServer(m.grpcServer, &querySrv{mock: m})
@@ -445,15 +463,7 @@ func Server(tb testing.TB, opts ...ServerOption) *server {
 
 	tb.Cleanup(m.Close)
 
-	for range 100 {
-		conn, err := net.Dial("tcp", lis.Addr().String()) //nolint:noctx
-		if err == nil {
-			conn.Close()
-
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitListenerReady(tb, lis.Addr().String())
 
 	return m
 }

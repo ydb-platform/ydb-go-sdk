@@ -239,21 +239,22 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 
 func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryService_AttachSessionClient) {
 	for core.IsAlive() {
-		if msg, recvErr := attachStream.Recv(); recvErr != nil {
+		msg, recvErr := attachStream.Recv()
+		if recvErr != nil {
 			core.releaseSession()
 
 			return
-		} else {
-			if hint := msg.GetSessionShutdown(); hint != nil {
-				core.releaseSession()
+		}
 
-				return
-			}
-			if hint := msg.GetNodeShutdown(); hint != nil {
-				core.onNodeShutdown(errNodeShutdownHint)
+		if hint := msg.GetSessionShutdown(); hint != nil {
+			core.releaseSession()
 
-				return
-			}
+			return
+		}
+		if hint := msg.GetNodeShutdown(); hint != nil {
+			core.onNodeShutdown(errNodeShutdownHint)
+
+			return
 		}
 	}
 }
