@@ -199,6 +199,7 @@ type (
 		Call    Call
 
 		Tx         TxInfo
+		Session    SessionInfo
 		Query      string
 		Label      string
 		WithCommit bool
@@ -249,6 +250,7 @@ type (
 		Call    Call
 
 		Tx         TxInfo
+		Session    SessionInfo
 		Query      string
 		Label      string
 		WithCommit bool

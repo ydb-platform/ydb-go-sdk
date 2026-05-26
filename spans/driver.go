@@ -430,9 +430,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 // address comes in `host:port` form (e.g. "8e5d46f58bc6:2136"); we split
 // it so the span has both attributes per OTel semantic conventions.
 //
-// Additionally, the YDB node id (also exposed by the Endpoint) is attached
-// as ydb.node.id; we set it here so even spans created above the session
-// (e.g. ydb.RunWithRetry / ydb.Try) can be filtered by node in Tempo.
+// Additionally, endpoint metadata is attached as YDB-specific attributes.
 func annotateNetworkPeer(s Span, endpoint trace.EndpointInfo) {
 	if endpoint == nil {
 		return
@@ -441,7 +439,7 @@ func annotateNetworkPeer(s Span, endpoint trace.EndpointInfo) {
 	if addr == "" {
 		return
 	}
-	attrs := make([]KeyValue, 0, 3)
+	attrs := make([]KeyValue, 0, 4)
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
 		attrs = append(attrs, kv.String(AttrNetworkPeerAddress, addr))
@@ -454,7 +452,20 @@ func annotateNetworkPeer(s Span, endpoint trace.EndpointInfo) {
 	if dc := endpoint.Location(); dc != "" {
 		attrs = append(attrs, kv.String(AttrYDBNodeDC, dc))
 	}
-	s.SetAttributes(attrs...)
+	if id := endpoint.NodeID(); id != 0 {
+		attrs = append(attrs, kv.Int64(AttrYDBNodeID, int64(id)))
+	}
+	setSpanAttributes(s, attrs...)
+}
+
+type spanAttributesSetter interface {
+	SetAttributes(attributes ...KeyValue)
+}
+
+func setSpanAttributes(s Span, attrs ...KeyValue) {
+	if setter, ok := s.(spanAttributesSetter); ok {
+		setter.SetAttributes(attrs...)
+	}
 }
 
 type grpcStreamMsgCountersKey struct{}

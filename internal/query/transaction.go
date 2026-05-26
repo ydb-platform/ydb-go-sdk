@@ -87,7 +87,7 @@ func (tx *Transaction) QueryResultSet(
 
 	onDone := gtrace.QueryOnTxQueryResultSet(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"),
-		tx, q, txSettings.Label(), txSettings.TxControl().Commit(),
+		tx, tx.s, q, txSettings.Label(), txSettings.TxControl().Commit(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -141,7 +141,7 @@ func (tx *Transaction) QueryRow(
 
 	onDone := gtrace.QueryOnTxQueryRow(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryRow"),
-		tx, q, txSettings.Label(), txSettings.TxControl().Commit(),
+		tx, tx.s, q, txSettings.Label(), txSettings.TxControl().Commit(),
 	)
 	defer func() {
 		onDone(finalErr)

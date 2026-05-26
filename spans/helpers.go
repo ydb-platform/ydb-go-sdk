@@ -38,14 +38,13 @@ func finish(
 	fields ...KeyValue,
 ) {
 	if err != nil {
-		setSpanException(s, err)
+		setSpanError(s, err)
 	}
 	s.End(fields...)
 }
 
-// setSpanException is the Go counterpart of OTel SDK's SetException for
-// dotnet/java. It marks the span as failed and attaches OTel-compliant error
-// attributes:
+// setSpanError marks the span as failed and attaches OTel-compliant error
+// attributes.
 //
 //   - error.type
 //   - db.response.status_code (only when the error carries a YDB status code)
@@ -55,7 +54,7 @@ func finish(
 //   - "ydb_error"       for any other ydb.Error,
 //   - the Go dynamic type name (e.g. "*errors.errorString",
 //     "context.deadlineExceededError") otherwise.
-func setSpanException(s Span, err error) {
+func setSpanError(s Span, err error) {
 	s.Error(err, errorAttrs(err)...)
 }
 

@@ -132,6 +132,40 @@ func TestQuerySpanNamesAreOTelCompliant(t *testing.T) {
 		require.Len(t, spans, 1)
 		require.Equal(t, int64(42), spans[0].attr(AttrYDBNodeID))
 	})
+
+	t.Run("ydb.ExecuteQuery on TxQueryResultSet sets node id", func(t *testing.T) {
+		c := ctx
+		done := q.OnTxQueryResultSet(trace.QueryTxQueryResultSetStartInfo{
+			Context: &c,
+			Call:    call,
+			Session: session,
+			Tx:      tx,
+			Query:   "SELECT 3",
+		})
+		require.NotNil(t, done)
+		done(trace.QueryTxQueryResultSetDoneInfo{})
+
+		spans := adapter.byName(SpanNameExecuteQuery)
+		s := spans[len(spans)-1]
+		require.Equal(t, int64(42), s.attr(AttrYDBNodeID))
+	})
+
+	t.Run("ydb.ExecuteQuery on TxQueryRow sets node id", func(t *testing.T) {
+		c := ctx
+		done := q.OnTxQueryRow(trace.QueryTxQueryRowStartInfo{
+			Context: &c,
+			Call:    call,
+			Session: session,
+			Tx:      tx,
+			Query:   "SELECT 4",
+		})
+		require.NotNil(t, done)
+		done(trace.QueryTxQueryRowDoneInfo{})
+
+		spans := adapter.byName(SpanNameExecuteQuery)
+		s := spans[len(spans)-1]
+		require.Equal(t, int64(42), s.attr(AttrYDBNodeID))
+	})
 }
 
 func TestQueryNoisySpansAreSuppressed(t *testing.T) {

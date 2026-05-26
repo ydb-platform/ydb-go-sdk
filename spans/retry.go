@@ -104,7 +104,7 @@ func Retry(adapter Adapter) (t trace.Retry) {
 		return func(info trace.RetryLoopDoneInfo) {
 			fields := fieldsFromStore(ctx)
 			if info.Error != nil {
-				setSpanException(start, info.Error)
+				setSpanError(start, info.Error)
 			}
 			start.End(fields...)
 		}
@@ -130,7 +130,7 @@ func Retry(adapter Adapter) (t trace.Retry) {
 
 		return func(info trace.RetryAttemptDoneInfo) {
 			if info.Error != nil {
-				setSpanException(start, info.Error)
+				setSpanError(start, info.Error)
 			}
 			start.End()
 		}

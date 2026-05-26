@@ -2100,11 +2100,12 @@ func QueryOnTxQuery(t *trace.Query, c *context.Context, c1 trace.Call, session t
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxQueryResultSet(t *trace.Query, c *context.Context, c1 trace.Call, tx trace.TxInfo, query string, label string, withCommit bool) func(error) {
+func QueryOnTxQueryResultSet(t *trace.Query, c *context.Context, c1 trace.Call, tx trace.TxInfo, session trace.SessionInfo, query string, label string, withCommit bool) func(error) {
 	var p trace.QueryTxQueryResultSetStartInfo
 	p.Context = c
 	p.Call = c1
 	p.Tx = tx
+	p.Session = session
 	p.Query = query
 	p.Label = label
 	p.WithCommit = withCommit
@@ -2116,11 +2117,12 @@ func QueryOnTxQueryResultSet(t *trace.Query, c *context.Context, c1 trace.Call, 
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxQueryRow(t *trace.Query, c *context.Context, c1 trace.Call, tx trace.TxInfo, query string, label string, withCommit bool) func(error) {
+func QueryOnTxQueryRow(t *trace.Query, c *context.Context, c1 trace.Call, tx trace.TxInfo, session trace.SessionInfo, query string, label string, withCommit bool) func(error) {
 	var p trace.QueryTxQueryRowStartInfo
 	p.Context = c
 	p.Call = c1
 	p.Tx = tx
+	p.Session = session
 	p.Query = query
 	p.Label = label
 	p.WithCommit = withCommit

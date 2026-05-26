@@ -18,33 +18,9 @@ FROM golang:1.24-alpine AS build
 WORKDIR /src
 
 # The example is a sub-module that depends on the parent SDK via a
-# `replace` directive (../..). Copy both the parent module and the example
-# so `go build` can resolve the local replacement.
-COPY go.mod go.sum ./
-COPY internal ./internal
-COPY pkg ./pkg
-COPY trace ./trace
-COPY retry ./retry
-COPY spans ./spans
-COPY meta ./meta
-COPY query ./query
-COPY balancers ./balancers
-COPY config ./config
-COPY operation ./operation
-COPY scheme ./scheme
-COPY scripting ./scripting
-COPY sugar ./sugar
-COPY table ./table
-COPY topic ./topic
-COPY ratelimiter ./ratelimiter
-COPY discovery ./discovery
-COPY credentials ./credentials
-COPY coordination ./coordination
-COPY log ./log
-COPY metrics ./metrics
-COPY *.go ./
-
-COPY examples/opentelemetry ./examples/opentelemetry
+# `replace` directive (../..). Copy the whole SDK tree so future package
+# additions are automatically available to the Docker build.
+COPY . ./
 
 WORKDIR /src/examples/opentelemetry
 

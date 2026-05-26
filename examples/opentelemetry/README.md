@@ -8,9 +8,10 @@ The infrastructure (compose file, OTel collector / Tempo / Prometheus /
 Grafana configs, YDB local config and provisioned Grafana dashboards) is
 mirrored 1-to-1 from the .NET SDK example
 [`Ydb.Sdk.AdoNet.OpenTelemetry`](https://github.com/ydb-platform/ydb-dotnet-sdk/tree/main/examples/Ydb.Sdk.AdoNet.OpenTelemetry)
-so the two stacks can be compared side-by-side. The only Go-specific
-piece is the `app` service in `compose-e2e.yaml`, which builds and runs
-this directory's `main.go` from the local Dockerfile.
+so the two stacks can be compared side-by-side. The Go-specific piece is
+the `app` service in `compose-e2e.yaml`, which builds and runs this
+directory's `main.go` from the local Dockerfile and wires traces via
+[`ydb-go-sdk-otel`](https://github.com/ydb-platform/ydb-go-sdk-otel).
 
 ## How to run
 
@@ -46,14 +47,13 @@ YDB_DSN=grpc://localhost:2136/local \
 
 ## Enable server-side tracing in YDB (end-to-end)
 
-This demo already exports app traces to the collector. To also export
-**YDB server traces** into the same collector:
+This demo exports both application traces and **YDB server traces** into
+the same collector. The `ydb` service starts with
+`./ydb_config/ydb-config.yaml`, which already includes the
+`tracing_config` from `./ydb_config/otel-tracing-snippet.yaml`.
 
 ```bash
-# 1) edit ./ydb_config/ydb-config.yaml and add tracing_config
-#    (see ./ydb_config/otel-tracing-snippet.yaml)
-#
-# 2) recreate the ydb container to pick up the updated config
+# Recreate the ydb container after changing ./ydb_config/ydb-config.yaml
 docker-compose -f compose-e2e.yaml up -d --force-recreate ydb
 ```
 
@@ -80,7 +80,7 @@ docker-compose -f compose-e2e.yaml up -d --force-recreate ydb
 Spans are also printed in the `otel-collector` logs (the `debug`
 exporter is enabled).
 
-## Tracing reference (`spans.Adapter` implementation)
+## Tracing reference
 
 | Span                    | Kind     | When emitted                                                                                                  |
 | ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
@@ -125,9 +125,9 @@ ydb.RunWithRetry          (Internal)
 
 ### Common attributes
 
-The adapter in `adapter.go` attaches the OpenTelemetry
-[database semantic conventions](https://opentelemetry.io/docs/specs/semconv/database/database-spans/)
-on every span:
+The SDK emits OpenTelemetry
+[database semantic convention](https://opentelemetry.io/docs/specs/semconv/database/database-spans/)
+attributes where the data is available:
 
 | Attribute              | Source                                        |
 | ---------------------- | --------------------------------------------- |

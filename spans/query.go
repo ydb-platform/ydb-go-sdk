@@ -474,6 +474,7 @@ func query(adapter Adapter) trace.Query {
 				adapter,
 				info.Context,
 				SpanNameExecuteQuery,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 				kv.Bool("WithCommit", info.WithCommit),
 			)
 
@@ -492,6 +493,7 @@ func query(adapter Adapter) trace.Query {
 				adapter,
 				info.Context,
 				SpanNameExecuteQuery,
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 				kv.Bool("WithCommit", info.WithCommit),
 			)
 

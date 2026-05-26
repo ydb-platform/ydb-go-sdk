@@ -25,15 +25,15 @@ import (
 	"syscall"
 	"time"
 
+	ydbOtel "github.com/ydb-platform/ydb-go-sdk-otel"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	ydbtrace "github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/spans"
 )
 
 const (
@@ -113,11 +113,6 @@ func newTracerProvider(ctx context.Context, otlpAddr string) (*sdktrace.TracerPr
 }
 
 func openDB(ctx context.Context, dsn string) (*ydb.Driver, error) {
-	// Best-effort parsing of database / endpoint from the DSN so the adapter
-	// can attach db.namespace / server.address / server.port.
-	endpoint, database := parseDSN(dsn)
-	adapter := newOTelAdapter(serviceName, database, endpoint)
-
 	return ydb.Open(ctx, dsn,
 		ydb.WithApplicationName(serviceName),
 		// Bump dial timeout: the SDK default is 5s which is fine on a real
@@ -126,38 +121,11 @@ func openDB(ctx context.Context, dsn string) (*ydb.Driver, error) {
 		// internal cluster-discovery retry loop will retry a few times
 		// using this per-attempt timeout.
 		ydb.WithDialTimeout(30*time.Second),
-		spans.WithTraces(adapter),
+		ydbOtel.WithTracer(
+			otel.Tracer(serviceName),
+			ydbOtel.WithDetailer(ydbtrace.DetailsAll),
+		),
 	)
-}
-
-// parseDSN extracts host:port and database from the YDB connection string,
-// stripping the grpc[s]:// scheme. The result is purely informational —
-// ydb.Open uses the original DSN.
-func parseDSN(dsn string) (endpoint, database string) {
-	endpoint, database = dsn, ""
-	for _, prefix := range []string{"grpcs://", "grpc://"} {
-		if len(dsn) >= len(prefix) && dsn[:len(prefix)] == prefix {
-			endpoint = dsn[len(prefix):]
-
-			break
-		}
-	}
-	if i := indexByte(endpoint, '/'); i >= 0 {
-		database = endpoint[i:]
-		endpoint = endpoint[:i]
-	}
-
-	return endpoint, database
-}
-
-func indexByte(s string, c byte) int {
-	for i := 0; i < len(s); i++ {
-		if s[i] == c {
-			return i
-		}
-	}
-
-	return -1
 }
 
 func runDemo(ctx context.Context, db *ydb.Driver) error {
