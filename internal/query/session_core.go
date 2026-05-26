@@ -213,6 +213,8 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
+	// attach is called once per sessionCore lifetime; a reconnect path must not
+	// call attach again while listenAttachStream may still be running.
 	core.onNodeShutdown = func(cause error) {
 		conn.Ban(attachStream.Context(), cause)
 	}

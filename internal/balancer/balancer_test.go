@@ -26,6 +26,35 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+var errNodeShutdownHint = errors.New("received node shutdown hint")
+
+// poolRegisteredConn routes gRPC to a mock and state to a pool-registered connection.
+type poolRegisteredConn struct {
+	grpc.ClientConnInterface
+
+	inner conn.Conn
+}
+
+func (c *poolRegisteredConn) Endpoint() endpoint.Endpoint {
+	return c.inner.Endpoint()
+}
+
+func (c *poolRegisteredConn) LastUsage() (*time.Time, error) {
+	return c.inner.LastUsage()
+}
+
+func (c *poolRegisteredConn) GetState() state.State {
+	return c.inner.GetState()
+}
+
+func (c *poolRegisteredConn) SetState(ctx context.Context, s state.State) state.State {
+	return c.inner.SetState(ctx, s)
+}
+
+func (c *poolRegisteredConn) Unban(ctx context.Context) state.State {
+	return c.inner.Unban(ctx)
+}
+
 func TestBalancer_discoveryConn(t *testing.T) {
 	// testTimeout defines the test timeout and is an example of an actual user-defined timeout.
 	//
@@ -172,6 +201,57 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 	overloadedErr := xerrors.WithStackTrace(xerrors.Operation(
 		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
 	))
+
+	// When the connection is registered in the pool, wrapCall's optimistic unban on the
+	// next successful RPC clears a hint-based ban. BanCallbackPessimizesConnection does
+	// not catch this because its mock connections are not in the pool (pool.Allow no-ops).
+	t.Run("HintBanClearedByOptimisticUnbanWhenConnInPool", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		grpcCC := mock.NewMockClientConnInterface(ctrl)
+		grpcCC.EXPECT().Invoke(
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).Return(nil).Times(2)
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		e1 := endpoint.New("node1:2135", endpoint.WithID(1))
+		poolConn := pool.Get(e1)
+		poolConn.SetState(ctx, state.Online)
+
+		cc1 := &poolRegisteredConn{
+			inner:               poolConn,
+			ClientConnInterface: grpcCC,
+		}
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(s)
+
+		nodeCtx := endpoint.WithNodeID(ctx, e1.NodeID())
+
+		err := b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, state.Online, cc1.GetState())
+
+		// NodeShutdown on attach stream is delivered after the RPC that created the stream returns.
+		pool.Ban(ctx, cc1, errNodeShutdownHint)
+		require.Equal(t, state.Banned, cc1.GetState())
+
+		err = b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
+		require.NoError(t, err)
+		require.NotEqual(t, state.Banned, cc1.GetState(),
+			"optimistic unban on the next successful RPC clears a hint-based ban when the connection is in the pool",
+		)
+	})
 
 	t.Run("BanCallbackPessimizesConnection", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
