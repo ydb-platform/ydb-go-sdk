@@ -187,9 +187,10 @@ type (
 		Context *context.Context
 		Call    Call
 
-		Tx    TxInfo
-		Query string
-		Label string
+		Tx         TxInfo
+		Query      string
+		Label      string
+		WithCommit bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryResultSetDoneInfo struct {
@@ -236,9 +237,10 @@ type (
 		Context *context.Context
 		Call    Call
 
-		Tx    TxInfo
-		Query string
-		Label string
+		Tx         TxInfo
+		Query      string
+		Label      string
+		WithCommit bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryRowDoneInfo struct {
@@ -331,10 +333,11 @@ type (
 		Context *context.Context
 		Call    Call
 
-		Session SessionInfo
-		Tx      TxInfo
-		Query   string
-		Label   string
+		Session    SessionInfo
+		Tx         TxInfo
+		Query      string
+		Label      string
+		WithCommit bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxExecDoneInfo struct {
@@ -381,10 +384,11 @@ type (
 		Context *context.Context
 		Call    Call
 
-		Session SessionInfo
-		Tx      TxInfo
-		Query   string
-		Label   string
+		Session    SessionInfo
+		Tx         TxInfo
+		Query      string
+		Label      string
+		WithCommit bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryDoneInfo struct {
