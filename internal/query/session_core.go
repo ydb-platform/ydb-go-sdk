@@ -179,7 +179,7 @@ func Open(
 	core.id = response.GetSessionId()
 	core.nodeID = uint32(response.GetNodeId())
 
-	if err = core.attach(ctx, client); err != nil {
+	if err = core.attach(ctx); err != nil {
 		_ = core.deleteSession(ctx)
 
 		return nil, xerrors.WithStackTrace(err)
@@ -190,9 +190,7 @@ func Open(
 	return core, nil
 }
 
-func (core *sessionCore) attach(
-	ctx context.Context, client Ydb_Query_V1.QueryServiceClient,
-) (finalErr error) {
+func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 	onDone := gtrace.QueryOnSessionAttach(core.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach"),
 		core,
@@ -208,9 +206,7 @@ func (core *sessionCore) attach(
 		}
 	}()
 
-	// AttachSession must go through the balancer client so wrapCall installs a ban callback
-	// on the stream context (see attachStream.Context()).
-	attachStream, err := client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
+	attachStream, err := core.Client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
 		SessionId: core.id,
 	})
 	if err != nil {
