@@ -24,6 +24,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var _ baseTx.Transaction = &Transaction{}
@@ -694,4 +695,97 @@ func TestTransactionExecuteSettingsWithTxControl(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrOptionNotForTxExecute)
 	})
+}
+
+func TestTransactionTraceWithCommit(t *testing.T) {
+	stopExecute := errors.New("execute stopped")
+
+	for _, withCommit := range []bool{false, true} {
+		t.Run(fmt.Sprintf("WithCommit=%v", withCommit), func(t *testing.T) {
+			var executeOpts []options.Execute
+			if withCommit {
+				executeOpts = append(executeOpts, query.WithCommit())
+			}
+
+			t.Run("Exec", func(t *testing.T) {
+				var gotWithCommit bool
+
+				e := fixenv.New(t)
+				QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).
+					Return(nil, stopExecute).AnyTimes()
+
+				tx := TransactionOverGrpcMock(e)
+				tx.s.trace = &trace.Query{
+					OnTxExec: func(info trace.QueryTxExecStartInfo) func(trace.QueryTxExecDoneInfo) {
+						gotWithCommit = info.WithCommit
+
+						return func(trace.QueryTxExecDoneInfo) {}
+					},
+				}
+
+				_ = tx.Exec(sf.Context(e), "", executeOpts...)
+				require.Equal(t, withCommit, gotWithCommit)
+			})
+
+			t.Run("Query", func(t *testing.T) {
+				var gotWithCommit bool
+
+				e := fixenv.New(t)
+				QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).
+					Return(nil, stopExecute).AnyTimes()
+
+				tx := TransactionOverGrpcMock(e)
+				tx.s.trace = &trace.Query{
+					OnTxQuery: func(info trace.QueryTxQueryStartInfo) func(trace.QueryTxQueryDoneInfo) {
+						gotWithCommit = info.WithCommit
+
+						return func(trace.QueryTxQueryDoneInfo) {}
+					},
+				}
+
+				_, _ = tx.Query(sf.Context(e), "", executeOpts...)
+				require.Equal(t, withCommit, gotWithCommit)
+			})
+
+			t.Run("QueryResultSet", func(t *testing.T) {
+				var gotWithCommit bool
+
+				e := fixenv.New(t)
+				QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).
+					Return(nil, stopExecute).AnyTimes()
+
+				tx := TransactionOverGrpcMock(e)
+				tx.s.trace = &trace.Query{
+					OnTxQueryResultSet: func(info trace.QueryTxQueryResultSetStartInfo) func(trace.QueryTxQueryResultSetDoneInfo) {
+						gotWithCommit = info.WithCommit
+
+						return func(trace.QueryTxQueryResultSetDoneInfo) {}
+					},
+				}
+
+				_, _ = tx.QueryResultSet(sf.Context(e), "", executeOpts...)
+				require.Equal(t, withCommit, gotWithCommit)
+			})
+
+			t.Run("QueryRow", func(t *testing.T) {
+				var gotWithCommit bool
+
+				e := fixenv.New(t)
+				QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).
+					Return(nil, stopExecute).AnyTimes()
+
+				tx := TransactionOverGrpcMock(e)
+				tx.s.trace = &trace.Query{
+					OnTxQueryRow: func(info trace.QueryTxQueryRowStartInfo) func(trace.QueryTxQueryRowDoneInfo) {
+						gotWithCommit = info.WithCommit
+
+						return func(trace.QueryTxQueryRowDoneInfo) {}
+					},
+				}
+
+				_, _ = tx.QueryRow(sf.Context(e), "", executeOpts...)
+				require.Equal(t, withCommit, gotWithCommit)
+			})
+		})
+	}
 }
