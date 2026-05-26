@@ -490,6 +490,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
+				kv.Bool("WithCommit", info.WithCommit),
 			)
 
 			return func(info trace.QueryTxExecDoneInfo) {
@@ -508,6 +509,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
+				kv.Bool("WithCommit", info.WithCommit),
 			)
 
 			return func(info trace.QueryTxQueryDoneInfo) {
@@ -526,6 +528,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
+				kv.Bool("WithCommit", info.WithCommit),
 			)
 
 			return func(info trace.QueryTxQueryResultSetDoneInfo) {
@@ -544,6 +547,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				info.Call.String(),
 				kv.String("Query", strings.TrimSpace(info.Query)),
+				kv.Bool("WithCommit", info.WithCommit),
 			)
 
 			return func(info trace.QueryTxQueryRowDoneInfo) {

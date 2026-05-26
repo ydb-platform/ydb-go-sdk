@@ -80,7 +80,7 @@ func (tx *Transaction) QueryResultSet(
 
 	onDone := gtrace.QueryOnTxQueryResultSet(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"),
-		tx, q, txSettings.Label(),
+		tx, q, txSettings.Label(), txSettings.TxControl().Commit(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -134,7 +134,7 @@ func (tx *Transaction) QueryRow(
 
 	onDone := gtrace.QueryOnTxQueryRow(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryRow"),
-		tx, q, txSettings.Label(),
+		tx, q, txSettings.Label(), txSettings.TxControl().Commit(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -203,7 +203,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 
 	onDone := gtrace.QueryOnTxExec(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Exec"),
-		tx.s, tx, q, txSettings.Label(),
+		tx.s, tx, q, txSettings.Label(), txSettings.TxControl().Commit(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -297,7 +297,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 
 	onDone := gtrace.QueryOnTxQuery(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Query"),
-		tx.s, tx, q, txSettings.Label(),
+		tx.s, tx, q, txSettings.Label(), txSettings.TxControl().Commit(),
 	)
 	defer func() {
 		onDone(finalErr)

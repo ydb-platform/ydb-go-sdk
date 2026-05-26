@@ -573,6 +573,7 @@ func internalQuery(
 				kv.String("SessionID", info.Session.ID()),
 				kv.String("TransactionID", info.Tx.ID()),
 				kv.String("SessionStatus", info.Session.Status()),
+				kv.Bool("WithCommit", info.WithCommit),
 			)
 			start := time.Now()
 
@@ -603,6 +604,7 @@ func internalQuery(
 				kv.String("SessionID", info.Session.ID()),
 				kv.String("TransactionID", info.Tx.ID()),
 				kv.String("SessionStatus", info.Session.Status()),
+				kv.Bool("WithCommit", info.WithCommit),
 			)
 			start := time.Now()
 
@@ -617,6 +619,64 @@ func internalQuery(
 						lvl = DEBUG
 					}
 					l.Log(WithLevel(ctx, lvl), "query transaction query failed",
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
+					)
+				}
+			}
+		},
+		OnTxQueryResultSet: func(info trace.QueryTxQueryResultSetStartInfo) func(trace.QueryTxQueryResultSetDoneInfo) {
+			if d.Details()&trace.QueryTransactionEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "query", "result", "set")
+			l.Log(ctx, "ydb query transaction query result set starting...",
+				kv.String("TransactionID", info.Tx.ID()),
+				kv.Bool("WithCommit", info.WithCommit),
+			)
+			start := time.Now()
+
+			return func(info trace.QueryTxQueryResultSetDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, DEBUG), "query transaction query result set done",
+						kv.Latency(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "query transaction query result set failed",
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
+					)
+				}
+			}
+		},
+		OnTxQueryRow: func(info trace.QueryTxQueryRowStartInfo) func(trace.QueryTxQueryRowDoneInfo) {
+			if d.Details()&trace.QueryTransactionEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "query", "row")
+			l.Log(ctx, "ydb query transaction query row starting...",
+				kv.String("TransactionID", info.Tx.ID()),
+				kv.Bool("WithCommit", info.WithCommit),
+			)
+			start := time.Now()
+
+			return func(info trace.QueryTxQueryRowDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, DEBUG), "query transaction query row done",
+						kv.Latency(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "query transaction query row failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
