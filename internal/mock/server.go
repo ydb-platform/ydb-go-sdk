@@ -424,6 +424,7 @@ func waitListenerReady(tb testing.TB, addr string) {
 		c, err := net.Dial("tcp", addr) //nolint:noctx
 		if err == nil {
 			_ = c.Close()
+
 			return
 		}
 		time.Sleep(time.Millisecond)
