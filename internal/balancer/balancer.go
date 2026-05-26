@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -78,6 +79,7 @@ type Balancer struct {
 
 	connectionsState atomic.Pointer[connectionsState]
 	closed           atomic.Bool
+	stickyHintBans   sync.Map // map[conn.Conn]struct{}
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -425,7 +427,9 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	defer func() {
 		if err == nil {
 			if !b.driverConfig.DisableOptimisticUnban() && cc.GetState() == state.Banned {
-				b.pool.Allow(ctx, cc)
+				if _, sticky := b.stickyHintBans.Load(cc); !sticky {
+					b.pool.Allow(ctx, cc)
+				}
 			}
 		} else if IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
 			b.pool.Ban(ctx, cc, err)
@@ -433,6 +437,7 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	}()
 
 	if err = f(conn.WithBanCallback(ctx, func(cause error) {
+		b.stickyHintBans.Store(cc, struct{}{})
 		b.pool.Ban(ctx, cc, cause)
 	}), cc); err != nil {
 		if conn.UseWrapping(ctx) {

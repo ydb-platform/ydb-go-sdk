@@ -202,18 +202,27 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
 	))
 
-	// When the connection is registered in the pool, wrapCall's optimistic unban on the
-	// next successful RPC clears a hint-based ban. BanCallbackPessimizesConnection does
-	// not catch this because its mock connections are not in the pool (pool.Allow no-ops).
-	t.Run("HintBanClearedByOptimisticUnbanWhenConnInPool", func(t *testing.T) {
+	t.Run("HintBanRemainsAfterSuccessfulRPCWhenConnInPool", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		grpcCC := mock.NewMockClientConnInterface(ctrl)
-		grpcCC.EXPECT().Invoke(
-			gomock.Any(),
-			gomock.Any(),
-			gomock.Any(),
-			gomock.Any(),
-		).Return(nil).Times(2)
+		gomock.InOrder(
+			grpcCC.EXPECT().Invoke(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).DoAndReturn(func(ctx context.Context, _ string, _, _ any, _ ...grpc.CallOption) error {
+				conn.Ban(ctx, errNodeShutdownHint)
+
+				return nil
+			}),
+			grpcCC.EXPECT().Invoke(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(nil),
+		)
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
@@ -240,16 +249,12 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		err := b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
 		require.NoError(t, err)
-		require.Equal(t, state.Online, cc1.GetState())
-
-		// NodeShutdown on attach stream is delivered after the RPC that created the stream returns.
-		pool.Ban(ctx, cc1, errNodeShutdownHint)
 		require.Equal(t, state.Banned, cc1.GetState())
 
 		err = b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
 		require.NoError(t, err)
-		require.NotEqual(t, state.Banned, cc1.GetState(),
-			"optimistic unban on the next successful RPC clears a hint-based ban when the connection is in the pool",
+		require.Equal(t, state.Banned, cc1.GetState(),
+			"hint-based ban must remain after a successful RPC when the connection is in the pool",
 		)
 	})
 
