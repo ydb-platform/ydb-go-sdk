@@ -647,7 +647,7 @@ func internalQuery(
 					if !xerrors.IsYdb(info.Error) {
 						lvl = DEBUG
 					}
-					l.Log(WithLevel(ctx, lvl), "query transaction query failed",
+					l.Log(WithLevel(ctx, lvl), "query transaction query result set failed",
 						kv.Latency(start),
 						kv.Error(info.Error),
 						kv.Version(),
