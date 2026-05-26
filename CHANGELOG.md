@@ -1,4 +1,4 @@
-* Added a query trace field `WithCommit` for spans and logs
+* Added an internal query transaction trace field `WithCommit` for spans and logs
 
 ## v3.138.1
 * Moved the trace-generated code in `trace` package from the public API to the internal packages
