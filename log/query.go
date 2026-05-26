@@ -660,7 +660,7 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "query", "row")
-			l.Log(ctx, "ydb query transaction query starting...",
+			l.Log(ctx, "ydb query transaction query row starting...",
 				kv.String("TransactionID", info.Tx.ID()),
 				kv.Bool("WithCommit", info.WithCommit),
 			)
