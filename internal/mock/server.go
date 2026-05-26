@@ -70,12 +70,22 @@ func (m *server) TriggerNodeShutdown() {
 	}
 }
 
-func (m *server) nextQuerySession() string {
-	return fmt.Sprintf("q-%d", m.querySessionID.Add(1))
+func (m *server) nextQuerySession() (string, uint32) {
+	id := m.querySessionID.Add(1)
+
+	return fmt.Sprintf("q-%d", id), m.querySessionNodeID(id)
 }
 
 func (m *server) nextTableSession() string {
 	return fmt.Sprintf("t-%d", m.tableSessionID.Add(1))
+}
+
+func (m *server) querySessionNodeID(sessionID uint64) uint32 {
+	if len(m.clusterNodeIDs) == 0 {
+		return 1
+	}
+
+	return m.clusterNodeIDs[(sessionID-1)%uint64(len(m.clusterNodeIDs))]
 }
 
 // ExecuteQueryCalls returns the number of times QueryService.ExecuteQuery
@@ -207,10 +217,12 @@ func (m *querySrv) CreateSession(
 	_ context.Context,
 	_ *Ydb_Query.CreateSessionRequest,
 ) (*Ydb_Query.CreateSessionResponse, error) {
+	sessionID, nodeID := m.mock.nextQuerySession()
+
 	return &Ydb_Query.CreateSessionResponse{
 		Status:    Ydb.StatusIds_SUCCESS,
-		SessionId: m.mock.nextQuerySession(),
-		NodeId:    1,
+		SessionId: sessionID,
+		NodeId:    int64(nodeID),
 	}, nil
 }
 

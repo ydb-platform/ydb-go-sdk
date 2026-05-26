@@ -230,7 +230,12 @@ func TestSessionCoreNodeShutdownHintBansConnection(t *testing.T) {
 		}, time.Second, time.Millisecond,
 			"NodeShutdown hint must call conn.Ban on the attach context",
 		)
-		require.True(t, core.IsAlive(), "node shutdown must not close the session")
+		require.Eventually(t, func() bool {
+			return !core.IsAlive()
+		}, time.Second, time.Millisecond,
+			"NodeShutdown hint must release the session",
+		)
+		require.Equal(t, StatusClosed.String(), core.Status())
 	}, xtest.StopAfter(time.Second))
 }
 
