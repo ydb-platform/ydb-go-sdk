@@ -24,6 +24,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 var errNodeShutdownHint = errors.New("received node shutdown hint")
@@ -203,59 +204,61 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 	))
 
 	t.Run("HintBanRemainsAfterSuccessfulRPCWhenConnInPool", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		grpcCC := mock.NewMockClientConnInterface(ctrl)
-		gomock.InOrder(
-			grpcCC.EXPECT().Invoke(
-				gomock.Any(),
-				gomock.Any(),
-				gomock.Any(),
-				gomock.Any(),
-			).DoAndReturn(func(ctx context.Context, _ string, _, _ any, _ ...grpc.CallOption) error {
-				conn.Ban(ctx, errNodeShutdownHint)
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			ctrl := gomock.NewController(t)
+			grpcCC := mock.NewMockClientConnInterface(ctrl)
+			gomock.InOrder(
+				grpcCC.EXPECT().Invoke(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).DoAndReturn(func(ctx context.Context, _ string, _, _ any, _ ...grpc.CallOption) error {
+					conn.Ban(ctx, errNodeShutdownHint)
 
-				return nil
-			}),
-			grpcCC.EXPECT().Invoke(
-				gomock.Any(),
-				gomock.Any(),
-				gomock.Any(),
-				gomock.Any(),
-			).Return(nil),
-		)
+					return nil
+				}),
+				grpcCC.EXPECT().Invoke(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(nil),
+			)
 
-		cfg := config.New()
-		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+			cfg := config.New()
+			pool := conn.NewPool(ctx, cfg)
+			defer func() { _ = pool.Release(ctx) }()
 
-		e1 := endpoint.New("node1:2135", endpoint.WithID(1))
-		poolConn := pool.Get(e1)
-		poolConn.SetState(ctx, state.Online)
+			e1 := endpoint.New("node1:2135", endpoint.WithID(1))
+			poolConn := pool.Get(e1)
+			poolConn.SetState(ctx, state.Online)
 
-		cc1 := &poolRegisteredConn{
-			inner:               poolConn,
-			ClientConnInterface: grpcCC,
-		}
+			cc1 := &poolRegisteredConn{
+				inner:               poolConn,
+				ClientConnInterface: grpcCC,
+			}
 
-		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
-		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
-		b.connectionsState.Store(s)
+			b := &Balancer{
+				driverConfig:   cfg,
+				pool:           pool,
+				balancerConfig: balancerConfig.Config{},
+			}
+			s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
+			b.connectionsState.Store(s)
 
-		nodeCtx := endpoint.WithNodeID(ctx, e1.NodeID())
+			nodeCtx := endpoint.WithNodeID(ctx, e1.NodeID())
 
-		err := b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
-		require.NoError(t, err)
-		require.Equal(t, state.Banned, cc1.GetState())
+			err := b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
+			require.NoError(t, err)
+			assert.Equal(t, state.Banned, cc1.GetState())
 
-		err = b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
-		require.NoError(t, err)
-		require.Equal(t, state.Banned, cc1.GetState(),
-			"hint-based ban must remain after a successful RPC when the connection is in the pool",
-		)
+			err = b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
+			require.NoError(t, err)
+			assert.Equal(t, state.Banned, cc1.GetState(),
+				"hint-based ban must remain after a successful RPC when the connection is in the pool",
+			)
+		})
 	})
 
 	t.Run("BanCallbackPessimizesConnection", func(t *testing.T) {
