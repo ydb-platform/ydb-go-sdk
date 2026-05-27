@@ -19,6 +19,10 @@ func UseWrapping(ctx context.Context) bool {
 }
 
 func WithBanCallback(ctx context.Context, callback func(cause error)) context.Context {
+	if callback == nil {
+		return ctx
+	}
+
 	return context.WithValue(ctx, ctxBan{}, onBan(callback))
 }
 
