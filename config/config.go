@@ -54,6 +54,7 @@ func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 func (c *Config) DisableOptimisticUnban() bool {
 	return true
 }
+
 // GrpcDialOptions reports about used grpc dialing options
 func (c *Config) GrpcDialOptions() []grpc.DialOption {
 	return append(
