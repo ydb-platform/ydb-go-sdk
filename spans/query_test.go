@@ -35,7 +35,7 @@ func TestQuerySpanNamesAreOTelCompliant(t *testing.T) {
 	q := query(adapter)
 
 	ctx := context.Background()
-	call := stack.FunctionID("test.caller")
+	call := stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/spans.TestQuerySpanNamesAreOTelCompliant")
 	session := &fakeSession{id: "session-1", status: "ready", nodeID: 42}
 	tx := &fakeTx{id: "tx-1"}
 
@@ -173,7 +173,7 @@ func TestQueryNoisySpansAreSuppressed(t *testing.T) {
 	q := query(adapter)
 
 	ctx := context.Background()
-	call := stack.FunctionID("test.caller")
+	call := stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/spans.TestQueryNoisySpansAreSuppressed")
 
 	// OnDo / OnDoTx / OnSessionBegin / OnPoolWith / OnPoolTry / OnPoolPut
 	// must NOT register handlers — they are intentionally suppressed so the
@@ -203,7 +203,7 @@ func TestQuerySpanFailureSetsExceptionAttrs(t *testing.T) {
 	adapter := &recordingAdapter{}
 	q := query(adapter)
 	ctx := context.Background()
-	call := stack.FunctionID("test.caller")
+	call := stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/spans.TestQuerySpanFailureSetsExceptionAttrs")
 
 	t.Run("ydb error sets db.response.status_code and error.type=ydb_error", func(t *testing.T) {
 		c := ctx

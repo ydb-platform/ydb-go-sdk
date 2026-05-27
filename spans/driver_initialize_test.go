@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -21,6 +20,10 @@ func (fakeEndpoint) Location() string       { return "local" }
 func (fakeEndpoint) LoadFactor() float32    { return 0 }
 func (fakeEndpoint) LastUpdated() time.Time { return time.Time{} }
 func (fakeEndpoint) LocalDC() bool          { return true }
+
+type fakeCall string
+
+func (c fakeCall) String() string { return string(c) }
 
 func TestDriverInitializeSpan(t *testing.T) {
 	const (
@@ -69,7 +72,7 @@ func TestDriverInitializeSpan(t *testing.T) {
 			done := d.OnBalancerClusterDiscoveryAttempt(
 				trace.DriverBalancerClusterDiscoveryAttemptStartInfo{
 					Context:  &ctx,
-					Call:     stack.FunctionID(tc.callID),
+					Call:     fakeCall(tc.callID),
 					Address:  "ydb:2136",
 					Database: "/local",
 				},
