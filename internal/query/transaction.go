@@ -41,7 +41,7 @@ func begin(
 	s *Session,
 	txSettings query.TransactionSettings,
 ) (txID string, finalErr error) {
-	onDone := trace.QueryOnSessionBeginTransaction(s.trace, &ctx,
+	onDone := gtrace.QueryOnSessionBeginTransaction(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.begin"),
 		s,
 	)

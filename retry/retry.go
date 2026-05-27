@@ -347,7 +347,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 
 		default:
 			attemptCtx := ctx
-			onAttemptDone := trace.RetryOnRetryAttempt(options.trace, &attemptCtx,
+			onAttemptDone := gtrace.RetryOnRetryAttempt(options.trace, &attemptCtx,
 				options.call, options.label, options.idempotent, attempts, nextBackoff,
 			)
 			v, err := opWithRecover(attemptCtx, options, op)
