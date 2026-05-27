@@ -219,9 +219,16 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		conn.Ban(attachStream.Context(), cause)
 	}
 
-	_, err = attachStream.Recv()
+	msg, err := attachStream.Recv()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
+	}
+
+	switch {
+	case msg.GetSessionShutdown() != nil:
+		return xerrors.WithStackTrace(errSessionShutdownHint)
+	case msg.GetNodeShutdown() != nil:
+		return xerrors.WithStackTrace(errNodeShutdownHint)
 	}
 
 	core.cancelAttach = cancelAttach
@@ -248,12 +255,12 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 			return
 		}
 
-		if hint := msg.GetSessionShutdown(); hint != nil {
+		if msg.GetSessionShutdown() != nil {
 			core.releaseSession()
 
 			return
 		}
-		if hint := msg.GetNodeShutdown(); hint != nil {
+		if msg.GetNodeShutdown() != nil {
 			core.onNodeShutdown(errNodeShutdownHint)
 			core.releaseSession()
 
