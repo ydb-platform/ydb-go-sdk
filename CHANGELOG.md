@@ -1,5 +1,5 @@
-* The session connection attach stream supports hints about the session or node shutdown. When a node is under shutdown, the client balancer pessimized (i.e., banned) the  connection to YDB node. If a node is banned, subsequent gRPC calls will be redirected to other YDB nodes.
-* The `config.WithDisableOptimisticUnban()` option has been deprecated. Optimistic unban behavior (where a successful gRPC call on banned connection unban it) has now been disabled for all connections. A node will only be unbanned after the next background discovery call, when the banned YDB node is still listed in the discovery response.
+* Added support for session and node shutdown hints on the session attach stream. When a node shutdown hint was received, the balancer pessimized (banned) the connection to that YDB node, so subsequent gRPC calls were routed to other nodes.
+* Deprecated `config.WithDisableOptimisticUnban()`. Optimistic unban (where a successful gRPC call would immediately unban a banned connection) was disabled for all connections; nodes are now unbanned only after the next background discovery refresh if the node is still present in the discovery response.
 
 ## v3.138.2
 * Added an internal query transaction trace field `WithCommit` for spans and logs
