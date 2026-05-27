@@ -47,6 +47,13 @@ func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
+// DisableOptimisticUnban
+//
+// Deprecated: will be removed after Nov 2026.
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func (c *Config) DisableOptimisticUnban() bool {
+	return true
+}
 // GrpcDialOptions reports about used grpc dialing options
 func (c *Config) GrpcDialOptions() []grpc.DialOption {
 	return append(
