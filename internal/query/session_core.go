@@ -213,12 +213,6 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	// attach is called once per sessionCore lifetime; a reconnect path must not
-	// call attach again while listenAttachStream may still be running.
-	core.onNodeShutdown = func(cause error) {
-		conn.Ban(attachStream.Context(), cause)
-	}
-
 	msg, err := attachStream.Recv()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -228,10 +222,15 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 	case msg.GetSessionShutdown() != nil:
 		return xerrors.WithStackTrace(errSessionShutdownHint)
 	case msg.GetNodeShutdown() != nil:
+		conn.Ban(attachStream.Context(), errNodeShutdownHint)
+
 		return xerrors.WithStackTrace(errNodeShutdownHint)
 	}
 
 	core.cancelAttach = cancelAttach
+	core.onNodeShutdown = func(cause error) {
+		conn.Ban(attachStream.Context(), cause)
+	}
 
 	if markGoroutineWithLabelNodeIDForAttachStream {
 		pprof.Do(ctx, pprof.Labels(
