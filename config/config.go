@@ -336,7 +336,7 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 // WithDisableOptimisticUnban
 //
 // Deprecated: will be removed after Nov 2026.
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDisableOptimisticUnban() Option {
 	return func(c *Config) {}
 }
