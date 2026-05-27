@@ -47,10 +47,11 @@ func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
-// DisableOptimisticUnban
+// DisableOptimisticUnban reports whether optimistic unban is disabled.
 //
-// Deprecated: will be removed after Nov 2026.
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: Optimistic unban is now always disabled (this method always returns true).
+// Will be removed after Nov 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (c *Config) DisableOptimisticUnban() bool {
 	return true
 }
