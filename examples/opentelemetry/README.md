@@ -4,13 +4,23 @@ Goal: spin up a local OpenTelemetry stack and verify that a Go application
 exports traces produced by `ydb-go-sdk` via the `otel-collector` into
 `Tempo` / `Prometheus`, with visualization in `Grafana`.
 
-The infrastructure (compose file, OTel collector / Tempo / Prometheus /
-Grafana configs, YDB local config and provisioned Grafana dashboards) is
-mirrored 1-to-1 from the .NET SDK example
+OpenTelemetry tracing is a first-class citizen across all YDB client
+SDKs — Go ([`ydb-go-sdk`](https://github.com/ydb-platform/ydb-go-sdk) +
+[`ydb-go-sdk-otel`](https://github.com/ydb-platform/ydb-go-sdk-otel)),
+.NET ([`ydb-dotnet-sdk`](https://github.com/ydb-platform/ydb-dotnet-sdk)),
+Java ([`ydb-java-sdk`](https://github.com/ydb-platform/ydb-java-sdk)),
+Python ([`ydb-python-sdk`](https://github.com/ydb-platform/ydb-python-sdk)),
+and others — so the same observability stack works regardless of the
+language a service is written in.
+
+The infrastructure here (compose file, OTel collector / Tempo /
+Prometheus / Grafana configs, YDB local config and provisioned Grafana
+dashboards) is mirrored 1-to-1 from the .NET SDK example
 [`Ydb.Sdk.AdoNet.OpenTelemetry`](https://github.com/ydb-platform/ydb-dotnet-sdk/tree/main/examples/Ydb.Sdk.AdoNet.OpenTelemetry)
-so the two stacks can be compared side-by-side. The Go-specific piece is
-the `app` service in `compose-e2e.yaml`, which builds and runs this
-directory's `main.go` from the local Dockerfile and wires traces via
+so traces produced by any YDB SDK can be compared side-by-side against
+the same backend. The Go-specific piece is the `app` service in
+`compose-e2e.yaml`, which builds and runs this directory's `main.go`
+from the local Dockerfile and wires traces via
 [`ydb-go-sdk-otel`](https://github.com/ydb-platform/ydb-go-sdk-otel).
 
 ## How to run
