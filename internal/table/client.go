@@ -59,31 +59,29 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 
 			return newSession(ctx, cc, config)
 		}),
-		pool.WithTrace[*Session, Session](&pool.Trace{
+		pool.WithTrace[*Session, Session](&pool.Trace[*Session, Session]{
 			OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
 				return func(limit int) {
 					onDone(limit)
 				}
 			},
-			OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
-				onDone := gtrace.TableOnPoolPut( //nolint:forcetypeassert
-					config.Trace(), ctx, call, item.(*Session),
-				)
+			OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
+				onDone := gtrace.TableOnPoolPut(config.Trace(), ctx, call, item)
 
 				return func(err error) {
 					onDone(err)
 				}
 			},
 			OnGet: func(ctx *context.Context, call stack.Caller) func(
-				item any,
+				item *Session,
 				hintInfo *trace.NodeHintInfo,
 				attempts int,
 				err error,
 			) {
 				onDone := gtrace.TableOnPoolGet(config.Trace(), ctx, call)
 
-				return func(item any, hintInfo *trace.NodeHintInfo, attempts int, err error) {
-					onDone(item.(*Session), attempts, hintInfo, err) //nolint:forcetypeassert
+				return func(item *Session, hintInfo *trace.NodeHintInfo, attempts int, err error) {
+					onDone(item, attempts, hintInfo, err)
 				}
 			},
 			OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {

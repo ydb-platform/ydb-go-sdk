@@ -82,6 +82,10 @@ func (core *sessionCore) SetStatus(status Status) {
 }
 
 func (core *sessionCore) Status() string {
+	if core == nil {
+		return StatusUnknown.String()
+	}
+
 	if core.closed.Load() {
 		return StatusClosed.String()
 	}

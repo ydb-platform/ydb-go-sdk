@@ -32,7 +32,7 @@ type (
 		Item
 	}
 	Config[PT ItemConstraint[T], T any] struct {
-		trace              *Trace
+		trace              *Trace[PT, T]
 		clock              clockwork.Clock
 		limit              int
 		createTimeout      time.Duration
@@ -112,7 +112,7 @@ func WithItemUsageTTL[PT ItemConstraint[T], T any](ttl time.Duration) Option[PT,
 	}
 }
 
-func WithTrace[PT ItemConstraint[T], T any](t *Trace) Option[PT, T] {
+func WithTrace[PT ItemConstraint[T], T any](t *Trace[PT, T]) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.trace = t
 	}
@@ -145,7 +145,7 @@ func New[PT ItemConstraint[T], T any](
 ) (_ *Pool[PT, T], err error) {
 	p := &Pool[PT, T]{
 		config: &Config[PT, T]{
-			trace: &Trace{},
+			trace: &Trace[PT, T]{},
 			clock: clockwork.NewRealClock(),
 			limit: DefaultLimit,
 			createItemFunc: func(ctx context.Context) (PT, error) {
