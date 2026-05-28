@@ -57,10 +57,18 @@ type (
 )
 
 func (core *sessionCore) ID() string {
+	if core == nil {
+		return ""
+	}
+
 	return core.id
 }
 
 func (core *sessionCore) NodeID() uint32 {
+	if core == nil {
+		return 0
+	}
+
 	return core.nodeID
 }
 

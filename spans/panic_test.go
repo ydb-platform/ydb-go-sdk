@@ -69,14 +69,27 @@ func (tx *panicTx) ID() string {
 func TestErrorPathDoesNotCallSessionMetadata(t *testing.T) {
 	ctx := context.Background()
 	tr := query(testAdapter{})
-	done := tr.OnPoolGet(trace.QueryPoolGetStartInfo{
+	poolGetDone := tr.OnPoolGet(trace.QueryPoolGetStartInfo{
 		Context: &ctx,
 		Call:    testCall("OnPoolGet"),
 	})
-	require.NotNil(t, done)
+	require.NotNil(t, poolGetDone)
 
 	require.NotPanics(t, func() {
-		done(trace.QueryPoolGetDoneInfo{
+		poolGetDone(trace.QueryPoolGetDoneInfo{
+			Error:   errors.New("test error"),
+			Session: (*panicSession)(nil),
+		})
+	})
+
+	sessionCreateDone := tr.OnSessionCreate(trace.QuerySessionCreateStartInfo{
+		Context: &ctx,
+		Call:    testCall("OnSessionCreate"),
+	})
+	require.NotNil(t, sessionCreateDone)
+
+	require.NotPanics(t, func() {
+		sessionCreateDone(trace.QuerySessionCreateDoneInfo{
 			Error:   errors.New("test error"),
 			Session: (*panicSession)(nil),
 		})
@@ -86,17 +99,30 @@ func TestErrorPathDoesNotCallSessionMetadata(t *testing.T) {
 func TestErrorPathDoesNotCallTableSessionMetadata(t *testing.T) {
 	ctx := context.Background()
 	tr := table(testAdapter{})
-	done := tr.OnPoolGet(trace.TablePoolGetStartInfo{
+	poolGetDone := tr.OnPoolGet(trace.TablePoolGetStartInfo{
 		Context: &ctx,
 		Call:    testCall("OnPoolGet"),
 	})
-	require.NotNil(t, done)
+	require.NotNil(t, poolGetDone)
 
 	require.NotPanics(t, func() {
-		done(trace.TablePoolGetDoneInfo{
+		poolGetDone(trace.TablePoolGetDoneInfo{
 			Error:    errors.New("test error"),
 			Attempts: 1,
 			Session:  (*panicSession)(nil),
+		})
+	})
+
+	sessionNewDone := tr.OnSessionNew(trace.TableSessionNewStartInfo{
+		Context: &ctx,
+		Call:    testCall("OnSessionNew"),
+	})
+	require.NotNil(t, sessionNewDone)
+
+	require.NotPanics(t, func() {
+		sessionNewDone(trace.TableSessionNewDoneInfo{
+			Error:   errors.New("test error"),
+			Session: (*panicSession)(nil),
 		})
 	})
 }
@@ -117,15 +143,42 @@ func TestErrorPathDoesNotCallTxMetadata(t *testing.T) {
 		})
 	})
 
+	tableTrace := table(testAdapter{})
+	tableTxBeginDone := tableTrace.OnTxBegin(trace.TableTxBeginStartInfo{
+		Context: &ctx,
+		Call:    testCall("OnTxBegin"),
+	})
+	require.NotNil(t, tableTxBeginDone)
+
+	require.NotPanics(t, func() {
+		tableTxBeginDone(trace.TableTxBeginDoneInfo{
+			Error: errors.New("test error"),
+			Tx:    (*panicTx)(nil),
+		})
+	})
+
 	sqlTrace := databaseSQL(testAdapter{})
-	sqlDone := sqlTrace.OnConnBegin(trace.DatabaseSQLConnBeginStartInfo{
+	connBeginDone := sqlTrace.OnConnBegin(trace.DatabaseSQLConnBeginStartInfo{
 		Context: &ctx,
 		Call:    testCall("OnConnBegin"),
 	})
-	require.NotNil(t, sqlDone)
+	require.NotNil(t, connBeginDone)
 
 	require.NotPanics(t, func() {
-		sqlDone(trace.DatabaseSQLConnBeginDoneInfo{
+		connBeginDone(trace.DatabaseSQLConnBeginDoneInfo{
+			Error: errors.New("test error"),
+			Tx:    (*panicTx)(nil),
+		})
+	})
+
+	connBeginTxDone := sqlTrace.OnConnBeginTx(trace.DatabaseSQLConnBeginTxStartInfo{
+		Context: &ctx,
+		Call:    testCall("OnConnBeginTx"),
+	})
+	require.NotNil(t, connBeginTxDone)
+
+	require.NotPanics(t, func() {
+		connBeginTxDone(trace.DatabaseSQLConnBeginTxDoneInfo{
 			Error: errors.New("test error"),
 			Tx:    (*panicTx)(nil),
 		})
