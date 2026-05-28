@@ -826,6 +826,20 @@ func newWithQueryServiceClient(ctx context.Context,
 	return c, nil
 }
 
+func sessionInfo[PT pool.ItemConstraint[T], T any](item PT) trace.SessionInfo {
+	// PT is *T; compare with nil before interface conversion to avoid typed nil.
+	if item == nil {
+		return nil
+	}
+
+	s, ok := any(item).(trace.SessionInfo)
+	if !ok {
+		return nil
+	}
+
+	return s
+}
+
 func poolTrace(t *trace.Query) *pool.Trace[*Session, Session] {
 	return &pool.Trace[*Session, Session]{
 		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
@@ -857,22 +871,22 @@ func poolTrace(t *trace.Query) *pool.Trace[*Session, Session] {
 			}
 		},
 		OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
-			onDone := gtrace.QueryOnPoolPut(t, ctx, call, item)
+			onDone := gtrace.QueryOnPoolPut(t, ctx, call, sessionInfo(item))
 
 			return func(err error) {
 				onDone(err)
 			}
 		},
 		OnGet: func(ctx *context.Context, call stack.Caller) func(
-			item *Session,
+			session *Session,
 			hint *trace.NodeHintInfo,
 			attempts int,
 			err error,
 		) {
 			onDone := gtrace.QueryOnPoolGet(t, ctx, call)
 
-			return func(item *Session, hint *trace.NodeHintInfo, attempts int, err error) {
-				onDone(item, attempts, hint, err)
+			return func(session *Session, hint *trace.NodeHintInfo, attempts int, err error) {
+				onDone(sessionInfo(session), attempts, hint, err)
 			}
 		},
 		OnChange: func(stats pool.Stats) {

@@ -31,6 +31,20 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*Session, error)
 
+func sessionInfo[PT pool.ItemConstraint[T], T any](item PT) trace.SessionInfo {
+	// PT is *T; compare with nil before interface conversion to avoid typed nil.
+	if item == nil {
+		return nil
+	}
+
+	s, ok := any(item).(trace.SessionInfo)
+	if !ok {
+		return nil
+	}
+
+	return s
+}
+
 func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) { //nolint:funlen
 	onDone := gtrace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
@@ -66,22 +80,22 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				}
 			},
 			OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
-				onDone := gtrace.TableOnPoolPut(config.Trace(), ctx, call, item)
+				onDone := gtrace.TableOnPoolPut(config.Trace(), ctx, call, sessionInfo(item))
 
 				return func(err error) {
 					onDone(err)
 				}
 			},
 			OnGet: func(ctx *context.Context, call stack.Caller) func(
-				item *Session,
+				session *Session,
 				hintInfo *trace.NodeHintInfo,
 				attempts int,
 				err error,
 			) {
 				onDone := gtrace.TableOnPoolGet(config.Trace(), ctx, call)
 
-				return func(item *Session, hintInfo *trace.NodeHintInfo, attempts int, err error) {
-					onDone(item, attempts, hintInfo, err)
+				return func(session *Session, hintInfo *trace.NodeHintInfo, attempts int, err error) {
+					onDone(sessionInfo(session), attempts, hintInfo, err)
 				}
 			},
 			OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
