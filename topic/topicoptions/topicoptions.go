@@ -31,6 +31,26 @@ func (mode withMeteringMode) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	(*topictypes.MeteringMode)(&mode).ToRaw(&req.SetMeteringMode)
 }
 
+type withMetricsLevel uint32
+
+func (level withMetricsLevel) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.MetricsLevel.HasValue = true
+	request.MetricsLevel.Value = uint32(level)
+}
+
+func (level withMetricsLevel) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	req.SetMetricsLevel.HasValue = true
+	req.SetMetricsLevel.Value = uint32(level)
+	req.ResetMetricsLevel = false
+}
+
+type withResetMetricsLevel struct{}
+
+func (withResetMetricsLevel) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	req.ResetMetricsLevel = true
+	req.SetMetricsLevel.HasValue = false
+}
+
 type withMinActivePartitions int64
 
 func (minActivePartitions withMinActivePartitions) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
