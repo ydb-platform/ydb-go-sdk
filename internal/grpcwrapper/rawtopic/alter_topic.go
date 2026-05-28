@@ -26,6 +26,8 @@ type AlterTopicRequest struct {
 	DropConsumers                        []string
 	AlterConsumers                       []AlterConsumer
 	SetMeteringMode                      MeteringMode
+	SetMetricsLevel                      rawoptional.Uint32
+	ResetMetricsLevel                    bool
 }
 
 func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
@@ -43,6 +45,17 @@ func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
 
 	if req.SetSupportedCodecs {
 		res.SetSupportedCodecs = req.SetSupportedCodecsValue.ToProto()
+	}
+
+	if req.SetMetricsLevel.HasValue {
+		res.MetricsLevel = &Ydb_Topic.AlterTopicRequest_SetMetricsLevel{
+			SetMetricsLevel: req.SetMetricsLevel.Value,
+		}
+	}
+	if req.ResetMetricsLevel {
+		res.MetricsLevel = &Ydb_Topic.AlterTopicRequest_ResetMetricsLevel{
+			ResetMetricsLevel: &emptypb.Empty{},
+		}
 	}
 
 	res.AddConsumers = make([]*Ydb_Topic.Consumer, len(req.AddConsumers))

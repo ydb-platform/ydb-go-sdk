@@ -18,6 +18,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -710,6 +711,58 @@ func TestAlterTopic(t *testing.T) {
 	topicDesc, err = scope.Driver().Topic().Describe(ctx, topicPath)
 	require.NoError(t, err)
 	require.Equal(t, newMinActivePartitions, topicDesc.PartitionSettings.MinActivePartitions)
+}
+
+func TestTopicMetricsLevel(t *testing.T) {
+	if ydbVersion := os.Getenv("YDB_VERSION"); ydbVersion != "" &&
+		ydbVersion != "nightly" && ydbVersion != "edge" && ydbVersion != "latest" &&
+		version.Lt(ydbVersion, "25.4") {
+		t.Skip("require support for topic metrics_level")
+	}
+
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	topicName := "test-topic-" + t.Name()
+	topicPath := scope.Driver().Name() + "/" + topicName
+
+	_ = scope.Driver().Topic().Drop(ctx, topicPath)
+
+	const initialLevel = uint32(3)
+	err := scope.Driver().Topic().Create(ctx, topicPath,
+		topicoptions.CreateWithMinActivePartitions(1),
+		topicoptions.CreateWithMaxActivePartitions(1),
+		topicoptions.CreateWithMetricsLevel(initialLevel),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = scope.Driver().Topic().Drop(ctx, topicPath)
+	})
+
+	desc, err := scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.NotNil(t, desc.MetricsLevel, "metrics_level must be populated after create")
+	require.Equal(t, initialLevel, *desc.MetricsLevel)
+
+	const updatedLevel = uint32(5)
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithSetMetricsLevel(updatedLevel),
+	)
+	require.NoError(t, err)
+
+	desc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.NotNil(t, desc.MetricsLevel, "metrics_level must be populated after alter set")
+	require.Equal(t, updatedLevel, *desc.MetricsLevel)
+
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithResetMetricsLevel(),
+	)
+	require.NoError(t, err)
+
+	desc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Nil(t, desc.MetricsLevel, "metrics_level must be reset to the database default")
 }
 
 func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {
