@@ -261,7 +261,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.newSession"),
 	)
 	defer func() {
-		onDone(s, finalErr)
+		onDone(sessionInfo(s), finalErr)
 	}()
 
 	if config.UseQuerySession() {

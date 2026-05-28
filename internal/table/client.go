@@ -252,11 +252,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		s        *Session
 	)
 	defer func() {
-		if s != nil {
-			onDone(s, attempts, err)
-		} else {
-			onDone(nil, attempts, err)
-		}
+		onDone(sessionInfo(s), attempts, err)
 	}()
 
 	s, err = retry.RetryWithResult(ctx, createSession,
