@@ -29,11 +29,15 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
-			if info.Error == nil {
+			if info.Error == nil && info.Session != nil {
 				l.Log(WithLevel(ctx, DEBUG), "database/sql connect done",
 					kv.Latency(start),
 					kv.String("session_id", info.Session.ID()),
 					kv.String("session_status", info.Session.Status()),
+				)
+			} else if info.Error == nil {
+				l.Log(WithLevel(ctx, DEBUG), "database/sql connect done",
+					kv.Latency(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "database/sql connect failed",

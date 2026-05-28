@@ -106,14 +106,28 @@ func query(adapter Adapter) trace.Query {
 			)
 
 			return func(info trace.QueryPoolGetDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					kv.Int("attempts", info.Attempts),
-					kv.String("status", safeStatus(info.Session)),
-					kv.String("node_id", safeNodeID(info.Session)),
-					kv.String("session_id", safeID(info.Session)),
-				)
+				if info.Error != nil {
+					finish(
+						start,
+						info.Error,
+						kv.Int("attempts", info.Attempts),
+					)
+				} else if info.Session != nil {
+					finish(
+						start,
+						nil,
+						kv.Int("attempts", info.Attempts),
+						kv.String("status", safeStatus(info.Session)),
+						kv.String("node_id", safeNodeID(info.Session)),
+						kv.String("session_id", safeID(info.Session)),
+					)
+				} else {
+					finish(
+						start,
+						nil,
+						kv.Int("attempts", info.Attempts),
+					)
+				}
 			}
 		},
 		// OnDo / OnDoTx are intentionally not wired: the ydb.RunWithRetry
@@ -198,9 +212,18 @@ func query(adapter Adapter) trace.Query {
 			)
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
-				finish(start, info.Error,
-					kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
-				)
+				if info.Error != nil {
+					finish(
+						start,
+						info.Error,
+					)
+				} else {
+					finish(
+						start,
+						nil,
+						kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
+					)
+				}
 			}
 		},
 		OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {

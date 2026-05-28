@@ -19,19 +19,21 @@ func retry(config Config) (t trace.Retry) {
 		start := time.Now()
 
 		return func(info trace.RetryLoopDoneInfo) {
-			if config.Details()&trace.RetryEvents != 0 {
-				attempts.With(map[string]string{
-					"retry_label": label,
-				}).Record(float64(info.Attempts))
-				errs.With(map[string]string{
-					"status":      errorBrief(info.Error),
-					"retry_label": label,
-					"final":       "true",
-				}).Inc()
-				latency.With(map[string]string{
-					"retry_label": label,
-				}).Record(time.Since(start))
+			if config.Details()&trace.RetryEvents == 0 {
+				return
 			}
+
+			attempts.With(map[string]string{
+				"retry_label": label,
+			}).Record(float64(info.Attempts))
+			errs.With(map[string]string{
+				"status":      errorBrief(info.Error),
+				"retry_label": label,
+				"final":       "true",
+			}).Inc()
+			latency.With(map[string]string{
+				"retry_label": label,
+			}).Record(time.Since(start))
 		}
 	}
 

@@ -102,7 +102,12 @@ func Retry(adapter Adapter) (t trace.Retry) {
 		ctx := *info.Context
 
 		return func(info trace.RetryLoopDoneInfo) {
-			fields := fieldsFromStore(ctx)
+			fields := []KeyValue{
+				kv.Int("attempts", info.Attempts),
+			}
+			if fieldsFromStore := fieldsFromStore(ctx); len(fieldsFromStore) > 0 {
+				fields = append(fields, fieldsFromStore...)
+			}
 			if info.Error != nil {
 				setSpanError(start, info.Error)
 			}
