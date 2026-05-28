@@ -693,11 +693,14 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		)
 		if onDone != nil {
 			defer func() {
-				var item PT
-				if info != nil {
-					item = info.item
+				if info != nil && info.item != nil {
+					onDone(info.item,
+						getNodeHintInfo(info.item, nodeID, hasPreferredNodeID, finalErr),
+						attempts, finalErr,
+					)
+				} else {
+					onDone(nil, nil, attempts, finalErr)
 				}
-				onDone(item, getNodeHintInfo(item, nodeID, hasPreferredNodeID, finalErr), attempts, finalErr)
 			}()
 		}
 	}
