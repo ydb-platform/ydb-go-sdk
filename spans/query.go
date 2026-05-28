@@ -147,14 +147,28 @@ func query(adapter Adapter) trace.Query {
 			)
 
 			return func(info trace.QueryPoolGetDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					kv.Int("attempts", info.Attempts),
-					kv.String("status", safeStatus(info.Session)),
-					kv.String("node_id", safeNodeID(info.Session)),
-					kv.String("session_id", safeID(info.Session)),
-				)
+				if info.Error != nil {
+					finish(
+						start,
+						info.Error,
+						kv.Int("attempts", info.Attempts),
+					)
+				} else if info.Session != nil {
+					finish(
+						start,
+						nil,
+						kv.Int("attempts", info.Attempts),
+						kv.String("status", safeStatus(info.Session)),
+						kv.String("node_id", safeNodeID(info.Session)),
+						kv.String("session_id", safeID(info.Session)),
+					)
+				} else {
+					finish(
+						start,
+						nil,
+						kv.Int("attempts", info.Attempts),
+					)
+				}
 			}
 		},
 		OnDo: func(info trace.QueryDoStartInfo) func(trace.QueryDoDoneInfo) {
@@ -276,13 +290,22 @@ func query(adapter Adapter) trace.Query {
 			)
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					kv.String("SessionID", safeID(info.Session)),
-					kv.String("SessionStatus", safeStatus(info.Session)),
-					kv.Int64("NodeID", nodeID(info.Session)),
-				)
+				if info.Error != nil {
+					finish(
+						start,
+						info.Error,
+					)
+				} else if info.Session != nil {
+					finish(
+						start,
+						nil,
+						kv.String("SessionID", safeID(info.Session)),
+						kv.String("SessionStatus", safeStatus(info.Session)),
+						kv.Int64("NodeID", nodeID(info.Session)),
+					)
+				} else {
+					finish(start, nil)
+				}
 			}
 		},
 		OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {
@@ -405,11 +428,20 @@ func query(adapter Adapter) trace.Query {
 			)
 
 			return func(info trace.QuerySessionBeginDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					kv.String("TransactionID", safeID(info.Tx)),
-				)
+				if info.Error != nil {
+					finish(
+						start,
+						info.Error,
+					)
+				} else if info.Tx != nil {
+					finish(
+						start,
+						nil,
+						kv.String("TransactionID", safeID(info.Tx)),
+					)
+				} else {
+					finish(start, nil)
+				}
 			}
 		},
 		OnResultNew: func(info trace.QueryResultNewStartInfo) func(info trace.QueryResultNewDoneInfo) {

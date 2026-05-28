@@ -60,40 +60,40 @@ func fieldsFromStore(ctx context.Context) []kv.KeyValue {
 
 func Retry(adapter Adapter) (t trace.Retry) {
 	t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-		if adapter.Details()&trace.RetryEvents != 0 && isTraceRetry(*info.Context) { //nolint:nestif
-			operationName := info.Label
-			if operationName == "" {
-				operationName = info.Call.String()
-			}
-			if functionID := functionID(*info.Context); functionID != "" {
-				operationName = functionID
-			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				operationName,
-				kv.Bool("idempotent", info.Idempotent),
-			)
-			if info.NestedCall {
-				start.Warn(errNestedCall)
-			}
-			ctx := *info.Context
-
-			return func(info trace.RetryLoopDoneInfo) {
-				fields := []KeyValue{
-					kv.Int("attempts", info.Attempts),
-				}
-				if fieldsFromStore := fieldsFromStore(ctx); len(fieldsFromStore) > 0 {
-					fields = append(fields, fieldsFromStore...)
-				}
-				if info.Error != nil {
-					start.Error(info.Error)
-				}
-				start.End(fields...)
-			}
+		if adapter.Details()&trace.RetryEvents == 0 || !isTraceRetry(*info.Context) {
+			return nil
 		}
 
-		return nil
+		operationName := info.Label
+		if operationName == "" {
+			operationName = info.Call.String()
+		}
+		if functionID := functionID(*info.Context); functionID != "" {
+			operationName = functionID
+		}
+		start := childSpanWithReplaceCtx(
+			adapter,
+			info.Context,
+			operationName,
+			kv.Bool("idempotent", info.Idempotent),
+		)
+		if info.NestedCall {
+			start.Warn(errNestedCall)
+		}
+		ctx := *info.Context
+
+		return func(info trace.RetryLoopDoneInfo) {
+			fields := []KeyValue{
+				kv.Int("attempts", info.Attempts),
+			}
+			if fieldsFromStore := fieldsFromStore(ctx); len(fieldsFromStore) > 0 {
+				fields = append(fields, fieldsFromStore...)
+			}
+			if info.Error != nil {
+				start.Error(info.Error)
+			}
+			start.End(fields...)
+		}
 	}
 
 	return t
