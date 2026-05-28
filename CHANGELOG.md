@@ -1,3 +1,5 @@
+* Fixed `ydb.WithStatsMode*` for `database/sql` silently dropping a previously registered stats callback when called more than once on the same context. Repeated calls now chain callbacks (they fire in registration order) and the effective stats mode is the most detailed one across the chain.
+
 ## v3.138.2
 * Added an internal query transaction trace field `WithCommit` for spans and logs
 
