@@ -2,6 +2,10 @@
 * Added `MetricsLevel` field to `topictypes.TopicDescription`
 * Bumped `ydb-go-genproto` to expose the `metrics_level` field on topic create/alter/describe protos
 
+## v3.138.3
+* Fixed panic risks in tracing callbacks by separating error and success paths in `spans`/`metrics` and by making internal pool trace types generic-safe.
+* Fixed `ydb.WithStatsMode*` for `database/sql` silently dropping a previously registered stats callback when called more than once on the same context. Repeated calls now chain callbacks (they fire in registration order) and the effective stats mode is the most detailed one across the chain.
+
 ## v3.138.2
 * Added an internal query transaction trace field `WithCommit` for spans and logs
 

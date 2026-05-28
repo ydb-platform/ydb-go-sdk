@@ -38,17 +38,21 @@ func query(config Config) (t trace.Query) {
 			nodeHint := poolConfig.CounterVec("node_hint", "preferred_node_id", "session_node_id", "hit")
 			t.OnPoolGet = func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
 				return func(info trace.QueryPoolGetDoneInfo) {
-					if poolConfig.Details()&trace.QueryPoolEvents != 0 {
-						if info.NodeHintInfo != nil {
-							preferred := idToString(info.NodeHintInfo.PreferredNodeID)
-							actual := idToString(info.NodeHintInfo.SessionNodeID)
-							nodeHint.With(map[string]string{
-								"preferred_node_id": preferred,
-								"session_node_id":   actual,
-								"hit":               strconv.FormatBool(preferred == actual),
-							}).Inc()
-						}
+					if poolConfig.Details()&trace.QueryPoolEvents == 0 {
+						return
 					}
+
+					if info.NodeHintInfo == nil {
+						return
+					}
+
+					preferred := idToString(info.NodeHintInfo.PreferredNodeID)
+					actual := idToString(info.NodeHintInfo.SessionNodeID)
+					nodeHint.With(map[string]string{
+						"preferred_node_id": preferred,
+						"session_node_id":   actual,
+						"hit":               strconv.FormatBool(preferred == actual),
+					}).Inc()
 				}
 			}
 		}
@@ -94,14 +98,16 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QueryDoDoneInfo) {
 					labels := map[string]string{"label": label}
-					if doConfig.Details()&trace.QueryEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-							"label":  label,
-						}).Inc()
-						attempts.With(labels).Record(float64(info.Attempts))
-						latency.With(labels).Record(time.Since(start))
+					if doConfig.Details()&trace.QueryEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"label":  label,
+					}).Inc()
+					attempts.With(labels).Record(float64(info.Attempts))
+					latency.With(labels).Record(time.Since(start))
 				}
 			}
 		}
@@ -116,14 +122,16 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QueryDoTxDoneInfo) {
 					labels := map[string]string{"label": label}
-					if doTxConfig.Details()&trace.QueryEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-							"label":  label,
-						}).Inc()
-						attempts.With(labels).Record(float64(info.Attempts))
-						latency.With(labels).Record(time.Since(start))
+					if doTxConfig.Details()&trace.QueryEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"label":  label,
+					}).Inc()
+					attempts.With(labels).Record(float64(info.Attempts))
+					latency.With(labels).Record(time.Since(start))
 				}
 			}
 		}
@@ -137,13 +145,15 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QueryExecDoneInfo) {
 					labels := map[string]string{"label": label}
-					if doTxConfig.Details()&trace.QueryEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-							"label":  label,
-						}).Inc()
-						latency.With(labels).Record(time.Since(start))
+					if doTxConfig.Details()&trace.QueryEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"label":  label,
+					}).Inc()
+					latency.With(labels).Record(time.Since(start))
 				}
 			}
 		}
@@ -157,13 +167,15 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QueryQueryDoneInfo) {
 					labels := map[string]string{"label": label}
-					if qqConfig.Details()&trace.QueryEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-							"label":  label,
-						}).Inc()
-						latency.With(labels).Record(time.Since(start))
+					if qqConfig.Details()&trace.QueryEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"label":  label,
+					}).Inc()
+					latency.With(labels).Record(time.Since(start))
 				}
 			}
 			{
@@ -180,13 +192,15 @@ func query(config Config) (t trace.Query) {
 
 					return func(info trace.QueryQueryRowDoneInfo) {
 						labels := map[string]string{"label": label}
-						if qqConfig.Details()&trace.QueryEvents != 0 {
-							errs.With(map[string]string{
-								"status": errorBrief(info.Error),
-								"label":  label,
-							}).Inc()
-							latency.With(labels).Record(time.Since(start))
+						if qqConfig.Details()&trace.QueryEvents == 0 {
+							return
 						}
+
+						errs.With(map[string]string{
+							"status": errorBrief(info.Error),
+							"label":  label,
+						}).Inc()
+						latency.With(labels).Record(time.Since(start))
 					}
 				}
 			}
@@ -205,15 +219,17 @@ func query(config Config) (t trace.Query) {
 
 					return func(info trace.QueryQueryResultSetDoneInfo) {
 						labels := map[string]string{"label": label}
-						if qqConfig.Details()&trace.QueryEvents != 0 {
-							errs.With(map[string]string{
-								"status": errorBrief(info.Error),
-								"label":  label,
-							}).Inc()
-							latency.With(labels).Record(time.Since(start))
-							if info.Error == nil {
-								rowsCount.With(labels).Set(float64(info.RowsCount))
-							}
+						if qqConfig.Details()&trace.QueryEvents == 0 {
+							return
+						}
+
+						errs.With(map[string]string{
+							"status": errorBrief(info.Error),
+							"label":  label,
+						}).Inc()
+						latency.With(labels).Record(time.Since(start))
+						if info.Error == nil {
+							rowsCount.With(labels).Set(float64(info.RowsCount))
 						}
 					}
 				}
@@ -231,15 +247,17 @@ func query(config Config) (t trace.Query) {
 				start := time.Now()
 
 				return func(info trace.QuerySessionCreateDoneInfo) {
-					if createConfig.Details()&trace.QuerySessionEvents != 0 {
-						if info.Error == nil {
-							count.With(nil).Add(1)
-						}
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-						}).Inc()
-						latency.With(nil).Record(time.Since(start))
+					if createConfig.Details()&trace.QuerySessionEvents == 0 {
+						return
 					}
+
+					if info.Error == nil && info.Session != nil {
+						count.With(nil).Add(1)
+					}
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+					}).Inc()
+					latency.With(nil).Record(time.Since(start))
 				}
 			}
 		}
@@ -251,13 +269,15 @@ func query(config Config) (t trace.Query) {
 				start := time.Now()
 
 				return func(info trace.QuerySessionDeleteDoneInfo) {
-					if deleteConfig.Details()&trace.QuerySessionEvents != 0 {
-						count.With(nil).Add(-1)
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-						}).Inc()
-						latency.With(nil).Record(time.Since(start))
+					if deleteConfig.Details()&trace.QuerySessionEvents == 0 {
+						return
 					}
+
+					count.With(nil).Add(-1)
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+					}).Inc()
+					latency.With(nil).Record(time.Since(start))
 				}
 			}
 		}
@@ -271,13 +291,15 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QuerySessionExecDoneInfo) {
 					labels := map[string]string{"label": label}
-					if sessionExecConfig.Details()&trace.QuerySessionEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-							"label":  label,
-						}).Inc()
-						latency.With(labels).Record(time.Since(start))
+					if sessionExecConfig.Details()&trace.QuerySessionEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"label":  label,
+					}).Inc()
+					latency.With(labels).Record(time.Since(start))
 				}
 			}
 		}
@@ -291,13 +313,15 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QuerySessionQueryDoneInfo) {
 					labels := map[string]string{"label": label}
-					if sessionQueryConfig.Details()&trace.QuerySessionEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-							"label":  label,
-						}).Inc()
-						latency.With(labels).Record(time.Since(start))
+					if sessionQueryConfig.Details()&trace.QuerySessionEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"label":  label,
+					}).Inc()
+					latency.With(labels).Record(time.Since(start))
 				}
 			}
 		}
@@ -309,12 +333,14 @@ func query(config Config) (t trace.Query) {
 				start := time.Now()
 
 				return func(info trace.QuerySessionBeginDoneInfo) {
-					if beginConfig.Details()&trace.QuerySessionEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-						}).Inc()
-						latency.With(nil).Record(time.Since(start))
+					if beginConfig.Details()&trace.QuerySessionEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+					}).Inc()
+					latency.With(nil).Record(time.Since(start))
 				}
 			}
 		}
@@ -331,13 +357,15 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QueryTxExecDoneInfo) {
 					labels := map[string]string{"label": label}
-					if txExecConfig.Details()&trace.QuerySessionEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-							"label":  label,
-						}).Inc()
-						latency.With(labels).Record(time.Since(start))
+					if txExecConfig.Details()&trace.QuerySessionEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"label":  label,
+					}).Inc()
+					latency.With(labels).Record(time.Since(start))
 				}
 			}
 		}
@@ -351,13 +379,15 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QueryTxQueryDoneInfo) {
 					labels := map[string]string{"label": label}
-					if txQueryConfig.Details()&trace.QuerySessionEvents != 0 {
-						errs.With(map[string]string{
-							"status": errorBrief(info.Error),
-							"label":  label,
-						}).Inc()
-						latency.With(labels).Record(time.Since(start))
+					if txQueryConfig.Details()&trace.QuerySessionEvents == 0 {
+						return
 					}
+
+					errs.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"label":  label,
+					}).Inc()
+					latency.With(labels).Record(time.Since(start))
 				}
 			}
 			{
@@ -370,13 +400,15 @@ func query(config Config) (t trace.Query) {
 
 					return func(info trace.QueryTxQueryRowDoneInfo) {
 						labels := map[string]string{"label": label}
-						if txQueryConfig.Details()&trace.QuerySessionEvents != 0 {
-							errs.With(map[string]string{
-								"status": errorBrief(info.Error),
-								"label":  label,
-							}).Inc()
-							latency.With(labels).Record(time.Since(start))
+						if txQueryConfig.Details()&trace.QuerySessionEvents == 0 {
+							return
 						}
+
+						errs.With(map[string]string{
+							"status": errorBrief(info.Error),
+							"label":  label,
+						}).Inc()
+						latency.With(labels).Record(time.Since(start))
 					}
 				}
 			}
@@ -390,13 +422,15 @@ func query(config Config) (t trace.Query) {
 
 					return func(info trace.QueryTxQueryResultSetDoneInfo) {
 						labels := map[string]string{"label": label}
-						if txQueryConfig.Details()&trace.QuerySessionEvents != 0 {
-							errs.With(map[string]string{
-								"status": errorBrief(info.Error),
-								"label":  label,
-							}).Inc()
-							latency.With(labels).Record(time.Since(start))
+						if txQueryConfig.Details()&trace.QuerySessionEvents == 0 {
+							return
 						}
+
+						errs.With(map[string]string{
+							"status": errorBrief(info.Error),
+							"label":  label,
+						}).Inc()
+						latency.With(labels).Record(time.Since(start))
 					}
 				}
 			}
