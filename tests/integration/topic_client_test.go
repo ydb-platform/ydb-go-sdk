@@ -723,21 +723,13 @@ func TestTopicMetricsLevel(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
 
-	topicName := "test-topic-" + t.Name()
-	topicPath := scope.Driver().Name() + "/" + topicName
-
-	_ = scope.Driver().Topic().Drop(ctx, topicPath)
-
 	const initialLevel = uint32(3)
-	err := scope.Driver().Topic().Create(ctx, topicPath,
+
+	topicPath := scope.TopicPath(
 		topicoptions.CreateWithMinActivePartitions(1),
 		topicoptions.CreateWithMaxActivePartitions(1),
 		topicoptions.CreateWithMetricsLevel(initialLevel),
 	)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = scope.Driver().Topic().Drop(ctx, topicPath)
-	})
 
 	desc, err := scope.Driver().Topic().Describe(ctx, topicPath)
 	require.NoError(t, err)
@@ -767,10 +759,6 @@ func TestTopicMetricsLevel(t *testing.T) {
 
 func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {
 	return connectWithLogOption(t, false, opts...)
-}
-
-func connectWithGrpcLogging(t testing.TB, opts ...ydb.Option) *ydb.Driver {
-	return connectWithLogOption(t, true, opts...)
 }
 
 func connectWithLogOption(t testing.TB, logGRPC bool, opts ...ydb.Option) *ydb.Driver {
