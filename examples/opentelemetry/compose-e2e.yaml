@@ -1,10 +1,8 @@
 # End-to-end OpenTelemetry playground for ydb-go-sdk.
 #
-# Mirrors the working stack from the .NET SDK example
-# https://github.com/ydb-platform/ydb-dotnet-sdk/tree/main/examples/Ydb.Sdk.AdoNet.OpenTelemetry
-# 1-to-1 (Tempo / Prometheus / Grafana / OTel Collector + locally provisioned
-# YDB), with the .NET `app`/`load-generator` services replaced by a single
-# Go demo program built from this directory's Dockerfile.
+# Brings up a local stack — YDB, OTel Collector, Tempo, Prometheus,
+# Grafana — plus a single Go demo program (the `app` service) built
+# from this directory's Dockerfile.
 services:
   app:
     build:

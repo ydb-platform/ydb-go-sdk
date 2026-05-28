@@ -1,27 +1,14 @@
 # ydb-go-sdk + OpenTelemetry (E2E playground)
 
-Goal: spin up a local OpenTelemetry stack and verify that a Go application
-exports traces produced by `ydb-go-sdk` via the `otel-collector` into
-`Tempo` / `Prometheus`, with visualization in `Grafana`.
+A local OpenTelemetry stack that verifies traces produced by
+`ydb-go-sdk` end-to-end: a Go program exports them through an OTel
+Collector into Tempo / Prometheus, with visualization in Grafana. YDB
+server-side traces are exported into the same collector, so application
+and server spans line up in a single trace.
 
-OpenTelemetry tracing is a first-class citizen across all YDB client
-SDKs — Go ([`ydb-go-sdk`](https://github.com/ydb-platform/ydb-go-sdk) +
-[`ydb-go-sdk-otel`](https://github.com/ydb-platform/ydb-go-sdk-otel)),
-.NET ([`ydb-dotnet-sdk`](https://github.com/ydb-platform/ydb-dotnet-sdk)),
-Java ([`ydb-java-sdk`](https://github.com/ydb-platform/ydb-java-sdk)),
-Python ([`ydb-python-sdk`](https://github.com/ydb-platform/ydb-python-sdk)),
-and others — so the same observability stack works regardless of the
-language a service is written in.
-
-The infrastructure here (compose file, OTel collector / Tempo /
-Prometheus / Grafana configs, YDB local config and provisioned Grafana
-dashboards) is mirrored 1-to-1 from the .NET SDK example
-[`Ydb.Sdk.AdoNet.OpenTelemetry`](https://github.com/ydb-platform/ydb-dotnet-sdk/tree/main/examples/Ydb.Sdk.AdoNet.OpenTelemetry)
-so traces produced by any YDB SDK can be compared side-by-side against
-the same backend. The Go-specific piece is the `app` service in
-`compose-e2e.yaml`, which builds and runs this directory's `main.go`
-from the local Dockerfile and wires traces via
-[`ydb-go-sdk-otel`](https://github.com/ydb-platform/ydb-go-sdk-otel).
+OpenTelemetry tracing is supported by all YDB client SDKs, so the same
+observability stack works regardless of the language a service is
+written in.
 
 ## How to run
 
@@ -156,7 +143,7 @@ YDB-specific attributes:
 | `ydb.node.dc`          | location DC reported by the node              |
 | `ydb.retry.backoff_ms` | sleep waited before the current `ydb.Try`     |
 
-### Error attributes (`SetException`-equivalent)
+### Error attributes
 
 | Attribute                 | Value                                                                  |
 | ------------------------- | ---------------------------------------------------------------------- |
