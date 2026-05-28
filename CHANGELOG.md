@@ -1,3 +1,4 @@
+## v3.138.4
 * Added `topicoptions.CreateWithMetricsLevel`, `topicoptions.AlterWithSetMetricsLevel`, and `topicoptions.AlterWithResetMetricsLevel` to configure topic metrics level
 * Added `MetricsLevel` field to `topictypes.TopicDescription`
 * Bumped `ydb-go-genproto` to expose the `metrics_level` field on topic create/alter/describe protos
