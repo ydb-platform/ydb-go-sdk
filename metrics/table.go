@@ -33,7 +33,8 @@ func table(config Config) (t trace.Table) {
 	}
 	t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
 		return func(info trace.TableSessionNewDoneInfo) {
-			if config.Details()&trace.TableSessionEvents != 0 {
+			if config.Details()&trace.TableSessionEvents == 0 {
+			       return
 				if info.Error != nil || info.Session == nil {
 					return
 				}
