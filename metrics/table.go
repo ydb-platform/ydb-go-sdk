@@ -56,6 +56,7 @@ func table(config Config) (t trace.Table) {
 		alive.With(map[string]string{
 			"node_id": idToString(info.Session.NodeID()),
 		}).Add(-1)
+
 		return nil
 	}
 	t.OnPoolWith = func(info trace.TablePoolWithStartInfo) func(trace.TablePoolWithDoneInfo) {
@@ -98,6 +99,7 @@ func table(config Config) (t trace.Table) {
 		}
 
 		put.With(nil).Inc()
+
 		return nil
 	}
 	t.OnPoolStateChange = func(info trace.TablePoolStateChangeInfo) {

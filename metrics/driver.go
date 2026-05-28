@@ -94,6 +94,7 @@ func driver(config Config) (t trace.Driver) {
 			"node_id":  idToString(info.Endpoint.NodeID()),
 			"cause":    errorBrief(info.Cause),
 		}).Add(1)
+
 		return nil
 	}
 	t.OnBalancerClusterDiscoveryAttempt = func(info trace.DriverBalancerClusterDiscoveryAttemptStartInfo) func(
@@ -174,6 +175,7 @@ func driver(config Config) (t trace.Driver) {
 			"endpoint": info.Endpoint.Address(),
 			"node_id":  idToString(info.Endpoint.NodeID()),
 		}).Add(-1)
+
 		return nil
 	}
 
