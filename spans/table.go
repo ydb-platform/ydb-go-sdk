@@ -28,7 +28,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 		*info.Context = withFunctionID(*info.Context, info.Call.String())
 
 		return func(info trace.TableCreateSessionDoneInfo) {
-			if info.Error == nil {
+			if info.Error == nil && info.Session != nil {
 				fieldsStore.fields = append(fieldsStore.fields,
 					kv.String("session_id", safeID(info.Session)),
 					kv.String("session_status", safeStatus(info.Session)),
@@ -114,7 +114,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					start,
 					info.Error,
 				)
-			} else {
+			} else if info.Session != nil {
 				finish(
 					start,
 					nil,
@@ -122,6 +122,8 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					kv.String("node_id", nodeID(safeID(info.Session))),
 					kv.String("session_id", safeID(info.Session)),
 				)
+			} else {
+				finish(start, nil)
 			}
 		}
 	}
@@ -225,7 +227,12 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 		)
 
 		return func(info trace.TableExecuteDataQueryDoneInfo) {
-			if info.Error == nil {
+			if info.Error != nil {
+				finish(
+					start,
+					info.Error,
+				)
+			} else if info.Tx != nil {
 				finish(
 					start,
 					safeErr(info.Result),
@@ -235,7 +242,8 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			} else {
 				finish(
 					start,
-					info.Error,
+					safeErr(info.Result),
+					kv.Bool("prepared", info.Prepared),
 				)
 			}
 		}
@@ -309,12 +317,14 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					start,
 					info.Error,
 				)
-			} else {
+			} else if info.Tx != nil {
 				finish(
 					start,
 					nil,
 					kv.String("transaction_id", safeID(info.Tx)),
 				)
+			} else {
+				finish(start, nil)
 			}
 		}
 	}
@@ -465,7 +475,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					info.Error,
 					kv.Int("attempts", info.Attempts),
 				)
-			} else {
+			} else if info.Session != nil {
 				finish(
 					start,
 					nil,
@@ -473,6 +483,12 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					kv.String("status", safeStatus(info.Session)),
 					kv.String("node_id", nodeID(safeID(info.Session))),
 					kv.String("session_id", safeID(info.Session)),
+				)
+			} else {
+				finish(
+					start,
+					nil,
+					kv.Int("attempts", info.Attempts),
 				)
 			}
 		}

@@ -251,7 +251,7 @@ func query(config Config) (t trace.Query) {
 						return
 					}
 
-					if info.Error == nil {
+					if info.Error == nil && info.Session != nil {
 						count.With(nil).Add(1)
 					}
 					errs.With(map[string]string{

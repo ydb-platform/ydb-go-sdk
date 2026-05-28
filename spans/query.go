@@ -153,7 +153,7 @@ func query(adapter Adapter) trace.Query {
 						info.Error,
 						kv.Int("attempts", info.Attempts),
 					)
-				} else {
+				} else if info.Session != nil {
 					finish(
 						start,
 						nil,
@@ -161,6 +161,12 @@ func query(adapter Adapter) trace.Query {
 						kv.String("status", safeStatus(info.Session)),
 						kv.String("node_id", safeNodeID(info.Session)),
 						kv.String("session_id", safeID(info.Session)),
+					)
+				} else {
+					finish(
+						start,
+						nil,
+						kv.Int("attempts", info.Attempts),
 					)
 				}
 			}
@@ -289,7 +295,7 @@ func query(adapter Adapter) trace.Query {
 						start,
 						info.Error,
 					)
-				} else {
+				} else if info.Session != nil {
 					finish(
 						start,
 						nil,
@@ -297,6 +303,8 @@ func query(adapter Adapter) trace.Query {
 						kv.String("SessionStatus", safeStatus(info.Session)),
 						kv.Int64("NodeID", nodeID(info.Session)),
 					)
+				} else {
+					finish(start, nil)
 				}
 			}
 		},
@@ -425,12 +433,14 @@ func query(adapter Adapter) trace.Query {
 						start,
 						info.Error,
 					)
-				} else {
+				} else if info.Tx != nil {
 					finish(
 						start,
 						nil,
 						kv.String("TransactionID", safeID(info.Tx)),
 					)
+				} else {
+					finish(start, nil)
 				}
 			}
 		},

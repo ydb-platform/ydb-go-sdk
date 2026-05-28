@@ -79,7 +79,7 @@ func table(config Config) (t trace.Table) {
 				return
 			}
 
-			if info.Error == nil {
+			if info.Error == nil && info.Session != nil {
 				get.With(nil).Inc()
 			}
 			if info.NodeHintInfo != nil {

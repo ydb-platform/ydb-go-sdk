@@ -167,12 +167,14 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 						start,
 						info.Error,
 					)
-				} else {
+				} else if info.Tx != nil {
 					finish(
 						start,
 						nil,
 						kv.String("transaction_id", safeID(info.Tx)),
 					)
+				} else {
+					finish(start, nil)
 				}
 			}
 		},
@@ -192,12 +194,14 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 						start,
 						info.Error,
 					)
-				} else {
+				} else if info.Tx != nil {
 					finish(
 						start,
 						nil,
 						kv.String("transaction_id", safeID(info.Tx)),
 					)
+				} else {
+					finish(start, nil)
 				}
 			}
 		},

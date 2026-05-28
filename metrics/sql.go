@@ -54,7 +54,7 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 			}
 
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && info.Tx != nil {
 					txs.With(nil).Add(1)
 					txStart.Set(info.Tx.ID(), time.Now())
 				}
@@ -66,7 +66,7 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 			}
 
 			return func(info trace.DatabaseSQLConnBeginTxDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && info.Tx != nil {
 					txs.With(nil).Add(1)
 					txStart.Set(info.Tx.ID(), time.Now())
 				}
