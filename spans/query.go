@@ -20,10 +20,22 @@ import (
 //   - ydb.Commit           (CLIENT) — CommitTransaction RPC
 //   - ydb.Rollback         (CLIENT) — RollbackTransaction RPC
 //
-// All client-kind spans are augmented with the OTel database semantic
-// attributes (db.system.name, db.namespace, server.address, server.port,
-// network.peer.address, network.peer.port) by the adapter implementation;
-// only the ydb.node.id custom tag is attached at this level.
+// Attribute provenance for client-kind spans:
+//
+//   - db.system.name, db.namespace, server.address, server.port — attached by
+//     the adapter implementation from the driver configuration (the SDK does
+//     not have direct access to the driver Endpoint / Database at this layer).
+//   - network.peer.address, network.peer.port, ydb.node.id, ydb.node.dc —
+//     attached by the SDK once the gRPC layer selects a concrete endpoint for
+//     the RPC. See annotateNetworkPeer in driver.go: both the innermost open
+//     span (SpanFromContext) and the surrounding top-level CLIENT span
+//     (clientSpanFromContext, registered via withClientSpan below) get the
+//     same set of peer/node attributes so every ydb.* CLIENT span ends up
+//     with ydb.node.id / ydb.node.dc.
+//   - ydb.node.id is additionally attached at span start for every session-
+//     bound handler (OnSession* / OnTx*) using the node id already known on
+//     the session, so the value is present even before the gRPC peer is
+//     chosen and survives retries that never reach the wire.
 //
 //nolint:funlen,gocyclo
 func query(adapter Adapter) trace.Query {
@@ -142,6 +154,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				SpanNameExecuteQuery,
 			)
+			*info.Context = withClientSpan(*info.Context, start)
 
 			return func(info trace.QueryExecDoneInfo) {
 				finish(
@@ -159,6 +172,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				SpanNameExecuteQuery,
 			)
+			*info.Context = withClientSpan(*info.Context, start)
 
 			return func(info trace.QueryQueryDoneInfo) {
 				finish(
@@ -176,6 +190,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				SpanNameExecuteQuery,
 			)
+			*info.Context = withClientSpan(*info.Context, start)
 
 			return func(info trace.QueryQueryResultSetDoneInfo) {
 				finish(
@@ -193,6 +208,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				SpanNameExecuteQuery,
 			)
+			*info.Context = withClientSpan(*info.Context, start)
 
 			return func(info trace.QueryQueryRowDoneInfo) {
 				finish(
@@ -212,18 +228,13 @@ func query(adapter Adapter) trace.Query {
 			)
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
-				if info.Error != nil {
-					finish(
-						start,
-						info.Error,
-					)
-				} else {
-					finish(
-						start,
-						nil,
-						kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
-					)
+				var nodeID int64
+				if info.Error == nil {
+					nodeID = safeNodeIDInt64(info.Session)
 				}
+				finish(start, info.Error,
+					kv.Int64(AttrYDBNodeID, nodeID),
+				)
 			}
 		},
 		OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {

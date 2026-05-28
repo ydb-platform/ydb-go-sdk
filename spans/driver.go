@@ -75,6 +75,15 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			}
 			parent := adapter.SpanFromContext(*info.Context)
 			annotateNetworkPeer(parent, info.Endpoint)
+			// Also propagate the same peer/node attributes up to the
+			// surrounding top-level CLIENT span (e.g. the outer
+			// ydb.ExecuteQuery span emitted by OnExec/OnQuery/...) so that
+			// every ydb.* CLIENT span carries ydb.node.id / ydb.node.dc
+			// alongside network.peer.* — see the documentation block at
+			// the top of spans/query.go.
+			if clientSpan := clientSpanFromContext(*info.Context); clientSpan != nil {
+				annotateNetworkPeer(clientSpan, info.Endpoint)
+			}
 			if id, valid := parent.ID(); valid {
 				if traceID, valid := parent.TraceID(); valid {
 					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
@@ -102,6 +111,9 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			*info.Context = withGrpcStreamMsgCounters(*info.Context)
 			parent := adapter.SpanFromContext(*info.Context)
 			annotateNetworkPeer(parent, info.Endpoint)
+			if clientSpan := clientSpanFromContext(*info.Context); clientSpan != nil {
+				annotateNetworkPeer(clientSpan, info.Endpoint)
+			}
 			if id, valid := parent.ID(); valid {
 				if traceID, valid := parent.TraceID(); valid {
 					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))

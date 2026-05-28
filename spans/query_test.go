@@ -168,6 +168,122 @@ func TestQuerySpanNamesAreOTelCompliant(t *testing.T) {
 	})
 }
 
+// TestQueryClientLevelExecuteQueryGetsNodeIDFromAnnotateNetworkPeer verifies
+// that the outer ydb.ExecuteQuery span emitted by top-level Client.Exec /
+// Query / QueryRow / QueryResultSet (where no session is known at span start)
+// still ends up with ydb.node.id / ydb.node.dc once the gRPC layer picks an
+// endpoint — i.e. the withClientSpan / clientSpanFromContext plumbing actually
+// propagates network-peer attributes up to the surrounding CLIENT span.
+func TestQueryClientLevelExecuteQueryGetsNodeIDFromAnnotateNetworkPeer(t *testing.T) {
+	adapter := &recordingAdapter{}
+	q := query(adapter)
+	d := driver(adapter)
+	call := stack.FunctionID(
+		"github.com/ydb-platform/ydb-go-sdk/v3/spans.TestQueryClientLevelExecuteQueryGetsNodeIDFromAnnotateNetworkPeer",
+	)
+
+	cases := []struct {
+		name string
+		emit func(ctx *context.Context) func()
+	}{
+		{
+			name: "OnExec",
+			emit: func(ctx *context.Context) func() {
+				done := q.OnExec(trace.QueryExecStartInfo{Context: ctx, Call: call, Query: "SELECT 1"})
+
+				return func() { done(trace.QueryExecDoneInfo{}) }
+			},
+		},
+		{
+			name: "OnQuery",
+			emit: func(ctx *context.Context) func() {
+				done := q.OnQuery(trace.QueryQueryStartInfo{Context: ctx, Call: call, Query: "SELECT 2"})
+
+				return func() { done(trace.QueryQueryDoneInfo{}) }
+			},
+		},
+		{
+			name: "OnQueryResultSet",
+			emit: func(ctx *context.Context) func() {
+				done := q.OnQueryResultSet(trace.QueryQueryResultSetStartInfo{Context: ctx, Call: call, Query: "SELECT 3"})
+
+				return func() { done(trace.QueryQueryResultSetDoneInfo{}) }
+			},
+		},
+		{
+			name: "OnQueryRow",
+			emit: func(ctx *context.Context) func() {
+				done := q.OnQueryRow(trace.QueryQueryRowStartInfo{Context: ctx, Call: call, Query: "SELECT 4"})
+
+				return func() { done(trace.QueryQueryRowDoneInfo{}) }
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := context.Background()
+			finish := tc.emit(&c)
+			invokeCtx := c
+			invokeDone := d.OnConnInvoke(trace.DriverConnInvokeStartInfo{
+				Context:  &invokeCtx,
+				Endpoint: fakeEndpoint{},
+			})
+			if invokeDone != nil {
+				invokeDone(trace.DriverConnInvokeDoneInfo{})
+			}
+			finish()
+
+			topLevel := adapter.byName(SpanNameExecuteQuery)
+			require.NotEmpty(t, topLevel)
+			latest := topLevel[len(topLevel)-1]
+			require.Equal(t, int64(42), latest.attr(AttrYDBNodeID),
+				"%s: top-level ydb.ExecuteQuery must carry ydb.node.id from annotateNetworkPeer", tc.name)
+			require.Equal(t, "local", latest.attr(AttrYDBNodeDC),
+				"%s: top-level ydb.ExecuteQuery must carry ydb.node.dc from annotateNetworkPeer", tc.name)
+			require.Equal(t, "node-1", latest.attr(AttrNetworkPeerAddress),
+				"%s: top-level ydb.ExecuteQuery must carry network.peer.address", tc.name)
+			require.Equal(t, 2136, latest.attr(AttrNetworkPeerPort),
+				"%s: top-level ydb.ExecuteQuery must carry network.peer.port", tc.name)
+		})
+	}
+}
+
+// TestQueryCreateSessionAlwaysHasNodeID makes sure ydb.CreateSession carries
+// ydb.node.id even when the underlying RPC fails — Nebius diagnostics rely on
+// this attribute being present on every CLIENT span the SDK emits.
+func TestQueryCreateSessionAlwaysHasNodeID(t *testing.T) {
+	adapter := &recordingAdapter{}
+	q := query(adapter)
+	call := stack.FunctionID(
+		"github.com/ydb-platform/ydb-go-sdk/v3/spans.TestQueryCreateSessionAlwaysHasNodeID",
+	)
+
+	t.Run("success carries session node id", func(t *testing.T) {
+		c := context.Background()
+		done := q.OnSessionCreate(trace.QuerySessionCreateStartInfo{Context: &c, Call: call})
+		require.NotNil(t, done)
+		done(trace.QuerySessionCreateDoneInfo{Session: &fakeSession{id: "s", nodeID: 42}})
+
+		spans := adapter.byName(SpanNameCreateSession)
+		require.NotEmpty(t, spans)
+		require.Equal(t, int64(42), spans[len(spans)-1].attr(AttrYDBNodeID))
+	})
+
+	t.Run("error path still records ydb.node.id", func(t *testing.T) {
+		c := context.Background()
+		done := q.OnSessionCreate(trace.QuerySessionCreateStartInfo{Context: &c, Call: call})
+		require.NotNil(t, done)
+		done(trace.QuerySessionCreateDoneInfo{Error: errors.New("rpc failed")})
+
+		spans := adapter.byName(SpanNameCreateSession)
+		require.NotEmpty(t, spans)
+		latest := spans[len(spans)-1]
+		require.NotNil(t, latest.attr(AttrYDBNodeID),
+			"ydb.CreateSession must carry ydb.node.id even on failure")
+	})
+}
+
 func TestQueryNoisySpansAreSuppressed(t *testing.T) {
 	adapter := &recordingAdapter{}
 	q := query(adapter)

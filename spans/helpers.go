@@ -110,3 +110,32 @@ func logToParentSpanError(
 	parent := cfg.SpanFromContext(ctx)
 	logError(parent, err, fields...)
 }
+
+type ctxClientSpanKey struct{}
+
+// withClientSpan remembers s in ctx as the surrounding CLIENT-kind span so the
+// driver layer can also attach network.peer.* / ydb.node.* attributes to it
+// once the gRPC layer selects a concrete endpoint (see annotateNetworkPeer in
+// driver.go).
+//
+// The outermost registration wins: nested calls do not overwrite an already
+// registered span. This is needed because top-level Query / Exec / QueryRow /
+// QueryResultSet handlers open a CLIENT span that is the parent of internal
+// retry/try INTERNAL spans, and the actual RPC happens inside the inner
+// INTERNAL spans — without this registration the outer client span would
+// never receive ydb.node.id / ydb.node.dc.
+func withClientSpan(ctx context.Context, s Span) context.Context {
+	if _, has := ctx.Value(ctxClientSpanKey{}).(Span); has {
+		return ctx
+	}
+
+	return context.WithValue(ctx, ctxClientSpanKey{}, s)
+}
+
+// clientSpanFromContext returns the outermost CLIENT-kind span registered in
+// ctx via withClientSpan, or nil if no such span is registered.
+func clientSpanFromContext(ctx context.Context) Span {
+	s, _ := ctx.Value(ctxClientSpanKey{}).(Span)
+
+	return s
+}
