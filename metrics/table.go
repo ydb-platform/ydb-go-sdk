@@ -33,7 +33,11 @@ func table(config Config) (t trace.Table) {
 	}
 	t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
 		return func(info trace.TableSessionNewDoneInfo) {
-			if info.Error == nil && config.Details()&trace.TableSessionEvents != 0 {
+			if config.Details()&trace.TableSessionEvents != 0 {
+				if info.Error != nil {
+					return
+				}
+
 				alive.With(map[string]string{
 					"node_id": idToString(info.Session.NodeID()),
 				}).Add(1)

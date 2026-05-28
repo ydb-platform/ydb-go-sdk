@@ -106,13 +106,20 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			)
 
 			return func(info trace.TableSessionNewDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					kv.String("status", safeStatus(info.Session)),
-					kv.String("node_id", nodeID(safeID(info.Session))),
-					kv.String("session_id", safeID(info.Session)),
-				)
+				if info.Error != nil {
+					finish(
+						start,
+						info.Error,
+					)
+				} else {
+					finish(
+						start,
+						nil,
+						kv.String("status", safeStatus(info.Session)),
+						kv.String("node_id", nodeID(safeID(info.Session))),
+						kv.String("session_id", safeID(info.Session)),
+					)
+				}
 			}
 		}
 
@@ -294,11 +301,18 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			)
 
 			return func(info trace.TableTxBeginDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					kv.String("transaction_id", safeID(info.Tx)),
-				)
+				if info.Error != nil {
+					finish(
+						start,
+						info.Error,
+					)
+				} else {
+					finish(
+						start,
+						nil,
+						kv.String("transaction_id", safeID(info.Tx)),
+					)
+				}
 			}
 		}
 
@@ -442,14 +456,22 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 			)
 
 			return func(info trace.TablePoolGetDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					kv.Int("attempts", info.Attempts),
-					kv.String("status", safeStatus(info.Session)),
-					kv.String("node_id", nodeID(safeID(info.Session))),
-					kv.String("session_id", safeID(info.Session)),
-				)
+				if info.Error != nil {
+					finish(
+						start,
+						info.Error,
+						kv.Int("attempts", info.Attempts),
+					)
+				} else {
+					finish(
+						start,
+						nil,
+						kv.Int("attempts", info.Attempts),
+						kv.String("status", safeStatus(info.Session)),
+						kv.String("node_id", nodeID(safeID(info.Session))),
+						kv.String("session_id", safeID(info.Session)),
+					)
+				}
 			}
 		}
 

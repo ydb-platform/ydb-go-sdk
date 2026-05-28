@@ -159,11 +159,18 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 				)
 
 				return func(info trace.DatabaseSQLConnBeginDoneInfo) {
-					finish(
-						start,
-						info.Error,
-						kv.String("transaction_id", safeID(info.Tx)),
-					)
+					if info.Error != nil {
+						finish(
+							start,
+							info.Error,
+						)
+					} else {
+						finish(
+							start,
+							nil,
+							kv.String("transaction_id", safeID(info.Tx)),
+						)
+					}
 				}
 			}
 
@@ -177,11 +184,18 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 				)
 
 				return func(info trace.DatabaseSQLConnBeginTxDoneInfo) {
-					finish(
-						start,
-						info.Error,
-						kv.String("transaction_id", safeID(info.Tx)),
-					)
+					if info.Error != nil {
+						finish(
+							start,
+							info.Error,
+						)
+					} else {
+						finish(
+							start,
+							nil,
+							kv.String("transaction_id", safeID(info.Tx)),
+						)
+					}
 				}
 			}
 
