@@ -158,12 +158,17 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			start := time.Now()
 
 			return func(info trace.TableCreateSessionDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && info.Session != nil {
 					l.Log(ctx, "table create session done",
 						kv.Latency(start),
 						kv.Int("attempts", info.Attempts),
 						kv.String("session_id", info.Session.ID()),
 						kv.String("session_status", info.Session.Status()),
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "table create session done",
+						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "table create session failed",
@@ -333,13 +338,23 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			start := time.Now()
 
 			return func(info trace.TableExecuteDataQueryDoneInfo) {
-				if info.Error == nil {
-					tx := info.Tx
+				if info.Error == nil && info.Tx != nil {
 					l.Log(ctx, "table session query execute done",
 						appendFieldByCondition(l.logQuery,
 							kv.Stringer("query", query),
 							kv.String("id", session.ID()),
-							kv.String("tx", tx.ID()),
+							kv.String("tx", info.Tx.ID()),
+							kv.String("status", session.Status()),
+							kv.Bool("prepared", info.Prepared),
+							kv.NamedError("result_err", info.Result.Err()),
+							kv.Latency(start),
+						)...,
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "table session query execute done",
+						appendFieldByCondition(l.logQuery,
+							kv.Stringer("query", query),
+							kv.String("id", session.ID()),
 							kv.String("status", session.Status()),
 							kv.Bool("prepared", info.Prepared),
 							kv.NamedError("result_err", info.Result.Err()),
@@ -457,12 +472,18 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			start := time.Now()
 
 			return func(info trace.TableTxBeginDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && info.Tx != nil {
 					l.Log(ctx, "table tx begin done",
 						kv.Latency(start),
 						kv.String("id", session.ID()),
 						kv.String("status", session.Status()),
 						kv.String("tx", info.Tx.ID()),
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "table tx begin done",
+						kv.Latency(start),
+						kv.String("id", session.ID()),
+						kv.String("status", session.Status()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "table tx begin failed",
@@ -586,12 +607,17 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			start := time.Now()
 
 			return func(info trace.TablePoolGetDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && info.Session != nil {
 					session := info.Session
 					l.Log(ctx, "done",
 						kv.Latency(start),
 						kv.String("id", session.ID()),
 						kv.String("status", session.Status()),
+						kv.Int("attempts", info.Attempts),
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "done",
+						kv.Latency(start),
 						kv.Int("attempts", info.Attempts),
 					)
 				} else {

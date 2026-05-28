@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/safe"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
@@ -59,31 +60,29 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 
 			return newSession(ctx, cc, config)
 		}),
-		pool.WithTrace[*Session, Session](&pool.Trace{
+		pool.WithTrace[*Session, Session](&pool.Trace[*Session, Session]{
 			OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
 				return func(limit int) {
 					onDone(limit)
 				}
 			},
-			OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
-				onDone := gtrace.TableOnPoolPut( //nolint:forcetypeassert
-					config.Trace(), ctx, call, item.(*Session),
-				)
+			OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
+				onDone := gtrace.TableOnPoolPut(config.Trace(), ctx, call, safe.SessionInfo(item))
 
 				return func(err error) {
 					onDone(err)
 				}
 			},
 			OnGet: func(ctx *context.Context, call stack.Caller) func(
-				item any,
+				session *Session,
 				hintInfo *trace.NodeHintInfo,
 				attempts int,
 				err error,
 			) {
 				onDone := gtrace.TableOnPoolGet(config.Trace(), ctx, call)
 
-				return func(item any, hintInfo *trace.NodeHintInfo, attempts int, err error) {
-					onDone(item.(*Session), attempts, hintInfo, err) //nolint:forcetypeassert
+				return func(session *Session, hintInfo *trace.NodeHintInfo, attempts int, err error) {
+					onDone(safe.SessionInfo(session), attempts, hintInfo, err)
 				}
 			},
 			OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
@@ -233,18 +232,13 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 
 	var (
 		onDone = gtrace.TableOnCreateSession(c.config.Trace(), &ctx,
-			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"),
 		)
 		attempts = 0
 		s        *Session
 	)
 	defer func() {
-		if s != nil {
-			onDone(s, attempts, err)
-		} else {
-			onDone(nil, attempts, err)
-		}
+		onDone(safe.SessionInfo(s), attempts, err)
 	}()
 
 	s, err = retry.RetryWithResult(ctx, createSession,

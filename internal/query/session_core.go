@@ -58,10 +58,18 @@ type (
 )
 
 func (core *sessionCore) ID() string {
+	if core == nil {
+		return ""
+	}
+
 	return core.id
 }
 
 func (core *sessionCore) NodeID() uint32 {
+	if core == nil {
+		return 0
+	}
+
 	return core.nodeID
 }
 
@@ -83,6 +91,10 @@ func (core *sessionCore) SetStatus(status Status) {
 }
 
 func (core *sessionCore) Status() string {
+	if core == nil {
+		return StatusUnknown.String()
+	}
+
 	if core.closed.Load() {
 		return StatusClosed.String()
 	}
