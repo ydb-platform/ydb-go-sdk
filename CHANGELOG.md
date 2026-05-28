@@ -1,3 +1,5 @@
+* Fixed panic risks in tracing callbacks by separating error and success paths in `spans`/`metrics` and by making internal pool trace types generic-safe.
+
 ## v3.138.2
 * Added an internal query transaction trace field `WithCommit` for spans and logs
 
