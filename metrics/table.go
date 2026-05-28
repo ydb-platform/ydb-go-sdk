@@ -34,15 +34,16 @@ func table(config Config) (t trace.Table) {
 	t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
 		return func(info trace.TableSessionNewDoneInfo) {
 			if config.Details()&trace.TableSessionEvents == 0 {
-			       return
-				if info.Error != nil || info.Session == nil {
-					return
-				}
-
-				alive.With(map[string]string{
-					"node_id": idToString(info.Session.NodeID()),
-				}).Add(1)
+				return
 			}
+
+			if info.Error != nil || info.Session == nil {
+				return
+			}
+
+			alive.With(map[string]string{
+				"node_id": idToString(info.Session.NodeID()),
+			}).Add(1)
 		}
 	}
 	t.OnSessionDelete = func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
