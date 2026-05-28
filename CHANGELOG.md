@@ -1,3 +1,6 @@
+* Added `topicoptions.WithWriterDirectWrite(bool)` option to bind a topic writer with a fixed partition ID to the node that hosts the partition, bypassing the topic proxy
+* Added `topicoptions.WithMultiWriterDirectWrite(bool)` option to enable direct writes for all per-partition writers spawned by `topicoptions.WithWriteToManyPartitions`
+
 ## v3.138.2
 * Added an internal query transaction trace field `WithCommit` for spans and logs
 

@@ -144,6 +144,15 @@ func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption 
 	}
 }
 
+// WithDirectWrite enables direct connection to the node hosting the target
+// partition. Requires a fixed partition ID via WithPartitioning(NewPartitioningWithPartitionID(...))
+// or WithWriterPartitionID at the public option level.
+func WithDirectWrite(enable bool) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.directWrite = enable
+	}
+}
+
 func WithProducerID(producerID string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.producerID = producerID

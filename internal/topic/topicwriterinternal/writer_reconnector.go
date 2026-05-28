@@ -18,6 +18,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -50,6 +52,9 @@ var (
 	// It is fast check for return error at writer create context instead of stream initialization
 	// The error will remove in the future, when skip message group id will be allowed by server.
 	errProducerIDNotEqualMessageGroupID = xerrors.Wrap(errors.New("ydb: producer id not equal to message group id, use option WithMessageGroupID(producerID) for create writer")) //nolint:lll
+
+	errDirectWriteRequiresPartitionID = xerrors.Wrap(errors.New("ydb: direct write requires fixed partition id, use WithWriterPartitionID")) //nolint:lll
+	errDirectWritePartitionNotFound   = xerrors.Wrap(errors.New("ydb: direct write: target partition not found in topic description"))       //nolint:lll
 )
 
 type WriterReconnectorConfig struct {
@@ -76,6 +81,12 @@ type WriterReconnectorConfig struct {
 	MultiWriterConfig any
 	RetrySettings     topic.RetrySettings
 
+	// directWrite enables resolving the node that hosts the target partition
+	// via DescribeTopic before each stream connect, and binds the gRPC call
+	// to that node via endpoint.WithNodeID. Requires defaultPartitioning to
+	// be PartitioningPartitionID.
+	directWrite bool
+
 	connectTimeout time.Duration
 }
 
@@ -83,6 +94,10 @@ func (cfg *WriterReconnectorConfig) validate() error {
 	if cfg.defaultPartitioning.Type == rawtopicwriter.PartitioningMessageGroupID &&
 		cfg.producerID != cfg.defaultPartitioning.MessageGroupID {
 		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
+	}
+
+	if cfg.directWrite && cfg.defaultPartitioning.Type != rawtopicwriter.PartitioningPartitionID {
+		return xerrors.WithStackTrace(errDirectWriteRequiresPartitionID)
 	}
 
 	return nil
@@ -131,17 +146,65 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	if cfg.Connect == nil {
-		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
-			RawTopicWriterStream,
-			error,
-		) {
-			return cfg.rawTopicClient.StreamWrite(xcontext.MergeContexts(ctx, cfg.LogContext), tracer)
-		}
-
-		cfg.Connect = connector
+		cfg.Connect = defaultConnectFunc(&cfg)
 	}
 
 	return cfg
+}
+
+// defaultConnectFunc returns the ConnectFunc used when none is provided.
+// When directWrite is enabled it pre-resolves the partition's hosting node
+// via DescribeTopic and binds the StreamWrite call to that node.
+func defaultConnectFunc(cfg *WriterReconnectorConfig) ConnectFunc {
+	return func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error) {
+		mergedCtx := xcontext.MergeContexts(ctx, cfg.LogContext)
+		if cfg.directWrite {
+			resolvedCtx, err := resolvePartitionNode(
+				mergedCtx,
+				cfg.rawTopicClient,
+				cfg.topic,
+				cfg.defaultPartitioning.PartitionID,
+			)
+			if err != nil {
+				return nil, err
+			}
+			mergedCtx = resolvedCtx
+		}
+
+		return cfg.rawTopicClient.StreamWrite(mergedCtx, tracer)
+	}
+}
+
+// resolvePartitionNode looks up which node currently hosts the given partition
+// of the topic and returns a context bound to that node via endpoint.WithNodeID.
+// Returns the original DescribeTopic error wrapped via xerrors.WithStackTrace
+// so the writer reconnect loop can classify it through topic.RetryDecision
+// (UNAVAILABLE/OVERLOADED retry, BAD_REQUEST/SCHEME_ERROR stop).
+func resolvePartitionNode(
+	ctx context.Context,
+	rawClient *rawtopic.Client,
+	topicPath string,
+	partitionID int64,
+) (context.Context, error) {
+	res, err := rawClient.DescribeTopic(ctx, rawtopic.DescribeTopicRequest{
+		Path:            topicPath,
+		IncludeLocation: true,
+	})
+	if err != nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: direct write: describe topic failed: %w", err))
+	}
+
+	for i := range res.Partitions {
+		p := &res.Partitions[i]
+		if p.PartitionID == partitionID {
+			return endpoint.WithNodeID(ctx, uint32(p.PartitionLocation.NodeID)), nil
+		}
+	}
+
+	return nil, xerrors.WithStackTrace(fmt.Errorf(
+		"%w: topic=%q partition_id=%d",
+		errDirectWritePartitionNotFound, topicPath, partitionID,
+	))
 }
 
 type WriterReconnector struct {

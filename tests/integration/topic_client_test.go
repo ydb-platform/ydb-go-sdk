@@ -350,6 +350,100 @@ func TestDescribePartitionSettings(t *testing.T) {
 	require.Equal(t, expected, topicDesc)
 }
 
+func TestTopicDirectWrite(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	topicPath := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(2),
+		topicoptions.CreateWithMaxActivePartitions(2),
+	)
+
+	t.Run("WriteAndRead", func(t *testing.T) {
+		writer, err := scope.Driver().Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterPartitionID(0),
+			topicoptions.WithWriterDirectWrite(true),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		require.NoError(t, err)
+
+		payload := []byte("direct-write-payload")
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(payload)}))
+		require.NoError(t, writer.Close(ctx))
+
+		reader, err := scope.Driver().Topic().StartReader(
+			scope.TopicConsumerName(),
+			topicoptions.ReadSelectors{
+				{Path: topicPath, Partitions: []int64{0}},
+			},
+		)
+		require.NoError(t, err)
+		defer func() { _ = reader.Close(ctx) }()
+
+		msg, err := reader.ReadMessage(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(0), msg.PartitionID())
+
+		got, err := io.ReadAll(msg)
+		require.NoError(t, err)
+		require.Equal(t, payload, got)
+	})
+
+	t.Run("RequiresPartitionID", func(t *testing.T) {
+		writer, err := scope.Driver().Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterDirectWrite(true),
+		)
+		require.Error(t, err)
+		require.Nil(t, writer)
+	})
+}
+
+func TestTopicMultiWriterDirectWrite(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	topicPath := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(2),
+		topicoptions.CreateWithMaxActivePartitions(2),
+	)
+
+	writer, err := scope.Driver().Topic().StartWriter(
+		topicPath,
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByPartitionID(),
+			topicoptions.WithMultiWriterDirectWrite(true),
+		),
+	)
+	require.NoError(t, err)
+
+	const messageText = "multi-writer-direct"
+	require.NoError(t, writer.Write(ctx,
+		topicwriter.Message{PartitionID: 0, Data: strings.NewReader(messageText + "-0")},
+		topicwriter.Message{PartitionID: 1, Data: strings.NewReader(messageText + "-1")},
+	))
+	require.NoError(t, writer.Close(ctx))
+
+	reader, err := scope.Driver().Topic().StartReader(
+		scope.TopicConsumerName(),
+		topicoptions.ReadSelectors{
+			{Path: topicPath, Partitions: []int64{0, 1}},
+		},
+	)
+	require.NoError(t, err)
+	defer func() { _ = reader.Close(ctx) }()
+
+	gotByPartition := map[int64]string{}
+	for range 2 {
+		msg, err := reader.ReadMessage(ctx)
+		require.NoError(t, err)
+		body, err := io.ReadAll(msg)
+		require.NoError(t, err)
+		gotByPartition[msg.PartitionID()] = string(body)
+	}
+	require.Equal(t, messageText+"-0", gotByPartition[0])
+	require.Equal(t, messageText+"-1", gotByPartition[1])
+}
+
 func TestDescribeTopicConsumer(t *testing.T) {
 	ctx := xtest.Context(t)
 	db := connect(t)

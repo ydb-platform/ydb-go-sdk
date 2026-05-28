@@ -136,6 +136,24 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 	return topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID))
 }
 
+// WithWriterDirectWrite enables direct writes from the SDK to the YDB node that
+// hosts the target partition, bypassing the topic proxy. Before each (re)connect
+// the writer resolves the node via DescribeTopic(IncludeLocation=true) and binds
+// the stream to it.
+//
+// Requires WithWriterPartitionID to be set: without a fixed partition the SDK
+// cannot resolve a single node. Writer creation fails with a validation error
+// if this option is enabled without a partition ID.
+//
+// Transient lookup errors (UNAVAILABLE, OVERLOADED, etc.) are retried by the
+// existing writer reconnect loop. Terminal errors (BAD_REQUEST, SCHEME_ERROR,
+// missing partition) stop the writer.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithWriterDirectWrite(enable bool) WriterOption {
+	return topicwriterinternal.WithDirectWrite(enable)
+}
+
 // WithSyncWrite
 //
 // Deprecated: was experimental and not actual now.
