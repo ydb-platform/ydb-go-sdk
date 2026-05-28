@@ -293,9 +293,8 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 		return func(info trace.TableSessionQueryStreamReadDoneInfo) {
 			if info.Error != nil {
 				start.Error(info.Error)
-			} else {
-				start.End()
 			}
+			start.End()
 		}
 	}
 	t.OnTxBegin = func(info trace.TableTxBeginStartInfo) func(trace.TableTxBeginDoneInfo) {

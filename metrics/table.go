@@ -136,7 +136,7 @@ func table(config Config) (t trace.Table) {
 				latency.With(nil).Record(time.Since(start))
 				errs.With(map[string]string{
 					"status": errorBrief(doneInfo.Error),
-				})
+				}).Inc()
 				attempts.With(nil).Record(float64(doneInfo.Attempts))
 			}
 		}
@@ -156,7 +156,7 @@ func table(config Config) (t trace.Table) {
 				latency.With(nil).Record(time.Since(start))
 				errs.With(map[string]string{
 					"status": errorBrief(doneInfo.Error),
-				})
+				}).Inc()
 				attempts.With(nil).Record(float64(doneInfo.Attempts))
 			}
 		}
