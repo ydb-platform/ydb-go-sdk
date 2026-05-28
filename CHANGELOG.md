@@ -11,6 +11,7 @@
 * Added `SetException`-equivalent error attributes on every span produced by the `spans` package: `error.type` (`"transport_error"` for grpc transport errors, `"ydb_error"` for any other `ydb.Error`, dynamic Go type name otherwise) and `db.response.status_code` (only when the error carries a YDB status code)
 * Added `trace.Retry.OnRetryAttempt` event fired once per retry attempt (including the first), carrying the attempt number and the backoff duration that was waited before the attempt
 * Added a new `examples/opentelemetry` example showing how to map the `spans.Adapter` interface onto the OpenTelemetry Go SDK with a docker-compose stack of OTel Collector / Tempo / Prometheus / Grafana, including a `Dockerfile` that runs the demo program inside the same compose network as the rest of the stack so spans share a common wall clock — mirrors the `Ydb.Sdk.AdoNet.OpenTelemetry` .NET example
+* Fixed `ydb.WithStatsMode*` for `database/sql` silently dropping a previously registered stats callback when called more than once on the same context. Repeated calls now chain callbacks (they fire in registration order) and the effective stats mode is the most detailed one across the chain.
 
 ## v3.138.2
 * Added an internal query transaction trace field `WithCommit` for spans and logs
