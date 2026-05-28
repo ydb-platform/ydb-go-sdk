@@ -449,12 +449,10 @@ func annotateNetworkPeer(s Span, endpoint trace.EndpointInfo) {
 			attrs = append(attrs, kv.Int(AttrNetworkPeerPort, port))
 		}
 	}
-	if dc := endpoint.Location(); dc != "" {
-		attrs = append(attrs, kv.String(AttrYDBNodeDC, dc))
-	}
-	if id := endpoint.NodeID(); id != 0 {
-		attrs = append(attrs, kv.Int64(AttrYDBNodeID, int64(id)))
-	}
+	attrs = append(attrs,
+		kv.String(AttrYDBNodeDC, endpoint.Location()),
+		kv.Int64(AttrYDBNodeID, int64(endpoint.NodeID())),
+	)
 	setSpanAttributes(s, attrs...)
 }
 
