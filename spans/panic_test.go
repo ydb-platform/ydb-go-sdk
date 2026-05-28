@@ -130,7 +130,18 @@ func TestErrorPathDoesNotCallTableSessionMetadata(t *testing.T) {
 func TestErrorPathDoesNotCallTxMetadata(t *testing.T) {
 	ctx := context.Background()
 	q := query(testAdapter{})
-	require.Nil(t, q.OnSessionBegin, "query begin is intentionally suppressed because lazy begin is not an RPC span")
+	qDone := q.OnSessionBegin(trace.QuerySessionBeginStartInfo{
+		Context: &ctx,
+		Call:    testCall("OnSessionBegin"),
+	})
+	require.NotNil(t, qDone)
+
+	require.NotPanics(t, func() {
+		qDone(trace.QuerySessionBeginDoneInfo{
+			Error: errors.New("test error"),
+			Tx:    (*panicTx)(nil),
+		})
+	})
 
 	tableTrace := table(testAdapter{})
 	tableTxBeginDone := tableTrace.OnTxBegin(trace.TableTxBeginStartInfo{

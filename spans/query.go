@@ -228,13 +228,26 @@ func query(adapter Adapter) trace.Query {
 			)
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
-				var nodeID int64
-				if info.Error == nil {
-					nodeID = safeNodeIDInt64(info.Session)
+				switch {
+				case info.Error != nil:
+					finish(
+						start,
+						info.Error,
+						kv.Int64(AttrYDBNodeID, 0),
+					)
+				case info.Session != nil:
+					finish(
+						start,
+						nil,
+						kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
+					)
+				default:
+					finish(
+						start,
+						nil,
+						kv.Int64(AttrYDBNodeID, 0),
+					)
 				}
-				finish(start, info.Error,
-					kv.Int64(AttrYDBNodeID, nodeID),
-				)
 			}
 		},
 		OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {
@@ -332,11 +345,35 @@ func query(adapter Adapter) trace.Query {
 				)
 			}
 		},
-		// OnSessionBegin is intentionally not wired: it fires for every
-		// `s.Begin(ctx, ...)` call, including lazy transactions where no
-		// gRPC RPC happens — emitting a span for those would produce a
-		// CLIENT span without a network call. The actual BeginTransaction
-		// RPC is covered by OnSessionBeginTransaction below.
+		OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(info trace.QuerySessionBeginDoneInfo) {
+			if adapter.Details()&trace.QuerySessionEvents == 0 {
+				return nil
+			}
+			start := childSpanWithReplaceCtx(
+				adapter,
+				info.Context,
+				info.Call.String(),
+				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
+			)
+
+			return func(info trace.QuerySessionBeginDoneInfo) {
+				switch {
+				case info.Error != nil:
+					finish(start, info.Error)
+				case info.Tx != nil:
+					finish(
+						start,
+						nil,
+						kv.String("TransactionID", safeID(info.Tx)),
+					)
+				default:
+					finish(start, nil)
+				}
+			}
+		},
+		// OnSessionBeginTransaction covers an actual gRPC BeginTransaction
+		// RPC (eager `s.Begin` and `Tx.UnLazy`); lazy DoTx never fires this
+		// event because the begin is fused into the first ExecuteQuery.
 		OnSessionBeginTransaction: func(
 			info trace.QuerySessionBeginTransactionStartInfo,
 		) func(info trace.QuerySessionBeginTransactionDoneInfo) {

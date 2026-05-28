@@ -291,12 +291,11 @@ func TestQueryNoisySpansAreSuppressed(t *testing.T) {
 	ctx := context.Background()
 	call := stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/spans.TestQueryNoisySpansAreSuppressed")
 
-	// OnDo / OnDoTx / OnSessionBegin / OnPoolWith / OnPoolTry / OnPoolPut
+	// OnDo / OnDoTx / OnSessionDelete / OnPoolWith / OnPoolTry / OnPoolPut
 	// must NOT register handlers — they are intentionally suppressed so the
 	// span tree only shows ydb.* user-facing names.
 	require.Nil(t, q.OnDo)
 	require.Nil(t, q.OnDoTx)
-	require.Nil(t, q.OnSessionBegin)
 	require.Nil(t, q.OnSessionDelete)
 	require.Nil(t, q.OnPoolWith)
 	require.Nil(t, q.OnPoolTry)
