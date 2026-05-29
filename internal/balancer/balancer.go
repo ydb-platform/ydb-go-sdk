@@ -2,9 +2,7 @@ package balancer
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync/atomic"
 
@@ -36,32 +34,6 @@ var (
 	ErrNoEndpoints    = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
 	errBalancerClosed = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
 )
-
-// streamWrapper wraps grpc.ClientStream and triggers pool.Ban on RecvMsg/SendMsg/CloseSend
-// errors that qualify as bad connection (same logic as wrapCall defer).
-type streamWrapper struct {
-	grpc.ClientStream
-
-	onErr func(error)
-}
-
-func (s *streamWrapper) SendMsg(m interface{}) error {
-	err := s.ClientStream.SendMsg(m)
-	if err != nil && !errors.Is(err, io.EOF) {
-		s.onErr(err)
-	}
-
-	return err
-}
-
-func (s *streamWrapper) RecvMsg(m interface{}) error {
-	err := s.ClientStream.RecvMsg(m)
-	if err != nil && !errors.Is(err, io.EOF) {
-		s.onErr(err)
-	}
-
-	return err
-}
 
 type Balancer struct {
 	driverConfig      *config.Config
@@ -393,27 +365,17 @@ func (b *Balancer) NewStream(
 		return nil, xerrors.WithStackTrace(errBalancerClosed)
 	}
 
-	var stream grpc.ClientStream
-	if err := b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
-		inner, innerErr := cc.NewStream(ctx, desc, method, opts...)
-		if innerErr != nil {
-			return innerErr
-		}
-		stream = &streamWrapper{
-			ClientStream: inner,
-			onErr: func(err error) {
-				if IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-					b.pool.Ban(ctx, cc, err)
-				}
-			},
-		}
+	var client grpc.ClientStream
+	err = b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
+		client, err = cc.NewStream(ctx, desc, method, opts...)
 
-		return nil
-	}); err != nil {
-		return nil, err
+		return err
+	})
+	if err == nil {
+		return client, nil
 	}
 
-	return stream, nil
+	return nil, err
 }
 
 func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc conn.Conn) error) (err error) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
@@ -63,6 +64,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 
 	cc = newConn(endpoint, p,
 		withOnClose(p.remove),
+		withOnTransportError(p.Ban),
 	)
 
 	p.conns.Set(endpoint.Key(), cc)
@@ -88,10 +90,24 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
+	if !xerrors.IsTransportError(cause,
+		grpcCodes.ResourceExhausted,
+		grpcCodes.Unavailable,
+	) {
+		return
+	}
+
+	e := cc.Endpoint().Copy()
+
+	cc, ok := p.conns.Get(e.Key())
+	if !ok {
+		return
+	}
+
 	trace.DriverOnConnBan(
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
-		cc.Endpoint().Copy(), cc.GetState(), cause,
+		e, cc.GetState(), cause,
 	)(cc.SetState(ctx, state.Banned))
 }
 

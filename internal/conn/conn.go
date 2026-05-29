@@ -67,7 +67,8 @@ type (
 		state        atomic.Uint32
 		childStreams *xcontext.CancelsGuard
 		lastUsage    xsync.LastUsage
-		onClose      []func(*conn)
+		onClose           []func(*conn)
+		onTransportErrors []func(ctx context.Context, cc Conn, cause error)
 	}
 )
 
@@ -157,6 +158,12 @@ func (c *conn) Unban(ctx context.Context) state.State {
 	c.setState(ctx, newState)
 
 	return newState
+}
+
+func (c *conn) onTransportError(ctx context.Context, cause error) {
+	for _, onTransportError := range c.onTransportErrors {
+		onTransportError(ctx, c, cause)
+	}
 }
 
 func (c *conn) GetState() (s state.State) {
@@ -532,6 +539,14 @@ func withOnClose(onClose func(*conn)) option {
 	return func(c *conn) {
 		if onClose != nil {
 			c.onClose = append(c.onClose, onClose)
+		}
+	}
+}
+
+func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, cause error)) option {
+	return func(c *conn) {
+		if onTransportError != nil {
+			c.onTransportErrors = append(c.onTransportErrors, onTransportError)
 		}
 	}
 }
