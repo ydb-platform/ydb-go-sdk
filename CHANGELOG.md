@@ -1,3 +1,5 @@
+* Added `label` to `table` `OnDo`/`OnDoTx` metrics (`latency`, `errs`, `attempts`) so that `table.WithLabel` breaks them down by label, consistent with the `query` service metrics
+
 ## v3.139.1
 * Added support for session and node shutdown hints on the session attach stream. When a node shutdown hint was received, the balancer pessimized (banned) the connection to that YDB node, so subsequent gRPC calls were routed to other nodes.
 * Deprecated `config.WithDisableOptimisticUnban()` option and `config.Config.DisableOptimisticUnban()` method. Optimistic unban (where a successful gRPC call would immediately unban a banned connection) was disabled for all connections; nodes are now unbanned only after the next background discovery refresh if the node is still present in the discovery response.
