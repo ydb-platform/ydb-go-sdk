@@ -829,6 +829,41 @@ func Compose(lhs *trace.Query, rhs *trace.Query, opts ...QueryComposeOption) *tr
 		}
 	}
 	{
+		h1 := lhs.OnSessionBeginTransaction
+		h2 := rhs.OnSessionBeginTransaction
+		ret.OnSessionBeginTransaction = func(q trace.QuerySessionBeginTransactionStartInfo) func(trace.QuerySessionBeginTransactionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(trace.QuerySessionBeginTransactionDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q trace.QuerySessionBeginTransactionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
 		h1 := lhs.OnTxCommit
 		h2 := rhs.OnTxCommit
 		ret.OnTxCommit = func(q trace.QueryTxCommitStartInfo) func(trace.QueryTxCommitDoneInfo) {
@@ -1517,6 +1552,21 @@ func onSessionBegin(t *trace.Query, q trace.QuerySessionBeginStartInfo) func(inf
 	}
 	return res
 }
+func onSessionBeginTransaction(t *trace.Query, q trace.QuerySessionBeginTransactionStartInfo) func(trace.QuerySessionBeginTransactionDoneInfo) {
+	fn := t.OnSessionBeginTransaction
+	if fn == nil {
+		return func(trace.QuerySessionBeginTransactionDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(trace.QuerySessionBeginTransactionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func onTxCommit(t *trace.Query, q trace.QueryTxCommitStartInfo) func(info trace.QueryTxCommitDoneInfo) {
 	fn := t.OnTxCommit
 	if fn == nil {
@@ -1974,6 +2024,20 @@ func QueryOnSessionBegin(t *trace.Query, c *context.Context, c1 trace.Call, sess
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnSessionBeginTransaction(t *trace.Query, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(_ error, txID string) {
+	var p trace.QuerySessionBeginTransactionStartInfo
+	p.Context = c
+	p.Call = c1
+	p.Session = session
+	res := onSessionBeginTransaction(t, p)
+	return func(e error, txID string) {
+		var p trace.QuerySessionBeginTransactionDoneInfo
+		p.Error = e
+		p.TxID = txID
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnTxCommit(t *trace.Query, c *context.Context, c1 trace.Call, session trace.SessionInfo, tx trace.TxInfo) func(error) {
 	var p trace.QueryTxCommitStartInfo
 	p.Context = c
@@ -2036,11 +2100,12 @@ func QueryOnTxQuery(t *trace.Query, c *context.Context, c1 trace.Call, session t
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxQueryResultSet(t *trace.Query, c *context.Context, c1 trace.Call, tx trace.TxInfo, query string, label string, withCommit bool) func(error) {
+func QueryOnTxQueryResultSet(t *trace.Query, c *context.Context, c1 trace.Call, tx trace.TxInfo, session trace.SessionInfo, query string, label string, withCommit bool) func(error) {
 	var p trace.QueryTxQueryResultSetStartInfo
 	p.Context = c
 	p.Call = c1
 	p.Tx = tx
+	p.Session = session
 	p.Query = query
 	p.Label = label
 	p.WithCommit = withCommit
@@ -2052,11 +2117,12 @@ func QueryOnTxQueryResultSet(t *trace.Query, c *context.Context, c1 trace.Call, 
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxQueryRow(t *trace.Query, c *context.Context, c1 trace.Call, tx trace.TxInfo, query string, label string, withCommit bool) func(error) {
+func QueryOnTxQueryRow(t *trace.Query, c *context.Context, c1 trace.Call, tx trace.TxInfo, session trace.SessionInfo, query string, label string, withCommit bool) func(error) {
 	var p trace.QueryTxQueryRowStartInfo
 	p.Context = c
 	p.Call = c1
 	p.Tx = tx
+	p.Session = session
 	p.Query = query
 	p.Label = label
 	p.WithCommit = withCommit

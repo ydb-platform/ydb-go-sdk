@@ -1,3 +1,7 @@
+* Reworked the `spans` package to follow OpenTelemetry semantic conventions: the emitted span tree now uses `ydb.*` names (`ydb.CreateSession`, `ydb.ExecuteQuery`, `ydb.BeginTransaction`, `ydb.Commit`, `ydb.Rollback`, `ydb.GetSession`, `ydb.Driver.Initialize`, `ydb.RunWithRetry`, `ydb.Try`) and OTel attribute keys (`db.*`, `server.*`, `network.peer.*`, `error.*`) plus YDB-specific `ydb.node.id`, `ydb.node.dc` and `ydb.retry.backoff_ms`. Noisy internal-package spans are suppressed. See [SPANS.md](SPANS.md) for the full span/attribute reference and migration notes
+* Added `trace.Retry.OnRetryAttempt` callback fired once per retry attempt with the attempt number and the backoff duration waited before it; this is what feeds the new `ydb.Try` spans
+* Added an `examples/opentelemetry` example that wires `spans.Adapter` onto the OpenTelemetry Go SDK via [`ydb-go-sdk-otel`](https://github.com/ydb-platform/ydb-go-sdk-otel), with an end-to-end docker-compose stack (OTel Collector / Tempo / Prometheus / Grafana)
+
 ## v3.138.4
 * Added `topicoptions.CreateWithMetricsLevel`, `topicoptions.AlterWithSetMetricsLevel`, and `topicoptions.AlterWithResetMetricsLevel` to configure topic metrics level
 * Added `MetricsLevel` field to `topictypes.TopicDescription`
