@@ -16,6 +16,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
@@ -29,6 +30,7 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 			SessionId: "123",
 		}, nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+		stubAttachStreamContext(attachStream)
 		var (
 			corePtr        atomic.Pointer[sessionCore]
 			startRecv      = make(chan struct{}, 1)
@@ -83,6 +85,7 @@ func TestSessionCoreAttachError(t *testing.T) {
 				return &Ydb_Query.DeleteSessionResponse{}, nil
 			})
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+		stubAttachStreamContext(attachStream)
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			return nil, errSessionClosed
 		}).AnyTimes()
@@ -106,6 +109,7 @@ func TestSessionCoreClose(t *testing.T) {
 			SessionId: "123",
 		}, nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+		stubAttachStreamContext(attachStream)
 		var (
 			corePtr        atomic.Pointer[sessionCore]
 			startRecv      = make(chan struct{}, 1)
@@ -179,4 +183,123 @@ func TestSessionCoreClose(t *testing.T) {
 		require.GreaterOrEqual(t, sessionDeletes.Load(), uint32(1))
 		require.LessOrEqual(t, sessionDeletes.Load(), uint32(10))
 	}, xtest.StopAfter(time.Second))
+}
+
+func TestSessionCoreNodeShutdownHintBansConnection(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx := t.Context()
+		ctrl := gomock.NewController(t)
+		client := NewMockQueryServiceClient(ctrl)
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+			Status:    Ydb.StatusIds_SUCCESS,
+			SessionId: "123",
+			NodeId:    1,
+		}, nil)
+
+		var (
+			firstRecv   atomic.Bool
+			deliverHint = make(chan struct{})
+			closeGate   sync.Once
+		)
+		t.Cleanup(func() {
+			closeGate.Do(func() { close(deliverHint) })
+		})
+
+		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+		var banned atomic.Bool
+		ctx = conn.WithBanCallback(ctx, func(cause error) {
+			banned.Store(true)
+			require.ErrorIs(t, cause, errNodeShutdownHint)
+		})
+		stubAttachStreamContextWith(ctx, attachStream)
+		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
+			if !firstRecv.Swap(true) {
+				return &Ydb_Query.SessionState{
+					Status: Ydb.StatusIds_SUCCESS,
+				}, nil
+			}
+
+			<-deliverHint
+
+			return &Ydb_Query.SessionState{
+				Status: Ydb.StatusIds_SUCCESS,
+				SessionHint: &Ydb_Query.SessionState_NodeShutdown{
+					NodeShutdown: &Ydb_Query.NodeShutdownHint{},
+				},
+			}, nil
+		}).AnyTimes()
+		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+			SessionId: "123",
+		}).Return(attachStream, nil)
+
+		core, err := Open(ctx, client)
+		require.NoError(t, err)
+		require.NotNil(t, core)
+
+		closeGate.Do(func() { close(deliverHint) })
+
+		require.Eventually(t, func() bool {
+			return banned.Load() && !core.IsAlive()
+		}, time.Second, time.Millisecond,
+			"NodeShutdown hint must ban the connection and release the session",
+		)
+		require.Equal(t, StatusClosed.String(), core.Status())
+	}, xtest.StopAfter(time.Second))
+}
+
+func TestSessionCoreSessionShutdownHintClosesSession(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx := t.Context()
+
+		ctrl := gomock.NewController(t)
+		client := NewMockQueryServiceClient(ctrl)
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+			Status:    Ydb.StatusIds_SUCCESS,
+			SessionId: "123",
+		}, nil)
+
+		var (
+			firstRecv   atomic.Bool
+			deliverHint = make(chan struct{})
+			closeGate   sync.Once
+		)
+		t.Cleanup(func() {
+			closeGate.Do(func() { close(deliverHint) })
+		})
+
+		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+		stubAttachStreamContext(attachStream)
+		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
+			if !firstRecv.Swap(true) {
+				return &Ydb_Query.SessionState{
+					Status: Ydb.StatusIds_SUCCESS,
+				}, nil
+			}
+
+			<-deliverHint
+
+			return &Ydb_Query.SessionState{
+				Status: Ydb.StatusIds_SUCCESS,
+				SessionHint: &Ydb_Query.SessionState_SessionShutdown{
+					SessionShutdown: &Ydb_Query.SessionShutdownHint{},
+				},
+			}, nil
+		}).AnyTimes()
+		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+			SessionId: "123",
+		}).Return(attachStream, nil)
+
+		core, err := Open(ctx, client)
+		require.NoError(t, err)
+		require.NotNil(t, core)
+
+		closeGate.Do(func() { close(deliverHint) })
+
+		require.Eventually(t, func() bool {
+			return !core.IsAlive()
+		}, time.Second, time.Millisecond,
+			"SessionShutdown hint must release the session",
+		)
+		require.Equal(t, StatusClosed.String(), core.Status())
+	})
 }
