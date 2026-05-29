@@ -2,8 +2,8 @@ package version
 
 const (
 	Major = "3"
-	Minor = "138"
-	Patch = "4"
+	Minor = "139"
+	Patch = "0"
 
 	Package = "ydb-go-sdk"
 )
