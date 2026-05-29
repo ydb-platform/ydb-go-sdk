@@ -1,3 +1,4 @@
+## v3.139.2
 * Added `label` to `table` `OnDo`/`OnDoTx` metrics (`latency`, `errs`, `attempts`) so that `table.WithLabel` breaks them down by label, consistent with the `query` service metrics
 
 ## v3.139.1
