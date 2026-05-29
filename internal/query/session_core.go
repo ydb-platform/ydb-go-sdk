@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -158,9 +157,7 @@ func Open(
 		}
 	}()
 
-	response, err := client.CreateSession(
-		balancer.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED),
-		&Ydb_Query.CreateSessionRequest{},
+	response, err := client.CreateSession(ctx, &Ydb_Query.CreateSessionRequest{},
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
