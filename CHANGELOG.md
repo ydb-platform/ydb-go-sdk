@@ -1,6 +1,11 @@
 * Added support for session and node shutdown hints on the session attach stream. When a node shutdown hint was received, the balancer pessimized (banned) the connection to that YDB node, so subsequent gRPC calls were routed to other nodes.
 * Deprecated `config.WithDisableOptimisticUnban()`. Optimistic unban (where a successful gRPC call would immediately unban a banned connection) was disabled for all connections; nodes are now unbanned only after the next background discovery refresh if the node is still present in the discovery response.
 
+## v3.138.4
+* Added `topicoptions.CreateWithMetricsLevel`, `topicoptions.AlterWithSetMetricsLevel`, and `topicoptions.AlterWithResetMetricsLevel` to configure topic metrics level
+* Added `MetricsLevel` field to `topictypes.TopicDescription`
+* Bumped `ydb-go-genproto` to expose the `metrics_level` field on topic create/alter/describe protos
+
 ## v3.138.3
 * Fixed panic risks in tracing callbacks by separating error and success paths in `spans`/`metrics` and by making internal pool trace types generic-safe.
 * Fixed `ydb.WithStatsMode*` for `database/sql` silently dropping a previously registered stats callback when called more than once on the same context. Repeated calls now chain callbacks (they fire in registration order) and the effective stats mode is the most detailed one across the chain.
