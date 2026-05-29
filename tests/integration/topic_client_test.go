@@ -18,6 +18,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -712,12 +713,52 @@ func TestAlterTopic(t *testing.T) {
 	require.Equal(t, newMinActivePartitions, topicDesc.PartitionSettings.MinActivePartitions)
 }
 
-func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {
-	return connectWithLogOption(t, false, opts...)
+func TestTopicMetricsLevel(t *testing.T) {
+	if ydbVersion := os.Getenv("YDB_VERSION"); ydbVersion != "" &&
+		ydbVersion != "nightly" && ydbVersion != "edge" && ydbVersion != "latest" &&
+		version.Lt(ydbVersion, "25.4") {
+		t.Skip("require support for topic metrics_level")
+	}
+
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	const initialLevel = uint32(3)
+
+	topicPath := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(1),
+		topicoptions.CreateWithMaxActivePartitions(1),
+		topicoptions.CreateWithMetricsLevel(initialLevel),
+	)
+
+	desc, err := scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.NotNil(t, desc.MetricsLevel, "metrics_level must be populated after create")
+	require.Equal(t, initialLevel, *desc.MetricsLevel)
+
+	const updatedLevel = uint32(5)
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithSetMetricsLevel(updatedLevel),
+	)
+	require.NoError(t, err)
+
+	desc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.NotNil(t, desc.MetricsLevel, "metrics_level must be populated after alter set")
+	require.Equal(t, updatedLevel, *desc.MetricsLevel)
+
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithResetMetricsLevel(),
+	)
+	require.NoError(t, err)
+
+	desc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Nil(t, desc.MetricsLevel, "metrics_level must be reset to the database default")
 }
 
-func connectWithGrpcLogging(t testing.TB, opts ...ydb.Option) *ydb.Driver {
-	return connectWithLogOption(t, true, opts...)
+func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {
+	return connectWithLogOption(t, false, opts...)
 }
 
 func connectWithLogOption(t testing.TB, logGRPC bool, opts ...ydb.Option) *ydb.Driver {
