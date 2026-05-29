@@ -38,13 +38,20 @@ type (
 
 func begin(
 	ctx context.Context,
-	client Ydb_Query_V1.QueryServiceClient,
-	sessionID string,
+	s *Session,
 	txSettings query.TransactionSettings,
-) (txID string, _ error) {
-	response, err := client.BeginTransaction(ctx,
+) (txID string, finalErr error) {
+	onDone := gtrace.QueryOnSessionBeginTransaction(s.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.begin"),
+		s,
+	)
+	defer func() {
+		onDone(finalErr, txID)
+	}()
+
+	response, err := s.client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
-			SessionId:  sessionID,
+			SessionId:  s.ID(),
 			TxSettings: txSettings.ToYdbQuerySettings(),
 		},
 	)
@@ -60,7 +67,7 @@ func (tx *Transaction) UnLazy(ctx context.Context) error {
 		return nil
 	}
 
-	txID, err := begin(ctx, tx.s.client, tx.s.ID(), tx.txSettings)
+	txID, err := begin(ctx, tx.s, tx.txSettings)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -80,7 +87,7 @@ func (tx *Transaction) QueryResultSet(
 
 	onDone := gtrace.QueryOnTxQueryResultSet(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryResultSet"),
-		tx, q, txSettings.Label(), txSettings.TxControl().Commit(),
+		tx, tx.s, q, txSettings.Label(), txSettings.TxControl().Commit(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -134,7 +141,7 @@ func (tx *Transaction) QueryRow(
 
 	onDone := gtrace.QueryOnTxQueryRow(tx.s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).QueryRow"),
-		tx, q, txSettings.Label(), txSettings.TxControl().Commit(),
+		tx, tx.s, q, txSettings.Label(), txSettings.TxControl().Commit(),
 	)
 	defer func() {
 		onDone(finalErr)

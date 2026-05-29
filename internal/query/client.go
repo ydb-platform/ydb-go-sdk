@@ -372,6 +372,9 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 			return op(ctx, s)
 		},
 		append([]retry.Option{
+			// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
+			// callers see ydb.RunWithRetry / ydb.Try spans for Do().
+			retry.WithTrace(c.config.TraceRetry()),
 			retry.WithTrace(&trace.Retry{
 				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 					return func(info trace.RetryLoopDoneInfo) {
@@ -699,6 +702,9 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 		settings.TxSettings(),
 		append(
 			[]retry.Option{
+				// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
+				// callers see ydb.RunWithRetry / ydb.Try spans for DoTx().
+				retry.WithTrace(c.config.TraceRetry()),
 				retry.WithTrace(&trace.Retry{
 					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 						return func(info trace.RetryLoopDoneInfo) {

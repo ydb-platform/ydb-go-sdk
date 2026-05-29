@@ -21,6 +21,14 @@ func safeNodeID(n interface{ NodeID() uint32 }) string {
 	return strconv.FormatUint(uint64(n.NodeID()), 10)
 }
 
+func safeNodeIDInt64(n interface{ NodeID() uint32 }) int64 {
+	if n == nil {
+		return 0
+	}
+
+	return int64(n.NodeID())
+}
+
 func safeID(id interface{ ID() string }) string {
 	if id == nil {
 		return ""

@@ -4,6 +4,7 @@ package gtrace
 
 import (
 	"context"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -73,6 +74,41 @@ func Compose(lhs *trace.Retry, rhs *trace.Retry, opts ...RetryComposeOption) *tr
 			}
 		}
 	}
+	{
+		h1 := lhs.OnRetryAttempt
+		h2 := rhs.OnRetryAttempt
+		ret.OnRetryAttempt = func(r trace.RetryAttemptStartInfo) func(trace.RetryAttemptDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r1, r2 func(trace.RetryAttemptDoneInfo)
+			if h1 != nil {
+				r1 = h1(r)
+			}
+			if h2 != nil {
+				r2 = h2(r)
+			}
+			return func(r trace.RetryAttemptDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r1 != nil {
+					r1(r)
+				}
+				if r2 != nil {
+					r2(r)
+				}
+			}
+		}
+	}
 	return &ret
 }
 func onRetry(t *trace.Retry, r trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
@@ -90,6 +126,21 @@ func onRetry(t *trace.Retry, r trace.RetryLoopStartInfo) func(trace.RetryLoopDon
 	}
 	return res
 }
+func onRetryAttempt(t *trace.Retry, r trace.RetryAttemptStartInfo) func(trace.RetryAttemptDoneInfo) {
+	fn := t.OnRetryAttempt
+	if fn == nil {
+		return func(trace.RetryAttemptDoneInfo) {
+			return
+		}
+	}
+	res := fn(r)
+	if res == nil {
+		return func(trace.RetryAttemptDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func RetryOnRetry(t *trace.Retry, c *context.Context, c1 trace.Call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
 	var p trace.RetryLoopStartInfo
@@ -102,6 +153,22 @@ func RetryOnRetry(t *trace.Retry, c *context.Context, c1 trace.Call, label strin
 	return func(attempts int, e error) {
 		var p trace.RetryLoopDoneInfo
 		p.Attempts = attempts
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func RetryOnRetryAttempt(t *trace.Retry, c *context.Context, c1 trace.Call, label string, idempotent bool, attempt int, backoff time.Duration) func(error) {
+	var p trace.RetryAttemptStartInfo
+	p.Context = c
+	p.Call = c1
+	p.Label = label
+	p.Idempotent = idempotent
+	p.Attempt = attempt
+	p.Backoff = backoff
+	res := onRetryAttempt(t, p)
+	return func(e error) {
+		var p trace.RetryAttemptDoneInfo
 		p.Error = e
 		res(p)
 	}
