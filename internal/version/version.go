@@ -9,6 +9,6 @@ const (
 )
 
 const (
-	Version     = Major + "." + Minor + "." + Patch + "-hotfix.1"
+	Version     = Major + "." + Minor + "." + Patch + "-hotfix.4"
 	FullVersion = Package + "/" + Version
 )
