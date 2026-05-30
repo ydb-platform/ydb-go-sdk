@@ -144,6 +144,8 @@ func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	}
 }
 
+var nopFunc = func() {}
+
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
@@ -160,8 +162,12 @@ func newResult(
 		}
 	}
 
-	// replace all hooks to once func
-	r.onClose = sync.OnceFunc(r.onClose)
+	if r.onClose != nil {
+		// replace all hooks to once func
+		r.onClose = sync.OnceFunc(r.onClose)
+	} else {
+		r.onClose = nopFunc
+	}
 
 	if r.trace != nil {
 		onDone := gtrace.QueryOnResultNew(r.trace, &ctx,
