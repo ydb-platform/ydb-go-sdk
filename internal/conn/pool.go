@@ -9,7 +9,6 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
-	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
@@ -88,13 +87,6 @@ func (p *Pool) isClosed() bool {
 
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	if p.isClosed() {
-		return
-	}
-
-	// Canceled (context or gRPC) is client- or server-initiated and does not indicate
-	// a bad connection. Skip ban regardless of call path.
-	if xerrors.Is(cause, context.Canceled) ||
-		xerrors.IsTransportError(cause, grpcCodes.Canceled) {
 		return
 	}
 

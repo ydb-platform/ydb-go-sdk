@@ -62,7 +62,6 @@ func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bo
 	}
 
 	operationErrorCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType)
-
 	if len(operationErrorCodes) > 0 && xerrors.IsOperationError(err, operationErrorCodes...) {
 		return true
 	}
