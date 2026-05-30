@@ -255,10 +255,8 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	if r.stream != nil {
-		if streamCtx := r.stream.Context(); streamCtx != nil {
-			if err := streamCtx.Err(); err != nil {
-				return nil
-			}
+		if r.stream.Context().Err() != nil {
+			return nil
 		}
 	}
 
@@ -301,7 +299,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 				return nil
 			}
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return xerrors.WithStackTrace(ctxErr)
+				return ctxErr
 			}
 
 			return xerrors.WithStackTrace(err)
