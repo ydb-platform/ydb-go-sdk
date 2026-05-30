@@ -581,45 +581,25 @@ func TestExecute(t *testing.T) {
 			})
 		})
 
-		// Verifies that canceling the ctx passed to nextPart unblocks a Recv
-		// that is already waiting on the wire. Without the per-call
-		// context.AfterFunc(ctx, streamCancel) installed by nextPart, Recv
-		// would block indefinitely until the server sends or ends the stream
-		// because executeCtx is decoupled from the caller's ctx after
-		// execute() returns (see CancelAfterExecute for the decoupling
-		// contract).
-		t.Run("CancelCallCtxUnblocksBlockedRecv", func(t *testing.T) {
+		// Per-call ctx cancellation must not cancel the gRPC execute stream: nextPart
+		// returns immediately when the call ctx is already done, without forwarding
+		// cancellation to executeCtx (see stream_ctx_decoupling_test.go).
+		t.Run("CancelCallCtxReturnsWithoutCancelingExecuteStream", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
-			recvStarted := make(chan struct{})
-			var streamCtx context.Context
-
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-			// First Recv() satisfies newResult() inside execute().
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
 				ResultSetIndex: 0,
 				ResultSet:      &Ydb.ResultSet{},
 			}, nil)
-			// Second Recv() simulates a slow server: it blocks until the gRPC
-			// stream's ctx is cancelled and only then surfaces the cancellation,
-			// matching real gRPC behavior where Recv unblocks on stream ctx
-			// cancellation.
-			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-				close(recvStarted)
-				<-streamCtx.Done()
-
-				return nil, streamCtx.Err()
-			})
 
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(ctx context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
 					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
 				) {
-					streamCtx = ctx
-
 					return stream, nil
 				})
 
@@ -630,13 +610,11 @@ func TestExecute(t *testing.T) {
 			}()
 
 			callCtx, callCancel := context.WithCancel(context.Background())
-			go func() {
-				<-recvStarted
-				callCancel()
-			}()
+			callCancel()
 
 			_, err = r.nextPart(callCtx)
 			require.ErrorIs(t, err, context.Canceled)
+			require.NoError(t, r.lastErr)
 		})
 	})
 }

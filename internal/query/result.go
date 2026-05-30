@@ -28,6 +28,13 @@ import (
 
 var errReadNextResultSet = xerrors.Wrap(errors.New("ydb: stop read the result set because see part of next result set"))
 
+// isPerCallContextError reports cancellation/deadline on the caller's per-iteration ctx.
+// Such errors must not poison streamResult.lastErr or cancel the gRPC execute stream:
+// Close with a fresh ctx must still drain late stream parts (e.g. ExecStats).
+func isPerCallContextError(err error) bool {
+	return xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded)
+}
+
 var (
 	_ result.Result = (*streamResult)(nil)
 	_ result.Result = (*materializedResult)(nil)
@@ -50,12 +57,7 @@ type (
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
-		// streamCancel cancels the gRPC context that backs stream.Recv(). It
-		// is wired up by execute() to point at the executeCtx CancelFunc and
-		// invoked on demand from nextPart so that a Recv blocked on the wire
-		// can be unblocked when the caller's ctx is cancelled mid-flight.
-		streamCancel context.CancelFunc
-		closed       atomic.Bool
+		closed         atomic.Bool
 	}
 	resultOption func(s *streamResult)
 )
@@ -143,16 +145,6 @@ func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	}
 }
 
-// withStreamCancel wires a CancelFunc that nextPart invokes via
-// context.AfterFunc to unblock stream.Recv() when the caller's ctx is
-// cancelled. Typically this is the same CancelFunc that controls the gRPC
-// context the stream was opened with.
-func withStreamCancel(cancel context.CancelFunc) resultOption {
-	return func(s *streamResult) {
-		s.streamCancel = cancel
-	}
-}
-
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
@@ -201,7 +193,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
 ) {
 	defer func() {
-		if finishErr != nil {
+		if finishErr != nil && !isPerCallContextError(finishErr) {
 			r.lastErr = finishErr
 		}
 	}()
@@ -216,28 +208,11 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	}
 
 	if err := ctx.Err(); err != nil {
-		if r.streamCancel != nil {
-			r.streamCancel()
-		}
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if r.lastErr != nil {
 		return nil, r.lastErr
-	}
-
-	// Forward ctx cancellation to the gRPC stream context so a Recv blocked
-	// waiting for the next server message unblocks if the caller cancels.
-	// AfterFunc only spawns a goroutine when ctx is actually done, so on the
-	// happy path this costs a single register+stop pair (no goroutine, no
-	// extra allocations beyond the AfterFunc node itself). The forwarding is
-	// strictly per-call: the streamResult intentionally stays decoupled from
-	// the original execute() ctx after execute returns, which keeps callers
-	// free to iterate the result with a fresh ctx (see CancelAfterExecute).
-	if r.streamCancel != nil {
-		stop := context.AfterFunc(ctx, r.streamCancel)
-		defer stop()
 	}
 
 	part, err := nextPart(r.stream)
@@ -331,7 +306,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishErr error) {
 	defer func() {
-		if finishErr != nil {
+		if finishErr != nil && !isPerCallContextError(finishErr) {
 			r.lastErr = finishErr
 		}
 	}()
@@ -339,19 +314,6 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
 		if err := ctx.Err(); err != nil {
-			// Mirror nextPart: cancel the gRPC stream context on per-call ctx
-			// error so the underlying stream is torn down consistently with
-			// lastErr being poisoned by the deferred func above. Without this,
-			// nextResultSet would leave the stream half-alive: lastErr is set
-			// (so subsequent nextPart/Close(freshCtx) bail out at the lastErr
-			// check before ever calling Recv), while the gRPC stream itself
-			// keeps holding resources until the server eventually ends it.
-			// streamCancel is idempotent, so calling it here is safe even if
-			// nextPart later cancels it again.
-			if r.streamCancel != nil {
-				r.streamCancel()
-			}
-
 			return nil, xerrors.WithStackTrace(err)
 		}
 

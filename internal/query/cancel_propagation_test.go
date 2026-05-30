@@ -19,10 +19,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// TestStreamResultNextResultSet_CtxErrorCancelsStream is a regression test for
-// the inconsistency between streamResult.nextResultSet and streamResult.nextPart
-// when the per-call ctx is cancelled.
-func TestStreamResultNextResultSet_CtxErrorCancelsStream(t *testing.T) {
+// TestStreamResultNextResultSet_CtxErrorDoesNotCancelExecuteStream is a regression test:
+// per-call ctx cancellation must not run executeCancel early or poison lastErr.
+func TestStreamResultNextResultSet_CtxErrorDoesNotCancelExecuteStream(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctrl := gomock.NewController(t)
 
@@ -33,12 +32,11 @@ func TestStreamResultNextResultSet_CtxErrorCancelsStream(t *testing.T) {
 			ResultSet:      &Ydb.ResultSet{},
 		}, nil)
 
-		var streamCancelCalls atomic.Uint64
-		streamCancel := func() {
-			streamCancelCalls.Add(1)
-		}
+		var onCloseCalls atomic.Uint64
 
-		r, err := newResult(context.Background(), stream, withStreamCancel(streamCancel))
+		r, err := newResult(context.Background(), stream, withStreamResultOnClose(func() {
+			onCloseCalls.Add(1)
+		}))
 		require.NoError(t, err)
 
 		cancelledCtx, cancel := context.WithCancel(context.Background())
@@ -46,10 +44,10 @@ func TestStreamResultNextResultSet_CtxErrorCancelsStream(t *testing.T) {
 
 		_, err = r.nextResultSet(cancelledCtx)
 		require.ErrorIs(t, err, context.Canceled)
-		require.EqualValues(t, 1, streamCancelCalls.Load(),
-			"nextResultSet must cancel the gRPC stream on ctx error to stay consistent with nextPart",
+		require.EqualValues(t, 0, onCloseCalls.Load(),
+			"nextResultSet must not run executeCancel on per-call ctx error",
 		)
-		require.ErrorIs(t, r.lastErr, context.Canceled)
+		require.NoError(t, r.lastErr)
 	})
 }
 

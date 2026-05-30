@@ -19,11 +19,18 @@ type executeQueryBehavior int
 const (
 	executeQueryBehaviorDefault executeQueryBehavior = iota
 	executeQueryBehaviorCommitFirstCanceledThenStatsFirstPart
+	executeQueryBehaviorCommitStatsDelayed
 )
 
 func WithCommitFirstCanceledThenStatsFirstPart() ServerOption {
 	return func(m *server) {
 		m.executeQueryBehavior = executeQueryBehaviorCommitFirstCanceledThenStatsFirstPart
+	}
+}
+
+func WithCommitStatsDelayed() ServerOption {
+	return func(m *server) {
+		m.executeQueryBehavior = executeQueryBehaviorCommitStatsDelayed
 	}
 }
 
@@ -68,6 +75,19 @@ func (m *querySrv) executeCommitQuery(
 			ResultSetIndex: 0,
 			ResultSet:      selectOneResultSet(),
 			ExecStats:      docapiCommitExecStats(),
+		})
+	case executeQueryBehaviorCommitStatsDelayed:
+		if err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet:      selectOneResultSet(),
+		}); err != nil {
+			return err
+		}
+
+		return stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:    Ydb.StatusIds_SUCCESS,
+			ExecStats: docapiCommitExecStats(),
 		})
 	default:
 		return stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
