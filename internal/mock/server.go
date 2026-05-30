@@ -104,6 +104,12 @@ func (m *server) ExecuteDataQueryCalls() uint64 {
 	return m.executeDataQueryCalls.Load()
 }
 
+// CommitQueryCalls returns the number of commit ExecuteQuery invocations handled by
+// executeCommitQuery (select-1 commit with basic stats) since the mock was started.
+func (m *server) CommitQueryCalls() uint64 {
+	return m.commitQueryCalls.Load()
+}
+
 // ConnString returns a grpc:// DSN for ydb.Open pointing at this mock.
 func (m *server) ConnString() string {
 	return fmt.Sprintf("grpc://%s/local", m.listener.Addr().String())

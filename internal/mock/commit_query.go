@@ -11,7 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const commitSelectOne = "select 1"
+// CommitSelectOne is the query text used by commit-query mock routing and commit regression tests.
+const CommitSelectOne = "select 1"
 
 type executeQueryBehavior int
 
@@ -32,7 +33,7 @@ func isCommitQuery(req *Ydb_Query.ExecuteQueryRequest) bool {
 	}
 
 	text := strings.TrimSpace(strings.ToLower(req.GetQueryContent().GetText()))
-	if text != commitSelectOne {
+	if text != CommitSelectOne {
 		return false
 	}
 

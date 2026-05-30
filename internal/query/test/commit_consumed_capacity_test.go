@@ -11,8 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-const commitQuery = "select 1"
-
 const expectedConsumedUnits = 2.0
 
 // TestCommitConsumedUnitsAfterCanceledDrain checks that gRPC Canceled during result drain
@@ -34,18 +32,34 @@ func TestCommitConsumedUnitsAfterCanceledDrain(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = db.Close(ctx) }()
 
-	var capacity float64
+	var (
+		firstCapacity  float64
+		firstErr       error
+		secondCapacity float64
+	)
 	err = db.Query().Do(ctx, func(ctx context.Context, session query.Session) error {
-		_, _ = commitWithStatsBeforeClose(ctx, session)
-
 		var commitErr error
-		capacity, commitErr = commitWithStatsBeforeClose(ctx, session)
+
+		firstCapacity, firstErr = commitWithStatsBeforeClose(ctx, session)
+		if firstErr != nil {
+			return firstErr
+		}
+		require.EqualValues(t, 1, mockSrv.CommitQueryCalls(),
+			"first commit must reach mock Canceled-on-drain path before second commit")
+
+		secondCapacity, commitErr = commitWithStatsBeforeClose(ctx, session)
 
 		return commitErr
 	})
 	require.NoError(t, err)
-	require.Equal(t, expectedConsumedUnits, capacity,
-		"docapi DeleteItem expectRelevant(1, 2): billing commit after Canceled drain must keep capacity")
+	require.NoError(t, firstErr,
+		"first commit Query must succeed; mock Canceled applies on drain Close only")
+	require.EqualValues(t, 0, firstCapacity,
+		"first commit mock sends no ExecStats before Canceled")
+	require.EqualValues(t, 2, mockSrv.CommitQueryCalls(),
+		"second commit must run after first commit Canceled drain")
+	require.Equal(t, expectedConsumedUnits, secondCapacity,
+		"second commit after Canceled drain must report stats: 1 delete row × 2 write-unit multiplier = 2.0")
 }
 
 // commitWithStatsBeforeClose: commit via Query(WithCommit) and read stats before Close.
@@ -58,7 +72,7 @@ func commitWithStatsBeforeClose(ctx context.Context, session query.Session) (flo
 	var queryStats query.Stats
 	res, err := transaction.Query(
 		ctx,
-		commitQuery,
+		mock.CommitSelectOne,
 		query.WithCommit(),
 		query.WithStatsMode(query.StatsModeBasic, func(s query.Stats) {
 			queryStats = s
