@@ -8,3 +8,5 @@ ignore:
   - trace
   - testutil
   - examples
+  - internal/mock
+  - pkg/xtest
