@@ -28,6 +28,17 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// ServerOption configures mock server behavior.
+type ServerOption func(*server)
+
+// WithClusterNodes makes discovery report multiple endpoints that share the
+// mock listener address but have distinct node IDs.
+func WithClusterNodes(nodeIDs ...uint32) ServerOption {
+	return func(m *server) {
+		m.clusterNodeIDs = append([]uint32(nil), nodeIDs...)
+	}
+}
+
 // server is a local gRPC mock (Discovery + Table + Query).
 type server struct {
 	listener   net.Listener
@@ -35,6 +46,12 @@ type server struct {
 
 	querySessionID atomic.Uint64
 	tableSessionID atomic.Uint64
+
+	clusterNodeIDs []uint32
+
+	// nodeShutdownSignal unblocks AttachSession handlers waiting to send a
+	// NodeShutdown hint (see TriggerNodeShutdown).
+	nodeShutdownSignal chan struct{}
 
 	// executeQueryCalls counts QueryService.ExecuteQuery invocations.
 	// executeDataQueryCalls counts TableService.ExecuteDataQuery invocations.
@@ -44,12 +61,31 @@ type server struct {
 	executeDataQueryCalls atomic.Uint64
 }
 
-func (m *server) nextQuerySession() string {
-	return fmt.Sprintf("q-%d", m.querySessionID.Add(1))
+// TriggerNodeShutdown makes one AttachSession handler send a
+// NodeShutdown hint after its initial SessionState.
+func (m *server) TriggerNodeShutdown() {
+	select {
+	case m.nodeShutdownSignal <- struct{}{}:
+	default:
+	}
+}
+
+func (m *server) nextQuerySession() (string, uint32) {
+	id := m.querySessionID.Add(1)
+
+	return fmt.Sprintf("q-%d", id), m.querySessionNodeID(id)
 }
 
 func (m *server) nextTableSession() string {
 	return fmt.Sprintf("t-%d", m.tableSessionID.Add(1))
+}
+
+func (m *server) querySessionNodeID(sessionID uint64) uint32 {
+	if len(m.clusterNodeIDs) == 0 {
+		return 1
+	}
+
+	return m.clusterNodeIDs[(sessionID-1)%uint64(len(m.clusterNodeIDs))]
 }
 
 // ExecuteQueryCalls returns the number of times QueryService.ExecuteQuery
@@ -97,8 +133,7 @@ func operationOK(msg proto.Message) *Ydb_Operations.Operation {
 type discoverySrv struct {
 	Ydb_Discovery_V1.UnimplementedDiscoveryServiceServer
 
-	host string
-	port uint32
+	endpoints []*Ydb_Discovery.EndpointInfo
 }
 
 func (m *discoverySrv) ListEndpoints(
@@ -106,18 +141,7 @@ func (m *discoverySrv) ListEndpoints(
 	_ *Ydb_Discovery.ListEndpointsRequest,
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
 	res := &Ydb_Discovery.ListEndpointsResult{
-		Endpoints: []*Ydb_Discovery.EndpointInfo{
-			{
-				Address:    m.host,
-				Port:       m.port,
-				LoadFactor: 0,
-				Ssl:        false,
-				Service:    nil,
-				Location:   "",
-				NodeId:     1,
-				IpV4:       []string{"127.0.0.1"},
-			},
-		},
+		Endpoints:    m.endpoints,
 		SelfLocation: "",
 	}
 
@@ -193,10 +217,12 @@ func (m *querySrv) CreateSession(
 	_ context.Context,
 	_ *Ydb_Query.CreateSessionRequest,
 ) (*Ydb_Query.CreateSessionResponse, error) {
+	sessionID, nodeID := m.mock.nextQuerySession()
+
 	return &Ydb_Query.CreateSessionResponse{
 		Status:    Ydb.StatusIds_SUCCESS,
-		SessionId: m.mock.nextQuerySession(),
-		NodeId:    1,
+		SessionId: sessionID,
+		NodeId:    int64(nodeID),
 	}, nil
 }
 
@@ -220,9 +246,17 @@ func (m *querySrv) AttachSession(
 		return err
 	}
 
-	<-stream.Context().Done()
-
-	return nil
+	select {
+	case <-m.mock.nodeShutdownSignal:
+		return stream.Send(&Ydb_Query.SessionState{
+			Status: Ydb.StatusIds_SUCCESS,
+			SessionHint: &Ydb_Query.SessionState_NodeShutdown{
+				NodeShutdown: &Ydb_Query.NodeShutdownHint{},
+			},
+		})
+	case <-stream.Context().Done():
+		return nil
+	}
 }
 
 func (m *querySrv) ExecuteQuery(
@@ -365,8 +399,42 @@ func select42ResultSet() *Ydb.ResultSet {
 	}
 }
 
+func discoveryEndpoints(host string, port uint32, nodeIDs []uint32) []*Ydb_Discovery.EndpointInfo {
+	endpoints := make([]*Ydb_Discovery.EndpointInfo, len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		endpoints[i] = &Ydb_Discovery.EndpointInfo{
+			Address:    host,
+			Port:       port,
+			LoadFactor: 0,
+			Ssl:        false,
+			Service:    nil,
+			Location:   "",
+			NodeId:     nodeID,
+			IpV4:       []string{"127.0.0.1"},
+		}
+	}
+
+	return endpoints
+}
+
+func waitListenerReady(tb testing.TB, addr string) {
+	tb.Helper()
+
+	for range 100 {
+		c, err := net.Dial("tcp", addr) //nolint:noctx
+		if err == nil {
+			_ = c.Close()
+
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	tb.Fatalf("mock gRPC listener did not become ready: %s", addr)
+}
+
 // Server binds a random TCP port, registers Discovery + Table + Query mocks, and serves until Close or tb cleanup.
-func Server(tb testing.TB) *server {
+func Server(tb testing.TB, opts ...ServerOption) *server {
 	tb.Helper()
 
 	lc := net.ListenConfig{}
@@ -381,13 +449,24 @@ func Server(tb testing.TB) *server {
 	require.NoError(tb, err)
 
 	m := &server{
-		listener:   lis,
-		grpcServer: grpc.NewServer(),
+		listener:           lis,
+		grpcServer:         grpc.NewServer(),
+		nodeShutdownSignal: make(chan struct{}, 1),
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(m)
+		}
+	}
+
+	nodeIDs := m.clusterNodeIDs
+	if len(nodeIDs) == 0 {
+		nodeIDs = []uint32{1}
 	}
 
 	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(m.grpcServer, &discoverySrv{
-		host: host,
-		port: uint32(port),
+		endpoints: discoveryEndpoints(host, uint32(port), nodeIDs),
 	})
 	Ydb_Table_V1.RegisterTableServiceServer(m.grpcServer, &tableSrv{mock: m})
 	Ydb_Query_V1.RegisterQueryServiceServer(m.grpcServer, &querySrv{mock: m})
@@ -398,15 +477,7 @@ func Server(tb testing.TB) *server {
 
 	tb.Cleanup(m.Close)
 
-	for range 100 {
-		conn, err := net.Dial("tcp", lis.Addr().String()) //nolint:noctx
-		if err == nil {
-			conn.Close()
-
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitListenerReady(tb, lis.Addr().String())
 
 	return m
 }
