@@ -34,7 +34,6 @@ var (
 		grpcCodes.ResourceExhausted,
 		grpcCodes.OutOfRange,
 		grpcCodes.OK,
-		// client-side stream teardown (Close drain, executeCancel) must not ban the connection.
 		grpcCodes.Canceled,
 	}
 	badCodes = xslices.Subtract(xslices.Keys(allCodes), goodCodes)
@@ -62,6 +61,7 @@ func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bo
 	}
 
 	operationErrorCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType)
+
 	if len(operationErrorCodes) > 0 && xerrors.IsOperationError(err, operationErrorCodes...) {
 		return true
 	}
