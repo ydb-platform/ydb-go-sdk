@@ -588,12 +588,16 @@ func TestExecute(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-				Status:         Ydb.StatusIds_SUCCESS,
-				TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
-				ResultSetIndex: 0,
-				ResultSet:      &Ydb.ResultSet{},
-			}, nil)
+			gomock.InOrder(
+				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					Status:         Ydb.StatusIds_SUCCESS,
+					TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+					ResultSetIndex: 0,
+					ResultSet:      &Ydb.ResultSet{},
+				}, nil),
+				// Close(background) must still drain the stream after per-call ctx cancel.
+				stream.EXPECT().Recv().Return(nil, io.EOF),
+			)
 
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -605,9 +609,6 @@ func TestExecute(t *testing.T) {
 
 			r, err := execute(t.Context(), "123", client, "", options.ExecuteSettings())
 			require.NoError(t, err)
-			defer func() {
-				_ = r.Close(context.Background())
-			}()
 
 			callCtx, callCancel := context.WithCancel(context.Background())
 			callCancel()
@@ -615,6 +616,8 @@ func TestExecute(t *testing.T) {
 			_, err = r.nextPart(callCtx)
 			require.ErrorIs(t, err, context.Canceled)
 			require.NoError(t, r.lastErr)
+
+			require.NoError(t, r.Close(context.Background()))
 		})
 	})
 }
