@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
