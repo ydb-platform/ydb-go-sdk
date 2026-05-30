@@ -28,13 +28,6 @@ import (
 
 var errReadNextResultSet = xerrors.Wrap(errors.New("ydb: stop read the result set because see part of next result set"))
 
-// isPerCallContextError reports cancellation/deadline on the caller's per-iteration ctx.
-// Such errors must not poison streamResult.lastErr or cancel the gRPC execute stream:
-// Close with a fresh ctx must still drain late stream parts (e.g. ExecStats).
-func isPerCallContextError(err error) bool {
-	return xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded)
-}
-
 var (
 	_ result.Result = (*streamResult)(nil)
 	_ result.Result = (*materializedResult)(nil)
@@ -191,7 +184,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
 ) {
 	defer func() {
-		if finishErr != nil && !isPerCallContextError(finishErr) {
+		if finishErr != nil && ctx.Err() == nil {
 			r.lastErr = finishErr
 		}
 	}()
@@ -318,7 +311,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishErr error) {
 	defer func() {
-		if finishErr != nil && !isPerCallContextError(finishErr) {
+		if finishErr != nil && ctx.Err() == nil {
 			r.lastErr = finishErr
 		}
 	}()
