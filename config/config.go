@@ -36,7 +36,6 @@ type Config struct {
 	meta               *meta.Meta
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
-	disableOptimisticUnban           bool
 }
 
 func (c *Config) Credentials() credentials.Credentials {
@@ -48,8 +47,13 @@ func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
+// DisableOptimisticUnban reports whether optimistic unban is disabled.
+//
+// Deprecated: Optimistic unban is now always disabled (this method always returns true).
+// Will be removed after Nov 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (c *Config) DisableOptimisticUnban() bool {
-	return c.disableOptimisticUnban
+	return true
 }
 
 // GrpcDialOptions reports about used grpc dialing options
@@ -329,14 +333,12 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 	}
 }
 
-// WithDisableOptimisticUnban disables optimistic unban of nodes after a successful call
-// immediately following pessimization.
+// WithDisableOptimisticUnban
 //
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+// Deprecated: will be removed after Nov 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDisableOptimisticUnban() Option {
-	return func(c *Config) {
-		c.disableOptimisticUnban = true
-	}
+	return func(c *Config) {}
 }
 
 func New(opts ...Option) *Config {

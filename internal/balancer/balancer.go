@@ -423,16 +423,15 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	}
 
 	defer func() {
-		if err == nil {
-			if !b.driverConfig.DisableOptimisticUnban() && cc.GetState() == state.Banned {
-				b.pool.Allow(ctx, cc)
-			}
-		} else if IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
+		if err != nil && cc.GetState() != state.Banned &&
+			IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
 			b.pool.Ban(ctx, cc, err)
 		}
 	}()
 
-	if err = f(ctx, cc); err != nil {
+	if err = f(conn.WithBanCallback(ctx, func(cause error) {
+		b.pool.Ban(ctx, cc, cause)
+	}), cc); err != nil {
 		if conn.UseWrapping(ctx) {
 			if credentials.IsAccessError(err) {
 				err = credentials.AccessError("no access", err,
