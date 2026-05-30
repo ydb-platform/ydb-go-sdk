@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
@@ -87,6 +88,12 @@ func (p *Pool) isClosed() bool {
 
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	if p.isClosed() {
+		return
+	}
+
+	// gRPC/context Canceled on streaming drain must not ban the connection (docapi commit billing).
+	if xerrors.Is(cause, context.Canceled) ||
+		xerrors.IsTransportError(cause, grpcCodes.Canceled) {
 		return
 	}
 

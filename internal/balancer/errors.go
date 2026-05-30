@@ -34,6 +34,8 @@ var (
 		grpcCodes.ResourceExhausted,
 		grpcCodes.OutOfRange,
 		grpcCodes.OK,
+		// Client-side stream teardown (Close drain, executeCancel) must not ban the connection.
+		grpcCodes.Canceled,
 	}
 	badCodes = xslices.Subtract(xslices.Keys(allCodes), goodCodes)
 )

@@ -1,3 +1,6 @@
+## UNRELEASED
+* Fixed connection pessimization when a query `ExecuteQuery` stream ends with gRPC `Canceled` or `context.Canceled` during result drain ([#2186](https://github.com/ydb-platform/ydb-go-sdk/issues/2186))
+
 ## v3.139.2
 * Added `label` to `table` `OnDo`/`OnDoTx` metrics (`latency`, `errs`, `attempts`) so that `table.WithLabel` breaks them down by label, consistent with the `query` service metrics
 
