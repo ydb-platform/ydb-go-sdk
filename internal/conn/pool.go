@@ -91,7 +91,8 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	// gRPC/context Canceled on streaming drain must not ban the connection (docapi commit billing).
+	// Canceled (context or gRPC) is client- or server-initiated and does not indicate
+	// a bad connection. Skip ban regardless of call path.
 	if xerrors.Is(cause, context.Canceled) ||
 		xerrors.IsTransportError(cause, grpcCodes.Canceled) {
 		return
