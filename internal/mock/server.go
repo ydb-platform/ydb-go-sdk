@@ -61,7 +61,6 @@ type server struct {
 	executeDataQueryCalls atomic.Uint64
 
 	executeQueryBehavior executeQueryBehavior
-	commitQueryCalls     atomic.Uint64
 	queryTxID            atomic.Uint64
 }
 
