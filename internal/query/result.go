@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -57,7 +57,6 @@ type (
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
-		closed         atomic.Bool
 	}
 	resultOption func(s *streamResult)
 )
@@ -262,21 +261,32 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
-	if !r.closed.CompareAndSwap(false, true) {
-		return nil
+	if r.stream != nil {
+		if streamCtx := r.stream.Context(); streamCtx != nil {
+			if err := streamCtx.Err(); err != nil {
+				return nil
+			}
+		}
 	}
 
-	defer func() {
-		for _, f := range r.shutdownHooks {
-			f()
-		}
-	}()
+	var shutdownOnce sync.Once
+	runShutdown := func() {
+		shutdownOnce.Do(func() {
+			for _, f := range r.shutdownHooks {
+				f()
+			}
+		})
+	}
+	defer runShutdown()
 
 	if r.closeTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, r.closeTimeout)
 		defer cancel()
 	}
+
+	stop := context.AfterFunc(ctx, runShutdown)
+	defer stop()
 
 	if r.trace != nil {
 		onDone := gtrace.QueryOnResultClose(r.trace, &ctx,
@@ -296,6 +306,9 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				return nil
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return xerrors.WithStackTrace(ctxErr)
 			}
 
 			return xerrors.WithStackTrace(err)

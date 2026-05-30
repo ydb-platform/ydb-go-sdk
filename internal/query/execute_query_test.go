@@ -151,7 +151,7 @@ func TestExecute(t *testing.T) {
 		t.Run("OnStream", func(t *testing.T) {
 			ctx := t.Context()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 				TxMeta: &Ydb_Query.TransactionMeta{
@@ -306,7 +306,7 @@ func TestExecute(t *testing.T) {
 		t.Run("OnCall", func(t *testing.T) {
 			ctx := t.Context()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(
 				Ydb.StatusIds_UNAVAILABLE,
 			)))
@@ -320,7 +320,7 @@ func TestExecute(t *testing.T) {
 		t.Run("OnStream", func(t *testing.T) {
 			ctx := t.Context()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 				TxMeta: &Ydb_Query.TransactionMeta{
@@ -437,7 +437,7 @@ func TestExecute(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			var executeCtx context.Context
 
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 				cancel() // canceling happen in the beginning of the Recv() call
 
@@ -525,7 +525,7 @@ func TestExecute(t *testing.T) {
 				// Recv() may or may not be reached depending on the AfterFunc race
 				// described above; on either path it returns the parent ctx's
 				// cancellation error.
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream := newExecuteQueryStreamMock(ctrl)
 				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 					return nil, ctx.Err()
 				}).AnyTimes()
@@ -556,7 +556,7 @@ func TestExecute(t *testing.T) {
 				// Recv() may be invoked zero or more times depending on whether
 				// the AfterFunc forwarding parent ctx → executeCtx fires before
 				// nextPart()'s ctx.Err() check.
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+				stream := newExecuteQueryStreamMock(ctrl)
 				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 					return nil, ctx.Err()
 				}).AnyTimes()
@@ -587,7 +587,7 @@ func TestExecute(t *testing.T) {
 		t.Run("CancelCallCtxReturnsWithoutCancelingExecuteStream", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			gomock.InOrder(
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status:         Ydb.StatusIds_SUCCESS,
@@ -635,7 +635,7 @@ func TestNewResult_DecoupledExecuteCtx(t *testing.T) {
 		parentCancel()
 
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		// Recv must NOT be called — the cancelled ctx short-circuits newResult.
 
 		_, err := newResult(parentCtx, stream)
@@ -654,7 +654,7 @@ func TestNewResult_DecoupledExecuteCtx(t *testing.T) {
 		defer executeCancel()
 
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -929,7 +929,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 }
 
 func happyWayStream(ctrl *gomock.Controller) Ydb_Query_V1.QueryService_ExecuteQueryClient {
-	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream := newExecuteQueryStreamMock(ctrl)
 	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 		Status: Ydb.StatusIds_SUCCESS,
 		TxMeta: &Ydb_Query.TransactionMeta{

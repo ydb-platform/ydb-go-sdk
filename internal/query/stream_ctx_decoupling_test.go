@@ -5,6 +5,7 @@ import (
 	"io"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -23,6 +24,8 @@ func TestStreamResult_PerCallCtxCancelDoesNotRunExecuteOnCloseEarly(t *testing.T
 		ctrl := gomock.NewController(t)
 
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		executeCtx, executeCancel := context.WithCancel(context.Background())
+		stubExecuteQueryStreamContext(executeCtx, stream)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -32,6 +35,7 @@ func TestStreamResult_PerCallCtxCancelDoesNotRunExecuteOnCloseEarly(t *testing.T
 		var onCloseCalls atomic.Uint64
 		onClose := func() {
 			onCloseCalls.Add(1)
+			executeCancel()
 		}
 
 		r, err := newResult(context.Background(), stream, withStreamResultOnClose(onClose))
@@ -68,6 +72,7 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 		}
 
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		_, opts := executeQueryStreamContextWithOnClose(stream)
 		gomock.InOrder(
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
@@ -86,7 +91,7 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 			gotStats     atomic.Bool
 		)
 
-		r, err := newResult(context.Background(), stream,
+		r, err := newResult(context.Background(), stream, append(opts,
 			withStreamResultOnClose(func() { onCloseCalls.Add(1) }),
 			withStreamResultStatsCallback(func(queryStats stats.QueryStats) {
 				if queryStats == nil {
@@ -96,7 +101,7 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 					gotStats.Store(true)
 				}
 			}),
-		)
+		)...)
 		require.NoError(t, err)
 
 		cancelledCtx, cancel := context.WithCancel(context.Background())
@@ -111,5 +116,62 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 		require.EqualValues(t, 1, onCloseCalls.Load())
 		require.True(t, gotStats.Load(),
 			"Close with fresh ctx must drain ExecStats after per-call ctx cancel")
+	})
+}
+
+// TestStreamResult_CloseIsIdempotentViaStreamContext ensures repeated Close after drain
+// is a no-op once shutdown hooks cancel the gRPC stream context.
+func TestStreamResult_CloseIsIdempotentViaStreamContext(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctrl := gomock.NewController(t)
+
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		_, opts := executeQueryStreamContextWithOnClose(stream)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet:      &Ydb.ResultSet{},
+		}, nil)
+		stream.EXPECT().Recv().Return(nil, io.EOF)
+
+		r, err := newResult(context.Background(), stream, opts...)
+		require.NoError(t, err)
+
+		require.NoError(t, r.Close(context.Background()))
+		require.NoError(t, r.Close(context.Background()))
+	})
+}
+
+// TestStreamResult_CloseTimeoutInterruptsBlockedRecv ensures closeTimeout cancels the
+// execute stream (via shutdown hooks) and unblocks a stalled drain Recv().
+func TestStreamResult_CloseTimeoutInterruptsBlockedRecv(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctrl := gomock.NewController(t)
+
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		executeCtx, opts := executeQueryStreamContextWithOnClose(stream)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet:      &Ydb.ResultSet{},
+		}, nil)
+		stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+			<-executeCtx.Done()
+
+			return nil, executeCtx.Err()
+		})
+
+		r, err := newResult(context.Background(), stream, append(opts,
+			withStreamResultCloseTimeout(50*time.Millisecond),
+		)...)
+		require.NoError(t, err)
+
+		start := time.Now()
+		err = r.Close(context.Background())
+		elapsed := time.Since(start)
+
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Less(t, elapsed, time.Second,
+			"Close must return after closeTimeout, not hang on blocked Recv")
 	})
 }

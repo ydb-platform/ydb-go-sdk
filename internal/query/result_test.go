@@ -25,7 +25,7 @@ func TestResultNextResultSet(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -456,7 +456,7 @@ func TestResultNextResultSet(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -561,7 +561,7 @@ func TestResultNextResultSet(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -893,7 +893,7 @@ func TestResultNextResultSet(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:    Ydb.StatusIds_SUCCESS,
 			ResultSet: &Ydb.ResultSet{},
@@ -915,7 +915,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 	ctx := t.Context()
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -973,7 +973,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 	})
 	t.Run("MoreThanOneRow", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -1034,7 +1034,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 	})
 	t.Run("MoreThanOneRowErrorOnNextRow", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -1086,7 +1086,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 	})
 	t.Run("MoreThanOneResultSet", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -1176,7 +1176,7 @@ func TestExactlyOneRowFromResult(t *testing.T) {
 	})
 	t.Run("MoreThanOneResultSetErrorOnNextResultSet", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -1232,7 +1232,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 	ctx := t.Context()
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -1314,7 +1314,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 	})
 	t.Run("MoreThanOneResultSet", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -1404,7 +1404,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 	})
 	t.Run("MoreThanOneResultSetErrorOnNextResultSet", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -1459,7 +1459,7 @@ func TestExactlyOneResultSetFromResult(t *testing.T) {
 func TestCloseResultOnCloseClosableResultSet(t *testing.T) {
 	ctx := t.Context()
 	ctrl := gomock.NewController(t)
-	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream := newExecuteQueryStreamMock(ctrl)
 	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 		Status: Ydb.StatusIds_SUCCESS,
 		TxMeta: &Ydb_Query.TransactionMeta{
@@ -1621,7 +1621,7 @@ func TestResultStats(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -1971,7 +1971,7 @@ func TestResultStats(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -2337,7 +2337,7 @@ func TestResultStats(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -2699,7 +2699,7 @@ func TestResultStats(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -3053,7 +3053,7 @@ func TestMaterializedResultStats(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -3403,7 +3403,7 @@ func TestMaterializedResultStats(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -3769,7 +3769,7 @@ func TestMaterializedResultStats(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -4131,7 +4131,7 @@ func TestMaterializedResultStats(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			ctrl := gomock.NewController(t)
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,

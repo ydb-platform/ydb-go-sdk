@@ -35,7 +35,7 @@ func testPartOneResultSetTwoRows(t *testing.T) *Ydb_Query.ExecuteQueryResponsePa
 
 func TestStreamResult_NextResultSet_ContextCanceled(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream := newExecuteQueryStreamMock(ctrl)
 
 	stream.EXPECT().Recv().Return(testPartOneResultSetTwoRows(t), nil).Times(1)
 	stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
@@ -57,7 +57,7 @@ func TestStreamResult_NextResultSet_ContextCanceled(t *testing.T) {
 
 func TestStreamResult_NextRow_ContextCanceledAfterFirstRow(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream := newExecuteQueryStreamMock(ctrl)
 
 	stream.EXPECT().Recv().Return(testPartOneResultSetTwoRows(t), nil).Times(1)
 	stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
@@ -86,7 +86,7 @@ func TestStreamResult_NextRow_ContextCanceledAfterFirstRow(t *testing.T) {
 
 func TestStreamResult_NextResultSet_AfterDrain_ContextCanceledNotEOF(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream := newExecuteQueryStreamMock(ctrl)
 
 	part := testPartOneResultSetTwoRows(t)
 

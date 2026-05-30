@@ -25,7 +25,7 @@ func TestStreamResultNextResultSet_CtxErrorDoesNotCancelExecuteStream(t *testing
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
