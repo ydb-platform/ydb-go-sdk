@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -581,9 +582,8 @@ func TestExecute(t *testing.T) {
 			})
 		})
 
-		// Per-call ctx cancellation must not cancel the gRPC execute stream: nextPart
-		// returns immediately when the call ctx is already done, without forwarding
-		// cancellation to executeCtx (see stream_ctx_decoupling_test.go).
+		// Per-call ctx cancellation is checked before stream.Recv() only. See
+		// per_call_ctx_recv_test.go for blocked-Recv behavior and Close unblocking.
 		t.Run("CancelCallCtxReturnsWithoutCancelingExecuteStream", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
@@ -618,6 +618,74 @@ func TestExecute(t *testing.T) {
 			require.NoError(t, r.lastErr)
 
 			require.NoError(t, r.Close(context.Background()))
+		})
+
+		t.Run("CancelCallCtxWhileRecvBlockedViaExecute", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			var executeCtx context.Context
+			recvEntered := make(chan struct{})
+
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			gomock.InOrder(
+				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					Status:         Ydb.StatusIds_SUCCESS,
+					TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+					ResultSetIndex: 0,
+					ResultSet:      &Ydb.ResultSet{},
+				}, nil),
+				stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+					close(recvEntered)
+
+					<-executeCtx.Done()
+
+					return nil, executeCtx.Err()
+				}),
+				stream.EXPECT().Recv().Return(nil, io.EOF),
+			)
+
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(ctx context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+					Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+				) {
+					executeCtx = ctx
+					stubExecuteQueryStreamContext(ctx, stream)
+
+					return stream, nil
+				})
+
+			r, err := execute(t.Context(), "123", client, "", options.ExecuteSettings(),
+				withStreamResultCloseTimeout(50*time.Millisecond),
+			)
+			require.NoError(t, err)
+
+			callCtx, callCancel := context.WithCancel(context.Background())
+
+			iterDone := make(chan error, 1)
+			go func() {
+				_, err := r.nextPart(callCtx)
+				iterDone <- err
+			}()
+
+			<-recvEntered
+			callCancel()
+			require.NoError(t, executeCtx.Err())
+
+			start := time.Now()
+			closeErr := r.Close(context.Background())
+			require.Less(t, time.Since(start), time.Second)
+
+			select {
+			case err := <-iterDone:
+				require.Error(t, err)
+			case <-time.After(time.Second):
+				t.Fatal("nextPart still blocked after Close")
+			}
+
+			if closeErr != nil {
+				require.ErrorIs(t, closeErr, context.DeadlineExceeded)
+			}
 		})
 	})
 }
