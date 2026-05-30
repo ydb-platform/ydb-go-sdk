@@ -41,7 +41,6 @@ type (
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		lastErr        error
-		shutdownHooks  []func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
 		trace          *trace.Query
@@ -50,6 +49,7 @@ type (
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
+		onClose        func()
 	}
 	resultOption func(s *streamResult)
 )
@@ -115,7 +115,14 @@ func withStreamResultStatsCallback(callback func(queryStats stats.QueryStats)) r
 
 func withStreamResultOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
-		s.shutdownHooks = append(s.shutdownHooks, onClose)
+		if prevOnClose := s.onClose; prevOnClose != nil {
+			s.onClose = func() {
+				prevOnClose()
+				onClose()
+			}
+		} else {
+			s.onClose = onClose
+		}
 	}
 }
 
@@ -152,6 +159,9 @@ func newResult(
 			opt(&r)
 		}
 	}
+
+	// replace all hooks to once func
+	r.onClose = sync.OnceFunc(r.onClose)
 
 	if r.trace != nil {
 		onDone := gtrace.QueryOnResultNew(r.trace, &ctx,
@@ -254,21 +264,13 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
+	defer r.onClose()
+
 	if r.stream != nil {
 		if r.stream.Context().Err() != nil {
 			return nil
 		}
 	}
-
-	var shutdownOnce sync.Once
-	runShutdown := func() {
-		shutdownOnce.Do(func() {
-			for _, f := range r.shutdownHooks {
-				f()
-			}
-		})
-	}
-	defer runShutdown()
 
 	if r.closeTimeout > 0 {
 		var cancel context.CancelFunc
@@ -276,7 +278,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		defer cancel()
 	}
 
-	stop := context.AfterFunc(ctx, runShutdown)
+	stop := context.AfterFunc(ctx, r.onClose)
 	defer stop()
 
 	if r.trace != nil {
