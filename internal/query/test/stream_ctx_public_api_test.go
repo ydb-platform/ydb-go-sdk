@@ -16,8 +16,8 @@ const commitSelectOneQuery = "select 1"
 
 // TestQueryResultCloseDrainsStatsAfterNextResultSetCanceledCtx uses only the public query API.
 //
-// Regression (v3.127.7+): forwarding per-call ctx cancellation to executeCtx via streamCancel
-// and poisoning lastErr prevented Close(background) from draining late stream parts with ExecStats.
+// Regression: forwarding per-call ctx cancellation to executeCtx and poisoning lastErr
+// prevented Close(background) from draining late stream parts with ExecStats.
 //
 // User-visible flow:
 //  1. tx.Query returns a result; first stream part has no ExecStats (mock: delayed stats).
