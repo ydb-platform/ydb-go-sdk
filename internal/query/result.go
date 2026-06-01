@@ -41,6 +41,7 @@ type (
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		lastErr        error
+		onClose        func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
 		trace          *trace.Query
@@ -49,8 +50,7 @@ type (
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
-		onClose        func()
-		cancelStream   context.CancelFunc
+		streamCancel   context.CancelFunc
 	}
 	resultOption func(s *streamResult)
 )
@@ -127,12 +127,6 @@ func withStreamResultOnClose(onClose func()) resultOption {
 	}
 }
 
-func withCancelStream(cancelStream context.CancelFunc) resultOption {
-	return func(s *streamResult) {
-		s.cancelStream = cancelStream
-	}
-}
-
 func onNextPartErr(callback func(err error)) resultOption {
 	return func(s *streamResult) {
 		s.onNextPartErr = append(s.onNextPartErr, callback)
@@ -148,6 +142,16 @@ func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
 func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	return func(s *streamResult) {
 		s.closeTimeout = timeout
+	}
+}
+
+// withStreamCancel wires a CancelFunc that nextPart invokes via
+// context.AfterFunc to unblock stream.Recv() when the caller's ctx is
+// cancelled. Typically this is the same CancelFunc that controls the gRPC
+// context the stream was opened with.
+func withStreamCancel(cancel context.CancelFunc) resultOption {
+	return func(s *streamResult) {
+		s.streamCancel = cancel
 	}
 }
 
@@ -229,8 +233,16 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		return nil, r.lastErr
 	}
 
-	if r.cancelStream != nil {
-		stop := context.AfterFunc(ctx, r.cancelStream)
+	// Forward ctx cancellation to the gRPC stream context so a Recv blocked
+	// waiting for the next server message unblocks if the caller cancels.
+	// AfterFunc only spawns a goroutine when ctx is actually done, so on the
+	// happy path this costs a single register+stop pair (no goroutine, no
+	// extra allocations beyond the AfterFunc node itself). The forwarding is
+	// strictly per-call: the streamResult intentionally stays decoupled from
+	// the original execute() ctx after execute returns, which keeps callers
+	// free to iterate the result with a fresh ctx (see CancelAfterExecute).
+	if r.streamCancel != nil {
+		stop := context.AfterFunc(ctx, r.streamCancel)
 		defer stop()
 	}
 
@@ -296,9 +308,6 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		defer cancel()
 	}
 
-	stop := context.AfterFunc(ctx, r.onClose)
-	defer stop()
-
 	if r.trace != nil {
 		onDone := gtrace.QueryOnResultClose(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
@@ -309,8 +318,8 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	}
 
 	for {
-		if err := ctx.Err(); err != nil {
-			return xerrors.WithStackTrace(err)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
 
 		_, err := r.nextPart(ctx)
@@ -318,6 +327,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 			if xerrors.Is(err, io.EOF) {
 				return nil
 			}
+
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return ctxErr
 			}
