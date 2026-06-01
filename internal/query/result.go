@@ -312,6 +312,9 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		defer cancel()
 	}
 
+	stop := context.AfterFunc(ctx, r.onClose)
+	defer stop()
+
 	if r.trace != nil {
 		onDone := gtrace.QueryOnResultClose(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
