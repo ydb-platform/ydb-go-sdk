@@ -286,7 +286,7 @@ func TestPerCallCtx_CloseDrainsAfterBlockedIterationCanceled(t *testing.T) {
 			}),
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:    Ydb.StatusIds_SUCCESS,
-				ExecStats: сommitExecStatsForTest(),
+				ExecStats: commitExecStatsForTest(),
 			}, nil),
 			stream.EXPECT().Recv().Return(nil, io.EOF),
 		)
@@ -320,8 +320,8 @@ func TestPerCallCtx_CloseDrainsAfterBlockedIterationCanceled(t *testing.T) {
 	})
 }
 
-// сommitExecStatsForTest mirrors mock stats shape used in commit regressions.
-func сommitExecStatsForTest() *Ydb_TableStats.QueryStats {
+// commitExecStatsForTest mirrors mock stats shape used in commit regressions.
+func commitExecStatsForTest() *Ydb_TableStats.QueryStats {
 	return &Ydb_TableStats.QueryStats{
 		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
 			{
