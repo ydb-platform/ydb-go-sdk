@@ -52,10 +52,10 @@ func TestPerCallCtx_CancelBeforeRecvReturnsImmediately(t *testing.T) {
 		executeCtx, opts := executeQueryStreamContextWithOnClose(stream)
 		stream.EXPECT().Recv().Return(testEmptyStreamPart(), nil)
 
-		r, err := newResult(context.Background(), stream, opts...)
+		r, err := newResult(t.Context(), stream, opts...)
 		require.NoError(t, err)
 
-		callCtx, callCancel := context.WithCancel(context.Background())
+		callCtx, callCancel := context.WithCancel(t.Context())
 		callCancel()
 
 		_, err = r.nextPart(callCtx)
@@ -74,10 +74,10 @@ func TestPerCallCtx_DeadlineExceededBeforeRecvDoesNotPoisonLastErr(t *testing.T)
 		stream.EXPECT().Recv().Return(testEmptyStreamPart(), nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
 
-		r, err := newResult(context.Background(), stream, opts...)
+		r, err := newResult(t.Context(), stream, opts...)
 		require.NoError(t, err)
 
-		callCtx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+		callCtx, cancel := context.WithTimeout(t.Context(), time.Nanosecond)
 		defer cancel()
 		<-callCtx.Done()
 
@@ -86,7 +86,7 @@ func TestPerCallCtx_DeadlineExceededBeforeRecvDoesNotPoisonLastErr(t *testing.T)
 		require.NoError(t, r.lastErr)
 		require.NoError(t, executeCtx.Err())
 
-		require.NoError(t, r.Close(context.Background()))
+		require.NoError(t, r.Close(t.Context()))
 	})
 }
 
@@ -95,7 +95,7 @@ func TestPerCallCtx_CancelWhileRecvBlockedDoesNotCancelExecuteStream(t *testing.
 		ctrl := gomock.NewController(t)
 
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-		executeCtx, executeCancel := context.WithCancel(context.Background())
+		executeCtx, executeCancel := context.WithCancel(t.Context())
 		stubExecuteQueryStreamContext(executeCtx, stream)
 
 		recvEntered := make(chan struct{})
@@ -110,10 +110,10 @@ func TestPerCallCtx_CancelWhileRecvBlockedDoesNotCancelExecuteStream(t *testing.
 			}),
 		)
 
-		r, err := newResult(context.Background(), stream, withStreamResultOnClose(executeCancel))
+		r, err := newResult(t.Context(), stream, withStreamResultOnClose(executeCancel))
 		require.NoError(t, err)
 
-		callCtx, callCancel := context.WithCancel(context.Background())
+		callCtx, callCancel := context.WithCancel(t.Context())
 
 		done := make(chan error, 1)
 		go func() {
@@ -166,12 +166,12 @@ func TestPerCallCtx_CloseUnblocksConcurrentBlockedNextPart(t *testing.T) {
 			stream.EXPECT().Recv().Return(nil, io.EOF),
 		)
 
-		r, err := newResult(context.Background(), stream, append(opts,
+		r, err := newResult(t.Context(), stream, append(opts,
 			withStreamResultCloseTimeout(50*time.Millisecond),
 		)...)
 		require.NoError(t, err)
 
-		callCtx, callCancel := context.WithCancel(context.Background())
+		callCtx, callCancel := context.WithCancel(t.Context())
 
 		iterDone := make(chan error, 1)
 		go func() {
@@ -184,7 +184,7 @@ func TestPerCallCtx_CloseUnblocksConcurrentBlockedNextPart(t *testing.T) {
 		require.NoError(t, executeCtx.Err())
 
 		start := time.Now()
-		closeErr := r.Close(context.Background())
+		closeErr := r.Close(t.Context())
 		elapsed := time.Since(start)
 
 		require.Less(t, elapsed, time.Second,
@@ -209,7 +209,7 @@ func TestPerCallCtx_NextResultSetCancelWhileRecvBlocked(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-		executeCtx, executeCancel := context.WithCancel(context.Background())
+		executeCtx, executeCancel := context.WithCancel(t.Context())
 		stubExecuteQueryStreamContext(executeCtx, stream)
 
 		part := testSingleRowStreamPart()
@@ -227,18 +227,18 @@ func TestPerCallCtx_NextResultSetCancelWhileRecvBlocked(t *testing.T) {
 			stream.EXPECT().Recv().Return(nil, io.EOF),
 		)
 
-		r, err := newResult(context.Background(), stream, append([]resultOption{
+		r, err := newResult(t.Context(), stream, append([]resultOption{
 			withStreamResultOnClose(executeCancel),
 		}, withStreamResultCloseTimeout(50*time.Millisecond))...)
 		require.NoError(t, err)
 
-		bg := context.Background()
+		bg := t.Context()
 		rs, err := r.NextResultSet(bg)
 		require.NoError(t, err)
 		_, err = rs.NextRow(bg)
 		require.NoError(t, err)
 
-		callCtx, callCancel := context.WithCancel(context.Background())
+		callCtx, callCancel := context.WithCancel(t.Context())
 
 		iterDone := make(chan error, 1)
 		go func() {
@@ -292,7 +292,7 @@ func TestPerCallCtx_CloseDrainsAfterBlockedIterationCanceled(t *testing.T) {
 		)
 
 		var gotStats bool
-		r, err := newResult(context.Background(), stream, append(opts,
+		r, err := newResult(t.Context(), stream, append(opts,
 			withStreamResultStatsCallback(func(queryStats stats.QueryStats) {
 				if queryStats != nil {
 					gotStats = true
@@ -301,7 +301,7 @@ func TestPerCallCtx_CloseDrainsAfterBlockedIterationCanceled(t *testing.T) {
 		)...)
 		require.NoError(t, err)
 
-		callCtx, callCancel := context.WithCancel(context.Background())
+		callCtx, callCancel := context.WithCancel(t.Context())
 
 		iterDone := make(chan struct{})
 		go func() {
@@ -312,7 +312,7 @@ func TestPerCallCtx_CloseDrainsAfterBlockedIterationCanceled(t *testing.T) {
 		<-recvEntered
 		callCancel()
 
-		require.NoError(t, r.Close(context.Background()))
+		require.NoError(t, r.Close(t.Context()))
 
 		<-iterDone
 		require.True(t, gotStats,

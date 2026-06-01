@@ -26,7 +26,7 @@ func TestNodeShutdownHintPessimizesSessionNode(t *testing.T) {
 		banCause     error
 	)
 
-	openCtx := context.Background()
+	openCtx := t.Context()
 
 	driver, err := ydb.Open(openCtx, mockSrv.ConnString(),
 		ydb.WithAnonymousCredentials(),

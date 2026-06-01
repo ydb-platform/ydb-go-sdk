@@ -34,12 +34,12 @@ func TestStreamResultNextResultSet_CtxErrorDoesNotCancelExecuteStream(t *testing
 
 		var onCloseCalls atomic.Uint64
 
-		r, err := newResult(context.Background(), stream, withStreamResultOnClose(func() {
+		r, err := newResult(t.Context(), stream, withStreamResultOnClose(func() {
 			onCloseCalls.Add(1)
 		}))
 		require.NoError(t, err)
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		_, err = r.nextResultSet(cancelledCtx)
@@ -89,7 +89,7 @@ func TestClientCloseCancelsInflightDo(t *testing.T) {
 			t.Fatal("Do user op never started; setup is broken")
 		}
 
-		require.NoError(t, c.Close(context.Background()))
+		require.NoError(t, c.Close(t.Context()))
 
 		select {
 		case err := <-doDone:
@@ -160,7 +160,7 @@ func TestClientCloseCancelsInflightDoTx(t *testing.T) {
 			t.Fatal("DoTx user op never started; setup is broken")
 		}
 
-		require.NoError(t, c.Close(context.Background()))
+		require.NoError(t, c.Close(t.Context()))
 
 		select {
 		case err := <-doDone:
@@ -243,7 +243,7 @@ func TestClientCloseCancelsRegisteredCloseGoroutine(t *testing.T) {
 			registerCloseCancel: c.registerCloseCancel,
 		}
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		require.NoError(t, core.Close(cancelledCtx))
@@ -254,7 +254,7 @@ func TestClientCloseCancelsRegisteredCloseGoroutine(t *testing.T) {
 			t.Fatal("registered deleteSession goroutine never started")
 		}
 
-		require.NoError(t, c.Close(context.Background()))
+		require.NoError(t, c.Close(t.Context()))
 
 		require.Eventually(t, func() bool {
 			return len(c.closed.Get().cancels) == 0

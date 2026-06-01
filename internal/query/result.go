@@ -50,6 +50,7 @@ type (
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
 		onClose        func()
+		cancelStream   context.CancelFunc
 	}
 	resultOption func(s *streamResult)
 )
@@ -123,6 +124,12 @@ func withStreamResultOnClose(onClose func()) resultOption {
 		} else {
 			s.onClose = onClose
 		}
+	}
+}
+
+func withCancelStream(cancelStream context.CancelFunc) resultOption {
+	return func(s *streamResult) {
+		s.cancelStream = cancelStream
 	}
 }
 
@@ -214,12 +221,17 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 	}
 
-	if err := ctx.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(err)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
 	}
 
 	if r.lastErr != nil {
 		return nil, r.lastErr
+	}
+
+	if r.cancelStream != nil {
+		stop := context.AfterFunc(ctx, r.cancelStream)
+		defer stop()
 	}
 
 	part, err := nextPart(r.stream)
@@ -273,8 +285,8 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.onClose()
 
 	if r.stream != nil {
-		if ctxErr := r.stream.Context().Err(); ctxErr != nil {
-			return ctxErr
+		if r.stream.Context().Err() != nil {
+			return xerrors.WithStackTrace(errClosedExecuteQueryStream)
 		}
 	}
 

@@ -130,11 +130,11 @@ func TestExecute(t *testing.T) {
 		}
 		{
 			t.Log("close result")
-			r.Close(context.Background())
+			r.Close(t.Context())
 		}
 		{
 			t.Log("nextResultSet")
-			_, err := r.nextResultSet(context.Background())
+			_, err := r.nextResultSet(t.Context())
 			require.ErrorIs(t, err, io.EOF)
 		}
 	})
@@ -610,14 +610,14 @@ func TestExecute(t *testing.T) {
 			r, err := execute(t.Context(), "123", client, "", options.ExecuteSettings())
 			require.NoError(t, err)
 
-			callCtx, callCancel := context.WithCancel(context.Background())
+			callCtx, callCancel := context.WithCancel(t.Context())
 			callCancel()
 
 			_, err = r.nextPart(callCtx)
 			require.ErrorIs(t, err, context.Canceled)
 			require.NoError(t, r.lastErr)
 
-			require.NoError(t, r.Close(context.Background()))
+			require.NoError(t, r.Close(t.Context()))
 		})
 
 		t.Run("CancelCallCtxWhileRecvBlockedViaExecute", func(t *testing.T) {
@@ -660,7 +660,7 @@ func TestExecute(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			callCtx, callCancel := context.WithCancel(context.Background())
+			callCtx, callCancel := context.WithCancel(t.Context())
 
 			iterDone := make(chan error, 1)
 			go func() {
@@ -673,7 +673,7 @@ func TestExecute(t *testing.T) {
 			require.NoError(t, executeCtx.Err())
 
 			start := time.Now()
-			closeErr := r.Close(context.Background())
+			closeErr := r.Close(t.Context())
 			require.Less(t, time.Since(start), time.Second)
 
 			select {
@@ -699,7 +699,7 @@ func TestNewResult_DecoupledExecuteCtx(t *testing.T) {
 		// With the parent ctx passed directly, a cancelled ctx makes newResult
 		// fail before it ever calls Recv(). This is the old (buggy) behavior
 		// that the fix addresses at the execute() call-site.
-		parentCtx, parentCancel := context.WithCancel(context.Background())
+		parentCtx, parentCancel := context.WithCancel(t.Context())
 		parentCancel()
 
 		ctrl := gomock.NewController(t)
@@ -715,7 +715,7 @@ func TestNewResult_DecoupledExecuteCtx(t *testing.T) {
 		// parent via xcontext.ValueOnly, then add an independent cancel.
 		// Even though parentCtx is already cancelled, executeCtx is not — so
 		// newResult can proceed to Recv() and return the first response part.
-		parentCtx, parentCancel := context.WithCancel(context.Background())
+		parentCtx, parentCancel := context.WithCancel(t.Context())
 		parentCancel()
 
 		executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(parentCtx))
@@ -736,7 +736,7 @@ func TestNewResult_DecoupledExecuteCtx(t *testing.T) {
 		r, err := newResult(executeCtx, stream)
 		require.NoError(t, err)
 		if r != nil {
-			r.Close(context.Background())
+			r.Close(t.Context())
 		}
 	})
 }

@@ -22,11 +22,11 @@ const commitSelectOneQuery = "select 1"
 // User-visible flow:
 //  1. tx.Query returns a result; first stream part has no ExecStats (mock: delayed stats).
 //  2. res.NextResultSet(canceledCtx) fails with context.Canceled (e.g. deadline/cancel mid-read).
-//  3. res.Close(context.Background()) must still drain the stream and invoke the stats callback.
+//  3. res.Close(ctx) must still drain the stream and invoke the stats callback.
 func TestQueryResultCloseDrainsStatsAfterNextResultSetCanceledCtx(t *testing.T) {
 	mockSrv := mock.Server(t, mock.WithCommitStatsDelayed())
 
-	ctx := context.Background()
+	ctx := t.Context()
 	db, err := ydb.Open(ctx, mockSrv.ConnString(), ydb.WithAnonymousCredentials())
 	require.NoError(t, err)
 	defer func() { _ = db.Close(ctx) }()
@@ -56,7 +56,7 @@ func TestQueryResultCloseDrainsStatsAfterNextResultSetCanceledCtx(t *testing.T) 
 			return err
 		}
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		_, err = res.NextResultSet(cancelledCtx)
@@ -65,7 +65,7 @@ func TestQueryResultCloseDrainsStatsAfterNextResultSetCanceledCtx(t *testing.T) 
 		}
 		require.ErrorIs(t, err, context.Canceled)
 
-		return res.Close(context.Background())
+		return res.Close(t.Context())
 	})
 	require.NoError(t, err)
 	require.True(t, gotStats.Load(),

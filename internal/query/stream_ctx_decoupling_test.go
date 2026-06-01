@@ -24,7 +24,7 @@ func TestStreamResult_PerCallCtxCancelDoesNotRunExecuteOnCloseEarly(t *testing.T
 		ctrl := gomock.NewController(t)
 
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-		executeCtx, executeCancel := context.WithCancel(context.Background())
+		executeCtx, executeCancel := context.WithCancel(t.Context())
 		stubExecuteQueryStreamContext(executeCtx, stream)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
@@ -38,10 +38,10 @@ func TestStreamResult_PerCallCtxCancelDoesNotRunExecuteOnCloseEarly(t *testing.T
 			executeCancel()
 		}
 
-		r, err := newResult(context.Background(), stream, withStreamResultOnClose(onClose))
+		r, err := newResult(t.Context(), stream, nil, withStreamResultOnClose(onClose))
 		require.NoError(t, err)
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		_, err = r.nextResultSet(cancelledCtx)
@@ -91,7 +91,7 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 			gotStats     atomic.Bool
 		)
 
-		r, err := newResult(context.Background(), stream, append(opts,
+		r, err := newResult(t.Context(), stream, append(opts,
 			withStreamResultOnClose(func() { onCloseCalls.Add(1) }),
 			withStreamResultStatsCallback(func(queryStats stats.QueryStats) {
 				if queryStats == nil {
@@ -104,7 +104,7 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 		)...)
 		require.NoError(t, err)
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		_, err = r.nextResultSet(cancelledCtx)
@@ -112,7 +112,7 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 		require.EqualValues(t, 0, onCloseCalls.Load())
 		require.False(t, gotStats.Load())
 
-		require.NoError(t, r.Close(context.Background()))
+		require.NoError(t, r.Close(t.Context()))
 		require.EqualValues(t, 1, onCloseCalls.Load())
 		require.True(t, gotStats.Load(),
 			"Close with fresh ctx must drain ExecStats after per-call ctx cancel")
@@ -134,11 +134,11 @@ func TestStreamResult_CloseIsIdempotentViaStreamContext(t *testing.T) {
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
 
-		r, err := newResult(context.Background(), stream, opts...)
+		r, err := newResult(t.Context(), stream, opts...)
 		require.NoError(t, err)
 
-		require.NoError(t, r.Close(context.Background()))
-		require.NoError(t, r.Close(context.Background()))
+		require.NoError(t, r.Close(t.Context()))
+		require.ErrorIs(t, r.Close(t.Context()), errClosedExecuteQueryStream)
 	})
 }
 
@@ -161,13 +161,13 @@ func TestStreamResult_CloseTimeoutInterruptsBlockedRecv(t *testing.T) {
 			return nil, executeCtx.Err()
 		})
 
-		r, err := newResult(context.Background(), stream, append(opts,
+		r, err := newResult(t.Context(), stream, append(opts,
 			withStreamResultCloseTimeout(50*time.Millisecond),
 		)...)
 		require.NoError(t, err)
 
 		start := time.Now()
-		err = r.Close(context.Background())
+		err = r.Close(t.Context())
 		elapsed := time.Since(start)
 
 		require.ErrorIs(t, err, context.DeadlineExceeded)

@@ -1795,7 +1795,7 @@ func TestClient(t *testing.T) {
 			_, err := client.QueryRow(ctx, "SELECT 1")
 			require.NoError(t, err)
 
-			err = client.Close(context.Background())
+			err = client.Close(t.Context())
 
 			require.NoError(t, err)
 		})
