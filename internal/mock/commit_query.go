@@ -19,11 +19,18 @@ type executeQueryBehavior int
 const (
 	executeQueryBehaviorDefault executeQueryBehavior = iota
 	executeQueryBehaviorCommitFirstCanceledThenStatsFirstPart
+	executeQueryBehaviorCommitStatsDelayed
 )
 
 func WithCommitFirstCanceledThenStatsFirstPart() ServerOption {
 	return func(m *server) {
 		m.executeQueryBehavior = executeQueryBehaviorCommitFirstCanceledThenStatsFirstPart
+	}
+}
+
+func WithCommitStatsDelayed() ServerOption {
+	return func(m *server) {
+		m.executeQueryBehavior = executeQueryBehaviorCommitStatsDelayed
 	}
 }
 
@@ -67,14 +74,27 @@ func (m *querySrv) executeCommitQuery(
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
 			ResultSet:      selectOneResultSet(),
-			ExecStats:      docapiCommitExecStats(),
+			ExecStats:      commitExecStats(),
+		})
+	case executeQueryBehaviorCommitStatsDelayed:
+		if err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet:      selectOneResultSet(),
+		}); err != nil {
+			return err
+		}
+
+		return stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:    Ydb.StatusIds_SUCCESS,
+			ExecStats: commitExecStats(),
 		})
 	default:
 		return stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
 			ResultSet:      selectOneResultSet(),
-			ExecStats:      docapiCommitExecStats(),
+			ExecStats:      commitExecStats(),
 		})
 	}
 }
@@ -93,7 +113,7 @@ func selectOneResultSet() *Ydb.ResultSet {
 	}
 }
 
-func docapiCommitExecStats() *Ydb_TableStats.QueryStats {
+func commitExecStats() *Ydb_TableStats.QueryStats {
 	return &Ydb_TableStats.QueryStats{
 		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
 			{
