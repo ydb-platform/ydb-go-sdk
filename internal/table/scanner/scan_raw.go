@@ -361,7 +361,7 @@ func (s *rawConverter) ListItem(i int) {
 	if t := s.assertTypeList(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
-			t: t.ListType.GetItem(),
+			t: t.GetItem(),
 			v: p.v.GetItems()[i],
 		})
 	}
@@ -400,7 +400,7 @@ func (s *rawConverter) TupleItem(i int) {
 	if t := s.assertTypeTuple(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
-			t: t.TupleType.GetElements()[i],
+			t: t.GetElements()[i],
 			v: p.v.GetItems()[i],
 		})
 	}
@@ -437,7 +437,7 @@ func (s *rawConverter) StructField(i int) (name string) {
 		return
 	}
 	if t := s.assertTypeStruct(p.t); t != nil {
-		m := t.StructType.GetMembers()[i]
+		m := t.GetMembers()[i]
 		name = m.GetName()
 		s.stack.set(item{
 			name: m.GetName(),
@@ -483,7 +483,7 @@ func (s *rawConverter) DictKey(i int) {
 	if t := s.assertTypeDict(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
-			t: t.DictType.GetKey(),
+			t: t.GetKey(),
 			v: p.v.GetPairs()[i].GetKey(),
 		})
 	}
@@ -500,7 +500,7 @@ func (s *rawConverter) DictPayload(i int) {
 	if t := s.assertTypeDict(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
-			t: t.DictType.GetPayload(),
+			t: t.GetPayload(),
 			v: p.v.GetPairs()[i].GetPayload(),
 		})
 	}
@@ -551,13 +551,13 @@ func (s *rawConverter) Unwrap() {
 		return
 	}
 	v := x.v
-	if isOptional(t.OptionalType.GetItem()) {
+	if isOptional(t.GetItem()) {
 		v = s.unwrapValue()
 	}
 	s.stack.enter()
 	s.stack.set(item{
 		name: "*",
-		t:    t.OptionalType.GetItem(),
+		t:    t.GetItem(),
 		v:    v,
 	})
 }
@@ -586,8 +586,8 @@ func (s *rawConverter) UnwrapDecimal() decimal.Decimal {
 
 	return decimal.Decimal{
 		Bytes:     s.uint128(),
-		Precision: d.DecimalType.GetPrecision(),
-		Scale:     d.DecimalType.GetScale(),
+		Precision: d.GetPrecision(),
+		Scale:     d.GetScale(),
 	}
 }
 
@@ -610,30 +610,28 @@ func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
 
 func (s *rawConverter) isCurrentTypeDecimal() bool {
 	c := s.stack.current()
-	_, ok := c.t.GetType().(*Ydb.Type_DecimalType)
-
-	return ok
+	return c.t.WhichType() == Ydb.Type_DecimalType_case
 }
 
-func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32) (name string, t *Ydb.Type) {
+func (s *rawConverter) unwrapVariantType(typ *Ydb.VariantType, index uint32) (name string, t *Ydb.Type) {
 	i := int(index)
-	switch x := typ.VariantType.GetType().(type) {
-	case *Ydb.VariantType_TupleItems:
-		if i >= len(x.TupleItems.GetElements()) {
+	switch typ.WhichType() {
+	case Ydb.VariantType_TupleItems_case:
+		if i >= len(typ.GetTupleItems().GetElements()) {
 			_ = s.errorf(0, "unimplemented")
 
 			return
 		}
 
-		return "", x.TupleItems.GetElements()[i]
+		return "", typ.GetTupleItems().GetElements()[i]
 
-	case *Ydb.VariantType_StructItems:
-		if i >= len(x.StructItems.GetMembers()) {
+	case Ydb.VariantType_StructItems_case:
+		if i >= len(typ.GetStructItems().GetMembers()) {
 			_ = s.errorf(0, "unimplemented")
 
 			return
 		}
-		m := x.StructItems.GetMembers()[i]
+		m := typ.GetStructItems().GetMembers()[i]
 
 		return m.GetName(), m.GetType()
 
@@ -699,12 +697,12 @@ func (s *rawConverter) boundsCheck(n, i int) bool {
 	return true
 }
 
-func (s *valueScanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
-	if t, _ = typ.GetType().(*Ydb.Type_OptionalType); t == nil {
-		s.typeError(typ.GetType(), t)
+func (s *valueScanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.OptionalType) {
+	if typ.WhichType() != Ydb.Type_OptionalType_case {
+		s.typeError(typ, nil)
+		return nil
 	}
-
-	return
+	return typ.GetOptionalType()
 }
 
 func (s *rawConverter) assertCurrentTypeNullable() bool {
@@ -753,7 +751,7 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 	if d == nil {
 		return false
 	}
-	if !isEqualDecimal(d.DecimalType, t) {
+	if !isEqualDecimal(d, t) {
 		s.decimalTypeError(t)
 
 		return false
@@ -762,52 +760,52 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 	return true
 }
 
-func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.Type_ListType) {
-	if t, _ = typ.GetType().(*Ydb.Type_ListType); t == nil {
-		s.typeError(typ.GetType(), t)
+func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.ListType) {
+	if typ.WhichType() != Ydb.Type_ListType_case {
+		s.typeError(typ, nil)
+		return nil
 	}
-
-	return
+	return typ.GetListType()
 }
 
-func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
-	if t, _ = typ.GetType().(*Ydb.Type_TupleType); t == nil {
-		s.typeError(typ.GetType(), t)
+func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.TupleType) {
+	if typ.WhichType() != Ydb.Type_TupleType_case {
+		s.typeError(typ, nil)
+		return nil
 	}
-
-	return
+	return typ.GetTupleType()
 }
 
-func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) {
-	if t, _ = typ.GetType().(*Ydb.Type_StructType); t == nil {
-		s.typeError(typ.GetType(), t)
+func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.StructType) {
+	if typ.WhichType() != Ydb.Type_StructType_case {
+		s.typeError(typ, nil)
+		return nil
 	}
-
-	return
+	return typ.GetStructType()
 }
 
-func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
-	if t, _ = typ.GetType().(*Ydb.Type_DictType); t == nil {
-		s.typeError(typ.GetType(), t)
+func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.DictType) {
+	if typ.WhichType() != Ydb.Type_DictType_case {
+		s.typeError(typ, nil)
+		return nil
 	}
-
-	return
+	return typ.GetDictType()
 }
 
-func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	if t, _ = typ.GetType().(*Ydb.Type_DecimalType); t == nil {
-		s.typeError(typ.GetType(), t)
+func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.DecimalType) {
+	if typ.WhichType() != Ydb.Type_DecimalType_case {
+		s.typeError(typ, nil)
+		return nil
 	}
-
-	return
+	return typ.GetDecimalType()
 }
 
-func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType) {
-	if t, _ = typ.GetType().(*Ydb.Type_VariantType); t == nil {
-		s.typeError(typ.GetType(), t)
+func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.VariantType) {
+	if typ.WhichType() != Ydb.Type_VariantType_case {
+		s.typeError(typ, nil)
+		return nil
 	}
-
-	return
+	return typ.GetVariantType()
 }
 
 func (s *rawConverter) boundsError(n, i int) {

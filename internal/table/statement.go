@@ -30,31 +30,29 @@ func (s *statement) Execute(
 	parameters *params.Params,
 	opts ...options.ExecuteDataQueryOption,
 ) (txr table.Transaction, r result.Result, err error) {
-	var (
-		request = options.ExecuteDataQueryDesc{
-			ExecuteDataQueryRequest: &Ydb_Table.ExecuteDataQueryRequest{
-				SessionId: s.session.id,
-				TxControl: txControl.ToYdbTableTransactionControl(),
-				Parameters: func() map[string]*Ydb.TypedValue {
-					p, _ := parameters.ToYDB()
-
-					return p
-				}(),
-				Query: s.query.toYDB(),
-			},
-			IgnoreTruncated: s.session.config.IgnoreTruncated(),
-		}
-		callOptions []grpc.CallOption
-	)
-
-	request.QueryCachePolicy = &Ydb_Table.QueryCachePolicy{
-		KeepInCache: len(request.Parameters) > 0,
-	}
-
-	request.OperationParams = operation.Params(ctx,
+	ydbParams, _ := parameters.ToYDB()
+	queryCachePolicy := Ydb_Table.QueryCachePolicy_builder{
+		KeepInCache: len(ydbParams) > 0,
+	}.Build()
+	operationParams := operation.Params(ctx,
 		s.session.config.OperationTimeout(),
 		s.session.config.OperationCancelAfter(),
 		operation.ModeSync,
+	)
+
+	var (
+		request = options.ExecuteDataQueryDesc{
+			ExecuteDataQueryRequest: Ydb_Table.ExecuteDataQueryRequest_builder{
+				SessionId:        s.session.id,
+				TxControl:        txControl.ToYdbTableTransactionControl(),
+				Parameters:       ydbParams,
+				Query:            s.query.toYDB(),
+				QueryCachePolicy: queryCachePolicy,
+				OperationParams:  operationParams,
+			}.Build(),
+			IgnoreTruncated: s.session.config.IgnoreTruncated(),
+		}
+		callOptions []grpc.CallOption
 	)
 
 	for _, opt := range opts {
@@ -67,7 +65,7 @@ func (s *statement) Execute(
 		s.session.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*statement).Execute"),
 		s.session, s.query, parameters,
-		request.QueryCachePolicy.GetKeepInCache(),
+		queryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
 		onDone(txr, true, r, err)

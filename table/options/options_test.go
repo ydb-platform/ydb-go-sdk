@@ -55,7 +55,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
-		if p, ok := req.GetPartitions().(*Ydb_Table.CreateTableRequest_UniformPartitions); !ok || p.UniformPartitions != 3 {
+		if req.WhichPartitions() != Ydb_Table.CreateTableRequest_UniformPartitions_case || req.GetUniformPartitions() != 3 {
 			t.Errorf("Uniform partitioning policy is not as expected")
 		}
 	}
@@ -67,14 +67,13 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
-		p, ok := req.GetPartitions().(*Ydb_Table.CreateTableRequest_PartitionAtKeys)
-		if !ok {
+		if req.WhichPartitions() != Ydb_Table.CreateTableRequest_PartitionAtKeys_case {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
 			require.Equal(
 				t,
 				[]*Ydb.TypedValue{value.ToYDB(value.Int64Value(1))},
-				p.PartitionAtKeys.GetSplitPoints(),
+				req.GetPartitionAtKeys().GetSplitPoints(),
 			)
 		}
 	}

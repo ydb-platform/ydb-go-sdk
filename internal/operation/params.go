@@ -26,9 +26,9 @@ func Params(
 		return nil
 	}
 
-	return &Ydb_Operations.OperationParams{
+	return Ydb_Operations.OperationParams_builder{
 		OperationMode:    mode.toYDB(),
 		OperationTimeout: timeoutParam(timeout),
 		CancelAfter:      timeoutParam(cancelAfter),
-	}
+	}.Build()
 }

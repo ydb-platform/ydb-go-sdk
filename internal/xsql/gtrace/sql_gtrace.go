@@ -1119,6 +1119,7 @@ func onDoTx(t *trace.DatabaseSQL, d trace.DatabaseSQLDoTxStartInfo) func(trace.D
 		return res
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnectorConnect(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call) func(session trace.SessionInfo, _ error) {
 	var p trace.DatabaseSQLConnectorConnectStartInfo
@@ -1132,6 +1133,7 @@ func DatabaseSQLOnConnectorConnect(t *trace.DatabaseSQL, c *context.Context, c1 
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnPing(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.DatabaseSQLConnPingStartInfo
@@ -1144,6 +1146,7 @@ func DatabaseSQLOnConnPing(t *trace.DatabaseSQL, c *context.Context, c1 trace.Ca
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnPrepare(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, query string) func(error) {
 	var p trace.DatabaseSQLConnPrepareStartInfo
@@ -1157,6 +1160,7 @@ func DatabaseSQLOnConnPrepare(t *trace.DatabaseSQL, c *context.Context, c1 trace
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnClose(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.DatabaseSQLConnCloseStartInfo
@@ -1169,6 +1173,7 @@ func DatabaseSQLOnConnClose(t *trace.DatabaseSQL, c *context.Context, c1 trace.C
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnBegin(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call) func(tx trace.TxInfo, _ error) {
 	var p trace.DatabaseSQLConnBeginStartInfo
@@ -1182,6 +1187,7 @@ func DatabaseSQLOnConnBegin(t *trace.DatabaseSQL, c *context.Context, c1 trace.C
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnBeginTx(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call) func(tx trace.TxInfo, _ error) {
 	var p trace.DatabaseSQLConnBeginTxStartInfo
@@ -1195,6 +1201,7 @@ func DatabaseSQLOnConnBeginTx(t *trace.DatabaseSQL, c *context.Context, c1 trace
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnCheckNamedValue(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, value *driver.NamedValue) func(error) {
 	var p trace.DatabaseSQLConnCheckNamedValueStartInfo
@@ -1208,6 +1215,7 @@ func DatabaseSQLOnConnCheckNamedValue(t *trace.DatabaseSQL, c *context.Context, 
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnQuery(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, query string, mode string, idempotent bool) func(error) {
 	var p trace.DatabaseSQLConnQueryStartInfo
@@ -1223,6 +1231,7 @@ func DatabaseSQLOnConnQuery(t *trace.DatabaseSQL, c *context.Context, c1 trace.C
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnExec(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, query string, mode string, idempotent bool) func(error) {
 	var p trace.DatabaseSQLConnExecStartInfo
@@ -1238,6 +1247,7 @@ func DatabaseSQLOnConnExec(t *trace.DatabaseSQL, c *context.Context, c1 trace.Ca
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnIsTableExists(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, tableName string) func(exists bool, _ error) {
 	var p trace.DatabaseSQLConnIsTableExistsStartInfo
@@ -1252,6 +1262,7 @@ func DatabaseSQLOnConnIsTableExists(t *trace.DatabaseSQL, c *context.Context, c1
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnIsColumnExists(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, tableName string, columnName string) func(exists bool, _ error) {
 	var p trace.DatabaseSQLConnIsColumnExistsStartInfo
@@ -1267,6 +1278,7 @@ func DatabaseSQLOnConnIsColumnExists(t *trace.DatabaseSQL, c *context.Context, c
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnConnGetIndexColumns(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, tableName string, indexName string) func(columns []string, _ error) {
 	var p trace.DatabaseSQLConnGetIndexColumnsStartInfo
@@ -1282,6 +1294,7 @@ func DatabaseSQLOnConnGetIndexColumns(t *trace.DatabaseSQL, c *context.Context, 
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxQuery(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, txContext context.Context, tx trace.TxInfo, query string) func(error) {
 	var p trace.DatabaseSQLTxQueryStartInfo
@@ -1297,6 +1310,7 @@ func DatabaseSQLOnTxQuery(t *trace.DatabaseSQL, c *context.Context, c1 trace.Cal
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxExec(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, txContext context.Context, tx trace.TxInfo, query string) func(error) {
 	var p trace.DatabaseSQLTxExecStartInfo
@@ -1312,6 +1326,7 @@ func DatabaseSQLOnTxExec(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxPrepare(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, txContext context.Context, tx trace.TxInfo, query string) func(error) {
 	var p trace.DatabaseSQLTxPrepareStartInfo
@@ -1327,6 +1342,7 @@ func DatabaseSQLOnTxPrepare(t *trace.DatabaseSQL, c *context.Context, c1 trace.C
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxCommit(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, tx trace.TxInfo) func(error) {
 	var p trace.DatabaseSQLTxCommitStartInfo
@@ -1340,6 +1356,7 @@ func DatabaseSQLOnTxCommit(t *trace.DatabaseSQL, c *context.Context, c1 trace.Ca
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnTxRollback(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, tx trace.TxInfo) func(error) {
 	var p trace.DatabaseSQLTxRollbackStartInfo
@@ -1353,6 +1370,7 @@ func DatabaseSQLOnTxRollback(t *trace.DatabaseSQL, c *context.Context, c1 trace.
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtQuery(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, stmtContext context.Context, query string) func(error) {
 	var p trace.DatabaseSQLStmtQueryStartInfo
@@ -1367,6 +1385,7 @@ func DatabaseSQLOnStmtQuery(t *trace.DatabaseSQL, c *context.Context, c1 trace.C
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtExec(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, stmtContext context.Context, query string) func(error) {
 	var p trace.DatabaseSQLStmtExecStartInfo
@@ -1381,6 +1400,7 @@ func DatabaseSQLOnStmtExec(t *trace.DatabaseSQL, c *context.Context, c1 trace.Ca
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnStmtClose(t *trace.DatabaseSQL, stmtContext *context.Context, c trace.Call) func(error) {
 	var p trace.DatabaseSQLStmtCloseStartInfo
@@ -1393,6 +1413,7 @@ func DatabaseSQLOnStmtClose(t *trace.DatabaseSQL, stmtContext *context.Context, 
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DatabaseSQLOnDoTx(t *trace.DatabaseSQL, c *context.Context, c1 trace.Call, iD string, idempotent bool) func(error) func(attempts int, _ error) {
 	var p trace.DatabaseSQLDoTxStartInfo

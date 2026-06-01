@@ -6,12 +6,12 @@ import (
 
 func WithPageSize(pageSize uint64) options.List {
 	return func(r *options.ListOperationsRequest) {
-		r.PageSize = pageSize
+		r.SetPageSize(pageSize)
 	}
 }
 
 func WithPageToken(pageToken string) options.List {
 	return func(r *options.ListOperationsRequest) {
-		r.PageToken = pageToken
+		r.SetPageToken(pageToken)
 	}
 }

@@ -27,6 +27,7 @@ import (
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestClient(t *testing.T) {
@@ -35,18 +36,18 @@ func TestClient(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-			attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
+			attachStream.EXPECT().Recv().Return(Ydb_Query.SessionState_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil).AnyTimes()
+			}.Build(), nil).AnyTimes()
 			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 				Status:    Ydb.StatusIds_SUCCESS,
 				SessionId: "test",
-			}, nil)
+			}.Build(), nil)
 			client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-			client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+			client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.DeleteSessionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil)
+			}.Build(), nil)
 			attached := 0
 			s, err := createSession(ctx, client, WithTrace(
 				&trace.Query{
@@ -83,10 +84,10 @@ func TestClient(t *testing.T) {
 			t.Run("OnAttach", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				client := NewMockQueryServiceClient(ctrl)
-				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 					Status:    Ydb.StatusIds_SUCCESS,
 					SessionId: "test",
-				}, nil)
+				}.Build(), nil)
 				client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 				client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 				_, err := createSession(ctx, client)
@@ -98,14 +99,14 @@ func TestClient(t *testing.T) {
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 				attachStream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, "")).AnyTimes()
 				client := NewMockQueryServiceClient(ctrl)
-				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 					Status:    Ydb.StatusIds_SUCCESS,
 					SessionId: "test",
-				}, nil)
+				}.Build(), nil)
 				client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-				client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+				client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.DeleteSessionResponse_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-				}, nil)
+				}.Build(), nil)
 				_, err := createSession(ctx, client)
 				require.Error(t, err)
 				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
@@ -129,14 +130,14 @@ func TestClient(t *testing.T) {
 					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 				)
 				client := NewMockQueryServiceClient(ctrl)
-				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 					Status:    Ydb.StatusIds_SUCCESS,
 					SessionId: "test",
-				}, nil)
+				}.Build(), nil)
 				client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-				client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+				client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.DeleteSessionResponse_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-				}, nil)
+				}.Build(), nil)
 				_, err := createSession(ctx, client)
 				require.Error(t, err)
 				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
@@ -180,72 +181,56 @@ func TestClient(t *testing.T) {
 					client := NewMockQueryServiceClient(ctrl)
 					stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 					stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-						client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
+						client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.CommitTransactionResponse_builder{
 							Status: Ydb.StatusIds_SUCCESS,
-						}, nil)
+						}.Build(), nil)
 
-						return &Ydb_Query.ExecuteQueryResponsePart{
+						return Ydb_Query.ExecuteQueryResponsePart_builder{
 							Status: Ydb.StatusIds_SUCCESS,
-							TxMeta: &Ydb_Query.TransactionMeta{
+							TxMeta: Ydb_Query.TransactionMeta_builder{
 								Id: "456",
-							},
+							}.Build(),
 							ResultSetIndex: 0,
-							ResultSet: &Ydb.ResultSet{
+							ResultSet: Ydb.ResultSet_builder{
 								Columns: []*Ydb.Column{
-									{
+									Ydb.Column_builder{
 										Name: "a",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UINT64,
-											},
-										},
-									},
-									{
+										Type: Ydb.Type_builder{
+											TypeId: Ydb.Type_UINT64.Enum(),
+										}.Build(),
+									}.Build(),
+									Ydb.Column_builder{
 										Name: "b",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UTF8,
-											},
-										},
-									},
+										Type: Ydb.Type_builder{
+											TypeId: Ydb.Type_UTF8.Enum(),
+										}.Build(),
+									}.Build(),
 								},
 								Rows: []*Ydb.Value{
-									{
-										Items: []*Ydb.Value{{
-											Value: &Ydb.Value_Uint64Value{
-												Uint64Value: 1,
-											},
-										}, {
-											Value: &Ydb.Value_TextValue{
-												TextValue: "1",
-											},
-										}},
-									},
-									{
-										Items: []*Ydb.Value{{
-											Value: &Ydb.Value_Uint64Value{
-												Uint64Value: 2,
-											},
-										}, {
-											Value: &Ydb.Value_TextValue{
-												TextValue: "2",
-											},
-										}},
-									},
-									{
-										Items: []*Ydb.Value{{
-											Value: &Ydb.Value_Uint64Value{
-												Uint64Value: 3,
-											},
-										}, {
-											Value: &Ydb.Value_TextValue{
-												TextValue: "3",
-											},
-										}},
-									},
+									Ydb.Value_builder{
+										Items: []*Ydb.Value{Ydb.Value_builder{
+											Uint64Value: proto.Uint64(1),
+										}.Build(), Ydb.Value_builder{
+											TextValue: proto.String("1"),
+										}.Build()},
+									}.Build(),
+									Ydb.Value_builder{
+										Items: []*Ydb.Value{Ydb.Value_builder{
+											Uint64Value: proto.Uint64(2),
+										}.Build(), Ydb.Value_builder{
+											TextValue: proto.String("2"),
+										}.Build()},
+									}.Build(),
+									Ydb.Value_builder{
+										Items: []*Ydb.Value{Ydb.Value_builder{
+											Uint64Value: proto.Uint64(3),
+										}.Build(), Ydb.Value_builder{
+											TextValue: proto.String("3"),
+										}.Build()},
+									}.Build(),
 								},
-							},
-						}, nil
+							}.Build(),
+						}.Build(), nil
 					})
 					stream.EXPECT().Recv().Return(nil, io.EOF)
 					client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
@@ -274,72 +259,56 @@ func TestClient(t *testing.T) {
 								) {
 									stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-										client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
+										client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.CommitTransactionResponse_builder{
 											Status: Ydb.StatusIds_SUCCESS,
-										}, nil)
+										}.Build(), nil)
 
-										return &Ydb_Query.ExecuteQueryResponsePart{
+										return Ydb_Query.ExecuteQueryResponsePart_builder{
 											Status: Ydb.StatusIds_SUCCESS,
-											TxMeta: &Ydb_Query.TransactionMeta{
+											TxMeta: Ydb_Query.TransactionMeta_builder{
 												Id: "456",
-											},
+											}.Build(),
 											ResultSetIndex: 0,
-											ResultSet: &Ydb.ResultSet{
+											ResultSet: Ydb.ResultSet_builder{
 												Columns: []*Ydb.Column{
-													{
+													Ydb.Column_builder{
 														Name: "a",
-														Type: &Ydb.Type{
-															Type: &Ydb.Type_TypeId{
-																TypeId: Ydb.Type_UINT64,
-															},
-														},
-													},
-													{
+														Type: Ydb.Type_builder{
+															TypeId: Ydb.Type_UINT64.Enum(),
+														}.Build(),
+													}.Build(),
+													Ydb.Column_builder{
 														Name: "b",
-														Type: &Ydb.Type{
-															Type: &Ydb.Type_TypeId{
-																TypeId: Ydb.Type_UTF8,
-															},
-														},
-													},
+														Type: Ydb.Type_builder{
+															TypeId: Ydb.Type_UTF8.Enum(),
+														}.Build(),
+													}.Build(),
 												},
 												Rows: []*Ydb.Value{
-													{
-														Items: []*Ydb.Value{{
-															Value: &Ydb.Value_Uint64Value{
-																Uint64Value: 1,
-															},
-														}, {
-															Value: &Ydb.Value_TextValue{
-																TextValue: "1",
-															},
-														}},
-													},
-													{
-														Items: []*Ydb.Value{{
-															Value: &Ydb.Value_Uint64Value{
-																Uint64Value: 2,
-															},
-														}, {
-															Value: &Ydb.Value_TextValue{
-																TextValue: "2",
-															},
-														}},
-													},
-													{
-														Items: []*Ydb.Value{{
-															Value: &Ydb.Value_Uint64Value{
-																Uint64Value: 3,
-															},
-														}, {
-															Value: &Ydb.Value_TextValue{
-																TextValue: "3",
-															},
-														}},
-													},
+													Ydb.Value_builder{
+														Items: []*Ydb.Value{Ydb.Value_builder{
+															Uint64Value: proto.Uint64(1),
+														}.Build(), Ydb.Value_builder{
+															TextValue: proto.String("1"),
+														}.Build()},
+													}.Build(),
+													Ydb.Value_builder{
+														Items: []*Ydb.Value{Ydb.Value_builder{
+															Uint64Value: proto.Uint64(2),
+														}.Build(), Ydb.Value_builder{
+															TextValue: proto.String("2"),
+														}.Build()},
+													}.Build(),
+													Ydb.Value_builder{
+														Items: []*Ydb.Value{Ydb.Value_builder{
+															Uint64Value: proto.Uint64(3),
+														}.Build(), Ydb.Value_builder{
+															TextValue: proto.String("3"),
+														}.Build()},
+													}.Build(),
 												},
-											},
-										}, nil
+											}.Build(),
+										}.Build(), nil
 									})
 									stream.EXPECT().Recv().Return(nil, io.EOF)
 
@@ -347,10 +316,10 @@ func TestClient(t *testing.T) {
 								},
 							)
 
-							return &Ydb_Query.BeginTransactionResponse{
+							return Ydb_Query.BeginTransactionResponse_builder{
 								Status: Ydb.StatusIds_SUCCESS,
-								TxMeta: &Ydb_Query.TransactionMeta{Id: "456"},
-							}, nil
+								TxMeta: Ydb_Query.TransactionMeta_builder{Id: "456"}.Build(),
+							}.Build(), nil
 						},
 					)
 
@@ -369,15 +338,15 @@ func TestClient(t *testing.T) {
 			counter := 0
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.BeginTransactionResponse{
+			client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.BeginTransactionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil).AnyTimes()
-			client.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.RollbackTransactionResponse{
+			}.Build(), nil).AnyTimes()
+			client.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.RollbackTransactionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil).AnyTimes()
-			client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
+			}.Build(), nil).AnyTimes()
+			client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.CommitTransactionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil).AnyTimes()
+			}.Build(), nil).AnyTimes()
 			err := doTx(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), func(ctx context.Context, tx query.TxActor) error {
@@ -421,18 +390,18 @@ func TestClient(t *testing.T) {
 											) {
 												txInFlight--
 
-												return &Ydb_Query.CommitTransactionResponse{
+												return Ydb_Query.CommitTransactionResponse_builder{
 													Status: Ydb.StatusIds_SUCCESS,
-												}, nil
+												}.Build(), nil
 											})
 
-										return &Ydb_Query.ExecuteQueryResponsePart{
+										return Ydb_Query.ExecuteQueryResponsePart_builder{
 											Status: Ydb.StatusIds_SUCCESS,
-											TxMeta: &Ydb_Query.TransactionMeta{
+											TxMeta: Ydb_Query.TransactionMeta_builder{
 												Id: "456",
-											},
+											}.Build(),
 											ExecStats: &Ydb_TableStats.QueryStats{},
-										}, nil
+										}.Build(), nil
 									})
 
 									return stream, nil
@@ -478,13 +447,13 @@ func TestClient(t *testing.T) {
 											return nil, io.EOF
 										})
 
-										return &Ydb_Query.ExecuteQueryResponsePart{
+										return Ydb_Query.ExecuteQueryResponsePart_builder{
 											Status: Ydb.StatusIds_SUCCESS,
-											TxMeta: &Ydb_Query.TransactionMeta{
+											TxMeta: Ydb_Query.TransactionMeta_builder{
 												Id: "456",
-											},
+											}.Build(),
 											ExecStats: &Ydb_TableStats.QueryStats{},
-										}, nil
+										}.Build(), nil
 									})
 
 									return stream, nil
@@ -546,19 +515,19 @@ func TestClient(t *testing.T) {
 																) {
 																	txInFlight--
 
-																	return &Ydb_Query.CommitTransactionResponse{
+																	return Ydb_Query.CommitTransactionResponse_builder{
 																		Status: Ydb.StatusIds_SUCCESS,
-																	}, nil
+																	}.Build(), nil
 																})
 
 															return nil, io.EOF
 														})
 
-														return &Ydb_Query.ExecuteQueryResponsePart{
+														return Ydb_Query.ExecuteQueryResponsePart_builder{
 															Status:    Ydb.StatusIds_SUCCESS,
 															TxMeta:    &Ydb_Query.TransactionMeta{},
 															ExecStats: &Ydb_TableStats.QueryStats{},
-														}, nil
+														}.Build(), nil
 													})
 
 													return secondStream, nil
@@ -567,13 +536,13 @@ func TestClient(t *testing.T) {
 											return nil, io.EOF
 										})
 
-										return &Ydb_Query.ExecuteQueryResponsePart{
+										return Ydb_Query.ExecuteQueryResponsePart_builder{
 											Status: Ydb.StatusIds_SUCCESS,
-											TxMeta: &Ydb_Query.TransactionMeta{
+											TxMeta: Ydb_Query.TransactionMeta_builder{
 												Id: "456",
-											},
+											}.Build(),
 											ExecStats: &Ydb_TableStats.QueryStats{},
-										}, nil
+										}.Build(), nil
 									})
 
 									return firstStream, nil
@@ -635,11 +604,11 @@ func TestClient(t *testing.T) {
 															return nil, io.EOF
 														})
 
-														return &Ydb_Query.ExecuteQueryResponsePart{
+														return Ydb_Query.ExecuteQueryResponsePart_builder{
 															Status:    Ydb.StatusIds_SUCCESS,
 															TxMeta:    &Ydb_Query.TransactionMeta{},
 															ExecStats: &Ydb_TableStats.QueryStats{},
-														}, nil
+														}.Build(), nil
 													})
 
 													return secondStream, nil
@@ -648,13 +617,13 @@ func TestClient(t *testing.T) {
 											return nil, io.EOF
 										})
 
-										return &Ydb_Query.ExecuteQueryResponsePart{
+										return Ydb_Query.ExecuteQueryResponsePart_builder{
 											Status: Ydb.StatusIds_SUCCESS,
-											TxMeta: &Ydb_Query.TransactionMeta{
+											TxMeta: Ydb_Query.TransactionMeta_builder{
 												Id: "456",
-											},
+											}.Build(),
 											ExecStats: &Ydb_TableStats.QueryStats{},
-										}, nil
+										}.Build(), nil
 									})
 
 									return firstStream, nil
@@ -679,162 +648,120 @@ func TestClient(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			err := clientExec(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-					TxMeta: &Ydb_Query.TransactionMeta{
+					TxMeta: Ydb_Query.TransactionMeta_builder{
 						Id: "456",
-					},
+					}.Build(),
 					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Columns: []*Ydb.Column{
-							{
+							Ydb.Column_builder{
 								Name: "a",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UINT64.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "b",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UTF8.Enum(),
+								}.Build(),
+							}.Build(),
 						},
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 3,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "3",
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(1),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("1"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(2),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("2"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(3),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("3"),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					}.Build(),
+				}.Build(), nil)
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status:         Ydb.StatusIds_SUCCESS,
 					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 4,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "4",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 5,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "5",
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(4),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("4"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(5),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("5"),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					}.Build(),
+				}.Build(), nil)
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status:         Ydb.StatusIds_SUCCESS,
 					ResultSetIndex: 1,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Columns: []*Ydb.Column{
-							{
+							Ydb.Column_builder{
 								Name: "c",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UINT64.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "d",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UTF8.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "e",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_BOOL,
-									},
-								},
-							},
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_BOOL.Enum(),
+								}.Build(),
+							}.Build(),
 						},
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}, {
-									Value: &Ydb.Value_BoolValue{
-										BoolValue: true,
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}, {
-									Value: &Ydb.Value_BoolValue{
-										BoolValue: false,
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(1),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("1"),
+								}.Build(), Ydb.Value_builder{
+									BoolValue: proto.Bool(true),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(2),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("2"),
+								}.Build(), Ydb.Value_builder{
+									BoolValue: proto.Bool(false),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
+					}.Build(),
+				}.Build(), nil)
 				stream.EXPECT().Recv().Return(nil, io.EOF)
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
@@ -853,44 +780,44 @@ func TestClient(t *testing.T) {
 	})
 	t.Run("Query", func(t *testing.T) {
 		_uint64 := func(v uint64) *Ydb.Value {
-			return &Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: v}}
+			return Ydb.Value_builder{Uint64Value: proto.Uint64(v)}.Build()
 		}
 		_str := func(v string) *Ydb.Value {
-			return &Ydb.Value{Value: &Ydb.Value_TextValue{TextValue: v}}
+			return Ydb.Value_builder{TextValue: proto.String(v)}.Build()
 		}
 		_bool := func(v bool) *Ydb.Value {
-			return &Ydb.Value{Value: &Ydb.Value_BoolValue{BoolValue: v}}
+			return Ydb.Value_builder{BoolValue: proto.Bool(v)}.Build()
 		}
 		_respPart := func(idx int, columns []*Ydb.Column, rows [][]*Ydb.Value) *Ydb_Query.ExecuteQueryResponsePart {
-			return &Ydb_Query.ExecuteQueryResponsePart{
+			return Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
-				TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+				TxMeta:         Ydb_Query.TransactionMeta_builder{Id: "456"}.Build(),
 				ResultSetIndex: int64(idx),
-				ResultSet: &Ydb.ResultSet{
+				ResultSet: Ydb.ResultSet_builder{
 					Columns: columns,
 					Rows: func() []*Ydb.Value {
 						out := make([]*Ydb.Value, len(rows))
 						for i, items := range rows {
-							out[i] = &Ydb.Value{Items: items}
+							out[i] = Ydb.Value_builder{Items: items}.Build()
 						}
 
 						return out
 					}(),
-				},
-			}
+				}.Build(),
+			}.Build()
 		}
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			colsAB := []*Ydb.Column{
-				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
-				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+				Ydb.Column_builder{Name: "a", Type: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "b", Type: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build(),
 			}
 
 			colsCDE := []*Ydb.Column{
-				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
-				{Name: "d", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
-				{Name: "e", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
+				Ydb.Column_builder{Name: "c", Type: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "d", Type: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "e", Type: Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build()}.Build(),
 			}
 
 			respParts := []struct {
@@ -1006,14 +933,14 @@ func TestClient(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			colsAB := []*Ydb.Column{
-				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
-				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+				Ydb.Column_builder{Name: "a", Type: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "b", Type: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build(),
 			}
 
 			colsCDE := []*Ydb.Column{
-				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
-				{Name: "d", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
-				{Name: "e", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
+				Ydb.Column_builder{Name: "c", Type: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "d", Type: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "e", Type: Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build()}.Build(),
 			}
 
 			respParts := []struct {
@@ -1129,14 +1056,14 @@ func TestClient(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			colsAB := []*Ydb.Column{
-				{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
-				{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
+				Ydb.Column_builder{Name: "a", Type: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "b", Type: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build(),
 			}
 
 			colsCDE := []*Ydb.Column{
-				{Name: "c", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
-				{Name: "d", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}}},
-				{Name: "e", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
+				Ydb.Column_builder{Name: "c", Type: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "d", Type: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build(),
+				Ydb.Column_builder{Name: "e", Type: Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build()}.Build(),
 			}
 
 			respParts := []struct {
@@ -1276,17 +1203,17 @@ func TestClient(t *testing.T) {
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 
 			stream.EXPECT().Recv().Return(
-				&Ydb_Query.ExecuteQueryResponsePart{
+				Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status:         Ydb.StatusIds_SUCCESS,
-					TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+					TxMeta:         Ydb_Query.TransactionMeta_builder{Id: "456"}.Build(),
 					ResultSetIndex: int64(0),
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Columns: []*Ydb.Column{
-							{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}},
+							Ydb.Column_builder{Name: "a", Type: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build(),
 						},
 						Rows: []*Ydb.Value{},
-					},
-				},
+					}.Build(),
+				}.Build(),
 				nil,
 			)
 
@@ -1319,98 +1246,74 @@ func TestClient(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			rs, rowsCount, err := clientQueryResultSet(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-					TxMeta: &Ydb_Query.TransactionMeta{
+					TxMeta: Ydb_Query.TransactionMeta_builder{
 						Id: "456",
-					},
+					}.Build(),
 					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Columns: []*Ydb.Column{
-							{
+							Ydb.Column_builder{
 								Name: "a",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UINT64.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "b",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UTF8.Enum(),
+								}.Build(),
+							}.Build(),
 						},
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 3,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "3",
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(1),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("1"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(2),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("2"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(3),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("3"),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					}.Build(),
+				}.Build(), nil)
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status:         Ydb.StatusIds_SUCCESS,
 					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 4,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "4",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 5,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "5",
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(4),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("4"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(5),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("5"),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
+					}.Build(),
+				}.Build(), nil)
 				stream.EXPECT().Recv().Return(nil, io.EOF)
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
@@ -1465,162 +1368,120 @@ func TestClient(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			rs, rowsCount, err := clientQueryResultSet(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-					TxMeta: &Ydb_Query.TransactionMeta{
+					TxMeta: Ydb_Query.TransactionMeta_builder{
 						Id: "456",
-					},
+					}.Build(),
 					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Columns: []*Ydb.Column{
-							{
+							Ydb.Column_builder{
 								Name: "a",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UINT64.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "b",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UTF8.Enum(),
+								}.Build(),
+							}.Build(),
 						},
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 3,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "3",
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(1),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("1"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(2),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("2"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(3),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("3"),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					}.Build(),
+				}.Build(), nil)
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status:         Ydb.StatusIds_SUCCESS,
 					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 4,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "4",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 5,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "5",
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(4),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("4"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(5),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("5"),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+					}.Build(),
+				}.Build(), nil)
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status:         Ydb.StatusIds_SUCCESS,
 					ResultSetIndex: 1,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Columns: []*Ydb.Column{
-							{
+							Ydb.Column_builder{
 								Name: "c",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UINT64.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "d",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UTF8.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "e",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_BOOL,
-									},
-								},
-							},
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_BOOL.Enum(),
+								}.Build(),
+							}.Build(),
 						},
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}, {
-									Value: &Ydb.Value_BoolValue{
-										BoolValue: true,
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}, {
-									Value: &Ydb.Value_BoolValue{
-										BoolValue: false,
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(1),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("1"),
+								}.Build(), Ydb.Value_builder{
+									BoolValue: proto.Bool(true),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(2),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("2"),
+								}.Build(), Ydb.Value_builder{
+									BoolValue: proto.Bool(false),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
+					}.Build(),
+				}.Build(), nil)
 				stream.EXPECT().Recv().Return(nil, io.EOF)
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
@@ -1643,46 +1504,38 @@ func TestClient(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			row, err := clientQueryRow(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-					TxMeta: &Ydb_Query.TransactionMeta{
+					TxMeta: Ydb_Query.TransactionMeta_builder{
 						Id: "456",
-					},
+					}.Build(),
 					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Columns: []*Ydb.Column{
-							{
+							Ydb.Column_builder{
 								Name: "a",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UINT64.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "b",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UTF8.Enum(),
+								}.Build(),
+							}.Build(),
 						},
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(1),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("1"),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
+					}.Build(),
+				}.Build(), nil)
 				stream.EXPECT().Recv().Return(nil, io.EOF)
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
@@ -1706,68 +1559,52 @@ func TestClient(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			row, err := clientQueryRow(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-					TxMeta: &Ydb_Query.TransactionMeta{
+					TxMeta: Ydb_Query.TransactionMeta_builder{
 						Id: "456",
-					},
+					}.Build(),
 					ResultSetIndex: 0,
-					ResultSet: &Ydb.ResultSet{
+					ResultSet: Ydb.ResultSet_builder{
 						Columns: []*Ydb.Column{
-							{
+							Ydb.Column_builder{
 								Name: "a",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UINT64.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "b",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_UTF8.Enum(),
+								}.Build(),
+							}.Build(),
 						},
 						Rows: []*Ydb.Value{
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 1,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "1",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 2,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "2",
-									},
-								}},
-							},
-							{
-								Items: []*Ydb.Value{{
-									Value: &Ydb.Value_Uint64Value{
-										Uint64Value: 3,
-									},
-								}, {
-									Value: &Ydb.Value_TextValue{
-										TextValue: "3",
-									},
-								}},
-							},
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(1),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("1"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(2),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("2"),
+								}.Build()},
+							}.Build(),
+							Ydb.Value_builder{
+								Items: []*Ydb.Value{Ydb.Value_builder{
+									Uint64Value: proto.Uint64(3),
+								}.Build(), Ydb.Value_builder{
+									TextValue: proto.String("3"),
+								}.Build()},
+							}.Build(),
 						},
-					},
-				}, nil)
+					}.Build(),
+				}.Build(), nil)
 				stream.EXPECT().Recv().Return(nil, io.EOF)
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
@@ -1806,9 +1643,9 @@ func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client
 	ctrl := gomock.NewController(t)
 
 	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-		ResultSet: &Ydb.ResultSet{Rows: []*Ydb.Value{{}}},
-	}, nil)
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
+		ResultSet: Ydb.ResultSet_builder{Rows: []*Ydb.Value{{}}}.Build(),
+	}.Build(), nil)
 	stream.EXPECT().Recv().Return(nil, io.EOF)
 
 	queryService := NewMockQueryServiceClient(ctrl)
@@ -1891,37 +1728,37 @@ func TestQueryScript(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().ExecuteScript(gomock.Any(), gomock.Any()).Return(&Ydb_Operations.Operation{
+		client.EXPECT().ExecuteScript(gomock.Any(), gomock.Any()).Return(Ydb_Operations.Operation_builder{
 			Id:     "123",
 			Ready:  true,
 			Status: Ydb.StatusIds_SUCCESS,
-			Metadata: xtest.Must(anypb.New(&Ydb_Query.ExecuteScriptMetadata{
+			Metadata: xtest.Must(anypb.New(Ydb_Query.ExecuteScriptMetadata_builder{
 				ExecutionId: "123",
 				ExecStatus:  Ydb_Query.ExecStatus_EXEC_STATUS_STARTING,
-				ScriptContent: &Ydb_Query.QueryContent{
+				ScriptContent: Ydb_Query.QueryContent_builder{
 					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
 					Text:   "SELECT 1 AS a, 2 AS b",
-				},
+				}.Build(),
 				ResultSetsMeta: []*Ydb_Query.ResultSetMeta{
-					{
+					Ydb_Query.ResultSetMeta_builder{
 						Columns: []*Ydb.Column{
-							{
+							Ydb.Column_builder{
 								Name: "a",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-								},
-							},
-							{
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_INT32.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.Column_builder{
 								Name: "b",
-								Type: &Ydb.Type{
-									Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-								},
-							},
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_INT32.Enum(),
+								}.Build(),
+							}.Build(),
 						},
-					},
+					}.Build(),
 				},
 				ExecMode: Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				ExecStats: &Ydb_TableStats.QueryStats{
+				ExecStats: Ydb_TableStats.QueryStats_builder{
 					QueryPhases:      nil,
 					Compilation:      nil,
 					ProcessCpuTimeUs: 0,
@@ -1929,50 +1766,46 @@ func TestQueryScript(t *testing.T) {
 					QueryAst:         "",
 					TotalDurationUs:  0,
 					TotalCpuTimeUs:   0,
-				},
-			})),
+				}.Build(),
+			}.Build())),
 			CostInfo: nil,
-		}, nil)
-		client.EXPECT().FetchScriptResults(gomock.Any(), gomock.Any()).Return(&Ydb_Query.FetchScriptResultsResponse{
+		}.Build(), nil)
+		client.EXPECT().FetchScriptResults(gomock.Any(), gomock.Any()).Return(Ydb_Query.FetchScriptResultsResponse_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
-			ResultSet: &Ydb.ResultSet{
+			ResultSet: Ydb.ResultSet_builder{
 				Columns: []*Ydb.Column{
-					{
+					Ydb.Column_builder{
 						Name: "a",
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-						},
-					},
-					{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_INT32.Enum(),
+						}.Build(),
+					}.Build(),
+					Ydb.Column_builder{
 						Name: "b",
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-						},
-					},
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_INT32.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				Rows: []*Ydb.Value{
-					{
+					Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Int32Value{
-									Int32Value: 1,
-								},
+							Ydb.Value_builder{
+								Int32Value:   proto.Int32(1),
 								VariantIndex: 0,
-							},
-							{
-								Value: &Ydb.Value_Int32Value{
-									Int32Value: 2,
-								},
+							}.Build(),
+							Ydb.Value_builder{
+								Int32Value:   proto.Int32(2),
 								VariantIndex: 0,
-							},
+							}.Build(),
 						},
-					},
+					}.Build(),
 				},
 				Truncated: false,
-			},
+			}.Build(),
 			NextFetchToken: "456",
-		}, nil)
+		}.Build(), nil)
 		op, err := executeScript(ctx, client, &Ydb_Query.ExecuteScriptRequest{})
 		require.NoError(t, err)
 		require.EqualValues(t, "123", op.ID)

@@ -116,7 +116,7 @@ func queryExecuteStreamResultToTableResult(
 			if idx := int(recv.GetResultSetIndex()); idx == len(resultSets) {
 				resultSets = append(resultSets, recv.GetResultSet())
 			} else if idx < len(resultSets) {
-				resultSets[idx].Rows = append(resultSets[idx].GetRows(), recv.GetResultSet().GetRows()...)
+				resultSets[idx].SetRows(append(resultSets[idx].GetRows(), recv.GetResultSet().GetRows()...))
 			} else {
 				return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unexpected result set index: %d", idx))
 			}
@@ -138,18 +138,16 @@ func (e queryClientExecutor) execute(
 ) (_ *transaction, _ result.Result, finalErr error) {
 	request := &Ydb_Query.ExecuteQueryRequest{}
 
-	request.SessionId = executeDataQueryRequest.GetSessionId()
-	request.ExecMode = Ydb_Query.ExecMode_EXEC_MODE_EXECUTE
-	request.TxControl = txControl.ToYdbQueryTransactionControl()
-	request.Query = &Ydb_Query.ExecuteQueryRequest_QueryContent{
-		QueryContent: &Ydb_Query.QueryContent{
-			Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-			Text:   executeDataQueryRequest.GetQuery().GetYqlText(),
-		},
-	}
-	request.Parameters = executeDataQueryRequest.GetParameters()
-	request.StatsMode = statsModeToStatsMode(executeDataQueryRequest.GetCollectStats())
-	request.ConcurrentResultSets = false
+	request.SetSessionId(executeDataQueryRequest.GetSessionId())
+	request.SetExecMode(Ydb_Query.ExecMode_EXEC_MODE_EXECUTE)
+	request.SetTxControl(txControl.ToYdbQueryTransactionControl())
+	request.SetQueryContent(Ydb_Query.QueryContent_builder{
+		Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+		Text:   executeDataQueryRequest.GetQuery().GetYqlText(),
+	}.Build())
+	request.SetParameters(executeDataQueryRequest.GetParameters())
+	request.SetStatsMode(statsModeToStatsMode(executeDataQueryRequest.GetCollectStats()))
+	request.SetConcurrentResultSets(false)
 
 	stream, err := e.client.ExecuteQuery(ctx, request, callOptions...)
 	if err != nil {
@@ -276,14 +274,14 @@ func newTableSession(
 ) (*Session, error) {
 	response, err := Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(
 		balancer.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED),
-		&Ydb_Table.CreateSessionRequest{
+		Ydb_Table.CreateSessionRequest_builder{
 			OperationParams: operation.Params(
 				ctx,
 				config.OperationTimeout(),
 				config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -333,14 +331,14 @@ func closeTableSession(c Ydb_Table_V1.TableServiceClient, cfg *config.Config, id
 		}
 
 		_, err := c.DeleteSession(ctx,
-			&Ydb_Table.DeleteSessionRequest{
+			Ydb_Table.DeleteSessionRequest_builder{
 				SessionId: id,
 				OperationParams: operation.Params(ctx,
 					cfg.OperationTimeout(),
 					cfg.OperationCancelAfter(),
 					operation.ModeSync,
 				),
-			},
+			}.Build(),
 		)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -475,7 +473,7 @@ func (s *Session) KeepAlive(ctx context.Context) (err error) {
 	}()
 
 	resp, err := s.client.KeepAlive(ctx,
-		&Ydb_Table.KeepAliveRequest{
+		Ydb_Table.KeepAliveRequest_builder{
 			SessionId: s.id,
 			OperationParams: operation.Params(
 				ctx,
@@ -483,7 +481,7 @@ func (s *Session) KeepAlive(ctx context.Context) (err error) {
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -510,7 +508,7 @@ func (s *Session) CreateTable(
 	path string,
 	opts ...options.CreateTableOption,
 ) (err error) {
-	request := Ydb_Table.CreateTableRequest{
+	request := Ydb_Table.CreateTableRequest_builder{
 		SessionId: s.id,
 		Path:      path,
 		OperationParams: operation.Params(
@@ -519,13 +517,13 @@ func (s *Session) CreateTable(
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	}
+	}.Build()
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request))
+			opt.ApplyCreateTableOption((*options.CreateTableDesc)(request))
 		}
 	}
-	_, err = s.client.CreateTable(ctx, &request)
+	_, err = s.client.CreateTable(ctx, request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -600,18 +598,18 @@ func describeTableRequest(
 	path string,
 	opts []options.DescribeTableOption,
 ) *Ydb_Table.DescribeTableRequest {
-	request := Ydb_Table.DescribeTableRequest{
+	request := Ydb_Table.DescribeTableRequest_builder{
 		SessionId:       sessionID,
 		Path:            path,
 		OperationParams: operation.Params(ctx, 0, 0, operation.ModeSync),
-	}
+	}.Build()
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.DescribeTableDesc)(&request))
+			opt((*options.DescribeTableDesc)(request))
 		}
 	}
 
-	return &request
+	return request
 }
 
 func processColumns(columns []*Ydb_Table.ColumnMeta) []options.Column {
@@ -702,12 +700,12 @@ func processIndexes(indexes []*Ydb_Table.TableIndexDescription) []options.IndexD
 	idxs := make([]options.IndexDescription, len(indexes))
 	for i, idx := range indexes {
 		var typ options.IndexType
-		switch idx.GetType().(type) {
-		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
+		switch idx.WhichType() {
+		case Ydb_Table.TableIndexDescription_GlobalAsyncIndex_case:
 			typ = options.IndexTypeGlobalAsync
-		case *Ydb_Table.TableIndexDescription_GlobalIndex:
+		case Ydb_Table.TableIndexDescription_GlobalIndex_case:
 			typ = options.IndexTypeGlobal
-		case *Ydb_Table.TableIndexDescription_GlobalUniqueIndex:
+		case Ydb_Table.TableIndexDescription_GlobalUniqueIndex_case:
 			typ = options.IndexTypeGlobalUnique
 		}
 		idxs[i] = options.IndexDescription{
@@ -737,7 +735,7 @@ func (s *Session) DropTable(
 	path string,
 	opts ...options.DropTableOption,
 ) (err error) {
-	request := Ydb_Table.DropTableRequest{
+	request := Ydb_Table.DropTableRequest_builder{
 		SessionId: s.id,
 		Path:      path,
 		OperationParams: operation.Params(
@@ -746,13 +744,13 @@ func (s *Session) DropTable(
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	}
+	}.Build()
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
+			opt.ApplyDropTableOption((*options.DropTableDesc)(request))
 		}
 	}
-	_, err = s.client.DropTable(ctx, &request)
+	_, err = s.client.DropTable(ctx, request)
 
 	return xerrors.WithStackTrace(err)
 }
@@ -763,7 +761,7 @@ func (s *Session) AlterTable(
 	path string,
 	opts ...options.AlterTableOption,
 ) (err error) {
-	request := Ydb_Table.AlterTableRequest{
+	request := Ydb_Table.AlterTableRequest_builder{
 		SessionId: s.id,
 		Path:      path,
 		OperationParams: operation.Params(
@@ -772,13 +770,13 @@ func (s *Session) AlterTable(
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	}
+	}.Build()
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request))
+			opt.ApplyAlterTableOption((*options.AlterTableDesc)(request))
 		}
 	}
-	_, err = s.client.AlterTable(ctx, &request)
+	_, err = s.client.AlterTable(ctx, request)
 
 	return xerrors.WithStackTrace(err)
 }
@@ -789,7 +787,7 @@ func (s *Session) CopyTable(
 	dst, src string,
 	opts ...options.CopyTableOption,
 ) (err error) {
-	request := Ydb_Table.CopyTableRequest{
+	request := Ydb_Table.CopyTableRequest_builder{
 		SessionId:       s.id,
 		SourcePath:      src,
 		DestinationPath: dst,
@@ -799,13 +797,13 @@ func (s *Session) CopyTable(
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	}
+	}.Build()
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.CopyTableDesc)(&request))
+			opt((*options.CopyTableDesc)(request))
 		}
 	}
-	_, err = s.client.CopyTable(ctx, &request)
+	_, err = s.client.CopyTable(ctx, request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -825,7 +823,7 @@ func copyTables(
 	},
 	opts ...options.CopyTablesOption,
 ) (err error) {
-	request := Ydb_Table.CopyTablesRequest{
+	request := Ydb_Table.CopyTablesRequest_builder{
 		SessionId: sessionID,
 		OperationParams: operation.Params(
 			ctx,
@@ -833,16 +831,16 @@ func copyTables(
 			operationCancelAfter,
 			operation.ModeSync,
 		),
-	}
+	}.Build()
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.CopyTablesDesc)(&request))
+			opt((*options.CopyTablesDesc)(request))
 		}
 	}
 	if len(request.GetTables()) == 0 {
 		return xerrors.WithStackTrace(fmt.Errorf("no CopyTablesItem: %w", errParamsRequired))
 	}
-	_, err = service.CopyTables(ctx, &request)
+	_, err = service.CopyTables(ctx, request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -875,7 +873,7 @@ func renameTables(
 	},
 	opts ...options.RenameTablesOption,
 ) (err error) {
-	request := Ydb_Table.RenameTablesRequest{
+	request := Ydb_Table.RenameTablesRequest_builder{
 		SessionId: sessionID,
 		OperationParams: operation.Params(
 			ctx,
@@ -883,16 +881,16 @@ func renameTables(
 			operationCancelAfter,
 			operation.ModeSync,
 		),
-	}
+	}.Build()
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.RenameTablesDesc)(&request))
+			opt((*options.RenameTablesDesc)(request))
 		}
 	}
 	if len(request.GetTables()) == 0 {
 		return xerrors.WithStackTrace(fmt.Errorf("no RenameTablesItem: %w", errParamsRequired))
 	}
-	_, err = service.RenameTables(ctx, &request)
+	_, err = service.RenameTables(ctx, request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -933,7 +931,7 @@ func (s *Session) Explain(ctx context.Context, sql string) (exp table.DataQueryE
 	}()
 
 	response, err = s.client.ExplainDataQuery(ctx,
-		&Ydb_Table.ExplainDataQueryRequest{
+		Ydb_Table.ExplainDataQueryRequest_builder{
 			SessionId: s.id,
 			YqlText:   sql,
 			OperationParams: operation.Params(
@@ -942,7 +940,7 @@ func (s *Session) Explain(ctx context.Context, sql string) (exp table.DataQueryE
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return exp, xerrors.WithStackTrace(err)
@@ -982,7 +980,7 @@ func (s *Session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 	}()
 
 	response, err = s.client.PrepareDataQuery(ctx,
-		&Ydb_Table.PrepareDataQueryRequest{
+		Ydb_Table.PrepareDataQueryRequest_builder{
 			SessionId: s.id,
 			YqlText:   queryText,
 			OperationParams: operation.Params(
@@ -991,7 +989,7 @@ func (s *Session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -1019,29 +1017,27 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 ) {
 	var (
 		q       = queryFromText(sql)
+		ydbParams, _ = params.ToYDB()
+		queryCachePolicy = Ydb_Table.QueryCachePolicy_builder{
+			KeepInCache: true,
+		}.Build()
+		operationParams = operation.Params(ctx,
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		)
 		request = options.ExecuteDataQueryDesc{
-			ExecuteDataQueryRequest: &Ydb_Table.ExecuteDataQueryRequest{
+			ExecuteDataQueryRequest: Ydb_Table.ExecuteDataQueryRequest_builder{
 				SessionId: s.id,
 				TxControl: txControl.ToYdbTableTransactionControl(),
-				Parameters: func() map[string]*Ydb.TypedValue {
-					p, _ := params.ToYDB()
-
-					return p
-				}(),
+				Parameters: ydbParams,
 				Query: q.toYDB(),
-				QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
-					KeepInCache: true,
-				},
-			},
+				QueryCachePolicy: queryCachePolicy,
+				OperationParams: operationParams,
+			}.Build(),
 			IgnoreTruncated: s.config.IgnoreTruncated(),
 		}
 		callOptions []grpc.CallOption
-	)
-
-	request.OperationParams = operation.Params(ctx,
-		s.config.OperationTimeout(),
-		s.config.OperationCancelAfter(),
-		operation.ModeSync,
 	)
 
 	for _, opt := range opts {
@@ -1054,7 +1050,7 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 		s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Execute"),
 		s, q, params,
-		request.QueryCachePolicy.GetKeepInCache(),
+		queryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
 		onDone(txr, false, r, err)
@@ -1127,7 +1123,7 @@ func executeDataQuery(
 func (s *Session) ExecuteSchemeQuery(ctx context.Context, sql string,
 	opts ...options.ExecuteSchemeQueryOption,
 ) (err error) {
-	request := Ydb_Table.ExecuteSchemeQueryRequest{
+	request := Ydb_Table.ExecuteSchemeQueryRequest_builder{
 		SessionId: s.id,
 		YqlText:   sql,
 		OperationParams: operation.Params(
@@ -1136,13 +1132,13 @@ func (s *Session) ExecuteSchemeQuery(ctx context.Context, sql string,
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	}
+	}.Build()
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.ExecuteSchemeQueryDesc)(&request))
+			opt((*options.ExecuteSchemeQueryDesc)(request))
 		}
 	}
-	_, err = s.client.ExecuteSchemeQuery(ctx, &request)
+	_, err = s.client.ExecuteSchemeQuery(ctx, request)
 
 	return xerrors.WithStackTrace(err)
 }
@@ -1158,15 +1154,15 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult
 	)
-	request := Ydb_Table.DescribeTableOptionsRequest{
+	request := Ydb_Table.DescribeTableOptionsRequest_builder{
 		OperationParams: operation.Params(
 			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	}
-	response, err = s.client.DescribeTableOptions(ctx, &request)
+	}.Build()
+	response, err = s.client.DescribeTableOptions(ctx, request)
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
@@ -1299,10 +1295,10 @@ func (s *Session) StreamReadTable(
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).StreamReadTable"),
 			s,
 		)
-		request = Ydb_Table.ReadTableRequest{
+		request = Ydb_Table.ReadTableRequest_builder{
 			SessionId: s.id,
 			Path:      path,
-		}
+		}.Build()
 		stream Ydb_Table_V1.TableService_StreamReadTableClient
 	)
 	defer func() {
@@ -1311,13 +1307,13 @@ func (s *Session) StreamReadTable(
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyReadTableOption((*options.ReadTableDesc)(&request))
+			opt.ApplyReadTableOption((*options.ReadTableDesc)(request))
 		}
 	}
 
 	ctx, cancel := xcontext.WithCancel(ctx)
 
-	stream, err = s.client.StreamReadTable(ctx, &request)
+	stream, err = s.client.StreamReadTable(ctx, request)
 	if err != nil {
 		cancel()
 
@@ -1387,10 +1383,10 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, sql string, parame
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).StreamExecuteScanQuery"),
 			s, q, parameters,
 		)
-		request = Ydb_Table.ExecuteScanQueryRequest{
+		request = Ydb_Table.ExecuteScanQueryRequest_builder{
 			Query: q.toYDB(),
 			Mode:  Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
-		}
+		}.Build()
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 		callOptions []grpc.CallOption
 	)
@@ -1403,17 +1399,17 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, sql string, parame
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	request.Parameters = params
+	request.SetParameters(params)
 
 	for _, opt := range opts {
 		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyExecuteScanQueryOption((*options.ExecuteScanQueryDesc)(&request))...)
+			callOptions = append(callOptions, opt.ApplyExecuteScanQueryOption((*options.ExecuteScanQueryDesc)(request))...)
 		}
 	}
 
 	ctx, cancel := xcontext.WithCancel(ctx)
 
-	stream, err = s.client.StreamExecuteScanQuery(ctx, &request, callOptions...)
+	stream, err = s.client.StreamExecuteScanQuery(ctx, request, callOptions...)
 	if err != nil {
 		cancel()
 
@@ -1472,7 +1468,7 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	}
 
 	_, err = s.client.BulkUpsert(ctx,
-		&Ydb_Table.BulkUpsertRequest{
+		Ydb_Table.BulkUpsertRequest_builder{
 			Table: table,
 			Rows:  value.ToYDB(rows),
 			OperationParams: operation.Params(
@@ -1481,7 +1477,7 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows value.Value
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 		callOptions...,
 	)
 	if err != nil {
@@ -1510,7 +1506,7 @@ func (s *Session) BeginTransaction(
 	}()
 
 	response, err = s.client.BeginTransaction(ctx,
-		&Ydb_Table.BeginTransactionRequest{
+		Ydb_Table.BeginTransactionRequest_builder{
 			SessionId:  s.id,
 			TxSettings: txSettings.ToYdbTableSettings(),
 			OperationParams: operation.Params(
@@ -1519,7 +1515,7 @@ func (s *Session) BeginTransaction(
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

@@ -17,159 +17,123 @@ func TestControl(t *testing.T) {
 	}{
 		{
 			ctrl: SerializableReadWriteTxControl(),
-			tableTxControl: &Ydb_Table.TransactionControl{
-				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Table.TransactionSettings{
-						TxMode: &Ydb_Table.TransactionSettings_SerializableReadWrite{},
-					},
-				},
+			tableTxControl: Ydb_Table.TransactionControl_builder{
+				BeginTx: Ydb_Table.TransactionSettings_builder{
+					SerializableReadWrite: &Ydb_Table.SerializableModeSettings{},
+				}.Build(),
 				CommitTx: false,
-			},
-			queryTxControl: &Ydb_Query.TransactionControl{
-				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Query.TransactionSettings{
-						TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{},
-					},
-				},
+			}.Build(),
+			queryTxControl: Ydb_Query.TransactionControl_builder{
+				BeginTx: Ydb_Query.TransactionSettings_builder{
+					SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
+				}.Build(),
 				CommitTx: false,
-			},
+			}.Build(),
 		},
 		{
 			ctrl: SerializableReadWriteTxControl(CommitTx()),
-			tableTxControl: &Ydb_Table.TransactionControl{
-				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Table.TransactionSettings{
-						TxMode: &Ydb_Table.TransactionSettings_SerializableReadWrite{},
-					},
-				},
+			tableTxControl: Ydb_Table.TransactionControl_builder{
+				BeginTx: Ydb_Table.TransactionSettings_builder{
+					SerializableReadWrite: &Ydb_Table.SerializableModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
-			queryTxControl: &Ydb_Query.TransactionControl{
-				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Query.TransactionSettings{
-						TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{},
-					},
-				},
+			}.Build(),
+			queryTxControl: Ydb_Query.TransactionControl_builder{
+				BeginTx: Ydb_Query.TransactionSettings_builder{
+					SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
+			}.Build(),
 		},
 		{
 			ctrl: SnapshotReadOnlyTxControl(),
-			tableTxControl: &Ydb_Table.TransactionControl{
-				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Table.TransactionSettings{
-						TxMode: &Ydb_Table.TransactionSettings_SnapshotReadOnly{},
-					},
-				},
+			tableTxControl: Ydb_Table.TransactionControl_builder{
+				BeginTx: Ydb_Table.TransactionSettings_builder{
+					SnapshotReadOnly: &Ydb_Table.SnapshotModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
-			queryTxControl: &Ydb_Query.TransactionControl{
-				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Query.TransactionSettings{
-						TxMode: &Ydb_Query.TransactionSettings_SnapshotReadOnly{},
-					},
-				},
+			}.Build(),
+			queryTxControl: Ydb_Query.TransactionControl_builder{
+				BeginTx: Ydb_Query.TransactionSettings_builder{
+					SnapshotReadOnly: &Ydb_Query.SnapshotModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
+			}.Build(),
 		},
 		{
 			ctrl: OnlineReadOnlyTxControl(),
-			tableTxControl: &Ydb_Table.TransactionControl{
-				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Table.TransactionSettings{
-						TxMode: &Ydb_Table.TransactionSettings_OnlineReadOnly{},
-					},
-				},
+			tableTxControl: Ydb_Table.TransactionControl_builder{
+				BeginTx: Ydb_Table.TransactionSettings_builder{
+					OnlineReadOnly: &Ydb_Table.OnlineModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
-			queryTxControl: &Ydb_Query.TransactionControl{
-				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Query.TransactionSettings{
-						TxMode: &Ydb_Query.TransactionSettings_OnlineReadOnly{},
-					},
-				},
+			}.Build(),
+			queryTxControl: Ydb_Query.TransactionControl_builder{
+				BeginTx: Ydb_Query.TransactionSettings_builder{
+					OnlineReadOnly: &Ydb_Query.OnlineModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
+			}.Build(),
 		},
 		{
 			ctrl: OnlineReadOnlyTxControl(WithInconsistentReads()),
-			tableTxControl: &Ydb_Table.TransactionControl{
-				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Table.TransactionSettings{
-						TxMode: &Ydb_Table.TransactionSettings_OnlineReadOnly{
-							OnlineReadOnly: &Ydb_Table.OnlineModeSettings{AllowInconsistentReads: true},
-						},
-					},
-				},
+			tableTxControl: Ydb_Table.TransactionControl_builder{
+				BeginTx: Ydb_Table.TransactionSettings_builder{
+					OnlineReadOnly: Ydb_Table.OnlineModeSettings_builder{AllowInconsistentReads: true}.Build(),
+				}.Build(),
 				CommitTx: true,
-			},
-			queryTxControl: &Ydb_Query.TransactionControl{
-				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Query.TransactionSettings{
-						TxMode: &Ydb_Query.TransactionSettings_OnlineReadOnly{
-							OnlineReadOnly: &Ydb_Query.OnlineModeSettings{AllowInconsistentReads: true},
-						},
-					},
-				},
+			}.Build(),
+			queryTxControl: Ydb_Query.TransactionControl_builder{
+				BeginTx: Ydb_Query.TransactionSettings_builder{
+					OnlineReadOnly: Ydb_Query.OnlineModeSettings_builder{AllowInconsistentReads: true}.Build(),
+				}.Build(),
 				CommitTx: true,
-			},
+			}.Build(),
 		},
 		{
 			ctrl: StaleReadOnlyTxControl(),
-			tableTxControl: &Ydb_Table.TransactionControl{
-				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Table.TransactionSettings{
-						TxMode: &Ydb_Table.TransactionSettings_StaleReadOnly{},
-					},
-				},
+			tableTxControl: Ydb_Table.TransactionControl_builder{
+				BeginTx: Ydb_Table.TransactionSettings_builder{
+					StaleReadOnly: &Ydb_Table.StaleModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
-			queryTxControl: &Ydb_Query.TransactionControl{
-				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Query.TransactionSettings{
-						TxMode: &Ydb_Query.TransactionSettings_StaleReadOnly{},
-					},
-				},
+			}.Build(),
+			queryTxControl: Ydb_Query.TransactionControl_builder{
+				BeginTx: Ydb_Query.TransactionSettings_builder{
+					StaleReadOnly: &Ydb_Query.StaleModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
+			}.Build(),
 		},
 		{
 			ctrl: SnapshotReadWriteTxControl(),
-			tableTxControl: &Ydb_Table.TransactionControl{
-				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Table.TransactionSettings{
-						TxMode: &Ydb_Table.TransactionSettings_SnapshotReadWrite{},
-					},
-				},
+			tableTxControl: Ydb_Table.TransactionControl_builder{
+				BeginTx: Ydb_Table.TransactionSettings_builder{
+					SnapshotReadWrite: &Ydb_Table.SnapshotRWModeSettings{},
+				}.Build(),
 				CommitTx: false,
-			},
-			queryTxControl: &Ydb_Query.TransactionControl{
-				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Query.TransactionSettings{
-						TxMode: &Ydb_Query.TransactionSettings_SnapshotReadWrite{},
-					},
-				},
+			}.Build(),
+			queryTxControl: Ydb_Query.TransactionControl_builder{
+				BeginTx: Ydb_Query.TransactionSettings_builder{
+					SnapshotReadWrite: &Ydb_Query.SnapshotRWModeSettings{},
+				}.Build(),
 				CommitTx: false,
-			},
+			}.Build(),
 		},
 		{
 			ctrl: SnapshotReadWriteTxControl(CommitTx()),
-			tableTxControl: &Ydb_Table.TransactionControl{
-				TxSelector: &Ydb_Table.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Table.TransactionSettings{
-						TxMode: &Ydb_Table.TransactionSettings_SnapshotReadWrite{},
-					},
-				},
+			tableTxControl: Ydb_Table.TransactionControl_builder{
+				BeginTx: Ydb_Table.TransactionSettings_builder{
+					SnapshotReadWrite: &Ydb_Table.SnapshotRWModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
-			queryTxControl: &Ydb_Query.TransactionControl{
-				TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-					BeginTx: &Ydb_Query.TransactionSettings{
-						TxMode: &Ydb_Query.TransactionSettings_SnapshotReadWrite{},
-					},
-				},
+			}.Build(),
+			queryTxControl: Ydb_Query.TransactionControl_builder{
+				BeginTx: Ydb_Query.TransactionSettings_builder{
+					SnapshotReadWrite: &Ydb_Query.SnapshotRWModeSettings{},
+				}.Build(),
 				CommitTx: true,
-			},
+			}.Build(),
 		},
 	} {
 		t.Run("", func(t *testing.T) {

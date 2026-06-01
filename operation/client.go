@@ -65,9 +65,9 @@ func get(
 	status, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*operation, error) {
 		response, err := client.GetOperation(
 			conn.WithoutWrapping(ctx),
-			&Ydb_Operations.GetOperationRequest{
+			Ydb_Operations.GetOperationRequest_builder{
 				Id: opID,
-			},
+			}.Build(),
 		)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -141,9 +141,9 @@ func cancel(
 	ctx context.Context, client Ydb_Operation_V1.OperationServiceClient, opID string,
 ) error {
 	err := retry.Retry(ctx, func(ctx context.Context) error {
-		response, err := client.CancelOperation(conn.WithoutWrapping(ctx), &Ydb_Operations.CancelOperationRequest{
+		response, err := client.CancelOperation(conn.WithoutWrapping(ctx), Ydb_Operations.CancelOperationRequest_builder{
 			Id: opID,
-		})
+		}.Build())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -180,9 +180,9 @@ func forget(
 	ctx context.Context, client Ydb_Operation_V1.OperationServiceClient, opID string,
 ) error {
 	err := retry.Retry(ctx, func(ctx context.Context) error {
-		response, err := client.ForgetOperation(conn.WithoutWrapping(ctx), &Ydb_Operations.ForgetOperationRequest{
+		response, err := client.ForgetOperation(conn.WithoutWrapping(ctx), Ydb_Operations.ForgetOperationRequest_builder{
 			Id: opID,
-		})
+		}.Build())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -227,13 +227,13 @@ func (c *Client) ListBuildIndex(ctx context.Context) (
 	*listOperations[*metadata.BuildIndex, metadata.BuildIndex], error,
 ) {
 	request := &options.ListOperationsRequest{
-		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest_builder{
 			Kind: kindBuildIndex,
-		},
+		}.Build(),
 	}
 
 	operations, err := list[*metadata.BuildIndex, metadata.BuildIndex](
-		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+		ctx, c.operationServiceClient, request.ListOperationsRequest,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -249,13 +249,13 @@ func (c *Client) ListImportFromS3(ctx context.Context) (
 	*listOperations[*metadata.ImportFromS3, metadata.ImportFromS3], error,
 ) {
 	request := &options.ListOperationsRequest{
-		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest_builder{
 			Kind: kindImportFromS3,
-		},
+		}.Build(),
 	}
 
 	operations, err := list[*metadata.ImportFromS3, metadata.ImportFromS3](
-		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+		ctx, c.operationServiceClient, request.ListOperationsRequest,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -271,13 +271,13 @@ func (c *Client) ListExportToS3(ctx context.Context) (
 	*listOperations[*metadata.ExportToS3, metadata.ExportToS3], error,
 ) {
 	request := &options.ListOperationsRequest{
-		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest_builder{
 			Kind: kindExportToS3,
-		},
+		}.Build(),
 	}
 
 	operations, err := list[*metadata.ExportToS3, metadata.ExportToS3](
-		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+		ctx, c.operationServiceClient, request.ListOperationsRequest,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -293,13 +293,13 @@ func (c *Client) ListExportToYT(ctx context.Context) (
 	*listOperations[*metadata.ExportToYT, metadata.ExportToYT], error,
 ) {
 	request := &options.ListOperationsRequest{
-		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest_builder{
 			Kind: kindExportToYT,
-		},
+		}.Build(),
 	}
 
 	operations, err := list[*metadata.ExportToYT, metadata.ExportToYT](
-		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+		ctx, c.operationServiceClient, request.ListOperationsRequest,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -315,9 +315,9 @@ func (c *Client) ListExecuteQuery(ctx context.Context, opts ...options.List) (
 	*listOperationsWithNextToken[*metadata.ExecuteQuery, metadata.ExecuteQuery], error,
 ) {
 	request := &options.ListOperationsRequest{
-		ListOperationsRequest: Ydb_Operations.ListOperationsRequest{
+		ListOperationsRequest: Ydb_Operations.ListOperationsRequest_builder{
 			Kind: kindExecuteQuery,
-		},
+		}.Build(),
 	}
 
 	for _, opt := range opts {
@@ -327,7 +327,7 @@ func (c *Client) ListExecuteQuery(ctx context.Context, opts ...options.List) (
 	}
 
 	operations, err := list[*metadata.ExecuteQuery, metadata.ExecuteQuery](
-		ctx, c.operationServiceClient, &request.ListOperationsRequest,
+		ctx, c.operationServiceClient, request.ListOperationsRequest,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

@@ -21,11 +21,11 @@ type DescribeTopicRequest struct {
 }
 
 func (req *DescribeTopicRequest) ToProto() *Ydb_Topic.DescribeTopicRequest {
-	return &Ydb_Topic.DescribeTopicRequest{
+	return Ydb_Topic.DescribeTopicRequest_builder{
 		OperationParams: req.OperationParams.ToProto(),
 		Path:            req.Path,
 		IncludeStats:    req.IncludeStats,
-	}
+	}.Build()
 }
 
 type DescribeTopicResult struct {

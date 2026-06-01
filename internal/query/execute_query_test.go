@@ -20,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestExecute(t *testing.T) {
@@ -152,98 +153,74 @@ func TestExecute(t *testing.T) {
 			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-				TxMeta: &Ydb_Query.TransactionMeta{
+				TxMeta: Ydb_Query.TransactionMeta_builder{
 					Id: "456",
-				},
+				}.Build(),
 				ResultSetIndex: 0,
-				ResultSet: &Ydb.ResultSet{
+				ResultSet: Ydb.ResultSet_builder{
 					Columns: []*Ydb.Column{
-						{
+						Ydb.Column_builder{
 							Name: "a",
-							Type: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{
-									TypeId: Ydb.Type_UINT64,
-								},
-							},
-						},
-						{
+							Type: Ydb.Type_builder{
+								TypeId: Ydb.Type_UINT64.Enum(),
+							}.Build(),
+						}.Build(),
+						Ydb.Column_builder{
 							Name: "b",
-							Type: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{
-									TypeId: Ydb.Type_UTF8,
-								},
-							},
-						},
+							Type: Ydb.Type_builder{
+								TypeId: Ydb.Type_UTF8.Enum(),
+							}.Build(),
+						}.Build(),
 					},
 					Rows: []*Ydb.Value{
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 1,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "1",
-								},
-							}},
-						},
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 2,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "2",
-								},
-							}},
-						},
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 3,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "3",
-								},
-							}},
-						},
+						Ydb.Value_builder{
+							Items: []*Ydb.Value{Ydb.Value_builder{
+								Uint64Value: proto.Uint64(1),
+							}.Build(), Ydb.Value_builder{
+								TextValue: proto.String("1"),
+							}.Build()},
+						}.Build(),
+						Ydb.Value_builder{
+							Items: []*Ydb.Value{Ydb.Value_builder{
+								Uint64Value: proto.Uint64(2),
+							}.Build(), Ydb.Value_builder{
+								TextValue: proto.String("2"),
+							}.Build()},
+						}.Build(),
+						Ydb.Value_builder{
+							Items: []*Ydb.Value{Ydb.Value_builder{
+								Uint64Value: proto.Uint64(3),
+							}.Build(), Ydb.Value_builder{
+								TextValue: proto.String("3"),
+							}.Build()},
+						}.Build(),
 					},
-				},
-			}, nil)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				}.Build(),
+			}.Build(), nil)
+			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
-				ResultSet: &Ydb.ResultSet{
+				ResultSet: Ydb.ResultSet_builder{
 					Rows: []*Ydb.Value{
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 4,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "4",
-								},
-							}},
-						},
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 5,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "5",
-								},
-							}},
-						},
+						Ydb.Value_builder{
+							Items: []*Ydb.Value{Ydb.Value_builder{
+								Uint64Value: proto.Uint64(4),
+							}.Build(), Ydb.Value_builder{
+								TextValue: proto.String("4"),
+							}.Build()},
+						}.Build(),
+						Ydb.Value_builder{
+							Items: []*Ydb.Value{Ydb.Value_builder{
+								Uint64Value: proto.Uint64(5),
+							}.Build(), Ydb.Value_builder{
+								TextValue: proto.String("5"),
+							}.Build()},
+						}.Build(),
 					},
-				},
-			}, nil)
+				}.Build(),
+			}.Build(), nil)
 			stream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
@@ -321,68 +298,52 @@ func TestExecute(t *testing.T) {
 			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-				TxMeta: &Ydb_Query.TransactionMeta{
+				TxMeta: Ydb_Query.TransactionMeta_builder{
 					Id: "456",
-				},
+				}.Build(),
 				ResultSetIndex: 0,
-				ResultSet: &Ydb.ResultSet{
+				ResultSet: Ydb.ResultSet_builder{
 					Columns: []*Ydb.Column{
-						{
+						Ydb.Column_builder{
 							Name: "a",
-							Type: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{
-									TypeId: Ydb.Type_UINT64,
-								},
-							},
-						},
-						{
+							Type: Ydb.Type_builder{
+								TypeId: Ydb.Type_UINT64.Enum(),
+							}.Build(),
+						}.Build(),
+						Ydb.Column_builder{
 							Name: "b",
-							Type: &Ydb.Type{
-								Type: &Ydb.Type_TypeId{
-									TypeId: Ydb.Type_UTF8,
-								},
-							},
-						},
+							Type: Ydb.Type_builder{
+								TypeId: Ydb.Type_UTF8.Enum(),
+							}.Build(),
+						}.Build(),
 					},
 					Rows: []*Ydb.Value{
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 1,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "1",
-								},
-							}},
-						},
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 2,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "2",
-								},
-							}},
-						},
-						{
-							Items: []*Ydb.Value{{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 3,
-								},
-							}, {
-								Value: &Ydb.Value_TextValue{
-									TextValue: "3",
-								},
-							}},
-						},
+						Ydb.Value_builder{
+							Items: []*Ydb.Value{Ydb.Value_builder{
+								Uint64Value: proto.Uint64(1),
+							}.Build(), Ydb.Value_builder{
+								TextValue: proto.String("1"),
+							}.Build()},
+						}.Build(),
+						Ydb.Value_builder{
+							Items: []*Ydb.Value{Ydb.Value_builder{
+								Uint64Value: proto.Uint64(2),
+							}.Build(), Ydb.Value_builder{
+								TextValue: proto.String("2"),
+							}.Build()},
+						}.Build(),
+						Ydb.Value_builder{
+							Items: []*Ydb.Value{Ydb.Value_builder{
+								Uint64Value: proto.Uint64(3),
+							}.Build(), Ydb.Value_builder{
+								TextValue: proto.String("3"),
+							}.Build()},
+						}.Build(),
 					},
-				},
-			}, nil)
+				}.Build(),
+			}.Build(), nil)
 			stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(
 				Ydb.StatusIds_UNAVAILABLE,
 			)))
@@ -596,12 +557,12 @@ func TestExecute(t *testing.T) {
 
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			// First Recv() satisfies newResult() inside execute().
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
-				TxMeta:         &Ydb_Query.TransactionMeta{Id: "456"},
+				TxMeta:         Ydb_Query.TransactionMeta_builder{Id: "456"}.Build(),
 				ResultSetIndex: 0,
 				ResultSet:      &Ydb.ResultSet{},
-			}, nil)
+			}.Build(), nil)
 			// Second Recv() simulates a slow server: it blocks until the gRPC
 			// stream's ctx is cancelled and only then surfaces the cancellation,
 			// matching real gRPC behavior where Recv unblocks on stream ctx
@@ -674,14 +635,14 @@ func TestNewResult_DecoupledExecuteCtx(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-			TxMeta: &Ydb_Query.TransactionMeta{
+			TxMeta: Ydb_Query.TransactionMeta_builder{
 				Id: "456",
-			},
+			}.Build(),
 			ResultSetIndex: 0,
 			ResultSet:      &Ydb.ResultSet{},
-		}, nil)
+		}.Build(), nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
 
 		r, err := newResult(executeCtx, stream)
@@ -701,46 +662,38 @@ func TestExecuteQueryRequest(t *testing.T) {
 	}{
 		{
 			name: "WithoutOptions",
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithoutOptions",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithoutOptions",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithoutOptions",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithTxControl",
 			opts: []options.Execute{
 				options.WithTxControl(query.SerializableReadWriteTxControl(query.CommitTx())),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithTxControl",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
+				TxControl: Ydb_Query.TransactionControl_builder{
+					BeginTx: Ydb_Query.TransactionSettings_builder{
+						SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
+					}.Build(),
 					CommitTx: true,
-				},
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithTxControl",
-					},
-				},
+				}.Build(),
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithTxControl",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithParams",
@@ -753,164 +706,138 @@ func TestExecuteQueryRequest(t *testing.T) {
 						Build(),
 				),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithParams",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithParams",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithParams",
+				}.Build(),
 				Parameters: map[string]*Ydb.TypedValue{
-					"$a": {
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_UTF8,
-							},
-						},
-						Value: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: "A",
-							},
-						},
-					},
-					"$b": {
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_UTF8,
-							},
-						},
-						Value: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: "B",
-							},
-						},
-					},
-					"$c": {
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_UTF8,
-							},
-						},
-						Value: &Ydb.Value{
-							Value: &Ydb.Value_TextValue{
-								TextValue: "C",
-							},
-						},
-					},
+					"$a": Ydb.TypedValue_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UTF8.Enum(),
+						}.Build(),
+						Value: Ydb.Value_builder{
+							TextValue: proto.String("A"),
+						}.Build(),
+					}.Build(),
+					"$b": Ydb.TypedValue_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UTF8.Enum(),
+						}.Build(),
+						Value: Ydb.Value_builder{
+							TextValue: proto.String("B"),
+						}.Build(),
+					}.Build(),
+					"$c": Ydb.TypedValue_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UTF8.Enum(),
+						}.Build(),
+						Value: Ydb.Value_builder{
+							TextValue: proto.String("C"),
+						}.Build(),
+					}.Build(),
 				},
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithExplain",
 			opts: []options.Execute{
 				options.WithExecMode(options.ExecModeExplain),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithExplain",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXPLAIN,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithExplain",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithExplain",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithValidate",
 			opts: []options.Execute{
 				options.WithExecMode(options.ExecModeValidate),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithValidate",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_VALIDATE,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithValidate",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithValidate",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithValidate",
 			opts: []options.Execute{
 				options.WithExecMode(options.ExecModeParse),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithValidate",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_PARSE,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithValidate",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithValidate",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithStatsFull",
 			opts: []options.Execute{
 				options.WithStatsMode(options.StatsModeFull, nil),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithStatsFull",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithStatsFull",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithStatsFull",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_FULL,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithStatsBasic",
 			opts: []options.Execute{
 				options.WithStatsMode(options.StatsModeBasic, nil),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithStatsBasic",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithStatsBasic",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithStatsBasic",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_BASIC,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithStatsProfile",
 			opts: []options.Execute{
 				options.WithStatsMode(options.StatsModeProfile, nil),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithStatsProfile",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithStatsProfile",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithStatsProfile",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_PROFILE,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 		},
 		{
 			name: "WithGrpcCallOptions",
@@ -919,18 +846,16 @@ func TestExecuteQueryRequest(t *testing.T) {
 					"ext-header": []string{"test"},
 				})),
 			},
-			request: &Ydb_Query.ExecuteQueryRequest{
+			request: Ydb_Query.ExecuteQueryRequest_builder{
 				SessionId: "WithGrpcCallOptions",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-					QueryContent: &Ydb_Query.QueryContent{
-						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithGrpcCallOptions",
-					},
-				},
+				QueryContent: Ydb_Query.QueryContent_builder{
+					Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+					Text:   "WithGrpcCallOptions",
+				}.Build(),
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
 				ConcurrentResultSets: false,
-			},
+			}.Build(),
 			callOptions: []grpc.CallOption{
 				grpc.Header(&metadata.MD{
 					"ext-header": []string{"test"},
@@ -949,332 +874,236 @@ func TestExecuteQueryRequest(t *testing.T) {
 
 func happyWayStream(ctrl *gomock.Controller) Ydb_Query_V1.QueryService_ExecuteQueryClient {
 	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-		TxMeta: &Ydb_Query.TransactionMeta{
+		TxMeta: Ydb_Query.TransactionMeta_builder{
 			Id: "456",
-		},
+		}.Build(),
 		ResultSetIndex: 0,
-		ResultSet: &Ydb.ResultSet{
+		ResultSet: Ydb.ResultSet_builder{
 			Columns: []*Ydb.Column{
-				{
+				Ydb.Column_builder{
 					Name: "a",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UINT64,
-						},
-					},
-				},
-				{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_UINT64.Enum(),
+					}.Build(),
+				}.Build(),
+				Ydb.Column_builder{
 					Name: "b",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UTF8,
-						},
-					},
-				},
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_UTF8.Enum(),
+					}.Build(),
+				}.Build(),
 			},
 			Rows: []*Ydb.Value{
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 1,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "1",
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 2,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "2",
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 3,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "3",
-						},
-					}},
-				},
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(1),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("1"),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(2),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("2"),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(3),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("3"),
+					}.Build()},
+				}.Build(),
 			},
-		},
-	}, nil)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		}.Build(),
+	}.Build(), nil)
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 0,
-		ResultSet: &Ydb.ResultSet{
+		ResultSet: Ydb.ResultSet_builder{
 			Rows: []*Ydb.Value{
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 4,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "4",
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 5,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "5",
-						},
-					}},
-				},
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(4),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("4"),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(5),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("5"),
+					}.Build()},
+				}.Build(),
 			},
-		},
-	}, nil)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		}.Build(),
+	}.Build(), nil)
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 1,
-		ResultSet: &Ydb.ResultSet{
+		ResultSet: Ydb.ResultSet_builder{
 			Columns: []*Ydb.Column{
-				{
+				Ydb.Column_builder{
 					Name: "c",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UINT64,
-						},
-					},
-				},
-				{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_UINT64.Enum(),
+					}.Build(),
+				}.Build(),
+				Ydb.Column_builder{
 					Name: "d",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UTF8,
-						},
-					},
-				},
-				{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_UTF8.Enum(),
+					}.Build(),
+				}.Build(),
+				Ydb.Column_builder{
 					Name: "e",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_BOOL,
-						},
-					},
-				},
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_BOOL.Enum(),
+					}.Build(),
+				}.Build(),
 			},
 			Rows: []*Ydb.Value{
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 1,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "1",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: true,
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 2,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "2",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: false,
-						},
-					}},
-				},
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(1),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("1"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(true),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(2),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("2"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(false),
+					}.Build()},
+				}.Build(),
 			},
-		},
-	}, nil)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		}.Build(),
+	}.Build(), nil)
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 1,
-		ResultSet: &Ydb.ResultSet{
+		ResultSet: Ydb.ResultSet_builder{
 			Rows: []*Ydb.Value{
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 3,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "3",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: true,
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 4,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "4",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: false,
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 5,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "5",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: false,
-						},
-					}},
-				},
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(3),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("3"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(true),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(4),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("4"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(false),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(5),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("5"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(false),
+					}.Build()},
+				}.Build(),
 			},
-		},
-	}, nil)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		}.Build(),
+	}.Build(), nil)
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 2,
-		ResultSet: &Ydb.ResultSet{
+		ResultSet: Ydb.ResultSet_builder{
 			Columns: []*Ydb.Column{
-				{
+				Ydb.Column_builder{
 					Name: "c",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UINT64,
-						},
-					},
-				},
-				{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_UINT64.Enum(),
+					}.Build(),
+				}.Build(),
+				Ydb.Column_builder{
 					Name: "d",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UTF8,
-						},
-					},
-				},
-				{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_UTF8.Enum(),
+					}.Build(),
+				}.Build(),
+				Ydb.Column_builder{
 					Name: "e",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_BOOL,
-						},
-					},
-				},
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_BOOL.Enum(),
+					}.Build(),
+				}.Build(),
 			},
 			Rows: []*Ydb.Value{
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 1,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "1",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: true,
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 2,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "2",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: false,
-						},
-					}},
-				},
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(1),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("1"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(true),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(2),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("2"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(false),
+					}.Build()},
+				}.Build(),
 			},
-		},
-	}, nil)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		}.Build(),
+	}.Build(), nil)
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 2,
-		ResultSet: &Ydb.ResultSet{
+		ResultSet: Ydb.ResultSet_builder{
 			Rows: []*Ydb.Value{
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 3,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "3",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: true,
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 4,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "4",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: false,
-						},
-					}},
-				},
-				{
-					Items: []*Ydb.Value{{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 5,
-						},
-					}, {
-						Value: &Ydb.Value_TextValue{
-							TextValue: "5",
-						},
-					}, {
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: false,
-						},
-					}},
-				},
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(3),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("3"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(true),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(4),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("4"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(false),
+					}.Build()},
+				}.Build(),
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{Ydb.Value_builder{
+						Uint64Value: proto.Uint64(5),
+					}.Build(), Ydb.Value_builder{
+						TextValue: proto.String("5"),
+					}.Build(), Ydb.Value_builder{
+						BoolValue: proto.Bool(false),
+					}.Build()},
+				}.Build(),
 			},
-		},
-	}, nil)
+		}.Build(),
+	}.Build(), nil)
 	stream.EXPECT().Recv().Return(nil, io.EOF)
 
 	return stream

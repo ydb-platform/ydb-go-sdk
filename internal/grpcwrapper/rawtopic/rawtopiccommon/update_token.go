@@ -7,9 +7,9 @@ type UpdateTokenRequest struct {
 }
 
 func (r *UpdateTokenRequest) ToProto() *Ydb_Topic.UpdateTokenRequest {
-	return &Ydb_Topic.UpdateTokenRequest{
+	return Ydb_Topic.UpdateTokenRequest_builder{
 		Token: r.Token,
-	}
+	}.Build()
 }
 
 type UpdateTokenResponse struct{}

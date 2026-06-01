@@ -36,9 +36,9 @@ func TestParams(t *testing.T) {
 			timeout:     0,
 			cancelAfter: 0,
 			mode:        0,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationTimeout: durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithTimeout(
@@ -60,9 +60,9 @@ func TestParams(t *testing.T) {
 			timeout:     0,
 			cancelAfter: 0,
 			mode:        0,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationTimeout: durationpb.New(time.Second * 1),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithTimeout(
@@ -84,9 +84,9 @@ func TestParams(t *testing.T) {
 			timeout:     0,
 			cancelAfter: 0,
 			mode:        0,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationTimeout: durationpb.New(time.Second * 1),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithCancelAfter(
@@ -96,9 +96,9 @@ func TestParams(t *testing.T) {
 			timeout:     0,
 			cancelAfter: 0,
 			mode:        0,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				CancelAfter: durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithCancelAfter(
@@ -120,9 +120,9 @@ func TestParams(t *testing.T) {
 			timeout:     0,
 			cancelAfter: 0,
 			mode:        0,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				CancelAfter: durationpb.New(time.Second * 1),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithCancelAfter(
@@ -144,9 +144,9 @@ func TestParams(t *testing.T) {
 			timeout:     0,
 			cancelAfter: 0,
 			mode:        0,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				CancelAfter: durationpb.New(time.Second * 1),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithCancelAfter(
@@ -159,10 +159,10 @@ func TestParams(t *testing.T) {
 			timeout:     0,
 			cancelAfter: 0,
 			mode:        0,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationTimeout: durationpb.New(time.Second * 5),
 				CancelAfter:      durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithCancelAfter(
@@ -175,11 +175,11 @@ func TestParams(t *testing.T) {
 			timeout:     0,
 			cancelAfter: 0,
 			mode:        ModeSync,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationMode:    Ydb_Operations.OperationParams_SYNC,
 				OperationTimeout: durationpb.New(time.Second * 5),
 				CancelAfter:      durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithCancelAfter(
@@ -192,11 +192,11 @@ func TestParams(t *testing.T) {
 			timeout:     time.Second * 2,
 			cancelAfter: 0,
 			mode:        ModeSync,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationMode:    Ydb_Operations.OperationParams_SYNC,
 				OperationTimeout: durationpb.New(time.Second * 5),
 				CancelAfter:      durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: WithCancelAfter(
@@ -209,11 +209,11 @@ func TestParams(t *testing.T) {
 			timeout:     time.Second * 2,
 			cancelAfter: 0,
 			mode:        ModeAsync,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationMode:    Ydb_Operations.OperationParams_ASYNC,
 				OperationTimeout: durationpb.New(time.Second * 5),
 				CancelAfter:      durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: func() context.Context {
@@ -230,11 +230,11 @@ func TestParams(t *testing.T) {
 			timeout:     time.Second * 2,
 			cancelAfter: 0,
 			mode:        ModeAsync,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationMode:    Ydb_Operations.OperationParams_ASYNC,
 				OperationTimeout: durationpb.New(time.Second * 5),
 				CancelAfter:      durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: func() context.Context {
@@ -251,11 +251,11 @@ func TestParams(t *testing.T) {
 			timeout:     time.Second * 2,
 			cancelAfter: 0,
 			mode:        ModeAsync,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationMode:    Ydb_Operations.OperationParams_ASYNC,
 				OperationTimeout: durationpb.New(time.Second * 5),
 				CancelAfter:      durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: func() context.Context {
@@ -273,11 +273,11 @@ func TestParams(t *testing.T) {
 			timeout:              time.Second * 2,
 			cancelAfter:          0,
 			mode:                 ModeSync,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationMode:    Ydb_Operations.OperationParams_SYNC,
 				OperationTimeout: durationpb.New(time.Second * 1),
 				CancelAfter:      durationpb.New(time.Second * 5),
-			},
+			}.Build(),
 		},
 		{
 			ctx: func() context.Context {
@@ -289,10 +289,10 @@ func TestParams(t *testing.T) {
 			timeout:              time.Second * 2,
 			cancelAfter:          0,
 			mode:                 ModeSync,
-			exp: &Ydb_Operations.OperationParams{
+			exp: Ydb_Operations.OperationParams_builder{
 				OperationMode:    Ydb_Operations.OperationParams_SYNC,
 				OperationTimeout: durationpb.New(time.Second * 1),
-			},
+			}.Build(),
 		},
 	} {
 		t.Run("", func(t *testing.T) {

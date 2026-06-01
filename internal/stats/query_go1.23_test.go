@@ -12,52 +12,52 @@ import (
 )
 
 func TestIterateOverQueryPhases(t *testing.T) {
-	s := FromQueryStats(&Ydb_TableStats.QueryStats{
+	s := FromQueryStats(Ydb_TableStats.QueryStats_builder{
 		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
-			{
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 1,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "a",
-					},
-					{
+					}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "b",
-					},
-					{
+					}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "c",
-					},
+					}.Build(),
 				},
-			},
-			{
+			}.Build(),
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 2,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "d",
-					},
-					{
+					}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "e",
-					},
-					{
+					}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "f",
-					},
+					}.Build(),
 				},
-			},
-			{
+			}.Build(),
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 3,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "g",
-					},
-					{
+					}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "h",
-					},
-					{
+					}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "i",
-					},
+					}.Build(),
 				},
-			},
+			}.Build(),
 		},
-	})
+	}.Build())
 	t.Run("ImmutableIteration", func(t *testing.T) {
 		for i := range make([]struct{}, 3) {
 			t.Run(fmt.Sprintf("Pass#%d", i), func(t *testing.T) {

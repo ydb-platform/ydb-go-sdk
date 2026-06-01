@@ -67,18 +67,18 @@ func operationParams(
 func createNodeRequest(
 	path string, config coordination.NodeConfig, operationParams *Ydb_Operations.OperationParams,
 ) *Ydb_Coordination.CreateNodeRequest {
-	return &Ydb_Coordination.CreateNodeRequest{
+	return Ydb_Coordination.CreateNodeRequest_builder{
 		Path: path,
-		Config: &Ydb_Coordination.Config{
+		Config: Ydb_Coordination.Config_builder{
 			Path:                     config.Path,
 			SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
 			SessionGracePeriodMillis: config.SessionGracePeriodMillis,
 			ReadConsistencyMode:      config.ReadConsistencyMode.To(),
 			AttachConsistencyMode:    config.AttachConsistencyMode.To(),
 			RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
-		},
+		}.Build(),
 		OperationParams: operationParams,
-	}
+	}.Build()
 }
 
 func createNode(
@@ -158,18 +158,18 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 func alterNodeRequest(
 	path string, config coordination.NodeConfig, operationParams *Ydb_Operations.OperationParams,
 ) *Ydb_Coordination.AlterNodeRequest {
-	return &Ydb_Coordination.AlterNodeRequest{
+	return Ydb_Coordination.AlterNodeRequest_builder{
 		Path: path,
-		Config: &Ydb_Coordination.Config{
+		Config: Ydb_Coordination.Config_builder{
 			Path:                     config.Path,
 			SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
 			SessionGracePeriodMillis: config.SessionGracePeriodMillis,
 			ReadConsistencyMode:      config.ReadConsistencyMode.To(),
 			AttachConsistencyMode:    config.AttachConsistencyMode.To(),
 			RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
-		},
+		}.Build(),
 		OperationParams: operationParams,
-	}
+	}.Build()
 }
 
 func alterNode(
@@ -217,10 +217,10 @@ func (c *Client) DropNode(ctx context.Context, path string) (finalErr error) {
 }
 
 func dropNodeRequest(path string, operationParams *Ydb_Operations.OperationParams) *Ydb_Coordination.DropNodeRequest {
-	return &Ydb_Coordination.DropNodeRequest{
+	return Ydb_Coordination.DropNodeRequest_builder{
 		Path:            path,
 		OperationParams: operationParams,
-	}
+	}.Build()
 }
 
 func dropNode(
@@ -284,10 +284,10 @@ func (c *Client) DescribeNode(
 func describeNodeRequest(
 	path string, operationParams *Ydb_Operations.OperationParams,
 ) *Ydb_Coordination.DescribeNodeRequest {
-	return &Ydb_Coordination.DescribeNodeRequest{
+	return Ydb_Coordination.DescribeNodeRequest_builder{
 		Path:            path,
 		OperationParams: operationParams,
-	}
+	}.Build()
 }
 
 // DescribeNode describes a coordination node

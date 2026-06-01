@@ -15,39 +15,39 @@ type UpdateOffsetsInTransactionRequest struct {
 }
 
 func (r *UpdateOffsetsInTransactionRequest) ToProto() *Ydb_Topic.UpdateOffsetsInTransactionRequest {
-	req := &Ydb_Topic.UpdateOffsetsInTransactionRequest{
+	req := Ydb_Topic.UpdateOffsetsInTransactionRequest_builder{
 		OperationParams: r.OperationParams.ToProto(),
 		Tx:              r.Tx.ToProto(),
 		Consumer:        r.Consumer,
-	}
+	}.Build()
 
-	req.Topics = make([]*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets, len(r.Topics))
+	req.SetTopics(make([]*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets, len(r.Topics)))
 	for topicIndex := range r.Topics {
 		topic := &r.Topics[topicIndex]
-		offsets := &Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets{
+		offsets := Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_builder{
 			Path: topic.Path,
-		}
+		}.Build()
 
-		offsets.Partitions = make(
+		offsets.SetPartitions(make(
 			[]*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets,
 			len(topic.Partitions),
-		)
+		))
 		for partitionIndex := range topic.Partitions {
 			partition := &topic.Partitions[partitionIndex]
-			protoPartition := &Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets{
+			protoPartition := Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets_builder{
 				PartitionId: partition.PartitionID,
-			}
+			}.Build()
 
-			protoPartition.PartitionOffsets = make([]*Ydb_Topic.OffsetsRange, len(partition.PartitionOffsets))
+			protoPartition.SetPartitionOffsets(make([]*Ydb_Topic.OffsetsRange, len(partition.PartitionOffsets)))
 
 			for offsetIndex, offset := range partition.PartitionOffsets {
-				protoPartition.PartitionOffsets[offsetIndex] = offset.ToProto()
+				protoPartition.GetPartitionOffsets()[offsetIndex] = offset.ToProto()
 			}
 
-			offsets.Partitions[partitionIndex] = protoPartition
+			offsets.GetPartitions()[partitionIndex] = protoPartition
 		}
 
-		req.Topics[topicIndex] = offsets
+		req.GetTopics()[topicIndex] = offsets
 	}
 
 	return req

@@ -91,17 +91,17 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 
 	client := Ydb_Auth_V1.NewAuthServiceClient(cc)
 
-	response, err := client.Login(ctx, &Ydb_Auth.LoginRequest{
-		OperationParams: &Ydb_Operations.OperationParams{
+	response, err := client.Login(ctx, Ydb_Auth.LoginRequest_builder{
+		OperationParams: Ydb_Operations.OperationParams_builder{
 			OperationMode:    0,
 			OperationTimeout: nil,
 			CancelAfter:      nil,
 			Labels:           nil,
 			ReportCostInfo:   0,
-		},
+		}.Build(),
 		User:     c.user,
 		Password: c.password,
-	})
+	}.Build())
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}

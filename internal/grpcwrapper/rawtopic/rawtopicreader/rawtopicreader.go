@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"google.golang.org/protobuf/proto"
 )
 
 var ErrUnexpectedMessageType = errors.New("unexpected message type")
@@ -73,75 +74,75 @@ func (s StreamReader) Recv() (_ ServerMessage, resErr error) {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
 	}
 
-	switch m := grpcMess.GetServerMessage().(type) {
-	case *Ydb_Topic.StreamReadMessage_FromServer_InitResponse:
-		s.sessionID = m.InitResponse.GetSessionId()
+	switch grpcMess.WhichServerMessage() {
+	case Ydb_Topic.StreamReadMessage_FromServer_InitResponse_case:
+		s.sessionID = grpcMess.GetInitResponse().GetSessionId()
 
 		resp := &InitResponse{}
 		resp.ServerMessageMetadata = meta
-		resp.fromProto(m.InitResponse)
+		resp.fromProto(grpcMess.GetInitResponse())
 
 		return resp, nil
-	case *Ydb_Topic.StreamReadMessage_FromServer_ReadResponse:
+	case Ydb_Topic.StreamReadMessage_FromServer_ReadResponse_case:
 		resp := &ReadResponse{}
 		resp.ServerMessageMetadata = meta
-		if err = resp.fromProto(m.ReadResponse); err != nil {
+		if err = resp.fromProto(grpcMess.GetReadResponse()); err != nil {
 			return nil, err
 		}
 
 		return resp, nil
-	case *Ydb_Topic.StreamReadMessage_FromServer_StartPartitionSessionRequest:
+	case Ydb_Topic.StreamReadMessage_FromServer_StartPartitionSessionRequest_case:
 		resp := &StartPartitionSessionRequest{}
 		resp.ServerMessageMetadata = meta
-		if err = resp.fromProto(m.StartPartitionSessionRequest); err != nil {
+		if err = resp.fromProto(grpcMess.GetStartPartitionSessionRequest()); err != nil {
 			return nil, err
 		}
 
 		return resp, nil
-	case *Ydb_Topic.StreamReadMessage_FromServer_StopPartitionSessionRequest:
+	case Ydb_Topic.StreamReadMessage_FromServer_StopPartitionSessionRequest_case:
 		req := &StopPartitionSessionRequest{}
 		req.ServerMessageMetadata = meta
-		if err = req.fromProto(m.StopPartitionSessionRequest); err != nil {
+		if err = req.fromProto(grpcMess.GetStopPartitionSessionRequest()); err != nil {
 			return nil, err
 		}
 
 		return req, nil
 
-	case *Ydb_Topic.StreamReadMessage_FromServer_EndPartitionSession:
+	case Ydb_Topic.StreamReadMessage_FromServer_EndPartitionSession_case:
 		req := &EndPartitionSession{}
 		req.ServerMessageMetadata = meta
-		if err = req.fromProto(m.EndPartitionSession); err != nil {
+		if err = req.fromProto(grpcMess.GetEndPartitionSession()); err != nil {
 			return nil, err
 		}
 
 		return req, nil
 
-	case *Ydb_Topic.StreamReadMessage_FromServer_CommitOffsetResponse:
+	case Ydb_Topic.StreamReadMessage_FromServer_CommitOffsetResponse_case:
 		resp := &CommitOffsetResponse{}
 		resp.ServerMessageMetadata = meta
-		if err = resp.fromProto(m.CommitOffsetResponse); err != nil {
+		if err = resp.fromProto(grpcMess.GetCommitOffsetResponse()); err != nil {
 			return nil, err
 		}
 
 		return resp, nil
-	case *Ydb_Topic.StreamReadMessage_FromServer_PartitionSessionStatusResponse:
+	case Ydb_Topic.StreamReadMessage_FromServer_PartitionSessionStatusResponse_case:
 		resp := &PartitionSessionStatusResponse{}
 		resp.ServerMessageMetadata = meta
-		if err = resp.fromProto(m.PartitionSessionStatusResponse); err != nil {
+		if err = resp.fromProto(grpcMess.GetPartitionSessionStatusResponse()); err != nil {
 			return nil, err
 		}
 
 		return resp, nil
-	case *Ydb_Topic.StreamReadMessage_FromServer_UpdateTokenResponse:
+	case Ydb_Topic.StreamReadMessage_FromServer_UpdateTokenResponse_case:
 		resp := &UpdateTokenResponse{}
 		resp.ServerMessageMetadata = meta
-		resp.MustFromProto(m.UpdateTokenResponse)
+		resp.MustFromProto(grpcMess.GetUpdateTokenResponse())
 
 		return resp, nil
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf(
 			"ydb: receive unexpected message (%v): %w",
-			reflect.TypeOf(grpcMess.GetServerMessage()),
+			grpcMess.WhichServerMessage(),
 			ErrUnexpectedMessageType,
 		))
 	}
@@ -156,47 +157,37 @@ func (s StreamReader) Send(msg ClientMessage) (resErr error) {
 	var grpcMess *Ydb_Topic.StreamReadMessage_FromClient
 	switch m := msg.(type) {
 	case *InitRequest:
-		grpcMess = &Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_InitRequest{InitRequest: m.toProto()},
-		}
+		grpcMess = Ydb_Topic.StreamReadMessage_FromClient_builder{
+			InitRequest: proto.ValueOrDefault(m.toProto()),
+		}.Build()
 
 	case *ReadRequest:
-		grpcMess = &Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_ReadRequest{ReadRequest: m.toProto()},
-		}
+		grpcMess = Ydb_Topic.StreamReadMessage_FromClient_builder{
+			ReadRequest: proto.ValueOrDefault(m.toProto()),
+		}.Build()
 	case *StartPartitionSessionResponse:
-		grpcMess = &Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_StartPartitionSessionResponse{
-				StartPartitionSessionResponse: m.toProto(),
-			},
-		}
+		grpcMess = Ydb_Topic.StreamReadMessage_FromClient_builder{
+			StartPartitionSessionResponse: proto.ValueOrDefault(m.toProto()),
+		}.Build()
 	case *StopPartitionSessionResponse:
-		grpcMess = &Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_StopPartitionSessionResponse{
-				StopPartitionSessionResponse: m.toProto(),
-			},
-		}
+		grpcMess = Ydb_Topic.StreamReadMessage_FromClient_builder{
+			StopPartitionSessionResponse: proto.ValueOrDefault(m.toProto()),
+		}.Build()
 
 	case *CommitOffsetRequest:
-		grpcMess = &Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_CommitOffsetRequest{
-				CommitOffsetRequest: m.toProto(),
-			},
-		}
+		grpcMess = Ydb_Topic.StreamReadMessage_FromClient_builder{
+			CommitOffsetRequest: proto.ValueOrDefault(m.toProto()),
+		}.Build()
 
 	case *PartitionSessionStatusRequest:
-		grpcMess = &Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_PartitionSessionStatusRequest{
-				PartitionSessionStatusRequest: m.toProto(),
-			},
-		}
+		grpcMess = Ydb_Topic.StreamReadMessage_FromClient_builder{
+			PartitionSessionStatusRequest: proto.ValueOrDefault(m.toProto()),
+		}.Build()
 
 	case *UpdateTokenRequest:
-		grpcMess = &Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_UpdateTokenRequest{
-				UpdateTokenRequest: m.ToProto(),
-			},
-		}
+		grpcMess = Ydb_Topic.StreamReadMessage_FromClient_builder{
+			UpdateTokenRequest: proto.ValueOrDefault(m.ToProto()),
+		}.Build()
 	}
 
 	if grpcMess == nil {

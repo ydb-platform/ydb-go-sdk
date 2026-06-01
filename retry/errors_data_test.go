@@ -304,9 +304,9 @@ var errsToCheck = []struct {
 		err: xerrors.Operation(
 			xerrors.WithStatusCode(Ydb.StatusIds_ABORTED),
 			xerrors.WithIssues([]*Ydb_Issue.IssueMessage{
-				{
+				Ydb_Issue.IssueMessage_builder{
 					IssueCode: xerrors.IssueCodeDatashardProgramSizeLimitExceeded,
-				},
+				}.Build(),
 			}),
 		),
 		backoff: backoff.TypeInstant,

@@ -90,6 +90,7 @@ func onRetry(t *trace.Retry, r trace.RetryLoopStartInfo) func(trace.RetryLoopDon
 	}
 	return res
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func RetryOnRetry(t *trace.Retry, c *context.Context, c1 trace.Call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
 	var p trace.RetryLoopStartInfo

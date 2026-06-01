@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 )
@@ -275,34 +276,26 @@ func TestTypeToString(t *testing.T) {
 			s: "PgType(705)",
 		},
 		{
-			t: FromProtobuf(&Ydb.Type{
-				Type: &Ydb.Type_VariantType{
-					VariantType: &Ydb.VariantType{
-						Type: &Ydb.VariantType_StructItems{
-							StructItems: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "a",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_BOOL,
-											},
-										},
-									},
-									{
-										Name: "a",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_FLOAT,
-											},
-										},
-									},
-								},
-							},
+			t: FromProtobuf(Ydb.Type_builder{
+				VariantType: Ydb.VariantType_builder{
+					StructItems: Ydb.StructType_builder{
+						Members: []*Ydb.StructMember{
+							Ydb.StructMember_builder{
+								Name: "a",
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_BOOL.Enum(),
+								}.Build(),
+							}.Build(),
+							Ydb.StructMember_builder{
+								Name: "a",
+								Type: Ydb.Type_builder{
+									TypeId: Ydb.Type_FLOAT.Enum(),
+								}.Build(),
+							}.Build(),
 						},
-					},
-				},
-			}),
+					}.Build(),
+				}.Build(),
+			}.Build()),
 			s: "Variant<'a':Bool,'a':Float>",
 		},
 	} {
@@ -861,30 +854,30 @@ func TestNull(t *testing.T) {
 
 func TestProtobufType(t *testing.T) {
 	t.Run("String", func(t *testing.T) {
-		pb := FromProtobuf(&Ydb.Type{
-			Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
-		})
+		pb := FromProtobuf(Ydb.Type_builder{
+			TypeId: Ydb.Type_BOOL.Enum(),
+		}.Build())
 		require.Equal(t, "Bool", pb.String())
 	})
 	t.Run("equalsTo", func(t *testing.T) {
-		pb1 := FromProtobuf(&Ydb.Type{
-			Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
-		})
-		pb2 := FromProtobuf(&Ydb.Type{
-			Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
-		})
-		pb3 := FromProtobuf(&Ydb.Type{
-			Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-		})
+		pb1 := FromProtobuf(Ydb.Type_builder{
+			TypeId: Ydb.Type_BOOL.Enum(),
+		}.Build())
+		pb2 := FromProtobuf(Ydb.Type_builder{
+			TypeId: Ydb.Type_BOOL.Enum(),
+		}.Build())
+		pb3 := FromProtobuf(Ydb.Type_builder{
+			TypeId: Ydb.Type_INT32.Enum(),
+		}.Build())
 
 		require.True(t, pb1.equalsTo(pb2))
 		require.False(t, pb1.equalsTo(pb3))
 		require.False(t, pb1.equalsTo(Bool))
 	})
 	t.Run("ToYDB", func(t *testing.T) {
-		ydbInput := &Ydb.Type{
-			Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
-		}
+		ydbInput := Ydb.Type_builder{
+			TypeId: Ydb.Type_BOOL.Enum(),
+		}.Build()
 		pb := FromProtobuf(ydbInput)
 		ydbType := pb.ToYDB()
 		require.NotNil(t, ydbType)
@@ -930,77 +923,67 @@ func TestTypeFromYDB(t *testing.T) {
 		}
 		for _, p := range primitives {
 			t.Run(p.goType.Yql(), func(t *testing.T) {
-				ydbType := &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: p.ydbType},
-				}
+				ydbType := Ydb.Type_builder{
+					TypeId: p.ydbType.Enum(),
+				}.Build()
 				goType := TypeFromYDB(ydbType)
 				require.True(t, Equal(p.goType, goType))
 			})
 		}
 	})
 	t.Run("OptionalType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_OptionalType{
-				OptionalType: &Ydb.OptionalType{
-					Item: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
-					},
-				},
-			},
-		}
+		ydbType := Ydb.Type_builder{
+			OptionalType: Ydb.OptionalType_builder{
+				Item: Ydb.Type_builder{
+					TypeId: Ydb.Type_BOOL.Enum(),
+				}.Build(),
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewOptional(Bool), goType))
 	})
 	t.Run("ListType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_ListType{
-				ListType: &Ydb.ListType{
-					Item: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-					},
-				},
-			},
-		}
+		ydbType := Ydb.Type_builder{
+			ListType: Ydb.ListType_builder{
+				Item: Ydb.Type_builder{
+					TypeId: Ydb.Type_INT32.Enum(),
+				}.Build(),
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewList(Int32), goType))
 	})
 	t.Run("DecimalType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_DecimalType{
-				DecimalType: &Ydb.DecimalType{
-					Precision: 22,
-					Scale:     9,
-				},
-			},
-		}
+		ydbType := Ydb.Type_builder{
+			DecimalType: Ydb.DecimalType_builder{
+				Precision: 22,
+				Scale:     9,
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewDecimal(22, 9), goType))
 	})
 	t.Run("TupleType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_TupleType{
-				TupleType: &Ydb.TupleType{
-					Elements: []*Ydb.Type{
-						{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}},
-						{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-					},
+		ydbType := Ydb.Type_builder{
+			TupleType: Ydb.TupleType_builder{
+				Elements: []*Ydb.Type{
+					Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build(),
+					Ydb.Type_builder{TypeId: Ydb.Type_INT32.Enum()}.Build(),
 				},
-			},
-		}
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewTuple(Bool, Int32), goType))
 	})
 	t.Run("StructType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_StructType{
-				StructType: &Ydb.StructType{
-					Members: []*Ydb.StructMember{
-						{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
-						{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}}},
-					},
+		ydbType := Ydb.Type_builder{
+			StructType: Ydb.StructType_builder{
+				Members: []*Ydb.StructMember{
+					Ydb.StructMember_builder{Name: "a", Type: Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build()}.Build(),
+					Ydb.StructMember_builder{Name: "b", Type: Ydb.Type_builder{TypeId: Ydb.Type_INT32.Enum()}.Build()}.Build(),
 				},
-			},
-		}
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		expected := NewStruct(
 			StructField{Name: "a", T: Bool},
@@ -1009,62 +992,50 @@ func TestTypeFromYDB(t *testing.T) {
 		require.True(t, Equal(expected, goType))
 	})
 	t.Run("DictType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_DictType{
-				DictType: &Ydb.DictType{
-					Key:     &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
-					Payload: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-				},
-			},
-		}
+		ydbType := Ydb.Type_builder{
+			DictType: Ydb.DictType_builder{
+				Key:     Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build(),
+				Payload: Ydb.Type_builder{TypeId: Ydb.Type_INT32.Enum()}.Build(),
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewDict(Text, Int32), goType))
 	})
 	t.Run("DictTypeAsSet", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_DictType{
-				DictType: &Ydb.DictType{
-					Key:     &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
-					Payload: &Ydb.Type{Type: &Ydb.Type_VoidType{}},
-				},
-			},
-		}
+		ydbType := Ydb.Type_builder{
+			DictType: Ydb.DictType_builder{
+				Key:     Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build(),
+				Payload: Ydb.Type_builder{VoidType: structpb.NullValue_NULL_VALUE.Enum(),}.Build(),
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewSet(Text), goType))
 	})
 	t.Run("VariantTypeTuple", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_VariantType{
-				VariantType: &Ydb.VariantType{
-					Type: &Ydb.VariantType_TupleItems{
-						TupleItems: &Ydb.TupleType{
-							Elements: []*Ydb.Type{
-								{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}},
-								{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-							},
-						},
+		ydbType := Ydb.Type_builder{
+			VariantType: Ydb.VariantType_builder{
+				TupleItems: Ydb.TupleType_builder{
+					Elements: []*Ydb.Type{
+						Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build(),
+						Ydb.Type_builder{TypeId: Ydb.Type_INT32.Enum()}.Build(),
 					},
-				},
-			},
-		}
+				}.Build(),
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewVariantTuple(Bool, Int32), goType))
 	})
 	t.Run("VariantTypeStruct", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_VariantType{
-				VariantType: &Ydb.VariantType{
-					Type: &Ydb.VariantType_StructItems{
-						StructItems: &Ydb.StructType{
-							Members: []*Ydb.StructMember{
-								{Name: "a", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}}},
-								{Name: "b", Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}}},
-							},
-						},
+		ydbType := Ydb.Type_builder{
+			VariantType: Ydb.VariantType_builder{
+				StructItems: Ydb.StructType_builder{
+					Members: []*Ydb.StructMember{
+						Ydb.StructMember_builder{Name: "a", Type: Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build()}.Build(),
+						Ydb.StructMember_builder{Name: "b", Type: Ydb.Type_builder{TypeId: Ydb.Type_INT32.Enum()}.Build()}.Build(),
 					},
-				},
-			},
-		}
+				}.Build(),
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		expected := NewVariantStruct(
 			StructField{Name: "a", T: Bool},
@@ -1073,27 +1044,25 @@ func TestTypeFromYDB(t *testing.T) {
 		require.True(t, Equal(expected, goType))
 	})
 	t.Run("VoidType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_VoidType{},
-		}
+		ydbType := Ydb.Type_builder{
+			VoidType: structpb.NullValue_NULL_VALUE.Enum(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewVoid(), goType))
 	})
 	t.Run("NullType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_NullType{},
-		}
+		ydbType := Ydb.Type_builder{
+			NullType: structpb.NullValue_NULL_VALUE.Enum(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(NewNull(), goType))
 	})
 	t.Run("PgType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_PgType{
-				PgType: &Ydb.PgType{
-					Oid: 123,
-				},
-			},
-		}
+		ydbType := Ydb.Type_builder{
+			PgType: Ydb.PgType_builder{
+				Oid: 123,
+			}.Build(),
+		}.Build()
 		goType := TypeFromYDB(ydbType)
 		require.True(t, Equal(goType, PgType{OID: 123}))
 	})

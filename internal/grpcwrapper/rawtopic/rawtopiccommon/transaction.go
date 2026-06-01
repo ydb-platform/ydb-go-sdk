@@ -12,8 +12,8 @@ func (t TransactionIdentity) ToProto() *Ydb_Topic.TransactionIdentity {
 		return nil
 	}
 
-	return &Ydb_Topic.TransactionIdentity{
+	return Ydb_Topic.TransactionIdentity_builder{
 		Id:      t.ID,
 		Session: t.Session,
-	}
+	}.Build()
 }

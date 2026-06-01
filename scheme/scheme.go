@@ -177,8 +177,8 @@ type Permissions struct {
 }
 
 func (p Permissions) To(y *Ydb_Scheme.Permissions) {
-	y.Subject = p.Subject
-	y.PermissionNames = p.PermissionNames
+	y.SetSubject(p.Subject)
+	y.SetPermissionNames(p.PermissionNames)
 }
 
 func InnerConvertEntry(y *Ydb_Scheme.Entry) *Entry {

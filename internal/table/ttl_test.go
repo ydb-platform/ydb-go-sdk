@@ -16,14 +16,12 @@ func TestNewTimeToLiveSettings(t *testing.T) {
 	})
 
 	t.Run("DateTypeColumn mode", func(t *testing.T) {
-		settings := &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_DateTypeColumn{
-				DateTypeColumn: &Ydb_Table.DateTypeColumnModeSettings{
-					ColumnName:         "created_at",
-					ExpireAfterSeconds: 3600,
-				},
-			},
-		}
+		settings := Ydb_Table.TtlSettings_builder{
+			DateTypeColumn: Ydb_Table.DateTypeColumnModeSettings_builder{
+				ColumnName:         "created_at",
+				ExpireAfterSeconds: 3600,
+			}.Build(),
+		}.Build()
 
 		result := NewTimeToLiveSettings(settings)
 		require.NotNil(t, result)
@@ -33,15 +31,13 @@ func TestNewTimeToLiveSettings(t *testing.T) {
 	})
 
 	t.Run("ValueSinceUnixEpoch mode with seconds", func(t *testing.T) {
-		settings := &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_ValueSinceUnixEpoch{
-				ValueSinceUnixEpoch: &Ydb_Table.ValueSinceUnixEpochModeSettings{
-					ColumnName:         "timestamp",
-					ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_SECONDS,
-					ExpireAfterSeconds: 7200,
-				},
-			},
-		}
+		settings := Ydb_Table.TtlSettings_builder{
+			ValueSinceUnixEpoch: Ydb_Table.ValueSinceUnixEpochModeSettings_builder{
+				ColumnName:         "timestamp",
+				ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_SECONDS,
+				ExpireAfterSeconds: 7200,
+			}.Build(),
+		}.Build()
 
 		result := NewTimeToLiveSettings(settings)
 		require.NotNil(t, result)
@@ -53,15 +49,13 @@ func TestNewTimeToLiveSettings(t *testing.T) {
 	})
 
 	t.Run("ValueSinceUnixEpoch mode with milliseconds", func(t *testing.T) {
-		settings := &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_ValueSinceUnixEpoch{
-				ValueSinceUnixEpoch: &Ydb_Table.ValueSinceUnixEpochModeSettings{
-					ColumnName:         "timestamp_ms",
-					ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MILLISECONDS,
-					ExpireAfterSeconds: 1800,
-				},
-			},
-		}
+		settings := Ydb_Table.TtlSettings_builder{
+			ValueSinceUnixEpoch: Ydb_Table.ValueSinceUnixEpochModeSettings_builder{
+				ColumnName:         "timestamp_ms",
+				ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MILLISECONDS,
+				ExpireAfterSeconds: 1800,
+			}.Build(),
+		}.Build()
 
 		result := NewTimeToLiveSettings(settings)
 		require.NotNil(t, result)
@@ -73,15 +67,13 @@ func TestNewTimeToLiveSettings(t *testing.T) {
 	})
 
 	t.Run("ValueSinceUnixEpoch mode with microseconds", func(t *testing.T) {
-		settings := &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_ValueSinceUnixEpoch{
-				ValueSinceUnixEpoch: &Ydb_Table.ValueSinceUnixEpochModeSettings{
-					ColumnName:         "timestamp_us",
-					ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MICROSECONDS,
-					ExpireAfterSeconds: 900,
-				},
-			},
-		}
+		settings := Ydb_Table.TtlSettings_builder{
+			ValueSinceUnixEpoch: Ydb_Table.ValueSinceUnixEpochModeSettings_builder{
+				ColumnName:         "timestamp_us",
+				ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MICROSECONDS,
+				ExpireAfterSeconds: 900,
+			}.Build(),
+		}.Build()
 
 		result := NewTimeToLiveSettings(settings)
 		require.NotNil(t, result)
@@ -93,15 +85,13 @@ func TestNewTimeToLiveSettings(t *testing.T) {
 	})
 
 	t.Run("ValueSinceUnixEpoch mode with nanoseconds", func(t *testing.T) {
-		settings := &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_ValueSinceUnixEpoch{
-				ValueSinceUnixEpoch: &Ydb_Table.ValueSinceUnixEpochModeSettings{
-					ColumnName:         "timestamp_ns",
-					ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_NANOSECONDS,
-					ExpireAfterSeconds: 600,
-				},
-			},
-		}
+		settings := Ydb_Table.TtlSettings_builder{
+			ValueSinceUnixEpoch: Ydb_Table.ValueSinceUnixEpochModeSettings_builder{
+				ColumnName:         "timestamp_ns",
+				ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_NANOSECONDS,
+				ExpireAfterSeconds: 600,
+			}.Build(),
+		}.Build()
 
 		result := NewTimeToLiveSettings(settings)
 		require.NotNil(t, result)
@@ -113,15 +103,13 @@ func TestNewTimeToLiveSettings(t *testing.T) {
 	})
 
 	t.Run("ValueSinceUnixEpoch mode with unspecified unit", func(t *testing.T) {
-		settings := &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_ValueSinceUnixEpoch{
-				ValueSinceUnixEpoch: &Ydb_Table.ValueSinceUnixEpochModeSettings{
-					ColumnName:         "timestamp_unspec",
-					ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_UNSPECIFIED,
-					ExpireAfterSeconds: 300,
-				},
-			},
-		}
+		settings := Ydb_Table.TtlSettings_builder{
+			ValueSinceUnixEpoch: Ydb_Table.ValueSinceUnixEpochModeSettings_builder{
+				ColumnName:         "timestamp_unspec",
+				ColumnUnit:         Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_UNSPECIFIED,
+				ExpireAfterSeconds: 300,
+			}.Build(),
+		}.Build()
 
 		result := NewTimeToLiveSettings(settings)
 		require.NotNil(t, result)

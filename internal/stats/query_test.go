@@ -8,68 +8,68 @@ import (
 )
 
 func TestFromQueryStats(t *testing.T) {
-	s := FromQueryStats(&Ydb_TableStats.QueryStats{
+	s := FromQueryStats(Ydb_TableStats.QueryStats_builder{
 		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
-			{
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 10,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "a",
-						Reads: &Ydb_TableStats.OperationStats{
+						Reads: Ydb_TableStats.OperationStats_builder{
 							Rows:  100,
 							Bytes: 200,
-						},
-						Updates: &Ydb_TableStats.OperationStats{
+						}.Build(),
+						Updates: Ydb_TableStats.OperationStats_builder{
 							Rows:  300,
 							Bytes: 400,
-						},
-						Deletes: &Ydb_TableStats.OperationStats{
+						}.Build(),
+						Deletes: Ydb_TableStats.OperationStats_builder{
 							Rows:  500,
 							Bytes: 600,
-						},
+						}.Build(),
 						PartitionsCount: 700,
-					},
+					}.Build(),
 				},
 				CpuTimeUs:      20,
 				AffectedShards: 30,
 				LiteralPhase:   true,
-			},
-			{
+			}.Build(),
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 11,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
+					Ydb_TableStats.TableAccessStats_builder{
 						Name: "b",
-						Reads: &Ydb_TableStats.OperationStats{
+						Reads: Ydb_TableStats.OperationStats_builder{
 							Rows:  101,
 							Bytes: 201,
-						},
-						Updates: &Ydb_TableStats.OperationStats{
+						}.Build(),
+						Updates: Ydb_TableStats.OperationStats_builder{
 							Rows:  301,
 							Bytes: 401,
-						},
-						Deletes: &Ydb_TableStats.OperationStats{
+						}.Build(),
+						Deletes: Ydb_TableStats.OperationStats_builder{
 							Rows:  501,
 							Bytes: 601,
-						},
+						}.Build(),
 						PartitionsCount: 701,
-					},
+					}.Build(),
 				},
 				CpuTimeUs:      21,
 				AffectedShards: 31,
 				LiteralPhase:   false,
-			},
+			}.Build(),
 		},
-		Compilation: &Ydb_TableStats.CompilationStats{
+		Compilation: Ydb_TableStats.CompilationStats_builder{
 			FromCache:  true,
 			DurationUs: 123,
 			CpuTimeUs:  456,
-		},
+		}.Build(),
 		ProcessCpuTimeUs: 100,
 		QueryPlan:        "plan",
 		QueryAst:         "ast",
 		TotalDurationUs:  200,
 		TotalCpuTimeUs:   300,
-	})
+	}.Build())
 	require.Equal(t, fromUs(100), s.ProcessCPUTime())
 	require.Equal(t, fromUs(200), s.TotalDuration())
 	require.Equal(t, fromUs(300), s.TotalCPUTime())

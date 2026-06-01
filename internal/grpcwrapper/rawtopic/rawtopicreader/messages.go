@@ -98,25 +98,25 @@ type InitRequest struct {
 }
 
 func (r *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
-	p := &Ydb_Topic.StreamReadMessage_InitRequest{
+	p := Ydb_Topic.StreamReadMessage_InitRequest_builder{
 		Consumer:                r.Consumer,
 		AutoPartitioningSupport: r.AutoPartitioningSupport,
-	}
+	}.Build()
 
-	p.TopicsReadSettings = make([]*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings, len(r.TopicsReadSettings))
+	p.SetTopicsReadSettings(make([]*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings, len(r.TopicsReadSettings)))
 	for topicSettingsIndex := range r.TopicsReadSettings {
 		srcTopicSettings := &r.TopicsReadSettings[topicSettingsIndex]
 		dstTopicSettings := &Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings{}
-		p.TopicsReadSettings[topicSettingsIndex] = dstTopicSettings
+		p.GetTopicsReadSettings()[topicSettingsIndex] = dstTopicSettings
 
-		dstTopicSettings.Path = srcTopicSettings.Path
-		dstTopicSettings.MaxLag = srcTopicSettings.MaxLag.ToProto()
-		dstTopicSettings.ReadFrom = srcTopicSettings.ReadFrom.ToProto()
+		dstTopicSettings.SetPath(srcTopicSettings.Path)
+		dstTopicSettings.SetMaxLag(srcTopicSettings.MaxLag.ToProto())
+		dstTopicSettings.SetReadFrom(srcTopicSettings.ReadFrom.ToProto())
 
 		partitionsIDs := make([]int64, len(srcTopicSettings.PartitionsID))
 		copy(partitionsIDs, srcTopicSettings.PartitionsID)
 
-		dstTopicSettings.PartitionIds = partitionsIDs
+		dstTopicSettings.SetPartitionIds(partitionsIDs)
 	}
 
 	return p
@@ -168,7 +168,7 @@ type ReadRequest struct {
 }
 
 func (r *ReadRequest) toProto() *Ydb_Topic.StreamReadMessage_ReadRequest {
-	return &Ydb_Topic.StreamReadMessage_ReadRequest{BytesSize: int64(r.BytesSize)}
+	return Ydb_Topic.StreamReadMessage_ReadRequest_builder{BytesSize: int64(r.BytesSize)}.Build()
 }
 
 type ReadResponse struct {
@@ -296,21 +296,21 @@ type CommitOffsetRequest struct {
 
 func (r *CommitOffsetRequest) toProto() *Ydb_Topic.StreamReadMessage_CommitOffsetRequest {
 	res := &Ydb_Topic.StreamReadMessage_CommitOffsetRequest{}
-	res.CommitOffsets = make(
+	res.SetCommitOffsets(make(
 		[]*Ydb_Topic.StreamReadMessage_CommitOffsetRequest_PartitionCommitOffset,
 		len(r.CommitOffsets),
-	)
+	))
 
 	for sessionIndex := range r.CommitOffsets {
 		srcPartitionCommitOffset := &r.CommitOffsets[sessionIndex]
-		dstCommitOffset := &Ydb_Topic.StreamReadMessage_CommitOffsetRequest_PartitionCommitOffset{
+		dstCommitOffset := Ydb_Topic.StreamReadMessage_CommitOffsetRequest_PartitionCommitOffset_builder{
 			PartitionSessionId: srcPartitionCommitOffset.PartitionSessionID.ToInt64(),
-		}
-		res.CommitOffsets[sessionIndex] = dstCommitOffset
+		}.Build()
+		res.GetCommitOffsets()[sessionIndex] = dstCommitOffset
 
-		dstCommitOffset.Offsets = make([]*Ydb_Topic.OffsetsRange, len(srcPartitionCommitOffset.Offsets))
+		dstCommitOffset.SetOffsets(make([]*Ydb_Topic.OffsetsRange, len(srcPartitionCommitOffset.Offsets)))
 		for offsetIndex := range srcPartitionCommitOffset.Offsets {
-			dstCommitOffset.Offsets[offsetIndex] = srcPartitionCommitOffset.Offsets[offsetIndex].ToProto()
+			dstCommitOffset.GetOffsets()[offsetIndex] = srcPartitionCommitOffset.Offsets[offsetIndex].ToProto()
 		}
 	}
 
@@ -362,9 +362,9 @@ type PartitionSessionStatusRequest struct {
 }
 
 func (r *PartitionSessionStatusRequest) toProto() *Ydb_Topic.StreamReadMessage_PartitionSessionStatusRequest {
-	return &Ydb_Topic.StreamReadMessage_PartitionSessionStatusRequest{
+	return Ydb_Topic.StreamReadMessage_PartitionSessionStatusRequest_builder{
 		PartitionSessionId: r.PartitionSessionID.ToInt64(),
-	}
+	}.Build()
 }
 
 type PartitionSessionStatusResponse struct {
@@ -435,11 +435,11 @@ type StartPartitionSessionResponse struct {
 }
 
 func (r *StartPartitionSessionResponse) toProto() *Ydb_Topic.StreamReadMessage_StartPartitionSessionResponse {
-	res := &Ydb_Topic.StreamReadMessage_StartPartitionSessionResponse{
+	res := Ydb_Topic.StreamReadMessage_StartPartitionSessionResponse_builder{
 		PartitionSessionId: r.PartitionSessionID.ToInt64(),
 		ReadOffset:         r.ReadOffset.ToInt64Pointer(),
 		CommitOffset:       r.CommitOffset.ToInt64Pointer(),
-	}
+	}.Build()
 
 	return res
 }
@@ -476,9 +476,9 @@ type StopPartitionSessionResponse struct {
 }
 
 func (r *StopPartitionSessionResponse) toProto() *Ydb_Topic.StreamReadMessage_StopPartitionSessionResponse {
-	return &Ydb_Topic.StreamReadMessage_StopPartitionSessionResponse{
+	return Ydb_Topic.StreamReadMessage_StopPartitionSessionResponse_builder{
 		PartitionSessionId: r.PartitionSessionID.ToInt64(),
-	}
+	}.Build()
 }
 
 type EndPartitionSession struct {

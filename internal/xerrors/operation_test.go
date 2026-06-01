@@ -89,18 +89,18 @@ func TestIsOperationErrorTransactionLocksInvalidated(t *testing.T) {
 		{
 			err: Operation(
 				WithStatusCode(Ydb.StatusIds_ABORTED),
-				WithIssues([]*Ydb_Issue.IssueMessage{{
+				WithIssues([]*Ydb_Issue.IssueMessage{Ydb_Issue.IssueMessage_builder{
 					IssueCode: IssueCodeTransactionLocksInvalidated,
-				}}),
+				}.Build()}),
 			),
 			isTLI: true,
 		},
 		{
 			err: Operation(
 				WithStatusCode(Ydb.StatusIds_OVERLOADED),
-				WithIssues([]*Ydb_Issue.IssueMessage{{
+				WithIssues([]*Ydb_Issue.IssueMessage{Ydb_Issue.IssueMessage_builder{
 					IssueCode: IssueCodeTransactionLocksInvalidated,
-				}}),
+				}.Build()}),
 			),
 			isTLI: false,
 		},
@@ -113,11 +113,11 @@ func TestIsOperationErrorTransactionLocksInvalidated(t *testing.T) {
 		{
 			err: Operation(
 				WithStatusCode(Ydb.StatusIds_ABORTED),
-				WithIssues([]*Ydb_Issue.IssueMessage{{
-					Issues: []*Ydb_Issue.IssueMessage{{
+				WithIssues([]*Ydb_Issue.IssueMessage{Ydb_Issue.IssueMessage_builder{
+					Issues: []*Ydb_Issue.IssueMessage{Ydb_Issue.IssueMessage_builder{
 						IssueCode: IssueCodeTransactionLocksInvalidated,
-					}},
-				}}),
+					}.Build()},
+				}.Build()}),
 			),
 			isTLI: true,
 		},
@@ -147,34 +147,34 @@ func Test_operationError_Error(t *testing.T) {
 		},
 		{
 			err: Operation(WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED), WithIssues([]*Ydb_Issue.IssueMessage{
-				{
+				Ydb_Issue.IssueMessage_builder{
 					Message:   "issue one",
 					IssueCode: 1,
-					Position: &Ydb_Issue.IssueMessage_Position{
+					Position: Ydb_Issue.IssueMessage_Position_builder{
 						Row:    15,
 						Column: 3,
 						File:   "",
-					},
-				},
-				{
+					}.Build(),
+				}.Build(),
+				Ydb_Issue.IssueMessage_builder{
 					Message:   "issue two",
 					IssueCode: 2,
 					Issues: []*Ydb_Issue.IssueMessage{
-						{
+						Ydb_Issue.IssueMessage_builder{
 							Message:   "issue three",
 							IssueCode: 3,
-							Position: &Ydb_Issue.IssueMessage_Position{
+							Position: Ydb_Issue.IssueMessage_Position_builder{
 								Row:    16,
 								Column: 4,
 								File:   "test.yql",
-							},
-						},
-						{
+							}.Build(),
+						}.Build(),
+						Ydb_Issue.IssueMessage_builder{
 							Message:   "issue four",
 							IssueCode: 4,
-						},
+						}.Build(),
 					},
-				},
+				}.Build(),
 			})),
 			text: "operation/PRECONDITION_FAILED (code = 400120, issues = [{15:3 => #1 'issue one'},{#2 'issue two' [{test.yql:16:4 => #3 'issue three'},{#4 'issue four'}]}])", //nolint:lll
 		},
@@ -194,9 +194,9 @@ func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
 		{
 			err: Operation(
 				WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
-				WithIssues([]*Ydb_Issue.IssueMessage{{
+				WithIssues([]*Ydb_Issue.IssueMessage{Ydb_Issue.IssueMessage_builder{
 					Message: "Request exceeded a limit on the number of schema operations, try again later",
-				}}),
+				}.Build()}),
 			),
 			expectedType:    TypeRetryable,
 			expectedBackoff: backoff.TypeSlow,
@@ -204,9 +204,9 @@ func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
 		{
 			err: Operation(
 				WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
-				WithIssues([]*Ydb_Issue.IssueMessage{{
+				WithIssues([]*Ydb_Issue.IssueMessage{Ydb_Issue.IssueMessage_builder{
 					Message: "Some other error message",
-				}}),
+				}.Build()}),
 			),
 			expectedType:    TypeUndefined,
 			expectedBackoff: backoff.TypeInstant,
@@ -214,11 +214,11 @@ func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
 		{
 			err: Operation(
 				WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
-				WithIssues([]*Ydb_Issue.IssueMessage{{
-					Issues: []*Ydb_Issue.IssueMessage{{
+				WithIssues([]*Ydb_Issue.IssueMessage{Ydb_Issue.IssueMessage_builder{
+					Issues: []*Ydb_Issue.IssueMessage{Ydb_Issue.IssueMessage_builder{
 						Message: "Request exceeded a limit on the number of schema operations, try again later",
-					}},
-				}}),
+					}.Build()},
+				}.Build()}),
 			),
 			expectedType:    TypeRetryable,
 			expectedBackoff: backoff.TypeSlow,

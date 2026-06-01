@@ -1,7 +1,9 @@
 package value
 
 import (
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 )
 
 type (
@@ -43,18 +45,18 @@ func GetDefaultFromYDB(column *Ydb_Table.ColumnMeta) *DefaultValue {
 	}
 	if protoSeq := column.GetFromSequence(); protoSeq != nil {
 		seq := DefaultSequenceValue{
-			Name:       protoSeq.Name,
-			MinValue:   protoSeq.MinValue,
-			MaxValue:   protoSeq.MaxValue,
-			StartValue: protoSeq.StartValue,
-			Cache:      protoSeq.Cache,
-			Increment:  protoSeq.Increment,
-			Cycle:      protoSeq.Cycle,
+			Name:       proto.ValueOrNil(protoSeq.HasName(), protoSeq.GetName),
+			MinValue:   proto.ValueOrNil(protoSeq.HasMinValue(), protoSeq.GetMinValue),
+			MaxValue:   proto.ValueOrNil(protoSeq.HasMaxValue(), protoSeq.GetMaxValue),
+			StartValue: proto.ValueOrNil(protoSeq.HasStartValue(), protoSeq.GetStartValue),
+			Cache:      proto.ValueOrNil(protoSeq.HasCache(), protoSeq.GetCache),
+			Increment:  proto.ValueOrNil(protoSeq.HasIncrement(), protoSeq.GetIncrement),
+			Cycle:      proto.ValueOrNil(protoSeq.HasCycle(), protoSeq.GetCycle),
 		}
 		if setVal := protoSeq.GetSetVal(); setVal != nil {
 			seq.SetVal = &SequenceSetVal{
-				NextValue: setVal.NextValue,
-				NextUsed:  setVal.NextUsed,
+				NextValue: proto.ValueOrNil(setVal.HasNextValue(), setVal.GetNextValue),
+				NextUsed:  proto.ValueOrNil(setVal.HasNextUsed(), setVal.GetNextUsed),
 			}
 		}
 		underlyingValue = seq
@@ -94,20 +96,18 @@ func (d *DefaultValue) ToYDB(targetColumn *Ydb_Table.ColumnMeta) {
 
 	switch value := d.underlyingValue.(type) {
 	case DefaultLiteralValue:
-		targetColumn.DefaultValue = value.toYDB()
+		targetColumn.SetFromLiteral(value.toYDB())
 	case DefaultSequenceValue:
-		targetColumn.DefaultValue = value.toYDB()
+		targetColumn.SetFromSequence(value.toYDB())
 	}
 }
 
-func (l *DefaultLiteralValue) toYDB() *Ydb_Table.ColumnMeta_FromLiteral {
-	return &Ydb_Table.ColumnMeta_FromLiteral{
-		FromLiteral: ToYDB(l.Value),
-	}
+func (l *DefaultLiteralValue) toYDB() *Ydb.TypedValue {
+	return ToYDB(l.Value)
 }
 
-func (s *DefaultSequenceValue) toYDB() *Ydb_Table.ColumnMeta_FromSequence {
-	protoSeq := &Ydb_Table.SequenceDescription{
+func (s *DefaultSequenceValue) toYDB() *Ydb_Table.SequenceDescription {
+	protoSeq := Ydb_Table.SequenceDescription_builder{
 		Name:       s.Name,
 		MinValue:   s.MinValue,
 		MaxValue:   s.MaxValue,
@@ -115,16 +115,14 @@ func (s *DefaultSequenceValue) toYDB() *Ydb_Table.ColumnMeta_FromSequence {
 		Cache:      s.Cache,
 		Increment:  s.Increment,
 		Cycle:      s.Cycle,
-	}
+	}.Build()
 
 	if s.SetVal != nil {
-		protoSeq.SetVal = &Ydb_Table.SequenceDescription_SetVal{
+		protoSeq.SetSetVal(Ydb_Table.SequenceDescription_SetVal_builder{
 			NextValue: s.SetVal.NextValue,
 			NextUsed:  s.SetVal.NextUsed,
-		}
+		}.Build())
 	}
 
-	return &Ydb_Table.ColumnMeta_FromSequence{
-		FromSequence: protoSeq,
-	}
+	return protoSeq
 }

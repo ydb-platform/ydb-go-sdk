@@ -59,9 +59,9 @@ func (s *testExecuteQueryStream) RecvMsg(any) error {
 }
 
 func partWithIndex(idx int64) *Ydb_Query.ExecuteQueryResponsePart {
-	return &Ydb_Query.ExecuteQueryResponsePart{
+	return Ydb_Query.ExecuteQueryResponsePart_builder{
 		ResultSetIndex: idx,
-	}
+	}.Build()
 }
 
 func TestWrapExecuteQueryStreamWithPrefetchOrderAndEOF(t *testing.T) {

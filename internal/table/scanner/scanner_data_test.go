@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"google.golang.org/protobuf/proto"
 )
 
 type column struct {
@@ -473,11 +474,11 @@ var scannerData = []struct {
 
 func initScanner() *valueScanner {
 	res := valueScanner{
-		set: &Ydb.ResultSet{
+		set: Ydb.ResultSet_builder{
 			Columns:   nil,
 			Rows:      nil,
 			Truncated: false,
-		},
+		}.Build(),
 		row: nil,
 		stack: scanStack{
 			v: nil,
@@ -494,57 +495,41 @@ func initScanner() *valueScanner {
 
 func generateScannerData(count int) *valueScanner {
 	res := initScanner()
-	res.set.Columns = []*Ydb.Column{{
+	res.set.SetColumns([]*Ydb.Column{Ydb.Column_builder{
 		Name: "series_id",
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_UINT64,
-			},
-		},
-	}, {
+		Type: Ydb.Type_builder{
+			TypeId: Ydb.Type_UINT64.Enum(),
+		}.Build(),
+	}.Build(), Ydb.Column_builder{
 		Name: "title",
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_OptionalType{
-				OptionalType: &Ydb.OptionalType{
-					Item: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UTF8,
-						},
-					},
-				},
-			},
-		},
-	}, {
+		Type: Ydb.Type_builder{
+			OptionalType: Ydb.OptionalType_builder{
+				Item: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+		}.Build(),
+	}.Build(), Ydb.Column_builder{
 		Name: "release_date",
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_OptionalType{
-				OptionalType: &Ydb.OptionalType{
-					Item: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_DATETIME,
-						},
-					},
-				},
-			},
-		},
-	}}
-	res.set.Rows = []*Ydb.Value{}
+		Type: Ydb.Type_builder{
+			OptionalType: Ydb.OptionalType_builder{
+				Item: Ydb.Type_builder{
+					TypeId: Ydb.Type_DATETIME.Enum(),
+				}.Build(),
+			}.Build(),
+		}.Build(),
+	}.Build()})
+	res.set.SetRows([]*Ydb.Value{})
 	for i := range count {
-		res.set.Rows = append(res.set.GetRows(), &Ydb.Value{
-			Items: []*Ydb.Value{{
-				Value: &Ydb.Value_Uint64Value{
-					Uint64Value: uint64(i),
-				},
-			}, {
-				Value: &Ydb.Value_TextValue{
-					TextValue: strconv.Itoa(i) + "a",
-				},
-			}, {
-				Value: &Ydb.Value_Uint32Value{
-					Uint32Value: uint32(i),
-				},
-			}},
-		})
+		res.set.SetRows(append(res.set.GetRows(), Ydb.Value_builder{
+			Items: []*Ydb.Value{Ydb.Value_builder{
+				Uint64Value: proto.Uint64(uint64(i)),
+			}.Build(), Ydb.Value_builder{
+				TextValue: proto.String(strconv.Itoa(i) + "a"),
+			}.Build(), Ydb.Value_builder{
+				Uint32Value: proto.Uint32(uint32(i)),
+			}.Build()},
+		}.Build()))
 	}
 	res.converter = &rawConverter{res}
 

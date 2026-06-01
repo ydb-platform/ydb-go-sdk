@@ -205,9 +205,9 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		}
 	}()
 
-	attachStream, err := core.Client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
+	attachStream, err := core.Client.AttachSession(attachCtx, Ydb_Query.AttachSessionRequest_builder{
 		SessionId: core.id,
-	})
+	}.Build())
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -258,9 +258,9 @@ func deleteSession(ctx context.Context,
 	}
 
 	_, err := client.DeleteSession(ctx,
-		&Ydb_Query.DeleteSessionRequest{
+		Ydb_Query.DeleteSessionRequest_builder{
 			SessionId: sessionID,
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)

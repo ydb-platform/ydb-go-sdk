@@ -1303,16 +1303,16 @@ func (s lazyProtoStringifer) String() string {
 			storage := make([]messDataType, len(data.GetMessages()))
 			for i := range data.GetMessages() {
 				storage[i].Data = data.GetMessages()[i].GetData()
-				data.Messages[i] = nil
+				data.GetMessages()[i] = nil
 
 				storage[i].Metadata = data.GetMessages()[i].GetMetadataItems()
-				data.Messages[i].MetadataItems = nil
+				data.GetMessages()[i].SetMetadataItems(nil)
 			}
 
 			defer func() {
 				for i := range data.GetMessages() {
-					data.Messages[i].Data = storage[i].Data
-					data.Messages[i].MetadataItems = storage[i].Metadata
+					data.GetMessages()[i].SetData(storage[i].Data)
+					data.GetMessages()[i].SetMetadataItems(storage[i].Metadata)
 				}
 			}()
 		}

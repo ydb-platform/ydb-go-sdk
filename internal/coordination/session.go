@@ -262,20 +262,18 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 
 		// Start a new session.
 		onStart := gtrace.CoordinationOnSessionStart(s.trace)
-		startSession := Ydb_Coordination.SessionRequest{
-			Request: &Ydb_Coordination.SessionRequest_SessionStart_{
-				SessionStart: &Ydb_Coordination.SessionRequest_SessionStart{
+		startSession := Ydb_Coordination.SessionRequest_builder{
+				SessionStart: Ydb_Coordination.SessionRequest_SessionStart_builder{
 					Path:          path,
 					SessionId:     s.sessionID,
 					TimeoutMillis: uint64(s.sessionTimeout.Milliseconds()),
 					ProtectionKey: protectionKey,
 					SeqNo:         seqNo,
 					Description:   s.description,
-				},
-			},
-		}
+				}.Build(),
+		}.Build()
 
-		err = sessionClient.Send(&startSession)
+		err = sessionClient.Send(startSession)
 		if err != nil {
 			// Reconnect if a session cannot be started in this stream.
 			onStart(err)
@@ -364,11 +362,9 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 			gtrace.CoordinationOnSessionStop(s.trace, s.sessionID)
 			s.controller.Close(conversation.NewConversation(
 				func() *Ydb_Coordination.SessionRequest {
-					return &Ydb_Coordination.SessionRequest{
-						Request: &Ydb_Coordination.SessionRequest_SessionStop_{
-							SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
-						},
-					}
+					return Ydb_Coordination.SessionRequest_builder{
+						SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
+					}.Build()
 				}),
 			)
 
@@ -427,8 +423,8 @@ func (s *session) receiveLoop( //nolint:funlen
 		}
 		onDone(message, nil)
 
-		switch message.GetResponse().(type) {
-		case *Ydb_Coordination.SessionResponse_Failure_:
+		switch message.WhichResponse() {
+		case Ydb_Coordination.SessionResponse_Failure_case:
 			if message.GetFailure().GetStatus() == Ydb.StatusIds_SESSION_EXPIRED ||
 				message.GetFailure().GetStatus() == Ydb.StatusIds_UNAUTHORIZED ||
 				message.GetFailure().GetStatus() == Ydb.StatusIds_NOT_FOUND {
@@ -441,25 +437,23 @@ func (s *session) receiveLoop( //nolint:funlen
 			gtrace.CoordinationOnSessionServerError(s.trace, message.GetFailure())
 
 			return
-		case *Ydb_Coordination.SessionResponse_SessionStarted_:
+		case Ydb_Coordination.SessionResponse_SessionStarted_case:
 			sessionStarted <- message.GetSessionStarted()
 			s.updateLastGoodResponseTime()
-		case *Ydb_Coordination.SessionResponse_SessionStopped_:
+		case Ydb_Coordination.SessionResponse_SessionStopped_case:
 			sessionStopped <- message.GetSessionStopped()
 			s.cancel()
 
 			return
-		case *Ydb_Coordination.SessionResponse_Ping:
+		case Ydb_Coordination.SessionResponse_Ping_case:
 			opaque := message.GetPing().GetOpaque()
 			err := s.controller.PushFront(conversation.NewConversation(
 				func() *Ydb_Coordination.SessionRequest {
-					return &Ydb_Coordination.SessionRequest{
-						Request: &Ydb_Coordination.SessionRequest_Pong{
-							Pong: &Ydb_Coordination.SessionRequest_PingPong{
-								Opaque: opaque,
-							},
-						},
-					}
+					return Ydb_Coordination.SessionRequest_builder{
+						Pong: Ydb_Coordination.SessionRequest_PingPong_builder{
+							Opaque: opaque,
+						}.Build(),
+					}.Build()
 				}),
 			)
 			if err != nil {
@@ -467,7 +461,7 @@ func (s *session) receiveLoop( //nolint:funlen
 				return
 			}
 			s.updateLastGoodResponseTime()
-		case *Ydb_Coordination.SessionResponse_Pong:
+		case Ydb_Coordination.SessionResponse_Pong_case:
 			// Ignore pongs since we do not ping the server.
 		default:
 			if !s.controller.OnRecv(message) {
@@ -558,22 +552,20 @@ func (s *session) CreateSemaphore(
 ) error {
 	req := conversation.NewConversation(
 		func() *Ydb_Coordination.SessionRequest {
-			createSemaphore := Ydb_Coordination.SessionRequest_CreateSemaphore{
+			createSemaphore := Ydb_Coordination.SessionRequest_CreateSemaphore_builder{
 				ReqId: newReqID(),
 				Name:  name,
 				Limit: limit,
-			}
+			}.Build()
 			for _, o := range opts {
 				if o != nil {
-					o(&createSemaphore)
+					o(createSemaphore)
 				}
 			}
 
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
-					CreateSemaphore: &createSemaphore,
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				CreateSemaphore: createSemaphore,
+			}.Build()
 		},
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,
@@ -601,21 +593,19 @@ func (s *session) UpdateSemaphore(
 ) error {
 	req := conversation.NewConversation(
 		func() *Ydb_Coordination.SessionRequest {
-			updateSemaphore := Ydb_Coordination.SessionRequest_UpdateSemaphore{
+			updateSemaphore := Ydb_Coordination.SessionRequest_UpdateSemaphore_builder{
 				ReqId: newReqID(),
 				Name:  name,
-			}
+			}.Build()
 			for _, o := range opts {
 				if o != nil {
-					o(&updateSemaphore)
+					o(updateSemaphore)
 				}
 			}
 
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_UpdateSemaphore_{
-					UpdateSemaphore: &updateSemaphore,
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				UpdateSemaphore: updateSemaphore,
+			}.Build()
 		},
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,
@@ -645,21 +635,19 @@ func (s *session) DeleteSemaphore(
 ) error {
 	req := conversation.NewConversation(
 		func() *Ydb_Coordination.SessionRequest {
-			deleteSemaphore := Ydb_Coordination.SessionRequest_DeleteSemaphore{
+			deleteSemaphore := Ydb_Coordination.SessionRequest_DeleteSemaphore_builder{
 				ReqId: newReqID(),
 				Name:  name,
-			}
+			}.Build()
 			for _, o := range opts {
 				if o != nil {
-					o(&deleteSemaphore)
+					o(deleteSemaphore)
 				}
 			}
 
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_DeleteSemaphore_{
-					DeleteSemaphore: &deleteSemaphore,
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				DeleteSemaphore: deleteSemaphore,
+			}.Build()
 		},
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,
@@ -688,21 +676,19 @@ func (s *session) DescribeSemaphore(
 ) (*coordination.SemaphoreDescription, error) {
 	req := conversation.NewConversation(
 		func() *Ydb_Coordination.SessionRequest {
-			describeSemaphore := Ydb_Coordination.SessionRequest_DescribeSemaphore{
+			describeSemaphore := Ydb_Coordination.SessionRequest_DescribeSemaphore_builder{
 				ReqId: newReqID(),
 				Name:  name,
-			}
+			}.Build()
 			for _, o := range opts {
 				if o != nil {
-					o(&describeSemaphore)
+					o(describeSemaphore)
 				}
 			}
 
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
-					DescribeSemaphore: &describeSemaphore,
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				DescribeSemaphore: describeSemaphore,
+			}.Build()
 		},
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,
@@ -787,23 +773,21 @@ func (s *session) AcquireSemaphore( //nolint:funlen
 ) (coordination.Lease, error) {
 	req := conversation.NewConversation(
 		func() *Ydb_Coordination.SessionRequest {
-			acquireSemaphore := Ydb_Coordination.SessionRequest_AcquireSemaphore{
+			acquireSemaphore := Ydb_Coordination.SessionRequest_AcquireSemaphore_builder{
 				ReqId:         newReqID(),
 				Name:          name,
 				Count:         count,
 				TimeoutMillis: math.MaxUint64,
-			}
+			}.Build()
 			for _, o := range opts {
 				if o != nil {
-					o(&acquireSemaphore)
+					o(acquireSemaphore)
 				}
 			}
 
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_AcquireSemaphore_{
-					AcquireSemaphore: &acquireSemaphore,
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				AcquireSemaphore: acquireSemaphore,
+			}.Build()
 		},
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,
@@ -819,14 +803,12 @@ func (s *session) AcquireSemaphore( //nolint:funlen
 		}),
 		conversation.WithCancelMessage(
 			func(request *Ydb_Coordination.SessionRequest) *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_ReleaseSemaphore_{
-						ReleaseSemaphore: &Ydb_Coordination.SessionRequest_ReleaseSemaphore{
-							Name:  name,
-							ReqId: newReqID(),
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					ReleaseSemaphore: Ydb_Coordination.SessionRequest_ReleaseSemaphore_builder{
+						Name:  name,
+						ReqId: newReqID(),
+					}.Build(),
+				}.Build()
 			},
 			func(
 				request *Ydb_Coordination.SessionRequest,
@@ -868,14 +850,12 @@ func (l *lease) Context() context.Context {
 func (l *lease) Release() error {
 	req := conversation.NewConversation(
 		func() *Ydb_Coordination.SessionRequest {
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_ReleaseSemaphore_{
-					ReleaseSemaphore: &Ydb_Coordination.SessionRequest_ReleaseSemaphore{
-						ReqId: newReqID(),
-						Name:  l.name,
-					},
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				ReleaseSemaphore: Ydb_Coordination.SessionRequest_ReleaseSemaphore_builder{
+					ReqId: newReqID(),
+					Name:  l.name,
+				}.Build(),
+			}.Build()
 		},
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,

@@ -500,10 +500,10 @@ type bulkUpsertRows struct {
 }
 
 func (data bulkUpsertRows) ToYDB(tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
-	return &Ydb_Table.BulkUpsertRequest{
+	return Ydb_Table.BulkUpsertRequest_builder{
 		Table: tableName,
 		Rows:  value.ToYDB(data.rows),
-	}, nil
+	}.Build(), nil
 }
 
 func BulkUpsertDataRows(rows types.Value) bulkUpsertRows {
@@ -518,29 +518,26 @@ type bulkUpsertCsv struct {
 }
 
 type csvFormatOption interface {
-	applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) (err error)
+	applyCsvFormatOption(csvSettings *Ydb_Formats.CsvSettings) (err error)
 }
 
 func (data bulkUpsertCsv) ToYDB(tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
-	var (
-		request = &Ydb_Table.BulkUpsertRequest{
-			Table: tableName,
-			Data:  data.data,
-		}
-		dataFormat = &Ydb_Table.BulkUpsertRequest_CsvSettings{
-			CsvSettings: &Ydb_Formats.CsvSettings{},
-		}
-	)
+	request := Ydb_Table.BulkUpsertRequest_builder{
+		Table: tableName,
+		Data:  data.data,
+	}.Build()
+	
+	csvSettings := &Ydb_Formats.CsvSettings{}
 
 	for _, opt := range data.opts {
 		if opt != nil {
-			if err := opt.applyCsvFormatOption(dataFormat); err != nil {
+			if err := opt.applyCsvFormatOption(csvSettings); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	request.DataFormat = dataFormat
+	request.SetCsvSettings(csvSettings)
 
 	return request, nil
 }
@@ -554,8 +551,8 @@ func BulkUpsertDataCsv(data []byte, opts ...csvFormatOption) bulkUpsertCsv {
 
 type csvHeaderOption struct{}
 
-func (opt *csvHeaderOption) applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) error {
-	dataFormat.CsvSettings.Header = true
+func (opt *csvHeaderOption) applyCsvFormatOption(csvSettings *Ydb_Formats.CsvSettings) error {
+	csvSettings.SetHeader(true)
 
 	return nil
 }
@@ -567,8 +564,8 @@ func WithCsvHeader() csvFormatOption {
 
 type csvNullValueOption []byte
 
-func (nullValue csvNullValueOption) applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) error {
-	dataFormat.CsvSettings.NullValue = nullValue
+func (nullValue csvNullValueOption) applyCsvFormatOption(csvSettings *Ydb_Formats.CsvSettings) error {
+	csvSettings.SetNullValue(nullValue)
 
 	return nil
 }
@@ -580,8 +577,8 @@ func WithCsvNullValue(value []byte) csvFormatOption {
 
 type csvDelimiterOption []byte
 
-func (delimeter csvDelimiterOption) applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) error {
-	dataFormat.CsvSettings.Delimiter = delimeter
+func (delimeter csvDelimiterOption) applyCsvFormatOption(csvSettings *Ydb_Formats.CsvSettings) error {
+	csvSettings.SetDelimiter(delimeter)
 
 	return nil
 }
@@ -593,8 +590,8 @@ func WithCsvDelimiter(value []byte) csvFormatOption {
 
 type csvSkipRowsOption uint32
 
-func (skipRows csvSkipRowsOption) applyCsvFormatOption(dataFormat *Ydb_Table.BulkUpsertRequest_CsvSettings) error {
-	dataFormat.CsvSettings.SkipRows = uint32(skipRows)
+func (skipRows csvSkipRowsOption) applyCsvFormatOption(csvSettings *Ydb_Formats.CsvSettings) error {
+	csvSettings.SetSkipRows(uint32(skipRows))
 
 	return nil
 }
@@ -610,29 +607,26 @@ type bulkUpsertArrow struct {
 }
 
 type arrowFormatOption interface {
-	applyArrowFormatOption(req *Ydb_Table.BulkUpsertRequest_ArrowBatchSettings) (err error)
+	applyArrowFormatOption(arrowSettings *Ydb_Formats.ArrowBatchSettings) (err error)
 }
 
 func (data bulkUpsertArrow) ToYDB(tableName string) (*Ydb_Table.BulkUpsertRequest, error) {
-	var (
-		request = &Ydb_Table.BulkUpsertRequest{
-			Table: tableName,
-			Data:  data.data,
-		}
-		dataFormat = &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{
-			ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{},
-		}
-	)
+	request := Ydb_Table.BulkUpsertRequest_builder{
+		Table: tableName,
+		Data:  data.data,
+	}.Build()
+	
+	arrowSettings := &Ydb_Formats.ArrowBatchSettings{}
 
 	for _, opt := range data.opts {
 		if opt != nil {
-			if err := opt.applyArrowFormatOption(dataFormat); err != nil {
+			if err := opt.applyArrowFormatOption(arrowSettings); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	request.DataFormat = dataFormat
+	request.SetArrowBatchSettings(arrowSettings)
 
 	return request, nil
 }
@@ -647,9 +641,9 @@ func BulkUpsertDataArrow(data []byte, opts ...arrowFormatOption) bulkUpsertArrow
 type arrowSchemaOption []byte
 
 func (schema arrowSchemaOption) applyArrowFormatOption(
-	dataFormat *Ydb_Table.BulkUpsertRequest_ArrowBatchSettings,
+	arrowSettings *Ydb_Formats.ArrowBatchSettings,
 ) error {
-	dataFormat.ArrowBatchSettings.Schema = schema
+	arrowSettings.SetSchema(schema)
 
 	return nil
 }
