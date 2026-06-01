@@ -50,7 +50,11 @@ type (
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
-		streamCancel   context.CancelFunc
+		// streamCancel cancels the gRPC context that backs stream.Recv(). It
+		// is wired up by execute() to point at the executeCtx CancelFunc and
+		// invoked on demand from nextPart so that a Recv blocked on the wire
+		// can be unblocked when the caller's ctx is cancelled mid-flight.
+		streamCancel context.CancelFunc
 	}
 	resultOption func(s *streamResult)
 )
