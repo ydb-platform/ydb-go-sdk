@@ -24,5 +24,4 @@ var (
 	errSessionClosed            = errors.New("session is closed")
 	errNodeShutdownHint         = xerrors.Wrap(errors.New("received node shutdown hint"))
 	errSessionShutdownHint      = xerrors.Wrap(errors.New("received session shutdown hint"))
-	errClosedExecuteQueryStream = xerrors.Wrap(errors.New("execute query stream closed"))
 )

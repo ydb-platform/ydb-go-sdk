@@ -284,10 +284,10 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.onClose()
 
-	if r.stream != nil {
-		if r.stream.Context().Err() != nil {
-			return xerrors.WithStackTrace(errClosedExecuteQueryStream)
-		}
+	if r.stream != nil && r.stream.Context().Err() != nil {
+		// Stream already torn down (EOF, per-call ctx cancel, or prior Close).
+		// onClose runs via defer; nothing left to drain.
+		return nil
 	}
 
 	if r.closeTimeout > 0 {

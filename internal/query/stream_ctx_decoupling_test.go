@@ -138,7 +138,7 @@ func TestStreamResult_CloseIsIdempotentViaStreamContext(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, r.Close(t.Context()))
-		require.ErrorIs(t, r.Close(t.Context()), errClosedExecuteQueryStream)
+		require.NoError(t, r.Close(t.Context()))
 	})
 }
 
