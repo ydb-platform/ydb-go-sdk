@@ -273,8 +273,8 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.onClose()
 
 	if r.stream != nil {
-		if r.stream.Context().Err() != nil {
-			return nil
+		if ctxErr := r.stream.Context().Err(); ctxErr != nil {
+			return ctxErr
 		}
 	}
 
