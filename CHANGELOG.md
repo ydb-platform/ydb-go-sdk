@@ -1,8 +1,11 @@
 * Fixed query result stream draining when `Close` is called with a fresh context after `NextResultSet` used a cancelled per-call context while `ExecStats` arrive in later stream parts ([#2187](https://github.com/ydb-platform/ydb-go-sdk/issues/2187))
+<<<<<<< HEAD
 * Fixed query result `Close` to succeed when the execute stream is already closed (for example after full iteration or per-call context cancellation), matching `database/sql` expectations and table result close behavior ([#2187](https://github.com/ydb-platform/ydb-go-sdk/issues/2187))
 
 ## v3.139.3
 * Fixed connection pessimization when a query `ExecuteQuery` stream ends with gRPC `Canceled` or `context.Canceled` during result drain ([#2186](https://github.com/ydb-platform/ydb-go-sdk/issues/2186))
+=======
+>>>>>>> 5ca819f7 (test: align database/sql multi-result-set expectations with query stream cancel)
 
 ## v3.139.2
 * Added `label` to `table` `OnDo`/`OnDoTx` metrics (`latency`, `errs`, `attempts`) so that `table.WithLabel` breaks them down by label, consistent with the `query` service metrics

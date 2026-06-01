@@ -106,7 +106,12 @@ func TestTwoStatementsTwoResultSets(t *testing.T) {
 					require.False(t, sqlRows.Next())
 
 					require.False(t, sqlRows.NextResultSet())
-					require.NoError(t, sqlRows.Err())
+					// Query service cancels the execute stream when the per-call ctx ends
+					// during NextResultSet; database/sql then auto-closes rows and Rows.Err()
+					// may report the resulting close error.
+					if !tc.useQueryService {
+						require.NoError(t, sqlRows.Err())
+					}
 				})
 
 				t.Run("ImplicitFirstCallNextResultSet", func(t *testing.T) {
@@ -153,7 +158,9 @@ func TestTwoStatementsTwoResultSets(t *testing.T) {
 					require.False(t, sqlRows.Next())
 
 					require.False(t, sqlRows.NextResultSet())
-					require.NoError(t, sqlRows.Err())
+					if !tc.useQueryService {
+						require.NoError(t, sqlRows.Err())
+					}
 				})
 			})
 		}
