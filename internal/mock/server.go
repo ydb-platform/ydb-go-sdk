@@ -59,6 +59,10 @@ type server struct {
 	// dispatched to (e.g. when toggling WithExecuteDataQueryOverQueryClient).
 	executeQueryCalls     atomic.Uint64
 	executeDataQueryCalls atomic.Uint64
+
+	executeQueryBehavior executeQueryBehavior
+	commitQueryCalls     atomic.Uint64
+	queryTxID            atomic.Uint64
 }
 
 // TriggerNodeShutdown makes one AttachSession handler send a
@@ -98,6 +102,12 @@ func (m *server) ExecuteQueryCalls() uint64 {
 // has been invoked on this mock since it was started.
 func (m *server) ExecuteDataQueryCalls() uint64 {
 	return m.executeDataQueryCalls.Load()
+}
+
+// CommitQueryCalls returns the number of commit ExecuteQuery invocations handled by
+// executeCommitQuery (select-1 commit with basic stats) since the mock was started.
+func (m *server) CommitQueryCalls() uint64 {
+	return m.commitQueryCalls.Load()
 }
 
 // ConnString returns a grpc:// DSN for ydb.Open pointing at this mock.
@@ -213,6 +223,25 @@ type querySrv struct {
 	mock *server
 }
 
+func (m *querySrv) BeginTransaction(
+	_ context.Context,
+	_ *Ydb_Query.BeginTransactionRequest,
+) (*Ydb_Query.BeginTransactionResponse, error) {
+	id := fmt.Sprintf("tx-%d", m.mock.queryTxID.Add(1))
+
+	return &Ydb_Query.BeginTransactionResponse{
+		Status: Ydb.StatusIds_SUCCESS,
+		TxMeta: &Ydb_Query.TransactionMeta{Id: id},
+	}, nil
+}
+
+func (m *querySrv) RollbackTransaction(
+	_ context.Context,
+	_ *Ydb_Query.RollbackTransactionRequest,
+) (*Ydb_Query.RollbackTransactionResponse, error) {
+	return &Ydb_Query.RollbackTransactionResponse{Status: Ydb.StatusIds_SUCCESS}, nil
+}
+
 func (m *querySrv) CreateSession(
 	_ context.Context,
 	_ *Ydb_Query.CreateSessionRequest,
@@ -264,6 +293,10 @@ func (m *querySrv) ExecuteQuery(
 	stream Ydb_Query_V1.QueryService_ExecuteQueryServer,
 ) error {
 	m.mock.executeQueryCalls.Add(1)
+
+	if isCommitQuery(req) && m.mock.executeQueryBehavior != executeQueryBehaviorDefault {
+		return m.executeCommitQuery(req, stream)
+	}
 
 	resultSets := resultSetsForQuery(req.GetQueryContent().GetText())
 
