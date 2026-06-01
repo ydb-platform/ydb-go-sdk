@@ -641,8 +641,10 @@ func TestExecute(t *testing.T) {
 
 					return nil, executeCtx.Err()
 				}),
-				stream.EXPECT().Recv().Return(nil, io.EOF),
 			)
+			// Drain Recv during Close is optional: if callCtx cancel already
+			// propagated to executeCtx via withStreamCancel, Close returns early.
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
 
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -670,7 +672,15 @@ func TestExecute(t *testing.T) {
 
 			<-recvEntered
 			callCancel()
-			require.NoError(t, executeCtx.Err())
+
+			// execute() wires withStreamCancel(executeCancel), so per-call ctx
+			// cancel forwards to the gRPC stream context asynchronously via
+			// context.AfterFunc — not synchronously at callCancel() time.
+			require.Eventually(t, func() bool {
+				return executeCtx.Err() != nil
+			}, time.Second, time.Millisecond,
+				"callCtx cancel must propagate to execute stream")
+			require.ErrorIs(t, executeCtx.Err(), context.Canceled)
 
 			start := time.Now()
 			closeErr := r.Close(t.Context())
@@ -683,6 +693,8 @@ func TestExecute(t *testing.T) {
 				t.Fatal("nextPart still blocked after Close")
 			}
 
+			// Close may return nil if the stream was already torn down by
+			// streamCancel, or DeadlineExceeded if drain hit closeTimeout first.
 			if closeErr != nil {
 				require.ErrorIs(t, closeErr, context.DeadlineExceeded)
 			}

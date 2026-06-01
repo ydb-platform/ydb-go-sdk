@@ -38,7 +38,7 @@ func TestStreamResult_PerCallCtxCancelDoesNotRunExecuteOnCloseEarly(t *testing.T
 			executeCancel()
 		}
 
-		r, err := newResult(t.Context(), stream, nil, withStreamResultOnClose(onClose))
+		r, err := newResult(t.Context(), stream, withStreamResultOnClose(onClose))
 		require.NoError(t, err)
 
 		cancelledCtx, cancel := context.WithCancel(t.Context())
