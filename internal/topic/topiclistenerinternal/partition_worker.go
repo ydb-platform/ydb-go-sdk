@@ -172,10 +172,11 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 		if !ok {
 			// Queue was closed - this is a normal stop reason during shutdown
 			reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-				"partition worker message queue closed: topic=%s, partition=%d, partitionSession=%d",
+				"partition worker message queue closed: topic=%s, partition=%d, partitionSession=%d: %w",
 				w.partitionSession.Topic,
 				w.partitionSession.PartitionID,
 				w.partitionSessionID,
+				errPartitionQueueClosed,
 			)))
 			w.onStopped(w.partitionSessionID, reason)
 

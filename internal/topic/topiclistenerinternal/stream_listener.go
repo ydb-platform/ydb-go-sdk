@@ -130,20 +130,21 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 		}
 	})
 
-	// Close workers without holding the mutex
-	for _, worker := range workers {
-		if err := worker.Close(ctx, reason); err != nil {
-			resErrors = append(resErrors, err)
-		}
-	}
-
-	// should be first because background wait stop of steams
+	// Stop the read stream and background workers before closing partition workers,
+	// so receiveMessagesLoop does not route messages into shutting-down workers.
 	if l.stream != nil {
 		l.streamClose(reason)
 	}
 
 	if err := l.background.Close(ctx, reason); err != nil {
 		resErrors = append(resErrors, err)
+	}
+
+	// Close workers without holding the mutex
+	for _, worker := range workers {
+		if err := worker.Close(ctx, reason); err != nil {
+			resErrors = append(resErrors, err)
+		}
 	}
 
 	if err := l.syncCommitter.Close(ctx, reason); err != nil {
@@ -364,6 +365,10 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 // routeMessage routes messages to appropriate handlers/workers
 func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.ServerMessage) error {
+	if l.closing.Load() {
+		return nil
+	}
+
 	switch m := mess.(type) {
 	case *rawtopicreader.StartPartitionSessionRequest:
 		return l.handleStartPartition(ctx, m)
