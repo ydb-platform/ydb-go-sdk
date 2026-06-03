@@ -93,6 +93,33 @@ func (v *Int32) ToProto() *int32 {
 	return &val
 }
 
+type Uint32 struct {
+	Value    uint32
+	HasValue bool
+}
+
+func (v *Uint32) ToProto() *uint32 {
+	if !v.HasValue {
+		return nil
+	}
+
+	val := v.Value
+
+	return &val
+}
+
+func (v *Uint32) MustFromProto(proto *uint32) {
+	if proto == nil {
+		v.Value = 0
+		v.HasValue = false
+
+		return
+	}
+
+	v.HasValue = true
+	v.Value = *proto
+}
+
 type Time struct {
 	Value    time.Time
 	HasValue bool

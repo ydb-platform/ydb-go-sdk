@@ -50,6 +50,7 @@ type (
 		nodeID         uint32
 		status         atomic.Uint32
 		onChangeStatus []func(status Status)
+		onNodeShutdown func(cause error)
 		cancelAttach   context.CancelFunc
 
 		registerCloseCancel func(context.CancelFunc) func()
@@ -57,10 +58,18 @@ type (
 )
 
 func (core *sessionCore) ID() string {
+	if core == nil {
+		return ""
+	}
+
 	return core.id
 }
 
 func (core *sessionCore) NodeID() uint32 {
+	if core == nil {
+		return 0
+	}
+
 	return core.nodeID
 }
 
@@ -82,6 +91,10 @@ func (core *sessionCore) SetStatus(status Status) {
 }
 
 func (core *sessionCore) Status() string {
+	if core == nil {
+		return StatusUnknown.String()
+	}
+
 	if core.closed.Load() {
 		return StatusClosed.String()
 	}
@@ -212,12 +225,24 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	_, err = attachStream.Recv()
+	msg, err := attachStream.Recv()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
+	switch {
+	case msg.GetSessionShutdown() != nil:
+		return xerrors.WithStackTrace(errSessionShutdownHint)
+	case msg.GetNodeShutdown() != nil:
+		conn.Ban(attachStream.Context(), errNodeShutdownHint)
+
+		return xerrors.WithStackTrace(errNodeShutdownHint)
+	}
+
 	core.cancelAttach = cancelAttach
+	core.onNodeShutdown = func(cause error) {
+		conn.Ban(attachStream.Context(), cause)
+	}
 
 	if markGoroutineWithLabelNodeIDForAttachStream {
 		pprof.Do(ctx, pprof.Labels(
@@ -234,7 +259,20 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 
 func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryService_AttachSessionClient) {
 	for core.IsAlive() {
-		if _, recvErr := attachStream.Recv(); recvErr != nil {
+		msg, recvErr := attachStream.Recv()
+		if recvErr != nil {
+			core.releaseSession()
+
+			return
+		}
+
+		if msg.GetSessionShutdown() != nil {
+			core.releaseSession()
+
+			return
+		}
+		if msg.GetNodeShutdown() != nil {
+			core.onNodeShutdown(errNodeShutdownHint)
 			core.releaseSession()
 
 			return

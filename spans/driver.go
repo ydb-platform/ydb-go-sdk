@@ -5,9 +5,13 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
+	"net"
+	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -47,88 +51,79 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnDial: func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+			// We don't create a child span for the gRPC dial — it would
+			// pollute the user-facing span tree. We only inject the W3C
+			// `traceparent` header so server-side YDB spans link to the
+			// caller's trace.
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
 			if traceID, valid := adapter.SpanFromContext(*info.Context).TraceID(); valid {
 				*info.Context = meta.WithTraceParent(*info.Context, traceID)
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-			)
 
-			return func(info trace.DriverConnDialDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
+			return nil
 		},
 		OnConnInvoke: func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
+			// The QueryService unary RPC. Instead of a child span, attach
+			// network.peer.address / network.peer.port to the surrounding
+			// client span (e.g. ydb.CreateSession, ydb.Commit) and inject
+			// traceparent so the server sees this RPC as a child of that
+			// span.
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-				kv.String("address", safeAddress(info.Endpoint)),
-				kv.String("method", string(info.Method)),
-			)
-
-			if id, valid := start.ID(); valid {
-				if traceID, valid := start.TraceID(); valid {
+			parent := adapter.SpanFromContext(*info.Context)
+			annotateNetworkPeer(parent, info.Endpoint)
+			// Also propagate the same peer/node attributes up to the
+			// surrounding top-level CLIENT span (e.g. the outer
+			// ydb.ExecuteQuery span emitted by OnExec/OnQuery/...) so that
+			// every ydb.* CLIENT span carries ydb.node.id / ydb.node.dc
+			// alongside network.peer.* — see the documentation block at
+			// the top of spans/query.go.
+			if clientSpan := clientSpanFromContext(*info.Context); clientSpan != nil {
+				annotateNetworkPeer(clientSpan, info.Endpoint)
+			}
+			if id, valid := parent.ID(); valid {
+				if traceID, valid := parent.TraceID(); valid {
 					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
 				}
 			}
 
 			return func(info trace.DriverConnInvokeDoneInfo) {
-				fields := []KeyValue{
-					kv.String("opID", info.OpID),
-					kv.String("state", safeStringer(info.State)),
-				}
-				if len(info.Issues) > 0 {
+				if info.Error != nil {
+					logError(parent, info.Error)
+				} else if len(info.Issues) > 0 {
 					issues := make([]string, len(info.Issues))
 					for i, issue := range info.Issues {
 						issues[i] = fmt.Sprintf("%+v", issue)
 					}
-					fields = append(fields,
-						kv.Strings("issues", issues),
-					)
+					parent.Log("conn.Invoke issues", kv.Strings("issues", issues))
 				}
-				finish(
-					start,
-					info.Error,
-					fields...,
-				)
 			}
 		},
 		OnConnNewStream: func(info trace.DriverConnNewStreamStartInfo) func(trace.DriverConnNewStreamDoneInfo) {
+			// The QueryService streaming RPC. Same treatment as Invoke:
+			// no child span, just augment the parent client span.
 			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
 			*info.Context = withGrpcStreamMsgCounters(*info.Context)
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-				kv.String("address", safeAddress(info.Endpoint)),
-				kv.String("method", string(info.Method)),
-			)
-
-			if id, valid := start.ID(); valid {
-				if traceID, valid := start.TraceID(); valid {
+			parent := adapter.SpanFromContext(*info.Context)
+			annotateNetworkPeer(parent, info.Endpoint)
+			if clientSpan := clientSpanFromContext(*info.Context); clientSpan != nil {
+				annotateNetworkPeer(clientSpan, info.Endpoint)
+			}
+			if id, valid := parent.ID(); valid {
+				if traceID, valid := parent.TraceID(); valid {
 					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
 				}
 			}
 
 			return func(info trace.DriverConnNewStreamDoneInfo) {
-				finish(start, info.Error,
-					kv.String("state", safeStringer(info.State)),
-				)
+				if info.Error != nil {
+					logError(parent, info.Error)
+				}
 			}
 		},
 		OnConnStreamRecvMsg: func(info trace.DriverConnStreamRecvMsgStartInfo) func(trace.DriverConnStreamRecvMsgDoneInfo) {
@@ -289,10 +284,23 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
+			// Driver bootstrap fires the trace event from two places:
+			//   - clusterDiscoveryAttemptWithDial (outer, also responsible
+			//     for opening the gRPC connection)
+			//   - clusterDiscoveryAttempt (inner, called from the outer one)
+			// We only want a single ydb.Driver.Initialize span, and only on
+			// the very first init — periodic discovery refreshes triggered
+			// by the repeater come with EventTick / EventForce and must not
+			// produce a span.
+			isOuter := strings.HasSuffix(info.Call.String(), "clusterDiscoveryAttemptWithDial")
+			isInit := repeater.EventType(*info.Context) == repeater.EventInit
+			if !isOuter || !isInit {
+				return nil
+			}
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				SpanNameDriverInitialize,
 				kv.String("address", info.Address),
 			)
 
@@ -426,6 +434,47 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				start.End()
 			}
 		},
+	}
+}
+
+// annotateNetworkPeer attaches network.peer.address / network.peer.port to
+// the given span based on the actual endpoint chosen for the RPC. The
+// address comes in `host:port` form (e.g. "8e5d46f58bc6:2136"); we split
+// it so the span has both attributes per OTel semantic conventions.
+//
+// Additionally, endpoint metadata is attached as YDB-specific attributes.
+func annotateNetworkPeer(s Span, endpoint trace.EndpointInfo) {
+	if endpoint == nil {
+		return
+	}
+	addr := endpoint.Address()
+	if addr == "" {
+		return
+	}
+	attrs := make([]KeyValue, 0, 4)
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		attrs = append(attrs, kv.String(AttrNetworkPeerAddress, addr))
+	} else {
+		attrs = append(attrs, kv.String(AttrNetworkPeerAddress, host))
+		if port, err := strconv.Atoi(portStr); err == nil {
+			attrs = append(attrs, kv.Int(AttrNetworkPeerPort, port))
+		}
+	}
+	attrs = append(attrs,
+		kv.String(AttrYDBNodeDC, endpoint.Location()),
+		kv.Int64(AttrYDBNodeID, int64(endpoint.NodeID())),
+	)
+	setSpanAttributes(s, attrs...)
+}
+
+type spanAttributesSetter interface {
+	SetAttributes(attributes ...KeyValue)
+}
+
+func setSpanAttributes(s Span, attrs ...KeyValue) {
+	if setter, ok := s.(spanAttributesSetter); ok {
+		setter.SetAttributes(attrs...)
 	}
 }
 

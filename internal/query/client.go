@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/safe"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -371,6 +372,9 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 			return op(ctx, s)
 		},
 		append([]retry.Option{
+			// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
+			// callers see ydb.RunWithRetry / ydb.Try spans for Do().
+			retry.WithTrace(c.config.TraceRetry()),
 			retry.WithTrace(&trace.Retry{
 				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 					return func(info trace.RetryLoopDoneInfo) {
@@ -698,6 +702,9 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 		settings.TxSettings(),
 		append(
 			[]retry.Option{
+				// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
+				// callers see ydb.RunWithRetry / ydb.Try spans for DoTx().
+				retry.WithTrace(c.config.TraceRetry()),
 				retry.WithTrace(&trace.Retry{
 					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 						return func(info trace.RetryLoopDoneInfo) {
@@ -826,8 +833,8 @@ func newWithQueryServiceClient(ctx context.Context,
 	return c, nil
 }
 
-func poolTrace(t *trace.Query) *pool.Trace {
-	return &pool.Trace{
+func poolTrace(t *trace.Query) *pool.Trace[*Session, Session] {
+	return &pool.Trace[*Session, Session]{
 		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
 			onDone := gtrace.QueryOnPoolNew(t, ctx, call)
 
@@ -856,23 +863,23 @@ func poolTrace(t *trace.Query) *pool.Trace {
 				onDone(attempts, err)
 			}
 		},
-		OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
-			onDone := gtrace.QueryOnPoolPut(t, ctx, call, item.(*Session)) //nolint:forcetypeassert
+		OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
+			onDone := gtrace.QueryOnPoolPut(t, ctx, call, safe.SessionInfo(item))
 
 			return func(err error) {
 				onDone(err)
 			}
 		},
 		OnGet: func(ctx *context.Context, call stack.Caller) func(
-			item any,
+			session *Session,
 			hint *trace.NodeHintInfo,
 			attempts int,
 			err error,
 		) {
 			onDone := gtrace.QueryOnPoolGet(t, ctx, call)
 
-			return func(item any, hint *trace.NodeHintInfo, attempts int, err error) {
-				onDone(item.(*Session), attempts, hint, err) //nolint:forcetypeassert
+			return func(session *Session, hint *trace.NodeHintInfo, attempts int, err error) {
+				onDone(safe.SessionInfo(session), attempts, hint, err)
 			}
 		},
 		OnChange: func(stats pool.Stats) {

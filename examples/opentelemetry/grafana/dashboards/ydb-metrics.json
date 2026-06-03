@@ -1,0 +1,135 @@
+{
+  "title": "YDB .NET SDK Dashboard",
+  "uid": "ydb-sdk-main",
+  "schemaVersion": 38,
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Request Rate (RPS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "expr": "sum by (operation_name) (rate(ydb_client_operation_duration_seconds_count[$__rate_interval]))",
+          "legendFormat": "{{operation_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        }
+      ]
+    },
+    {
+      "title": "Error Rate (RPS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "expr": "sum by (status_code) (rate(ydb_client_operation_failed_total[$__rate_interval]))",
+          "legendFormat": "{{status_code}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        }
+      ]
+    },
+    {
+      "title": "Session Pool (Used / Idle)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "expr": "sum by (ydb_query_session_pool_name) (ydb_query_session_count{ydb_query_session_state=\"used\"})",
+          "legendFormat": "used · {{ydb_query_session_pool_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "expr": "sum by (ydb_query_session_pool_name) (ydb_query_session_count{ydb_query_session_state=\"idle\"})",
+          "legendFormat": "idle · {{ydb_query_session_pool_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "expr": "sum by (ydb_query_session_pool_name) (ydb_query_session_count)",
+          "legendFormat": "total · {{ydb_query_session_pool_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        }
+      ]
+    },
+    {
+      "title": "Pending Session Requests",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "expr": "sum by (ydb_query_session_pool_name) (rate(ydb_query_session_pending_requests_total[$__rate_interval]))",
+          "legendFormat": "{{ydb_query_session_pool_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        }
+      ]
+    },
+    {
+      "title": "Session Timeouts",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "expr": "sum by (ydb_query_session_pool_name) (increase(ydb_query_session_timeouts_total[$__rate_interval]))",
+          "legendFormat": "{{ydb_query_session_pool_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        }
+      ]
+    },
+    {
+      "title": "Operation Latency Percentiles",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, operation_name) (rate(ydb_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p50 · {{operation_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, operation_name) (rate(ydb_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p95 · {{operation_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, operation_name) (rate(ydb_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p99 · {{operation_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        }
+      ]
+    },
+    {
+      "title": "Session Create Time Percentiles",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, ydb_query_session_pool_name) (rate(ydb_query_session_create_time_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p50 · {{ydb_query_session_pool_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, ydb_query_session_pool_name) (rate(ydb_query_session_create_time_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p95 · {{ydb_query_session_pool_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, ydb_query_session_pool_name) (rate(ydb_query_session_create_time_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p99 · {{ydb_query_session_pool_name}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        }
+      ]
+    }
+  ]
+}

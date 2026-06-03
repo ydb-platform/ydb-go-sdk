@@ -31,55 +31,50 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type (
-	testItem struct {
-		v int32
+type testItem struct {
+	v int32
 
-		closed bool
+	closed bool
 
-		onClose   func() error
-		onIsAlive func() bool
-		onNodeID  func() uint32
+	onClose   func() error
+	onIsAlive func() bool
+	onNodeID  func() uint32
+}
+
+func defaultTrace[PT ItemConstraint[T], T any]() *Trace[PT, T] {
+	return &Trace[PT, T]{
+		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
+			return func(limit int) {
+			}
+		},
+		OnClose: func(ctx *context.Context, call stack.Caller) func(err error) {
+			return func(err error) {
+			}
+		},
+		OnTry: func(ctx *context.Context, call stack.Caller) func(err error) {
+			return func(err error) {
+			}
+		},
+		OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
+			return func(attempts int, err error) {
+			}
+		},
+		OnPut: func(ctx *context.Context, call stack.Caller, info PT) func(err error) {
+			return func(err error) {
+			}
+		},
+		OnGet: func(ctx *context.Context, call stack.Caller) func(
+			info PT,
+			nodeHintInfo *trace.NodeHintInfo,
+			attempts int,
+			err error,
+		) {
+			return func(info PT, nodeHintInfo *trace.NodeHintInfo, attempts int, err error) {
+			}
+		},
+		OnChange: func(stats Stats) {
+		},
 	}
-	//	testWaitChPool struct {
-	//		xsync.Pool[chan *testItem]
-	//
-	//		testHookGetWaitCh func()
-	//	}
-)
-
-var defaultTrace = &Trace{
-	OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
-		return func(limit int) {
-		}
-	},
-	OnClose: func(ctx *context.Context, call stack.Caller) func(err error) {
-		return func(err error) {
-		}
-	},
-	OnTry: func(ctx *context.Context, call stack.Caller) func(err error) {
-		return func(err error) {
-		}
-	},
-	OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
-		return func(attempts int, err error) {
-		}
-	},
-	OnPut: func(ctx *context.Context, call stack.Caller, info any) func(err error) {
-		return func(err error) {
-		}
-	},
-	OnGet: func(ctx *context.Context, call stack.Caller) func(
-		info any,
-		nodeHintInfo *trace.NodeHintInfo,
-		attempts int,
-		err error,
-	) {
-		return func(info any, nodeHintInfo *trace.NodeHintInfo, attempts int, err error) {
-		}
-	},
-	OnChange: func(stats Stats) {
-	},
 }
 
 func (t *testItem) IsAlive() bool {
@@ -200,7 +195,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 	t.Run("New", func(t *testing.T) {
 		t.Run("Default", func(t *testing.T) {
 			p := mustNewPool[*testItem, testItem](t,
-				WithTrace[*testItem, testItem](defaultTrace),
+				WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 			)
 			requirePoolStats(t, p, poolStats(DefaultLimit, nil))
 
@@ -217,23 +212,24 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 		t.Run("RequireNodeIdFromPool", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
-				hintTrace := defaultTrace
 				var preferredID uint32
-				hintTrace.OnGet = func(ctx *context.Context, call stack.Caller) func(
-					info any,
-					nodeHintInfo *trace.NodeHintInfo,
-					attempts int,
-					err error,
-				) {
-					return func(info any, nodeHintInfo *trace.NodeHintInfo, attempts int, err error) {
-						if nodeHintInfo != nil {
-							preferredID = nodeHintInfo.PreferredNodeID
+				hintTrace := &Trace[*testItem, testItem]{
+					OnGet: func(ctx *context.Context, call stack.Caller) func(
+						info *testItem,
+						nodeHintInfo *trace.NodeHintInfo,
+						attempts int,
+						err error,
+					) {
+						return func(info *testItem, nodeHintInfo *trace.NodeHintInfo, attempts int, err error) {
+							if nodeHintInfo != nil {
+								preferredID = nodeHintInfo.PreferredNodeID
+							}
 						}
-					}
+					},
 				}
 				var newItemCalled uint32
 				p := mustNewPool[*testItem, testItem](t,
-					WithTrace[*testItem, testItem](defaultTrace),
+					WithTrace[*testItem, testItem](hintTrace),
 					WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 						newItemCalled++
 						v := testItem{
@@ -360,7 +356,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 		t.Run("PreferredNodeTakenAndPoolFull", func(t *testing.T) {
 			p := mustNewPool[*testItem, testItem](t,
-				WithTrace[*testItem, testItem](defaultTrace),
+				WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					v := testItem{
 						v: 0,
@@ -401,7 +397,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("CreateItemOnGivenNode", func(t *testing.T) {
 			var newItemCalled uint32
 			p := mustNewPool[*testItem, testItem](t,
-				WithTrace[*testItem, testItem](defaultTrace),
+				WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
 					newItemCalled++
 					v := testItem{
@@ -438,7 +434,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 		t.Run("WithLimit", func(t *testing.T) {
 			p := mustNewPool[*testItem, testItem](t, WithLimit[*testItem, testItem](1),
-				WithTrace[*testItem, testItem](defaultTrace),
+				WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 			)
 			require.EqualValues(t, 1, p.config.limit)
 			requirePoolStats(t, p, poolStats(1, nil))
@@ -488,7 +484,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 					return &v, nil
 				}),
-				WithTrace[*testItem, testItem](defaultTrace),
+				WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 			)
 			requirePoolStats(t, p, poolStats(1, nil))
 			err := p.With(t.Context(), func(ctx context.Context, info *testItem) error {
@@ -533,7 +529,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 					return &v, nil
 				}),
-				WithTrace[*testItem, testItem](defaultTrace),
+				WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 			)
 			requirePoolStats(t, p, poolStats(3, nil))
 
@@ -579,7 +575,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 
 						return &v, nil
 					}),
-					WithTrace[*testItem, testItem](defaultTrace),
+					WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 				)
 				requirePoolStats(t, p, poolStats(3, nil))
 
@@ -656,7 +652,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				ctx := t.Context()
 				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](2),
-					WithTrace[*testItem, testItem](defaultTrace),
+					WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 				)
 				requirePoolStats(t, p, poolStats(2, nil))
 
@@ -693,7 +689,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				ctx := t.Context()
 				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](1),
-					WithTrace[*testItem, testItem](defaultTrace),
+					WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 				)
 				requirePoolStats(t, p, poolStats(1, nil))
 
@@ -713,7 +709,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					ctx := t.Context()
 					tryStarted := make(chan struct{}, 1)
 					var tryCalls atomic.Int32
-					trace := *defaultTrace
+					trace := *defaultTrace[*testItem, testItem]()
 					trace.OnTry = func(ctx *context.Context, call stack.Caller) func(err error) {
 						// Signal only when the third With enters try (two holders already did).
 						if tryCalls.Add(1) == 3 {
@@ -774,7 +770,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					ctx := t.Context()
 					p := mustNewPool[*testItem, testItem](t,
 						WithLimit[*testItem, testItem](1),
-						WithTrace[*testItem, testItem](defaultTrace),
+						WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 					)
 					requirePoolStats(t, p, poolStats(1, nil))
 
@@ -817,7 +813,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					ctx := t.Context()
 					p := mustNewPool[*testItem, testItem](t,
 						WithLimit[*testItem, testItem](limit),
-						WithTrace[*testItem, testItem](defaultTrace),
+						WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 					)
 					requirePoolStats(t, p, poolStats(limit, nil))
 
@@ -920,7 +916,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithClock[*testItem, testItem](fakeClock),
 					WithIdleTimeToLive[*testItem, testItem](idleThreshold),
-					WithTrace[*testItem, testItem](defaultTrace),
+					WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 				)
 				requirePoolStats(t, p, poolStats(2, nil))
 
@@ -1437,7 +1433,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						},
 					}, nil
 				}),
-				WithTrace[*testItem, testItem](defaultTrace),
+				WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 			)
 			defer func() {
 				_ = p.Close(ctx)
@@ -1683,7 +1679,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 		t.Run("Racy", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
-				trace := &Trace{
+				trace := &Trace[*testItem, testItem]{
 					OnChange: func(stats Stats) {
 						require.GreaterOrEqual(t, stats.Limit, stats.Idle)
 					},
@@ -1722,7 +1718,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		})
 		t.Run("ParallelCreation", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
-				trace := &Trace{
+				trace := &Trace[*testItem, testItem]{
 					OnChange: func(stats Stats) {
 						require.Equal(t, DefaultLimit, stats.Limit)
 						require.LessOrEqual(t, stats.Idle, DefaultLimit)
@@ -2066,7 +2062,7 @@ func TestPoolWith_retriesOnNothingIdleItems(t *testing.T) {
 		attempts     atomic.Int32
 	)
 
-	trace := *defaultTrace
+	trace := *defaultTrace[*testItem, testItem]()
 	trace.OnWith = func(_ *context.Context, _ stack.Caller) func(int, error) {
 		return func(a int, err error) {
 			attempts.Store(int32(a))

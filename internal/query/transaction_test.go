@@ -41,7 +41,7 @@ func TestBegin(t *testing.T) {
 			},
 		}, nil)
 		t.Log("begin")
-		txID, err := begin(ctx, client, "123", query.TxSettings())
+		txID, err := begin(ctx, newTestSessionWithClient("123", client, false), query.TxSettings())
 		require.NoError(t, err)
 		require.Equal(t, "123", txID)
 	})
@@ -51,7 +51,7 @@ func TestBegin(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 		t.Log("begin")
-		_, err := begin(ctx, client, "123", query.TxSettings())
+		_, err := begin(ctx, newTestSessionWithClient("123", client, false), query.TxSettings())
 		require.Error(t, err)
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 	})
@@ -63,7 +63,7 @@ func TestBegin(t *testing.T) {
 			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 		)
 		t.Log("begin")
-		_, err := begin(ctx, client, "123", query.TxSettings())
+		_, err := begin(ctx, newTestSessionWithClient("123", client, false), query.TxSettings())
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 	})
@@ -184,7 +184,7 @@ func TestTxOnCompleted(t *testing.T) {
 	t.Run("OnExecWithoutCommitTxSuccess", func(t *testing.T) {
 		e := fixenv.New(t)
 
-		responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+		responseStream := newExecuteQueryStreamMock(MockController(e))
 		responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil)
@@ -206,7 +206,7 @@ func TestTxOnCompleted(t *testing.T) {
 	t.Run("OnQueryWithoutCommitTxSuccess", func(t *testing.T) {
 		e := fixenv.New(t)
 
-		responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+		responseStream := newExecuteQueryStreamMock(MockController(e))
 		responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil)
@@ -228,7 +228,7 @@ func TestTxOnCompleted(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := fixenv.New(t)
 
-			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream := newExecuteQueryStreamMock(MockController(e))
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
@@ -255,7 +255,7 @@ func TestTxOnCompleted(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := fixenv.New(t)
 
-			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream := newExecuteQueryStreamMock(MockController(e))
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
@@ -288,7 +288,7 @@ func TestTxOnCompleted(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := fixenv.New(t)
 
-			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream := newExecuteQueryStreamMock(MockController(e))
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
@@ -318,7 +318,7 @@ func TestTxOnCompleted(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := fixenv.New(t)
 
-			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream := newExecuteQueryStreamMock(MockController(e))
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
@@ -354,7 +354,7 @@ func TestTxOnCompleted(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := fixenv.New(t)
 
-			responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+			responseStream := newExecuteQueryStreamMock(MockController(e))
 			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				ResultSetIndex: 0,
 				ResultSet:      &Ydb.ResultSet{},
@@ -411,7 +411,7 @@ func TestTxOnCompleted(t *testing.T) {
 				e := fixenv.New(t)
 
 				testErr := errors.New("test")
-				responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+				responseStream := newExecuteQueryStreamMock(MockController(e))
 				responseStream.EXPECT().Recv().Return(nil, testErr)
 
 				QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
@@ -437,7 +437,7 @@ func TestTxOnCompleted(t *testing.T) {
 					e := fixenv.New(t)
 
 					errorReturned := false
-					responseStream := NewMockQueryService_ExecuteQueryClient(MockController(e))
+					responseStream := newExecuteQueryStreamMock(MockController(e))
 					responseStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 						errorReturned = true
 
