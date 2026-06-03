@@ -141,7 +141,7 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 // known the writer resolves the hosting node via DescribeTopic(IncludeLocation=true)
 // and binds the gRPC stream to it.
 //
-// The partition can be pinned by the caller via WithWriterPartitionID, in which
+// The partition can be pinned by the caller via [WithWriterPartitionID], in which
 // case the very first connect already goes direct. Without a pinned partition
 // the first connect goes through the proxy as usual; the partition the server
 // assigns in the InitResponse is captured, the stream is torn down, and the
