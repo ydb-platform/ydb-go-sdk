@@ -18,40 +18,50 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 )
 
-func TestDirectWriteValidation_RequiresPartitionID(t *testing.T) {
-	t.Run("WithoutPartitionID", func(t *testing.T) {
+// TestDirectWriteResolvedPartitionSeed covers how the shared
+// directWriteResolvedPartitionID atomic is initialized by
+// NewWriterReconnectorConfig. The connect path uses this value to decide
+// whether to bind to a node (>= 0) or fall back to the proxy (-1) until the
+// server tells us the partition.
+func TestDirectWriteResolvedPartitionSeed(t *testing.T) {
+	t.Run("UnknownWhenNoPartitionPinned", func(t *testing.T) {
 		cfg := NewWriterReconnectorConfig(
 			WithTopic("test-topic"),
 			WithDirectWrite(true),
 		)
-		require.ErrorIs(t, cfg.validate(), errDirectWriteRequiresPartitionID)
+		require.NoError(t, cfg.validate())
+		require.EqualValues(t, -1, cfg.directWriteResolvedPartitionID.Load())
 	})
 
-	t.Run("WithMessageGroupID", func(t *testing.T) {
+	t.Run("UnknownWithMessageGroupID", func(t *testing.T) {
 		cfg := NewWriterReconnectorConfig(
 			WithTopic("test-topic"),
 			WithProducerID("p1"),
 			WithPartitioning(NewPartitioningWithMessageGroupID("p1")),
 			WithDirectWrite(true),
 		)
-		require.ErrorIs(t, cfg.validate(), errDirectWriteRequiresPartitionID)
+		require.NoError(t, cfg.validate())
+		require.EqualValues(t, -1, cfg.directWriteResolvedPartitionID.Load())
 	})
 
-	t.Run("OkWithPartitionID", func(t *testing.T) {
+	t.Run("SeededFromStaticPartitionID", func(t *testing.T) {
 		cfg := NewWriterReconnectorConfig(
 			WithTopic("test-topic"),
 			WithPartitioning(NewPartitioningWithPartitionID(7)),
 			WithDirectWrite(true),
 		)
 		require.NoError(t, cfg.validate())
+		require.EqualValues(t, 7, cfg.directWriteResolvedPartitionID.Load())
 	})
 
-	t.Run("OkWhenDisabled", func(t *testing.T) {
+	t.Run("UnknownWhenDirectWriteDisabled", func(t *testing.T) {
 		cfg := NewWriterReconnectorConfig(
 			WithTopic("test-topic"),
+			WithPartitioning(NewPartitioningWithPartitionID(7)),
 			WithDirectWrite(false),
 		)
 		require.NoError(t, cfg.validate())
+		require.EqualValues(t, -1, cfg.directWriteResolvedPartitionID.Load())
 	})
 }
 

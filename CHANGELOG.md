@@ -1,3 +1,4 @@
+* Relaxed `topicoptions.WithWriterDirectWrite` to also work without `topicoptions.WithWriterPartitionID`: the writer probes the server for the assigned partition on the first connect and rebinds to the partition's node; auto-partitioning splits/merges are handled by re-discovery on session errors
 * Added `topicoptions.WithWriterDirectWrite(bool)` option to bind a topic writer with a fixed partition ID to the node that hosts the partition, bypassing the topic proxy
 * Added `topicoptions.WithMultiWriterDirectWrite(bool)` option to enable direct writes for all per-partition writers spawned by `topicoptions.WithWriteToManyPartitions`
 
