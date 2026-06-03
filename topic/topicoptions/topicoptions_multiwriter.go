@@ -38,7 +38,7 @@ func WithWriterIdleTimeout(timeout time.Duration) MultiWriterOption {
 // WithMultiWriterDirectWrite enables direct writes to the node that hosts each
 // target partition for all per-partition writers spawned by the multi-writer.
 //
-// See topicoptions.WithWriterDirectWrite for behavior details and error semantics.
+// See [WithWriterDirectWrite] for behavior details and error semantics.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithMultiWriterDirectWrite(enable bool) MultiWriterOption {
