@@ -137,13 +137,24 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 }
 
 // WithWriterDirectWrite enables direct writes from the SDK to the YDB node that
-// hosts the target partition, bypassing the topic proxy. Before each (re)connect
-// the writer resolves the node via DescribeTopic(IncludeLocation=true) and binds
-// the stream to it.
+// hosts the target partition, bypassing the topic proxy. When the partition is
+// known the writer resolves the hosting node via DescribeTopic(IncludeLocation=true)
+// and binds the gRPC stream to it.
 //
-// Requires WithWriterPartitionID to be set: without a fixed partition the SDK
-// cannot resolve a single node. Writer creation fails with a validation error
-// if this option is enabled without a partition ID.
+// The partition can be pinned by the caller via WithWriterPartitionID, in which
+// case the very first connect already goes direct. Without a pinned partition
+// the first connect goes through the proxy as usual; the partition the server
+// assigns in the InitResponse is captured, the stream is torn down, and the
+// next reconnect binds to the partition's node. User Write calls are parked on
+// the SDK side until the rebound session is ready, so messages never leak to
+// the proxy node.
+//
+// On any session failure after the partition was learned from the server (i.e.
+// not pinned by the caller) the resolved partition is dropped and the next
+// reconnect goes back through the proxy to re-discover. This handles topics
+// with auto-partitioning (split / merge invalidates the old partition) and
+// node migrations the SDK can't detect on its own. A user-pinned partition is
+// never reset; errors propagate to the caller.
 //
 // Transient lookup errors (UNAVAILABLE, OVERLOADED, etc.) are retried by the
 // existing writer reconnect loop. Terminal errors (BAD_REQUEST, SCHEME_ERROR,
