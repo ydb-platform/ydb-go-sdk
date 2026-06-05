@@ -5,11 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"sync/atomic"
+	"time"
+
+	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -31,6 +37,9 @@ type directWrite struct {
 	pinnedByUser bool
 	original     rawtopicwriter.Partitioning
 	partitioning *rawtopicwriter.Partitioning
+
+	// retryResetPending is set after a successful proxy probe; the next connect must not count as a failed retry.
+	retryResetPending bool
 }
 
 func (dw *directWrite) finishInit(partitioning *rawtopicwriter.Partitioning) {
@@ -46,6 +55,64 @@ func (dw *directWrite) finishInit(partitioning *rawtopicwriter.Partitioning) {
 	}
 
 	dw.resolved.Store(-1)
+}
+
+func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, producerID string) error {
+	if !dw.enabled ||
+		partitioning.Type == rawtopicwriter.PartitioningPartitionID ||
+		producerID != "" {
+		return nil
+	}
+
+	return xerrors.WithStackTrace(errDirectWriteRequiresPartitionOrProducer)
+}
+
+func newWriterConnectFunc(cfg *WriterReconnectorConfig) ConnectFunc {
+	return func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error) {
+		mergedCtx := xcontext.MergeContexts(ctx, cfg.LogContext)
+		resolvedCtx, err := cfg.directWrite.bindConnectContext(mergedCtx, cfg.rawTopicClient, cfg.topic)
+		if err != nil {
+			return nil, err
+		}
+
+		return cfg.rawTopicClient.StreamWrite(resolvedCtx, tracer)
+	}
+}
+
+func (dw *directWrite) bumpConnectionAttempt(
+	clock clockwork.Clock,
+	connectTimeout time.Duration,
+	reconnectReason error,
+	withLock func(func()),
+	prevAttemptTime time.Time,
+	attempt int,
+	startOfRetries time.Time,
+) (newAttempt int, newStartOfRetries, now time.Time) {
+	dw.dropLearnedPartitionIfNeeded(reconnectReason, withLock)
+
+	now = time.Now()
+	if dw.consumeRetryReset() ||
+		startOfRetries.IsZero() ||
+		topic.CheckResetReconnectionCounters(prevAttemptTime, now, connectTimeout) {
+		return 0, clock.Now(), now
+	}
+
+	return attempt + 1, startOfRetries, now
+}
+
+// handleProbeInit records partition from a proxy InitResponse. Must be called with the writer mutex held.
+// It returns true when the connection loop must rebind to the partition host node.
+func (dw *directWrite) handleProbeInit(writer *SingleStreamWriter, setLastSeqNo func(int64)) bool {
+	if !dw.awaitingPartition() {
+		return false
+	}
+
+	dw.pinPartitionFromInit(writer.PartitionID)
+	if writer.LastSeqNumRequested {
+		setLastSeqNo(writer.ReceivedLastSeqNum)
+	}
+
+	return true
 }
 
 // bindConnectContext resolves the node for a known partition and binds the
@@ -66,6 +133,20 @@ func (dw *directWrite) bindConnectContext(
 	}
 
 	return resolvePartitionNode(ctx, rawClient, topicPath, partitionID)
+}
+
+func (dw *directWrite) completeProbe(streamCtx context.Context, writer *SingleStreamWriter) {
+	_ = writer.close(streamCtx, nil)
+	dw.retryResetPending = true
+}
+
+func (dw *directWrite) consumeRetryReset() bool {
+	if !dw.retryResetPending {
+		return false
+	}
+	dw.retryResetPending = false
+
+	return true
 }
 
 // dropLearnedPartitionIfNeeded clears a server-learned partition after a
