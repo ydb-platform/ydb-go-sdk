@@ -255,8 +255,7 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 // PartitionLocation describes which node currently hosts a partition.
 // It is populated only when [topicoptions.IncludeLocation] is passed to Describe.
 type PartitionLocation struct {
-	NodeID     uint32
-	Generation int64
+	NodeID uint32
 }
 
 // PartitionInfo contains info about partition.
@@ -280,7 +279,6 @@ func (p *PartitionInfo) FromRaw(raw *rawtopic.PartitionInfo) {
 	p.ParentPartitionIDs = clone.Int64Slice(raw.ParentPartitionIDs)
 	p.PartitionStats.FromRaw(&raw.PartitionStats)
 	p.Location.NodeID = uint32(raw.PartitionLocation.NodeID)
-	p.Location.Generation = raw.PartitionLocation.Generation
 	p.FromBound = raw.FromBound
 	p.ToBound = raw.ToBound
 }

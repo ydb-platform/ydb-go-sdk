@@ -131,8 +131,7 @@ func (pi *PartitionInfo) FromProto(proto *Ydb_Topic.DescribeTopicResult_Partitio
 // PartitionLocation describes which node currently hosts a partition.
 // It is populated only when DescribeTopicRequest.IncludeLocation is set to true.
 type PartitionLocation struct {
-	NodeID     int32
-	Generation int64
+	NodeID int32
 }
 
 // FromProto fills location from proto. Accepts nil (location info not requested).
@@ -141,5 +140,4 @@ func (pl *PartitionLocation) FromProto(proto *Ydb_Topic.PartitionLocation) {
 		return
 	}
 	pl.NodeID = proto.GetNodeId()
-	pl.Generation = proto.GetGeneration()
 }
