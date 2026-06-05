@@ -52,15 +52,9 @@ func (dw *directWrite) validateForWriter(
 	partitioning rawtopicwriter.Partitioning,
 	producerID string,
 ) error {
-	if !dw.enabled {
-		return nil
-	}
-
-	if partitioning.Type == rawtopicwriter.PartitioningPartitionID {
-		return nil
-	}
-
-	if producerID != "" {
+	if !dw.enabled ||
+		partitioning.Type == rawtopicwriter.PartitioningPartitionID ||
+		producerID != "" {
 		return nil
 	}
 
@@ -87,19 +81,15 @@ func (dw *directWrite) bindConnectContext(
 	return resolvePartitionNode(ctx, rawClient, topicPath, partitionID)
 }
 
-type directWriteLocker interface {
-	WithLock(callback func())
-}
-
 // dropLearnedPartitionIfNeeded clears a server-learned partition after a
 // session failure so the next connect re-discovers via the proxy.
-func (dw *directWrite) dropLearnedPartitionIfNeeded(reason error, locker directWriteLocker) {
+func (dw *directWrite) dropLearnedPartitionIfNeeded(reason error, withLock func(func())) {
 	if reason == nil || !dw.enabled || dw.pinnedByUser || dw.resolved.Load() < 0 {
 		return
 	}
 
 	dw.resolved.Store(-1)
-	locker.WithLock(func() {
+	withLock(func() {
 		*dw.partitioning = dw.original
 	})
 }
@@ -113,10 +103,6 @@ func (dw *directWrite) awaitingPartition() bool {
 func (dw *directWrite) pinPartitionFromInit(partitionID int64) {
 	dw.resolved.Store(partitionID)
 	*dw.partitioning = rawtopicwriter.NewPartitioningPartitionID(partitionID)
-}
-
-func (dw *directWrite) closeStreamAfterRebind(streamCtx context.Context, writer *SingleStreamWriter) {
-	_ = writer.close(streamCtx, nil)
 }
 
 // resolvePartitionNode looks up which node currently hosts the given partition

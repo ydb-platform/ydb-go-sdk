@@ -522,7 +522,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			prevAttemptTime, attempt, startOfRetries,
 		)
 
-		w.cfg.directWrite.dropLearnedPartitionIfNeeded(reconnectReason, &w.m)
+		w.cfg.directWrite.dropLearnedPartitionIfNeeded(reconnectReason, w.m.WithLock)
 
 		if reconnectReason != nil {
 			if w.handleReconnectRetry(ctx, reconnectReason, attempt, startOfRetries) {
@@ -547,7 +547,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		case err != nil:
 			reconnectReason = err
 		case w.onWriterChange(writer):
-			w.cfg.directWrite.closeStreamAfterRebind(streamCtx, writer)
+			_ = writer.close(streamCtx, nil)
 			reconnectReason = nil
 			attempt, startOfRetries = 0, time.Time{}
 		default:

@@ -109,7 +109,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 		opt(&writerCfg)
 	}
 	if p.cfg.DirectWrite {
-		topicwriterinternal.ReapplyDirectWritePartitionState(&writerCfg)
+		writerCfg.ReapplyDirectWritePartitionState()
 	}
 
 	wr, err := p.cfg.writersFactory.Create(writerCfg)

@@ -27,29 +27,23 @@ import (
 // Multi-writer and probe-and-rebind flows are covered by unit tests and grpc mocks.
 type directWriteStreamChecker struct {
 	mu    sync.Mutex
-	calls []directWriteStreamCall
-}
-
-type directWriteStreamCall struct {
-	NodeID          uint32
-	DisableFallback bool
+	calls []struct {
+		nodeID          uint32
+		disableFallback bool
+	}
 }
 
 func newDirectWriteStreamChecker() *directWriteStreamChecker {
 	return &directWriteStreamChecker{}
 }
 
-func (c *directWriteStreamChecker) DriverOption() ydb.Option {
-	return ydb.With(config.WithGrpcOptions(
-		grpc.WithChainStreamInterceptor(c.streamInterceptor),
-	))
-}
-
 // Driver opens a dedicated cached driver instance that includes the StreamWrite interceptor.
 // Do not pass the option to [scopeT.Driver]: fixenv caches drivers by name only, so opts
 // on the default driver are ignored after the first connect.
 func (c *directWriteStreamChecker) Driver(scope *scopeT) *ydb.Driver {
-	return scope.driverNamed("direct-write-routing", c.DriverOption())
+	return scope.driverNamed("direct-write-routing", ydb.With(config.WithGrpcOptions(
+		grpc.WithChainStreamInterceptor(c.streamInterceptor),
+	)))
 }
 
 func (c *directWriteStreamChecker) streamInterceptor(
@@ -66,9 +60,12 @@ func (c *directWriteStreamChecker) streamInterceptor(
 			nodeID = 0
 		}
 		c.mu.Lock()
-		c.calls = append(c.calls, directWriteStreamCall{
-			NodeID:          nodeID,
-			DisableFallback: endpoint.ContextDisableFallback(ctx),
+		c.calls = append(c.calls, struct {
+			nodeID          uint32
+			disableFallback bool
+		}{
+			nodeID:          nodeID,
+			disableFallback: endpoint.ContextDisableFallback(ctx),
 		})
 		c.mu.Unlock()
 	}
@@ -83,7 +80,7 @@ func (c *directWriteStreamChecker) RequireRoutedToNode(t testing.TB, expectedNod
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, call := range c.calls {
-		if call.DisableFallback && call.NodeID == expectedNode {
+		if call.disableFallback && call.nodeID == expectedNode {
 			return
 		}
 	}

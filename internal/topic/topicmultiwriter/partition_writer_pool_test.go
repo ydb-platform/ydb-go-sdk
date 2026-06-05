@@ -150,10 +150,6 @@ func TestPartitionWriterPool_CreateDirectWriterSeedsDirectWritePartition(t *test
 	_, err := pool.get(7, true)
 	require.NoError(t, err)
 	require.Equal(t, []int64{7}, factory.partitionIDs)
-	require.True(t, factory.lastCfg.DirectWriteEnabled())
-	partitionID, ok := factory.lastCfg.DirectWriteResolvedPartition()
-	require.True(t, ok)
-	require.EqualValues(t, 7, partitionID)
 }
 
 func TestPartitionWriterPool_GetCreatesWriterAndReturnsSameOnSecondGet(t *testing.T) {

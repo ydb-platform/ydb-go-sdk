@@ -14,7 +14,7 @@ func TestReapplyDirectWritePartitionState(t *testing.T) {
 	require.EqualValues(t, -1, cfg.directWrite.resolved.Load())
 
 	WithPartitioning(NewPartitioningWithPartitionID(7))(&cfg)
-	ReapplyDirectWritePartitionState(&cfg)
+	cfg.ReapplyDirectWritePartitionState()
 
 	require.EqualValues(t, 7, cfg.directWrite.resolved.Load())
 	require.True(t, cfg.directWrite.pinnedByUser)
