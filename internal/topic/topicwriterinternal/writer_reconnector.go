@@ -462,6 +462,7 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 	return resErr
 }
 
+//nolint:funlen // reconnect state machine; direct-write adds probe/rebind on top of the existing loop
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	attempt := 0
 	createStreamContext := func() (context.Context, context.CancelFunc) {
@@ -486,12 +487,18 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
-		counters := bumpWriterConnectionAttempt(w, reconnectReason, connectionCounters{
-			PrevAttemptTime: prevAttemptTime,
-			Attempt:         attempt,
-			StartOfRetries:  startOfRetries,
-		})
-		attempt, startOfRetries, prevAttemptTime = counters.Attempt, counters.StartOfRetries, counters.PrevAttemptTime
+		w.cfg.directWrite.dropLearnedPartitionIfNeeded(reconnectReason, w.m.WithLock)
+
+		now := time.Now()
+		if w.cfg.directWrite.consumeRetryReset() ||
+			startOfRetries.IsZero() ||
+			topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+			attempt = 0
+			startOfRetries = w.cfg.clock.Now()
+		} else {
+			attempt++
+		}
+		prevAttemptTime = now
 
 		if reconnectReason != nil {
 			if w.handleReconnectRetry(ctx, reconnectReason, attempt, startOfRetries) {

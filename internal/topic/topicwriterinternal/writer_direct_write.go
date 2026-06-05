@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"sync/atomic"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -74,38 +72,6 @@ func newWriterConnectFunc(cfg *WriterReconnectorConfig) ConnectFunc {
 		}
 
 		return cfg.rawTopicClient.StreamWrite(resolvedCtx, tracer)
-	}
-}
-
-type connectionCounters struct {
-	PrevAttemptTime time.Time
-	Attempt         int
-	StartOfRetries  time.Time
-}
-
-func bumpWriterConnectionAttempt(
-	w *WriterReconnector,
-	reconnectReason error,
-	counters connectionCounters,
-) connectionCounters {
-	dw := &w.cfg.directWrite
-	dw.dropLearnedPartitionIfNeeded(reconnectReason, w.m.WithLock)
-
-	now := time.Now()
-	if dw.consumeRetryReset() ||
-		counters.StartOfRetries.IsZero() ||
-		topic.CheckResetReconnectionCounters(counters.PrevAttemptTime, now, w.cfg.connectTimeout) {
-		return connectionCounters{
-			PrevAttemptTime: now,
-			Attempt:         0,
-			StartOfRetries:  w.cfg.clock.Now(),
-		}
-	}
-
-	return connectionCounters{
-		PrevAttemptTime: now,
-		Attempt:         counters.Attempt + 1,
-		StartOfRetries:  counters.StartOfRetries,
 	}
 }
 
