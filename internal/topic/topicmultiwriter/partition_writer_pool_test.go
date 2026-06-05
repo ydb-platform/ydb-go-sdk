@@ -46,10 +46,12 @@ type poolMockFactory struct {
 	producerIDs  []string
 	returnError  bool
 	writers      []*poolTestWriter
+	lastCfg      topicwriterinternal.WriterReconnectorConfig
 }
 
 func (f *poolMockFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	f.createCalls++
+	f.lastCfg = cfg
 	if partID, ok := cfg.PartitionID(); ok {
 		f.partitionIDs = append(f.partitionIDs, partID)
 	}
@@ -134,6 +136,24 @@ func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
 	err := s.step()
 	require.ErrorIs(t, err, initErr)
 	require.Equal(t, int64(0), testWriter.writeCalled.Load())
+}
+
+func TestPartitionWriterPool_CreateDirectWriterSeedsDirectWritePartition(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+
+	pool.cfg.DirectWrite = true
+
+	_, err := pool.get(7, true)
+	require.NoError(t, err)
+	require.Equal(t, []int64{7}, factory.partitionIDs)
+	require.True(t, factory.lastCfg.DirectWriteEnabled())
+	partitionID, ok := factory.lastCfg.DirectWriteResolvedPartition()
+	require.True(t, ok)
+	require.EqualValues(t, 7, partitionID)
 }
 
 func TestPartitionWriterPool_GetCreatesWriterAndReturnsSameOnSecondGet(t *testing.T) {

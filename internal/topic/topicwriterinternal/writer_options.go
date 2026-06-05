@@ -156,6 +156,29 @@ func WithDirectWrite(enable bool) PublicWriterOption {
 	}
 }
 
+// ReapplyDirectWritePartitionState refreshes direct-write partition resolution after
+// defaultPartitioning was changed on a WriterReconnectorConfig copy (for example,
+// when a multi-writer spawns a per-partition child writer).
+func ReapplyDirectWritePartitionState(cfg *WriterReconnectorConfig) {
+	cfg.directWrite.finishInit(&cfg.defaultPartitioning)
+}
+
+// DirectWriteEnabled reports whether direct write is enabled on the writer config.
+func (cfg WriterReconnectorConfig) DirectWriteEnabled() bool {
+	return cfg.directWrite.enabled
+}
+
+// DirectWriteResolvedPartition returns the pinned or learned partition for direct write.
+// The second value is false when direct write is disabled or the partition is not known yet.
+func (cfg WriterReconnectorConfig) DirectWriteResolvedPartition() (partitionID int64, ok bool) {
+	if !cfg.directWrite.enabled {
+		return 0, false
+	}
+	partitionID = cfg.directWrite.resolved.Load()
+
+	return partitionID, partitionID >= 0
+}
+
 func WithProducerID(producerID string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.producerID = producerID

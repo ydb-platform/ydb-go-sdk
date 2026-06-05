@@ -360,7 +360,11 @@ func TestTopicDirectWrite(t *testing.T) {
 	)
 
 	t.Run("WriteAndRead", func(t *testing.T) {
-		writer, err := scope.Driver().Topic().StartWriter(
+		hostNode, err := topicPartitionHostNodeID(ctx, scope.Driver().Topic(), topicPath, 0)
+		require.NoError(t, err)
+
+		routing := newDirectWriteStreamChecker()
+		writer, err := routing.Driver(scope).Topic().StartWriter(
 			topicPath,
 			topicoptions.WithWriterPartitionID(0),
 			topicoptions.WithWriterDirectWrite(true),
@@ -370,6 +374,7 @@ func TestTopicDirectWrite(t *testing.T) {
 
 		payload := []byte("direct-write-payload")
 		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(payload)}))
+		routing.RequireRoutedToNode(t, hostNode)
 		require.NoError(t, writer.Close(ctx))
 
 		reader, err := scope.Driver().Topic().StartReader(
@@ -414,6 +419,7 @@ func TestTopicMultiWriterDirectWrite(t *testing.T) {
 
 	writer, err := scope.Driver().Topic().StartWriter(
 		topicPath,
+		topicoptions.WithWriterWaitServerAck(true),
 		topicoptions.WithWriteToManyPartitions(
 			topicoptions.WithWriterPartitionByPartitionID(),
 			topicoptions.WithMultiWriterDirectWrite(true),
