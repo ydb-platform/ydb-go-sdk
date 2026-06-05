@@ -18,19 +18,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 )
 
-// TestDirectWriteResolvedPartitionSeed covers how the shared
-// directWriteResolvedPartitionID atomic is initialized by
-// NewWriterReconnectorConfig. The connect path uses this value to decide
-// whether to bind to a node (>= 0) or fall back to the proxy (-1) until the
-// server tells us the partition.
+// TestDirectWriteResolvedPartitionSeed covers how the shared resolved-partition
+// atomic is initialized by NewWriterReconnectorConfig. The connect path uses
+// this value to decide whether to bind to a node (>= 0) or fall back to the
+// proxy (-1) until the server tells us the partition.
 func TestDirectWriteResolvedPartitionSeed(t *testing.T) {
 	t.Run("UnknownWhenNoPartitionPinned", func(t *testing.T) {
 		cfg := NewWriterReconnectorConfig(
 			WithTopic("test-topic"),
+			WithProducerID("p1"),
 			WithDirectWrite(true),
 		)
 		require.NoError(t, cfg.validate())
-		require.EqualValues(t, -1, cfg.directWriteResolvedPartitionID.Load())
+		require.EqualValues(t, -1, cfg.directWrite.resolved.Load())
 	})
 
 	t.Run("UnknownWithMessageGroupID", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestDirectWriteResolvedPartitionSeed(t *testing.T) {
 			WithDirectWrite(true),
 		)
 		require.NoError(t, cfg.validate())
-		require.EqualValues(t, -1, cfg.directWriteResolvedPartitionID.Load())
+		require.EqualValues(t, -1, cfg.directWrite.resolved.Load())
 	})
 
 	t.Run("SeededFromStaticPartitionID", func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestDirectWriteResolvedPartitionSeed(t *testing.T) {
 			WithDirectWrite(true),
 		)
 		require.NoError(t, cfg.validate())
-		require.EqualValues(t, 7, cfg.directWriteResolvedPartitionID.Load())
+		require.EqualValues(t, 7, cfg.directWrite.resolved.Load())
 	})
 
 	t.Run("UnknownWhenDirectWriteDisabled", func(t *testing.T) {
@@ -61,7 +61,36 @@ func TestDirectWriteResolvedPartitionSeed(t *testing.T) {
 			WithDirectWrite(false),
 		)
 		require.NoError(t, cfg.validate())
-		require.EqualValues(t, -1, cfg.directWriteResolvedPartitionID.Load())
+		require.EqualValues(t, -1, cfg.directWrite.resolved.Load())
+	})
+}
+
+func TestDirectWriteValidate(t *testing.T) {
+	t.Run("OkWithAutoProducer", func(t *testing.T) {
+		cfg := NewWriterReconnectorConfig(
+			WithTopic("test-topic"),
+			WithDirectWrite(true),
+		)
+		require.NotEmpty(t, cfg.producerID)
+		require.NoError(t, cfg.validate())
+	})
+
+	t.Run("OkWithPinnedPartition", func(t *testing.T) {
+		cfg := NewWriterReconnectorConfig(
+			WithTopic("test-topic"),
+			WithPartitioning(NewPartitioningWithPartitionID(3)),
+			WithDirectWrite(true),
+		)
+		require.NoError(t, cfg.validate())
+	})
+
+	t.Run("OkWithExplicitProducer", func(t *testing.T) {
+		cfg := NewWriterReconnectorConfig(
+			WithTopic("test-topic"),
+			WithProducerID("producer-1"),
+			WithDirectWrite(true),
+		)
+		require.NoError(t, cfg.validate())
 	})
 }
 
@@ -93,6 +122,7 @@ func TestResolvePartitionNode(t *testing.T) {
 		got, ok := endpoint.ContextNodeID(ctx)
 		require.True(t, ok)
 		require.Equal(t, uint32(nodeID), got)
+		require.True(t, endpoint.ContextDisableFallback(ctx))
 	})
 
 	t.Run("PartitionNotFound", func(t *testing.T) {

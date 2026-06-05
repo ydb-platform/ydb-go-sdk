@@ -127,11 +127,18 @@ func WithWriterProducerID(producerID string) WriterOption {
 // Use WithWriterPartitionID instead.
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// See [WithWriterPartitionID] for important usage limitations.
 func WithPartitionID(partitionID int64) WriterOption {
 	return WithWriterPartitionID(partitionID)
 }
 
-// WithWriterPartitionID set direct partition id on write session level
+// WithWriterPartitionID pins all writes in the session to a single partition ID.
+//
+// Avoid this option on topics with automatic partitioning (auto-split). After a split
+// the pinned partition may become inactive; the server can then respond with OVERLOADED,
+// which the SDK treats as retryable, so the writer may retry indefinitely and appear
+// stuck.
 func WithWriterPartitionID(partitionID int64) WriterOption {
 	return topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID))
 }
@@ -159,6 +166,9 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 // Transient lookup errors (UNAVAILABLE, OVERLOADED, etc.) are retried by the
 // existing writer reconnect loop. Terminal errors (BAD_REQUEST, SCHEME_ERROR,
 // missing partition) stop the writer.
+//
+// Direct write requires either [WithWriterPartitionID] or a producer ID
+// (including the auto-generated one when [WithProducerID] was not set).
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithWriterDirectWrite(enable bool) WriterOption {

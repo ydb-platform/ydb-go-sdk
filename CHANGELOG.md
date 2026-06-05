@@ -1,5 +1,4 @@
-* Added `topicoptions.WithWriterDirectWrite(bool)` option to bind a topic writer with a fixed partition ID to the node that hosts the partition, bypassing the topic proxy
-* Added `topicoptions.WithMultiWriterDirectWrite(bool)` option to enable direct writes for all per-partition writers spawned by `topicoptions.WithWriteToManyPartitions`
+* Added `topicoptions.WithWriterDirectWrite(bool)` and `topicoptions.WithMultiWriterDirectWrite(bool)` options to send topic writes to the node that hosts the target partition, bypassing the topic proxy
 
 ## v3.139.5
 * Fixed panic and data race in `TopicListener` when partition workers were closed while the read stream still delivered messages: `internal/xsync.UnboundedChan` no longer closes its signal channel on shutdown, stop the read loop before closing partition workers, and ignore routed messages after listener shutdown starts

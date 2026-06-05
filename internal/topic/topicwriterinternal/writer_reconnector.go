@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"os"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -19,8 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -53,14 +50,6 @@ var (
 	// It is fast check for return error at writer create context instead of stream initialization
 	// The error will remove in the future, when skip message group id will be allowed by server.
 	errProducerIDNotEqualMessageGroupID = xerrors.Wrap(errors.New("ydb: producer id not equal to message group id, use option WithMessageGroupID(producerID) for create writer")) //nolint:lll
-
-	errDirectWritePartitionNotFound = xerrors.Wrap(errors.New("ydb: direct write: target partition not found in topic description")) //nolint:lll
-	// errDirectWriteRebindAfterInit is a sentinel reconnect reason used when
-	// direct write was enabled without a static partition ID. After the very
-	// first InitResponse arrives we learn the partition the server assigned and
-	// must reopen the stream bound to that partition's node — the reconnect
-	// loop treats this sentinel as "rebind, do not pause".
-	errDirectWriteRebindAfterInit = xerrors.Wrap(errors.New("ydb: direct write: rebind to assigned partition after first init"))
 )
 
 type WriterReconnectorConfig struct {
@@ -87,40 +76,7 @@ type WriterReconnectorConfig struct {
 	MultiWriterConfig any
 	RetrySettings     topic.RetrySettings
 
-	// directWrite enables resolving the node that hosts the target partition
-	// via DescribeTopic before each stream connect, and binds the gRPC call
-	// to that node via endpoint.WithNodeID.
-	//
-	// If a static partition ID is supplied (defaultPartitioning.PartitionID),
-	// it is used from the very first connect. Otherwise the first connect
-	// goes through the proxy as usual; the partition the server assigns in
-	// the InitResponse is then captured into directWriteResolvedPartitionID
-	// and the stream is rebuilt against that partition's node.
-	directWrite bool
-
-	// directWriteResolvedPartitionID is a shared sink for the partition the
-	// direct-write connect should bind to. -1 means "not yet known" and the
-	// connect runs through the proxy. Stored via pointer so the connect
-	// closure and the WriterReconnector see the same underlying atomic
-	// regardless of how WriterReconnectorConfig is copied.
-	directWriteResolvedPartitionID *atomic.Int64
-
-	// directWritePartitionPinnedByUser is true when the caller pinned a
-	// partition via WithWriterPartitionID. In that case the resolved-partition
-	// atomic is set from config at start time and never reset — errors
-	// propagate so the caller can react. When false, the partition is learned
-	// from the server's first InitResponse; on any session failure we drop
-	// the pin so the next connect re-discovers via the proxy. This covers
-	// auto-partitioning (split / merge invalidates our partition) and node
-	// migrations the SDK can't detect on its own.
-	directWritePartitionPinnedByUser bool
-
-	// directWriteOriginalPartitioning is the defaultPartitioning value as it
-	// stood at config time, before the writer overwrote it with a learned
-	// PartitioningPartitionID. We restore it whenever we drop the learned
-	// partition so the next InitRequest goes back to the original routing
-	// (typically PartitioningMessageGroupID derived from the producer ID).
-	directWriteOriginalPartitioning rawtopicwriter.Partitioning
+	directWrite directWrite
 
 	connectTimeout time.Duration
 }
@@ -131,7 +87,7 @@ func (cfg *WriterReconnectorConfig) validate() error {
 		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
 	}
 
-	return nil
+	return cfg.directWrite.validateForWriter(cfg.defaultPartitioning, cfg.producerID)
 }
 
 func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
@@ -176,18 +132,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		WithProducerID(uuid.NewString())(&cfg)
 	}
 
-	// Seed the resolved-partition atomic. If the caller pinned a partition
-	// via WithPartitioning(NewPartitioningWithPartitionID(...)) we can do
-	// direct write from the very first connect; otherwise -1 signals
-	// "ask the server in the first InitResponse, then rebind".
-	cfg.directWriteResolvedPartitionID = &atomic.Int64{}
-	cfg.directWriteOriginalPartitioning = cfg.defaultPartitioning
-	if cfg.directWrite && cfg.defaultPartitioning.Type == rawtopicwriter.PartitioningPartitionID {
-		cfg.directWriteResolvedPartitionID.Store(cfg.defaultPartitioning.PartitionID)
-		cfg.directWritePartitionPinnedByUser = true
-	} else {
-		cfg.directWriteResolvedPartitionID.Store(-1)
-	}
+	cfg.directWrite.finishInit(&cfg.defaultPartitioning)
 
 	if cfg.Connect == nil {
 		cfg.Connect = defaultConnectFunc(&cfg)
@@ -206,64 +151,13 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 func defaultConnectFunc(cfg *WriterReconnectorConfig) ConnectFunc {
 	return func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error) {
 		mergedCtx := xcontext.MergeContexts(ctx, cfg.LogContext)
-		if cfg.directWrite {
-			if partitionID := cfg.directWriteResolvedPartitionID.Load(); partitionID >= 0 {
-				resolvedCtx, err := resolvePartitionNode(
-					mergedCtx,
-					cfg.rawTopicClient,
-					cfg.topic,
-					partitionID,
-				)
-				if err != nil {
-					return nil, err
-				}
-				mergedCtx = resolvedCtx
-			}
+		resolvedCtx, err := cfg.directWrite.bindConnectContext(mergedCtx, cfg.rawTopicClient, cfg.topic)
+		if err != nil {
+			return nil, err
 		}
 
-		return cfg.rawTopicClient.StreamWrite(mergedCtx, tracer)
+		return cfg.rawTopicClient.StreamWrite(resolvedCtx, tracer)
 	}
-}
-
-// resolvePartitionNode looks up which node currently hosts the given partition
-// of the topic and returns a context bound to that node via endpoint.WithNodeID.
-// Returns the original DescribeTopic error wrapped via xerrors.WithStackTrace
-// so the writer reconnect loop can classify it through topic.RetryDecision
-// (UNAVAILABLE/OVERLOADED retry, BAD_REQUEST/SCHEME_ERROR stop).
-func resolvePartitionNode(
-	ctx context.Context,
-	rawClient *rawtopic.Client,
-	topicPath string,
-	partitionID int64,
-) (context.Context, error) {
-	res, err := rawClient.DescribeTopic(ctx, rawtopic.DescribeTopicRequest{
-		Path:            topicPath,
-		IncludeLocation: true,
-	})
-	if err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: direct write: describe topic failed: %w", err))
-	}
-
-	for i := range res.Partitions {
-		p := &res.Partitions[i]
-		if p.PartitionID == partitionID {
-			nodeID := uint32(p.PartitionLocation.NodeID)
-			// Temporary diagnostic: dump what we resolved so callers running
-			// against unfamiliar clusters can tell whether the server is
-			// honoring IncludeLocation. nodeID==0 usually means the server
-			// returned an empty PartitionLocation.
-			fmt.Fprintf(os.Stderr,
-				"[direct-write] resolved topic=%q partition=%d → nodeID=%d generation=%d\n",
-				topicPath, partitionID, nodeID, p.PartitionLocation.Generation,
-			)
-			return endpoint.WithNodeID(ctx, nodeID), nil
-		}
-	}
-
-	return nil, xerrors.WithStackTrace(fmt.Errorf(
-		"%w: topic=%q partition_id=%d",
-		errDirectWritePartitionNotFound, topicPath, partitionID,
-	))
 }
 
 type WriterReconnector struct {
@@ -587,6 +481,19 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 	return resErr
 }
 
+func (w *WriterReconnector) bumpConnectionAttempt(
+	prevAttemptTime time.Time,
+	attempt int,
+	startOfRetries time.Time,
+) (newAttempt int, newStartOfRetries, now time.Time) {
+	now = time.Now()
+	if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+		return 0, w.cfg.clock.Now(), now
+	}
+
+	return attempt + 1, startOfRetries, now
+}
+
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	attempt := 0
 	createStreamContext := func() (context.Context, context.CancelFunc) {
@@ -611,42 +518,11 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
-		now := time.Now()
-		if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
-			attempt = 0
-			startOfRetries = w.cfg.clock.Now()
-		} else {
-			attempt++
-		}
-		prevAttemptTime = now
+		attempt, startOfRetries, prevAttemptTime = w.bumpConnectionAttempt(
+			prevAttemptTime, attempt, startOfRetries,
+		)
 
-		// Direct-write rebind isn't a real failure: we closed the stream
-		// ourselves to switch from proxy mode to direct mode after learning
-		// the partition. Skip the retry-pause / unretriable-error machinery.
-		if errors.Is(reconnectReason, errDirectWriteRebindAfterInit) {
-			reconnectReason = nil
-			attempt = 0
-			startOfRetries = time.Time{}
-		}
-
-		// Direct-write auto-partition rediscovery: when a session that was
-		// bound to a server-learned partition fails for any reason, drop the
-		// pin so the next connect goes back through the proxy and picks up
-		// whatever partition the server now wants us to write to. This is
-		// what makes us tolerant of auto-partitioning (a split / merge can
-		// invalidate the partition we were holding) and of node migrations
-		// where the previously hosting node no longer serves the partition.
-		// User-pinned partitions are left untouched — the caller asked for
-		// that specific partition and errors should propagate.
-		if reconnectReason != nil &&
-			w.cfg.directWrite &&
-			!w.cfg.directWritePartitionPinnedByUser &&
-			w.cfg.directWriteResolvedPartitionID.Load() >= 0 {
-			w.cfg.directWriteResolvedPartitionID.Store(-1)
-			w.m.WithLock(func() {
-				w.cfg.defaultPartitioning = w.cfg.directWriteOriginalPartitioning
-			})
-		}
+		w.cfg.directWrite.dropLearnedPartitionIfNeeded(reconnectReason, &w.m)
 
 		if reconnectReason != nil {
 			if w.handleReconnectRetry(ctx, reconnectReason, attempt, startOfRetries) {
@@ -665,13 +541,18 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		)
 
 		writer, err := w.startWriteStream(streamCtx)
-		w.onWriterChange(writer)
 		onStreamError := onWriterStarted(err)
-		if err == nil {
+
+		switch {
+		case err != nil:
+			reconnectReason = err
+		case w.onWriterChange(writer):
+			w.cfg.directWrite.closeStreamAfterRebind(streamCtx, writer)
+			reconnectReason = nil
+			attempt, startOfRetries = 0, time.Time{}
+		default:
 			reconnectReason = writer.WaitClose(ctx)
 			startOfRetries = time.Now()
-		} else {
-			reconnectReason = err
 		}
 		onStreamError(reconnectReason)
 	}
@@ -753,44 +634,27 @@ func (w *WriterReconnector) onAckReceived(count int) {
 	w.semaphore.Release(int64(count))
 }
 
-func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
+// onWriterChange records the result of the latest stream init. It returns true
+// when connectionLoop must rebind (direct-write proxy → partition node).
+func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) (rebindRequested bool) {
 	if writerStream == nil {
 		w.m.WithLock(func() { w.sessionID = "" })
 
-		return
+		return false
 	}
 
-	var (
-		isFirstInit   bool
-		triggerRebind bool
-	)
+	var isFirstInit bool
 	w.m.WithLock(func() {
 		w.sessionID = writerStream.SessionID
 
-		// Direct-write rebind path. Triggered whenever the resolved-partition
-		// atomic is -1 ("unknown"). This happens (a) on the very first
-		// connect when the user did not pin a partition, and (b) after the
-		// connection loop dropped a previously learned partition because the
-		// session failed (auto-partitioning split / merge, node migration).
-		//
-		// We pin the partition the server just assigned, update both the
-		// connect-time atomic (drives DescribeTopic-based node binding) and
-		// cfg.defaultPartitioning (drives the next InitRequest, so the server
-		// won't re-pick a different partition on a partition-specific node),
-		// and tear down the current stream. The connectionLoop sentinel
-		// `errDirectWriteRebindAfterInit` keeps the retry pause out of it.
-		//
-		// On the *very first* rebind we also keep firstInitResponseProcessedChan
-		// open: user writes must wait until the rebound session is up, otherwise
-		// the first batch would leak onto the proxy node we just left.
-		if w.cfg.directWrite && w.cfg.directWriteResolvedPartitionID.Load() < 0 {
-			pid := writerStream.PartitionID
-			w.cfg.directWriteResolvedPartitionID.Store(pid)
-			w.cfg.defaultPartitioning = rawtopicwriter.NewPartitioningPartitionID(pid)
+		if w.cfg.directWrite.awaitingPartition() {
+			// Keep firstInitResponseProcessedChan / initDoneCh open: user.Write
+			// must wait for the rebound session, not the proxy we are leaving.
+			w.cfg.directWrite.pinPartitionFromInit(writerStream.PartitionID)
 			if writerStream.LastSeqNumRequested {
 				w.lastSeqNo = writerStream.ReceivedLastSeqNum
 			}
-			triggerRebind = true
+			rebindRequested = true
 
 			return
 		}
@@ -806,17 +670,8 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 		}
 	})
 
-	if triggerRebind {
-		// connectionLoop is about to call writerStream.WaitClose; closing
-		// from this goroutine would deadlock. Hand off to a fresh goroutine.
-		go func() {
-			_ = writerStream.close(
-				context.Background(),
-				xerrors.WithStackTrace(errDirectWriteRebindAfterInit),
-			)
-		}()
-
-		return
+	if rebindRequested {
+		return true
 	}
 
 	if isFirstInit {
@@ -835,6 +690,8 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 		})
 		w.onWriterInitCallbackHandler(writerStream, callbackLastSeqNo, callbackSessionID)
 	}
+
+	return false
 }
 
 func (w *WriterReconnector) waitInit(ctx context.Context) (info InitialInfo, err error) {

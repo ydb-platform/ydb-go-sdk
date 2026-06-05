@@ -390,13 +390,17 @@ func TestTopicDirectWrite(t *testing.T) {
 		require.Equal(t, payload, got)
 	})
 
-	t.Run("RequiresPartitionID", func(t *testing.T) {
+	t.Run("WithAutoProducer", func(t *testing.T) {
 		writer, err := scope.Driver().Topic().StartWriter(
 			topicPath,
 			topicoptions.WithWriterDirectWrite(true),
+			topicoptions.WithWriterWaitServerAck(true),
 		)
-		require.Error(t, err)
-		require.Nil(t, writer)
+		require.NoError(t, err)
+		defer func() { _ = writer.Close(ctx) }()
+
+		require.NoError(t, writer.WaitInit(ctx))
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader([]byte("direct-write-auto-producer"))}))
 	})
 }
 

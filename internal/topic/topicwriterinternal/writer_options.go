@@ -152,7 +152,7 @@ func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption 
 // behavior contract.
 func WithDirectWrite(enable bool) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
-		cfg.directWrite = enable
+		cfg.directWrite.enabled = enable
 	}
 }
 
