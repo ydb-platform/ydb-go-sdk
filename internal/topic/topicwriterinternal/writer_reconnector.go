@@ -87,7 +87,13 @@ func (cfg *WriterReconnectorConfig) validate() error {
 		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
 	}
 
-	return cfg.directWrite.validateForWriter(cfg.defaultPartitioning, cfg.producerID)
+	if cfg.directWrite.enabled &&
+		cfg.defaultPartitioning.Type != rawtopicwriter.PartitioningPartitionID &&
+		cfg.producerID == "" {
+		return xerrors.WithStackTrace(errDirectWriteRequiresPartitionOrProducer)
+	}
+
+	return nil
 }
 
 func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {

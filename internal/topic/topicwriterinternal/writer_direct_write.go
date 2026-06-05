@@ -48,19 +48,6 @@ func (dw *directWrite) finishInit(partitioning *rawtopicwriter.Partitioning) {
 	dw.resolved.Store(-1)
 }
 
-func (dw *directWrite) validateForWriter(
-	partitioning rawtopicwriter.Partitioning,
-	producerID string,
-) error {
-	if !dw.enabled ||
-		partitioning.Type == rawtopicwriter.PartitioningPartitionID ||
-		producerID != "" {
-		return nil
-	}
-
-	return xerrors.WithStackTrace(errDirectWriteRequiresPartitionOrProducer)
-}
-
 // bindConnectContext resolves the node for a known partition and binds the
 // gRPC call via endpoint.WithNodeID(..., endpoint.WithDisableFallback()). When the partition is still unknown (-1)
 // the context is returned unchanged (proxy connect).
