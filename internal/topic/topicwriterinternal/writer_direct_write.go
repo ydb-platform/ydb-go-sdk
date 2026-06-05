@@ -7,8 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
@@ -79,25 +77,36 @@ func newWriterConnectFunc(cfg *WriterReconnectorConfig) ConnectFunc {
 	}
 }
 
-func (dw *directWrite) bumpConnectionAttempt(
-	clock clockwork.Clock,
-	connectTimeout time.Duration,
-	reconnectReason error,
-	withLock func(func()),
-	prevAttemptTime time.Time,
-	attempt int,
-	startOfRetries time.Time,
-) (newAttempt int, newStartOfRetries, now time.Time) {
-	dw.dropLearnedPartitionIfNeeded(reconnectReason, withLock)
+type connectionCounters struct {
+	PrevAttemptTime time.Time
+	Attempt         int
+	StartOfRetries  time.Time
+}
 
-	now = time.Now()
+func bumpWriterConnectionAttempt(
+	w *WriterReconnector,
+	reconnectReason error,
+	counters connectionCounters,
+) connectionCounters {
+	dw := &w.cfg.directWrite
+	dw.dropLearnedPartitionIfNeeded(reconnectReason, w.m.WithLock)
+
+	now := time.Now()
 	if dw.consumeRetryReset() ||
-		startOfRetries.IsZero() ||
-		topic.CheckResetReconnectionCounters(prevAttemptTime, now, connectTimeout) {
-		return 0, clock.Now(), now
+		counters.StartOfRetries.IsZero() ||
+		topic.CheckResetReconnectionCounters(counters.PrevAttemptTime, now, w.cfg.connectTimeout) {
+		return connectionCounters{
+			PrevAttemptTime: now,
+			Attempt:         0,
+			StartOfRetries:  w.cfg.clock.Now(),
+		}
 	}
 
-	return attempt + 1, startOfRetries, now
+	return connectionCounters{
+		PrevAttemptTime: now,
+		Attempt:         counters.Attempt + 1,
+		StartOfRetries:  counters.StartOfRetries,
+	}
 }
 
 // handleProbeInit records partition from a proxy InitResponse. Must be called with the writer mutex held.

@@ -486,10 +486,12 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
-		attempt, startOfRetries, prevAttemptTime = w.cfg.directWrite.bumpConnectionAttempt(
-			w.cfg.clock, w.cfg.connectTimeout, reconnectReason, w.m.WithLock,
-			prevAttemptTime, attempt, startOfRetries,
-		)
+		counters := bumpWriterConnectionAttempt(w, reconnectReason, connectionCounters{
+			PrevAttemptTime: prevAttemptTime,
+			Attempt:         attempt,
+			StartOfRetries:  startOfRetries,
+		})
+		attempt, startOfRetries, prevAttemptTime = counters.Attempt, counters.StartOfRetries, counters.PrevAttemptTime
 
 		if reconnectReason != nil {
 			if w.handleReconnectRetry(ctx, reconnectReason, attempt, startOfRetries) {
