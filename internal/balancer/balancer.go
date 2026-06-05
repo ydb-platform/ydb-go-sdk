@@ -9,8 +9,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
 	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"

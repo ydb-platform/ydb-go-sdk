@@ -3,7 +3,7 @@ package endpoint
 import "context"
 
 type (
-	ctxEndpointKey struct{}
+	ctxEndpointKey  struct{}
 	ctxPinnedNodeID uint32
 
 	withNodeIDConfig struct {
