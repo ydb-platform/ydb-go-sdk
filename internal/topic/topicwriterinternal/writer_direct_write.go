@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -140,14 +139,6 @@ func resolvePartitionNode(
 		p := &res.Partitions[i]
 		if p.PartitionID == partitionID {
 			nodeID := uint32(p.PartitionLocation.NodeID)
-			// Temporary diagnostic: dump what we resolved so callers running
-			// against unfamiliar clusters can tell whether the server is
-			// honoring IncludeLocation. nodeID==0 usually means the server
-			// returned an empty PartitionLocation.
-			fmt.Fprintf(os.Stderr,
-				"[direct-write] resolved topic=%q partition=%d → nodeID=%d generation=%d\n",
-				topicPath, partitionID, nodeID, p.PartitionLocation.Generation,
-			)
 
 			return endpoint.WithNodeID(ctx, nodeID, endpoint.WithDisableFallback()), nil
 		}
