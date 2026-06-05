@@ -170,6 +170,11 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 // Direct write requires either [WithWriterPartitionID] or a producer ID
 // (including the auto-generated one when [WithProducerID] was not set).
 //
+// Every node that hosts a partition of the topic must be reachable from the client.
+// If a write is routed to an unreachable node, the SDK may retry indefinitely and
+// appear stuck. When only a subset of cluster nodes is accessible (for example,
+// through a single proxy endpoint), do not enable this option.
+//
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithWriterDirectWrite(enable bool) WriterOption {
 	return topicwriterinternal.WithDirectWrite(enable)

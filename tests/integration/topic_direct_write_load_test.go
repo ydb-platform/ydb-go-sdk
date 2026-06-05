@@ -31,7 +31,8 @@ import (
 // Defaults for TestTopicDirectWriteLoad. They target the preprod cluster
 // requested in the task; override any of them via the matching env var below.
 const (
-	directWriteLoadDefaultEndpoint      = "grpc://ydb-ru.yandex.net:2135/?database=/ru/kikimr/preprod/alexandr268-test"
+	directWriteLoadDefaultGRPCAddress   = "grpc://ydb-ru.yandex.net:2135"
+	directWriteLoadDefaultDatabase      = "/ru/kikimr/preprod/alexandr268-test"
 	directWriteLoadDefaultTopic         = "topics/zkpo-direct-write-load"
 	directWriteLoadDefaultMinPartitions = int64(10)
 	directWriteLoadDefaultMaxPartitions = int64(1000)
@@ -45,7 +46,10 @@ const (
 // Env vars recognized by TestTopicDirectWriteLoad.
 const (
 	envDirectWriteLoadEnable        = "YDB_TOPIC_DIRECT_WRITE_LOAD"                // set to non-empty to run the test
-	envDirectWriteLoadEndpoint      = "YDB_TOPIC_DIRECT_WRITE_LOAD_DSN"            // overrides connection string
+	envDirectWriteLoadEndpoint      = "YDB_TOPIC_DIRECT_WRITE_LOAD_DSN"            // overrides full connection string
+	envDirectWriteLoadGRPC          = "YDB_TOPIC_DIRECT_WRITE_LOAD_GRPC"           // overrides gRPC address (without database)
+	envDirectWriteLoadDatabase      = "YDB_TOPIC_DIRECT_WRITE_LOAD_DATABASE"       // overrides database path
+	envDirectWriteLoadAccessToken   = "YDB_ACCESS_TOKEN_CREDENTIALS"               // access token (required)
 	envDirectWriteLoadTopic         = "YDB_TOPIC_DIRECT_WRITE_LOAD_TOPIC"          // overrides topic path
 	envDirectWriteLoadMinPartitions = "YDB_TOPIC_DIRECT_WRITE_LOAD_MIN_PARTITIONS" // min partitions (initial)
 	envDirectWriteLoadMaxPartitions = "YDB_TOPIC_DIRECT_WRITE_LOAD_MAX_PARTITIONS" // max partitions (autosplit cap)
@@ -60,14 +64,18 @@ const (
 // against a topic on a real cluster, verifies each writer ends up bound to
 // a specific partition's node, and then pumps messages through them in
 // parallel. The default endpoint points at the Yandex preprod cluster
-// requested in the task — override via YDB_TOPIC_DIRECT_WRITE_LOAD_DSN.
+// requested in the task — override via YDB_TOPIC_DIRECT_WRITE_LOAD_DSN or
+// YDB_TOPIC_DIRECT_WRITE_LOAD_GRPC + YDB_TOPIC_DIRECT_WRITE_LOAD_DATABASE.
 // Auth uses YDB_ACCESS_TOKEN_CREDENTIALS.
 func TestTopicDirectWriteLoad(t *testing.T) {
 	// if os.Getenv(envDirectWriteLoadEnable) == "" {
 	// 	t.Skipf("set %s=1 to run this load stub", envDirectWriteLoadEnable)
 	// }
 
-	endpoint := envOr(envDirectWriteLoadEndpoint, directWriteLoadDefaultEndpoint)
+	endpoint := directWriteLoadEndpoint()
+	accessToken := os.Getenv(envDirectWriteLoadAccessToken)
+	require.NotEmpty(t, accessToken, "%s must be set", envDirectWriteLoadAccessToken)
+
 	topicPath := envOr(envDirectWriteLoadTopic, directWriteLoadDefaultTopic)
 	minPartitions := envInt64(t, envDirectWriteLoadMinPartitions, directWriteLoadDefaultMinPartitions)
 	maxPartitions := envInt64(t, envDirectWriteLoadMaxPartitions, directWriteLoadDefaultMaxPartitions)
@@ -127,7 +135,7 @@ func TestTopicDirectWriteLoad(t *testing.T) {
 		ydb.With(config.WithGrpcOptions(
 			grpc.WithChainStreamInterceptor(streamPeerInterceptor),
 		)),
-		ydb.WithAccessTokenCredentials("y1__xCWs-eRpdT-ARi-ByDPn_UC9dXiBjEBEnpgJpRZHJdd1MeooPQ"),
+		ydb.WithAccessTokenCredentials(accessToken),
 		ydb.WithTraceTopic(trace.Topic{
 			OnWriterInitStream: func(_ trace.TopicWriterInitStreamStartInfo) func(trace.TopicWriterInitStreamDoneInfo) {
 				return func(done trace.TopicWriterInitStreamDoneInfo) {
@@ -346,6 +354,17 @@ func endpointAddrNode(ep trace.EndpointInfo) (string, uint32) {
 		}
 	}
 	return ep.Address(), ep.NodeID()
+}
+
+func directWriteLoadEndpoint() string {
+	if v := os.Getenv(envDirectWriteLoadEndpoint); v != "" {
+		return v
+	}
+
+	grpcAddr := envOr(envDirectWriteLoadGRPC, directWriteLoadDefaultGRPCAddress)
+	database := envOr(envDirectWriteLoadDatabase, directWriteLoadDefaultDatabase)
+
+	return fmt.Sprintf("%s/?database=%s", strings.TrimRight(grpcAddr, "/"), database)
 }
 
 func envOr(name, fallback string) string {
