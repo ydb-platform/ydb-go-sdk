@@ -23,9 +23,19 @@ func Fill(f *Fuzzer, v reflect.Value) {
 	case reflect.Bool:
 		v.SetBool(f.Bool())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		v.SetInt(int64(f.Int()))
+		bits := v.Type().Bits()
+		x := int64(f.uint64())
+		if bits < 64 {
+			x = (x << (64 - bits)) >> (64 - bits)
+		}
+		v.SetInt(x)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		v.SetUint(f.uint64())
+		bits := v.Type().Bits()
+		x := f.uint64()
+		if bits < 64 {
+			x &= (uint64(1) << bits) - 1
+		}
+		v.SetUint(x)
 	case reflect.Float32, reflect.Float64:
 		v.SetFloat(float64(f.Int()) / 1000)
 	case reflect.String:
