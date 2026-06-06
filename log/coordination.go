@@ -131,7 +131,7 @@ func internalCoordination(
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
-			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "node", "describe")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "session")
 			l.Log(ctx, "create coordination session starting...")
 			start := time.Now()
 

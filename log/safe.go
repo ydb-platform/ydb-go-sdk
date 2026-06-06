@@ -156,6 +156,14 @@ func safeConnState(s trace.ConnState) string {
 	return s.String()
 }
 
+func safeEndpointString(e trace.EndpointInfo) string {
+	if isNil(e) {
+		return ""
+	}
+
+	return e.String()
+}
+
 func safeEndpointNodeID(e trace.EndpointInfo) int64 {
 	if isNil(e) {
 		return 0

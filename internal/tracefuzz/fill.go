@@ -82,15 +82,6 @@ func fillStruct(f *Fuzzer, v reflect.Value) {
 
 		return
 	}
-	if t == reflect.TypeFor[context.Context]() {
-		ctx := context.Background()
-		if f.Bool() {
-			ctx = context.WithValue(context.Background(), contextKey{}, f.String())
-		}
-		v.Set(reflect.ValueOf(ctx))
-
-		return
-	}
 
 	for i := 0; i < v.NumField(); i++ {
 		if !v.Field(i).CanSet() {

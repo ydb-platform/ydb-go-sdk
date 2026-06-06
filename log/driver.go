@@ -111,7 +111,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				return nil
 			}
 			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "dial")
-			endpoint := safeEndpointAddress(info.Endpoint)
+			endpoint := safeEndpointString(info.Endpoint)
 			l.Log(ctx, "driver connection dial starting...",
 				kv.String("endpoint", endpoint),
 			)
@@ -138,7 +138,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				return nil
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "driver", "conn", "state", "change")
-			endpoint := safeEndpointAddress(info.Endpoint)
+			endpoint := safeEndpointString(info.Endpoint)
 			l.Log(ctx, "driver connection state change starting...",
 				kv.String("endpoint", endpoint),
 				kv.String("state", safeConnState(info.State)),
@@ -158,7 +158,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				return nil
 			}
 			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "close")
-			endpoint := safeEndpointAddress(info.Endpoint)
+			endpoint := safeEndpointString(info.Endpoint)
 			l.Log(ctx, "driver connection close starting...",
 				kv.String("endpoint", endpoint),
 			)
@@ -185,7 +185,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				return nil
 			}
 			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "invoke")
-			endpoint := safeEndpointAddress(info.Endpoint)
+			endpoint := safeEndpointString(info.Endpoint)
 			method := string(info.Method)
 			l.Log(ctx, "driver connection invoke starting...",
 				kv.String("endpoint", endpoint),
@@ -233,7 +233,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				return nil
 			}
 			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "stream", "New")
-			endpoint := safeEndpointAddress(info.Endpoint)
+			endpoint := safeEndpointString(info.Endpoint)
 			method := string(info.Method)
 			l.Log(ctx, "driver new connection stream starting...",
 				kv.String("endpoint", endpoint),
@@ -332,7 +332,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				return nil
 			}
 			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "ban")
-			endpoint := safeEndpointAddress(info.Endpoint)
+			endpoint := safeEndpointString(info.Endpoint)
 			cause := info.Cause
 			l.Log(ctx, "driver connection ban starting...",
 				kv.String("endpoint", endpoint),
@@ -355,7 +355,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				return nil
 			}
 			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "allow")
-			endpoint := safeEndpointAddress(info.Endpoint)
+			endpoint := safeEndpointString(info.Endpoint)
 			l.Log(ctx, "driver connection allow starting...",
 				kv.String("endpoint", endpoint),
 			)
@@ -452,7 +452,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 				if info.Error == nil {
 					l.Log(ctx, "driver balancer choose endpoint done",
 						kv.Latency(start),
-						kv.String("endpoint", safeEndpointAddress(info.Endpoint)),
+						kv.String("endpoint", safeEndpointString(info.Endpoint)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "driver balancer choose endpoint failed",

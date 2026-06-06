@@ -16,6 +16,16 @@ func TestEmptyInterfaceLayout(t *testing.T) {
 	}
 }
 
+func TestEmptyInterfaceFieldOffsets(t *testing.T) {
+	var e emptyInterface
+	if unsafe.Offsetof(e.typ) != 0 {
+		t.Fatal("emptyInterface.typ offset mismatch")
+	}
+	if unsafe.Offsetof(e.data) != unsafe.Sizeof(unsafe.Pointer(nil)) {
+		t.Fatal("emptyInterface.data offset mismatch")
+	}
+}
+
 type testSession struct {
 	id string
 }

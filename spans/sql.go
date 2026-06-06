@@ -440,12 +440,13 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 				return nil
 			}
 
+			parentSpan := adapter.SpanFromContext(safeContextPtr(info.StmtContext))
 			start := childSpanWithReplaceCtx(
 				info.StmtContext,
 				safeCall(info.Call),
 			)
 
-			start.Link(adapter.SpanFromContext(safeContextPtr(info.StmtContext)))
+			start.Link(parentSpan)
 
 			withContextPtr(info.StmtContext, markStmtCall)
 

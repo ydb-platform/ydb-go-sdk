@@ -580,7 +580,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		}
 
 		start := time.Now()
-		ctx := withFromPtr(startInfo.Context, TRACE, "ydb", "topic", "reader", "transaction", "update_offsets")
+		ctx := withFromPtr(startInfo.Context, TRACE, "ydb", "topic", "reader", "transaction", "rollback")
 		l.Log(WithLevel(ctx, TRACE), "topic reader rollback transaction starting...",
 			kv.Int64("reader_id", startInfo.ReaderID),
 			kv.String("reader_connection_id", startInfo.ReaderConnectionID),
@@ -626,7 +626,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 		start := time.Now()
 
 		return func(doneInfo trace.TopicReaderTransactionCompletedDoneInfo) {
-			ctx := withFromPtr(startInfo.Context, TRACE, "ydb", "topic", "reader", "transaction", "update_offsets")
+			ctx := withFromPtr(startInfo.Context, TRACE, "ydb", "topic", "reader", "transaction", "completed")
 			l.Log(WithLevel(ctx, TRACE), "topic reader transaction completed",
 				kv.Int64("reader_id", startInfo.ReaderID),
 				kv.String("reader_connection_id", startInfo.ReaderConnectionID),
