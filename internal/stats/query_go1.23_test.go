@@ -12,6 +12,33 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 )
 
+// iterableQueryStatsPB has 3 phases × 3 tables: enough variety to verify
+// ordering, full traversal, and early-break behavior of the range iterators.
+func iterableQueryStatsPB() *Ydb_TableStats.QueryStats {
+	return &Ydb_TableStats.QueryStats{
+		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
+			{
+				DurationUs: 1,
+				TableAccess: []*Ydb_TableStats.TableAccessStats{
+					{Name: "a"}, {Name: "b"}, {Name: "c"},
+				},
+			},
+			{
+				DurationUs: 2,
+				TableAccess: []*Ydb_TableStats.TableAccessStats{
+					{Name: "d"}, {Name: "e"}, {Name: "f"},
+				},
+			},
+			{
+				DurationUs: 3,
+				TableAccess: []*Ydb_TableStats.TableAccessStats{
+					{Name: "g"}, {Name: "h"}, {Name: "i"},
+				},
+			},
+		},
+	}
+}
+
 func TestQueryPhasesIterator(t *testing.T) {
 	t.Run("WalksAllPhasesAndTables", func(t *testing.T) {
 		s := stats.FromQueryStats(iterableQueryStatsPB())

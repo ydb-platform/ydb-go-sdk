@@ -29,7 +29,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
-			if info.Error == nil && info.Session != nil {
+			if info.Error == nil && !isNil(info.Session) {
 				l.Log(WithLevel(ctx, DEBUG), "database/sql connect done",
 					kv.Latency(start),
 					kv.String("session_id", safeSessionID(info.Session)),

@@ -125,7 +125,7 @@ func query(adapter Adapter) trace.Query {
 						info.Error,
 						kv.Int("attempts", info.Attempts),
 					)
-				} else if info.Session != nil {
+				} else if !isNil(info.Session) {
 					finish(
 						start,
 						nil,
@@ -236,7 +236,7 @@ func query(adapter Adapter) trace.Query {
 						info.Error,
 						kv.Int64(AttrYDBNodeID, 0),
 					)
-				case info.Session != nil:
+				case !isNil(info.Session):
 					finish(
 						start,
 						nil,
@@ -361,7 +361,7 @@ func query(adapter Adapter) trace.Query {
 				switch {
 				case info.Error != nil:
 					finish(start, info.Error)
-				case info.Tx != nil:
+				case !isNil(info.Tx):
 					finish(
 						start,
 						nil,

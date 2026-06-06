@@ -158,7 +158,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			start := time.Now()
 
 			return func(info trace.TableCreateSessionDoneInfo) {
-				if info.Error == nil && info.Session != nil {
+				if info.Error == nil && !isNil(info.Session) {
 					l.Log(ctx, "table create session done",
 						kv.Latency(start),
 						kv.Int("attempts", info.Attempts),
@@ -190,7 +190,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 
 			return func(info trace.TableSessionNewDoneInfo) {
 				if info.Error == nil {
-					if info.Session != nil {
+					if !isNil(info.Session) {
 						l.Log(ctx, "table new session done",
 							kv.Latency(start),
 							kv.String("id", safeSessionID(info.Session)),
@@ -338,7 +338,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			start := time.Now()
 
 			return func(info trace.TableExecuteDataQueryDoneInfo) {
-				if info.Error == nil && info.Tx != nil {
+				if info.Error == nil && !isNil(info.Tx) {
 					l.Log(ctx, "table session query execute done",
 						appendFieldByCondition(l.logQuery,
 							kv.Stringer("query", query),
@@ -472,7 +472,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			start := time.Now()
 
 			return func(info trace.TableTxBeginDoneInfo) {
-				if info.Error == nil && info.Tx != nil {
+				if info.Error == nil && !isNil(info.Tx) {
 					l.Log(ctx, "table tx begin done",
 						kv.Latency(start),
 						kv.String("id", safeSessionID(session)),
@@ -607,7 +607,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			start := time.Now()
 
 			return func(info trace.TablePoolGetDoneInfo) {
-				if info.Error == nil && info.Session != nil {
+				if info.Error == nil && !isNil(info.Session) {
 					session := info.Session
 					l.Log(ctx, "done",
 						kv.Latency(start),

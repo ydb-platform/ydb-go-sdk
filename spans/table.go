@@ -28,7 +28,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 		withCallContext(info.Context, info.Call)
 
 		return func(info trace.TableCreateSessionDoneInfo) {
-			if info.Error == nil && info.Session != nil {
+			if info.Error == nil && !isNil(info.Session) {
 				fieldsStore.fields = append(fieldsStore.fields,
 					kv.String("session_id", safeID(info.Session)),
 					kv.String("session_status", safeStatus(info.Session)),
@@ -114,7 +114,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					start,
 					info.Error,
 				)
-			} else if info.Session != nil {
+			} else if !isNil(info.Session) {
 				finish(
 					start,
 					nil,
@@ -232,7 +232,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					start,
 					info.Error,
 				)
-			} else if info.Tx != nil {
+			} else if !isNil(info.Tx) {
 				finish(
 					start,
 					safeErr(info.Result),
@@ -316,7 +316,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					start,
 					info.Error,
 				)
-			} else if info.Tx != nil {
+			} else if !isNil(info.Tx) {
 				finish(
 					start,
 					nil,
@@ -474,7 +474,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 					info.Error,
 					kv.Int("attempts", info.Attempts),
 				)
-			} else if info.Session != nil {
+			} else if !isNil(info.Session) {
 				finish(
 					start,
 					nil,

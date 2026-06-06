@@ -167,7 +167,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 						start,
 						info.Error,
 					)
-				} else if info.Tx != nil {
+				} else if !isNil(info.Tx) {
 					finish(
 						start,
 						nil,
@@ -194,7 +194,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 						start,
 						info.Error,
 					)
-				} else if info.Tx != nil {
+				} else if !isNil(info.Tx) {
 					finish(
 						start,
 						nil,

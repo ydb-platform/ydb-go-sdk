@@ -397,7 +397,7 @@ func internalQuery(
 			start := time.Now()
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
-				if info.Error == nil && info.Session != nil {
+				if info.Error == nil && !isNil(info.Session) {
 					l.Log(ctx, "query session create done",
 						kv.Latency(start),
 						kv.String("session_id", safeSessionID(info.Session)),
@@ -550,7 +550,7 @@ func internalQuery(
 			start := time.Now()
 
 			return func(info trace.QuerySessionBeginDoneInfo) {
-				if info.Error == nil && info.Tx != nil {
+				if info.Error == nil && !isNil(info.Tx) {
 					l.Log(WithLevel(ctx, DEBUG), "query session begin done",
 						kv.Latency(start),
 						kv.String("TransactionID", safeTxID(info.Tx)),
