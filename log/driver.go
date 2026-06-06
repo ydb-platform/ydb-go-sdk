@@ -56,7 +56,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			endpoint := info.Endpoint
 			database := info.Database
 			secure := info.Secure
-			ctx := with(*info.Context, DEBUG, "ydb", "driver", "resolver", "init")
+			ctx := withFromPtr(info.Context, DEBUG, "ydb", "driver", "resolver", "init")
 			l.Log(ctx, "driver init starting...",
 				kv.String("endpoint", endpoint),
 				kv.String("database", database),
@@ -88,7 +88,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "resolver", "close")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "resolver", "close")
 			l.Log(ctx, "driver close starting...")
 			start := time.Now()
 
@@ -110,7 +110,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "dial")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "dial")
 			endpoint := info.Endpoint
 			l.Log(ctx, "driver connection dial starting...",
 				kv.Stringer("endpoint", endpoint),
@@ -157,7 +157,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "close")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "close")
 			endpoint := info.Endpoint
 			l.Log(ctx, "driver connection close starting...",
 				kv.Stringer("endpoint", endpoint),
@@ -184,7 +184,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "invoke")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "invoke")
 			endpoint := info.Endpoint
 			method := string(info.Method)
 			l.Log(ctx, "driver connection invoke starting...",
@@ -212,11 +212,14 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 					)
 				}
 				for _, issue := range info.Issues {
+					if isNil(issue) {
+						continue
+					}
 					l.Log(WithLevel(ctx, WARN), "YQL issue",
 						kv.String("method", method),
 						kv.Stringer("endpoint", endpoint),
-						kv.String("message", issue.GetMessage()),
-						kv.Int("code", int(issue.GetIssueCode())),
+						kv.String("message", safeIssueMessage(issue)),
+						kv.Int("code", int(safeIssueCode(issue))),
 					)
 				}
 			}
@@ -229,7 +232,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "New")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "stream", "New")
 			endpoint := info.Endpoint
 			method := string(info.Method)
 			l.Log(ctx, "driver new connection stream starting...",
@@ -262,7 +265,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "CloseSend")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "stream", "CloseSend")
 			l.Log(ctx, "driver send stream close starting...")
 			start := time.Now()
 
@@ -284,7 +287,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "SendMsg")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "stream", "SendMsg")
 			l.Log(ctx, "driver send stream msg starting...")
 			start := time.Now()
 
@@ -306,7 +309,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "RecvMsg")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "stream", "RecvMsg")
 			l.Log(ctx, "driver receive stream msg starting...")
 			start := time.Now()
 
@@ -328,7 +331,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "ban")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "ban")
 			endpoint := info.Endpoint
 			cause := info.Cause
 			l.Log(ctx, "driver connection ban starting...",
@@ -351,7 +354,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "allow")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "conn", "allow")
 			endpoint := info.Endpoint
 			l.Log(ctx, "driver connection allow starting...",
 				kv.Stringer("endpoint", endpoint),
@@ -370,7 +373,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverRepeaterEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "repeater", "wake", "up")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "repeater", "wake", "up")
 			name := info.Name
 			event := info.Event
 			l.Log(ctx, "driver repeater wakeup starting...",
@@ -401,7 +404,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "init")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "balancer", "init")
 			l.Log(ctx, "driver balancer init starting...")
 			start := time.Now()
 
@@ -415,7 +418,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "close")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "balancer", "close")
 			l.Log(ctx, "driver balancer close starting...")
 			start := time.Now()
 
@@ -441,7 +444,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "choose", "endpoint")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "balancer", "choose", "endpoint")
 			l.Log(ctx, "driver balancer choose endpoint starting...")
 			start := time.Now()
 
@@ -468,7 +471,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, DEBUG, "ydb", "driver", "balancer", "update")
+			ctx := withFromPtr(info.Context, DEBUG, "ydb", "driver", "balancer", "update")
 			l.Log(ctx, "driver balancer update starting...",
 				kv.Bool("needLocalDC", info.NeedLocalDC),
 				kv.String("database", info.Database),
@@ -489,7 +492,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 			if d.Details()&trace.DriverCredentialsEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "credentials", "get")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "driver", "credentials", "get")
 			l.Log(ctx, "driver get credentials starting...")
 			start := time.Now()
 

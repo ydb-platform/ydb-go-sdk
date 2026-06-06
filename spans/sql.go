@@ -45,7 +45,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 			}
 
 			start := childSpanWithReplaceCtx(info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
@@ -62,7 +62,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DatabaseSQLConnPingDoneInfo) {
@@ -79,7 +79,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("query", info.Query),
 			)
 
@@ -97,7 +97,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("query", info.Query),
 				kv.String("query_mode", info.Mode),
 				kv.Bool("idempotent", info.Idempotent),
@@ -117,7 +117,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("query", info.Query),
 				kv.String("query_mode", info.Mode),
 				kv.Bool("idempotent", info.Idempotent),
@@ -139,7 +139,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("table_name", info.TableName),
 			)
 
@@ -158,7 +158,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
@@ -185,7 +185,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DatabaseSQLConnBeginTxDoneInfo) {
@@ -212,7 +212,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("transaction_id", safeID(info.Tx)),
 			)
 
@@ -230,7 +230,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("transaction_id", safeID(info.Tx)),
 			)
 
@@ -248,12 +248,12 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("query", info.Query),
 				kv.String("transaction_id", safeID(info.Tx)),
 			)
 
-			if !isStmtCall(*info.Context) {
+			if !isStmtCall(safeContextPtr(info.Context)) {
 				start.Link(adapter.SpanFromContext(info.TxContext))
 			}
 
@@ -271,12 +271,12 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("query", info.Query),
 				kv.String("transaction_id", safeID(info.Tx)),
 			)
 
-			if !isStmtCall(*info.Context) {
+			if !isStmtCall(safeContextPtr(info.Context)) {
 				start.Link(adapter.SpanFromContext(info.TxContext))
 			}
 
@@ -294,7 +294,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("query", info.Query),
 				kv.String("transaction_id", safeID(info.Tx)),
 			)
@@ -313,13 +313,13 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("query", info.Query),
 			)
 
-			start.Link(adapter.SpanFromContext(info.StmtContext))
+			start.Link(adapter.SpanFromContext(safeContext(info.StmtContext)))
 
-			*info.Context = markStmtCall(*info.Context)
+			withContextPtr(info.Context, markStmtCall)
 
 			return func(info trace.DatabaseSQLStmtExecDoneInfo) {
 				finish(
@@ -335,13 +335,13 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("query", info.Query),
 			)
 
-			start.Link(adapter.SpanFromContext(info.StmtContext))
+			start.Link(adapter.SpanFromContext(safeContext(info.StmtContext)))
 
-			*info.Context = markStmtCall(*info.Context)
+			withContextPtr(info.Context, markStmtCall)
 
 			return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 				finish(
@@ -357,10 +357,10 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
-			*info.Context = markStmtCall(*info.Context)
+			withContextPtr(info.Context, markStmtCall)
 
 			return func(info trace.DatabaseSQLConnCloseDoneInfo) {
 				finish(
@@ -378,7 +378,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			var (
 				start = time.Now()
-				ctx   = *info.Context
+				ctx   = safeContextPtr(info.Context)
 				call  = info.Call
 				value = info.Value
 			)
@@ -390,7 +390,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 						kv.Latency(start),
 					)
 				} else {
-					logToParentSpan(adapter, ctx, call.String(),
+					logToParentSpan(adapter, ctx, safeCall(call),
 						kv.Any("value", value),
 						kv.Latency(start),
 					)
@@ -406,7 +406,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DatabaseSQLConnIsColumnExistsDoneInfo) {
@@ -425,7 +425,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DatabaseSQLConnGetIndexColumnsDoneInfo) {
@@ -442,12 +442,12 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.StmtContext,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
-			start.Link(adapter.SpanFromContext(*info.StmtContext))
+			start.Link(adapter.SpanFromContext(safeContextPtr(info.StmtContext)))
 
-			*info.StmtContext = markStmtCall(*info.StmtContext)
+			withContextPtr(info.StmtContext, markStmtCall)
 
 			return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
 				finish(
@@ -465,7 +465,7 @@ func databaseSQL(adapter Adapter) trace.DatabaseSQL {
 
 			start := childSpanWithReplaceCtx(
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DatabaseSQLDoTxIntermediateInfo) func(trace.DatabaseSQLDoTxDoneInfo) {

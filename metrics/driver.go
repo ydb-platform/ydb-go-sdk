@@ -34,8 +34,8 @@ func driver(config Config) (t trace.Driver) {
 	t.OnConnInvoke = func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
 		var (
 			method   = info.Method
-			endpoint = info.Endpoint.Address()
-			nodeID   = info.Endpoint.NodeID()
+			endpoint = safeEndpointAddress(info.Endpoint)
+			nodeID   = safeEndpointNodeID(info.Endpoint)
 		)
 
 		return func(info trace.DriverConnInvokeDoneInfo) {
@@ -63,8 +63,8 @@ func driver(config Config) (t trace.Driver) {
 	) {
 		var (
 			method   = info.Method
-			endpoint = info.Endpoint.Address()
-			nodeID   = info.Endpoint.NodeID()
+			endpoint = safeEndpointAddress(info.Endpoint)
+			nodeID   = safeEndpointNodeID(info.Endpoint)
 		)
 
 		return func(info trace.DriverConnNewStreamDoneInfo) {
@@ -90,8 +90,8 @@ func driver(config Config) (t trace.Driver) {
 		}
 
 		banned.With(map[string]string{
-			"endpoint": info.Endpoint.Address(),
-			"node_id":  idToString(info.Endpoint.NodeID()),
+			"endpoint": safeEndpointAddress(info.Endpoint),
+			"node_id":  idToString(safeEndpointNodeID(info.Endpoint)),
 			"cause":    errorBrief(info.Cause),
 		}).Add(1)
 
@@ -100,7 +100,7 @@ func driver(config Config) (t trace.Driver) {
 	t.OnBalancerClusterDiscoveryAttempt = func(info trace.DriverBalancerClusterDiscoveryAttemptStartInfo) func(
 		trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
 	) {
-		eventType := repeater.EventType(*info.Context)
+		eventType := repeater.EventType(safeContextPtr(info.Context))
 
 		return func(info trace.DriverBalancerClusterDiscoveryAttemptDoneInfo) {
 			if config.Details()&trace.DriverBalancerEvents == 0 {
@@ -114,7 +114,7 @@ func driver(config Config) (t trace.Driver) {
 		}
 	}
 	t.OnBalancerUpdate = func(info trace.DriverBalancerUpdateStartInfo) func(trace.DriverBalancerUpdateDoneInfo) {
-		eventType := repeater.EventType(*info.Context)
+		eventType := repeater.EventType(safeContextPtr(info.Context))
 
 		return func(info trace.DriverBalancerUpdateDoneInfo) {
 			if config.Details()&trace.DriverBalancerEvents == 0 {
@@ -128,6 +128,9 @@ func driver(config Config) (t trace.Driver) {
 			}).Inc()
 			newEndpoints := make(map[endpointKey]int, len(info.Endpoints))
 			for _, e := range info.Endpoints {
+				if isNil(e) {
+					continue
+				}
 				e := endpointKey{
 					az: e.Location(),
 				}
@@ -150,8 +153,8 @@ func driver(config Config) (t trace.Driver) {
 		}
 	}
 	t.OnConnDial = func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
-		endpoint := info.Endpoint.Address()
-		nodeID := info.Endpoint.NodeID()
+		endpoint := safeEndpointAddress(info.Endpoint)
+		nodeID := safeEndpointNodeID(info.Endpoint)
 
 		return func(info trace.DriverConnDialDoneInfo) {
 			if config.Details()&trace.DriverConnEvents == 0 {
@@ -172,8 +175,8 @@ func driver(config Config) (t trace.Driver) {
 		}
 
 		conns.With(map[string]string{
-			"endpoint": info.Endpoint.Address(),
-			"node_id":  idToString(info.Endpoint.NodeID()),
+			"endpoint": safeEndpointAddress(info.Endpoint),
+			"node_id":  idToString(safeEndpointNodeID(info.Endpoint)),
 		}).Add(-1)
 
 		return nil

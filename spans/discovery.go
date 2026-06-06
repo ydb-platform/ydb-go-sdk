@@ -16,7 +16,7 @@ func discovery(adapter Adapter) (t trace.Discovery) {
 		start := childSpanWithReplaceCtx(
 			adapter,
 			info.Context,
-			info.Call.String(),
+			safeCall(info.Call),
 			kv.String("address", info.Address),
 			kv.String("database", info.Database),
 		)
@@ -27,6 +27,9 @@ func discovery(adapter Adapter) (t trace.Discovery) {
 			} else {
 				endpoints := make([]string, len(info.Endpoints))
 				for i, e := range info.Endpoints {
+					if isNil(e) {
+						continue
+					}
 					endpoints[i] = e.String()
 				}
 				start.Log(fmt.Sprintf("endpoints=%v", endpoints))
