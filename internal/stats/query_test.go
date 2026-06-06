@@ -14,56 +14,6 @@ func us(microseconds uint64) time.Duration {
 	return time.Duration(microseconds) * time.Microsecond
 }
 
-// sampleQueryStatsPB returns a fully-populated QueryStats proto used by
-// scalar-field tests. Two query phases let us also exercise NextPhase
-// advancement and table access on more than one phase.
-func sampleQueryStatsPB() *Ydb_TableStats.QueryStats {
-	return &Ydb_TableStats.QueryStats{
-		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
-			{
-				DurationUs: 10,
-				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
-						Name:            "a",
-						Reads:           &Ydb_TableStats.OperationStats{Rows: 100, Bytes: 200},
-						Updates:         &Ydb_TableStats.OperationStats{Rows: 300, Bytes: 400},
-						Deletes:         &Ydb_TableStats.OperationStats{Rows: 500, Bytes: 600},
-						PartitionsCount: 700,
-					},
-				},
-				CpuTimeUs:      20,
-				AffectedShards: 30,
-				LiteralPhase:   true,
-			},
-			{
-				DurationUs: 11,
-				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
-						Name:            "b",
-						Reads:           &Ydb_TableStats.OperationStats{Rows: 101, Bytes: 201},
-						Updates:         &Ydb_TableStats.OperationStats{Rows: 301, Bytes: 401},
-						Deletes:         &Ydb_TableStats.OperationStats{Rows: 501, Bytes: 601},
-						PartitionsCount: 701,
-					},
-				},
-				CpuTimeUs:      21,
-				AffectedShards: 31,
-				LiteralPhase:   false,
-			},
-		},
-		Compilation: &Ydb_TableStats.CompilationStats{
-			FromCache:  true,
-			DurationUs: 123,
-			CpuTimeUs:  456,
-		},
-		ProcessCpuTimeUs: 100,
-		QueryPlan:        "plan",
-		QueryAst:         "ast",
-		TotalDurationUs:  200,
-		TotalCpuTimeUs:   300,
-	}
-}
-
 func TestFromQueryStats(t *testing.T) {
 	t.Run("NilProtoReturnsNil", func(t *testing.T) {
 		require.Nil(t, stats.FromQueryStats(nil))
@@ -127,9 +77,7 @@ func TestQueryStatsNextPhase(t *testing.T) {
 		// A nil entry inside the QueryPhases slice must terminate iteration
 		// cleanly instead of panicking when callers later dereference the
 		// returned phase.
-		s := stats.FromQueryStats(&Ydb_TableStats.QueryStats{
-			QueryPhases: []*Ydb_TableStats.QueryPhaseStats{nil},
-		})
+		s := stats.FromQueryStats(queryStatsWithNilPhase())
 
 		p, ok := s.NextPhase()
 
@@ -160,9 +108,7 @@ func TestQueryPhaseNextTableAccess(t *testing.T) {
 	})
 
 	t.Run("ReturnsFalseOnEmpty", func(t *testing.T) {
-		s := stats.FromQueryStats(&Ydb_TableStats.QueryStats{
-			QueryPhases: []*Ydb_TableStats.QueryPhaseStats{{}},
-		})
+		s := stats.FromQueryStats(queryStatsWithEmptyPhase())
 		phase, ok := s.NextPhase()
 		require.True(t, ok)
 
