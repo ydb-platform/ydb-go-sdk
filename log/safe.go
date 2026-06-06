@@ -148,6 +148,14 @@ func safeIssueCode(i trace.Issue) uint32 {
 	return i.GetIssueCode()
 }
 
+func safeConnState(s trace.ConnState) string {
+	if isNil(s) {
+		return ""
+	}
+
+	return s.String()
+}
+
 func safeEndpointNodeID(e trace.EndpointInfo) int64 {
 	if isNil(e) {
 		return 0

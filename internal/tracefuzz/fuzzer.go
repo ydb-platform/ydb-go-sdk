@@ -52,7 +52,8 @@ func (f *Fuzzer) Bool() bool {
 }
 
 func (f *Fuzzer) Int() int {
-	return int(f.uint64())
+	// Keep values non-negative; width is still reduced in Fill() per destination type.
+	return int(f.uint64() >> 1)
 }
 
 func (f *Fuzzer) Intn(n int) int {
