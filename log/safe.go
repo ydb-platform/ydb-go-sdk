@@ -1,22 +1,12 @@
 package log
 
 import (
-	"fmt"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func isNil(v any) bool {
 	return xiface.IsNil(v)
-}
-
-func safeStringer(s fmt.Stringer) string {
-	if isNil(s) {
-		return ""
-	}
-
-	return s.String()
 }
 
 func safeSessionID(s interface{ ID() string }) string {
@@ -61,7 +51,8 @@ func safeResultSetCount(r interface{ ResultSetCount() int }) int {
 
 func safeCommitInfos(m interface {
 	GetCommitsInfo() []trace.TopicReaderStreamCommitInfo
-}) []trace.TopicReaderStreamCommitInfo {
+},
+) []trace.TopicReaderStreamCommitInfo {
 	if isNil(m) {
 		return nil
 	}
@@ -87,7 +78,8 @@ func safeTopicTopics(r interface{ GetTopics() []string }) []string {
 
 func safeDataResponseCounts(r interface {
 	GetPartitionBatchMessagesCounts() (partitionCount, batchCount, messagesCount int)
-}) (partitionCount, batchCount, messagesCount int) {
+},
+) (partitionCount, batchCount, messagesCount int) {
 	if isNil(r) {
 		return 0, 0, 0
 	}

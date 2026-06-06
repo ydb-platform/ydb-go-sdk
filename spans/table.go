@@ -1,7 +1,6 @@
 package spans
 
 import (
-	"context"
 	"net/url"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
@@ -26,7 +25,7 @@ func table(adapter Adapter) (t trace.Table) { //nolint:gocyclo
 		}
 
 		fieldsStore := fieldsStoreFromContext(info.Context)
-		withContextPtr(info.Context, func(c context.Context) context.Context { return withFunctionID(c, safeCall(info.Call)) })
+		withCallContext(info.Context, info.Call)
 
 		return func(info trace.TableCreateSessionDoneInfo) {
 			if info.Error == nil && info.Session != nil {

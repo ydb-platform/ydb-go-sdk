@@ -15,8 +15,8 @@ func (noopCounter) Inc() {}
 
 type noopGauge struct{}
 
-func (noopGauge) Add(float64)    {}
-func (noopGauge) Set(float64)    {}
+func (noopGauge) Add(float64) {}
+func (noopGauge) Set(float64) {}
 
 type noopTimer struct{}
 

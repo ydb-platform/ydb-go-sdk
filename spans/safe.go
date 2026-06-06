@@ -100,6 +100,12 @@ func withContextPtr(ctx *context.Context, fn func(context.Context) context.Conte
 	*ctx = fn(safeContextPtr(ctx))
 }
 
+func withCallContext(ctx *context.Context, call trace.Call) {
+	withContextPtr(ctx, func(c context.Context) context.Context {
+		return withFunctionID(c, safeCall(call))
+	})
+}
+
 func isNil(v any) bool {
 	return xiface.IsNil(v)
 }

@@ -81,6 +81,7 @@ func BenchmarkIsNilReflect(b *testing.B) {
 	}
 }
 
+//nolint:staticcheck // benchmark baseline: interface == nil is false for typed nil
 func BenchmarkIsNilEqOnly(b *testing.B) {
 	var typedNil *testSession
 	v := trace.SessionInfo(typedNil)

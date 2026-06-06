@@ -35,13 +35,13 @@ type fuzzEndpoint struct {
 	localDC    bool
 }
 
-func (e *fuzzEndpoint) NodeID() uint32              { return e.nodeID }
-func (e *fuzzEndpoint) Address() string             { return e.address }
-func (e *fuzzEndpoint) Location() string            { return e.location }
-func (e *fuzzEndpoint) LoadFactor() float32         { return e.loadFactor }
-func (e *fuzzEndpoint) LastUpdated() time.Time      { return e.updated }
-func (e *fuzzEndpoint) LocalDC() bool               { return e.localDC }
-func (e *fuzzEndpoint) String() string { return e.address }
+func (e *fuzzEndpoint) NodeID() uint32         { return e.nodeID }
+func (e *fuzzEndpoint) Address() string        { return e.address }
+func (e *fuzzEndpoint) Location() string       { return e.location }
+func (e *fuzzEndpoint) LoadFactor() float32    { return e.loadFactor }
+func (e *fuzzEndpoint) LastUpdated() time.Time { return e.updated }
+func (e *fuzzEndpoint) LocalDC() bool          { return e.localDC }
+func (e *fuzzEndpoint) String() string         { return e.address }
 
 type fuzzConnState struct {
 	code  int
@@ -78,6 +78,7 @@ func (r *fuzzTableResultErr) Err() error { return r.err }
 
 type fuzzTableResult struct {
 	fuzzTableResultErr
+
 	count int
 }
 
@@ -95,6 +96,7 @@ func (r *fuzzScriptingResultErr) Err() error { return r.err }
 
 type fuzzScriptingResult struct {
 	fuzzScriptingResultErr
+
 	count int
 }
 
