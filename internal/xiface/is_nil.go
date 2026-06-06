@@ -2,6 +2,13 @@ package xiface
 
 import "unsafe"
 
+// emptyInterface mirrors the runtime representation of an interface value.
+// It is not part of the Go public API, but has been stable since Go 1.0.
+type emptyInterface struct {
+	typ  unsafe.Pointer
+	data unsafe.Pointer
+}
+
 // IsNil reports whether v is an untyped nil or an interface value holding a
 // typed nil pointer (for example, (*T)(nil) stored in trace.SessionInfo).
 //
@@ -12,10 +19,5 @@ func IsNil(v any) bool {
 		return true
 	}
 
-	type eface struct {
-		typ  unsafe.Pointer
-		data unsafe.Pointer
-	}
-
-	return (*eface)(unsafe.Pointer(&v)).data == nil
+	return (*emptyInterface)(unsafe.Pointer(&v)).data == nil
 }

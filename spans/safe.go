@@ -58,7 +58,7 @@ func safeStringer(s fmt.Stringer) string {
 }
 
 func safeError(err error) string {
-	if err == nil {
+	if xiface.IsNil(err) {
 		return ""
 	}
 
@@ -78,7 +78,7 @@ func safeCall(c trace.Call) string {
 }
 
 func safeContext(ctx context.Context) context.Context {
-	if ctx == nil {
+	if xiface.IsNil(ctx) {
 		return context.Background()
 	}
 
@@ -86,11 +86,11 @@ func safeContext(ctx context.Context) context.Context {
 }
 
 func safeContextPtr(ctx *context.Context) context.Context {
-	if ctx == nil || *ctx == nil {
+	if ctx == nil {
 		return context.Background()
 	}
 
-	return *ctx
+	return safeContext(*ctx)
 }
 
 func withContextPtr(ctx *context.Context, fn func(context.Context) context.Context) {

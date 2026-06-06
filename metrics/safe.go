@@ -44,7 +44,10 @@ func safeTxID(tx trace.TxInfo) string {
 }
 
 func safeContextPtr(ctx *context.Context) context.Context {
-	if ctx == nil || *ctx == nil {
+	if ctx == nil {
+		return context.Background()
+	}
+	if isNil(*ctx) {
 		return context.Background()
 	}
 

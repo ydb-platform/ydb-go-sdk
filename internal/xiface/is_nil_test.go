@@ -4,9 +4,17 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestEmptyInterfaceLayout(t *testing.T) {
+	var iface any
+	if unsafe.Sizeof(iface) != unsafe.Sizeof(emptyInterface{}) {
+		t.Fatal("interface size mismatch with emptyInterface")
+	}
+}
 
 type testSession struct {
 	id string

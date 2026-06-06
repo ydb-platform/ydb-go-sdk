@@ -25,12 +25,12 @@ func discovery(adapter Adapter) (t trace.Discovery) {
 			if info.Error != nil {
 				start.Error(info.Error)
 			} else {
-				endpoints := make([]string, len(info.Endpoints))
-				for i, e := range info.Endpoints {
+				endpoints := make([]string, 0, len(info.Endpoints))
+				for _, e := range info.Endpoints {
 					if isNil(e) {
 						continue
 					}
-					endpoints[i] = e.String()
+					endpoints = append(endpoints, e.String())
 				}
 				start.Log(fmt.Sprintf("endpoints=%v", endpoints))
 			}

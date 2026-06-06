@@ -57,7 +57,10 @@ func with(ctx context.Context, lvl Level, names ...string) context.Context {
 }
 
 func safeContextPtr(ctx *context.Context) context.Context {
-	if ctx == nil || *ctx == nil {
+	if ctx == nil {
+		return context.Background()
+	}
+	if isNil(*ctx) {
 		return context.Background()
 	}
 
@@ -65,7 +68,7 @@ func safeContextPtr(ctx *context.Context) context.Context {
 }
 
 func withContext(ctx context.Context, lvl Level, names ...string) context.Context {
-	if ctx == nil {
+	if isNil(ctx) {
 		return with(context.Background(), lvl, names...)
 	}
 

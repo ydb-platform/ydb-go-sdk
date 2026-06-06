@@ -326,28 +326,26 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			)
 
 			return func(info trace.DriverBalancerUpdateDoneInfo) {
-				var (
-					endpoints = make([]string, len(info.Endpoints))
-					added     = make([]string, len(info.Added))
-					dropped   = make([]string, len(info.Dropped))
-				)
-				for i, e := range info.Endpoints {
+				endpoints := make([]string, 0, len(info.Endpoints))
+				added := make([]string, 0, len(info.Added))
+				dropped := make([]string, 0, len(info.Dropped))
+				for _, e := range info.Endpoints {
 					if isNil(e) {
 						continue
 					}
-					endpoints[i] = e.String()
+					endpoints = append(endpoints, e.String())
 				}
-				for i, e := range info.Added {
+				for _, e := range info.Added {
 					if isNil(e) {
 						continue
 					}
-					added[i] = e.String()
+					added = append(added, e.String())
 				}
-				for i, e := range info.Dropped {
+				for _, e := range info.Dropped {
 					if isNil(e) {
 						continue
 					}
-					dropped[i] = e.String()
+					dropped = append(dropped, e.String())
 				}
 				start.Log(fmt.Sprintf("endpoints=%v", endpoints))
 				start.Log(fmt.Sprintf("added=%v", added))
