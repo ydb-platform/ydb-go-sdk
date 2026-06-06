@@ -1,3 +1,4 @@
+## v3.139.6
 * Fixed panics in built-in trace handlers (`spans`, `log`, and `metrics`) when callback info contains typed-nil interfaces (for example, nil `SessionInfo` or `TxInfo`) or nil context pointers
 
 ## v3.139.5
