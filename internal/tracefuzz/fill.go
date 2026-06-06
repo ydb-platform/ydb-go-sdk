@@ -160,6 +160,7 @@ func fillInterface(f *Fuzzer, v reflect.Value) {
 	if v.Type() == reflect.TypeFor[context.Context]() {
 		if f.Bool() {
 			v.SetZero()
+
 			return
 		}
 		ctx := context.Background()
@@ -167,6 +168,7 @@ func fillInterface(f *Fuzzer, v reflect.Value) {
 			ctx = context.WithValue(ctx, contextKey{}, f.String())
 		}
 		v.Set(reflect.ValueOf(ctx))
+
 		return
 	}
 
