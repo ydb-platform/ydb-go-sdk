@@ -54,9 +54,9 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 			}
 
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
-				if info.Error == nil && info.Tx != nil {
+				if info.Error == nil && !isNil(info.Tx) {
 					txs.With(nil).Add(1)
-					txStart.Set(info.Tx.ID(), time.Now())
+					txStart.Set(safeTxID(info.Tx), time.Now())
 				}
 			}
 		},
@@ -66,16 +66,16 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 			}
 
 			return func(info trace.DatabaseSQLConnBeginTxDoneInfo) {
-				if info.Error == nil && info.Tx != nil {
+				if info.Error == nil && !isNil(info.Tx) {
 					txs.With(nil).Add(1)
-					txStart.Set(info.Tx.ID(), time.Now())
+					txStart.Set(safeTxID(info.Tx), time.Now())
 				}
 			}
 		},
 		OnTxCommit: func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
 			txs.With(nil).Add(-1)
 
-			if start, has := txStart.Extract(info.Tx.ID()); has {
+			if start, has := txStart.Extract(safeTxID(info.Tx)); has {
 				txLatency.With(nil).Record(time.Since(start))
 			}
 
@@ -84,7 +84,7 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 		OnTxRollback: func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
 			txs.With(nil).Add(-1)
 
-			if start, has := txStart.Extract(info.Tx.ID()); has {
+			if start, has := txStart.Extract(safeTxID(info.Tx)); has {
 				txLatency.With(nil).Record(time.Since(start))
 			}
 

@@ -24,16 +24,16 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnectorEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "connector", "connect")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "connector", "connect")
 		l.Log(ctx, "database/sql connect starting...")
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
-			if info.Error == nil && info.Session != nil {
+			if info.Error == nil && !isNil(info.Session) {
 				l.Log(WithLevel(ctx, DEBUG), "database/sql connect done",
 					kv.Latency(start),
-					kv.String("session_id", info.Session.ID()),
-					kv.String("session_status", info.Session.Status()),
+					kv.String("session_id", safeSessionID(info.Session)),
+					kv.String("session_status", safeSessionStatus(info.Session)),
 				)
 			} else if info.Error == nil {
 				l.Log(WithLevel(ctx, DEBUG), "database/sql connect done",
@@ -53,7 +53,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "ping")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "conn", "ping")
 		l.Log(ctx, "database/sql ping starting...")
 		start := time.Now()
 
@@ -97,7 +97,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "begin", "tx")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "conn", "begin", "tx")
 		l.Log(ctx, "database/sql transaction begin starting...")
 		start := time.Now()
 
@@ -119,7 +119,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "prepare", "stmt")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "conn", "prepare", "stmt")
 		l.Log(ctx, "database/sql prepare starting...",
 			appendFieldByCondition(l.logQuery,
 				kv.String("query", info.Query),
@@ -149,7 +149,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "exec")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "conn", "exec")
 		l.Log(ctx, "database/sql exec starting...",
 			appendFieldByCondition(l.logQuery,
 				kv.String("query", info.Query),
@@ -184,7 +184,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "query")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "conn", "query")
 		l.Log(ctx, "database/sql query starting...",
 			appendFieldByCondition(l.logQuery,
 				kv.String("query", info.Query),
@@ -219,7 +219,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "tx", "commit")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "tx", "commit")
 		l.Log(ctx, "database/sql tx commit starting")
 		start := time.Now()
 
@@ -241,7 +241,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "tx", "rollback")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "tx", "rollback")
 		l.Log(ctx, "database/sql tx rollback starting...")
 		start := time.Now()
 
@@ -285,7 +285,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "stmt", "exec")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "stmt", "exec")
 		l.Log(ctx, "database/sql statement exec starting...",
 			appendFieldByCondition(l.logQuery,
 				kv.String("query", info.Query),
@@ -316,7 +316,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "stmt", "query")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "database", "sql", "stmt", "query")
 		l.Log(ctx, "database/sql statement query starting...",
 			appendFieldByCondition(l.logQuery,
 				kv.String("query", info.Query),
