@@ -90,6 +90,7 @@ func (cfg *WriterReconnectorConfig) validate() error {
 	return cfg.directWrite.validate(cfg.defaultPartitioning, cfg.producerID)
 }
 
+//nolint:funlen // config constructor: defaults, options, and default Connect closure
 func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
 	cfg := WriterReconnectorConfig{
 		WritersCommonConfig: WritersCommonConfig{
@@ -135,7 +136,10 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	cfg.directWrite.finishInit(&cfg.defaultPartitioning)
 
 	if cfg.Connect == nil {
-		cfg.Connect = func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error) {
+		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
+			RawTopicWriterStream,
+			error,
+		) {
 			streamCtx, err := cfg.directWrite.bindConnectContext(
 				xcontext.MergeContexts(ctx, cfg.LogContext),
 				cfg.rawTopicClient,
@@ -147,6 +151,8 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 
 			return cfg.rawTopicClient.StreamWrite(streamCtx, tracer)
 		}
+
+		cfg.Connect = connector
 	}
 
 	return cfg
