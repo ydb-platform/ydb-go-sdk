@@ -105,6 +105,7 @@ func newMockQueryServiceForWarmUp(ctrl *gomock.Controller, createSessions int) Y
 	}
 
 	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+	stubAttachStreamContext(attachStream)
 	attachStream.EXPECT().Recv().Return(Ydb_Query.SessionState_builder{
 		Status: Ydb.StatusIds_SUCCESS,
 	}.Build(), nil).AnyTimes()

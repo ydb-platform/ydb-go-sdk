@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawscheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -42,6 +43,7 @@ type DescribeTopicResult struct {
 	Attributes                        map[string]string
 	Consumers                         []Consumer
 	MeteringMode                      MeteringMode
+	MetricsLevel                      rawoptional.Uint32
 }
 
 func (res *DescribeTopicResult) FromProto(response operation.Response) error {
@@ -89,6 +91,13 @@ func (res *DescribeTopicResult) FromProto(response operation.Response) error {
 	}
 
 	res.MeteringMode = MeteringMode(protoResult.GetMeteringMode())
+
+	if protoResult.HasMetricsLevel() {
+		res.MetricsLevel = rawoptional.Uint32{
+			Value:    protoResult.GetMetricsLevel(),
+			HasValue: true,
+		}
+	}
 
 	return nil
 }

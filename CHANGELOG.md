@@ -1,3 +1,40 @@
+## v3.139.6
+* Fixed panics in built-in trace handlers (`spans`, `log`, and `metrics`) when callback info contains typed-nil interfaces (for example, nil `SessionInfo` or `TxInfo`) or nil context pointers
+
+## v3.139.5
+* Fixed panic and data race in `TopicListener` when partition workers were closed while the read stream still delivered messages: `internal/xsync.UnboundedChan` no longer closes its signal channel on shutdown, stop the read loop before closing partition workers, and ignore routed messages after listener shutdown starts
+
+## v3.139.4
+* Fixed query result stream draining when `Close` is called with a fresh context after `NextResultSet` used a cancelled per-call context while `ExecStats` arrive in later stream parts ([#2187](https://github.com/ydb-platform/ydb-go-sdk/issues/2187))
+* Fixed query result `Close` to succeed when the execute stream is already closed (for example after full iteration or per-call context cancellation), matching `database/sql` expectations and table result close behavior ([#2187](https://github.com/ydb-platform/ydb-go-sdk/issues/2187))
+
+## v3.139.3
+* Fixed connection pessimization when a query `ExecuteQuery` stream ends with gRPC `Canceled` or `context.Canceled` during result drain ([#2186](https://github.com/ydb-platform/ydb-go-sdk/issues/2186))
+
+## v3.139.2
+* Added `label` to `table` `OnDo`/`OnDoTx` metrics (`latency`, `errs`, `attempts`) so that `table.WithLabel` breaks them down by label, consistent with the `query` service metrics
+
+## v3.139.1
+* Added support for session and node shutdown hints on the session attach stream. When a node shutdown hint was received, the balancer pessimized (banned) the connection to that YDB node, so subsequent gRPC calls were routed to other nodes.
+* Deprecated `config.WithDisableOptimisticUnban()` option and `config.Config.DisableOptimisticUnban()` method. Optimistic unban (where a successful gRPC call would immediately unban a banned connection) was disabled for all connections; nodes are now unbanned only after the next background discovery refresh if the node is still present in the discovery response.
+
+## v3.139.0
+* Reworked the `spans` package to follow OpenTelemetry semantic conventions: the emitted span tree now uses `ydb.*` names (`ydb.CreateSession`, `ydb.ExecuteQuery`, `ydb.BeginTransaction`, `ydb.Commit`, `ydb.Rollback`, `ydb.GetSession`, `ydb.Driver.Initialize`, `ydb.RunWithRetry`, `ydb.Try`) and OTel attribute keys (`db.*`, `server.*`, `network.peer.*`, `error.*`) plus YDB-specific `ydb.node.id`, `ydb.node.dc` and `ydb.retry.backoff_ms`. Noisy internal-package spans are suppressed. See [SPANS.md](SPANS.md) for the full span/attribute reference and migration notes
+* Added `trace.Retry.OnRetryAttempt` callback fired once per retry attempt with the attempt number and the backoff duration waited before it; this is what feeds the new `ydb.Try` spans
+* Added an `examples/opentelemetry` example that wires `spans.Adapter` onto the OpenTelemetry Go SDK via [`ydb-go-sdk-otel`](https://github.com/ydb-platform/ydb-go-sdk-otel), with an end-to-end docker-compose stack (OTel Collector / Tempo / Prometheus / Grafana)
+
+## v3.138.4
+* Added `topicoptions.CreateWithMetricsLevel`, `topicoptions.AlterWithSetMetricsLevel`, and `topicoptions.AlterWithResetMetricsLevel` to configure topic metrics level
+* Added `MetricsLevel` field to `topictypes.TopicDescription`
+* Bumped `ydb-go-genproto` to expose the `metrics_level` field on topic create/alter/describe protos
+
+## v3.138.3
+* Fixed panic risks in tracing callbacks by separating error and success paths in `spans`/`metrics` and by making internal pool trace types generic-safe.
+* Fixed `ydb.WithStatsMode*` for `database/sql` silently dropping a previously registered stats callback when called more than once on the same context. Repeated calls now chain callbacks (they fire in registration order) and the effective stats mode is the most detailed one across the chain.
+
+## v3.138.2
+* Added an internal query transaction trace field `WithCommit` for spans and logs
+
 ## v3.138.1
 * Moved the trace-generated code in `trace` package from the public API to the internal packages
   This was a backward-incompatible change, but it had been documented in the [versioning policy](VERSIONING.md)

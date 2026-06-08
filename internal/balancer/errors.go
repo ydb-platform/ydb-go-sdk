@@ -34,6 +34,7 @@ var (
 		grpcCodes.ResourceExhausted,
 		grpcCodes.OutOfRange,
 		grpcCodes.OK,
+		grpcCodes.Canceled,
 	}
 	badCodes = xslices.Subtract(xslices.Keys(allCodes), goodCodes)
 )

@@ -22,7 +22,7 @@ func TestResultSetNext(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Run("Next", func(t *testing.T) {
 		t.Run("EmptyResultSet", func(t *testing.T) {
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -62,7 +62,7 @@ func TestResultSetNext(t *testing.T) {
 			}
 		})
 		t.Run("SecondResultSetEmpty", func(t *testing.T) {
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -146,7 +146,7 @@ func TestResultSetNext(t *testing.T) {
 			}
 		})
 		t.Run("IntermediateResultSetEmpty", func(t *testing.T) {
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -288,7 +288,7 @@ func TestResultSetNext(t *testing.T) {
 			}
 		})
 		t.Run("OverTwoParts", func(t *testing.T) {
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -398,7 +398,7 @@ func TestResultSetNext(t *testing.T) {
 		})
 		t.Run("CanceledContext", func(t *testing.T) {
 			childCtx, cancel := context.WithCancel(t.Context())
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -465,7 +465,7 @@ func TestResultSetNext(t *testing.T) {
 			}
 		})
 		t.Run("OperationError", func(t *testing.T) {
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -550,7 +550,7 @@ func TestResultSetNext(t *testing.T) {
 			}
 		})
 		t.Run("TransportError", func(t *testing.T) {
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -729,7 +729,7 @@ func TestResultSetNext(t *testing.T) {
 			}
 		})
 		t.Run("WrongResultSetIndex", func(t *testing.T) {
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
@@ -852,7 +852,7 @@ func TestResultSetNext(t *testing.T) {
 			}
 		})
 	})
-	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream := newExecuteQueryStreamMock(ctrl)
 	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 0,

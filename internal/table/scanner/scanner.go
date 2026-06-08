@@ -521,11 +521,11 @@ func (s *valueScanner) unwrap() {
 func (s *valueScanner) unwrapValue() (v *Ydb.Value) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return nil
 	}
 	if cur.WhichValue() != Ydb.Value_NestedValue_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return nil
 	}
 
@@ -560,11 +560,11 @@ func (s *valueScanner) unwrapDecimal() decimal.Decimal {
 func (s *valueScanner) bool() (v bool) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_BoolValue_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -618,11 +618,11 @@ func (s *valueScanner) uint16() (v uint16) {
 func (s *valueScanner) int32() (v int32) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_Int32Value_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -632,11 +632,11 @@ func (s *valueScanner) int32() (v int32) {
 func (s *valueScanner) uint32() (v uint32) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_Uint32Value_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -646,11 +646,11 @@ func (s *valueScanner) uint32() (v uint32) {
 func (s *valueScanner) int64() (v int64) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_Int64Value_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -660,11 +660,11 @@ func (s *valueScanner) int64() (v int64) {
 func (s *valueScanner) uint64() (v uint64) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_Uint64Value_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -674,11 +674,11 @@ func (s *valueScanner) uint64() (v uint64) {
 func (s *valueScanner) float() (v float32) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_FloatValue_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -688,11 +688,11 @@ func (s *valueScanner) float() (v float32) {
 func (s *valueScanner) double() (v float64) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_DoubleValue_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -702,11 +702,11 @@ func (s *valueScanner) double() (v float64) {
 func (s *valueScanner) bytes() (v []byte) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_BytesValue_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -716,11 +716,11 @@ func (s *valueScanner) bytes() (v []byte) {
 func (s *valueScanner) text() (v string) {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_TextValue_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
@@ -792,11 +792,11 @@ func (s *valueScanner) uuid() uuid.UUID {
 func (s *valueScanner) null() {
 	cur, ok := s.stack.currentValue().(*Ydb.Value)
 	if !ok {
-		s.valueTypeError(nil, nil)
+		s.valueTypeError("type assertion failed", nil)
 		return
 	}
 	if cur.WhichValue() != Ydb.Value_NullFlagValue_case {
-		s.valueTypeError(cur, nil)
+		s.valueTypeError(cur.WhichValue(), nil)
 	}
 }
 

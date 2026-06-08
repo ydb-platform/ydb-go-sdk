@@ -27,6 +27,8 @@ type AlterTopicRequest struct {
 	DropConsumers                        []string
 	AlterConsumers                       []AlterConsumer
 	SetMeteringMode                      MeteringMode
+	SetMetricsLevel                      rawoptional.Uint32
+	ResetMetricsLevel                    bool
 }
 
 func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
@@ -46,17 +48,26 @@ func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
 		res.SetSetSupportedCodecs(req.SetSupportedCodecsValue.ToProto())
 	}
 
-	res.SetAddConsumers(make([]*Ydb_Topic.Consumer, len(req.AddConsumers)))
-	for i := range req.AddConsumers {
-		res.GetAddConsumers()[i] = req.AddConsumers[i].ToProto()
+	if req.SetMetricsLevel.HasValue {
+		res.SetSetMetricsLevel(req.SetMetricsLevel.Value)
 	}
+	if req.ResetMetricsLevel {
+		res.SetResetMetricsLevel(&emptypb.Empty{})
+	}
+
+	consumers := make([]*Ydb_Topic.Consumer, len(req.AddConsumers))
+	for i := range req.AddConsumers {
+		consumers[i] = req.AddConsumers[i].ToProto()
+	}
+	res.SetAddConsumers(consumers)
 
 	res.SetDropConsumers(req.DropConsumers)
 
-	res.SetAlterConsumers(make([]*Ydb_Topic.AlterConsumer, len(req.AlterConsumers)))
+	alterConsumers := make([]*Ydb_Topic.AlterConsumer, len(req.AlterConsumers))
 	for i := range req.AlterConsumers {
-		res.GetAlterConsumers()[i] = req.AlterConsumers[i].ToProto()
+		alterConsumers[i] = req.AlterConsumers[i].ToProto()
 	}
+	res.SetAlterConsumers(alterConsumers)
 
 	return res
 }

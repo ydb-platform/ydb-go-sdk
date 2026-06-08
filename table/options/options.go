@@ -253,7 +253,7 @@ func (cf columnFamilies) ApplyAlterTableOption(d *AlterTableDesc) {
 	for i := range cf {
 		families[i] = cf[i].toYDB()
 	}
-	rd.SetAddColumnFamilies(append(rd.GetAddColumnFamilies(), families...))
+	rd.SetAddColumnFamilies(families)
 }
 
 func (cf columnFamilies) ApplyCreateTableOption(d *CreateTableDesc) {
@@ -262,7 +262,7 @@ func (cf columnFamilies) ApplyCreateTableOption(d *CreateTableDesc) {
 	for i := range cf {
 		families[i] = cf[i].toYDB()
 	}
-	rc.SetColumnFamilies(append(rc.GetColumnFamilies(), families...))
+	rc.SetColumnFamilies(families)
 }
 
 func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {

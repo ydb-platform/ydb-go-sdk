@@ -47,7 +47,7 @@ func warmUp(ctx context.Context, t testing.TB, driver *ydb.Driver) {
 
 // BenchmarkQuery measures query.Client (driver.Query()) against the in-process xsql mock: QueryRow("SELECT 42").
 //
-// BenchmarkQuery-12  107622    10798 ns/op     23994 B/op    398 allocs/op
+// BenchmarkQuery-12		11727 ns/op		22857 B/op		379 allocs/op
 func BenchmarkQuery(b *testing.B) {
 	ctx := b.Context()
 

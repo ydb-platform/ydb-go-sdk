@@ -27,7 +27,7 @@ const twoStatementsSQL = `SELECT 42 AS id; SELECT "hello"u AS hello, "world" AS 
 func TestTwoStatementsScanStruct(t *testing.T) {
 	mockSrv := mock.Server(t)
 
-	openCtx := context.Background()
+	openCtx := t.Context()
 
 	nativeDriver, err := ydb.Open(openCtx, mockSrv.ConnString(),
 		ydb.WithAnonymousCredentials(),
@@ -105,7 +105,7 @@ func TestTwoStatementsScanStruct(t *testing.T) {
 func TestTwoStatementsScanNamed(t *testing.T) {
 	mockSrv := mock.Server(t)
 
-	openCtx := context.Background()
+	openCtx := t.Context()
 
 	nativeDriver, err := ydb.Open(openCtx, mockSrv.ConnString(),
 		ydb.WithAnonymousCredentials(),

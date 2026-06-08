@@ -174,7 +174,7 @@ func TestReadRow(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: Ydb_Query.TransactionMeta_builder{
@@ -216,7 +216,7 @@ func TestReadRow(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: Ydb_Query.TransactionMeta_builder{
@@ -262,7 +262,7 @@ func TestReadRow(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: Ydb_Query.TransactionMeta_builder{
@@ -298,7 +298,7 @@ func TestReadRow(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: Ydb_Query.TransactionMeta_builder{

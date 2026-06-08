@@ -19,37 +19,35 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// TestStreamResultNextResultSet_CtxErrorCancelsStream is a regression test for
-// the inconsistency between streamResult.nextResultSet and streamResult.nextPart
-// when the per-call ctx is cancelled.
-func TestStreamResultNextResultSet_CtxErrorCancelsStream(t *testing.T) {
+// TestStreamResultNextResultSet_CtxErrorDoesNotCancelExecuteStream is a regression test:
+// per-call ctx cancellation must not run executeCancel early or poison lastErr.
+func TestStreamResultNextResultSet_CtxErrorDoesNotCancelExecuteStream(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
 			ResultSet:      &Ydb.ResultSet{},
 		}.Build(), nil)
 
-		var streamCancelCalls atomic.Uint64
-		streamCancel := func() {
-			streamCancelCalls.Add(1)
-		}
+		var onCloseCalls atomic.Uint64
 
-		r, err := newResult(context.Background(), stream, withStreamCancel(streamCancel))
+		r, err := newResult(t.Context(), stream, withStreamResultOnClose(func() {
+			onCloseCalls.Add(1)
+		}))
 		require.NoError(t, err)
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		_, err = r.nextResultSet(cancelledCtx)
 		require.ErrorIs(t, err, context.Canceled)
-		require.EqualValues(t, 1, streamCancelCalls.Load(),
-			"nextResultSet must cancel the gRPC stream on ctx error to stay consistent with nextPart",
+		require.EqualValues(t, 0, onCloseCalls.Load(),
+			"nextResultSet must not run executeCancel on per-call ctx error",
 		)
-		require.ErrorIs(t, r.lastErr, context.Canceled)
+		require.NoError(t, r.lastErr)
 	})
 }
 
@@ -91,7 +89,7 @@ func TestClientCloseCancelsInflightDo(t *testing.T) {
 			t.Fatal("Do user op never started; setup is broken")
 		}
 
-		require.NoError(t, c.Close(context.Background()))
+		require.NoError(t, c.Close(t.Context()))
 
 		select {
 		case err := <-doDone:
@@ -162,7 +160,7 @@ func TestClientCloseCancelsInflightDoTx(t *testing.T) {
 			t.Fatal("DoTx user op never started; setup is broken")
 		}
 
-		require.NoError(t, c.Close(context.Background()))
+		require.NoError(t, c.Close(t.Context()))
 
 		select {
 		case err := <-doDone:
@@ -245,7 +243,7 @@ func TestClientCloseCancelsRegisteredCloseGoroutine(t *testing.T) {
 			registerCloseCancel: c.registerCloseCancel,
 		}
 
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancelledCtx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		require.NoError(t, core.Close(cancelledCtx))
@@ -256,7 +254,7 @@ func TestClientCloseCancelsRegisteredCloseGoroutine(t *testing.T) {
 			t.Fatal("registered deleteSession goroutine never started")
 		}
 
-		require.NoError(t, c.Close(context.Background()))
+		require.NoError(t, c.Close(t.Context()))
 
 		require.Eventually(t, func() bool {
 			return len(c.closed.Get().cancels) == 0

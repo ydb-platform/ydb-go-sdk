@@ -152,7 +152,7 @@ func (s *Session) Begin(
 		}, nil
 	}
 
-	txID, err := begin(ctx, s.client, s.ID(), txSettings)
+	txID, err := begin(ctx, s, txSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

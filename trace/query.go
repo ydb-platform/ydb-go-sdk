@@ -61,6 +61,17 @@ type (
 		OnSessionQueryRow func(QuerySessionQueryRowStartInfo) func(QuerySessionQueryRowDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnSessionBegin func(QuerySessionBeginStartInfo) func(info QuerySessionBeginDoneInfo)
+
+		// OnSessionBeginTransaction fires only for an actual
+		// QueryService.BeginTransaction RPC (eager transactions and
+		// Tx.UnLazy). Lazy transactions started via DoTx do not produce
+		// this event because they fuse the begin into the first
+		// ExecuteQuery RPC.
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnSessionBeginTransaction func(
+			QuerySessionBeginTransactionStartInfo,
+		) func(QuerySessionBeginTransactionDoneInfo)
+
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnTxCommit func(QueryTxCommitStartInfo) func(info QueryTxCommitDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -187,9 +198,11 @@ type (
 		Context *context.Context
 		Call    Call
 
-		Tx    TxInfo
-		Query string
-		Label string
+		Tx         TxInfo
+		Session    SessionInfo
+		Query      string
+		Label      string
+		WithCommit bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryResultSetDoneInfo struct {
@@ -236,9 +249,11 @@ type (
 		Context *context.Context
 		Call    Call
 
-		Tx    TxInfo
-		Query string
-		Label string
+		Tx         TxInfo
+		Session    SessionInfo
+		Query      string
+		Label      string
+		WithCommit bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryRowDoneInfo struct {
@@ -331,10 +346,11 @@ type (
 		Context *context.Context
 		Call    Call
 
-		Session SessionInfo
-		Tx      TxInfo
-		Query   string
-		Label   string
+		Session    SessionInfo
+		Tx         TxInfo
+		Query      string
+		Label      string
+		WithCommit bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxExecDoneInfo struct {
@@ -381,10 +397,11 @@ type (
 		Context *context.Context
 		Call    Call
 
-		Session SessionInfo
-		Tx      TxInfo
-		Query   string
-		Label   string
+		Session    SessionInfo
+		Tx         TxInfo
+		Query      string
+		Label      string
+		WithCommit bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxQueryDoneInfo struct {
@@ -418,6 +435,28 @@ type (
 	QuerySessionBeginDoneInfo struct {
 		Error error
 		Tx    TxInfo
+	}
+	// QuerySessionBeginTransactionStartInfo carries the context for an
+	// actual QueryService.BeginTransaction RPC.
+	//
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QuerySessionBeginTransactionStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    Call
+
+		Session SessionInfo
+	}
+	// QuerySessionBeginTransactionDoneInfo carries the outcome of an actual
+	// QueryService.BeginTransaction RPC.
+	//
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QuerySessionBeginTransactionDoneInfo struct {
+		Error error
+		TxID  string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryResultNewStartInfo struct {

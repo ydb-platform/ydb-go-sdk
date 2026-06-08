@@ -204,6 +204,10 @@ type TopicDescription struct {
 	Attributes                        map[string]string
 	Consumers                         []Consumer
 	MeteringMode                      MeteringMode
+
+	// MetricsLevel reports the metrics level configured for the topic.
+	// A nil value means the topic uses the database default.
+	MetricsLevel *uint32
 }
 
 // FromRaw convert from public format to internal. Used internally only.
@@ -239,6 +243,13 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	}
 
 	d.MeteringMode.FromRaw(raw.MeteringMode)
+
+	if raw.MetricsLevel.HasValue {
+		level := raw.MetricsLevel.Value
+		d.MetricsLevel = &level
+	} else {
+		d.MetricsLevel = nil
+	}
 }
 
 // PartitionInfo contains info about partition.

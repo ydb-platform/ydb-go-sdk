@@ -61,9 +61,11 @@ func TestCreateSession(t *testing.T) {
 			SessionId: "123",
 		}.Build(), nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+		stubAttachStreamContext(attachStream)
 		attachStream.EXPECT().Recv().Return(Ydb_Query.SessionState_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-		}.Build(), nil).AnyTimes()
+		}.Build(), nil)
+		attachStream.EXPECT().Recv().Return(nil, errSessionClosed).AnyTimes()
 		client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 			SessionId: "123",
 		}.Build()).Return(attachStream, nil)

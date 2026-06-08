@@ -53,8 +53,8 @@ func TestConn(t *testing.T) {
 			cc.EXPECT().Invoke(
 				gomock.Any(),
 				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
-				&Ydb_Discovery.WhoAmIRequest{},
-				&Ydb_Discovery.WhoAmIResponse{},
+				gomock.Any(),
+				gomock.Any(),
 				gomock.Any(),
 			).DoAndReturn(func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 				res, ok := reply.(*Ydb_Discovery.WhoAmIResponse)
@@ -84,8 +84,8 @@ func TestConn(t *testing.T) {
 			cc.EXPECT().Invoke(
 				gomock.Any(),
 				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
-				&Ydb_Discovery.WhoAmIRequest{},
-				&Ydb_Discovery.WhoAmIResponse{},
+				gomock.Any(),
+				gomock.Any(),
 				gomock.Any(),
 			).Return(expectedErr)
 			client := Ydb_Discovery_V1.NewDiscoveryServiceClient(&connMock{
@@ -105,8 +105,8 @@ func TestConn(t *testing.T) {
 			cc.EXPECT().Invoke(
 				gomock.Any(),
 				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
-				&Ydb_Discovery.WhoAmIRequest{},
-				&Ydb_Discovery.WhoAmIResponse{},
+				gomock.Any(),
+				gomock.Any(),
 				gomock.Any(),
 			).Return(grpcStatus.Error(grpcCodes.Canceled, "rpc canceled"))
 
@@ -127,8 +127,8 @@ func TestConn(t *testing.T) {
 				cc.EXPECT().Invoke(
 					gomock.Any(),
 					Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
-					&Ydb_Discovery.WhoAmIRequest{},
-					&Ydb_Discovery.WhoAmIResponse{},
+					gomock.Any(),
+					gomock.Any(),
 					gomock.Any(),
 				).DoAndReturn(func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 					res, ok := reply.(*Ydb_Discovery.WhoAmIResponse)
@@ -156,8 +156,8 @@ func TestConn(t *testing.T) {
 				cc.EXPECT().Invoke(
 					gomock.Any(),
 					Ydb_Query_V1.QueryService_BeginTransaction_FullMethodName,
-					&Ydb_Query.BeginTransactionRequest{},
-					&Ydb_Query.BeginTransactionResponse{},
+					gomock.Any(),
+					gomock.Any(),
 					gomock.Any(),
 				).DoAndReturn(func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 					res, ok := reply.(*Ydb_Query.BeginTransactionResponse)
