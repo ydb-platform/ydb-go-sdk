@@ -35,5 +35,3 @@ require (
 )
 
 retract v3.67.1 // decimal broken https://github.com/ydb-platform/ydb-go-sdk/issues/1234
-
-replace github.com/ydb-platform/ydb-go-genproto => ../ydb-go-genproto
