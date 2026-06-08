@@ -1,5 +1,8 @@
 * Added `topicoptions.WithWriterDirectWrite(bool)` and `topicoptions.WithMultiWriterDirectWrite(bool)` options to send topic writes to the node that hosts the target partition, bypassing the topic proxy
 
+## v3.139.6
+* Fixed panics in built-in trace handlers (`spans`, `log`, and `metrics`) when callback info contains typed-nil interfaces (for example, nil `SessionInfo` or `TxInfo`) or nil context pointers
+
 ## v3.139.5
 * Fixed panic and data race in `TopicListener` when partition workers were closed while the read stream still delivered messages: `internal/xsync.UnboundedChan` no longer closes its signal channel on shutdown, stop the read loop before closing partition workers, and ignore routed messages after listener shutdown starts
 
